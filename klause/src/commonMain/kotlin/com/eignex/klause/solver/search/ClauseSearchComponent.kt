@@ -35,6 +35,31 @@ class ClauseSearchComponent(clauses: Iterable<Clause>) :
         drain()
     }
 
+    internal fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> = sequence {
+        var visits = 0
+        for (clause in sourceClauses) {
+            for (literal in clause) {
+                if (context.atomLiteral(SearchDecision.Bool(literal)) == null) {
+                    yield(ComponentResult.Indeterminate)
+                    return@sequence
+                }
+                if (++visits % INITIALIZATION_BATCH_SIZE == 0) yield(null)
+            }
+        }
+        for (literals in sourceClauses) {
+            val result = withContext(context) {
+                val index = store.add(literals.copyOf(), lbd = literals.size)
+                if (index < 0) ComponentResult.Consistent else store.attach(index, this)
+            }
+            if (result !is ComponentResult.Consistent) {
+                yield(result)
+                return@sequence
+            }
+            if (++visits % INITIALIZATION_BATCH_SIZE == 0) yield(null)
+        }
+        yield(withContext(context) { drain() })
+    }.iterator()
+
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
         if (decision !is SearchDecision.Bool) return ComponentResult.Consistent
         return withContext(context) {
@@ -101,8 +126,12 @@ class ClauseSearchComponent(clauses: Iterable<Clause>) :
     private inline fun withContext(context: SearchContext, body: () -> ComponentResult): ComponentResult {
         val previous = active
         active = context
-        val result = body()
-        active = previous
-        return result
+        return try {
+            body()
+        } finally {
+            active = previous
+        }
     }
 }
+
+private const val INITIALIZATION_BATCH_SIZE = 256

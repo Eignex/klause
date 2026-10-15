@@ -4,8 +4,43 @@ import com.eignex.klause.factor.bool.Clause
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ClauseSearchComponentTest {
+    @Test
+    fun `cooperative clause installation retains implications across pauses`() {
+        val count = 513
+        val clauses = listOf(Clause(intArrayOf(0))) + List(count) { index ->
+            Clause(intArrayOf((index shl 1) xor 1, (index + 1) shl 1))
+        }
+        val component = ClauseSearchComponent(clauses)
+        val session = SearchSession(listOf(component))
+        val pending = session.prepareInitialization { _, context -> component.prepareInitialization(context) }
+        var result: ComponentResult? = null
+        var pauses = 0
+
+        while (result == null) {
+            result = pending.next()
+            if (result == null) pauses++
+        }
+
+        assertIs<ComponentResult.Consistent>(result)
+        assertTrue(pauses > 1)
+        assertEquals(true, session.boolValue(count))
+    }
+
+    @Test
+    fun `cooperative validation rejects an unknown literal before publishing a prefix`() {
+        val component = ClauseSearchComponent(listOf(Clause(intArrayOf(0)), Clause(intArrayOf(2))))
+        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+        val pending = session.prepareInitialization { _, context -> component.prepareInitialization(context) }
+
+        val result = pending.next()
+
+        assertIs<ComponentResult.Indeterminate>(result)
+        assertNull(session.boolValue(0))
+    }
 
     @Test
     fun `widely separated watched identifiers retain their implications`() {

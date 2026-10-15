@@ -4,14 +4,17 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.search.AssembledSearchModel
 import com.eignex.klause.solver.search.BooleanBranching
+import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.HeuristicBooleanBranching
+import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchBoolValue
 import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchDecision
@@ -49,6 +52,7 @@ internal class RetainedLinearQueries(
     private val state = OpenTheorySolveState(params)
     private val scope = ConditionedQueryScope(params.timeout or params.cancellation)
     private var planned: PlannedSearch? = null
+    private var preparing: LinearRootPreparation? = null
     private var sourceRefuted = false
     private var checking = false
     private var closed = false
@@ -155,26 +159,47 @@ internal class RetainedLinearQueries(
     @Suppress("TooGenericExceptionCaught") // Invocation cleanup preserves an arbitrary primary failure.
     private fun prepared(): PlannedSearch? {
         planned?.let { return it }
-        val created = open(scope.stop, state) ?: return null
-        var retained = false
-        var failure: Throwable? = null
         try {
-            created.session.bindOpenTheoryWork(state.work)
-            when (created.session.initialize()) {
-                ComponentResult.Consistent -> if (!scope.stop()) {
-                    planned = created
-                    retained = true
-                    return created
+            val current = preparing ?: run {
+                val created = open(scope.stop, state) ?: return null
+                LinearRootPreparation(created).also {
+                    preparing = it
+                    created.session.bindOpenTheoryWork(state.work)
                 }
-                is ComponentResult.Conflict -> sourceRefuted = true
-                ComponentResult.Indeterminate -> Unit
+            }
+            if (current.search.cp?.session?.fixpointCancelled == true) {
+                preparing = null
+                current.search.close()
+                return null
+            }
+            while (!scope.stop() && !exhausted) {
+                when (current.advance()) {
+                    null -> Unit
+                    ComponentResult.Consistent -> {
+                        if (scope.stop()) return null
+                        preparing = null
+                        planned = current.search
+                        return current.search
+                    }
+                    is ComponentResult.Conflict -> {
+                        preparing = null
+                        sourceRefuted = true
+                        current.search.close()
+                        return null
+                    }
+                    ComponentResult.Indeterminate -> {
+                        preparing = null
+                        current.search.close()
+                        return null
+                    }
+                }
             }
             return null
         } catch (primary: Throwable) {
-            failure = primary
+            val failed = preparing
+            preparing = null
+            failed?.search?.closeAfter(primary)
             throw primary
-        } finally {
-            if (!retained) created.closeAfter(failure)
         }
     }
 
@@ -273,14 +298,29 @@ internal class RetainedLinearQueries(
     override fun close() {
         if (closed) return
         closed = true
-        val search = planned
+        val search = planned ?: preparing?.search
         planned = null
+        preparing = null
         val resources = SearchInvocationResources()
         search?.let(resources::own)
         resources.own(AutoCloseable { state.capture(search?.session) })
         resources.own(scope)
         resources.close()
     }
+}
+
+private class LinearRootPreparation(val search: PlannedSearch) {
+    private val initialization = search.session.prepareInitialization { component, context ->
+        when (component) {
+            is CpSearchComponent -> component.prepareInitialization(context)
+            is ClauseSearchComponent -> component.prepareInitialization(context)
+            is PreparingSearchComponent -> component.prepareInitialization(context)
+            else -> sequence { yield(component.initialize(context)) }.iterator()
+        }
+    }
+    private var result: ComponentResult? = null
+
+    fun advance(): ComponentResult? = result ?: initialization.next().also { result = it }
 }
 
 private fun ComponentResult.result(): ExactNeighborhoodResult = when (this) {

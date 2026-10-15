@@ -658,6 +658,15 @@ candidate's delta against the same containing ledger. Workers share immutable
 planning data, and each worker owns its mutable completion. Operation and handle
 closure dispose the private arithmetic state.
 
+Before applying any query pins, the linear owner can pause shared root
+initialization between component preparation steps. It retains the private search
+and its initialization cursor, but exposes root values only after initialization
+and shared propagation complete. A sibling query resumes that unconditioned cursor
+under its own invocation token and the same containing work ledger. Atomic numerical
+initialization that returns indeterminate, or an interrupted finite constructor,
+discards the incomplete root. Closing the owner explicitly releases partial search
+resources; abandoning a suspended iterator cannot perform that cleanup.
+
 [Theory contracts](../theories.md) define the supported graph, linear and polynomial
 checks. Their source semantics and resource ledgers remain authoritative across
 candidate retries. Completion coordinates are distinct from the finite factors

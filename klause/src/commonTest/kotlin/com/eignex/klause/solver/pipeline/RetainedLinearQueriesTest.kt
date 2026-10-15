@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchLearnedDbParams
@@ -17,10 +18,139 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class RetainedLinearQueriesTest {
+    @Test
+    fun `a paused root resumes before applying a sibling condition`() {
+        val source = Problem(1, 0, emptyArray(), emptyArray())
+        var paused = false
+        var openings = 0
+        var initializations = 0
+        val registration = PreparedSearchRegistration(source, ExecutionComponentDescriptor("root",
+            ComponentResponsibility.BOOLEAN, emptyList(), emptyList(), emptyList())) {
+            openings++
+            listOf(object : PreparingSearchComponent {
+                override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> = sequence {
+                    initializations++
+                    assertTrue(context.consumeCheck())
+                    paused = true
+                    yield(null)
+                    yield(context.publish(Lit.make(0, true)))
+                }.iterator()
+            })
+        }
+        val prepared = PreparedSearchRegistrations(source, listOf(registration))
+        val queries = RetainedLinearQueries(source, TheoryParams(), null) { stop, _ ->
+            prepared.open(Long.MAX_VALUE, stop, SearchLearnedDbParams(), null, null)
+        }
+
+        queries.use {
+            val contrary = ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap())
+            assertIs<ExactNeighborhoodResult.Undecided>(it.check(contrary, Cancellation { paused }))
+            assertNull(it.rootBooleanValue(0))
+            val spent = it.work
+            assertTrue(spent > 0)
+            assertTrue(it.prepareBooleanCenter(Cancellation.Never))
+
+            assertEquals(1, openings)
+            assertEquals(1, initializations)
+            assertEquals(spent, it.work)
+            assertEquals(true, it.rootBooleanValue(0))
+            assertIs<ExactNeighborhoodResult.Refuted>(it.check(contrary, Cancellation.Never))
+            assertEquals(true, it.rootBooleanValue(0))
+        }
+    }
+
+    @Test
+    fun `closing a paused root releases its suspended component once`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        var paused = false
+        var closed = 0
+        var completed = false
+        val registration = PreparedSearchRegistration(source, ExecutionComponentDescriptor("root",
+            ComponentResponsibility.BOOLEAN, emptyList(), emptyList(), emptyList())) {
+            listOf(object : PreparingSearchComponent, AutoCloseable {
+                override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> = sequence {
+                    paused = true
+                    yield(null)
+                    completed = true
+                    yield(ComponentResult.Consistent)
+                }.iterator()
+                override fun close() { closed++ }
+            })
+        }
+        val prepared = PreparedSearchRegistrations(source, listOf(registration))
+        val queries = RetainedLinearQueries(source, TheoryParams(), null) { stop, _ ->
+            prepared.open(Long.MAX_VALUE, stop, SearchLearnedDbParams(), null, null)
+        }
+        assertFalse(queries.prepareBooleanCenter(Cancellation { paused }))
+
+        queries.close()
+        queries.close()
+
+        assertEquals(1, closed)
+        assertFalse(completed)
+    }
+
+    @Test
+    fun `an indeterminate initializer is discarded before a sibling root`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        var openings = 0
+        var closed = 0
+        val registration = PreparedSearchRegistration(source, ExecutionComponentDescriptor("root",
+            ComponentResponsibility.BOOLEAN, emptyList(), emptyList(), emptyList())) {
+            val decline = openings++ == 0
+            listOf(object : SearchComponent, AutoCloseable {
+                override fun initialize(context: SearchContext): ComponentResult =
+                    if (decline) ComponentResult.Indeterminate else ComponentResult.Consistent
+                override fun close() { closed++ }
+            })
+        }
+        val prepared = PreparedSearchRegistrations(source, listOf(registration))
+        val queries = RetainedLinearQueries(source, TheoryParams(), null) { stop, _ ->
+            prepared.open(Long.MAX_VALUE, stop, SearchLearnedDbParams(), null, null)
+        }
+
+        queries.use {
+            assertFalse(it.prepareBooleanCenter(Cancellation.Never))
+            assertEquals(1, closed)
+            assertTrue(it.prepareBooleanCenter(Cancellation.Never))
+            assertEquals(2, openings)
+        }
+        assertEquals(2, closed)
+    }
+
+    @Test
+    fun `cancellation at completed initialization does not replay the root`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        var paused = false
+        var initializations = 0
+        val registration = PreparedSearchRegistration(source, ExecutionComponentDescriptor("root",
+            ComponentResponsibility.BOOLEAN, emptyList(), emptyList(), emptyList())) {
+            listOf(object : SearchComponent {
+                override fun initialize(context: SearchContext): ComponentResult {
+                    initializations++
+                    paused = true
+                    return ComponentResult.Consistent
+                }
+            })
+        }
+        val prepared = PreparedSearchRegistrations(source, listOf(registration))
+        val queries = RetainedLinearQueries(source, TheoryParams(), null) { stop, _ ->
+            prepared.open(Long.MAX_VALUE, stop, SearchLearnedDbParams(), null, null)
+        }
+
+        queries.use {
+            assertFalse(it.prepareBooleanCenter(Cancellation { paused }))
+            assertTrue(it.prepareBooleanCenter(Cancellation.Never))
+
+            assertEquals(1, initializations)
+        }
+    }
+
     @Test
     fun `generated center preparation preserves cancellation and one root opening`() {
         val source = Problem(1, 0, emptyArray(), emptyArray())

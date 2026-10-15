@@ -81,7 +81,7 @@ object CompletionInitializationProfile {
         private val adapter = Class.forName("com.eignex.klause.solver.pipeline.OpenExactNeighborhood")
         private val condition = Class.forName("com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition")
         private val constructor = adapter.getDeclaredConstructor(Problem::class.java, TheoryParams::class.java,
-            LinearObjective::class.java, PreparedSourcePlan::class.java)
+            LinearObjective::class.java, PreparedSourcePlan::class.java, kotlin.jvm.functions.Function0::class.java)
         private val conditionConstructor = condition.getDeclaredConstructor(Map::class.java, Map::class.java,
             Map::class.java, BigFraction::class.java)
         private val check = adapter.getMethod("check", condition, Cancellation::class.java)
@@ -97,7 +97,7 @@ object CompletionInitializationProfile {
             2 to BigFraction.ofLong(3).reciprocal(), 3 to BigFraction.ofLong(9).reciprocal())
         private val query = conditionConstructor.newInstance(emptyMap<Int, Boolean>(), pins, pins, null)
 
-        fun open(model: Problem): Any = constructor.newInstance(model, TheoryParams(), null, null)
+        fun open(model: Problem): Any = constructor.newInstance(model, TheoryParams(), null, null, { null })
         fun check(owner: Any, stop: Cancellation): Any = check.invoke(owner, query, stop)
         fun close(owner: Any) { close.invoke(owner) }
         fun work(owner: Any): Long = work.invoke(owner) as Long
