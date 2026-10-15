@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.FloatBucketing
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.reifyRealLinear
 import com.eignex.klause.lowering.tseitinOr
