@@ -287,8 +287,8 @@ run before ordinary family selection, choosing the least elapsed available sibli
 Initial admission and explicit minimum shares retain precedence. Coverage can interrupt
 preparation revisits without closing or restarting their retained cursors.
 Retired, deferred and auxiliary proof workers supply no coverage debt; paused handles
-retain their elapsed credit. A first accepted incumbent ends this floor. Dedicated
-lanes, segment deadlines and containing work/native allowances retain their controls.
+retain their elapsed credit. An accepted incumbent ends this floor at installation;
+the ordinary reward phase settles with its producing segment. Dedicated lanes, segment deadlines and containing work/native allowances retain their controls.
 The lag and cooperative segment overspend bound the opportunity guarantee; no fixed
 number of milliseconds or result is promised to an individual worker. Work bounds keep
 each segment's stopping point stable for the same incoming state. Elapsed coverage can
