@@ -3,6 +3,8 @@ package com.eignex.klause.bench.metric
 import java.math.BigInteger
 
 internal object ExactFlatZincValidation {
+    private val powerPredicates = setOf("int_pow", "int_pow_fixed", "klause_int_pow", "float_pow", "klause_float_pow")
+
     private sealed interface Value {
         data class Number(val value: ExactObjective) : Value
         data class Bool(val value: Boolean) : Value
@@ -172,7 +174,7 @@ internal object ExactFlatZincValidation {
             }
             val base = name.removeSuffix("_reif").removeSuffix("_imp")
             val arity = if ("_lin_" in base || base.endsWith("_times") ||
-                base.endsWith("_plus") || base == "float_div"
+                base.endsWith("_plus") || base == "float_div" || base in powerPredicates
             ) {
                 3
             } else {
@@ -212,7 +214,7 @@ internal object ExactFlatZincValidation {
                     }
                 }
 
-                "int_pow", "int_pow_fixed", "klause_int_pow", "float_pow", "klause_float_pow" ->
+                in powerPredicates ->
                     powerMatches(numeric(args[0]), numeric(args[1]), numeric(args[2]))
 
                 "float_times", "int_times" ->
