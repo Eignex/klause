@@ -459,7 +459,7 @@ fun Problem.componentPlan(
             differenceDecline = EncoderDecline.RESOURCE
             null
         }
-        !initialResourceDecline && difference != null && differenceKept.size == factors.size -> {
+        !initialResourceDecline && difference != null && kept.size == factors.size -> {
             cancellation.charge(1)
             if (cancellation()) {
                 preparationStopped = true

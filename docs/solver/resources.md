@@ -343,7 +343,10 @@ construction token; rewritten or conditioned relations receive their current con
 Component planning charges one consultation unit to the same containing token before
 reusing each completed full-source target installation. Its ordered-subset size check
 does not scan or copy installed relations. Earlier installation charges remain spent;
-skipped repeated construction incurs no construction charge. An initial target's resource
+skipped repeated construction incurs no construction charge. Reuse can retain shared
+Boolean clause relations in a full difference installation without changing their
+primary owner; complete checks still visit these redundant relations. An omitted
+nonparticipating finite factor requires fresh subset installation. An initial target's resource
 decline disables reuse in that call; fresh installation retains per-target decline and
 fallback semantics. Cancellation observed by a reuse consultation stops the remaining
 target preparation and retains an explicit resource cause even if a predicate token
