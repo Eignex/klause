@@ -24,9 +24,13 @@ class LinearIndicator(
 
     override fun remap(mapping: VarRemap): Factor = LinearIndicator(mapping.int(indicator), whenOne, row.remap(mapping))
 
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LINEAR_INDICATOR) {
-        int(indicator)
+    override fun structuralKey(): StructuralKey = key()
+
+    override fun remapStructuralHash(mapping: VarRemap): Int = key(mapping).hashCode()
+
+    private fun key(mapping: VarRemap? = null): StructuralKey = StructuralKey.of(FactorKind.LINEAR_INDICATOR) {
+        int(mapping?.int(indicator) ?: indicator)
         bool(whenOne)
-        ints(row.structuralKey().toString().map { it.code }.toIntArray())
+        ints(row.key(mapping).toString().map { it.code }.toIntArray())
     }
 }

@@ -16,6 +16,8 @@ import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.ir.WideConsts
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.plus
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.div
 import com.eignex.klause.util.gcd
@@ -51,10 +53,32 @@ class ExactLinear private constructor(
         coefficients.map { BigFraction.of(it, BIG_ONE) }, relation, BigFraction.of(rhs, BIG_ONE),
     )
 
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.EXACT_LINEAR) {
-        ints(references)
-        enum(relation)
-        for (value in coefficients + rhs) ints(value.toString().map { it.code }.toIntArray())
+    override fun structuralKey(): StructuralKey = key()
+
+    override fun remapStructuralHash(mapping: VarRemap): Int = key(mapping).hashCode()
+
+    internal fun key(mapping: VarRemap? = null): StructuralKey {
+        val terms = LinkedHashMap<Pair<Boolean, Int>, BigInt>()
+        for (index in references.indices) {
+            val reference = references[index]
+            val real = Term.isReal(reference)
+            val id = if (real) Term.realVar(reference) else Term.intVar(reference)
+            val image = if (real) mapping?.real(id) ?: id else mapping?.int(id) ?: id
+            val coordinate = real to image
+            terms[coordinate] = (terms[coordinate] ?: BIG_ZERO) + coefficients[index]
+        }
+        val kept = terms.filterValues { it != BIG_ZERO }
+            .entries.sortedWith(compareBy({ it.key.first }, { it.key.second }))
+        return StructuralKey.of(FactorKind.EXACT_LINEAR) {
+            enum(relation)
+            ints(rhs.toString().map { it.code }.toIntArray())
+            int(kept.size)
+            for ((coordinate, coefficient) in kept) {
+                bool(coordinate.first)
+                int(coordinate.second)
+                ints(coefficient.toString().map { it.code }.toIntArray())
+            }
+        }
     }
 
     /** Exact source construction; positive denominator clearing preserves the comparison direction. */
