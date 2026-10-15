@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.IntDomain
@@ -24,6 +25,64 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LocalSearchStateTest {
+    @Test
+    fun `defined output writes preserve the source tabu window`() {
+        for (positive in listOf(false, true)) {
+            val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, !positive), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, positive), Lit.make(1, false))),
+            ))
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+                BoolFoldDefinition(1, intArrayOf(Lit.make(0, positive)), true),
+            )))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+            state.invariants = sweep.network(0, 2)
+            sweep.sweep(state.assignment, state.rootDomains)
+            state.recompute()
+
+            state.apply(Move.BoolFlip(0))
+
+            assertTrue(state.tabu.isTaboo(Move.BoolFlip(0), tenure = 1))
+        }
+    }
+
+    @Test
+    fun `compound intermediate costs do not set the best committed cost`() {
+        val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+        ))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.recompute()
+
+        state.apply(Move.Compound(listOf(Move.BoolFlip(0), Move.BoolFlip(1))))
+
+        assertEquals(1L, state.cost)
+        assertEquals(1L, state.bestCostSeen)
+    }
+
+    @Test
+    fun `definition intermediate costs do not set the best committed cost`() {
+        val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(0, true))),
+            Clause(intArrayOf(Lit.make(1, true))), Clause(intArrayOf(Lit.make(1, true))),
+        ))
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+        )))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.invariants = sweep.network(0, 2)
+        sweep.sweep(state.assignment, state.rootDomains)
+        state.recompute()
+
+        state.apply(Move.BoolFlip(0))
+
+        assertEquals(2L, state.cost)
+        assertEquals(2L, state.bestCostSeen)
+    }
+
     @Test
     fun `scaled maintained literal channels backsolve exact binary targets`() {
         for ((bound, outputCoefficient) in listOf(0 to 1L, 1 to 1L, 0 to -1L, 1 to -1L)) {

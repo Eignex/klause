@@ -256,6 +256,7 @@ class LocalSearchState private constructor(
     // any conf-change marks would have to be reverted anyway.
     private var probeActive = false
     private var activityTracking = true
+    private var trackedMoveStarted = false
 
     // Repair keeps payloads and scores current, but its transient activity epoch is discarded.
     internal fun repairInitialization(repair: () -> Unit) {
@@ -455,8 +456,10 @@ class LocalSearchState private constructor(
     fun apply(move: Move) {
         check(!probeActive && !moveActive) { "local-search moves cannot be nested" }
         moveActive = true
+        trackedMoveStarted = false
         try {
             apply(move, null)
+            if (cost < bestCostSeen) bestCostSeen = cost
         } finally {
             moveActive = false
         }
@@ -893,15 +896,17 @@ class LocalSearchState private constructor(
         refresh()
         settle()
         if (activityTracking) {
+            if (!trackedMoveStarted) {
+                tabu.step++
+                trackedMoveStarted = true
+            }
             if (!probeActive) {
                 markNeighborConfChange(touchedFactors)
                 markMovedVar()
             }
-            tabu.step++
             tabu.lastTouched[slot] = tabu.step
             if (tabu.touchCount[slot] < Int.MAX_VALUE) tabu.touchCount[slot]++
         }
-        if (cost < bestCostSeen) bestCostSeen = cost
     }
 
     // Brute-force factors subtract their pre-move break/make contributions; incremental factors fold the whole
