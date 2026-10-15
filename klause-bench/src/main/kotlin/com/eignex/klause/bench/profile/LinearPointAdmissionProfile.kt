@@ -43,8 +43,11 @@ internal object LinearPointAdmissionProfile {
         val compiled = SmtLib.parse(bytes.decodeToString())
         require(compiled.objective == null) { "only satisfaction openings are supported" }
         val params = TheoryParams(timeout = stop, randomSeed = 3)
-        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(compiled.model))
         // Internal admission inspection stays outside the published solver API.
+        val factory = OpenTheoryPipeline.javaClass.declaredMethods.single {
+            it.name.startsWith("engineFor") && it.parameterCount == 1
+        }
+        val engine = requireNotNull(factory.invoke(OpenTheoryPipeline, OpenTheoryRequest(compiled.model)))
         val stateType = Class.forName("com.eignex.klause.solver.pipeline.OpenTheorySolveState")
         val state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
         val begin = engine.javaClass.declaredMethods.single { it.name.startsWith("begin") && it.parameterCount == 3 }
