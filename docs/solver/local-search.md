@@ -82,7 +82,8 @@ reset remain atomic outside the retained initial buffer/assignment/definition cu
 
 Maintained integer absolute-value outputs backsolve independent repair targets into
 both signs of their operand. Adjacent absolute-value definitions are followed through
-at most sixteen nodes; negative intermediate magnitudes decline. Every target must
+at most sixteen nodes; negative intermediate magnitudes decline. Nested calls through
+other repair helpers share a sixteen-call absolute-value nesting limit. Every target must
 belong to its root domain and pass the sink's frozen and implicit-owner filters.
 Terminal operands use the existing channeling, affine, Element and extremum repairs.
 These proposals change searched inputs and let the definition network recompute outputs.
