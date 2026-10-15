@@ -18,6 +18,7 @@ import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.parseBigInt
 import kotlin.math.abs
 import kotlin.math.floor
@@ -213,17 +214,35 @@ private fun requireExactMpsSource(compiled: MpsCompiled) {
     }
 }
 
-/** Render a float solution: integer columns exactly, continuous columns as the shortest decimal of their double. */
-private fun renderMpsFloat(compiled: MpsCompiled, sample: Sample): String = buildString {
-    append("v")
-    for (column in compiled.columns) {
-        val value = if (column.real) {
-            sample.approximateRealValue(column.id).toString()
-        } else {
-            sample.intValue(column.id).toString()
+internal fun renderMpsFloat(compiled: MpsCompiled, sample: Sample): String {
+    checkedIntegralMpsFloat(compiled, sample)?.let { return renderMpsWitness(compiled, it) }
+    return buildString {
+        append("v")
+        for (column in compiled.columns) {
+            val value = if (column.real) {
+                sample.approximateRealValue(column.id).toString()
+            } else {
+                sample.intValue(column.id).toString()
+            }
+            append(" ${column.name}=$value")
         }
-        append(" ${column.name}=$value")
     }
+}
+
+private fun checkedIntegralMpsFloat(compiled: MpsCompiled, sample: Sample): MpsSourceWitness? {
+    if (!compiled.sourceExact || compiled.columns.size > 4096 || sample.reals.size > 4096 ||
+        sample.reals.none { it != 0.0 && abs(it) <= 1e-12 }
+    ) return null
+    val values = sample.reals.map { value ->
+        if (!value.isFinite()) return null
+        if (abs(value) <= 1e-12) BigFraction.ZERO else {
+            val exact = BigFraction.ofDouble(value) ?: return null
+            if (exact.den != BIG_ONE || !exact.num.fitsLong()) return null
+            exact
+        }
+    }
+    val witness = compiled.sourceWitnessOrNull(sample.ints, values, maxEntries = 32768) ?: return null
+    return witness.takeIf { it.objective == compiled.sourceObjective(sample.ints, sample.reals) }
 }
 
 /** Render an MPS solution line: `v name=value` per column, a continuous column shown as its LP value. */
