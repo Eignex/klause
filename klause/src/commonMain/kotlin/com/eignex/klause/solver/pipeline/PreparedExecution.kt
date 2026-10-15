@@ -54,7 +54,8 @@ internal val PreparedExecution.finiteLinear: PreparedExecution.FiniteLinear? get
 internal val PreparedExecution.polynomial: PreparedExecution.Polynomial? get() = when (this) {
     is PreparedExecution.Polynomial -> this
     is PreparedExecution.Declined -> retained as? PreparedExecution.Polynomial
-    is PreparedExecution.FiniteLinear, is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
+    is PreparedExecution.FiniteLinear, is PreparedExecution.NonlinearInteger,
+    is PreparedExecution.Transcendental -> null
 }
 
 internal val PreparedExecution.kind: PreparedExecutionKind get() = when (this) {

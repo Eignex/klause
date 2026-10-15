@@ -963,7 +963,8 @@ class PreparedSourcePlanTest {
         assertEquals(PreparedExecutionKind.TRANSCENDENTAL, operation.kind)
         assertTrue(operation.capabilities.admission(FiniteEngine.BACKTRACK).runnable)
         assertEquals(ExecutionDeclineCause.OPERATION_SURFACE,
-            operation.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE).declines.single().cause)
+            operation.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE)
+                .declines.single().cause)
     }
 
     @Test
