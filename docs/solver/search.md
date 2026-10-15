@@ -326,6 +326,11 @@ sets use separate state storage, leaving reversible payloads intact; each fire c
 its previous failure, and undo discards pending failure context. The native SAT lane
 keeps its own state and leaves general CP failure storage unallocated.
 
+Variable-array Element groups unsupported result and selected-cell values sharing one
+premise into a single immutable domain replacement. The mutation retains individual
+hole reasons and all changed bound, value and fixed-variable wakeups; one trail record
+restores the complete prior domain. Index exclusions retain position-specific reasons.
+
 Prepared capability summaries read the selected projection descriptors. Built-in
 providers declare their existing execution routes; replacements supply their own
 filtering, scoring and check roles.

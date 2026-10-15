@@ -17,17 +17,74 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.holeReasonFor
+import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.propagation.reasonOf
+import com.eignex.klause.propagation.undoTo
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ElementPropagatorTest {
+    @Test
+    fun `variable-array result exclusions retain their lazy support reasons`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4)),
+            factors = arrayOf<Factor>(Element(0, 1, longArrayOf(2, 3), true, 0)),
+        )
+
+        PropagationReasonOracle.assertReasonsImply(problem, "element result holes") { state ->
+            state.excludeIntValue(2, 1) && state.excludeIntValue(2, 3) &&
+                state.excludeIntValue(3, 1) && state.excludeIntValue(3, 3)
+        }
+    }
+
+    @Test
+    fun `selected-cell exclusions retain the index premise when another cell aliases the result`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 4), IntDomain(0, 4)),
+            factors = arrayOf<Factor>(Element(0, 1, longArrayOf(1, 2), true, 0)),
+        )
+
+        PropagationReasonOracle.assertReasonsImply(problem, "element selected cell alias") { state ->
+            state.tightenIntMin(0, 1) && state.excludeIntValue(1, 1) && state.excludeIntValue(1, 3)
+        }
+    }
+
+    @Test
+    fun `selected-cell holes retract before a sibling selects an excluded value`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 4), IntDomain(0, 4)),
+            factors = arrayOf<Factor>(Element(0, 1, longArrayOf(2), true, 0)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        assertNull(state.runToFixpoint(allFactors = true))
+        state.undoLogging = true
+        val mark = state.mark()
+        state.currentLevel = 1
+        assertTrue(state.excludeIntValue(1, 1) && state.excludeIntValue(1, 3))
+        assertNull(state.runToFixpoint(allFactors = false))
+        state.undoTo(mark)
+
+        state.currentLevel = 1
+        assertTrue(state.tightenIntMin(1, 1) && state.tightenIntMax(1, 1))
+        assertNull(state.runToFixpoint(allFactors = false))
+
+        assertEquals(1L, state.intDomains[2].min)
+        assertEquals(1L, state.intDomains[2].max)
+    }
+
     @Test
     fun `selection range can extend past the signed integer index offset`() {
         val offset = Int.MAX_VALUE.toLong()
