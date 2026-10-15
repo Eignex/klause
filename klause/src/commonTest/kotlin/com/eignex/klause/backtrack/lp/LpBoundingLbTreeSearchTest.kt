@@ -22,6 +22,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.ComparableTimeMark
@@ -73,7 +74,7 @@ class LpBoundingLbTreeSearchTest {
     }
 
     @Test
-    fun `a dive leaf whose reals descend without limit returns its checked ray`() {
+    fun `an unbounded leaf supplies a feasible point without a terminal claim`() {
         // x in [0,3], r >= 0 with x - r <= 1: minimizing -r grows r without limit from every leaf.
         val p = Problem(
             numBoolVars = 0,
@@ -90,7 +91,8 @@ class LpBoundingLbTreeSearchTest {
 
         val seed = engine(p, obj).use { assertNotNull(it.lbTreeSearch(obj, Cancellation.Never)) }
 
-        assertTrue(assertNotNull(seed.direction).single().signum() > 0)
+        assertTrue(seed.sample.reals.single() >= 0.0)
+        assertTrue(seed.sample.ints.single() - seed.sample.reals.single() <= 1.0)
     }
 
     @Test
@@ -227,4 +229,31 @@ class LpBoundingLbTreeSearchTest {
         assertEquals(0.5, sample.reals[0])
         assertEquals(2.0, objective.evaluate(sample))
     }
+    @Test
+    fun `open integer declarations decline without using fallback endpoints`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray(), openIntHi = booleanArrayOf(true))
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1L))
+        engine(problem, objective).use { parent ->
+            assertNull(parent.lbTreeSearch(objective, Cancellation.Never))
+            assertEquals(0L, parent.totalSolveWork())
+        }
+    }
+
+    @Test
+    fun `a cancelled mixed completion cannot seed an incumbent`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        var cancelled = false
+        engine(problem, objective).use { parent ->
+            assertNull(parent.lbTreeSearch(objective, Cancellation { cancelled }, complete = { _, _, _ ->
+                cancelled = true
+                com.eignex.klause.lp.relaxation.LeafRealResult(
+                    com.eignex.klause.lp.engine.LpVerdict.TOLERANCE_OPTIMUM, doubleArrayOf(0.0))
+            }, toleranceCheck = { true }))
+            assertTrue(parent.totalSolveWork() > 0L)
+            assertTrue(parent.primalPropagationWork > 0L)
+        }
+    }
+
 }
