@@ -59,6 +59,16 @@ class NativeVmLiveArgumentsTest(unittest.TestCase):
         self.assertIn('DRAIN_MARKER', script)
         self.assertIn('(uint32)retval', script)
 
+    def test_terminal_snapshot_precedes_drain_and_sequence_map_clear(self):
+        script = live.program(Path('/opt/jdk/lib/server/libjvm.so'), 1234, [])
+
+        terminal = script.splitlines()[-1]
+        self.assertIn('for ($row : @sequence)', terminal)
+        self.assertLess(terminal.index('FINAL_SEQUENCE\\t'), terminal.index('FINAL_SEQUENCE_TOTAL\\t'))
+        self.assertLess(terminal.index('FINAL_SEQUENCE_TOTAL\\t'), terminal.index('DRAIN_MARKER\\t'))
+        self.assertLess(terminal.index('DRAIN_MARKER\\t'), terminal.index('clear(@sequence)'))
+        self.assertNotIn('find(', terminal)
+
     def test_required_hooks_refuse_missing_undefined_or_ambiguous_entry_records(self):
         rows = [{'originalSymbol': {'name': name, 'value': index, 'size': 1, 'function': True,
                                    'undefined': False, 'ordinarySectionDefinition': True},

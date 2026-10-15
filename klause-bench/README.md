@@ -1445,6 +1445,8 @@ from the queue; wrapper destruction and other returns never dereference a task.
 
 One warning-enabled observer retains a labelled invalid-read case, per-TID
 sequences, USDT identity lengths/bytes, returns, fork records and a drain marker.
+After detachment, the end program exports every final per-TID sequence value and
+its map cardinality/sequence total before the drain marker and map clear.
 Key-presence guards precede ordinary map-value reads, distinguishing fresh
 sequence keys from memory read failures. Raw boot/monotonic/realtime anchors
 surround child release, exit
@@ -1472,6 +1474,14 @@ Remote summaries count retained identity matches, missing matches and lifetime
 failures without relaxing capture-wide guards. Staged compile-ID, method/level/OSR
 and native-thread matches distinguish absent JFR records from identity mismatches;
 all same-ID candidates and unmatched JFR records remain in the report.
+Terminal delivery additionally requires complete callback fragments, matching
+final per-TID counters, a consistent complete-map total and one ordered drain
+marker. Null candidates retain their explicit pointer record without field reads.
+Truncated identity bytes can be completely delivered while their identity remains
+unaccepted. Captures lacking final counters cannot pass this guard. Its scope is
+sequenced native/USDT callbacks; unsequenced EXEC/FORK records and the global kernel
+event-loss counter remain outside that proof. This guard does not erase unfinished
+invocations or relax any existing read, lifetime or independent identity checks.
 Per-record association supplies no complete calling convention, queue/root census,
 loss-free capture, return-size semantics, clock alignment or compiler-saving proof.
 
