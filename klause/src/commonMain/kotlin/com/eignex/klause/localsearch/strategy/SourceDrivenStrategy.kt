@@ -12,7 +12,6 @@ import com.eignex.klause.localsearch.schedule.RoundAccumulator
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.schedule.StallSchedule
 import com.eignex.klause.localsearch.scoring.MoveScoring
-import com.eignex.klause.util.Cancellation
 
 /** Temperature a Metropolis acceptance falls back to when the schedule axis supplies none. */
 private const val DEFAULT_METROPOLIS_TEMPERATURE = 1.0
@@ -134,9 +133,7 @@ class SourceDrivenStrategy(
     private val alternativeSink = MoveSink()
 
     /** Pick the next move to apply, or `null` when no candidate is available (the engine restarts). */
-    fun pickMove(state: LocalSearchState): Move? = pickMove(state, Cancellation.Never)
-
-    internal fun pickMove(state: LocalSearchState, cancellation: Cancellation): Move? {
+    fun pickMove(state: LocalSearchState): Move? {
         val stall = schedule.noise as? StallSchedule
         val fraction = if ((schedule.weights != null || stall != null) && scoring != MoveScoring.Break) {
             state.cumulativeRepairFraction()
@@ -156,11 +153,7 @@ class SourceDrivenStrategy(
         stall?.update(state.step, state.cost, fraction)
         val stalled = stall?.stalled ?: false
         // A triggered kick pre-empts the normal pick.
-        perturbation?.invoke(state)?.let { proposed ->
-            val closure = state.booleanRepairs
-            if (closure == null) return proposed
-            closure.close(state, proposed, cancellation)?.let { return it }
-        }
+        perturbation?.invoke(state)?.let { return it }
 
         noiseSink.clear()
         scoreSink.clear()
@@ -185,25 +178,19 @@ class SourceDrivenStrategy(
             val sink = if (cs.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
             cs.source.generate(state, sink)
         }
-        return selectMove(state, stall, stalled, cancellation)
+        return selectMove(state, stall, stalled)
     }
 
-    private fun selectMove(
-        state: LocalSearchState, stall: StallSchedule?, stalled: Boolean, cancellation: Cancellation,
-    ): Move? {
-        val closure = state.booleanRepairs
-        val noiseCandidates = closure?.closeAll(state, noiseSink.list, cancellation) ?: noiseSink.list
-        val scoreCandidates = closure?.closeAll(state, scoreSink.list, cancellation) ?: scoreSink.list
-        val alternativeCandidates = closure?.closeAll(state, alternativeSink.list, cancellation) ?: alternativeSink.list
+    private fun selectMove(state: LocalSearchState, stall: StallSchedule?, stalled: Boolean): Move? {
         // The noise/score pool split is preserved across the CC + tabu filters. CC precedes tabu: the
         // configuration filter is the primary focus, tabu the cycle-breaker layered on what survives it.
-        val ccNoise = ccFilter(state, noiseCandidates)
+        val ccNoise = ccFilter(state, noiseSink.list)
         val noiseFiltered = tabu.filter(state, ccNoise)
         // While stalled, never let tabu starve the noise pool into a null pick (a restart that discards
         // plateau progress): fall back to the unfiltered candidates so the search keeps walking the plateau.
         val noiseMoves = if (noiseFiltered.isEmpty() && stalled) ccNoise else noiseFiltered
-        val primaryScoreMoves = tabu.filter(state, ccFilter(state, scoreCandidates))
-        val alternatives = tabu.filter(state, ccFilter(state, alternativeCandidates))
+        val primaryScoreMoves = tabu.filter(state, ccFilter(state, scoreSink.list))
+        val alternatives = tabu.filter(state, ccFilter(state, alternativeSink.list))
         val scoreMoves = if (alternatives.isEmpty()) {
             primaryScoreMoves
         } else {

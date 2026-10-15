@@ -12,9 +12,6 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.acceptance.AcceptanceRule
-import com.eignex.klause.localsearch.movesource.ConfiguredSource
-import com.eignex.klause.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
@@ -40,39 +37,6 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
-    @Test
-    fun `native objective descent closes clauses around maintained unit definitions`() {
-        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
-        ))
-        val strategy = SourceDrivenStrategy(
-            sources = listOf(ConfiguredSource(ObjectiveSeed())),
-            feasibleAcceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned,
-        )
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
-            perMoveInvariants = true,
-            definitionalSweep = DefinitionalSweep.infer(problem, boolFolds = listOf(
-                BoolFoldDefinition(3, intArrayOf(Lit.make(0, false)), true),
-            )),
-        )
-        val objective = LinearObjective(boolWeights = longArrayOf(0, 0, 0, 1))
-        val params = LocalSearchParams(
-            maxFlips = 2L, randomSeed = 0L,
-            initialAssignment = Sample(booleanArrayOf(false, false, false, true), longArrayOf()),
-        )
-
-        val result = search.improvements(objective, params, warm = null)
-            .filterIsInstance<MinimizeResult.WithSample>().last()
-
-        assertTrue((0..2).all { result.sample.boolValue(it) })
-        assertFalse(result.sample.boolValue(3))
-        assertEquals(0.0, objective.evaluate(result.sample))
-    }
-
     @Test
     fun `optimization seed cost observations follow definition reconciliation`() {
         val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
