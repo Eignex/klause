@@ -294,7 +294,8 @@ class ComponentPlan internal constructor(
         val selected = spec.componentPlan(factorProjections, cancellation = cancellation)
         if (selected.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN) return null
         val fragment = factorProjections.linearTheoryModel(EncodingTarget.LINEAR,
-            selected.selectedTheoryFactorIndices(), cancellation = cancellation, completeFiniteConditions = true) ?: return null
+            selected.selectedTheoryFactorIndices(), cancellation = cancellation,
+            completeFiniteConditions = true) ?: return null
         val route = when {
             fragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
             fragment.supportsExactLira() -> ProblemPipeline.EXACT_LIRA

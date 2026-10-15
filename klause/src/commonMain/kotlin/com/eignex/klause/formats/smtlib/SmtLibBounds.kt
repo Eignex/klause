@@ -70,7 +70,9 @@ internal fun Compiler.Builder.hasOpenProductOperand(): Boolean {
         if (sourceCancellation()) throw PolynomialSourceInterrupted()
         val (node, product) = pending.removeLast()
         when (node) {
-            is SExpr.Atom -> if (product && intNames[node.text]?.let { intDomains[it] is PresolveDomain.Open } == true) {
+            is SExpr.Atom -> if (product &&
+                intNames[node.text]?.let { intDomains[it] is PresolveDomain.Open } == true
+            ) {
                 return true
             }
             is SExpr.SList -> {
