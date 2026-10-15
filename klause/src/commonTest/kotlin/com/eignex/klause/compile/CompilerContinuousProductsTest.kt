@@ -1,6 +1,7 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.GridProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.lowering.ProblemBuilder
@@ -158,7 +159,7 @@ class CompilerContinuousProductsTest {
     }
 
     @Test
-    fun `products decline connected grid representations`() {
+    fun `products retain connected grid representations and approximation provenance`() {
         val x = FloatHandle("x", -2.0, 2.0)
         val definition = SchemaDef<SchemaEntry>(mapOf(
             "x" to FloatSpec(-2.0, 2.0, 5), "y" to FloatSpec(-2.0, 2.0, 5),
@@ -166,7 +167,14 @@ class CompilerContinuousProductsTest {
             "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("y"), IntCmpOp.LT, 0.0)),
         ))
 
-        assertFailsWith<IllegalArgumentException> { definition.compile() }
+        val compiled = definition.compile()
+        val factor = compiled.problem.factors.filterIsInstance<GridProduct>().single()
+
+        assertEquals(0, factor.a.variable)
+        assertEquals(factor.a, factor.b)
+        assertEquals(1, factor.output.variable)
+        assertTrue(compiled.floatRepresentations.values.all { it.approximate })
+        assertEquals(0, compiled.problem.numRealVars)
     }
 
     @Test

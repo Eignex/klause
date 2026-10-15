@@ -414,3 +414,16 @@ and scalar image. Selected finite and LP consumers build private tuple projectio
 selected arithmetic consumers install a valid-input cover and guarded image
 relations. The finite relation preserves the existing nearest-bucket policy.
 Original float witness checks and grid result qualifications remain required.
+
+## Grid arithmetic relations
+
+Internal `GridProduct` and `GridPower` retain an operation and each integer index's
+finite binary64 range and bucket count. Source fields preserve repeated operand
+and result roles through remapping. The declared nearest-output-bucket relation is
+an approximation of continuous arithmetic; its exact finite membership does not
+establish a continuous-source witness or proof. Frontend component provenance and
+original-source checks retain that distinction. Native projections do not allocate
+frontend tuple tables. Each filtering pass handles at most 4096 input combinations;
+private linear/polynomial encodings admit at most 4096 combinations and charge the
+containing cancellation/work allowance. Larger encoding requests decline while
+native finite filtering and scoring remain available.

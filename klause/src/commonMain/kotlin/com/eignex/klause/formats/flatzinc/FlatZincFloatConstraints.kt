@@ -297,7 +297,7 @@ internal fun FlatZincCompiler.emitFloatDiv(c: FznConstraint) {
     )
 }
 
-/** Lower `float_times` to a bucket-index table. */
+/** Retain `float_times` under its component's exact or rounded grid semantics. */
 internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     expectArity(c, 3)
     val aRef = resolveFloatVarOrConst(c.args[0])
@@ -351,49 +351,14 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
         emitFiniteFloatProduct(aRef, bRef, cRef)
         return
     }
-    if (aRef !is FloatRef.Var || bRef !is FloatRef.Var || cRef !is FloatRef.Var) {
-        failHere("float_times with constant operand not yet handled (only var·var=var)")
-    }
-    val a = aRef.bk
-    val b = bRef.bk
-    val cBk = cRef.bk
-    val stepA = if (a.buckets > 1) (a.hi - a.lo) / (a.buckets - 1) else 0.0
-    val stepB = if (b.buckets > 1) (b.hi - b.lo) / (b.buckets - 1) else 0.0
-    val stepC = if (cBk.buckets > 1) (cBk.hi - cBk.lo) / (cBk.buckets - 1) else 0.0
-    val rows = LongArrayList(a.buckets * b.buckets * 3)
-    val tolerance = 0.5 // round to nearest bucket
-    for (ia in 0 until a.buckets) {
-        val va = a.lo + ia * stepA
-        for (ib in 0 until b.buckets) {
-            val vb = b.lo + ib * stepB
-            val vc = va * vb
-            if (vc < cBk.lo - stepC * tolerance || vc > cBk.hi + stepC * tolerance) continue
-            val ic = if (stepC == 0.0) {
-                0
-            } else {
-                ((vc - cBk.lo) / stepC).let {
-                    val rounded = round(it).toInt()
-                    if (abs(it - rounded) > tolerance) return@let -1
-                    rounded
-                }
-            }
-            if (ic < 0 || ic >= cBk.buckets) continue
-            rows.add(ia.toLong())
-            rows.add(ib.toLong())
-            rows.add(ic.toLong())
+    fun coordinate(ref: FloatRef): GridCoordinate = when (ref) {
+        is FloatRef.Var -> ref.bk.let { GridCoordinate(it.varId, it.lo, it.hi, it.buckets) }
+        is FloatRef.Const -> resolveFloatElement(FznExpr.FloatLit(ref.value),
+            "__grid_product_${floatVars.size}", lpOnly = false).let {
+            GridCoordinate(it.varId, it.lo, it.hi, it.buckets)
         }
     }
-    if (rows.isEmpty()) {
-        // No bucket triple realises the product within tolerance. This is a resolution limit of the
-        // bucketing, not proven infeasibility, so reject rather than report a spurious UNSAT.
-        failHere("float_times: product not representable under the current float bucketing")
-    }
-    factors.add(
-        Table(
-            intArrayOf(a.varId, b.varId, cBk.varId),
-            rows.toLongArray(),
-        ),
-    )
+    factors.add(GridProduct(coordinate(aRef), coordinate(bRef), coordinate(cRef)))
 }
 
 /** Retain `float_abs(x, y)` under its component's exact or bucketed semantics. */

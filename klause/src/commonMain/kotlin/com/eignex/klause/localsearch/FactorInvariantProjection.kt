@@ -46,6 +46,8 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
 
     is GridAbs -> gridAbsoluteValueTable(this).buildInvariantProjection(domains)
 
+    is GridArithmetic -> GridArithmeticInvariant(this)
+
     is ArrayMinMax -> ArrayMinMaxInvariant(result, xs, max)
 
     is GridArrayMinMax -> GridArrayMinMaxInvariant(this)

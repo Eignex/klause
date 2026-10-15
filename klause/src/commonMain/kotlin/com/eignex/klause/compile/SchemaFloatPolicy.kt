@@ -51,13 +51,6 @@ internal fun schemaFloatRepresentations(def: SchemaDef<SchemaEntry>): Map<String
     for (presence in def.entries.values.filterIsInstance<PresenceSpec>()) {
         ids[presence.valueName]?.let { reasons[components.find(it)] = "optional schema float value" }
     }
-    for (product in products) {
-        for (name in continuousNames(product.left) + continuousNames(product.right)) {
-            require(components.find(ids.getValue(name)) !in reasons) {
-                "Continuous products require exact real columns: '$name' uses a finite grid"
-            }
-        }
-    }
     return names.associateWith { name ->
         val root = components.find(ids.getValue(name))
         FloatRepresentation(root, reasons[root])

@@ -118,6 +118,7 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
         domainRelaxation
     }
     is Abs, is GridAbs -> domainRelaxation
+    is GridArithmetic -> finiteDomains
     is WideDivMod -> finiteBounds
     is DivMod -> finiteDomains
     is Inverse, is ValuePrecede -> finiteDomains

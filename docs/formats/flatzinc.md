@@ -52,8 +52,9 @@ nonnegative integer exponents. The MiniZinc library routes fixed nonnegative
 `pow` through `klause_int_pow`; its negative fixed powers retain the standard integer-division decomposition.
 Variable powers remain outside the native advertised surface. Raw variable or negative exponent predicates
 decline. Exact `float_pow` accepts fixed nonnegative integral exponents and retains
-real coordinates for polynomial completion. Grid coordinates, negative/fractional
-exponents and variable real exponents decline.
+real coordinates for polynomial completion. Default grid components retain
+`GridPower` with the same fixed-exponent contract and nearest-result-bucket policy
+as multiplication. Negative/fractional exponents and variable real exponents decline.
 
 ## FlatZinc floats
 
@@ -97,7 +98,11 @@ arithmetic.
 Bucketed search decides a finite grid. It may miss solutions between grid points;
 rounding can produce candidates violating the source constraints. Bucketed
 absolute values retain `GridAbs` with the same rounding image; their tuple
-encodings belong to selected private consumers. Source-check a
+encodings belong to selected private consumers. Grid multiplication and fixed powers
+retain `GridProduct` and `GridPower` instead of frontend tables. Native filtering
+limits each pass to 4096 operand combinations and checks pinned tuples; native
+scoring grades the rounded relation. Selected private enforcing encodings decline
+above 4096 operand combinations or on containing cancellation. Source-check a
 returned candidate before assigning it feasibility credit. Even a source-valid
 grid witness does not turn a grid optimum or refutation into a source proof.
 
