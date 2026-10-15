@@ -59,6 +59,10 @@ Integer aggregation uses Int128. Rational reconstruction, factors and continuati
 escalate from `Frac128` to `BigFraction`; residual refinement uses `BigFraction`.
 Oversized authority starts wide, and fixed-width overflow restarts the whole
 operation from authority. Failed attempts and precision restarts are charged.
+Integer quotient checks reject magnitudes outside the signed result range before
+rounding can wrap an unsigned intermediate. Assignment subproblems track path
+reachability separately from exact costs; unrepresentable residual costs decline
+the bound through checked overflow.
 An off-status feasible point cannot furnish the claimed warm basis.
 
 Zero-objective continuation imports the active strict lower and upper sides. Its

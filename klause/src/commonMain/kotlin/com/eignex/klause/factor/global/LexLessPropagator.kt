@@ -79,7 +79,11 @@ internal class LexLessPropagator(
             }
             if (a == len) {
                 if (!tailAllowsEquality) {
-                    state.propagatorFailures[this] = reasonVars(len - 1, len - 1, strictHere = false)
+                    state.propagatorFailures[this] = if (len == 0) {
+                        IntArray(0)
+                    } else {
+                        reasonVars(len - 1, len - 1, strictHere = false)
+                    }
                 }
                 return tailAllowsEquality
             }

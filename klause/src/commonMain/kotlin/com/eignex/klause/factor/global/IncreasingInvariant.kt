@@ -1,5 +1,7 @@
 package com.eignex.klause.factor.global
 
+import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
+import com.eignex.klause.factor.arithmetic.internals.successorOrNull
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.factor.saturatedAdd
 import com.eignex.klause.factor.saturatedSub
@@ -22,9 +24,17 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         for (i in 0 until xs.size - 1) {
-            if (state.assignment.intValue(xs[i]) + gap > state.assignment.intValue(xs[i + 1])) return true
+            if (violates(state.assignment.intValue(xs[i]), state.assignment.intValue(xs[i + 1]))) return true
         }
         return false
+    }
+
+    private fun violates(a: Long, b: Long): Boolean = if (gap == 0) a > b else a >= b
+
+    private fun step(value: Long, raise: Boolean): Long? = when {
+        gap == 0 -> value
+        raise -> successorOrNull(value)
+        else -> predecessorOrNull(value)
     }
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
@@ -53,7 +63,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
     private inline fun degree(softCap: Int, valueAt: (Int) -> Long): Int {
         var raw = 0L
         for (i in 0 until xs.size - 1) {
-            val overshoot = saturatedSub(saturatedAdd(valueAt(i), gap.toLong()), valueAt(i + 1))
+            val overshoot = saturatedAdd(saturatedSub(valueAt(i), valueAt(i + 1)), gap.toLong())
             if (overshoot > 0L) raw = saturatedAdd(raw, overshoot)
         }
         return compressViolation(raw, softCap)
@@ -64,7 +74,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         var k = -1
         for (i in 0 until xs.size - 1) {
-            if (state.assignment.intValue(xs[i]) + gap > state.assignment.intValue(xs[i + 1])) {
+            if (violates(state.assignment.intValue(xs[i]), state.assignment.intValue(xs[i + 1]))) {
                 k = i
                 break
             }
@@ -73,8 +83,8 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
         val a = state.assignment.intValue(xs[k])
         val b = state.assignment.intValue(xs[k + 1])
         // Local snaps at the inversion: pull xs(k) down to b−gap, or push xs(k+1) up to a+gap.
-        snap(state, sink, xs[k], target = b - gap, lowering = true)
-        snap(state, sink, xs[k + 1], target = a + gap, lowering = false)
+        step(b, raise = false)?.let { snap(state, sink, xs[k], target = it, lowering = true) }
+        step(a, raise = true)?.let { snap(state, sink, xs[k + 1], target = it, lowering = false) }
         // Cascading re-monotonisation of the whole chain in a single compound move.
         proposeCascade(state, sink, raise = true)
         proposeCascade(state, sink, raise = false)
@@ -112,7 +122,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
                 target[i] = cur
                 first = false
             } else {
-                val prev = if (raise) target[i - 1] + gap else target[i + 1] - gap
+                val prev = step(if (raise) target[i - 1] else target[i + 1], raise) ?: return
                 val want = if (raise) maxOf(cur, prev) else minOf(cur, prev)
                 target[i] = (if (raise) d.ceilingOrNull(want) else d.floorOrNull(want)) ?: return
             }
@@ -132,8 +142,10 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
         for (i in 0 until n) {
             val cur = state.assignment.intValue(xs[i])
             val d = state.rootDomains[xs[i]]
-            val lo = if (i == 0) d.min else maxOf(d.min, state.assignment.intValue(xs[i - 1]) + gap)
-            val hi = if (i == n - 1) d.max else minOf(d.max, state.assignment.intValue(xs[i + 1]) - gap)
+            val lo = if (i == 0) d.min else
+                maxOf(d.min, step(state.assignment.intValue(xs[i - 1]), raise = true) ?: continue)
+            val hi = if (i == n - 1) d.max else
+                minOf(d.max, step(state.assignment.intValue(xs[i + 1]), raise = false) ?: continue)
             if (cur > d.min) {
                 val down = d.lower(cur)
                 if (down >= lo) sink.addChannelingIntSet(state, xs[i], down)
@@ -153,11 +165,11 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
             if (state.assumptions.isFrozenInt(v)) {
                 val fv = state.assignment.intValue(v)
                 if (fv < floor) return false // a frozen value already breaks the chain
-                floor = fv + gap
+                if (i < xs.lastIndex) floor = step(fv, raise = true) ?: return false
             } else {
                 val pick = d.ceilingOrNull(floor) ?: return false
                 state.assignment.setInt(v, pick)
-                floor = pick + gap
+                if (i < xs.lastIndex) floor = step(pick, raise = true) ?: return false
             }
         }
         return true

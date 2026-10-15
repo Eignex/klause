@@ -78,6 +78,28 @@ class Int128Test {
     }
 
     @Test
+    fun `ceiling division preserves the minimum signed quotient`() {
+        for (bits in intArrayOf(1, 5, 20, 40, 62)) {
+            val divisor = 1L shl bits
+            for (offset in longArrayOf(-divisor, -1L, 0L, 1L, divisor)) {
+                val acc = Int128().apply {
+                    addProduct(Long.MIN_VALUE, divisor)
+                    addLong(offset)
+                }
+                val expected = when {
+                    offset == -divisor -> null
+                    offset > 0L -> Long.MIN_VALUE + 1L
+                    else -> Long.MIN_VALUE
+                }
+
+                val result = acc.ceilDivPow2(bits)
+
+                assertEquals(expected, result, "ceil(${acc.toBig()} / 2^$bits)")
+            }
+        }
+    }
+
+    @Test
     fun `floorDivPositive matches the oracle`() {
         val rng = Random(2024)
         val divisors = longArrayOf(1L, 2L, 3L, 7L, 1024L, 1L shl 20, 1L shl 40, (1L shl 52) - 1, Long.MAX_VALUE)
@@ -93,6 +115,20 @@ class Int128Test {
                 val floor = if (r.signum() < 0) q - BigInteger.ONE else q // truncation → floor for d > 0
                 assertEquals(floor.toLongOrNull(), acc.floorDivPositive(d), "floor($value / $d)")
             }
+        }
+    }
+
+    @Test
+    fun `negative floor division rejects quotients whose rounding exceeds unsigned word range`() {
+        for (divisor in longArrayOf(2L, 3L, 7L, Long.MAX_VALUE)) {
+            val acc = Int128().apply {
+                repeat(2) { addProduct(Long.MIN_VALUE, divisor) }
+                addLong(1L)
+            }
+
+            val result = acc.floorDivPositive(divisor)
+
+            assertNull(result, "floor(${acc.toBig()} / $divisor)")
         }
     }
 

@@ -179,6 +179,7 @@ object Dimacs {
                     terminated = true
                     break
                 }
+                dimacsRequire(lit != Int.MIN_VALUE) { "wcnf literal index exceeds the supported 32-bit range: '$tok'" }
                 val v = abs(lit) - 1
                 // New-format instances carry no header, so the variable count grows to fit each literal;
                 // an old-header instance must stay within the declared `nvars`, as the CNF path enforces —
@@ -202,7 +203,12 @@ object Dimacs {
                 // A zero-weight soft clause contributes no cost and imposes no constraint.
                 weight == 0L -> Unit
 
-                clauseLits.isEmpty() -> fixedCost += weight
+                clauseLits.isEmpty() -> {
+                    dimacsRequire(fixedCost <= Long.MAX_VALUE - weight) {
+                        "DIMACS wcnf fixed objective cost exceeds the supported 64-bit range"
+                    }
+                    fixedCost += weight
+                }
 
                 else -> softClauses.add(WeightedCnfClause(weight, clauseLits))
             }

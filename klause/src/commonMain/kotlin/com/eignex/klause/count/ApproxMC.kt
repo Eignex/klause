@@ -127,8 +127,14 @@ internal object ApproxMC {
         val mStar = high
 
         val cell = cellAt(mStar)
-        if (cell.count > 0) return CoreResult(cell.count.toLong() shl mStar, mStar)
-        return CoreResult(thresh.toLong() shl (mStar - 1), mStar) // empty cell: recover from mStar-1
+        if (cell.count > 0) return CoreResult(scaleCellCount(cell.count, mStar), mStar)
+        return CoreResult(scaleCellCount(thresh, mStar - 1), mStar) // empty cell: recover from mStar-1
+    }
+
+    internal fun scaleCellCount(count: Int, hashes: Int): Long = when {
+        count == 0 -> 0L
+        hashes >= Long.SIZE_BITS - 1 || count.toLong() > (Long.MAX_VALUE shr hashes) -> Long.MAX_VALUE
+        else -> count.toLong() shl hashes
     }
 
     /** `thresh = 1 + 9.84·(1 + ε/(1+ε))·(1 + 1/ε)²`, rounded up. */
