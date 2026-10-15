@@ -342,13 +342,8 @@ sealed class ExecutionOption<T> private constructor(internal val id: String) {
         }
     }
 
-    /** The `dry-run-presolve` execution setting. */
-    data object DryRunPresolve : ExecutionOption<Boolean>("dry-run-presolve") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
-
     internal companion object {
-        val all: List<ExecutionOption<*>> get() = listOf(
+        private val all: List<ExecutionOption<*>> get() = listOf(
             MaxDecisions, Luby, AdaptiveRestart, EmaRestart, ModeSwitchingRestart,
             PhaseSaving, TargetPhasing, SolutionPhasing, RephaseInterval, MaxLearned,
             LbdGlue, TieredDb, MidLbd, Vivification, VivifyBatch,
@@ -361,8 +356,9 @@ sealed class ExecutionOption<T> private constructor(internal val id: String) {
             Scoring, Acceptance, Restart, Strategy, LocalSearchArm,
             Lambda, Arms, LocalSearchArms, BacktrackArms, ClauseShareLbd,
             ClauseShareLen, SliceWork, SliceMaxWork, SliceGrowth, PhaseRetention,
-            ReseedStaleThreshold, LsResiduals, LsPhaseTimes, BacktrackArmsByLabel, DryRunPresolve,
+            ReseedStaleThreshold, LsResiduals, LsPhaseTimes, BacktrackArmsByLabel,
         )
+        // Typed keys can initialize before their containing catalog on the JVM.
         val byId by lazy { all.associateBy { it.id } }
     }
 }
@@ -410,7 +406,7 @@ class ExecutionOptions private constructor(
             }
             val values = raw.mapValues { (key, value) ->
                 val option = ExecutionOption.byId[key]
-                if (option == null) OptionValue.Valid(value) else try {
+                if (option == null) OptionValue.Valid(Unit) else try {
                     OptionValue.Valid(option.decode(EngineParams(listOf("$key=$value"))))
                 } catch (failure: PipelineConfigException) {
                     OptionValue.Invalid(requireNotNull(failure.message), configuration = true)

@@ -21,7 +21,7 @@ class ExecutionOptionsTest {
     @Test
     fun `typed portfolio settings preserve parsed settings and seed precedence`() {
         val typed = ExecutionOptions(
-            ExecutionOption.Seed(7L), ExecutionOption.Arms(3), ExecutionOption.Lambda(0.75),
+            ExecutionOption.Seed(2L), ExecutionOption.Seed(7L), ExecutionOption.Arms(3), ExecutionOption.Lambda(0.75),
             ExecutionOption.SliceWork(1_000L), ExecutionOption.SliceMaxWork(2_000L),
             ExecutionOption.SliceGrowth(1.25), ExecutionOption.PhaseRetention(0.5),
         )
@@ -119,6 +119,7 @@ class ExecutionOptionsTest {
     @Test
     fun `frontend values retain route diagnostic precedence`() {
         val controls = listOf(
+            listOf("malformed"), listOf("=7"),
             listOf("seed=bad", "arms=bad"),
             listOf("arms=bad", "seed=bad"),
             listOf("seed=bad", "seed=7", "unrecognized=1"),
@@ -130,7 +131,9 @@ class ExecutionOptionsTest {
                 buildPortfolioScenario(EngineParams(pairs), null, 1, Kind.CSP, EngineMix.BACKTRACK, 6)
             }
             val typed = assertFailsWith<PipelineConfigException> {
-                buildPortfolioScenario(ExecutionOptions.parse(pairs).reader(), null, 1, Kind.CSP, EngineMix.BACKTRACK, 6)
+                buildPortfolioScenario(
+                    ExecutionOptions.parse(pairs).reader(), null, 1, Kind.CSP, EngineMix.BACKTRACK, 6,
+                )
             }
             assertEquals(legacy.message, typed.message)
         }
