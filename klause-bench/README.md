@@ -793,6 +793,32 @@ ownership. The lab's 1 GiB output retrieval limit can omit files; completion cre
 requires the actual terminal inventory, `omitted.tsv` and collected payload hashes,
 not only the worker's completion flag.
 
+### Prepared MPS primal probes
+
+`bench.profile.MpsPrimalProbe` accepts original MPS paths and compares the public
+`BacktrackSolver.minimize` API with `LpPlan(bounding=true, lbTreeSearch=false|true)`.
+Rounding and pumping keep their plan default (`false`); this isolates explicit
+library enablement and does not represent the curated CLI recipe. Both variants
+use the exact original-decimal source adapter, with the ordinary source-tolerance
+callback in default mode and no callback in exact mode. Open integer declarations
+are refused rather than boxed or routed to an open theory.
+
+A private JVM uses one active processor, Serial GC and `-Xmx3g`. After one warmup
+round, three measured rounds alternate variant order, with seed3, `IndomainMin`
+and an unchanged five-second invocation budget. Parsing and baking are outside
+the prepared API timing; root and numerical work remain inside its normal allowance.
+Run through the AWS lab client on a pinned revision, one machine and `parallel:1`.
+The self-authored `mps-linear-source-v1/primal-point-{min,max,wide}.mps` fixtures
+exercise original sense, constants, coordinates and many integral LP columns.
+
+The profile retains original bytes/hashes, installed build and loaded classpath
+hashes, runtime/options, child process exit, measurements and every incumbent in
+`cases.json`. Each record is a witness-only publication, independent of the native
+terminal result recorded in `measurements.json`; no native proof is captured.
+Check every first and final witness/objective with `SourceRecordCheck`, supplying
+the retained hash-named sources and `witnessOnly=true`. Report prepared API evidence
+separately from whole-CLI comparisons and exclude warmup rounds from measurements.
+
 ### CLI stream capture
 
 `com.eignex.klause.bench.profile.CliStreamCapture` runs the installed CLI as a subprocess

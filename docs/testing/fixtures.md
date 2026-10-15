@@ -47,6 +47,7 @@ declaration. See [corpus management](../../klause-bench/README.md#catalog-and-co
 | `smtlib` | Self-authored linear integer/real satisfaction, optimization, infeasibility, disjunction and exact-rational cases |
 | `xcsp3` | Self-authored magic-series, sum optimization, magic-square and graph-colouring cases |
 | `mps` | Self-authored integer and continuous optimization, equality feasibility, infeasibility, unboundedness and open decimal witness controls |
+| `mps-linear-source-v1` | Self-authored Apache-2.0 exact decimal, indicator, wide-coordinate and mixed primal-point source controls; original sense, constants and integral LP columns retain their source mappings |
 | `product-aliases` | Self-authored MiniZinc repeated-role products and fixed powers, including reified comparisons, zero/identity powers and standard truncated negative powers; Apache-2.0 |
 | `divmod` | Self-authored Apache-2.0 signed quotient/remainder, wide Euclidean, joint conflict and equivalent linear controls; MiniZinc input is `klause-mzn-lib/test-models/divmod.mzn` |
 | `lp-component-split` | Self-authored dense bounded block systems for the explicit measurement suite |
