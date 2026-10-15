@@ -730,6 +730,8 @@ internal class LocalSearchEngine(
         var bestFoundAtMs = -1L
         val maxFlips = moveCap(params)
         var cancelled = false
+        var liveCompletion: Completion? = null
+        var pendingCompletedMove = false
 
         // Cross-engine solution flow: publish each improvement into the shared exchange, and before a
         // restart adopt a fresher-and-better published assignment as the incumbent so the restart anchors
@@ -775,20 +777,36 @@ internal class LocalSearchEngine(
         val roundFeedback = RoundFeedback.of(satisfyStrategy, configuredRestart)
         var cancelCountdown = 0
         var lastCheckMs = 0L
+        val completedMoves = if (completion != null && problem.numRealVars > 0 &&
+            problem.numBoolVars + problem.numIntVars > 0 && feasibleMode == FeasibleDescent.SelfOwned
+        ) CompletedMoveEvaluation(
+            state, objective, params.cancellation,
+            mayAttempt = {
+                totalFlips < maxFlips && params.nodeBudget?.allowance?.movesLeft() != 0L &&
+                    checkpoint?.shouldPause(totalFlips) != true
+            },
+            complete = { candidate ->
+                decide(state, candidate, params.cancellation, sink.ls) { work ->
+                    totalFlips += work
+                    progress.charge(totalFlips)
+                }
+            },
+            current = { (liveCompletion as? Completion.Witness)?.sample ?: state.assignment.snapshot() },
+        ) else null
 
         fun reportProgress() = progress.optimization(
             totalFlips, restartCount, stallCount, bestObj, bestSample != null,
             bestCostInfeasible, bestFoundAtMs, checkpoint,
         )
 
-        while (totalFlips < maxFlips) {
+        while (totalFlips < maxFlips || pendingCompletedMove) {
             progress.observeResidual()
             while (checkpoint?.shouldPause(totalFlips) == true) {
                 reportProgress()
                 yield(null)
                 cancelCountdown = 0
             }
-            if (params.nodeBudget?.allowance?.movesLeft() == 0L) break
+            if (params.nodeBudget?.allowance?.movesLeft() == 0L && !pendingCompletedMove) break
             if (cancelCountdown-- <= 0) {
                 while (params.cancellation()) {
                     if (checkpoint != null) {
@@ -819,7 +837,8 @@ internal class LocalSearchEngine(
                     cancelCountdown = 0
                 }
             }
-            if (state.cost == 0L) {
+            if (state.cost == 0L || pendingCompletedMove) {
+                pendingCompletedMove = false
                 // Each descent step is O(numVars); the once-per-CANCEL_CHECK_INTERVAL throttle above
                 // is too coarse to keep the optimize phase deadline-responsive. One extra poll per
                 // descent step is negligible against the step's own cost.
@@ -837,30 +856,35 @@ internal class LocalSearchEngine(
                 // improvement, so the steady state allocates nothing per iteration.
                 if (completion != null) {
                     state.refreshRealRows()
-                    if (state.cost != 0L) {
+                    if (state.cost != 0L && liveCompletion !is Completion.Witness) {
                         totalFlips++
                         continue
                     }
                 }
-                val obj = if (completion != null || wideObjective) {
+                val obj = if (liveCompletion is Completion.Witness) {
+                    objective.evaluate(liveCompletion.sample)
+                } else if (completion != null || wideObjective) {
                     objective.evaluate(state.assignment.snapshot())
                 } else {
                     objective.evaluate(state.assignment)
                 }
-                if (obj < bestObj && state.intValuesInDomain()) {
-                    val decided = decide(
+                if ((completion != null || obj < bestObj) && state.intValuesInDomain()) {
+                    val decided = liveCompletion ?: decide(
                         state,
                         state.assignment.snapshot(),
                         params.cancellation,
                         sink.ls,
                     ) { work -> totalFlips += work }
+                    if (completion != null) liveCompletion = decided
                     if (decided !is Completion.Witness) {
                         if (checkpoint != null && decided is Completion.Undecided && params.cancellation()) {
+                            liveCompletion = null
                             reportProgress()
                             yield(null)
                             cancelCountdown = 0
                             continue
                         }
+                        liveCompletion = null
                         restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
                         restartCount++
                         flipsSinceRestart = 0
@@ -870,7 +894,12 @@ internal class LocalSearchEngine(
                     val solution = decided.sample
                     if (completion != null) adoptReals(state, solution)
                     val solved = if (completion != null || wideObjective) objective.evaluate(solution) else obj
-                    if (solved < bestObj) {
+                    val previous = bestSample
+                    val improves = if (completion != null && objective is LinearObjective && previous != null &&
+                        solution.symbolicReals == null && solution.algebraicReals == null &&
+                        previous.symbolicReals == null && previous.algebraicReals == null
+                    ) objective.evaluateExact(solution) < objective.evaluateExact(previous) else solved < bestObj
+                    if (improves) {
                         bestObj = solved
                         bestSample = solution
                         bestFoundAtMs = sink.elapsedMs()
@@ -882,6 +911,7 @@ internal class LocalSearchEngine(
                         continue
                     }
                 }
+                if (totalFlips >= maxFlips) break
                 // Explicit feasible-phase dispatch — exhaustive, no else: every strategy declares its
                 // [FeasibleDescent], so nothing falls into a default descent by accident.
                 when (feasibleMode) {
@@ -894,11 +924,13 @@ internal class LocalSearchEngine(
                     FeasibleDescent.RatchetAsConstraint -> {
                         if (ratchetBound != null) {
                             ratchetBound.tightenBelow(obj)
+                            liveCompletion = null
                             state.reevaluateFactor(problem.numFactors - 1)
                             totalFlips++
                             continue
                         }
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
+                        liveCompletion = null
                         restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
                         stallCount++
                         restartCount++
@@ -914,20 +946,33 @@ internal class LocalSearchEngine(
                     // feasibility-breaking pick is reverted and retried; a null pick is a local optimum.
                     FeasibleDescent.SelfOwned -> {
                         val m = timing.inPhase("selection") {
-                            (descentStrategy ?: strategy).pickMove(state, params.cancellation)
+                            (descentStrategy ?: strategy).pickMove(state, params.cancellation, completedMoves)
                         }
                         if (m != null) {
                             feasibleMisses = 0
-                            val savedSnap = state.assignment.snapshot()
-                            timing.inPhase("application") {
-                                state.apply(m)
-                                if (state.cost != 0L) revertMove(state, m, savedSnap)
+                            if (completedMoves != null) {
+                                val solution = completedMoves.sample(m) ?: completedMoves.attempt(m)
+                                if (solution != null) {
+                                    timing.inPhase("application") { state.apply(completedMoves.commitMove(m, solution)) }
+                                    liveCompletion = Completion.Witness(solution)
+                                    pendingCompletedMove = true
+                                }
+                            } else {
+                                val savedSnap = state.assignment.snapshot()
+                                timing.inPhase("application") {
+                                    state.apply(m)
+                                    if (state.cost != 0L) revertMove(state, m, savedSnap)
+                                }
+                                liveCompletion = null
                             }
                             flipsSinceRestart++
                             totalFlips++
                             continue
                         }
-                        if (params.cancellation()) {
+                        if (params.cancellation() || totalFlips >= maxFlips ||
+                            params.nodeBudget?.allowance?.movesLeft() == 0L ||
+                            checkpoint?.shouldPause(totalFlips) == true
+                        ) {
                             cancelCountdown = 0
                             continue
                         }
@@ -943,6 +988,7 @@ internal class LocalSearchEngine(
                         }
                         feasibleMisses = 0
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
+                        liveCompletion = null
                         restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
                         stallCount++
                         restartCount++
@@ -953,6 +999,7 @@ internal class LocalSearchEngine(
                 }
             }
             if (restarts.shouldRestart(flipsSinceRestart)) {
+                liveCompletion = null
                 restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
                 restartCount++
                 flipsSinceRestart = 0
@@ -972,6 +1019,7 @@ internal class LocalSearchEngine(
                     cancelCountdown = 0
                     continue
                 }
+                liveCompletion = null
                 restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
                 restartCount++
                 flipsSinceRestart = 0
@@ -980,6 +1028,7 @@ internal class LocalSearchEngine(
                 continue
             }
             timing.inPhase("application") { state.apply(move) }
+            liveCompletion = null
             if (state.cost in 1 until bestCostInfeasible) {
                 bestCostInfeasible = state.cost
             }
@@ -1088,16 +1137,20 @@ internal class LocalSearchEngine(
         charge: (Long) -> Unit,
     ): Completion {
         if (unscoredCandidateCheck == null && completion == null) return Completion.Witness(candidate)
-        val checked = unscoredCandidateCheck?.check(candidate, state.assumptions, cancellation)
-            ?: Completion.Witness(candidate)
-        val completed = if (checked is Completion.Witness) {
-            completion?.complete(candidate, cancellation) ?: checked
-        } else checked
-        val decided = if (completed is Completion.Witness &&
-            (cancellation() || completed.sample.numBoolVars != candidate.numBoolVars ||
-                completed.sample.numIntVars != candidate.numIntVars ||
-                candidate.hammingDistanceTo(completed.sample) != 0)
-        ) Completion.Undecided(completed.work) else completed
+        val real = completion?.complete(candidate, cancellation) ?: Completion.Witness(candidate)
+        val compatible = if (real is Completion.Witness &&
+            (cancellation() || real.sample.numBoolVars != candidate.numBoolVars ||
+                real.sample.numIntVars != candidate.numIntVars ||
+                (problem.numRealVars > 0 && real.sample.numRealVars != candidate.numRealVars) ||
+                candidate.hammingDistanceTo(real.sample) != 0)
+        ) Completion.Undecided(real.work) else real
+        val decided = if (compatible is Completion.Witness) {
+            when (val checked = unscoredCandidateCheck?.check(compatible.sample, state.assumptions, cancellation)) {
+                null, is Completion.Witness -> compatible
+                is Completion.Refuted -> Completion.Refuted(checked.factors, compatible.work + checked.work)
+                is Completion.Undecided -> Completion.Undecided(compatible.work + checked.work)
+            }
+        } else compatible
         charge(decided.work)
         stats?.recordCompletion(refuted = decided is Completion.Refuted, undecided = decided is Completion.Undecided)
         if (decided is Completion.Refuted) {

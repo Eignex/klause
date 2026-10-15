@@ -27,7 +27,13 @@ data class TabuFilter(
     val dynamicTenure: ((step: Long) -> Int)? = null,
 ) {
     /** Filter `moves`, dropping tabu ones (subject to aspiration). */
-    fun filter(state: LocalSearchState, raw: List<Move>): List<Move> {
+    fun filter(state: LocalSearchState, raw: List<Move>): List<Move> = filter(state, raw, null)
+
+    internal fun filter(
+        state: LocalSearchState,
+        raw: List<Move>,
+        completedImprovement: ((Move) -> Boolean)?,
+    ): List<Move> {
         val effective = dynamicTenure?.invoke(state.step) ?: tenure
         if (effective <= 0 || raw.isEmpty()) return raw
 
@@ -45,7 +51,10 @@ data class TabuFilter(
         val admitted = ArrayList<Move>(raw.size)
         for (m in raw) {
             val tabu = state.tabu.isTaboo(m, effective)
-            if (!tabu || aspiration.admitsTabu(state, m)) admitted.add(m)
+            val aspired = if (tabu && completedImprovement != null && aspiration == AspirationCriterion.OrImproving) {
+                completedImprovement(m)
+            } else tabu && aspiration.admitsTabu(state, m)
+            if (!tabu || aspired) admitted.add(m)
         }
         return when {
             admitted.isNotEmpty() -> admitted

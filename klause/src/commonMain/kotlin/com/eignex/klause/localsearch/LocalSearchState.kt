@@ -1168,6 +1168,12 @@ class LocalSearchState private constructor(
         }
     }
 
+    internal fun snapshotAfter(move: Move): Sample {
+        var sample: Sample? = null
+        evaluateMove(move, capture = { sample = assignment.snapshot() })
+        return checkNotNull(sample)
+    }
+
     // Use the committed move's single propagation pass and restore saved outputs without replaying definitions.
     private fun evaluateMove(
         move: Move,
@@ -1176,11 +1182,12 @@ class LocalSearchState private constructor(
         weightedResidual: Boolean = false,
         elementEligibility: MoveSink? = null,
         feasibleObjective: Boolean = false,
+        capture: (() -> Unit)? = null,
     ): MoveEval {
         check(!probeActive && !moveActive) { "local-search probes cannot be nested" }
         moveActive = true
         try {
-            return probeMove(move, objective, refineCumulative, weightedResidual, elementEligibility, feasibleObjective)
+            return probeMove(move, objective, refineCumulative, weightedResidual, elementEligibility, feasibleObjective, capture)
         } finally {
             moveActive = false
         }
@@ -1193,6 +1200,7 @@ class LocalSearchState private constructor(
         weightedResidual: Boolean,
         elementEligibility: MoveSink?,
         feasibleObjective: Boolean,
+        capture: (() -> Unit)?,
     ): MoveEval {
         val oldCost = cost
         val oldBestCost = bestCostSeen
@@ -1223,6 +1231,7 @@ class LocalSearchState private constructor(
         breakProbeActive = true
         try {
             apply(move, affected)
+            capture?.invoke()
             breakProbeActive = false
             var breakCount = 0
             var makeCount = 0

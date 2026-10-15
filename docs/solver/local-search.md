@@ -651,6 +651,26 @@ against those constraints before publication; a rejected or indeterminate candid
 cannot refute the source model. Completed samples retain authoritative coordinates
 and source scope rather than substituting the local-search score for a witness check.
 
+Self-owned optimization with finite and continuous coordinates admits at most two
+completion probes per pick after source generation and configuration filtering. One
+probe follows the best raw score; the other explores a rotating proposal. A rotating
+finite coordinate touching a continuous factor also offers a channeling-aware flip,
+neighbor or domain endpoint, including directions whose direct objective cost rises.
+Raw feasibility and objective deltas order probes without rejecting that exploration.
+The existing instruction, solve-wide move and containing native/query allowances
+bound attempts; every completed attempt is charged once, including failures.
+
+Only accepted completions enter the recipe's noise/score pools. Their scores compare
+the original objective on completed samples, and improving tabu aspiration uses that
+comparison. The recipe retains its acceptance, configuration, schedule and restart
+policies. A selected finite move and completed reals commit as one compound transition;
+its authoritative sample is retained for publication without repeating completion.
+Reverted probes preserve assignment, definitions, costs, configuration and activity.
+Failed, canceled or undecided attempts cannot replace an incumbent. Finite-only,
+continuous-only and ratchet recipes retain their existing move selection. A completed
+witness remains heuristic incumbent evidence, with the completion adapter's exact or
+configured source-tolerance guarantee; it supplies no optimum proof.
+
 Numerical finite completion uses the same original-source tolerance callback as
 CP when the invocation supplies one. The residual LP must accept its floating gap,
 and the callback checks the full completed source point again before returning a
@@ -673,8 +693,8 @@ that guide the walk.
 
 Standalone LS checks covered constraints through their invariants. A propagation-only
 custom factor mapped to `NoInvariant` instead receives a private
-[full-coordinate finite check](search.md#custom-factor-publication-checks) before
-caller completion. Zero score alone cannot publish its candidate. An uncovered
+[full-coordinate finite check](search.md#custom-factor-publication-checks) on the
+completed sample before publication. Zero score alone cannot publish its candidate. An uncovered
 continuous constraint explicitly declines finite local-search execution.
 
 ## Exact coordinate neighborhoods
