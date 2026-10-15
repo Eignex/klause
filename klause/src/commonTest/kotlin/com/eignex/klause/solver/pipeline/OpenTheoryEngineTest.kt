@@ -59,7 +59,7 @@ class OpenTheoryEngineTest {
                 numBoolVars = 0,
                 intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
                 factors = arrayOf(
-                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, width),
+                    Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, width),
                     Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
                 ),
             )
