@@ -12,7 +12,10 @@ import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class PortfolioWorkerTest {
     @Test
@@ -25,10 +28,9 @@ class PortfolioWorkerTest {
         val stronger = EngineInvocation(plan, model, objective, sourceAssumptions = Assumptions(ints = mapOf(0 to 3L)))
         val bounds = SharedObjectiveBound(identity = model)
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Unsat() }
-            .bindEvidence(model).bindInvocation(stronger)
         worker.sharedPools = SharedPools(null, null, bounds = bounds, identity = model)
 
-        worker.bindSharingInvocation(containing)
+        worker.bindSource(SourceWorkerBinding(stronger, sharingInvocation = containing))
         bounds.publish(CompletedEnginePublication.ObjectiveBound(stronger, 3.0))
 
         assertSame(stronger, worker.evidenceInvocation)
@@ -45,9 +47,9 @@ class PortfolioWorkerTest {
         val stronger = EngineInvocation(plan, model, objective, sourceAssumptions = Assumptions(ints = mapOf(0 to 3L)))
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Unsat() }.bindEvidence(model)
         worker.sharedPools = SharedPools(null, null, bounds = SharedObjectiveBound(identity = model), identity = model)
-        worker.bindSharingInvocation(containing)
+        worker.bindSource(SourceWorkerBinding(containing, sharingInvocation = containing))
 
-        assertFailsWith<IllegalArgumentException> { worker.bindSharingInvocation(stronger) }
+        assertFailsWith<IllegalArgumentException> { worker.bindSource(SourceWorkerBinding(containing, sharingInvocation = stronger)) }
     }
 
     @Test
@@ -62,4 +64,63 @@ class PortfolioWorkerTest {
             assertFailsWith<IllegalArgumentException> { worker.bindEvidence(foreign) }
         }
     }
+
+    @Test
+    fun `a foreign source binding leaves the worker unbound`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val model = ModelIdentity.of(source)
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Unsat() }.bindEvidence(model)
+        val foreign = Problem(0, 0, emptyArray(), emptyArray())
+        val invocation = EngineInvocation(foreign.prepareExecutionPlan(), ModelIdentity.of(foreign))
+
+        assertFailsWith<IllegalArgumentException> { worker.bindSource(SourceWorkerBinding(invocation)) }
+
+        assertNull(worker.sourceBinding)
+    }
+
+    @Test
+    fun `repeated source binding retains witness only authority`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val invocation = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Unsat() }
+        val binding = SourceWorkerBinding(invocation, provesResults = false)
+        worker.bindSource(binding)
+
+        worker.bindSource(SourceWorkerBinding(invocation, provesResults = false)).bindEvidence(invocation.model)
+
+        assertSame(binding, worker.sourceBinding)
+        assertFalse(worker.permitsSourceProofs)
+        assertFailsWith<IllegalArgumentException> { worker.bindSource(SourceWorkerBinding(invocation)) }
+    }
+
+    @Test
+    fun `sharing rejects another prepared invocation without equating conditions`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
+        val model = ModelIdentity.of(source)
+        val producer = EngineInvocation(source.prepareExecutionPlan(), model)
+        val foreign = EngineInvocation(source.prepareExecutionPlan(), model)
+
+        assertFailsWith<IllegalArgumentException> { SourceWorkerBinding(producer, sharingInvocation = foreign) }
+    }
+
+    @Test
+    fun `source binding rejects a changed objective identity`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val invocation = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
+
+        assertFailsWith<IllegalArgumentException> {
+            SourceWorkerBinding(ModelIdentity.of(source, Any()), invocation)
+        }
+    }
+
+    @Test
+    fun `low level workers retain unbound caller trusted execution`() {
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Unsat() }
+
+        val result = Portfolio.thompson(listOf(worker)).use { it.solve() }
+
+        assertTrue(result is SolveResult.Unsat)
+        assertNull(worker.sourceBinding)
+    }
+
 }

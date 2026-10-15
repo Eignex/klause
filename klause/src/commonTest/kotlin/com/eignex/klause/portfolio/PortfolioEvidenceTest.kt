@@ -1,8 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
@@ -15,11 +15,11 @@ import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.CandidateVerifier
-import com.eignex.klause.solver.incumbent.CompletedEngineResult
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.CompletedEngineResult
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
-import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
@@ -45,8 +45,7 @@ class PortfolioEvidenceTest {
             val worker = PortfolioWorker.ofMinimize("exhausted", 0) { bound, _, _, _ ->
                 assertEquals(Double.POSITIVE_INFINITY, bound())
                 sequenceOf(MinimizeResult.Unknown(TerminationReason.SearchExhausted))
-            }.bindEvidence(identity, provesResults = proofs).bindInvocation(invocation)
-                .bindSharingInvocation(invocation).also {
+            }.bindSource(SourceWorkerBinding(invocation, sharingInvocation = invocation, provesResults = proofs)).also {
                 it.controlsObjectiveCutoff = controlled
             }
 
@@ -66,7 +65,7 @@ class PortfolioEvidenceTest {
         val producer = EngineInvocation(plan, model, executionAssumptions = Assumptions(bools = mapOf(0 to true)))
         val point = Sample(booleanArrayOf(false), longArrayOf())
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
-            .bindEvidence(model).bindInvocation(producer)
+            .bindSource(SourceWorkerBinding(producer))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(containing)
 
         val checked = verifier.witness(worker, point, null)
@@ -86,7 +85,7 @@ class PortfolioEvidenceTest {
         point.witnessCertificate = EvidenceCertificate.published(
             CompletedEnginePublication.Witness(producer, point, 2.0))
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
-            .bindEvidence(model).bindInvocation(producer)
+            .bindSource(SourceWorkerBinding(producer))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(containing)
 
         val checked = verifier.witness(worker, point, 2.0)
@@ -104,7 +103,7 @@ class PortfolioEvidenceTest {
         point.witnessCertificate = EvidenceCertificate.published(
             CompletedEnginePublication.Witness(producer, point, null))
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
-            .bindEvidence(model).bindInvocation(producer)
+            .bindSource(SourceWorkerBinding(producer))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(containing)
 
         val checked = verifier.witness(worker, point, null)
@@ -122,7 +121,7 @@ class PortfolioEvidenceTest {
         point.witnessCertificate = EvidenceCertificate.published(
             CompletedEnginePublication.Witness(binding, point, 2.0))
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
-            .bindEvidence(model).bindInvocation(binding)
+            .bindSource(SourceWorkerBinding(binding))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(binding)
 
         val checked = verifier.witness(worker, point, 3.0)
@@ -141,7 +140,7 @@ class PortfolioEvidenceTest {
         point.witnessCertificate = EvidenceCertificate.published(
             CompletedEnginePublication.Witness(producer, point, null))
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
-            .bindEvidence(model).bindInvocation(producer)
+            .bindSource(SourceWorkerBinding(producer))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(containing)
 
         val checked = verifier.witness(worker, point, null)
@@ -264,7 +263,7 @@ class PortfolioEvidenceTest {
         val point = Sample(booleanArrayOf(), longArrayOf(0))
         val worker = PortfolioWorker.ofMinimize("bound", 0) { _, _, _, _ ->
             sequenceOf(MinimizeResult.Optimal(point, 0.0))
-        }.bindEvidence(model).bindInvocation(invocation)
+        }.bindSource(SourceWorkerBinding(invocation))
         val portfolio = Portfolio.thompson(listOf(worker))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(invocation)
         portfolio.evidenceVerification = verifier
@@ -292,7 +291,7 @@ class PortfolioEvidenceTest {
                 sequenceOf(MinimizeResult.BestFound(first, objective.evaluateExact(first).toDouble(),
                     TerminationReason.BudgetExhausted),
                     MinimizeResult.Optimal(optimum, objective.evaluateExact(optimum).toDouble()))
-            }.bindEvidence(identity).bindInvocation(binding)
+            }.bindSource(SourceWorkerBinding(binding))
             val portfolio = Portfolio.thompson(listOf(complete))
             portfolio.exactLinearObjective = objective
             portfolio.evidenceVerification = PortfolioEvidence(identity, CandidateVerifier.trusting())
@@ -311,7 +310,7 @@ class PortfolioEvidenceTest {
         val model = ModelIdentity.of(Any())
         val scope = SourceScope(SourceRevision("original", "exact-affine"))
         val worker = PortfolioWorker.ofSolve("complete", 0) { _, _ -> SolveResult.Unsat() }
-            .bindEvidence(model).bindSourceScope(scope)
+            .bindSource(SourceWorkerBinding(model, scope = scope))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindSourceScope(scope)
         val foreign = scope.copy(revision = scope.revision.copy(identity = "foreign"))
 
@@ -326,7 +325,7 @@ class PortfolioEvidenceTest {
         val model = ModelIdentity.of(Any())
         val scope = SourceScope(SourceRevision("original", "exact-affine"))
         val worker = PortfolioWorker.ofSolve("complete", 0) { _, _ -> SolveResult.Unsat() }
-            .bindEvidence(model).bindSourceScope(scope)
+            .bindSource(SourceWorkerBinding(model, scope = scope))
         val verifier = PortfolioEvidence(model) { Verification.Rejected("original source refutes this point") }
         verifier.bindSourceScope(scope)
         val result = MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf()), 0.0)
@@ -419,7 +418,7 @@ class PortfolioEvidenceTest {
             SourceObjective("x", ObjectiveSense.MINIMIZE))
         val point = Sample(booleanArrayOf(), longArrayOf(0))
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
-            .bindEvidence(model).bindSourceScope(scope)
+            .bindSource(SourceWorkerBinding(model, scope = scope))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindSourceScope(scope)
         val completion = CompletedEngineResult.Minimize(scope, MinimizeResult.Optimal(point, 0.0))
 
@@ -437,7 +436,7 @@ class PortfolioEvidenceTest {
         val binding = EngineInvocation(plan, model, objective)
         val point = Sample(booleanArrayOf(), longArrayOf(1))
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
-            .bindEvidence(model).bindInvocation(binding)
+            .bindSource(SourceWorkerBinding(binding))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(binding)
 
         val checked = verifier.proof(worker, EvidenceKind.Bound,
@@ -453,7 +452,7 @@ class PortfolioEvidenceTest {
         val model = ModelIdentity.of(source)
         val binding = EngineInvocation(plan, model)
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Unsat() }
-            .bindEvidence(model).bindInvocation(binding)
+            .bindSource(SourceWorkerBinding(binding))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(binding)
         val conditional = EngineInvocation(plan, model,
             executionAssumptions = Assumptions(bools = mapOf(0 to true)))

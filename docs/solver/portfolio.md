@@ -125,9 +125,16 @@ assumptions; explicit revision capture remains optional. It does not manufacture
 source revision for an uncaptured operation. Execution cutoff values remain in native
 minimized units, separate from exact original-source claims. That hook refuses foreign
 scopes and completion
-kinds unsupported by the result. Worker model, objective and invocation bindings
-cannot change after materialization; repeated matching binding retains witness-only
-withholding. Mixed invocation derivations cannot issue a completed certificate.
+kinds unsupported by the result. Source arm materialization installs one immutable `SourceWorkerBinding` before
+scheduler admission. It captures model/objective identity, source scope, the actual
+producer invocation, a separate containing sharing invocation and proof authority.
+Finite worker assumptions may strengthen the sharing scope; those producer conditions
+cannot justify unconditional imports into siblings. Quadratic workers retain their typed
+native invocation and certificate checks rather than an ordinary affine invocation.
+A completed binding cannot change or promote witness-only authority. Model-only metadata
+on low-level configurations does not manufacture a source invocation. Binding failure
+closes the materialized worker before invocation-owned source services unwind in reverse
+order. Mixed invocation derivations cannot issue a completed certificate.
 Its derivation verifier separately checks the actual
 requested source claim; an engine completion without captured derivations stays
 unavailable for independent proof checking. The legacy kind-only issuance remains

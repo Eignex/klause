@@ -16,6 +16,7 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.ReseedGuard
@@ -256,13 +257,15 @@ internal class QuadraticIntegerOptimization(
 
     fun worker(arm: Int): PortfolioWorker {
         val model = ModelIdentity.of(source, objective)
+        val binding = SourceWorkerBinding(model, provesResults = arm == 0, preparedPlan = plan,
+            quadraticInvocation = plan.quadraticEngineInvocation(objective, sense, quadraticAssumptions(controls, engine)))
         return if (arm == 0) PortfolioWorker.ofMinimize("bt+exact-integer-quadratic", arm,
             resumable = { completeHandle() }) { _, _, _, _ -> error("integer traversal runs by slice") }
-            .bindEvidence(model)
+            .bindSource(binding)
         else PortfolioWorker.ofMinimize(if (arm == 2) "alns+exact-integer-quadratic" else "ls+exact-integer-quadratic",
             arm, countsInstructions = true, resumable = { neighborhoodHandle(arm == 2) }) { _, _, _, _ ->
             error("integer neighborhood runs by slice")
-        }.bindEvidence(model, provesResults = false)
+        }.bindSource(binding)
     }
 
     private fun countedWork(): Long = native.work + minOf(sink.search.searchWork, Long.MAX_VALUE - native.work)

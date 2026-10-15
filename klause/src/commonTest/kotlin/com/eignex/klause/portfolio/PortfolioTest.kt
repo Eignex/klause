@@ -952,7 +952,7 @@ class PortfolioTest {
         val conditional = EngineInvocation(plan, identity,
             executionAssumptions = Assumptions(bools = mapOf(0 to false)))
         val worker = PortfolioWorker.ofSolve("conditional", 0) { _, _ -> SolveResult.Unsat() }
-            .bindEvidence(identity).bindInvocation(conditional)
+            .bindSource(SourceWorkerBinding(conditional))
         val portfolio = Portfolio.thompson(listOf(worker)).also {
             it.evidenceVerification = PortfolioEvidence(identity, finiteWitnessVerifier(source.bake(), null))
                 .bindInvocation(expected)

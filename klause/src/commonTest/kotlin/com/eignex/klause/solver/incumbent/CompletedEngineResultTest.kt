@@ -4,6 +4,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -49,7 +50,7 @@ class CompletedEngineResultTest {
     @Test
     fun `a worker cannot issue a completion for a foreign invocation`() {
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Unsat() }
-            .bindEvidence(identity).bindSourceScope(scope)
+            .bindSource(SourceWorkerBinding(identity, scope = scope))
         val foreign = scope.copy(revision = scope.revision.copy(identity = "foreign"))
         val completion = CompletedEngineResult.Solve(foreign, SolveResult.Unsat())
 
@@ -70,7 +71,7 @@ class CompletedEngineResultTest {
     @Test
     fun `an outer binding cannot give proof authority to a witness only worker`() {
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Unsat() }
-            .bindEvidence(identity, provesResults = false).bindSourceScope(scope).bindEvidence(identity)
+            .bindSource(SourceWorkerBinding(identity, scope = scope, provesResults = false)).bindEvidence(identity)
         val completion = CompletedEngineResult.Solve(scope, SolveResult.Unsat())
 
         assertNull(worker.certificateFor(EvidenceKind.Infeasible, completion))

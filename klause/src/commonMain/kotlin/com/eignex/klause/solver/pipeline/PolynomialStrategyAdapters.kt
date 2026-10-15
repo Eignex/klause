@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.EngineInvocation
@@ -85,15 +86,16 @@ internal class PolynomialStrategyAdapters(
                 ExecutionStrategy.MIXED -> error("admission supplies participating arms")
             }
             val family = when (arm) { 0 -> ArmFamily.Backtrack; 1 -> ArmFamily.LocalSearch; else -> ArmFamily.Lns }
-            PortfolioArmFactory(plan, arm, family) { slot ->
+            val executionAssumptions = if (arm == 0) {
+                params.backtrack.withAssumptions(params.assumptions).assumptions
+            } else params.localSearch.withAssumptions(params.assumptions).assumptions
+            val workerBinding = EngineInvocation(plan, identity, objective, params.assumptions, executionAssumptions)
+            PortfolioArmFactory(plan, arm, family, binding = {
+                SourceWorkerBinding(workerBinding, provesResults = it.permitsSourceProofs)
+            }) { slot ->
                 val controls = workerParams(slot)
-                val executionAssumptions = if (arm == 0) {
-                    controls.backtrack.withAssumptions(controls.assumptions).assumptions
-                } else controls.localSearch.withAssumptions(controls.assumptions).assumptions
-                val workerBinding = EngineInvocation(plan, identity, objective, controls.assumptions,
-                    executionAssumptions)
                 PolynomialWorkerAdapter(model, scope.worker(slot), controls, workerBinding,
-                    scope.workerCancellation(slot)).worker(arm, objective, slot).bindInvocation(workerBinding)
+                    scope.workerCancellation(slot)).worker(arm, objective, slot)
             }
         }
         val complete = engine == FiniteEngine.BACKTRACK
