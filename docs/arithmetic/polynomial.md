@@ -88,6 +88,14 @@ candidate intervals as needed. No fixed precision determines equality or order.
 Rational sector samples are chosen strictly between ordered algebraic boundaries,
 or beyond the finite bound of an unbounded sector.
 
+A point evaluation captures its own exact coordinate map and retains completed
+coordinate powers by ID and exponent. Each point owns a separate cache. Capture,
+lookups and completed inserts debit the same arithmetic token; an interrupted
+power installs no value. The ordinary evaluator keeps no retained powers. Both
+paths preserve coefficient-first multiplication order and exact scalar metadata.
+The point owner exposes its captured coordinates separately from arithmetic work,
+so callers can publish the same immutable values they evaluated.
+
 Specialization evaluates coefficients at exact earlier coordinates and trims
 vanished leading coefficients by exact sign. `AlgebraicPolynomial.isZero` retains
 nullification as a separate state. Lifting forms a rational annihilator by

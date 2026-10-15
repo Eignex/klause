@@ -24,6 +24,29 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `successive witness proposals keep exact powers isolated`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (= (* x x) 2))
+            (assert (= y (+ (^ x 4) (^ x 2))))
+        """.trimIndent())
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic))
+        val point = mutableMapOf(
+            0 to algebraic.roots(RationalPolynomial.of(-2, 0, 1)).last(),
+            1 to algebraic.rational(BigFraction.ofLong(6)),
+        )
+        assertIs<QfNraAssignment>(probe.candidate(point))
+        point[0] = algebraic.roots(RationalPolynomial.of(-3, 0, 1)).last()
+
+        val result = probe.candidate(point)
+
+        assertNull(result)
+    }
+
+    @Test
     fun `sparse dyadic weights preserve distant original ids within the coupled prefix`() {
         val declarations = (0 until 32).joinToString("\n") { "(declare-const x$it Real)" }
         val terms = (1..7).flatMap { x -> (1..8 - x).map { y -> x to y } }.take(19)

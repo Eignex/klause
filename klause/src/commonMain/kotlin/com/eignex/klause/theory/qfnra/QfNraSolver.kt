@@ -463,22 +463,25 @@ internal class WitnessProbe(
         arithmetic.step()
         proposals++
         val context = retentionGuides
-        return checkSample(formula, point, boolCount, arithmetic, algebraic,
-            if (context == null) null else { signs -> retainRejectedPoint(point, signs, context) })
+        return checkSample(
+            formula, point, boolCount, arithmetic, algebraic,
+            if (context == null) null else { captured, signs -> retainRejectedPoint(captured, signs, context) },
+            reusePowers = true,
+        )
     }
 
     private fun retainRejectedPoint(
-        point: Map<Int, AlgebraicReal>,
+        point: AlgebraicArithmetic.PointEvaluation,
         signs: IntArray,
         context: Pair<List<PolynomialAtom>, List<Int>>,
     ) {
         try {
             val variables = retentionVariables ?: return
-            if (point.size != retentionCount) return
+            if (point.coordinateCount != retentionCount) return
             var nonzero = 0
             for (variable in variables) {
                 arithmetic.step()
-                if (algebraic.sign(point.getValue(variable)) != 0) nonzero++
+                if (algebraic.sign(point.coordinate(variable)) != 0) nonzero++
                 if (nonzero == 2) break
             }
             if (nonzero < 2) return
@@ -492,7 +495,7 @@ internal class WitnessProbe(
             val snapshot = LinkedHashMap<Int, AlgebraicReal>()
             for (id in 0 until retentionCount) {
                 arithmetic.step()
-                snapshot[id] = point.getValue(id)
+                snapshot[id] = point.coordinate(id)
             }
             arithmetic.step()
             rejectedCoupled = score to snapshot
@@ -1327,8 +1330,10 @@ private fun checkSample(
     boolCount: Int,
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
-    rejected: ((IntArray) -> Unit)? = null,
+    rejected: ((AlgebraicArithmetic.PointEvaluation, IntArray) -> Unit)? = null,
+    reusePowers: Boolean = false,
 ): QfNraAssignment? {
+    val evaluation = if (reusePowers) algebraic.pointEvaluation(coordinates) else null
     val signs = if (rejected == null) null else {
         repeat(formula.atoms.size + 1) { arithmetic.step() }
         IntArray(formula.atoms.size)
@@ -1336,7 +1341,8 @@ private fun checkSample(
     val atomValues = IntArray(formula.atoms.size) { index ->
         arithmetic.step()
         val atom = formula.atoms[index]
-        val sign = algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))
+        val value = evaluation?.evaluate(atom.polynomial) ?: algebraic.evaluate(atom.polynomial, coordinates)
+        val sign = algebraic.sign(value)
         if (signs != null) {
             arithmetic.step()
             signs[index] = sign
@@ -1348,7 +1354,7 @@ private fun checkSample(
     val bools = solveBooleans(formula, boolCount, atomValues, arithmetic) ?: run {
         if (signs != null) {
             arithmetic.step()
-            rejected?.invoke(signs)
+            rejected?.invoke(requireNotNull(evaluation), signs)
         }
         return null
     }
@@ -1358,9 +1364,9 @@ private fun checkSample(
     }
     check(formula.truth(complete, atomValues, arithmetic) == PolynomialFormula.TRUE)
     arithmetic.step()
-    return QfNraAssignment(bools, List(coordinates.size) {
+    return QfNraAssignment(bools, List(evaluation?.coordinateCount ?: coordinates.size) {
         arithmetic.step()
-        coordinates.getValue(it)
+        evaluation?.coordinate(it) ?: coordinates.getValue(it)
     })
 }
 
