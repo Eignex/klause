@@ -1504,6 +1504,13 @@ argument corroboration. Stderr summaries do not replace this explicit snapshot.
 The counter covers tracer ring-buffer output; it does not prove probe invocation
 coverage, root completeness, call lifetimes, clocks, code sizes or compiler savings.
 
+`NativeVmLiveArgumentReview` also accepts `review=event-loss` with its three pinned
+archive arguments to inspect a saved counter-map binding failure. This mode extracts
+only the original helper output, errors, launch/extraction records and helper source.
+It reports bounded BTF type graphs and integer encodings from the saved bytes,
+including unsupported and missing types. It neither reads live maps nor reruns the
+target, and does not relax the counter's type, ownership or acceptance guards.
+
 ### Table profiling
 
 ```sh
