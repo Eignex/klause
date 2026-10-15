@@ -810,6 +810,11 @@ and aggregation as a historical minimum. `smtCompleteSearchLinearChecks` counts 
 attempts with all those Booleans assigned; `smtCompleteSearchLinearPoints` counts
 their returned continuous points before source-disjunction selection, integrality
 and full-source acceptance. Unobserved counts remain absent rather than zero.
+`smtCompleteSearchLinearOutcome_*` counts returned verdicts, float completion,
+raw exact-point presence and existing stage declines before the caller stop check.
+An absent stage differs from a present stage without a decline; neither establishes
+why another stage failed. A returned raw point can be withheld by the stop check
+and is not a source witness. These counters exclude private queries.
 These observations add no scan, numerical query,
 allowance or result authority and do not explain an UNKNOWN verdict by themselves.
 

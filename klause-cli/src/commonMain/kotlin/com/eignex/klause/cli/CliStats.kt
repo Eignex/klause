@@ -484,6 +484,9 @@ private fun smtStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     completeSearchMinUnassignedBooleans?.let { out += "smtCompleteSearchMinUnassignedBooleans" to "$it" }
     completeSearchLinearChecks?.let { out += "smtCompleteSearchLinearChecks" to "$it" }
     completeSearchLinearPoints?.let { out += "smtCompleteSearchLinearPoints" to "$it" }
+    completeSearchLinearOutcomes?.forEach { (key, count) ->
+        out += "smtCompleteSearchLinearOutcome_$key" to "$count"
+    }
     out += "smtWitnessCandidates" to "$witnessCandidates"
     out += "smtWitnessAccepted" to "$witnessAccepted"
     out += "smtStrictWitnessCandidates" to "$strictWitnessCandidates"

@@ -89,6 +89,7 @@ class ExactLiraSearchComponentTest {
                 assertEquals(if (complete) 0 else null, observed.completeSearchMinUnassignedBooleans)
                 assertEquals(complete, (observed.completeSearchLinearChecks ?: 0L) > 0L)
                 assertEquals(complete, (observed.completeSearchLinearPoints ?: 0L) > 0L)
+                assertEquals(observed.completeSearchLinearChecks, observed.completeSearchLinearOutcomes?.values?.sum())
             }
         }
     }
