@@ -13,7 +13,9 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import java.io.File
@@ -28,6 +30,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class Xcsp3SourceCheckerTest {
@@ -68,8 +71,20 @@ class Xcsp3SourceCheckerTest {
         val conflict = assertIs<ComponentResult.Conflict>(
             shared.push(SearchDecision.Bool(Lit.make(targetAbsent, false))),
         )
+        when (val resolution = cp.resolveConflict(shared)) {
+            is SearchConflictResolution.Backjump -> {
+                shared.popTo(resolution.conflict.decisionLevel)
+                assertIs<SearchLearnedConflictResult.Resume>(resolution.conflict.apply(shared))
+            }
+
+            SearchConflictResolution.Chronological -> {
+                shared.popTo(0)
+                shared.learn(conflict.explanation)
+            }
+
+            SearchConflictResolution.Exhausted -> fail("A checked source witness rules out root exhaustion")
+        }
         shared.popTo(0)
-        shared.learn(conflict.explanation)
 
         for ((name, value) in listOf("x" to 1L, "b" to 0L, "c" to 0L)) {
             assertIs<ComponentResult.Consistent>(
