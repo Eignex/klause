@@ -88,6 +88,35 @@ class CompletedMoveEvaluationTest {
     }
 
     @Test
+    fun `real guesses do not displace finite completion proposals`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.recompute()
+        val initial = state.assignment.snapshot()
+        val pins = mutableListOf<Long>()
+        val evaluation = CompletedMoveEvaluation(
+            state, LinearObjective(intCoefficients = longArrayOf(1)), Cancellation.Never,
+            mayAttempt = { true }, complete = { candidate ->
+                pins += candidate.intValue(0)
+                Completion.Witness(candidate)
+            }, current = { initial },
+        )
+        val finite = Move.IntSet(0, 1)
+        val real = Move.RealSet(0, 1.0)
+
+        evaluation.prepare(listOf(real, finite)) { if (it == real) -10.0 else 1.0 }
+        evaluation.attempt(real)
+
+        assertEquals(listOf(1L), pins)
+        assertNotNull(evaluation.sample(finite))
+        assertNull(evaluation.sample(real))
+        assertEquals(initial, state.assignment.snapshot())
+    }
+
+    @Test
     fun `a throwing completion leaves the live assignment unchanged`() {
         val problem = Problem(
             0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),

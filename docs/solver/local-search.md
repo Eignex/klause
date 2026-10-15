@@ -658,9 +658,12 @@ probe follows the best raw score. If that productive raw direction completes to 
 improvement, strict greedy descent retains its reservoir-selected proposal without
 another numerical query or tie draw. Existing proposal multiplicities are retained;
 exploration does not insert a duplicate into a pool. Otherwise a second probe explores
-a rotating proposal. A rotating finite coordinate touching a continuous factor also offers a channeling-aware flip,
-neighbor or domain endpoint, including directions whose direct objective cost rises.
-Raw continuous feasibility and objective deltas order probes without rejecting that
+a rotating proposal. An enabled `ObjectiveSeed` also offers a rotating finite
+coordinate touching a continuous factor: a channeling-aware flip, neighbor or domain
+endpoint, including directions whose direct objective cost rises. Its proposals retain
+that source's configured phase and pool.
+Real-only guesses do not enter numerical move probing: completion already optimizes
+the real coordinates for the current finite pins. Raw continuous feasibility and objective deltas order probes without rejecting that
 exploration. A violated finite-only row whose selected scoring projection declares
 an exact assignment check declines the pinned proposal before numerical completion;
 continuous changes cannot repair that source violation. Heuristic and unsupported

@@ -17,8 +17,13 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
+import com.eignex.klause.localsearch.movesource.MoveSource
+import com.eignex.klause.localsearch.movesource.MoveSourceId
 import com.eignex.klause.localsearch.movesource.ObjectiveSeed
+import com.eignex.klause.localsearch.movesource.Phase
+import com.eignex.klause.localsearch.movesource.Pool
 import com.eignex.klause.localsearch.scoring.MoveScoring
+import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.portfolio.LeafRealCompletion
@@ -983,7 +988,19 @@ class LocalSearchEngineTest {
 
     @Test
     fun `continuous savings admit a directly more expensive integer move`() {
-        for (relation in listOf(LinearOp.GE, LinearOp.EQ)) {
+        val supplied = object : MoveSource {
+            override val id = MoveSourceId("supplied")
+            override val phase = Phase.Feasible
+            override val pool = Pool.ScoreOnly
+            override fun generate(state: LocalSearchState, sink: MoveSink) = sink.addIntSet(0, 1)
+        }
+        val strategies = listOf(Cbls(), SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(supplied)), feasibleDescent = FeasibleDescent.SelfOwned,
+            feasibleAcceptance = AcceptanceRule.GreedyDescent,
+        ))
+        for ((relation, strategy) in listOf(LinearOp.GE, LinearOp.EQ).flatMap { relation ->
+            strategies.map { relation to it }
+        }) {
             val problem = Problem(
                 0, 1, arrayOf(IntDomain(0, 1)),
                 arrayOf<Factor>(Linear(
@@ -995,7 +1012,7 @@ class LocalSearchEngineTest {
             val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0))
             val completed = mutableListOf<Long>()
             val search = LocalSearchEngine(
-                LocalSearchModel.open(problem), greedyRepairOnRestart = false,
+                LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
                 completion = { candidate, _ ->
                     val b = candidate.intValue(0)
                     completed += b
