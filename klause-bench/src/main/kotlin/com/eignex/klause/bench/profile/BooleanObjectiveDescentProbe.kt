@@ -484,7 +484,8 @@ internal object BooleanObjectiveDescentProbe {
                 val sample = best?.let(reconstruct)
                 add(buildJsonObject {
                     put("index", index++); put("status", "DONE"); put("seed", 3)
-                    put("arm", "${if (initial == null) "unseeded" else "supplied"}-$label-${if (closed) "closed" else "raw"}")
+                    put("arm",
+                        "${if (initial == null) "unseeded" else "supplied"}-$label-${if (closed) "closed" else "raw"}")
                     put("problem", buildJsonObject {
                         put("suite", suite); put("problem", name); put("format", "WCNF")
                     })
