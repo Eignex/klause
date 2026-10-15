@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.cut.CutContext
 import com.eignex.klause.lp.cut.CutPool
@@ -220,19 +221,24 @@ internal class LpNodeOutcome(val prune: Boolean, val basis: Basis?, val explanat
  * Bounded, deduplicating buffer of LP-learned nogoods awaiting registration at the next restart.
  * Dedup is by sorted-literal key so a region pruned repeatedly is learned once; the cap bounds memory
  * between restarts. [drain] returns and clears the pending batch but keeps the seen-set so a flushed
- * clause is not re-queued.
+ * clause is not re-queued. Entries record immediate registration so restart sharing does not install
+ * those clauses in the same persistent CP session twice.
  */
 internal class LpNogoodPool(private val cap: Int = 4096) {
-    private val seen = HashSet<String>()
-    private val pending = ArrayList<IntArray>()
+    class Entry(val literals: IntArray, val registered: Boolean)
 
-    fun add(nogood: IntArray) {
-        if (nogood.isEmpty() || seen.size >= cap) return
+    private val seen = HashSet<String>()
+    private val pending = ArrayList<Entry>()
+
+    fun add(nogood: IntArray, registered: Boolean = false): Boolean {
+        if (nogood.isEmpty() || seen.size >= cap) return false
         val key = nogood.sorted().joinToString(",")
-        if (seen.add(key)) pending.add(nogood)
+        if (!seen.add(key)) return false
+        pending.add(Entry(nogood, registered))
+        return true
     }
 
-    fun drain(): List<IntArray> {
+    fun drain(): List<Entry> {
         if (pending.isEmpty()) return emptyList()
         val out = ArrayList(pending)
         pending.clear()
@@ -848,7 +854,13 @@ private fun LpEngine.applyRowBounds(
                 else -> session.boundGeLit(variable, threshold, positive = true)
             }
             noteNodeOverhead(support.size.toLong() + 1L)
-            pool.add(intArrayOf(conclusion) + support)
+            val clause = intArrayOf(conclusion) + support
+            if (pool.add(clause, registered = true) &&
+                session.addLearnedClause(Clause(clause), lbd = clause.size, permanent = true) is PropagationResult.Unsat
+            ) {
+                sink.lp.observePrune()
+                return true
+            }
         }
         sink.lp.observeFix()
         onFix()
