@@ -19,6 +19,8 @@ class Abs(
     /** Integer result coordinate. */
     val result: Int,
 ) : Factor {
+    init { require(operand >= 0 && result >= 0) { "Absolute-value IDs must be nonnegative" } }
+
     override val variables: VarList = IntVars(intArrayOf(operand, result).distinct().toIntArray())
 
     override fun remap(mapping: VarRemap): Factor = Abs(mapping.int(operand), mapping.int(result))
