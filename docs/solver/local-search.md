@@ -672,7 +672,8 @@ finite checks retain their ordinary completion/publication checks.
 The existing instruction, solve-wide move and containing native/query allowances
 bound attempts; every completed attempt is charged once, including failures. After
 a move probe charges work, that many further search instructions must accrue before
-another new move-completion query is admitted. Successful cached proposals remain
+another new move-completion query is admitted. Accepting an improving completed
+transition renews admission immediately, preserving productive descent. Successful cached proposals remain
 usable without another numerical query. This pacing leaves time for the recipe to
 resample, repair and restart instead of spending every instruction on completion.
 
