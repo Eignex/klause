@@ -2,20 +2,15 @@ package com.eignex.klause.formats.mps
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lowering.RowScale
 import com.eignex.klause.lowering.RowScaleBuilder
-import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
@@ -422,8 +417,8 @@ private const val MPS_INFINITY = 1e20
  *    an unbounded float keeps an open side of `±∞`.
  *    An unconditional integral affine definition over bounded integers gives a free float a finite integer id
  *    when the resulting rows and objective retain their source numbers.
- *  - an **indicated row** (an `INDICATORS` entry) becomes a reified row plus a `guard -> cond` clause over
- *    a Boolean channelled to its binary column, so the row is relaxed at the column's other value.
+ *  - an **indicated row** retains its exact source comparison and integer trigger in a native
+ *    [com.eignex.klause.factor.arithmetic.LinearIndicator]. Selected consumers install its implication.
  *  - a constraint or objective term touching a float becomes a real ([Double]-coefficient) [Linear] row;
  *    a purely-integer row with a fractional coefficient is multiplied onto the least common denominator
  *    of the decimals it is written with, so the integer row restates the source rather than rounding it.
@@ -495,7 +490,6 @@ fun MpsModel.toProblem(settings: ProblemSettings = KlauseConfig.current.problemS
     }
 
     val factors = ArrayList<Factor>()
-    val guards = IndicatorGuards(variables, intVarOf, factors)
     for ((rowIndex, c) in constraints.withIndex()) {
         if (c.indices.isEmpty()) {
             if (!emptyRowHolds(c.lower, c.upper)) {
@@ -504,22 +498,10 @@ fun MpsModel.toProblem(settings: ProblemSettings = KlauseConfig.current.problemS
             continue
         }
         val touchesFloat = c.indices.any { isFloat[it] }
-        val indicator = c.indicator
-        if (indicator == null) {
-            if (touchesFloat) {
-                emitRealRow(factors, c, isFloat, intVarOf, realVarOf)
-            } else {
-                emitIntRow(factors, c, intVarOf) { exactIntegerRow(c, rowIndex, sourceNumbers, intVarOf) }
-            }
+        if (touchesFloat) {
+            emitRealRow(factors, c, isFloat, intVarOf, realVarOf)
         } else {
-            val guard = guards.guardFor(indicator, c.name)
-            if (touchesFloat) {
-                emitIndicatedRealRow(factors, c, isFloat, intVarOf, realVarOf, guard, guards)
-            } else {
-                emitIndicatedIntRow(factors, c, intVarOf, guard, guards) {
-                    exactIntegerRow(c, rowIndex, sourceNumbers, intVarOf)
-                }
-            }
+            emitIntRow(factors, c, intVarOf) { exactIntegerRow(c, rowIndex, sourceNumbers, intVarOf) }
         }
     }
 
@@ -543,13 +525,13 @@ fun MpsModel.toProblem(settings: ProblemSettings = KlauseConfig.current.problemS
     }
     val objective = when {
         objective.indices.isEmpty() && objective.name.isEmpty() -> null
-        objectiveRow != null -> columnObjective(guards.numBool, numInt, numModelReal, objectiveColumn)
-        else -> buildObjective(isFloat, intVarOf, realVarOf, guards.numBool, numInt, numReal, objRowScale)
+        objectiveRow != null -> columnObjective(0, numInt, numModelReal, objectiveColumn)
+        else -> buildObjective(isFloat, intVarOf, realVarOf, 0, numInt, numReal, objRowScale)
     }
 
     val model = Problem(
         settings = settings,
-        numBoolVars = guards.numBool,
+        numBoolVars = 0,
         intBounds = IntBounds.fromModelBounds(lower, upper, openLoBits, openHiBits),
         factors = factors.toTypedArray(),
         numRealVars = numModelReal,
@@ -1094,121 +1076,6 @@ private fun emitRealRow(
     }
 }
 
-/**
- * Allocator for the Boolean guards an `INDICATORS` section needs. One guard per (column, trigger value)
- * pair channels the binary column onto a bool, so every row that pair gates shares it; the per-row
- * reification bools are minted separately by the row emitters.
- */
-private class IndicatorGuards(
-    private val variables: List<MpsVar>,
-    private val intVarOf: IntArray,
-    private val factors: MutableList<Factor>,
-) {
-    /** Boolean variables allocated so far — the problem's `numBoolVars`. */
-    var numBool = 0
-        private set
-
-    private val byTrigger = HashMap<MpsIndicator, Int>()
-
-    fun newBool(): Int = numBool++
-
-    /** The guard bool for [indicator] — true exactly when its column holds the trigger value. [rowName]
-     *  names the row in errors. */
-    fun guardFor(indicator: MpsIndicator, rowName: String): Int = byTrigger.getOrPut(indicator) {
-        val v = variables[indicator.column]
-        // A continuous column is LP-only, with no CP variable to equality-test, so it cannot gate a row.
-        if (!v.integer) {
-            throw MpsLoweringException(
-                "INDICATORS row '$rowName' names continuous column '${v.name}'; an indicator must be integer",
-            )
-        }
-        val guard = newBool()
-        val intVar = intVarOf[indicator.column]
-        // The guard is an equality test against the trigger value, exact over any integer domain. The
-        // binary channel is the same equality with the tight LP form, so it is taken when the declared
-        // bounds actually say binary — an integer column left unbounded (this parser's `[0, +∞)`
-        // default) still gates correctly through the general form rather than being rejected.
-        if (v.lower == 0.0 && v.upper == 1.0) {
-            channelBoolTo01(factors, guard, intVar, whenTrue = indicator.whenOne)
-        } else {
-            val trigger = if (indicator.whenOne) 1 else 0
-            factors.add(ReifiedLinear(guard, intArrayOf(1), intArrayOf(intVar), LinearOp.EQ, trigger))
-        }
-        guard
-    }
-}
-
-/** Post `guard -> cond`, the one-directional half of an indicated row's reification. */
-private fun postGuardImplies(factors: MutableList<Factor>, guard: Int, cond: Int) {
-    factors.add(Clause(intArrayOf(Lit.negate(Lit.make(guard, true)), Lit.make(cond, true))))
-}
-
-/** Emit a purely-integer indicated row: a fresh `cond <-> row` reification per emitted part plus the
- *  `guard -> cond` clause, so the row is relaxed whenever the indicator column takes the other value. A row no
- *  power of ten restates exactly is rebuilt from its [exact] source numbers. */
-private inline fun emitIndicatedIntRow(
-    factors: MutableList<Factor>,
-    c: MpsConstraint,
-    intVarOf: IntArray,
-    guard: Int,
-    guards: IndicatorGuards,
-    exact: () -> ExactIntegerRow,
-) {
-    val scale = c.integerRowScale()
-    if (scale !is RowScale.Exact) {
-        val row = exact()
-        for (side in row.sides) {
-            if (row.vars.isEmpty()) {
-                // A side violated with no terms left forbids the trigger value.
-                if (!side.holdsWithoutTerms()) factors.add(Clause(intArrayOf(Lit.negate(Lit.make(guard, true)))))
-                continue
-            }
-            val cond = guards.newBool()
-            val narrow = row.narrowCoefficients
-            factors.add(
-                if (narrow != null && side.bound.fitsLong()) {
-                    ReifiedLinear(cond, narrow, row.vars, side.op, side.bound.toLongExact())
-                } else {
-                    ReifiedLinear(cond, row.vars, row.coefficients, side.op, side.bound)
-                },
-            )
-            postGuardImplies(factors, guard, cond)
-        }
-        return
-    }
-    val vars = IntArray(c.indices.size) { intVarOf[c.indices[it]] }
-    val coeffs = LongArray(c.indices.size) { scale.scale(c.coeffs[it]) }
-    emitRow(rowBound(c.lower), rowBound(c.upper), scale::scale) { op, bound ->
-        val cond = guards.newBool()
-        factors.add(ReifiedLinear(cond, coeffs, vars, op, bound))
-        postGuardImplies(factors, guard, cond)
-    }
-}
-
-/** Emit an indicated row touching a continuous column. [ReifiedRealLinear] carries inequalities only, so
- *  an equality row becomes a separately-reified `≤` atom and `≥` atom. */
-private fun emitIndicatedRealRow(
-    factors: MutableList<Factor>,
-    c: MpsConstraint,
-    isFloat: BooleanArray,
-    intVarOf: IntArray,
-    realVarOf: IntArray,
-    guard: Int,
-    guards: IndicatorGuards,
-) {
-    val scale = c.realRowScale()
-    val p = splitRealRow(c, isFloat, intVarOf, realVarOf, scale)
-    fun post(op: LinearOp, bound: Double) {
-        val cond = guards.newBool()
-        factors.add(ReifiedRealLinear(cond, p.intVars, p.intCoeffs, p.realVars, p.realCoeffs, op, bound))
-        postGuardImplies(factors, guard, cond)
-    }
-    rowBound(c.upper)?.let { post(LinearOp.LE, scale.restate(it)) }
-    rowBound(c.lower)?.let { post(LinearOp.GE, scale.restate(it)) }
-}
-
-/** The scale carrying integer objective coefficients onto whole numbers when possible. A pure-real
- *  objective uses its real terms to recover their source decimals. */
 private fun MpsModel.objectiveRowScale(isFloat: BooleanArray): RowScale {
     val builder = RowScaleBuilder()
     val onlyRealTerms = objective.indices.all { isFloat[it] }
