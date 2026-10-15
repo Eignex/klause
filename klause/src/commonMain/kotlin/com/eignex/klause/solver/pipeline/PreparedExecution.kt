@@ -10,22 +10,28 @@ import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
 
 internal sealed interface PreparedExecution {
-    class FiniteLinear(val model: Problem, val ownership: ComponentPlan) : PreparedExecution {
+    sealed interface Factor : PreparedExecution {
+        val model: Problem
+    }
+
+    class FiniteLinear(override val model: Problem, val ownership: ComponentPlan) : Factor {
         init {
             ownership.requireSource(model)
         }
     }
 
-    class Polynomial(val completion: SharedPolynomialModel) : PreparedExecution
+    class Polynomial(val completion: SharedPolynomialModel) : Factor {
+        override val model: Problem get() = completion.source
+    }
     class NonlinearInteger(val source: NonlinearIntegerProblem) : PreparedExecution
     class Transcendental(val source: TranscendentalProblem) : PreparedExecution
     class Declined(
         val model: Problem,
         val reason: PreparedPlanDecline,
-        val finiteProjection: FiniteLinear? = null,
+        val retained: Factor? = null,
     ) : PreparedExecution {
         init {
-            require(finiteProjection == null || finiteProjection.model === model)
+            require(retained == null || retained.model === model)
         }
     }
 }
@@ -37,16 +43,18 @@ internal val PreparedExecution.model: Problem? get() = when (this) {
     is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
 }
 
-internal val PreparedExecution.componentPlan: ComponentPlan? get() = when (this) {
-    is PreparedExecution.FiniteLinear -> ownership
-    is PreparedExecution.Declined -> finiteProjection?.ownership
-    is PreparedExecution.Polynomial, is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
-}
+internal val PreparedExecution.componentPlan: ComponentPlan? get() = finiteLinear?.ownership
 
 internal val PreparedExecution.finiteLinear: PreparedExecution.FiniteLinear? get() = when (this) {
     is PreparedExecution.FiniteLinear -> this
-    is PreparedExecution.Declined -> finiteProjection
+    is PreparedExecution.Declined -> retained as? PreparedExecution.FiniteLinear
     is PreparedExecution.Polynomial, is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
+}
+
+internal val PreparedExecution.polynomial: PreparedExecution.Polynomial? get() = when (this) {
+    is PreparedExecution.Polynomial -> this
+    is PreparedExecution.Declined -> retained as? PreparedExecution.Polynomial
+    is PreparedExecution.FiniteLinear, is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
 }
 
 internal val PreparedExecution.kind: PreparedExecutionKind get() = when (this) {
@@ -81,12 +89,10 @@ internal class PreparedSourceStructure(
     val integerCoordinates = integerCoordinates.toList()
     val realCoordinates = realCoordinates.toList()
     val operations = operations.toSet()
-    val finiteFactorProjections: PreparedFactorProjections? = when (execution) {
-        is PreparedExecution.Polynomial -> factorProjections?.projected(
-            execution.completion.finite, execution.completion.finiteFactorIndices.toIntArray(),
-        )
-        else -> factorProjections
-    }
+    val finiteFactorProjections: PreparedFactorProjections? = execution.polynomial?.let { polynomial ->
+        factorProjections?.projected(polynomial.completion.finite,
+            polynomial.completion.finiteFactorIndices.toIntArray())
+    } ?: factorProjections
 
     init {
         require(this.integerCoordinates.size == sourceIntCount && this.realCoordinates.size == sourceRealCount)
@@ -109,7 +115,7 @@ internal class PreparedOperationBinding(
     fun supportedBy(source: PreparedSourceStructure): Boolean {
         val execution = source.execution
         if (quadraticObjective != null) {
-            return (execution is PreparedExecution.Polynomial || execution is PreparedExecution.NonlinearInteger) &&
+            return (execution.polynomial != null || execution is PreparedExecution.NonlinearInteger) &&
                 quadraticObjective.terms.all { term -> listOfNotNull(term.first, term.second).all { variable ->
                     when (variable) {
                         is QuadraticVariable.Bool -> variable.id.index in 0 until source.sourceBoolCount
@@ -148,6 +154,7 @@ internal fun legacyPreparedExecution(
         polynomialModel != null
     ) PreparedExecution.Polynomial(polynomialModel) else PreparedExecution.Declined(
         requireNotNull(model), requireNotNull(decline),
-        componentPlan?.let { PreparedExecution.FiniteLinear(requireNotNull(model), it) },
+        polynomialModel?.let { PreparedExecution.Polynomial(it) }
+            ?: componentPlan?.let { PreparedExecution.FiniteLinear(requireNotNull(model), it) },
     )
 }

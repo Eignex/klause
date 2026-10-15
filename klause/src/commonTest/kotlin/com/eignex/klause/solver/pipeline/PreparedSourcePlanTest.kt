@@ -966,4 +966,25 @@ class PreparedSourcePlanTest {
             operation.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE).declines.single().cause)
     }
 
+    @Test
+    fun `a final preparation stop retains completed polynomial coordinates across objective binding`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 2)), arrayOf(RealProduct(0, 0, 1, 1.0, 4.0)),
+            numRealVars = 2, realLower = doubleArrayOf(1.0, 4.0), realUpper = doubleArrayOf(4.0, 4.0))
+        var polls = 0
+        val complete = source.preparePolynomialExecutionPlan(cancellation = Cancellation { polls++; false })
+        val lastPoll = polls
+        polls = 0
+        val stopped = source.preparePolynomialExecutionPlan(cancellation = Cancellation { ++polls >= lastPoll })
+
+        val operation = stopped.withObjective(LinearObjective(intCoefficients = longArrayOf(1)))
+
+        assertEquals(PreparedPlanDecline.RESOURCE, operation.decline)
+        assertEquals(PreparedExecutionKind.DECLINED, operation.kind)
+        assertEquals(assertNotNull(complete.polynomialIntegerCoordinate(0)), operation.polynomialIntegerCoordinate(0))
+        assertEquals(0, operation.finiteIntegerCoordinate(0))
+        assertSame(stopped.polynomialModel, operation.polynomialModel)
+        assertSame(stopped.finiteFactorProjections, operation.finiteFactorProjections)
+        assertEquals(0, assertNotNull(operation.finiteFactorProjections).problem.numFactors)
+    }
+
 }

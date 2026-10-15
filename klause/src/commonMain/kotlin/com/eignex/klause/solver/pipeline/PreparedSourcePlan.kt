@@ -96,7 +96,7 @@ enum class PreparedPlanDecline {
     /** A continuous source factor has no exact polynomial encoding. */
     POLYNOMIAL_ENCODING,
 
-    /** Linear-objective polynomial execution requires a discrete objective. */
+    /** Legacy objective-only decline; a supported rebind retains the prepared source completion. */
     CONTINUOUS_LINEAR_OBJECTIVE,
 
     /** An open source column or factor has no complete owner. */
@@ -173,7 +173,7 @@ class PreparedSourcePlan private constructor(
         else execution.kind
     /** Finite/linear projection data, including a retained projection from declined preparation. */
     val componentPlan: ComponentPlan? get() = execution.componentPlan
-    internal val polynomialModel: SharedPolynomialModel? get() = (execution as? PreparedExecution.Polynomial)?.completion
+    internal val polynomialModel: SharedPolynomialModel? get() = execution.polynomial?.completion
     /** Original Boolean declarations, excluding private auxiliaries. */
     val sourceBoolCount: Int get() = preparation.sourceBoolCount
     /** Original integer declarations. */
@@ -241,8 +241,11 @@ class PreparedSourcePlan private constructor(
         return when (val selected = execution) {
             is PreparedExecution.Polynomial -> id
             is PreparedExecution.FiniteLinear -> selected.ownership.cpIntVars.indexOf(id).takeIf { it >= 0 }
-            is PreparedExecution.Declined -> selected.finiteProjection?.ownership?.cpIntVars?.indexOf(id)
-                ?.takeIf { it >= 0 }
+            is PreparedExecution.Declined -> when (val retained = selected.retained) {
+                is PreparedExecution.Polynomial -> id
+                is PreparedExecution.FiniteLinear -> retained.ownership.cpIntVars.indexOf(id).takeIf { it >= 0 }
+                null -> null
+            }
             is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
         }
     }
@@ -261,7 +264,7 @@ class PreparedSourcePlan private constructor(
 
     /** Polynomial completion column for a finite integer, or null when no embedding is required. */
     fun polynomialIntegerCoordinate(sourceId: Int): Int? =
-        (execution as? PreparedExecution.Polynomial)?.completion?.integerColumns?.get(integerCoordinate(sourceId))
+        execution.polynomial?.completion?.integerColumns?.get(integerCoordinate(sourceId))
 }
 
 /** Prepare source ownership and completion without running a solver or inventing finite bounds. */
@@ -434,7 +437,8 @@ internal fun Problem.preparePolynomialExecutionPlan(
     val sourceBools = (original as? PolynomialRealProblem)?.sourceBoolCount ?: numBoolVars
     val sourceReals = (original as? PolynomialRealProblem)?.sourceRealCount ?: numRealVars
     val execution = if (cause == null) PreparedExecution.Polynomial(requireNotNull(polynomial))
-        else PreparedExecution.Declined(this, cause, ownership?.let { PreparedExecution.FiniteLinear(this, it) })
+        else PreparedExecution.Declined(this, cause, polynomial?.let { PreparedExecution.Polynomial(it) }
+            ?: ownership?.let { PreparedExecution.FiniteLinear(this, it) })
     return PreparedSourcePlan(original, execution, descriptors, sourceBools, numIntVars, sourceReals,
         objective, maximize, factorProjections = projections)
 }
