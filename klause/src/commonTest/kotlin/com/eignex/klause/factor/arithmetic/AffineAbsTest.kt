@@ -10,10 +10,9 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
-import com.eignex.klause.solver.incumbent.EngineInvocation
-import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.evidence.absSourceWitnessContext
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.toSample
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
@@ -46,9 +45,9 @@ class AffineAbsTest {
     @Test
     fun `wide SMT source witnesses preserve magnitudes beyond signed word coordinates`() {
         val input = SmtLib.parse("(declare-const x Int) (assert (= x 9223372036854775808)) " +
-            "(assert (= (abs (* 9223372036854775808 x)) 85070591730234615865843651857942052864))")
+            "(assert (= (abs (+ 9223372036854775808 x)) 18446744073709551616))")
         val source = input.model
-        val invocation = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
+        val context = assertNotNull(source.absSourceWitnessContext(LinearObjective(), Cancellation.Never))
 
         val result = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source).solve())
         val sample = result.assignment.toSample(source)
@@ -56,7 +55,8 @@ class AffineAbsTest {
         assertEquals("9223372036854775808", result.assignment.intValue(input.intVarNames.getValue("x")))
         assertTrue(assertNotNull(sample.exactInts).any { !it.fitsLong() })
         assertTrue(source.factors.filterIsInstance<AffineAbs>().single().isSatisfied(sample::exactIntValue))
-        assertEquals(SourceEvidenceCheck.Checked, invocation.checkWitness(sample, Cancellation.Never))
+        assertEquals(SourceEvidenceCheck.Checked,
+            assertNotNull(context.semanticsChecker).witness(sample, context.scope, Cancellation.Never))
     }
 
     @Test
