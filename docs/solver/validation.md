@@ -44,4 +44,6 @@ views. They do not depend on pipeline, portfolio, backtracking, local-search,
 evidence orchestration or concrete theories. The
 [architecture gate](../architecture.md#boundary-validation) enforces this closed
 list without changing numerical kernel boundaries. Public source and library entry
-points retain their signatures and delegate to these internal services.
+points retain their signatures and delegate to these internal services. Legacy
+internal helper locations also retain thin forwarding functions to preserve their
+JVM static/default descriptors; production callers use the shared owner directly.

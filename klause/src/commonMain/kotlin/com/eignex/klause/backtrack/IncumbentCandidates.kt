@@ -9,7 +9,7 @@ import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.validation.composedFixpoint
+import com.eignex.klause.solver.validation.composedFixpoint as validateComposedFixpoint
 import com.eignex.klause.util.Cancellation
 import kotlin.math.nextDown
 import kotlin.math.nextUp
@@ -179,6 +179,24 @@ internal class ComposedSampleVerifier(
         if (evaluated != candidate.objective) {
             return Verification.Rejected("objective is $evaluated, not the claimed ${candidate.objective}")
         }
-        return composedFixpoint(problem, candidate, cancellation, assumptions, onWork)
+        return validateComposedFixpoint(problem, candidate, cancellation, assumptions, onWork)
     }
 }
+
+// Preserve the legacy JVM static descriptors while consumers use the shared owner.
+internal fun <V> composedFixpoint(
+    problem: Problem,
+    candidate: Candidate<Sample, V>,
+    cancellation: Cancellation,
+    assumptions: Assumptions = Assumptions.None,
+    onWork: (Long) -> Unit = {},
+): Verification<Sample, V> = validateComposedFixpoint(problem, candidate, cancellation, assumptions, onWork)
+
+internal fun <V> composedFixpoint(
+    problem: Problem,
+    candidate: Candidate<Sample, V>,
+    cancellation: Cancellation,
+    assumptions: Assumptions = Assumptions.None,
+    enforcingPeers: Set<Int>,
+    onWork: (Long) -> Unit = {},
+): Verification<Sample, V> = validateComposedFixpoint(problem, candidate, cancellation, assumptions, enforcingPeers, onWork)
