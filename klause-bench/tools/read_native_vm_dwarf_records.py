@@ -95,6 +95,9 @@ def inventory(dwarf, report, context=None):
             raise ValueError('Retained DWARF metadata exceeds bounds')
         return record
 
+    if context is not None:
+        context.bind_budget(retain)
+
     def enqueue(die):
         identity = key(die)
         if identity not in graph:

@@ -79,7 +79,9 @@ def serial(raw, depth=0):
     if isinstance(raw, dict):
         if len(raw) > MAX_ENTRIES:
             raise ContextLimit('DWARF context mapping exceeds bounds')
-        return {str(k): serial(v, depth + 1) for k, v in raw.items() if not str(k).startswith('_')}
+        internal = {'directory_entry_format_parser', 'file_name_entry_format_parser'}
+        return {str(k): serial(v, depth + 1) for k, v in raw.items()
+                if not str(k).startswith('_') and k not in internal}
     if isinstance(raw, (list, tuple)) and not isinstance(raw, bytes):
         if len(raw) > MAX_ENTRIES:
             raise ContextLimit('DWARF context entries exceed bounds')
@@ -103,6 +105,10 @@ class DwarfContext:
         self.dwarf = dwarf
         self.units = {}
         self.retained_bytes = 0
+        self.record_retainer = None
+
+    def bind_budget(self, retain):
+        self.record_retainer = retain
 
     @staticmethod
     def source_sha256():
@@ -120,7 +126,7 @@ class DwarfContext:
         self.retained_bytes += len(json.dumps(row).encode())
         if self.retained_bytes > MAX_CONTEXT_BYTES:
             raise ContextLimit('DWARF context retained byte bound exceeded')
-        return row
+        return self.record_retainer(row) if self.record_retainer is not None else row
 
     def attempt(self, action):
         budget = None
@@ -153,8 +159,8 @@ class DwarfContext:
             version = program.header['version']
             if version not in (2, 3, 4, 5):
                 raise ValueError('Unsupported line-header version')
-            formats = [*program.header.get('directory_entry_format', []),
-                       *program.header.get('file_name_entry_format', [])]
+            formats = [*(program.header.get('directory_entry_format') or []),
+                       *(program.header.get('file_name_entry_format') or [])]
             allowed = {'DW_FORM_string', 'DW_FORM_line_strp', 'DW_FORM_strp', 'DW_FORM_data1',
                        'DW_FORM_data2', 'DW_FORM_data4', 'DW_FORM_data8', 'DW_FORM_data16',
                        'DW_FORM_udata', 'DW_FORM_block', 'DW_FORM_block1', 'DW_FORM_block2', 'DW_FORM_block4'}
@@ -179,13 +185,13 @@ class DwarfContext:
         if type(index) is not int or attribute.form not in {
                 'DW_FORM_data1', 'DW_FORM_data2', 'DW_FORM_data4', 'DW_FORM_data8', 'DW_FORM_udata'}:
             return {**raw, 'status': 'unsupported-file-index'}
-        files = data['header'].get('file_entry', [])
+        files = data['header'].get('file_entry') or []
         position = index - data['fileIndexBase']
         if not 0 <= position < len(files):
             return {**raw, 'status': 'outside-header-file-table', 'dynamicFileDefinitionsIncluded': False}
         file = files[position]
         directory = file.get('dir_index')
-        directories = data['header'].get('include_directory', [])
+        directories = data['header'].get('include_directory') or []
         directory_position = directory - data['directoryIndexBase'] if type(directory) is int else -1
         if data['directoryIndexBase'] == 1 and type(directory) is int and directory == 0:
             directory_context = {'status': 'compilation-directory',
