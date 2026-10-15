@@ -756,8 +756,8 @@ immutable coordinates and do not transfer mutable worker state or proof authorit
 An absent, stale or unsuitable candidate leaves unfinished bootstrap preparation
 and search intact. Cancellation during admission leaves the candidate eligible for
 a later slice. Adoption releases both bootstrap handles before opening repair,
-retaining their measured work in statistics. Release detaches the handles before
-closing them: adoption, terminal completion, explicit close and exceptions each
+retaining their measured work in statistics, including counters finalized by close.
+Release detaches the handles before closing them: adoption, terminal completion, explicit close and exceptions each
 close a child at most once, including when a close throws. Invocation cancellation
 pauses owned state; closing the containing handle releases it. Seed acquisition
 renews no instruction, native-work, query or wall-time allowance. Repair uses the
