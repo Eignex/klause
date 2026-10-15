@@ -36,7 +36,6 @@ import com.eignex.klause.solver.pipeline.optimize
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.polynomialRequest
 import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
-import com.eignex.klause.solver.pipeline.requiresPolynomialCompletion
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -84,11 +83,9 @@ class SourceStrategy internal constructor(
         if (scope.stop()) return scope.unknown()
         if (!scope.supportsSource()) return scope.unsupported()
         val projections = projectionProviders.prepare(source)
-        val preparation = if (source.requiresPolynomialCompletion(projections)) scope.polynomialPreparation()
-            else scope.stop
         val route = source.pipelineRoute(
             projections, routePureRealToTheory = true,
-            boundCancellation = preparation,
+            boundCancellation = scope.stop, polynomialCancellation = scope.polynomialPreparation(),
         )
         if (scope.stop()) return scope.unknown()
         val result = when (route) {

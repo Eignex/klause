@@ -150,8 +150,9 @@ internal fun Problem.pipelineRoute(
     projections: PreparedFactorProjections,
     routePureRealToTheory: Boolean,
     boundCancellation: Cancellation,
+    polynomialCancellation: Cancellation = boundCancellation,
 ): SourceProblemRoute = pipelineRouteObserved(null, false, routePureRealToTheory, boundCancellation, null, false,
-    projections.providers, projections)
+    projections.providers, projections, polynomialCancellation)
 
 private fun Problem.pipelineRouteObserved(
     objective: LinearObjective?,
@@ -162,6 +163,7 @@ private fun Problem.pipelineRouteObserved(
     routeLinearToTheory: Boolean,
     providers: FactorProjectionProviders = FactorProjectionProviders.Default,
     projectionCapture: PreparedFactorProjections? = null,
+    polynomialCancellation: Cancellation = boundCancellation,
 ): SourceProblemRoute {
     val selection = projectionCapture ?: providers.prepare(this)
     val source = if (requiresPolynomialCompletion(selection)) null else
@@ -186,8 +188,11 @@ private fun Problem.pipelineRouteObserved(
     val finiteCompletion = finiteIntegerRanges && !routeLinearToTheory &&
         objective?.realCoefficientValues?.any { it != 0.0 } != true &&
         routed.requiresPolynomialCompletion(projections) && routed.finiteRealCompletionSupported(projections)
+    val arithmeticStop = if (routed.requiresPolynomialCompletion(projections, preferFinite = finiteCompletion)) {
+        polynomialCancellation
+    } else preparationStop
     val arithmetic = if (reuseInitial && !stopped) requireNotNull(initial) else routed.prepareExecutionPlan(
-        this, objective, maximize, preferFinite = finiteCompletion, providers, projections, preparationStop)
+        this, objective, maximize, preferFinite = finiteCompletion, providers, projections, arithmeticStop)
     if (arithmetic.kind == PreparedExecutionKind.DECLINED) {
         return SourceProblemRoute.UnsupportedOpen(null, routed, arithmetic)
     }
