@@ -821,7 +821,10 @@ and source branchers offering no further choice. `RECOVERY_*` records an actual 
 and its existing return path. These are component stages, not full-source acceptance
 or explanations for UNKNOWN. A missing recovery attempt cannot identify which earlier
 stage stopped progress without the corresponding observations. Stage recording adds
-no scan, owner poll, numerical query or work allowance.
+no scan, owner poll, numerical query or work allowance. Stages overlap and their
+counts are not a work total. Disjunction guide observations distinguish exact
+points from float guesses and record when the preferred row differs from source
+order; they establish no source witness.
 These observations add no scan, numerical query,
 allowance or result authority and do not explain an UNKNOWN verdict by themselves.
 
