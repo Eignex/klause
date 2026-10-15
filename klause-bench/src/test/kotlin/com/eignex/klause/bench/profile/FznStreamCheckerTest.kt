@@ -10,6 +10,39 @@ class FznStreamCheckerTest {
     private val declarations = "var 0..1: i; var float: x; var float: y; " +
         "constraint float_times(x, x, y); constraint float_le(y, 4.0); "
 
+    @ParameterizedTest
+    @ValueSource(strings = ["-1/3", "0", "1/3"])
+    fun `satisfaction publications check exact absolute value without a cost`(input: String) {
+        val source = "var float: x; var float: y; constraint float_abs(x,y); solve satisfy;"
+        val magnitude = if (input == "0") "0" else "1/3"
+        val output = "x = $input;\ny = $magnitude;\n----------\n"
+
+        val result = FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1).single()
+
+        assertEquals("valid", result.status)
+    }
+
+    @Test
+    fun `satisfaction publications reject a point allowed only by the absolute value relaxation`() {
+        val source = "var float: x; var float: y; constraint float_abs(x,y); solve satisfy;"
+        val output = "x = 0;\ny = 1/3;\n----------\n"
+
+        val result = FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1).single()
+
+        assertEquals("invalid", result.status)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["% objective=0\n", "_objective = 0;\n"])
+    fun `satisfaction publications cannot supply an optimization cost`(metadata: String) {
+        val source = "var float: x; var float: y; constraint float_abs(x,y); solve satisfy;"
+        val output = metadata + "x = 0;\ny = 0;\n----------\n"
+
+        assertFailsWith<IllegalArgumentException> {
+            FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1)
+        }
+    }
+
     @Test
     fun `finite objective fields are checked against the original source cost`() {
         val source = "var 0..2: i; solve minimize i;"
