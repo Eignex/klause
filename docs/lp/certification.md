@@ -100,8 +100,9 @@ checks; reuse does not replenish spending.
 
 Exact basis verification checks current row and coordinate ceilings before authority,
 heading, matrix or factor setup. Continuation target capture checks its current row,
-column and cell ceilings before exact-bound scans or exporting a basis. Dimension
-rejection does not construct an exception. The entry work debit and current
+column and cell ceilings before exact-bound scans or exporting a basis. Direct
+continuation selection checks the same ceilings before resume identity setup.
+Dimension rejection does not construct an exception. The entry work debit and current
 cancellation, time and work checks still precede that rejection.
 
 The basis verifier can reuse one immutable empty dimension-decline report. This
