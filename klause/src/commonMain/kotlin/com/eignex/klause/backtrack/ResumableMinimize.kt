@@ -1074,9 +1074,6 @@ internal class ResumableMinimize(
         return params.solveBudgetMillis?.let { it - startMark.elapsedNow().inWholeMilliseconds }
     }
 
-    /** Drains LP source-feasibility clauses at a restart, registering them permanently and sharing each
-     *  globally (its LBD = length would never clear the glue export filter). Returns true iff a
-     *  root contradiction proves the whole space empty. */
     private fun drainLpNogoods(): Boolean {
         val lpNogoods = lpEngine.lpNogoods ?: return false
         for (nogood in lpNogoods.drain()) {
