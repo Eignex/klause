@@ -126,6 +126,21 @@ class NativeVmEntriesTest(unittest.TestCase):
             self.assertFalse(report['actualTargetCallingConventionProven'])
             self.assertEqual('ImportError', report['error']['type'])
 
+    def test_invalid_queries_retain_failure_without_downloading_the_decoder(self):
+        for queries in [['duplicate', 'duplicate'], [''], ['not-an-identifier'], ['non_ascii_\u00e9'],
+                        ['a' * 129], [f'query_{index}' for index in range(17)]]:
+            with self.subTest(queries=queries), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / 'entries.json'
+                with patch.object(entries.sys, 'argv', ['reader', '/unread/library', 'pinned', str(output)] + queries), \
+                        patch.object(package, 'load_decoder') as load, self.assertRaises(ValueError):
+                    entries.main()
+
+                load.assert_not_called()
+                report = json.loads(output.read_text())
+                self.assertFalse(report['completed'])
+                self.assertFalse(report['actualTargetCallingConventionProven'])
+                self.assertEqual('ValueError', report['error']['type'])
+
 
 class NativeVmEntryDecoderTest(unittest.TestCase):
     def test_unpinned_decoder_bytes_are_rejected_before_extraction(self):
