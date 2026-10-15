@@ -46,7 +46,8 @@ internal class CompletedMoveEvaluation(
         ordinaryMove = move
     }
 
-    fun seed(destination: MoveSink) {
+    fun seed(destination: MoveSink, limit: Int = Int.MAX_VALUE) {
+        if (limit <= 0) return
         val sink = seedSink
         sink.clear()
         sink.setAssumptions(state.assumptions)
@@ -80,8 +81,11 @@ internal class CompletedMoveEvaluation(
             sink.addChannelingIntSet(state, id, target)
         }
         exploration = sink.list.firstOrNull()
+        var added = 0
         for (move in sink.list) {
             if (move in destination.list) continue
+            if (added == limit) break
+            added++
             when (move) {
                 is Move.BoolFlip -> destination.addBoolFlip(move.varId)
                 is Move.IntSet -> destination.addIntSet(move.varId, move.newValue)
