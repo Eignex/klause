@@ -118,7 +118,8 @@ grid witness does not turn a grid optimum or refutation into a source proof.
 satisfaction through the shared real/mixed theory, and requires exact certification
 for continuous objectives. It declines unsupported float operations and expansion
 above the alternative limit. Arithmetic overflow during lowering also declines
-with a diagnostic.
+with a diagnostic. Integer constants used in float arithmetic also decline when
+their exact source value cannot be represented in binary64.
 
 Authoritative rational witness coordinates are emitted as `% klause-exact:`
 comments while standard assignments retain MiniZinc-compatible decimal rendering.

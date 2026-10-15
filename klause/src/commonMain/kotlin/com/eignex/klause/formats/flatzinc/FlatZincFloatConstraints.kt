@@ -82,11 +82,11 @@ internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
 internal fun FlatZincCompiler.resolveFloatVarOrConst(e: FznExpr): FloatRef = when (e) {
     is FznExpr.FloatLit -> FloatRef.Const(e.value)
 
-    is FznExpr.IntLit -> FloatRef.Const(e.value.toDouble())
+    is FznExpr.IntLit -> FloatRef.Const(exactFloatInteger(e.value))
 
     is FznExpr.Ident -> floatVars[e.name]?.let { FloatRef.Var(it) }
         ?: (params[e.name] as? FlatZincCompiler.ParamValue.Float)?.let { FloatRef.Const(it.value) }
-        ?: (params[e.name] as? FlatZincCompiler.ParamValue.Int)?.let { FloatRef.Const(it.value.toDouble()) }
+        ?: (params[e.name] as? FlatZincCompiler.ParamValue.Int)?.let { FloatRef.Const(exactFloatInteger(it.value)) }
         ?: failHere("`${e.name}` is not a float var or float param")
 
     is FznExpr.ArrayAccess -> when (val arr = arrays[e.name]) {
@@ -97,7 +97,7 @@ internal fun FlatZincCompiler.resolveFloatVarOrConst(e: FznExpr): FloatRef = whe
 
         is FlatZincArray.FloatParam -> FloatRef.Const(arr.values[arrayOffset(arr.length, e.index, e.name)])
 
-        is FlatZincArray.IntParam -> FloatRef.Const(arr.values[arrayOffset(arr.length, e.index, e.name)].toDouble())
+        is FlatZincArray.IntParam -> FloatRef.Const(exactFloatInteger(arr.values[arrayOffset(arr.length, e.index, e.name)]))
 
         else -> failHere("`${e.name}` is not a float array")
     }
