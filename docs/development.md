@@ -72,6 +72,12 @@ GitHub CI supplies the full gate. Targeted local tests are optional; record skip
 or interrupted validation accurately and check CI before describing a PR as green.
 Fix failures through follow-up commits.
 
+Kotlin test tasks report and fail individually through
+`kotlin.tests.individualTaskReports=true`. The reporting policy is an explicit
+test-task cache input, so outputs produced under aggregate-only failure reporting
+cannot satisfy this gate. Successful test results remain cacheable; failed test
+tasks fail the build directly.
+
 When running the full gate locally:
 
 ```sh

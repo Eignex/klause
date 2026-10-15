@@ -45,6 +45,10 @@ allprojects {
             mavenContent { snapshotsOnly() }
         }
     }
+    tasks.withType<AbstractTestTask>().configureEach {
+        // Failure policy must separate cached results created with aggregate-only failure reporting.
+        inputs.property("kotlin.tests.individualTaskReports", providers.gradleProperty("kotlin.tests.individualTaskReports"))
+    }
     // JVM reductions use the Vector API; installed vendor BLAS uses foreign downcalls.
     tasks.withType<Test>().configureEach { jvmArgs(koblasJvmArgs) }
     tasks.withType<JavaExec>().configureEach { jvmArgs(koblasJvmArgs) }
