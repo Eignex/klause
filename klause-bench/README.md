@@ -301,6 +301,17 @@ loaded library/tool jar and reference binary identities. Source checking and set
 are outside the measured query spans. JFR instrumentation remains part of profile jobs;
 these measurements are preparation diagnostics, not ordinary end-to-end solve timings.
 
+`bench.profile.LinearRootOpeningProfile` inspects an original catalog source's
+direct-library root opening without advancing its traversal. Pass
+`suite=ID problem=NAME sha256=HEX`; it verifies and saves the decoded source bytes,
+then runs with a ten-second opening deadline and seed 1 in a one-processor child JVM.
+Parsing is timed separately before that deadline. The output records the raw decided
+reason or live root counters, deadline timing, runtime/build identity and child
+command, streams, exit and transport status. The parent reaps a terminated child;
+its separate transport limit does not extend the opening deadline. A running root
+is explicitly closed. This diagnostic claims neither CLI routing equivalence nor a
+source verdict, and cannot establish a default-route recovery.
+
 `bench.profile.SourceAgreementProfile` compares one combined exact linear owner with
 explicit registered linear peers over original real, wide-integer, strict and guarded
 sources. Pass `repeats=N warmups=N cases=<comma-separated names>`; defaults are three
