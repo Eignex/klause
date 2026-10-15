@@ -46,6 +46,58 @@ import kotlin.test.assertTrue
 
 class LpBoundingTest {
     @Test
+    fun `mixed row deductions consume newly tightened integer endpoints in one node pass`() {
+        for (learn in listOf(false, true)) {
+            val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)), arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, 0.75),
+                Linear(intArrayOf(1, 0), doubleArrayOf(1.0, -1.0), intArrayOf(1), doubleArrayOf(1.0),
+                    LinearOp.GE, -0.25),
+            ), numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(0.25, 0.25))
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(0.5, 0.5))
+            val session = PropagationSession(problem)
+            val sink = SolveStatsSink(backend = "row-follow-up")
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+
+                assertFalse(result.prune)
+                assertEquals(IntDomain(1, 1), session.intDomain(1))
+                assertEquals(1L, sink.lp.solves.read().sum)
+            }
+        }
+    }
+
+    @Test
+    fun `follow up mixed row deductions retract with their supporting branch`() {
+        for (learn in listOf(false, true)) {
+            val problem = Problem(0, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)), arrayOf(
+                Linear(intArrayOf(0, 2), doubleArrayOf(1.0, 1.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, 0.75),
+                Linear(intArrayOf(1, 0), doubleArrayOf(1.0, -1.0), intArrayOf(1), doubleArrayOf(1.0),
+                    LinearOp.GE, -0.25),
+            ), numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(0.25, 0.25))
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(0.5, 0.5))
+            val session = PropagationSession(problem)
+            session.pinInt(2, 0)
+            val sink = SolveStatsSink(backend = "row-follow-up")
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val relaxer = assertNotNull(engine.lpRelaxer)
+                engine.sparseSafePrune(relaxer, session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+                assertEquals(IntDomain(1, 1), session.intDomain(1))
+
+                session.popToLevel(0)
+                val result = engine.sparseSafePrune(relaxer, session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+
+                assertFalse(result.prune)
+                assertEquals(IntDomain(0, 1), session.intDomain(1))
+            }
+        }
+    }
+
+    @Test
     fun `mixed row feasibility fixes an integer root domain before an incumbent`() {
         for (sign in listOf(-1.0, 1.0)) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),

@@ -17,6 +17,7 @@ import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPhaseTimer
+import com.eignex.klause.lp.engine.LpProjectionStop
 import com.eignex.klause.lp.engine.LpRowBound
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolver
@@ -517,7 +518,7 @@ internal fun LpEngine.sparseSafePrune(
     // advisory — it never changes feasibility or the optimum.
     hints?.record(relaxation, result.primal, result.duals)
     // The scoped owner carries appended-row bases itself; the hint is only for external fresh solves.
-    val optimalBasis = result.basis
+    var optimalBasis: Basis? = result.basis
     val rowMeter = if (problem.numRealVars > 0 &&
         (problem.numIntVars > 0 || problem.numBoolVars > 0)
     ) MixedCertificateMeter(cancellation) else null
@@ -651,7 +652,8 @@ internal fun LpEngine.sparseSafePrune(
         sink.lp.certificationObserver(LpRoute.NODE),
         solveContext.certificationPolicy,
     ) ?: run {
-        val prune = rowMeter != null && applyMixedRowBounds(boundRel, session, sink, learn, cancellation, rowMeter)
+        val prune = rowMeter != null &&
+            applyMixedRowBounds(boundRel, session, sink, learn, cancellation, rowMeter, relaxer) { optimalBasis = null }
         return LpNodeOutcome(prune, if (prune) null else optimalBasis)
     }
     val full = checkNotNull(BigFraction.ofDouble(lower)) + BigFraction.ofLong(boundRel.objectiveConstant)
@@ -723,7 +725,9 @@ internal fun LpEngine.sparseSafePrune(
             return LpNodeOutcome(true, null)
         }
     }
-    if (rowMeter != null && applyMixedRowBounds(boundRel, session, sink, learn, cancellation, rowMeter)) {
+    if (rowMeter != null &&
+        applyMixedRowBounds(boundRel, session, sink, learn, cancellation, rowMeter, relaxer) { optimalBasis = null }
+    ) {
         return LpNodeOutcome(true, null)
     }
     return LpNodeOutcome(false, optimalBasis)
@@ -737,20 +741,36 @@ private fun LpEngine.applyMixedRowBounds(
     learn: Boolean,
     cancellation: Cancellation,
     meter: MixedCertificateMeter,
+    relaxer: CpToLpRelaxation? = null,
+    onRefresh: () -> Unit = {},
 ): Boolean {
-    if (cancellation()) return false
+    var current = relaxation
     val initialWork = meter.work
-    val affectedColumns = if (session.decisionLevel == 0) null
-        else narrowedRowColumns(relaxation, session, cancellation)
-    val projected = solveContext.certificationPolicy.acceptNullable(
-        LpCertifier.INTEGER,
-        mixedRowBounds(
-            relaxation.model, cancellation, sink.lp.certificationObserver(LpRoute.NODE), meter, affectedColumns,
-        ),
-    ).orEmpty()
-    noteNodeOverhead(meter.work - initialWork)
-    return observeNodeFixing(sink, LpSolvePhase.NODE_ROW_FIXING) {
-        applyRowBounds(relaxation, projected, session, sink, learn, cancellation)
+    try {
+        repeat(if (relaxer == null) 1 else 2) { pass ->
+            if (cancellation()) return false
+            val affectedColumns = if (session.decisionLevel == 0) null
+                else narrowedRowColumns(current, session, cancellation)
+            val projected = solveContext.certificationPolicy.acceptNullable(
+                LpCertifier.INTEGER,
+                mixedRowBounds(
+                    current.model, cancellation, sink.lp.certificationObserver(LpRoute.NODE), meter, affectedColumns,
+                ),
+            ).orEmpty()
+            var changed = false
+            if (observeNodeFixing(sink, LpSolvePhase.NODE_ROW_FIXING) {
+                applyRowBounds(current, projected, session, sink, learn, cancellation) { changed = true }
+            }) return true
+            if (!changed || relaxer == null || pass == 1 || cancellation()) return false
+            meter.reserve(current.model.numVars.toLong() * 16L + 128L)
+            onRefresh()
+            current = nodeRelaxation(relaxer, session) ?: return false
+        }
+        return false
+    } catch (_: LpProjectionStop) {
+        return false
+    } finally {
+        noteNodeOverhead(meter.work - initialWork)
     }
 }
 
@@ -779,13 +799,14 @@ private fun LpEngine.narrowedRowColumns(
 }
 
 @Suppress("CyclomaticComplexMethod")
-internal fun LpEngine.applyRowBounds(
+private fun LpEngine.applyRowBounds(
     relaxation: LpRelaxation,
     bounds: List<LpRowBound>,
     session: PropagationSession,
     sink: SolveStatsSink,
     learn: Boolean,
     cancellation: Cancellation,
+    onFix: () -> Unit,
 ): Boolean {
     for (certificate in bounds) {
         if (cancellation()) return false
@@ -820,6 +841,7 @@ internal fun LpEngine.applyRowBounds(
             return true
         }
         sink.lp.observeFix()
+        onFix()
     }
     return false
 }
