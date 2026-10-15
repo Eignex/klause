@@ -37,16 +37,16 @@ class NumericalLinearRequestTest {
 
     @Test
     fun `open integer guards retain the inactive regions around their trigger`() {
-        for (bounds in listOf("LI B I 0", "FR B I")) {
+        for ((bounds, trigger) in listOf("LI B I 0" to 0L, "FR B I" to 0L, "LI B I 1" to 1L)) {
             val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
                 " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R 1\nRHS\n RHS R 2\n" +
-                "BOUNDS\n $bounds\n LO B X 0\nINDICATORS\n IF R I 0\nENDATA\n").toExactSourceProblem()
+                "BOUNDS\n $bounds\n LO B X 0\nINDICATORS\n IF R I $trigger\nENDATA\n").toExactSourceProblem()
 
             val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve()
 
             val optimum = assertIs<SourceClaim.Optimal>(assertNotNull(result.terminal).claim)
             assertEquals(BigFraction.ZERO, (optimum.value as SourceValue.Rational).value)
-            assertTrue(optimum.sample.intValue(0) != 0L)
+            assertTrue(optimum.sample.intValue(0) != trigger)
             assertFalse(compiled.model.intBounds.hasUpper(0))
         }
     }
