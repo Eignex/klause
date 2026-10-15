@@ -73,7 +73,11 @@ internal fun Problem.finiteRealFactorSupported(index: Int, projections: Prepared
     if (factor is ExactLinear) return encoder.enforcesSource && factor.finiteRelaxationSupported()
     if (factor is LinearIndicator) return encoder.enforcesSource && factor.row.finiteRelaxationSupported()
     if (!encoder.enforcesSource && encoder.support != EncoderSupport.CONDITIONED) return false
-    return factor is RealProduct || factor is RealAbs || factor is RealElement ||
+    if (factor is RealProduct) return intBounds.hasLower(factor.intOperand) &&
+        intBounds.hasUpper(factor.intOperand) &&
+        intBounds.lower(factor.intOperand) >= -9007199254740992L &&
+        intBounds.upper(factor.intOperand) <= 9007199254740992L
+    return factor is RealAbs || factor is RealElement ||
         (factor is ContinuousProduct && factor.hasCompleteGuardedLpCompletion()) ||
         (factor is Power && factor.base is Power.Coordinate.Real && factor.exponent <= 1) ||
         ((factor.linearForm is LinearForm.Conjunction || factor.linearForm is LinearForm.Disjunction) &&

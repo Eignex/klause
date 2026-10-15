@@ -63,6 +63,21 @@ import kotlin.test.assertTrue
 
 class SourceStrategyTest {
     @Test
+    fun `mixed products outside binary integer precision retain exact completion`() {
+        val integer = 9007199254740993L
+        val source = Problem(0, 1, arrayOf(IntDomain(integer, integer)),
+            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0)), numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 9007199254740992.0),
+            realUpper = doubleArrayOf(1.0, 9007199254740994.0))
+
+        val result = BacktrackSolver.source(source).solve()
+
+        val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertEquals(integer.toString(), witness.intValue(0))
+        assertEquals(integer.toString(), witness.realValue(1))
+    }
+
+    @Test
     fun `bounded conditioned products retain finite holes beside an open linear integer`() {
         val source = Problem(0, 3, arrayOf(IntDomain(0, 2).excludeValue(1), IntDomain(0, 2), IntDomain(0, 1)),
             arrayOf(RealProduct(0, 0, 1, 1.0, 1.0), AllDifferent(intArrayOf(0, 1), 0, 3),
