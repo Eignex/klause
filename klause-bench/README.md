@@ -1256,7 +1256,8 @@ proof, optimization claim, reference latency or a current solver performance gap
 ### Polynomial source witness verifier
 
 [verify_nra_source_results.py](tools/verify_nra_source_results.py) independently
-checks complete named Int/Real/Bool models against an original polynomial SMT source.
+checks complete named Int/Real/Bool models against an original polynomial SMT source,
+including native numeric absolute-value terms.
 It reconstructs rational coordinates and `root-obj` algebraic coordinates using the
 pinned Z3 dependency, pins every source variable, and requires every
 original assertion and Boolean query assumption to evaluate exactly to true.
@@ -1264,7 +1265,7 @@ Algebraic coordinates use integer defining polynomials and one-based distinct
 ordered real-root indices. Approximate decimal coordinates do not establish exact
 irrational equalities. Missing, duplicate, unknown or sort-mismatched coordinates
 are rejected. Integer coordinates must be integral and retain arbitrary precision.
-Nonpolynomial, optimization and incremental sources decline.
+Other nonpolynomial, optimization and incremental sources decline.
 
 The ground witness route permits one auxiliary `/0` model definition with two
 Real arguments and a Real result when that name is not a source coordinate.
