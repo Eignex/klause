@@ -20,8 +20,8 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -65,7 +65,8 @@ class GridArithmeticEncoderTest {
             val source = Problem(0, 2, Array(2) { IntDomain(0, 4) }, arrayOf(relation))
             val encoded = assertNotNull(FactorProjectionProviders.Default.prepare(source)
                 .linearTheoryModel(EncodingTarget.LINEAR))
-            val queries = OpenExactNeighborhood(encoded, TheoryParams(), preparedSource = encoded.prepareExecutionPlan())
+            val queries = OpenExactNeighborhood(encoded, TheoryParams(),
+                preparedSource = encoded.prepareExecutionPlan())
             queries.use {
                 val conflict = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO,
                     1 to BigFraction.ZERO), emptyMap())
