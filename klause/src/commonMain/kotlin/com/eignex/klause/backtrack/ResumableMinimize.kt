@@ -285,6 +285,7 @@ internal class ResumableMinimize(
     private var rootExhausted: UnsatCore? = null
     private var rootIsExhausted = false
     private var firstRun = true
+    private var treeBudgetExhausted = false
     private val inprocessing = Inprocessing.from(params, sink.search)
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
     private val traversal by lazy(LazyThreadSafetyMode.NONE) { OptimizationTraversalPolicy() }
@@ -592,6 +593,7 @@ internal class ResumableMinimize(
         run.reset()
         inprocessing?.reset()
         firstRun = true
+        treeBudgetExhausted = false
         incumbents = minimizingSampleExchange(problem, params.toleranceCheck)
         objVarBest = null
         lastObjBoundAsserted = null
@@ -646,6 +648,7 @@ internal class ResumableMinimize(
                 firstRunWork()?.let { return StepEvent.Incumbent(it) }
             }
             unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
+            if (treeBudgetExhausted) return terminal(terminalBudget())
             return when (val e = run.next()) {
                 is SearchRunEvent.Satisfied -> {
                     unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
@@ -1013,11 +1016,14 @@ internal class ResumableMinimize(
             if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
         }
         if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null && params.componentFactory == null) {
-            lpEngine.lbTreeSearch(objective, rootToken, params.assumptions, params.toleranceCheck,
+            val before = lpEngine.primalSearchWork
+            val seed = lpEngine.lbTreeSearch(objective, rootToken, params.assumptions, params.toleranceCheck,
                 complete = ::completeLeaf,
                 accept = { verifiedLpProposal(it, rootToken)?.assignment },
-                nodeBudget = params.nodeBudget)?.let { seed ->
-                if (!params.cancellation()) recordIfImproving(seed.sample, objective.evaluate(seed.sample))?.let { return it }
+                nodeBudget = params.nodeBudget)
+            treeBudgetExhausted = lpEngine.primalSearchWork > before && params.nodeBudget?.exhausted() == true
+            if (seed != null && !params.cancellation()) {
+                recordIfImproving(seed.sample, objective.evaluate(seed.sample))?.let { return it }
             }
         }
         return null

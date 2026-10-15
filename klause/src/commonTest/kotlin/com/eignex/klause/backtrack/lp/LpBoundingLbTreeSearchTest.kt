@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack.lp
 
+import com.eignex.klause.backtrack.UnresolvedRealLeafFixture
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
@@ -27,6 +28,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -257,7 +259,7 @@ class LpBoundingLbTreeSearchTest {
                     LpVerdict.TOLERANCE_OPTIMUM, doubleArrayOf(0.0))
             }, toleranceCheck = { true }))
             assertTrue(parent.totalSolveWork() > 0L)
-            assertTrue(parent.primalPropagationWork > 0L)
+            assertEquals(1L, parent.primalSearchWork)
         }
     }
 
@@ -322,6 +324,24 @@ class LpBoundingLbTreeSearchTest {
 
         assertEquals(listOf(3L), visited)
         assertTrue(pointDeclines > 0)
+    }
+
+    @Test
+    fun `a failed mixed completion releases every private numerical owner`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> true }
+        val parent = LpEngine(fixture.problem, fixture.objective, LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "mixed-cleanup"), fixture.context)
+
+        assertFailsWith<IllegalStateException> {
+            parent.use {
+                it.lbTreeSearch(fixture.objective, Cancellation.Never,
+                    complete = { _, _, _ -> error("injected completion failure") })
+            }
+        }
+
+        assertTrue(fixture.persistentOpened > 0)
+        assertEquals(fixture.persistentOpened, fixture.persistentClosed)
     }
 
 }

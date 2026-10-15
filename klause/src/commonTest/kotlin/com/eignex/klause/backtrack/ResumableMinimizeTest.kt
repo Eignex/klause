@@ -85,6 +85,8 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
     val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
     var opened = 0
     var closed = 0
+    var persistentOpened = 0
+    var persistentClosed = 0
     var visited = 0
     val factory = RecordingLpEngineFactory(object : LpEngineFactory by ProductionLpEngineFactory {
         override fun newPersistentSolver(
@@ -99,6 +101,7 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
             val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation, refactorUpdateLimit,
                 iterationLimit, workLimit, trackDegeneracy, pricing)
             val leaf = iterationLimit == 0 && workLimit == 0L
+            persistentOpened++
             if (leaf) opened++
             return object : PersistentLpSolver by delegate {
                 override fun solve(warm: Basis?): FloatLpResult? {
@@ -112,6 +115,7 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
                 }
 
                 override fun close() {
+                    persistentClosed++
                     if (leaf) closed++
                     delegate.close()
                 }
@@ -700,24 +704,29 @@ class ResumableMinimizeTest {
                 fixture.acceptProof = { _, _ -> true }
                 val objective = LinearObjective(realCoefficients = doubleArrayOf(coefficient))
                 val offered = ArrayList<Sample>()
+                val nodesAtPublication = ArrayList<Double>()
                 val params = fixture.params.copy(maxDecisions = 0L,
                     lpPlan = fixture.params.lpPlan.copy(bounding = true, lbTreeSearch = enabled,
                         probe = false, rootCutHarvest = false))
 
                 fixture.solver.resumable(objective, params).use { search ->
-                    val result = search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
-                    assertEquals(0.0, search.stats.search.nodes.sum)
+                    val result = search.runSlice(Cancellation.Never, 1000L, 100_000L) {
+                        offered += it.sample
+                        nodesAtPublication += search.stats.search.nodes.sum
+                    }
                     assertTrue(result !is MinimizeResult.Infeasible)
                 }
 
                 assertEquals(if (enabled) 1 else 0, offered.size)
                 if (enabled) {
+                    assertEquals(listOf(0.0), nodesAtPublication)
                     val sample = offered.single()
                     assertEquals(expectedInteger, sample.ints.single())
                     assertEquals(expectedReal, sample.reals.single())
                     assertEquals(BigFraction.ofDouble(expectedReal), sample.exactReals?.single())
                 }
                 assertEquals(fixture.opened, fixture.closed)
+                assertEquals(fixture.persistentOpened, fixture.persistentClosed)
             }
         }
     }
@@ -743,6 +752,7 @@ class ResumableMinimizeTest {
             assertEquals(limit, budget.spent)
             assertTrue(offered.isEmpty())
             assertEquals(fixture.opened, fixture.closed)
+            assertEquals(fixture.persistentOpened, fixture.persistentClosed)
         }
     }
 
@@ -773,6 +783,7 @@ class ResumableMinimizeTest {
                 assertNull(offered.single().exactReals)
             }
             assertEquals(fixture.opened, fixture.closed)
+            assertEquals(fixture.persistentOpened, fixture.persistentClosed)
         }
     }
 
