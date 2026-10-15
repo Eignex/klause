@@ -71,7 +71,9 @@ private class ExactLinearScore(
         if (indicator >= 0 && intValue(indicator) != (if (whenOne) 1L else 0L)) return 0
         if (row.variables.reals.isEmpty()) {
             var activity = BIG_ZERO
-            for (k in 0 until row.size) activity += row.constants.exactCoeff(k) * bigIntOf(intValue(Term.intVar(row.ref(k))))
+            for (k in 0 until row.size) {
+                activity += row.constants.exactCoeff(k) * bigIntOf(intValue(Term.intVar(row.ref(k))))
+            }
             val residual = exactLinearResidual(activity - row.constants.exactBound, row.relation)
             val largest = bigIntOf(Long.MAX_VALUE)
             val capped = if (residual > largest) Long.MAX_VALUE else residual.toLongExact()

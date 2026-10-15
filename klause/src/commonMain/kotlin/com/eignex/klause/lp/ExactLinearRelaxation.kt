@@ -10,7 +10,9 @@ import com.eignex.klause.util.toLongExact
 internal fun ExactLinear.finiteRelaxationSupported(): Boolean = relation != LinearOp.NE &&
     constants.exactBound.fitsLong() &&
     constants.exactBound.toLongExact() != Long.MIN_VALUE &&
-    (0 until size).all { constants.exactCoeff(it).fitsLong() && constants.exactCoeff(it).toLongExact() != Long.MIN_VALUE }
+    (0 until size).all {
+        constants.exactCoeff(it).fitsLong() && constants.exactCoeff(it).toLongExact() != Long.MIN_VALUE
+    }
 
 internal fun ExactLinear.emitExactLpRelaxation(builder: RelaxationBuilder, indicator: Int = -1, value: Long = 0L) {
     if (relation == LinearOp.NE) return
