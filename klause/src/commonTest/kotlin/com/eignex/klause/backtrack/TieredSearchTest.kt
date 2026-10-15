@@ -25,7 +25,7 @@ class TieredSearchTest {
     private val rng = Random(1)
 
     @Test
-    fun `earlier tiers win over later tiers`() {
+    fun `earlier tiers should win over later tiers`() {
         val session = PropagationSession(problemOf(IntDomain(0, 2), IntDomain(0, 2)))
         val first = SearchTier(IntArray(0), intArrayOf(1), TierVarSelect.InputOrder, IndomainMin)
         val second = SearchTier(IntArray(0), intArrayOf(0), TierVarSelect.InputOrder, IndomainMin)
@@ -38,7 +38,7 @@ class TieredSearchTest {
     }
 
     @Test
-    fun `tiered values dispatch to the owning tier and fall back elsewhere`() {
+    fun `tiered values should dispatch to the owning tier and fall back elsewhere`() {
         val session = PropagationSession(problemOf(IntDomain(0, 5), IntDomain(0, 5)))
         val tier = SearchTier(IntArray(0), intArrayOf(1), TierVarSelect.InputOrder, IndomainMax)
         val h = TieredValueSelector(listOf(tier), IndomainMin, numBoolVars = 0, numIntVars = 2)

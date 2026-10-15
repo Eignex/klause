@@ -38,7 +38,7 @@ class GlobalCardinalityInvariantTest {
     }
 
     @Test
-    fun `extended structured moves include count-preserving 3-cycles`() {
+    fun `extended structured moves should include count-preserving 3-cycles`() {
         val p = problem(
             xs = intArrayOf(0, 1, 2, 3),
             cover = intArrayOf(1, 2, 3),
@@ -55,22 +55,22 @@ class GlobalCardinalityInvariantTest {
         var sawRotation = false
         for (seed in longArrayOf(1L, 2L, 3L, 7L, 11L, 29L)) {
             val state = seeded(seed)
-            assertTrue(state.cost == 0L, "the seed assignment must satisfy the global cardinality")
+            assertEquals(0L, state.cost)
             val sink = MoveSink()
             state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
             for (m in sink.list) {
                 if (m is Move.Compound && m.parts.size == 3) sawRotation = true
                 val check = seeded(0)
                 check.apply(m)
-                assertTrue(check.cost == 0L, "extended move $m broke the count constraint")
+                assertEquals(0L, check.cost, "$m")
             }
         }
-        assertTrue(sawRotation, "count-preserving 3-cycle rotations must be emitted")
+        assertTrue(sawRotation)
     }
 
     @Test
-    fun `violation degree equals total count deviation`() {
-        // cover=[1,2], lo=[2,2], hi=[3,3]. xs=[0,0,0]: count(1)=0 (2 short), count(2)=0 (2 short) → degree 4
+    fun `violation degree should equal total count deviation`() {
+        // Both covered values are 2 short of their lower count.
         val p = problem(intArrayOf(0, 1, 2), intArrayOf(1, 2), intArrayOf(2, 2), intArrayOf(3, 3))
         val state = LocalSearchState(p.bake(), Random(0))
         state.assignment.setInt(0, 0)
@@ -82,8 +82,7 @@ class GlobalCardinalityInvariantTest {
     }
 
     @Test
-    fun `delta predicts degree change when reassigning to cover value`() {
-        // cover=[1], lo=[2], hi=[2]. xs=[0,0,0]: violated, count(1)=0, need 2.
+    fun `delta should predict degree change when reassigning to a cover value`() {
         val p = problem(intArrayOf(0, 1, 2), intArrayOf(1), intArrayOf(2), intArrayOf(2))
         val state = LocalSearchState(p.bake(), Random(0))
         state.assignment.setInt(0, 0)

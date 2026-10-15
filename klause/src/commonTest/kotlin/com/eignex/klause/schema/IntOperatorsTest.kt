@@ -9,9 +9,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class IntOperatorsTest {
-
     @Test
-    fun `sum of two ints at top level emits linear`() {
+    fun `a sum of two ints at top level should emit a linear`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 5)
             val y by intVar(min = 0, max = 5)
@@ -26,7 +25,7 @@ class IntOperatorsTest {
     }
 
     @Test
-    fun `scaled terms carry coefficients`() {
+    fun `scaled terms should carry their coefficients`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 4)
             val y by intVar(min = 0, max = 4)
@@ -39,7 +38,7 @@ class IntOperatorsTest {
     }
 
     @Test
-    fun `subtraction and unary minus`() {
+    fun `subtraction should compile to a canonical linear`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 10)
             val y by intVar(min = 0, max = 10)
@@ -48,14 +47,14 @@ class IntOperatorsTest {
         val compiled = S().compile()
         val linear = compiled.problem.factors.single { it is Linear } as Linear
 
-        // `x - y ≥ 2` is canonicalised to `≤` at construction: `−x + y ≤ −2`.
+        // x - y >= 2 is canonicalised to -x + y <= -2.
         assertEquals(LinearOp.LE, linear.op)
         assertEquals(-2L, checkNotNull(linear.integerConstants).bound)
         assertEquals(setOf(1L, -1L), checkNotNull(linear.integerConstants).coeffs.toSet())
     }
 
     @Test
-    fun `single var constraint collapses to single-term Linear`() {
+    fun `a single var constraint should collapse to a single-term Linear`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 100)
             val y by intVar(min = 0, max = 100)
@@ -70,7 +69,7 @@ class IntOperatorsTest {
     }
 
     @Test
-    fun `reified single var compare`() {
+    fun `a single var compare under implies should compile to a reified linear`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val budget by intVar(min = 0, max = 100)
@@ -81,7 +80,7 @@ class IntOperatorsTest {
     }
 
     @Test
-    fun `reified linear for multi var inside implies`() {
+    fun `a multi var compare under implies should compile to a reified linear`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val x by intVar(min = 0, max = 10)
@@ -91,5 +90,4 @@ class IntOperatorsTest {
         val compiled = S().compile()
         assertTrue(compiled.problem.factors.any { it is ReifiedLinear })
     }
-
 }

@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class MpsFeasibilityTest {
     @Test
-    fun `stripping free rows preserves columns constraints ranges and bounds`() {
+    fun `stripping free rows should preserve columns constraints ranges and bounds`() {
         val source = """
 NAME feasibility
 OBJSENSE

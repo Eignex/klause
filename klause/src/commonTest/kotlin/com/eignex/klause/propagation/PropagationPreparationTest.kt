@@ -1,10 +1,10 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -16,10 +16,12 @@ import kotlin.test.assertTrue
 
 class PropagationPreparationTest {
     @Test
-    fun `paused root propagation preserves deductions and pending wakes`() {
+    fun `paused root propagation should preserve deductions and pending wakes`() {
         val variables = 260
         val problem = Problem(
-            0, variables, Array(variables) { IntDomain(0, 10) },
+            0,
+            variables,
+            Array(variables) { IntDomain(0, 10) },
             Array(variables) { v ->
                 if (v == variables - 1) {
                     Linear(intArrayOf(1), intArrayOf(v), LinearOp.LE, 3)
@@ -42,9 +44,11 @@ class PropagationPreparationTest {
     }
 
     @Test
-    fun `root conflict is published only after it is derived`() {
+    fun `a root conflict should be published only after it is derived`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 10)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 10)),
             Array(260) { v ->
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, if (v == 259) -1 else 10)
             },
@@ -60,7 +64,7 @@ class PropagationPreparationTest {
     }
 
     @Test
-    fun `cancellation between preparation batches preserves resumable private progress`() {
+    fun `cancellation between preparation batches should preserve resumable progress`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray())
         var cancelled = false
         val preparation = PropagationPreparation(problem, Cancellation { cancelled }, 0, false)
@@ -76,9 +80,11 @@ class PropagationPreparationTest {
     }
 
     @Test
-    fun `cancellation before a root fire preserves the pending queue`() {
+    fun `cancellation before a root fire should preserve the pending queue`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 10)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 10)),
             Array(260) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3) },
         )
         var polls = 0
@@ -99,10 +105,12 @@ class PropagationPreparationTest {
     }
 
     @Test
-    fun `a wide factor occurrence index matches eager wakeups`() {
+    fun `a wide factor occurrence index should match eager wakeups`() {
         val variables = 513
         val problem = Problem(
-            1, variables, Array(variables) { IntDomain(0, 1) },
+            1,
+            variables,
+            Array(variables) { IntDomain(0, 1) },
             arrayOf(
                 Linear(IntArray(variables) { 1 }, IntArray(variables) { it }, LinearOp.GE, 1),
                 Clause(intArrayOf(Lit.make(0, true))),
@@ -122,9 +130,11 @@ class PropagationPreparationTest {
     }
 
     @Test
-    fun `an assumption fixpoint can pause and resume without restarting its decision`() {
+    fun `an assumption fixpoint should pause and resume without restarting its decision`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
             Array(260) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1) },
         )
         var cancelled = false
@@ -151,7 +161,7 @@ class PropagationPreparationTest {
     }
 
     @Test
-    fun `assumptions without wakes remain pausable between pins`() {
+    fun `assumptions without wakes should remain pausable between pins`() {
         val problem = Problem(0, 260, Array(260) { IntDomain(0, 1) }, emptyArray())
         val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false)
         var ready: PropagationSession? = null
@@ -169,9 +179,11 @@ class PropagationPreparationTest {
     }
 
     @Test
-    fun `a boolean assumption preserves watched wakes across a pause`() {
+    fun `a boolean assumption should preserve watched wakes across a pause`() {
         val problem = Problem(
-            261, 0, emptyArray(),
+            261,
+            0,
+            emptyArray(),
             Array(260) { Clause(intArrayOf(Lit.make(0, false), Lit.make(it + 1, true))) },
         )
         val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false)

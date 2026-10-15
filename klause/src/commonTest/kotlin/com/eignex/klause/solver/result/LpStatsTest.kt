@@ -6,8 +6,8 @@ import com.eignex.klause.lp.engine.ExactBasisPhase
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpPhaseMetrics
-import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolveMetrics
+import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ContinuationPhase
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
@@ -19,19 +19,24 @@ import kotlin.test.assertTrue
 
 class LpStatsTest {
     @Test
-    fun `source residual timing includes component costs on the reported route`() {
+    fun `source residual timing should include component costs on the component route`() {
         val sink = LpStatsSink()
-        val metrics = LpSolveMetrics(sourceResidualCalls = 2L, sourceResidualNanos = 17L,
-            sourceResidualScaledCalls = 1L) + LpSolveMetrics(sourceResidualCalls = 1L, sourceResidualNanos = 5L)
+        val metrics = LpSolveMetrics(
+            sourceResidualCalls = 2L,
+            sourceResidualNanos = 17L,
+            sourceResidualScaledCalls = 1L,
+        ) + LpSolveMetrics(sourceResidualCalls = 1L, sourceResidualNanos = 5L)
 
         sink.certificationObserver().observeSolve(metrics, component = true)
 
-        assertEquals(LpPhaseStats(calls = 3L, nanos = 22L, outcomes = mapOf("SCALED" to 1L, "UNSCALED" to 2L)),
-            sink.snapshot().phases.getValue("SOURCE_RESIDUALS_COMPONENT"))
+        assertEquals(
+            LpPhaseStats(calls = 3L, nanos = 22L, outcomes = mapOf("SCALED" to 1L, "UNSCALED" to 2L)),
+            sink.snapshot().phases.getValue("SOURCE_RESIDUALS_COMPONENT"),
+        )
     }
 
     @Test
-    fun `phase snapshots retain refusal costs and consumer routes after merging`() {
+    fun `phase stats should keep outcomes and routes after merging`() {
         val sink = LpStatsSink()
         sink.certificationObserver(LpRoute.STANDALONE).observePhase(
             LpPhaseMetrics(LpSolvePhase.EXACT_DUALS, "STEPS", 13L, steps = 2),
@@ -47,14 +52,18 @@ class LpStatsTest {
         val combined = before.mergedWith(sink.snapshot())
 
         assertEquals(1L, before.phases.getValue("EXACT_DUALS_STANDALONE").calls)
-        assertEquals(LpPhaseStats(3L, 33L, steps = 5L, outcomes = mapOf("STEPS" to 2L, "ACCEPTED" to 1L)),
-            combined.phases.getValue("EXACT_DUALS_STANDALONE"))
-        assertEquals(LpPhaseStats(1L, 19L, 23L, 3L, outcomes = mapOf("PIVOTS" to 1L)),
-            combined.phases.getValue("CLEANUP_NODE"))
+        assertEquals(
+            LpPhaseStats(3L, 33L, steps = 5L, outcomes = mapOf("STEPS" to 2L, "ACCEPTED" to 1L)),
+            combined.phases.getValue("EXACT_DUALS_STANDALONE"),
+        )
+        assertEquals(
+            LpPhaseStats(1L, 19L, 23L, 3L, outcomes = mapOf("PIVOTS" to 1L)),
+            combined.phases.getValue("CLEANUP_NODE"),
+        )
     }
 
     @Test
-    fun `continuation invocation deltas retain abandoned work and terminal phase`() {
+    fun `continuation stats should keep abandoned work and terminal phase declines`() {
         val sink = LpStatsSink()
         val observer = sink.certificationObserver()
         observer.observeContinuation(
@@ -86,7 +95,7 @@ class LpStatsTest {
     }
 
     @Test
-    fun `rational basis accounting retains failed work and consumer routes`() {
+    fun `basis verification merge should keep failed work and routes`() {
         val first = LpBasisVerificationStats(
             calls = 1L, factoryCalls = 1L, builds = 2L, restarts = 1L,
             work = mapOf("FACTOR" to 19L), allocation = mapOf("FACTOR" to 29L),
@@ -111,7 +120,7 @@ class LpStatsTest {
     }
 
     @Test
-    fun `basis observer retains terminal phase with the decline reason`() {
+    fun `basis observer should record the terminal phase with the decline reason`() {
         val sink = LpStatsSink()
         val observer = sink.certificationObserver(LpRoute.NODE)
         val metrics = ExactBasisMetrics(
@@ -129,7 +138,7 @@ class LpStatsTest {
     }
 
     @Test
-    fun `route and certifier observations preserve zero attempt routes`() {
+    fun `route and certifier stats should keep zero attempt routes`() {
         val sink = LpStatsSink()
         val observer = sink.certificationObserver(LpRoute.NODE)
 
@@ -152,7 +161,7 @@ class LpStatsTest {
     }
 
     @Test
-    fun `node passes count nodes while solves count cut re-solves`() {
+    fun `node passes should count nodes and solves should count re-solves`() {
         val sink = LpStatsSink()
 
         sink.observeNodePass()
@@ -165,7 +174,7 @@ class LpStatsTest {
     }
 
     @Test
-    fun `active cuts preserve the largest simultaneous pool`() {
+    fun `cut active stat should keep the largest pool`() {
         val sink = LpStatsSink()
 
         sink.observeCutAccounting(candidates = 3, selected = 2, active = 2)
@@ -175,7 +184,7 @@ class LpStatsTest {
     }
 
     @Test
-    fun `a cutless separation does not fabricate an active-pool measurement`() {
+    fun `cutless separation should not record an active pool`() {
         val sink = LpStatsSink()
 
         sink.observeCutAccounting(candidates = 0, selected = 0, active = 0)
@@ -184,7 +193,7 @@ class LpStatsTest {
     }
 
     @Test
-    fun `cut builds count every growing selection but activate only successful builds`() {
+    fun `cut builds should count every selection but activate only successful builds`() {
         val sink = LpStatsSink()
 
         sink.observeCutBuild(2) { Unit }
@@ -199,7 +208,7 @@ class LpStatsTest {
     }
 
     @Test
-    fun `auxiliary route metrics do not change node cost totals`() {
+    fun `auxiliary route costs should not change node totals`() {
         val sink = LpStatsSink()
 
         sink.observeEngineCost(LpRoute.NODE, LpSolveMetrics(pivots = 2, workOps = 7, initialRefactorizations = 1))
@@ -217,7 +226,7 @@ class LpStatsTest {
     }
 
     @Test
-    fun `auxiliary routes preserve warm refactor and numerical metrics`() {
+    fun `root route should keep warm start refactor and numerical metrics`() {
         val sink = LpStatsSink()
 
         sink.observeEngineCost(
@@ -243,7 +252,7 @@ class LpStatsTest {
     }
 
     @Test
-    fun `presolve probes count root work without node outcomes`() {
+    fun `root sink should count root work without node outcomes`() {
         val sink = LpStatsSink(LpRoute.ROOT)
 
         sink.observeNodePass()
@@ -264,7 +273,7 @@ class LpStatsTest {
     }
 
     @Test
-    fun `component engines override the caller route for solve cost`() {
+    fun `component solve cost should override the sink route`() {
         val sink = LpStatsSink(LpRoute.ROOT)
 
         sink.certificationObserver().observeSolve(LpSolveMetrics(pivots = 3), component = true)
@@ -275,7 +284,7 @@ class LpStatsTest {
     }
 
     @Test
-    fun `engine reasons sum to refactorizations without inference`() {
+    fun `refactorization reasons should sum to the refactorization total`() {
         val sink = LpStatsSink()
 
         sink.observeEngineCost(
@@ -297,21 +306,7 @@ class LpStatsTest {
     }
 
     @Test
-    fun `a demotion is absent from a run that never throttled`() {
-        assertFalse(LpStatsSink().snapshot().demoted)
-    }
-
-    @Test
-    fun `a demotion reaches the snapshot whichever rule decided it`() {
-        val sink = LpStatsSink()
-
-        sink.observeDemoted()
-
-        assertTrue(sink.snapshot().demoted)
-    }
-
-    @Test
-    fun `a demotion on either side survives a merge`() {
+    fun `merge should keep a demotion from either side`() {
         val demoted = LpStatsSink().apply { observeDemoted() }.snapshot()
         val quiet = LpStatsSink().snapshot()
 
@@ -320,13 +315,23 @@ class LpStatsTest {
     }
 
     @Test
-    fun `a demotion by the per-node rule is recorded without the allowance being spent`() {
+    fun `observeDemoted should not mark the work allowance spent`() {
         val sink = LpStatsSink()
 
         sink.observeDemoted()
 
         val stats = sink.snapshot()
         assertTrue(stats.demoted)
-        assertFalse(stats.workAllowanceSpent, "the ratio rule must be distinguishable from the allowance")
+        assertFalse(stats.workAllowanceSpent)
+    }
+
+    @Test
+    fun `observeWork should accumulate totals`() {
+        val sink = LpStatsSink()
+
+        sink.observeWork(1_000L)
+        sink.observeWork(2_500L)
+
+        assertEquals(3_500.0, sink.snapshot().workOps.sum)
     }
 }

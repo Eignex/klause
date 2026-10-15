@@ -13,7 +13,7 @@ class AlgebraicArithmeticTest {
     private val arithmetic = AlgebraicArithmetic(polynomial)
 
     @Test
-    fun `completed root counts fit negative affine transforms in remaining caller work`() {
+    fun `completed root counts should fit negative affine transforms in remaining caller work`() {
         var spent = 0L
         var limit = Long.MAX_VALUE
         val meter = WorkMeter { spent += it }
@@ -32,7 +32,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `negative affine images retain root order for distinct defining polynomials`() {
+    fun `negative affine images should retain root order for distinct defining polynomials`() {
         val first = arithmetic.roots(RationalPolynomial.of(-2, 0, -1, 0, 1)).last()
         val second = arithmetic.roots(RationalPolynomial.of(6, 0, -5, 0, 1)).last()
 
@@ -42,7 +42,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `rational coefficient lifting returns only actual real roots`() {
+    fun `rational coefficient lifting should return only actual real roots`() {
         val source = RationalPolynomial.of(-2, 0, -1, 0, 1)
         val lifted = arithmetic.polynomial(source.coefficients.map(arithmetic::rational))
 
@@ -55,7 +55,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `rational coefficient lifting retains the caller dense limit`() {
+    fun `rational coefficient lifting should retain the caller dense limit`() {
         val source = arithmetic.polynomial(RationalPolynomial.of(-2, 0, 1).coefficients.map(arithmetic::rational))
         val counted = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxDenseCoefficients = 2)))
 
@@ -65,15 +65,17 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `known rational point images evaluate mixed source monomials exactly`() {
+    fun `rational point images should evaluate mixed source monomials exactly`() {
         val source = polynomial.add(
             polynomial.multiply(Polynomial.variable(0), Polynomial.variable(1)),
             polynomial.power(Polynomial.variable(0), 2),
         )
-        val point = arithmetic.pointEvaluation(mapOf(
-            0 to arithmetic.rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
-            1 to arithmetic.rational(BigFraction.ofLong(5) * BigFraction.ofLong(3).reciprocal()),
-        ))
+        val point = arithmetic.pointEvaluation(
+            mapOf(
+                0 to arithmetic.rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+                1 to arithmetic.rational(BigFraction.ofLong(5) * BigFraction.ofLong(3).reciprocal()),
+            ),
+        )
 
         val value = point.evaluate(source)
 
@@ -81,7 +83,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `rational point images use captured values after caller mutation`() {
+    fun `rational point images should use captured values after caller mutation`() {
         val coordinates = mutableMapOf(0 to arithmetic.rational(BigFraction.ofLong(2)))
         val point = arithmetic.pointEvaluation(coordinates)
         coordinates[0] = arithmetic.rational(BigFraction.ofLong(3))
@@ -92,11 +94,13 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `rational point images reject unrepresentable constant powers before expansion`() {
+    fun `rational point images should reject unrepresentable constant powers before expansion`() {
         val point = arithmetic.pointEvaluation(mapOf(0 to arithmetic.rational(BigFraction.ofLong(4))))
-        val source = Polynomial.of(listOf(
-            PolynomialTerm(Monomial.of(mapOf(0 to Int.MAX_VALUE)), BigFraction.ONE),
-        ))
+        val source = Polynomial.of(
+            listOf(
+                PolynomialTerm(Monomial.of(mapOf(0 to Int.MAX_VALUE)), BigFraction.ONE),
+            ),
+        )
 
         val failure = assertFailsWith<PolynomialResourceLimit> { point.evaluate(source) }
 
@@ -104,10 +108,11 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `completed point powers fit the remaining caller work`() {
+    fun `completed point powers should fit the remaining caller work`() {
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val source = polynomial.add(
-            polynomial.power(Polynomial.variable(0), 4), polynomial.power(Polynomial.variable(0), 2),
+            polynomial.power(Polynomial.variable(0), 4),
+            polynomial.power(Polynomial.variable(0), 2),
         )
         var spent = 0L
         var limit = Long.MAX_VALUE
@@ -127,7 +132,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `point capture owns its original algebraic coordinates`() {
+    fun `point capture should own its original algebraic coordinates`() {
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val other = arithmetic.roots(RationalPolynomial.of(-3, 0, 1)).last()
         val coordinates = mutableMapOf(0 to root)
@@ -142,7 +147,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `separate point evaluations retain their own exact powers`() {
+    fun `separate point evaluations should retain their own exact powers`() {
         val source = polynomial.power(Polynomial.variable(0), 2)
         val first = arithmetic.pointEvaluation(
             mapOf(0 to arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()),
@@ -158,7 +163,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `completed point powers still obey caller cancellation`() {
+    fun `completed point powers should still obey caller cancellation`() {
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         for (coordinate in listOf(root, arithmetic.rational(BigFraction.ofLong(2)))) {
             var cancelled = false
@@ -173,7 +178,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `distinct irrational roots have exact order and polynomial signs`() {
+    fun `distinct irrational roots should have exact order and polynomial signs`() {
         val roots = arithmetic.roots(RationalPolynomial.of(-2, 0, 1))
 
         assertEquals(-1, arithmetic.compare(roots[0], roots[1]))
@@ -183,7 +188,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `rational sector samples lie strictly between irrational boundaries`() {
+    fun `rational sector samples should lie strictly between irrational boundaries`() {
         val lower = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val upper = arithmetic.roots(RationalPolynomial.of(-3, 0, 1)).last()
 
@@ -194,7 +199,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `unbounded sector samples lie beyond the finite boundary`() {
+    fun `unbounded sector samples should lie beyond the finite boundary`() {
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
 
         assertEquals(-1, arithmetic.compare(arithmetic.rational(arithmetic.sampleBetween(null, root)), root))
@@ -202,7 +207,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `common irrational roots compare equal across different defining polynomials`() {
+    fun `common irrational roots should compare equal across different defining polynomials`() {
         val first = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val second = arithmetic.roots(RationalPolynomial.of(2, -2, -1, 1)).last()
 
@@ -210,7 +215,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `irrational arithmetic certifies exact rational cancellation`() {
+    fun `irrational arithmetic should certify exact rational cancellation`() {
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
 
         val square = arithmetic.multiply(root, root)
@@ -219,7 +224,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `different irrational conjugates sum to exact zero`() {
+    fun `different irrational conjugates should sum to exact zero`() {
         val roots = arithmetic.roots(RationalPolynomial.of(-2, 0, 1))
 
         val sum = arithmetic.add(roots[0], roots[1])
@@ -228,7 +233,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `independent irrational addition retains its annihilating identity`() {
+    fun `independent irrational addition should retain its annihilating identity`() {
         val a = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val b = arithmetic.roots(RationalPolynomial.of(-3, 0, 1)).last()
 
@@ -239,7 +244,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `reciprocal of an irrational value has exact multiplicative identity`() {
+    fun `reciprocal of an irrational value should have exact multiplicative identity`() {
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
 
         val product = arithmetic.multiply(root, arithmetic.reciprocal(root))
@@ -248,7 +253,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `lifting isolates exact roots above an irrational coordinate`() {
+    fun `lifting should isolate exact roots above an irrational coordinate`() {
         val x = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val relation = polynomial.subtract(polynomial.power(Polynomial.variable(1), 2), Polynomial.variable(0))
         val specialized = arithmetic.specialize(relation, 1, mapOf(0 to x))
@@ -262,7 +267,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `algebraic lifting filters roots from other coefficient conjugates`() {
+    fun `algebraic lifting should filter roots from other coefficient conjugates`() {
         val x = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val relation = polynomial.subtract(Polynomial.variable(1), Polynomial.variable(0))
 
@@ -273,13 +278,15 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `specialization trims vanished leading coefficients exactly`() {
+    fun `specialization should trim vanished leading coefficients exactly`() {
         val x = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val leading = polynomial.subtract(
-            polynomial.power(Polynomial.variable(0), 2), Polynomial.constant(BigFraction.ofLong(2)),
+            polynomial.power(Polynomial.variable(0), 2),
+            Polynomial.constant(BigFraction.ofLong(2)),
         )
         val relation = polynomial.add(
-            polynomial.multiply(leading, polynomial.power(Polynomial.variable(1), 2)), Polynomial.variable(1),
+            polynomial.multiply(leading, polynomial.power(Polynomial.variable(1), 2)),
+            Polynomial.variable(1),
         )
 
         val specialized = arithmetic.specialize(relation, 1, mapOf(0 to x))
@@ -289,10 +296,11 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `nullified specialization remains distinct from an empty root family`() {
+    fun `nullified specialization should remain distinct from an empty root family`() {
         val x = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val relation = polynomial.subtract(
-            polynomial.power(Polynomial.variable(0), 2), Polynomial.constant(BigFraction.ofLong(2)),
+            polynomial.power(Polynomial.variable(0), 2),
+            Polynomial.constant(BigFraction.ofLong(2)),
         )
 
         val specialized = arithmetic.specialize(relation, 1, mapOf(0 to x))
@@ -302,7 +310,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `repeated specialized roots appear once`() {
+    fun `repeated specialized roots should appear once`() {
         val irrational = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         for (x in listOf(irrational, arithmetic.rational(BigFraction.ofLong(2)))) {
             val linear = polynomial.subtract(Polynomial.variable(1), Polynomial.variable(0))
@@ -315,11 +323,12 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `lifting evaluates coefficients from multiple earlier irrational coordinates`() {
+    fun `lifting should evaluate coefficients from multiple earlier irrational coordinates`() {
         val x = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val y = arithmetic.roots(RationalPolynomial.of(-3, 0, 1)).last()
         val relation = polynomial.subtract(
-            Polynomial.variable(2), polynomial.add(Polynomial.variable(0), Polynomial.variable(1)),
+            Polynomial.variable(2),
+            polynomial.add(Polynomial.variable(0), Polynomial.variable(1)),
         )
 
         val roots = arithmetic.roots(arithmetic.specialize(relation, 2, mapOf(0 to x, 1 to y)))
@@ -329,7 +338,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `polynomial evaluation preserves equality across algebraic coordinates`() {
+    fun `polynomial evaluation should preserve equality across algebraic coordinates`() {
         val x = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val y = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 0, 1)).last()
         val relation = polynomial.subtract(polynomial.power(Polynomial.variable(1), 2), Polynomial.variable(0))
@@ -340,7 +349,7 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `lifting removes an unselected zero conjugate of the leading coefficient`() {
+    fun `lifting should remove an unselected zero conjugate of the leading coefficient`() {
         val leading = arithmetic.roots(RationalPolynomial.of(0, -2, 0, 1)).last()
         val relation = arithmetic.polynomial(listOf(arithmetic.rational(BigFraction.MINUS_ONE), leading))
 
@@ -348,22 +357,27 @@ class AlgebraicArithmeticTest {
 
         assertEquals(1, roots.size)
         assertEquals(
-            0, arithmetic.compare(arithmetic.multiply(leading, roots.single()), arithmetic.rational(BigFraction.ONE)),
+            0,
+            arithmetic.compare(arithmetic.multiply(leading, roots.single()), arithmetic.rational(BigFraction.ONE)),
         )
     }
 
     @Test
-    fun `negative irrational square target has no lifted real roots`() {
+    fun `negative irrational square target should have no lifted real roots`() {
         val target = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).first()
-        val relation = arithmetic.polynomial(listOf(
-            arithmetic.negate(target), arithmetic.rational(BigFraction.ZERO), arithmetic.rational(BigFraction.ONE),
-        ))
+        val relation = arithmetic.polynomial(
+            listOf(
+                arithmetic.negate(target),
+                arithmetic.rational(BigFraction.ZERO),
+                arithmetic.rational(BigFraction.ONE),
+            ),
+        )
 
         assertTrue(arithmetic.roots(relation).isEmpty())
     }
 
     @Test
-    fun `owned algebraic metadata survives mutation of producer coefficients`() {
+    fun `owned algebraic metadata should survive mutation of producer coefficients`() {
         val coefficients = mutableListOf(BigFraction.ofLong(-2), BigFraction.ZERO, BigFraction.ONE)
         val value = arithmetic.roots(RationalPolynomial(coefficients)).last()
 
@@ -375,11 +389,15 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `cancelled algebraic lifting publishes no partial root list`() {
+    fun `cancelled algebraic lifting should publish no partial root list`() {
         val x = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
-        val specialized = arithmetic.polynomial(listOf(
-            arithmetic.negate(x), arithmetic.rational(BigFraction.ZERO), arithmetic.rational(BigFraction.ONE),
-        ))
+        val specialized = arithmetic.polynomial(
+            listOf(
+                arithmetic.negate(x),
+                arithmetic.rational(BigFraction.ZERO),
+                arithmetic.rational(BigFraction.ONE),
+            ),
+        )
         val cancelled = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { true }))
 
         assertFailsWith<PolynomialInterrupted> { cancelled.roots(specialized) }

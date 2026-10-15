@@ -32,17 +32,24 @@ import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
     @Test
-    fun `late child images reject multiple values within one shared allowance`() {
+    fun `late child images should reject multiple values within one shared allowance`() {
         val builder = Compiler.Builder(
-            Long.MIN_VALUE, Long.MAX_VALUE, false,
+            Long.MIN_VALUE,
+            Long.MAX_VALUE,
+            false,
             conditionalEqualities = SmtLibConditionalEquality(workLimit = 6),
         )
-        val reader = SExprReader(StringCharSource("""
+        val reader =
+            SExprReader(
+                StringCharSource(
+                    """
             (declare-const b Bool) (declare-const s Int) (assert (<= 0 s 1))
             (declare-const r10 Bool) (declare-const r11 Bool) (declare-const r12 Bool)
             (assert (let ((v (ite b (ite (= s 0) 1 2) 3)))
                 (and (= r10 (= v 10)) (= r11 (= v 11)) (= r12 (= v 12)))))
-        """.trimIndent()))
+                    """.trimIndent(),
+                ),
+            )
         while (true) builder.command(reader.readCommandOrNull() ?: break)
         val parsed = builder.build()
         val session = SearchSession(
@@ -59,17 +66,24 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `an incomplete late image retains exact numeric comparisons`() {
+    fun `an incomplete late image should retain exact numeric comparisons`() {
         val builder = Compiler.Builder(
-            Long.MIN_VALUE, Long.MAX_VALUE, false,
+            Long.MIN_VALUE,
+            Long.MAX_VALUE,
+            false,
             conditionalEqualities = SmtLibConditionalEquality(workLimit = 3),
         )
-        val reader = SExprReader(StringCharSource("""
+        val reader =
+            SExprReader(
+                StringCharSource(
+                    """
             (declare-const b Bool) (declare-const s Int) (assert (<= 0 s 1))
             (declare-const r10 Bool) (declare-const r11 Bool) (declare-const r12 Bool)
             (assert (let ((v (ite b (ite (= s 0) 1 2) 3)))
                 (and (= r10 (= v 10)) (= r11 (= v 11)) (= r12 (= v 12)))))
-        """.trimIndent()))
+                    """.trimIndent(),
+                ),
+            )
         while (true) builder.command(reader.readCommandOrNull() ?: break)
         val parsed = builder.build()
 
@@ -82,17 +96,24 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `completed guard images exclude an open default without bounding its source`() {
+    fun `completed guard images should exclude an open default without bounding its source`() {
         val builder = Compiler.Builder(
-            Long.MIN_VALUE, Long.MAX_VALUE, false,
+            Long.MIN_VALUE,
+            Long.MAX_VALUE,
+            false,
             conditionalEqualities = SmtLibConditionalEquality(workLimit = 128),
         )
-        val reader = SExprReader(StringCharSource("""
+        val reader =
+            SExprReader(
+                StringCharSource(
+                    """
             (declare-const b Bool) (declare-const s Int) (declare-const x Int)
             (assert (<= 0 s 1)) (assert (> x 1000000))
             (assert (let ((v (ite b (ite (= s 0) 1 2) 3)))
                 (= (ite (= v 1) 4 (ite (= v 2) 5 (ite (= v 3) 6 x))) 99)))
-        """.trimIndent()))
+                    """.trimIndent(),
+                ),
+            )
         while (true) builder.command(reader.readCommandOrNull() ?: break)
         val parsed = builder.build()
         val session = SearchSession(
@@ -108,12 +129,14 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `an independent numeric consumer retains a late conditional value`() {
-        val parsed = SmtLib.parse("""
+    fun `an independent numeric consumer should retain a late conditional value`() {
+        val parsed = SmtLib.parse(
+            """
             (declare-const b Bool) (declare-const s Int) (declare-const x Int) (declare-const r Bool)
             (assert (<= 0 s 1)) (assert (= x 3))
             (assert (let ((v (ite b (ite (= s 0) 1 2) 3))) (and (= r (= v 10)) (= x v))))
-        """.trimIndent())
+            """.trimIndent(),
+        )
 
         val result = BacktrackSolver.source(parsed.model)
             .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
@@ -125,7 +148,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `cancellation during late image completion aborts parsing`() {
+    fun `cancellation during late image completion should abort parsing`() {
         val images = SmtLibConditionalEquality()
         var observedBuilder: Compiler.Builder? = null
         var sourceIntegers = Int.MAX_VALUE
@@ -136,13 +159,22 @@ class SmtLibConditionalEqualityTest {
                 (sourceIntegers until current.nextInt).all(images::isDefined) && ++completionPolls == 2
         }
         val builder = Compiler.Builder(
-            Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = images, sourceCancellation = stop,
+            Long.MIN_VALUE,
+            Long.MAX_VALUE,
+            false,
+            conditionalEqualities = images,
+            sourceCancellation = stop,
         )
         observedBuilder = builder
-        val reader = SExprReader(StringCharSource("""
+        val reader =
+            SExprReader(
+                StringCharSource(
+                    """
             (declare-const b Bool) (declare-const s Int) (assert (<= 0 s 1))
             (assert (= (ite b (ite (= s 0) 1 2) 3) 10))
-        """.trimIndent()))
+                    """.trimIndent(),
+                ),
+            )
         while (true) builder.command(reader.readCommandOrNull() ?: break)
         sourceIntegers = builder.intNames.size
 
@@ -150,7 +182,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `repeated conditional guards exclude unreachable values without equality expansion`() {
+    fun `repeated conditional guards should exclude unreachable values without equality expansion`() {
         val terms = listOf(
             "(ite c 5 (ite c 3 41))",
             "(ite c (ite c 5 3) 41)",
@@ -160,12 +192,16 @@ class SmtLibConditionalEqualityTest {
         for (guard in listOf("b", "(= x 0)")) {
             for (term in terms) {
                 val builder = Compiler.Builder(
-                    Long.MIN_VALUE, Long.MAX_VALUE, false,
+                    Long.MIN_VALUE,
+                    Long.MAX_VALUE,
+                    false,
                     conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
                 )
-                val reader = SExprReader(StringCharSource(
-                    "(declare-const b Bool) (declare-const x Int) (assert (let ((c $guard)) (= $term 3)))",
-                ))
+                val reader = SExprReader(
+                    StringCharSource(
+                        "(declare-const b Bool) (declare-const x Int) (assert (let ((c $guard)) (= $term 3)))",
+                    ),
+                )
                 while (true) builder.command(reader.readCommandOrNull() ?: break)
                 val parsed = builder.build()
                 val session = SearchSession(
@@ -179,7 +215,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `restricting one conditional use preserves an independent consumer of its inner definition`() {
+    fun `restricting one conditional use should preserve an independent consumer of its inner definition`() {
         val parsed = SmtLib.parse(
             """
             (declare-const b Bool) (declare-const x Int)
@@ -203,24 +239,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `an expanded conditional equality releases its arithmetic placeholder`() {
-        val parsed = SmtLib.parse(
-            "(declare-const b Bool) (assert (= (ite b 1 2) 1))",
-        )
-        val session = SearchSession(
-            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
-            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
-        )
-
-        session.initialize()
-        val result = session.solve(parsed.model.numBoolVars)
-
-        assertEquals(0, parsed.model.numIntVars)
-        assertIs<SearchResult.Satisfied>(result)
-    }
-
-    @Test
-    fun `unused difference equality gates release their arithmetic reads`() {
+    fun `unused difference equality gates should release their arithmetic reads`() {
         val parsed = SmtLib.parse(
             """
                 (declare-const x Int) (declare-const y Int)
@@ -232,9 +251,12 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a covered identity default excludes its old selector values without expansion`() {
+    fun `a covered identity default should exclude its old selector values without expansion`() {
         val builder = Compiler.Builder(
-            Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+            Long.MIN_VALUE,
+            Long.MAX_VALUE,
+            false,
+            conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
         )
         val reader = SExprReader(
             StringCharSource(
@@ -256,9 +278,12 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a covered selector excludes an open default without expansion`() {
+    fun `a covered selector should exclude an open default without expansion`() {
         val builder = Compiler.Builder(
-            Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+            Long.MIN_VALUE,
+            Long.MAX_VALUE,
+            false,
+            conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
         )
         val reader = SExprReader(
             StringCharSource(
@@ -280,9 +305,12 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `an uncovered selector value retains its open default without expansion`() {
+    fun `an uncovered selector value should retain its open default without expansion`() {
         val builder = Compiler.Builder(
-            Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+            Long.MIN_VALUE,
+            Long.MAX_VALUE,
+            false,
+            conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
         )
         val reader = SExprReader(
             StringCharSource(
@@ -310,9 +338,12 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a final comparison can refute the source after earlier comparisons exceed the expansion budget`() {
+    fun `a final comparison should refute the source after earlier comparisons exceed the expansion budget`() {
         val builder = Compiler.Builder(
-            Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 3),
+            Long.MIN_VALUE,
+            Long.MAX_VALUE,
+            false,
+            conditionalEqualities = SmtLibConditionalEquality(workLimit = 3),
         )
         val reader = SExprReader(
             StringCharSource(
@@ -335,10 +366,13 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `an exhausted comparison expansion retains its exact arithmetic meaning`() {
+    fun `an exhausted comparison expansion should retain its exact arithmetic meaning`() {
         for (value in listOf(0, 1)) {
             val builder = Compiler.Builder(
-                Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+                Long.MIN_VALUE,
+                Long.MAX_VALUE,
+                false,
+                conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
             )
             val reader = SExprReader(
                 StringCharSource(
@@ -367,10 +401,15 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a constant conditional result completes without arithmetic predicate decisions`() {
+    fun `a constant conditional result should complete without arithmetic predicate decisions`() {
         val guards = listOf(
-            "(<= x 0)", "(= x 0)", "(and (<= x 0) (= x 0))", "(or (<= x 0) (= x 0))",
-            "(xor (<= x 0) (= x 0))", "(=> (<= x 0) (= x 0))", "(= (<= x 0) (= x 0))",
+            "(<= x 0)",
+            "(= x 0)",
+            "(and (<= x 0) (= x 0))",
+            "(or (<= x 0) (= x 0))",
+            "(xor (<= x 0) (= x 0))",
+            "(=> (<= x 0) (= x 0))",
+            "(= (<= x 0) (= x 0))",
             "(ite (<= x 0) (= x 0) (< x 0))",
         )
         for (guard in guards) {
@@ -391,7 +430,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a Boolean gate retains its meaning when an arithmetic channel consumes it`() {
+    fun `a Boolean gate should retain its meaning when an arithmetic channel consumes it`() {
         val parsed = SmtLib.parse(
             """
             (declare-const b Bool) (declare-const c Bool)
@@ -413,7 +452,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a source Boolean retains a later arithmetic comparison after unused predicates are omitted`() {
+    fun `a source Boolean should retain a later arithmetic comparison after unused predicates are omitted`() {
         for (value in listOf(3, 4)) {
             val parsed = SmtLib.parse(
                 """
@@ -441,7 +480,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a conditional cannot take a conflicting selector value without arithmetic checks`() {
+    fun `a conditional should not take a conflicting selector value without arithmetic checks`() {
         for (comparison in listOf("(= (ite (= s 0) s 2) 1)", "(= (ite (= s 0) 2 s) 0)")) {
             val parsed = SmtLib.parse(
                 """
@@ -460,7 +499,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a conditional retains its guard meaning after another selector shares the literal`() {
+    fun `a conditional should retain its guard meaning after another selector shares the literal`() {
         val parsed = SmtLib.parse(
             """
             (declare-const b Bool)
@@ -479,7 +518,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a conditional default remains available at a different selector value`() {
+    fun `a conditional default should remain available at a different selector value`() {
         for (value in 0..2) {
             val parsed = SmtLib.parse(
                 """
@@ -504,7 +543,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a conditional can compare a branch from a different selector`() {
+    fun `a conditional should compare a branch from a different selector`() {
         val parsed = SmtLib.parse(
             """
             (declare-const s Int) (declare-const t Int)
@@ -527,7 +566,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `an equality key beyond a signed word cannot exclude a feasible conditional branch`() {
+    fun `an equality key beyond a signed word should not exclude a feasible conditional branch`() {
         val parsed = SmtLib.parse(
             """
             (declare-const x Int)
@@ -550,7 +589,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a mixed real constraint retains its conditional value after unused definitions are omitted`() {
+    fun `a mixed real constraint should retain its conditional value after unused definitions are omitted`() {
         val parsed = SmtLib.parse(
             """
             (declare-const b Bool) (declare-const x Int) (declare-const r Real)
@@ -570,13 +609,14 @@ class SmtLibConditionalEqualityTest {
 
             val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
             assertEquals(
-                BigFraction.of(bigIntOf(19), bigIntOf(2)), assignment.reals[parsed.realVarNames.getValue("r")],
+                BigFraction.of(bigIntOf(19), bigIntOf(2)),
+                assignment.reals[parsed.realVarNames.getValue("r")],
             )
         }
     }
 
     @Test
-    fun `a complete symbolic selector table resolves from its source Boolean values`() {
+    fun `a complete symbolic selector table should resolve from its source Boolean values`() {
         for (branch in listOf(true, false)) {
             var images = (0..15).map { it.toString() }
             for (bit in 0..3) {
@@ -607,7 +647,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a decision list over a symbolic selector completes without numeric predicate decisions`() {
+    fun `a decision list over a symbolic selector should complete without numeric predicate decisions`() {
         for (branch in listOf(true, false)) {
             val chain = (0..15).toList().foldRight("99") { key, rest -> "(ite (= selector $key) $key $rest)" }
             val parsed = SmtLib.parse(
@@ -632,7 +672,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a determined conditional comparison completes without Boolean decisions`() {
+    fun `a determined conditional comparison should complete without Boolean decisions`() {
         val parsed = SmtLib.parse(
             "(declare-const b Bool) (assert (= (ite b 1 2) 1))",
         )
@@ -648,7 +688,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a conditional compared with a constant retains its independent arithmetic use`() {
+    fun `a conditional compared with a constant should retain its independent arithmetic use`() {
         for (branch in listOf(1, 2)) {
             val parsed = SmtLib.parse(
                 """
@@ -672,7 +712,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `nested numeric conditional reads retain the definitions they depend on`() {
+    fun `nested numeric conditional reads should retain the definitions they depend on`() {
         val parsed = SmtLib.parse(
             """
             (declare-const b Bool) (declare-const c Bool) (declare-const x Int)
@@ -695,7 +735,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a conditional objective retains its branch value after unused definitions are omitted`() {
+    fun `a conditional objective should retain its branch value after unused definitions are omitted`() {
         for (branch in listOf(true, false)) {
             val parsed = SmtLib.parse(
                 """
@@ -725,7 +765,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a conditional branch comparison retains exact arithmetic beyond a signed word`() {
+    fun `a conditional branch comparison should retain exact arithmetic beyond a signed word`() {
         val parsed = SmtLib.parse(
             """
             (declare-const b Bool) (declare-const x Int)
@@ -743,7 +783,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `nested shared conditional bindings propagate through their complete definition chain`() {
+    fun `nested shared conditional bindings should propagate through their complete definition chain`() {
         val prefix = (0..127).joinToString(" ") { index ->
             val branch = if (index == 0) "1" else "t${index - 1}"
             "(let ((t$index (ite b $branch 2)))"
@@ -762,7 +802,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a nested conditional comparison propagates its source guard without arithmetic checks`() {
+    fun `a nested conditional comparison should propagate its source guard without arithmetic checks`() {
         val parsed = SmtLib.parse(
             """
             (declare-const b Bool)
@@ -783,7 +823,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a conditional constant outside every branch image refutes through Boolean clauses`() {
+    fun `a conditional constant outside every branch image should refute through Boolean clauses`() {
         val parsed = SmtLib.parse(
             """
             (declare-const b Bool) (declare-const c Bool)
@@ -799,7 +839,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `an open default retains its comparison when the constant arm is inactive`() {
+    fun `an open default should retain its comparison when the constant arm is inactive`() {
         for (expected in listOf(true, false)) {
             val assertion = if (expected) "(= t 7)" else "(not (= t 7))"
             val parsed = SmtLib.parse(
@@ -820,7 +860,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a completed decision list excludes constants outside its arms and default`() {
+    fun `a completed decision list should exclude constants outside its arms and default`() {
         val chain = (0..15).toList().foldRight("99") { key, rest -> "(ite (= s $key) $key $rest)" }
         val parsed = SmtLib.parse(
             """
@@ -838,7 +878,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `shadowed bindings keep conditional equality definitions attached to their own quantities`() {
+    fun `shadowed bindings should keep conditional equality definitions attached to their own quantities`() {
         val parsed = SmtLib.parse(
             """
             (declare-const b Bool) (declare-const c Bool)

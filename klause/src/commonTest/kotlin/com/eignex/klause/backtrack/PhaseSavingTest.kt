@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -24,11 +25,16 @@ import kotlin.test.assertIs
 class PhaseSavingTest {
 
     @Test
-    fun `a propagated phase survives backtracking`() {
+    fun `a propagated phase should survive backtracking`() {
         for (nativeSat in listOf(false, true)) {
-            val problem = Problem(2, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-            ))
+            val problem = Problem(
+                2,
+                0,
+                emptyArray(),
+                arrayOf(
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                ),
+            )
             val native = PropagationSession(problem, nativeSat = nativeSat)
             val cp = CpSearchComponent(native, branching = CpBranching.None)
             val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(2))
@@ -56,7 +62,7 @@ class PhaseSavingTest {
         PropagationSession(Problem(numBools, 0, emptyArray(), emptyList()))
 
     @Test
-    fun `a captured int phase is tried first`() {
+    fun `a captured int phase should be tried first`() {
         val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyList()))
         session.pinInt(0, 3)
         val phase = PhaseSaving(0, 1, BacktrackParams(phaseSaving = true))
@@ -65,19 +71,18 @@ class PhaseSavingTest {
     }
 
     @Test
-    fun `captureTargetIfDeeper only snapshots at a new maximum depth`() {
+    fun `captureTargetIfDeeper should snapshot only at a new maximum depth`() {
         val session = boolSession(1)
         session.pinBool(0, true)
         val phase = PhaseSaving(1, 0, BacktrackParams(targetPhasing = true))
         phase.captureTargetIfDeeper(session, trailSize = 3)
-        // A shallower prefix must not overwrite the target: flip the assignment, re-offer at depth 1.
         session.pinBool(0, false)
         phase.captureTargetIfDeeper(session, trailSize = 1)
         assertEquals(listOf(1L, 0L), phase.applyPhase(VarRef.Bool(0), sequenceOf(0, 1)).toList())
     }
 
     @Test
-    fun `managed STABLE mode dives on the solution phase`() {
+    fun `managed STABLE mode should dive on the solution phase`() {
         val phase = PhaseSaving(1, 0, BacktrackParams(solutionPhasing = true))
         phase.onSolution(Sample(booleanArrayOf(true), longArrayOf()))
         phase.setManagedMode(PhaseMode.STABLE)
@@ -85,28 +90,44 @@ class PhaseSavingTest {
     }
 
     @Test
-    fun `managed FOCUSED mode ignores the target phase`() {
+    fun `managed FOCUSED mode should ignore the target phase`() {
         val session = boolSession(1)
         session.pinBool(0, true)
         val phase = PhaseSaving(1, 0, BacktrackParams(targetPhasing = true))
         phase.captureTargetIfDeeper(session, trailSize = 1)
-        // The default TARGET source would prefer 1L; FOCUSED uses plain saved phase, and with none
-        // captured it falls through to the heuristic order.
         phase.setManagedMode(PhaseMode.FOCUSED)
         assertEquals(listOf(0L, 1L), phase.applyPhase(VarRef.Bool(0), sequenceOf(0, 1)).toList())
     }
 
     @Test
-    fun `onConflictTick rotates the polarity source off TARGET after the rephase interval`() {
+    fun `onConflictTick should rotate the polarity source off TARGET after the rephase interval`() {
         val session = boolSession(1)
         session.pinBool(0, true)
         val phase = PhaseSaving(1, 0, BacktrackParams(targetPhasing = true, rephaseInterval = 2))
         phase.captureTargetIfDeeper(session, trailSize = 1)
         assertEquals(listOf(1L, 0L), phase.applyPhase(VarRef.Bool(0), sequenceOf(0, 1)).toList())
-        // Two conflicts rotate TARGET -> SAVED; with no saved bool phase, SAVED mode falls through to the
-        // heuristic order unchanged.
         phase.onConflictTick()
         phase.onConflictTick()
         assertEquals(listOf(0L, 1L), phase.applyPhase(VarRef.Bool(0), sequenceOf(0, 1)).toList())
+    }
+
+    @Test
+    fun `phase saving should keep saved values across a backtrack`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = emptyArray(),
+        )
+        val params = BacktrackParams(
+            randomSeed = 0L,
+            phaseSaving = true,
+            variableSelector = InputOrder,
+            valueSelector = IndomainMin,
+        )
+        val samples = BacktrackSolver(problem.bake()).enumerate(params).take(2).toList()
+        assertEquals(2, samples.size)
+        assertEquals(listOf(false, false, false), samples[0].bools.toList())
+        assertEquals(listOf(false, false, true), samples[1].bools.toList())
     }
 }

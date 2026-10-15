@@ -9,7 +9,7 @@ import kotlin.test.assertFailsWith
 
 class PresolveEffortParamsTest {
     @Test
-    fun `effort overrides stay local to the request`() {
+    fun `effort overrides should stay local to the request`() {
         val params = mutableListOf("presolve-abort-fraction=0.01", "presolve-max-rounds=3", "seed=7")
 
         val edited = presolveEffortParams(params, PresolveConfig.DEFAULT)
@@ -23,7 +23,7 @@ class PresolveEffortParamsTest {
     }
 
     @Test
-    fun `plan adaptations retain experiment effort`() {
+    fun `plan adaptations should retain experiment effort`() {
         val base = PresolveConfig(PresolveEmphasis.AGGRESSIVE)
         val params = mutableListOf("presolve-probe-per-var=9", "presolve-probe-total=40", "presolve-max-rounds=2")
 
@@ -37,14 +37,14 @@ class PresolveEffortParamsTest {
     }
 
     @Test
-    fun `nonfinite fractions are rejected`() {
+    fun `nonfinite fractions should be rejected`() {
         assertFailsWith<CliUsageException> {
             presolveEffortParams(mutableListOf("presolve-abort-fraction=NaN"), PresolveConfig.DEFAULT)
         }
     }
 
     @Test
-    fun `negative round limits are rejected`() {
+    fun `negative round limits should be rejected`() {
         assertFailsWith<CliUsageException> {
             presolveEffortParams(mutableListOf("presolve-max-rounds=-1"), PresolveConfig.DEFAULT)
         }

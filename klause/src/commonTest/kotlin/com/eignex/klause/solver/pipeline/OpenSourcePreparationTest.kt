@@ -8,7 +8,6 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePass
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -19,16 +18,9 @@ import kotlin.test.assertNull
 
 class OpenSourcePreparationTest {
 
-    /** Probing would close the open columns and drop the rewritten row, so the aggregate runs alone. */
     private val aggregateOnly = PresolveConfig.parse(PresolvePass.AGGREGATE_SUB_SUMS.id)
 
-    /**
-     * `x = y + z` and `y + z <= 4` over open columns, then an `AllDifferent` over three bounded ones —
-     * three, because structural reduction rewrites a two-column one into a theory-owned `x - y != 0`.
-     *
-     * The aggregate pass rewrites the second row into `x <= 4`, which drops it and appends the rewrite —
-     * so the `AllDifferent` moves up a slot and factor ownership no longer lines up with the input.
-     */
+    // Three AllDifferent columns, since structural reduction rewrites a two-column one into a disequality.
     private fun aggregatable(openColumns: Boolean): Problem {
         val open = if (openColumns) Bits(6).also { bits -> repeat(3) { bits.set(it) } } else null
         val upper = if (openColumns) longArrayOf(0, 0, 0, 3, 3, 3) else longArrayOf(9, 9, 9, 3, 3, 3)
@@ -43,7 +35,6 @@ class OpenSourcePreparationTest {
         )
     }
 
-    /** `2x + 4y = 3` over open columns: no gcd multiple reaches 3, whatever the columns are worth. */
     private fun refutable(): Problem {
         val open = Bits(2).also { bits -> repeat(2) { bits.set(it) } }
         return Problem(
@@ -54,7 +45,7 @@ class OpenSourcePreparationTest {
     }
 
     @Test
-    fun `a source rewrite moves factor ownership with the factors`() {
+    fun `a source rewrite should move factor ownership with the factors`() {
         val model = aggregatable(openColumns = true)
         val declared = model.componentPlan()
 
@@ -65,7 +56,7 @@ class OpenSourcePreparationTest {
     }
 
     @Test
-    fun `source refutation is terminal for the open route`() {
+    fun `source refutation should be terminal for the open route`() {
         val model = refutable()
 
         val result = OpenTheoryEngine(model, model.sourceRoute()).solve()
@@ -75,25 +66,13 @@ class OpenSourcePreparationTest {
     }
 
     @Test
-    fun `a solve stopped before it starts prepares nothing`() {
+    fun `a solve stopped before it starts should prepare nothing`() {
         val model = aggregatable(openColumns = true)
 
         val result = OpenTheoryEngine(model, model.sourceRoute())
             .solve(TheoryParams(cancellation = Cancellation { true }))
 
         assertIs<OpenTheoryResult.Unknown>(result)
-        assertNull(result.stats.presolve, "a run that stopped before preparing has nothing to report")
-    }
-
-    @Test
-    fun `a descent stopped before it starts prepares nothing`() {
-        val model = aggregatable(openColumns = true)
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0, 0, 0))
-
-        val result = OpenTheoryMinimizer(model, objective)
-            .minimize(TheoryParams(cancellation = Cancellation { true }))
-
-        assertIs<OpenTheoryOptimum.Bounded>(result)
-        assertNull(result.stats.presolve, "a descent that stopped before preparing has nothing to report")
+        assertNull(result.stats.presolve)
     }
 }

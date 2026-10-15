@@ -6,14 +6,14 @@ import kotlin.test.assertNull
 
 class ExactObjectiveTest {
     @Test
-    fun `decimal and rational text normalize to an exact value`() {
+    fun `decimal and rational text should normalize to an exact value`() {
         for ((input, expected) in listOf("6/-9" to "-2/3", "1.25" to "5/4", "12e3" to "12000")) {
             assertEquals(expected, ExactObjective.parse(input).toString())
         }
     }
 
     @Test
-    fun `malformed exact values cannot fall back to rounded legacy credit`() {
+    fun `malformed exact values should not fall back to rounded credit`() {
         for (input in listOf("NaN", "Infinity", "1/0", "1/2/3", "")) {
             assertNull(ExactObjective.value(input, 1.0))
         }

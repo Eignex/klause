@@ -16,9 +16,13 @@ import kotlin.test.assertEquals
 
 class WideDivModTest {
     @Test
-    fun `aliased affine roles agree with private equivalent rows`() {
-        val source = WideDivMod(DivModExpression(mapOf(0 to BIG_ONE), bigIntOf(7)), bigIntOf(3),
-            DivModExpression(mapOf(1 to BIG_ONE), BIG_ZERO), DivModExpression(mapOf(2 to BIG_ONE), BIG_ZERO))
+    fun `aliased affine roles should agree with private equivalent rows`() {
+        val source = WideDivMod(
+            DivModExpression(mapOf(0 to BIG_ONE), bigIntOf(7)),
+            bigIntOf(3),
+            DivModExpression(mapOf(1 to BIG_ONE), BIG_ZERO),
+            DivModExpression(mapOf(2 to BIG_ONE), BIG_ZERO),
+        )
         val mapped = source.remap(VarRemap(intArrayOf(), intArrayOf(0, 0, 1))) as WideDivMod
         val domains = arrayOf(IntDomain(-3, 3), IntDomain(0, 2))
         for (factors in listOf(arrayOf<Factor>(mapped), wideDivModRows(mapped).toTypedArray<Factor>())) {

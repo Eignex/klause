@@ -8,11 +8,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.test.assertFalse
 
 class QuadraticNeighborhoodCursorTest {
     @Test
-    fun `adaptive proposals and widening survive cancelled sibling turns`() {
+    fun `adaptive proposals and widening should survive cancelled sibling turns`() {
         val whole = mutableListOf<ExactNeighborhoodCondition>()
         val sliced = mutableListOf<ExactNeighborhoodCondition>()
         val wholeAllowance = QuadraticNeighborhoodAllowance(4, 100, null)
@@ -21,16 +20,22 @@ class QuadraticNeighborhoodCursorTest {
         val unpaused = QuadraticNeighborhoodCursor(
             2, true, 7, wholeAllowance, Cancellation.Never, { 0 },
             { released, radius, random ->
-                ExactNeighborhoodCondition(mapOf(0 to random.nextBoolean()),
-                    mapOf(0 to if (0 in released) radius.negated() else BigFraction.ZERO), mapOf(0 to radius))
+                ExactNeighborhoodCondition(
+                    mapOf(0 to random.nextBoolean()),
+                    mapOf(0 to if (0 in released) radius.negated() else BigFraction.ZERO),
+                    mapOf(0 to radius),
+                )
                     .also { whole += it }
             }, completion, { false },
         )
         val paused = QuadraticNeighborhoodCursor(
             2, true, 7, slicedAllowance, Cancellation.Never, { 0 },
             { released, radius, random ->
-                ExactNeighborhoodCondition(mapOf(0 to random.nextBoolean()),
-                    mapOf(0 to if (0 in released) radius.negated() else BigFraction.ZERO), mapOf(0 to radius))
+                ExactNeighborhoodCondition(
+                    mapOf(0 to random.nextBoolean()),
+                    mapOf(0 to if (0 in released) radius.negated() else BigFraction.ZERO),
+                    mapOf(0 to radius),
+                )
                     .also { sliced += it }
             }, completion, { false },
         )
@@ -48,7 +53,7 @@ class QuadraticNeighborhoodCursorTest {
     }
 
     @Test
-    fun `reopening a neighborhood does not renew its containing move quota`() {
+    fun `reopening a neighborhood should not renew its containing move quota`() {
         val allowance = QuadraticNeighborhoodAllowance(2, 100, null)
         var queries = 0
         val completion = ExactNeighborhoodCompletion { _, _ ->
@@ -56,11 +61,15 @@ class QuadraticNeighborhoodCursorTest {
             ExactNeighborhoodResult.Undecided
         }
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
-        val first = QuadraticNeighborhoodCursor(1, false, 1, allowance, Cancellation.Never, { 0 },
-            { _, _, _ -> condition }, completion, { false })
+        val first = QuadraticNeighborhoodCursor(
+            1, false, 1, allowance, Cancellation.Never, { 0 },
+            { _, _, _ -> condition }, completion, { false },
+        )
         first.use { assertFalse(it.advance(Cancellation.Never, 1)) }
-        val reopened = QuadraticNeighborhoodCursor(1, false, 3, allowance, Cancellation.Never, { 0 },
-            { _, _, _ -> condition }, completion, { false })
+        val reopened = QuadraticNeighborhoodCursor(
+            1, false, 3, allowance, Cancellation.Never, { 0 },
+            { _, _, _ -> condition }, completion, { false },
+        )
 
         reopened.use {
             assertEquals(0L, it.work)
@@ -73,7 +82,7 @@ class QuadraticNeighborhoodCursorTest {
     }
 
     @Test
-    fun `atomic repair work charges the shared allowance once`() {
+    fun `atomic repair work should charge the shared allowance once`() {
         val budget = NodeBudget(5)
         val allowance = QuadraticNeighborhoodAllowance(10, 100, budget.allowance)
         var nativeWork = 0L
@@ -81,8 +90,10 @@ class QuadraticNeighborhoodCursorTest {
             nativeWork += 5
             ExactNeighborhoodResult.Undecided
         }
-        val cursor = QuadraticNeighborhoodCursor(1, true, 1, allowance, Cancellation.Never, { nativeWork },
-            { _, _, _ -> ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()) }, completion, { false })
+        val cursor = QuadraticNeighborhoodCursor(
+            1, true, 1, allowance, Cancellation.Never, { nativeWork },
+            { _, _, _ -> ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()) }, completion, { false },
+        )
 
         cursor.use { assertTrue(it.advance(Cancellation.Never, 1)) }
 
@@ -92,11 +103,13 @@ class QuadraticNeighborhoodCursorTest {
     }
 
     @Test
-    fun `closed neighborhoods reject another segment without spending work`() {
+    fun `closed neighborhood should reject another segment without spending work`() {
         val allowance = QuadraticNeighborhoodAllowance(10, 100, null)
-        val cursor = QuadraticNeighborhoodCursor(1, true, 1, allowance, Cancellation.Never, { 0 },
+        val cursor = QuadraticNeighborhoodCursor(
+            1, true, 1, allowance, Cancellation.Never, { 0 },
             { _, _, _ -> error("closed cursor cannot propose") },
-            ExactNeighborhoodCompletion { _, _ -> error("closed cursor cannot complete") }, { false })
+            ExactNeighborhoodCompletion { _, _ -> error("closed cursor cannot complete") }, { false },
+        )
 
         cursor.close()
         cursor.close()
@@ -106,19 +119,22 @@ class QuadraticNeighborhoodCursorTest {
     }
 
     @Test
-    fun `invocation cancellation reaches an atomic repair without using the segment deadline`() {
+    fun `invocation cancellation should reach an atomic repair without the segment deadline`() {
         val allowance = QuadraticNeighborhoodAllowance(10, 100, null)
         var cancelled = false
         var reached = false
         val invocation = Cancellation { cancelled }
-        val cursor = QuadraticNeighborhoodCursor(1, false, 1, allowance, Cancellation.Never, { 0 },
+        val cursor = QuadraticNeighborhoodCursor(
+            1, false, 1, allowance, Cancellation.Never, { 0 },
             { _, _, _ -> ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()) },
             ExactNeighborhoodCompletion { _, stop ->
                 assertFalse(stop())
                 cancelled = true
                 reached = stop()
                 ExactNeighborhoodResult.Undecided
-            }, { false })
+            },
+            { false },
+        )
 
         cursor.use { it.advance(Cancellation.Never, 100, invocation) }
 

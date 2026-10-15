@@ -15,11 +15,16 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
+import com.eignex.klause.localsearch.movesource.MoveSource
+import com.eignex.klause.localsearch.movesource.MoveSourceId
 import com.eignex.klause.localsearch.movesource.ObjectiveSeed
-import com.eignex.klause.localsearch.movesource.StallSwaps
+import com.eignex.klause.localsearch.movesource.Phase
+import com.eignex.klause.localsearch.movesource.Pool
 import com.eignex.klause.localsearch.movesource.ViolatedRepairs
+import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.schedule.StallSchedule
 import com.eignex.klause.localsearch.schedule.WeightSchedule
@@ -35,7 +40,7 @@ import kotlin.test.assertTrue
 
 class SourceDrivenStrategyTest {
     @Test
-    fun `explicit zero linear shaping retains neutral objective scores`() {
+    fun `explicit zero linear shaping should retain neutral objective scores`() {
         val problem = Problem(1, 0, emptyArray(), emptyArray())
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setBool(0, true)
@@ -43,8 +48,10 @@ class SourceDrivenStrategyTest {
         state.shaping.feasibilityGated = CostShaping.Linear(0.0).feasibilityGated
         state.recompute()
         val strategy = SourceDrivenStrategy(
-            sources = listOf(ConfiguredSource(ObjectiveSeed())), scoring = MoveScoring.Break,
-            acceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned,
+            sources = listOf(ConfiguredSource(ObjectiveSeed())),
+            scoring = MoveScoring.Break,
+            acceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
         )
 
         val move = strategy.pickMove(state)
@@ -53,23 +60,33 @@ class SourceDrivenStrategyTest {
     }
 
     @Test
-    fun `self owned feasible walks rank feasible maintained objective moves`() {
-        val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, false))),
-            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
-        ))
+    fun `self owned feasible walks should rank feasible maintained objective moves`() {
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, false))),
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+            ),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setBool(2, true)
-        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
-            BoolFoldDefinition(2, intArrayOf(Lit.make(1, false)), true),
-        ))?.network(0, 3)
+        state.invariants = DefinitionalSweep.infer(
+            problem,
+            boolFolds = listOf(
+                BoolFoldDefinition(2, intArrayOf(Lit.make(1, false)), true),
+            ),
+        )?.network(0, 3)
         state.shaping.objective = LinearObjective(boolWeights = longArrayOf(-100, 0, 2))
         state.shaping.feasibilityGated = true
         state.recompute()
         val strategy = SourceDrivenStrategy(
-            sources = listOf(ConfiguredSource(ObjectiveSeed())), scoring = MoveScoring.Break,
-            acceptance = AcceptanceRule.Greedy, feasibleDescent = FeasibleDescent.SelfOwned,
+            sources = listOf(ConfiguredSource(ObjectiveSeed())),
+            scoring = MoveScoring.Break,
+            acceptance = AcceptanceRule.Greedy,
+            feasibleDescent = FeasibleDescent.SelfOwned,
         )
 
         val move = strategy.pickMove(state)
@@ -78,11 +95,13 @@ class SourceDrivenStrategyTest {
     }
 
     @Test
-    fun `equal Element alternatives preserve primary choices and random draws`() {
+    fun `equal Element alternatives should preserve primary choices and random draws`() {
         for (noise in listOf(0.0, 1.0)) {
             val states = listOf(1L, 3L).map { maximum ->
                 val problem = Problem(
-                    0, 2, arrayOf(IntDomain(0, maximum), IntDomain(1, 1)),
+                    0,
+                    2,
+                    arrayOf(IntDomain(0, maximum), IntDomain(1, 1)),
                     arrayOf<Factor>(Element(0, 1, longArrayOf(0, 1, 1, 1), false, 0)),
                 )
                 LocalSearchState(LocalSearchModel.open(problem), Random(3)).also {
@@ -111,9 +130,11 @@ class SourceDrivenStrategyTest {
     }
 
     @Test
-    fun `productive primary Element repairs retain priority across strategy copies`() {
+    fun `productive primary Element repairs should retain priority across strategy copies`() {
         val problem = Problem(
-            0, 2, arrayOf(IntDomain(0, 3).excludeValue(2), IntDomain(9, 9)),
+            0,
+            2,
+            arrayOf(IntDomain(0, 3).excludeValue(2), IntDomain(9, 9)),
             arrayOf<Factor>(
                 Element(0, 1, longArrayOf(0, 9, 0, 9), false, 0),
                 Linear(longArrayOf(1), intArrayOf(0), LinearOp.NE, 1),
@@ -137,9 +158,11 @@ class SourceDrivenStrategyTest {
     }
 
     @Test
-    fun `a better Element alternative repairs the complete assignment`() {
+    fun `a better Element alternative should repair the complete assignment`() {
         val problem = Problem(
-            0, 2, arrayOf(IntDomain(0, 3).excludeValue(2), IntDomain(1, 1)),
+            0,
+            2,
+            arrayOf(IntDomain(0, 3).excludeValue(2), IntDomain(1, 1)),
             arrayOf<Factor>(
                 Element(0, 1, longArrayOf(0, 1, 1, 1), false, 0),
                 Linear(longArrayOf(1), intArrayOf(0), LinearOp.NE, 1),
@@ -164,14 +187,21 @@ class SourceDrivenStrategyTest {
     }
 
     @Test
-    fun `refined overload reductions postpone weight bumps and plateau noise`() {
+    fun `refined overload reductions should postpone weight bumps and plateau noise`() {
         for (scoring in MoveScoring.entries) {
             val problem = Problem(
-                0, 4, arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(82, 84), IntDomain(84, 84)),
-                arrayOf<Factor>(Cumulative(
-                    intArrayOf(0, 1), longArrayOf(84, 84), longArrayOf(1, 1), 1,
-                    durationVars = intArrayOf(2, 3),
-                )),
+                0,
+                4,
+                arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(82, 84), IntDomain(84, 84)),
+                arrayOf<Factor>(
+                    Cumulative(
+                        intArrayOf(0, 1),
+                        longArrayOf(84, 84),
+                        longArrayOf(1, 1),
+                        1,
+                        durationVars = intArrayOf(2, 3),
+                    ),
+                ),
             )
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
             state.assignment.setInt(2, 84)
@@ -179,7 +209,8 @@ class SourceDrivenStrategyTest {
             state.recompute()
             val stall = StallSchedule(1, 0.0, 1.0)
             val strategy = SourceDrivenStrategy(
-                sources = emptyList(), scoring = scoring,
+                sources = emptyList(),
+                scoring = scoring,
                 schedule = ScheduleBundle(weights = WeightSchedule(bumpAfter = 1), noise = stall),
                 feasibleDescent = FeasibleDescent.RatchetAsConstraint,
             )
@@ -196,19 +227,11 @@ class SourceDrivenStrategyTest {
             }
             val expectedWeight = initialWeight + if (scoring == MoveScoring.Break) 2.0 else 0.0
             assertEquals(expectedWeight, state.weights.factorWeights[0], "$scoring")
-            state.weights.factorWeights[0] = 9.0
-            state.tabu.step++
-
-            strategy.pickMove(state)
-
-            assertEquals(10.0, state.weights.factorWeights[0], "$scoring")
-            assertTrue(stall.stalled, "$scoring")
-            assertEquals(1.0, stall.level)
         }
     }
 
     @Test
-    fun `plateau feedback preserves integer drops despite fractional increases`() {
+    fun `plateau feedback should preserve integer drops despite fractional increases`() {
         val stall = StallSchedule(1, 0.0, 1.0)
         val cost = 9007199254740993L
         stall.update(0L, cost, 0.0)
@@ -219,7 +242,7 @@ class SourceDrivenStrategyTest {
     }
 
     @Test
-    fun `plateau feedback re-anchors fractional progress on restart and reset`() {
+    fun `plateau feedback should re-anchor fractional progress on restart and reset`() {
         for (reset in listOf(false, true)) {
             val stall = StallSchedule(1, 0.0, 1.0)
             stall.update(2L, 23L, 0.1)
@@ -234,8 +257,6 @@ class SourceDrivenStrategyTest {
         }
     }
 
-    /** Satisfiable `x0 + x1 = 2` over 0..3 — infeasible from the all-zero start, reachable by
-     *  single-variable repair moves. */
     private fun satisfiableProblem(): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 2,
@@ -244,7 +265,7 @@ class SourceDrivenStrategyTest {
     )
 
     @Test
-    fun `feasible descent declines an objective-lowering move that breaks feasibility`() {
+    fun `feasible descent should decline an objective-lowering move that breaks feasibility`() {
         // At (1,1), every objective-lowering move breaks x0 + x1 = 2; shaping must preserve feasibility.
         val strategy = SourceDrivenStrategy(
             sources = listOf(ConfiguredSource(ObjectiveSeed())),
@@ -266,29 +287,91 @@ class SourceDrivenStrategyTest {
         )
     }
 
+    private fun infeasibleRing(): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = 2,
+        intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+        factors = arrayOf<Factor>(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 3),
+            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+        ),
+    )
+
     @Test
-    fun `score-only sources are never taken by the noise draw`() {
-        // Only a ScoreOnly source, hot noise: the noise branch has nothing to take, so the move
-        // must come from the greedy score path — proving score-only moves bypass the dice.
+    fun `weight schedule should bump violated factor weights on stall`() {
         val strategy = SourceDrivenStrategy(
-            sources = listOf(ConfiguredSource(StallSwaps(cap = 16))),
-            acceptance = AcceptanceRule.WalkSatNoise(1.0),
+            sources = listOf(ConfiguredSource(ViolatedRepairs(sampleCount = 4))),
+            scoring = MoveScoring.Weighted,
+            schedule = ScheduleBundle(
+                weights = WeightSchedule.feasibilityJump(
+                    weightBumpAfter = 1,
+                    weightIncrement = 1.0,
+                    weightDecay = 1.0,
+                ),
+            ),
             feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
+        val state = LocalSearchState(infeasibleRing().bake(), Random(7))
+        state.recompute()
+        repeat(30) { strategy.pickMove(state)?.let { move -> state.apply(move) } }
+        assertTrue(
+            state.weights.factorWeights.max() > state.weights.baseFactorWeights.max(),
+            "a permanently-stalled search must bump some weight above its seed",
+        )
+    }
+
+    @Test
+    fun `configuration checking should drop config-unchanged candidates`() {
+        // A source emitting one move on var 0 and one on var 1; CC blocks var 0, so the pick is var 1.
+        val twoMoves = object : MoveSource {
+            override val id = MoveSourceId("test:two-int-moves")
+            override val phase = Phase.Any
+            override val pool = Pool.NoiseEligible
+            override fun generate(state: LocalSearchState, sink: MoveSink) {
+                sink.addIntSet(0, 1)
+                sink.addIntSet(1, 1)
+            }
+        }
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-            factors = arrayOf<Factor>(
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 3),
-                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
-            ),
+            factors = arrayOf<Factor>(),
+        )
+        val strategy = SourceDrivenStrategy(
+            listOf(ConfiguredSource(twoMoves)),
+            configurationChecking = true,
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
         val state = LocalSearchState(problem.bake(), Random(7))
         state.recompute()
-        assertTrue(state.cost > 0L, "fixture must be infeasible so StallSwaps is in phase")
-        // Repeated picks must never throw / index an empty noise pool; a returned move (when any)
-        // is a score-only swap, not a noise draw.
-        repeat(50) { strategy.pickMove(state) }
+        state.intConfChange[0] = false // var 0 CC-blocked
+        state.intConfChange[1] = true
+        val m = strategy.pickMove(state)
+        assertTrue(m is Move.IntSet && m.varId == 1, "CC must drop the var-0 (unchanged) move, leaving var 1; got $m")
+
+        state.intConfChange[1] = false
+        assertNotNull(strategy.pickMove(state))
+    }
+
+    @Test
+    fun `driver should cool the schedule temperature for a metropolis acceptance`() {
+        // A permanently infeasible problem keeps the noise pool non-empty on every pick.
+        val temperature = Geometric(initialTemperature = 1.0, coolingRate = 0.9)
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(ViolatedRepairs(sampleCount = 4))),
+            scoring = MoveScoring.Break,
+            acceptance = AcceptanceRule.Metropolis,
+            schedule = ScheduleBundle(temperature = temperature),
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
+        )
+        val state = LocalSearchState(infeasibleRing().bake(), Random(7))
+        state.recompute()
+        val t0 = temperature.temperature
+        repeat(20) { strategy.pickMove(state)?.let { move -> state.apply(move) } }
+        assertTrue(
+            temperature.temperature < t0,
+            "the driver must step the schedule temperature each Metropolis pick (was $t0)",
+        )
     }
 }

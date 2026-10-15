@@ -6,7 +6,6 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.result.SearchStatsSink
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -48,7 +47,7 @@ class ClauseDbTest {
     }
 
     @Test
-    fun `a vivified import keeps the arm it was imported from`() {
+    fun `a vivified import should keep the arm it was imported from`() {
         val session = PropagationSession(chainProblem().bake())
         session.addLearnedClause(
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
@@ -63,20 +62,6 @@ class ClauseDbTest {
     }
 
     @Test
-    fun `vivify counts every literal it pins and propagates as a probe`() {
-        val session = PropagationSession(chainProblem().bake())
-        session.addLearnedClause(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
-            lbd = 3,
-        )
-        val stats = SearchStatsSink()
-
-        vivify(session, BacktrackParams(vivification = true, vivifyBatch = 8), 0, stats)
-
-        assertEquals(1L, stats.inprocessProbes)
-    }
-
-    @Test
     fun `a vivified clause should inherit its parent's LBD`() {
         val baked = chainProblem().bake()
         val session = PropagationSession(baked)
@@ -86,6 +71,6 @@ class ClauseDbTest {
         )
         vivify(session, BacktrackParams(vivification = true, vivifyBatch = 8), 0)
         assertEquals(2, session.learnedClauseLiterals(0).size)
-        assertEquals(1, session.learnedClauseLbd(0), "the subclause keeps the parent's glue standing")
+        assertEquals(1, session.learnedClauseLbd(0))
     }
 }

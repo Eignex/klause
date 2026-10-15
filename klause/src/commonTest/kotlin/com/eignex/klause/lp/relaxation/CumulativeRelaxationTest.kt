@@ -19,11 +19,6 @@ class CumulativeRelaxationTest {
 
     private val eps = 1e-6
 
-    /**
-     * `min M  s.t.  M ≥ startᵢ + durᵢ ∀i,  cumulative(start, dur, res, cap)`. Variable layout: ints
-     * `0..n-1` are the starts, int `n` is the makespan `M`. The makespan link is the direct
-     * `M − startᵢ ≥ durᵢ` row the relaxation must recognise.
-     */
     private fun makespanProblem(
         starts: Array<IntDomain>,
         durations: LongArray,
@@ -33,11 +28,11 @@ class CumulativeRelaxationTest {
         disjunctive: Boolean = false,
     ): Problem {
         val n = starts.size
-        val m = n // makespan var id
+        val makespan = n
         val domains = Array(n + 1) { if (it < n) starts[it] else IntDomain(0, horizon.toLong()) }
         val factors = ArrayList<Factor>()
         for (i in 0 until n) {
-            factors.add(Linear(longArrayOf(1, -1), intArrayOf(m, i), LinearOp.GE, durations[i]))
+            factors.add(Linear(longArrayOf(1, -1), intArrayOf(makespan, i), LinearOp.GE, durations[i]))
         }
         factors.add(
             if (disjunctive) {
@@ -49,7 +44,6 @@ class CumulativeRelaxationTest {
         return Problem(0, n + 1, domains, factors.toTypedArray())
     }
 
-    /** LP bound of `min M` on [problem] with the cumulative makespan row [cumulative] on/off. */
     private fun makespanBound(problem: Problem, makespanVar: Int, cumulative: Boolean): Double {
         val obj = LinearObjective(intCoefficients = LongArray(problem.numIntVars) { if (it == makespanVar) 1L else 0L })
         val relaxation = CpToLpRelaxation(problem, obj, cumulative = cumulative).build(PropagationSession(problem))
@@ -59,8 +53,7 @@ class CumulativeRelaxationTest {
     }
 
     @Test
-    fun `area bound proves the disjunctive makespan`() {
-        // 3 unit tasks of length 3, capacity 1: total energy 9 must serialise ⇒ makespan ≥ 9.
+    fun `area bound should prove the disjunctive makespan`() {
         val p = makespanProblem(
             starts = Array(3) { IntDomain(0, 20) },
             durations = longArrayOf(3, 3, 3),
@@ -68,15 +61,12 @@ class CumulativeRelaxationTest {
             capacity = 1,
             horizon = 20,
         )
-        // Without the row the LP only sees M ≥ startᵢ + 3 with every start at 0 ⇒ M ≥ 3.
         assertEquals(3.0, makespanBound(p, makespanVar = 3, cumulative = false), eps)
         assertEquals(9.0, makespanBound(p, makespanVar = 3, cumulative = true), eps)
     }
 
     @Test
-    fun `energetic windowing beats the whole-horizon area`() {
-        // Task 0: est 0, len 2. Task 1: est 5, len 2. Capacity 1.
-        // Whole horizon (t1 = 0): 0 + (2 + 2) = 4. Window t1 = 5: 5 + 2 (task 1) = 7 > 4.
+    fun `energetic windowing should beat the whole-horizon area`() {
         val p = makespanProblem(
             starts = arrayOf(IntDomain(0, 20), IntDomain(5, 20)),
             durations = longArrayOf(2, 2),
@@ -88,41 +78,35 @@ class CumulativeRelaxationTest {
     }
 
     @Test
-    fun `makespan via array-max of end variables is recognised`() {
-        // ints: 0,1 starts; 2,3 ends; 4 makespan. endᵢ = startᵢ + 2 ; makespan = max(end).
+    fun `relaxation should recognise a makespan defined as array max of end variables`() {
         val domains = arrayOf(
             IntDomain(0, 20),
-            IntDomain(0, 20), // starts
             IntDomain(0, 20),
-            IntDomain(0, 20), // ends
-            IntDomain(0, 20), // makespan
+            IntDomain(0, 20),
+            IntDomain(0, 20),
+            IntDomain(0, 20),
         )
         val factors = arrayOf<Factor>(
-            Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.EQ, 2), // end0 - start0 = 2
-            Linear(intArrayOf(1, -1), intArrayOf(3, 1), LinearOp.EQ, 2), // end1 - start1 = 2
-            ArrayMinMax(result = 4, xs = intArrayOf(2, 3), max = true), // makespan = max(end)
+            Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.EQ, 2),
+            Linear(intArrayOf(1, -1), intArrayOf(3, 1), LinearOp.EQ, 2),
+            ArrayMinMax(result = 4, xs = intArrayOf(2, 3), max = true),
             Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), capacity = 1),
         )
         val p = Problem(0, 5, domains, factors)
-        // Energy 4 at capacity 1 ⇒ makespan ≥ 4.
         assertEquals(4.0, makespanBound(p, makespanVar = 4, cumulative = true), eps)
     }
 
     @Test
-    fun `no makespan link emits no row`() {
-        // Cumulative with no M ≥ end constraint at all: nothing to attach a bound to.
+    fun `relaxation should not apply without a makespan link`() {
         val p = Problem(
             0,
             3,
             Array(3) { IntDomain(0, 20) },
             arrayOf<Factor>(Cumulative(intArrayOf(0, 1, 2), longArrayOf(3, 3, 3), longArrayOf(1, 1, 1), 1)),
         )
-        assertTrue(!CumulativeRelaxation(p).applicable, "no verified makespan ⇒ no plan")
+        assertTrue(!CumulativeRelaxation(p).applicable)
     }
 
-    /** Two unit-demand tasks of length 2 under a *variable* capacity: ints 0..1 are the starts, 2 the
-     *  makespan (linked by `M ≥ startᵢ + 2`), 3 the capacity variable. [openCapacityAbove] marks the
-     *  capacity's upper endpoint as one the finite lane invented rather than one the model states. */
     private fun variableCapacityProblem(openCapacityAbove: Boolean): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 4,
@@ -142,23 +126,13 @@ class CumulativeRelaxationTest {
     )
 
     @Test
-    fun `a capacity variable the model leaves open above yields no plan`() {
-        // The energetic row weighs the counted energy against the declared capacity ceiling. Over a
-        // capacity the model leaves open above there is no ceiling to weigh it against — the box's
-        // endpoint would state a resource limit the model never declared.
-        assertTrue(
-            CumulativeRelaxation(variableCapacityProblem(openCapacityAbove = false)).applicable,
-            "a declared capacity ceiling yields the energetic plan",
-        )
-        assertTrue(
-            !CumulativeRelaxation(variableCapacityProblem(openCapacityAbove = true)).applicable,
-            "an invented capacity ceiling must not stand in for a declared one",
-        )
+    fun `relaxation should not apply when the capacity variable is open above`() {
+        assertTrue(CumulativeRelaxation(variableCapacityProblem(openCapacityAbove = false)).applicable)
+        assertTrue(!CumulativeRelaxation(variableCapacityProblem(openCapacityAbove = true)).applicable)
     }
 
     @Test
-    fun `variable durations and optional tasks are skipped`() {
-        // durationVars present ⇒ the M ≥ startᵢ + durᵢ link is not a two-variable linear; skip (sound).
+    fun `relaxation should not apply with variable durations`() {
         val p = Problem(
             0,
             5,
@@ -175,7 +149,6 @@ class CumulativeRelaxationTest {
                 ),
             ),
         )
-        assertTrue(!CumulativeRelaxation(p).applicable, "variable durations ⇒ no plan")
+        assertTrue(!CumulativeRelaxation(p).applicable)
     }
-
 }

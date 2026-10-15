@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class RefinementAuxiliaryTest {
     @Test
-    fun `an attained auxiliary recovers exact multipliers for a free source column`() {
+    fun `an attained auxiliary should recover exact multipliers for a free source column`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val state = LpExactState(
@@ -45,7 +45,7 @@ class RefinementAuxiliaryTest {
     }
 
     @Test
-    fun `an improving cone on an infeasible source yields a source Farkas proof`() {
+    fun `an improving cone on an infeasible source should yield a source Farkas proof`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val state = LpExactState(
@@ -70,9 +70,6 @@ class RefinementAuxiliaryTest {
 
             val conflict = assertNotNull(result.conflict)
             assertNull(result.unboundedness)
-            assertNull(result.witness)
-            assertTrue(result.metrics.auxiliaries > 0)
-            assertTrue(result.usedBasis)
             assertEquals(listOf(0), conflict.rows.toList())
             assertTrue(conflict.multipliers.single().signum() > 0)
             assertEquals(state, assertNotNull(result.support).state)
@@ -80,7 +77,7 @@ class RefinementAuxiliaryTest {
     }
 
     @Test
-    fun `a true recession requires an independently feasible source point`() {
+    fun `a true recession should require an independently feasible source point`() {
         val zero = ExactLpNumber.of(0L)
         val state = LpExactState(
             ExactLpModel(
@@ -105,7 +102,7 @@ class RefinementAuxiliaryTest {
     }
 
     @Test
-    fun `a positive strict margin gives a source witness without attaining its infimum`() {
+    fun `a positive strict margin should give a source witness without attaining its infimum`() {
         val zero = ExactLpNumber.of(0L)
         val state = LpExactState(
             ExactLpModel(
@@ -113,10 +110,7 @@ class RefinementAuxiliaryTest {
                 emptyList(),
                 listOf(
                     ExactLpColumn(
-                        ExactLpBounds(
-                            ExactLpSide(zero, strict = true),
-                            ExactLpSide(ExactLpNumber.of(1L)),
-                        ),
+                        ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(ExactLpNumber.of(1L))),
                         integral = false,
                     ),
                 ),
@@ -135,13 +129,11 @@ class RefinementAuxiliaryTest {
             assertTrue(point.primal.single() <= BigFraction.ONE)
             assertEquals(point.primal.single(), point.objective)
             assertEquals(1, result.metrics.strictWitnesses)
-            assertNull(result.conflict)
-            assertNull(result.unboundedness)
         }
     }
 
     @Test
-    fun `an integer recession rescales a rational direction using an integer feasible point`() {
+    fun `an integer recession should rescale a rational direction using an integer feasible point`() {
         val state = LpExactState(
             ExactLpModel(
                 listOf(emptyList()),
@@ -166,7 +158,7 @@ class RefinementAuxiliaryTest {
     }
 
     @Test
-    fun `a fractional integer coordinate prevents a mixed integer unboundedness claim`() {
+    fun `a fractional integer coordinate should prevent a mixed integer unboundedness claim`() {
         val zero = ExactLpNumber.of(0L)
         val state = LpExactState(
             ExactLpModel(

@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 
 class PolynomialSolvableTest {
     @Test
-    fun `polynomial strategy controls reach the finite workers`() {
+    fun `polynomial strategy controls should reach the finite workers`() {
         val common = CommonOptions().apply {
             randomSeed = 17
             engineParams.addAll(listOf("max-decisions=3", "max-flips=7", "max-instructions=11", "alns-iterations=2"))

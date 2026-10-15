@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
 class ApproxMCTest {
 
     @Test
-    fun `hash scaled cell counts saturate beyond the public count range`() {
+    fun `hash scaled cell counts should saturate beyond the public count range`() {
         val cases = listOf(
             Triple(3, 60, 3L shl 60),
             Triple(2, 62, Long.MAX_VALUE),
@@ -35,17 +35,16 @@ class ApproxMCTest {
         Problem(numBoolVars = n, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>())
 
     @Test
-    fun `small problem is counted exactly without hashing`() {
-        val p = unconstrained(3) // 8 models, below the hashing threshold
+    fun `small problem should be counted exactly without hashing`() {
+        val p = unconstrained(3)
         val r = BacktrackSolver(p.bake()).approximateCount(ApproxCountConfig(seed = 0L))
-        assertTrue(r.exact, "small instance should short-circuit to an exact count")
+        assertTrue(r.exact)
         assertEquals(8L, r.estimate)
     }
 
     @Test
-    fun `projected count over a subset of variables`() {
-        // Project 6 vars onto the first 4: 2^4 = 16 reachable projections, below the cell
-        // threshold so the projection short-circuits to an exact enumeration.
+    fun `projected count should count a subset of variables`() {
+        // 16 reachable projections stay below the cell threshold, so the count is exact.
         val p = unconstrained(6)
         val r = BacktrackSolver(p.bake()).approximateCount(
             ApproxCountConfig(epsilon = 0.8, delta = 0.35, samplingSet = intArrayOf(0, 1, 2, 3), seed = 5L),
@@ -54,7 +53,7 @@ class ApproxMCTest {
     }
 
     @Test
-    fun `unsat instance counts zero`() {
+    fun `unsat instance should count zero`() {
         val p = Problem(
             numBoolVars = 1,
             numIntVars = 0,
@@ -70,11 +69,14 @@ class ApproxMCTest {
     }
 
     @Test
-    fun `unconstrained reals are existential in public projected counting`() {
+    fun `unconstrained reals should be existential in projected counting`() {
         for (max in listOf(1L, 2L)) {
             val model = Problem(
-                numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(1, max)),
-                factors = emptyArray(), numRealVars = 2,
+                numBoolVars = 1,
+                numIntVars = 1,
+                intDomains = arrayOf(IntDomain(1, max)),
+                factors = emptyArray(),
+                numRealVars = 2,
                 realLower = doubleArrayOf(2.0, Double.NEGATIVE_INFINITY),
                 realUpper = doubleArrayOf(3.0, Double.POSITIVE_INFINITY),
             )
@@ -87,18 +89,36 @@ class ApproxMCTest {
     }
 
     @Test
-    fun `real constraints exclude infeasible integer projections in public counting`() {
+    fun `real constraints should exclude infeasible integer projections in counting`() {
         for (max in listOf(1L, 2L)) {
             val model = Problem(
-                numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(1, max)),
+                numBoolVars = 1,
+                numIntVars = 1,
+                intDomains = arrayOf(IntDomain(1, max)),
                 factors = arrayOf(
                     Clause(intArrayOf(Lit.make(0, true))),
-                    ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
-                        doubleArrayOf(3.0), LinearOp.LE, 0.0),
-                    ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
-                        doubleArrayOf(3.0), LinearOp.GE, 0.0),
+                    ReifiedRealLinear(
+                        0,
+                        intArrayOf(0),
+                        doubleArrayOf(-1.0),
+                        intArrayOf(0),
+                        doubleArrayOf(3.0),
+                        LinearOp.LE,
+                        0.0,
+                    ),
+                    ReifiedRealLinear(
+                        0,
+                        intArrayOf(0),
+                        doubleArrayOf(-1.0),
+                        intArrayOf(0),
+                        doubleArrayOf(3.0),
+                        LinearOp.GE,
+                        0.0,
+                    ),
                 ),
-                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.5),
+                numRealVars = 1,
+                realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(0.5),
             )
 
             val count = BacktrackSolver(model.bake()).approximateCount(
@@ -111,11 +131,16 @@ class ApproxMCTest {
     }
 
     @Test
-    fun `an empty real interval has zero public projected models`() {
+    fun `empty real interval should have zero projected models`() {
         for (max in listOf(1L, 2L)) {
             val model = Problem(
-                0, 1, arrayOf(IntDomain(1, max)), emptyArray(),
-                numRealVars = 1, realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(1.0),
+                0,
+                1,
+                arrayOf(IntDomain(1, max)),
+                emptyArray(),
+                numRealVars = 1,
+                realLower = doubleArrayOf(2.0),
+                realUpper = doubleArrayOf(1.0),
             )
 
             val count = BacktrackSolver(model.bake()).approximateCount(ApproxCountConfig(seed = 0L))
@@ -126,10 +151,15 @@ class ApproxMCTest {
     }
 
     @Test
-    fun `conditioned mixed counts restore Boolean pins and integer holes`() {
+    fun `conditioned mixed counts should restore Boolean pins and integer holes`() {
         val model = Problem(
-            1, 1, arrayOf(IntDomain(0, 2)), emptyArray(),
-            numRealVars = 1, realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(3.0),
+            1,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(2.0),
+            realUpper = doubleArrayOf(3.0),
         ).bake()
         val config = ApproxCountConfig(seed = 0L)
         BacktrackSolver(model).session().use { session ->

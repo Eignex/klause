@@ -7,9 +7,8 @@ import kotlin.test.assertFails
 import kotlin.test.assertTrue
 
 class BuildersTest {
-
     @Test
-    fun `gcc rejects negative range`() {
+    fun `gcc should reject a negative range`() {
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 2)
             val b by intVar(min = 0, max = 2)
@@ -19,7 +18,7 @@ class BuildersTest {
     }
 
     @Test
-    fun `gcc rejects range exceeding var count`() {
+    fun `gcc should reject a range exceeding the var count`() {
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 2)
             val b by intVar(min = 0, max = 2)
@@ -29,7 +28,7 @@ class BuildersTest {
     }
 
     @Test
-    fun `all different pigeonhole rejected`() {
+    fun `all different should reject a pigeonhole violation`() {
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 1)
             val b by intVar(min = 0, max = 1)
@@ -41,7 +40,7 @@ class BuildersTest {
     }
 
     @Test
-    fun `table tuple out of domain rejected`() {
+    fun `table should reject a tuple out of domain`() {
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 2)
             val b by intVar(min = 0, max = 2)
@@ -51,7 +50,7 @@ class BuildersTest {
     }
 
     @Test
-    fun `not table tuple out of domain rejected`() {
+    fun `not table should reject a tuple out of domain`() {
         class S : VariableSchema() {
             val a by intVar(min = 0, max = 2)
             val b by intVar(min = 0, max = 2)
@@ -61,7 +60,7 @@ class BuildersTest {
     }
 
     @Test
-    fun `pb reified under implies`() {
+    fun `pbAtMost under implies should compile to a reified pseudo-boolean`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val a by boolVar()
@@ -72,5 +71,4 @@ class BuildersTest {
         val compiled = S().compile()
         assertTrue(compiled.problem.factors.any { it is ReifiedPseudoBoolean })
     }
-
 }

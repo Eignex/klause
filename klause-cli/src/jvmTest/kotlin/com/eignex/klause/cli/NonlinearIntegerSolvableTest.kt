@@ -7,7 +7,7 @@ import kotlin.test.assertSame
 
 class NonlinearIntegerSolvableTest {
     @Test
-    fun `nonlinear source controls retain explicit candidate and move allowances`() {
+    fun `nonlinear source controls should retain explicit candidate and move allowances`() {
         val common = CommonOptions().apply {
             engineParams.addAll(listOf("nia-candidates=7", "nia-moves=11", "nra-work-limit=128"))
         }
@@ -20,7 +20,7 @@ class NonlinearIntegerSolvableTest {
     }
 
     @Test
-    fun `polynomial finite workers share one generic node allowance`() {
+    fun `polynomial finite workers should share one generic node allowance`() {
         val common = CommonOptions().apply { engineParams.add("node-limit=7") }
 
         val params = polynomialParams(common, Cancellation.Never)

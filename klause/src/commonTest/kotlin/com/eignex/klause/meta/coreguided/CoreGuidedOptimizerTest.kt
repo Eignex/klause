@@ -12,12 +12,8 @@ import kotlin.test.assertIs
 class CoreGuidedOptimizerTest {
 
     @Test
-    fun `returned sample true cost equals reported lower bound under overlapping cores`() {
-        // A "star" mutex: b0 conflicts with b1, b2, b3. All four softs
-        // want their var true (weight 1). The single optimum is to drop b0 (cost 1),
-        // satisfying every mutex at once. The relaxer machinery re-cores the shared soft
-        // s0 across the three mutex cores, which is exactly the spent-soft state where the
-        // recovered witness could be relaxed "for free" beyond the charged bound.
+    fun `returned sample cost should equal the reported lower bound under overlapping cores`() {
+        // Star mutex on b0: re-coring the shared soft leaves a witness that could over-relax past the bound.
         val problem = Problem(
             numBoolVars = 4,
             numIntVars = 0,
@@ -38,7 +34,7 @@ class CoreGuidedOptimizerTest {
     }
 
     @Test
-    fun `weighted overlapping cores - sample cost matches bound`() {
+    fun `weighted overlapping cores should yield a sample cost matching the bound`() {
         // Weighted star mutex with distinct weights forcing RC2 weight-splitting on the
         // shared soft. Optimum: keep the heavy b0 (w=6), violate b1+b2 (1+1) = cost 2.
         val problem = Problem(
@@ -65,7 +61,7 @@ class CoreGuidedOptimizerTest {
     }
 
     @Test
-    fun `globally unsat hard constraint returns Infeasible`() {
+    fun `a globally unsatisfiable hard constraint should return infeasible`() {
         val problem = Problem(
             numBoolVars = 1,
             numIntVars = 0,

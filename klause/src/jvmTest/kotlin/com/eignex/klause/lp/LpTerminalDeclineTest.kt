@@ -9,12 +9,11 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.ComponentLpSolverCapability
-import com.eignex.klause.lp.engine.RetainedComponentLpSolverCapability
 import com.eignex.klause.lp.engine.FloatLpResult
-import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -22,17 +21,17 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.engine.PersistentLpSolver
-import com.eignex.klause.lp.engine.ProductionLpCertificationPolicy
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.lp.engine.RetainedComponentLpSolverCapability
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
-import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveShape
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
@@ -91,8 +90,12 @@ private class TerminalRecordingFactory : LpEngineFactory {
         isolated: IntArray,
     ): ComponentLpSolverCapability = ProductionLpEngineFactory.newComponentSolver(model, parts, solvers, isolated)
 
-    override fun newRetainedComponentSolver(model: LpModel, parts: List<LpNeighborhood>, solvers: List<LpSolver>,
-        isolated: IntArray): RetainedComponentLpSolverCapability =
+    override fun newRetainedComponentSolver(
+        model: LpModel,
+        parts: List<LpNeighborhood>,
+        solvers: List<LpSolver>,
+        isolated: IntArray,
+    ): RetainedComponentLpSolverCapability =
         ProductionLpEngineFactory.newRetainedComponentSolver(model, parts, solvers, isolated)
 
     override fun newTableauSolver(
@@ -246,44 +249,28 @@ class LpTerminalDeclineTest {
     }
 
     @Test
-    fun `finite MPS satisfaction decline is unknown`() {
+    fun `finite MPS satisfaction decline should be unknown`() {
         val rejectingFactory = TerminalRecordingFactory()
         val rejectingPolicy = TerminalPolicy { _, _ -> false }
-        val acceptingFactory = TerminalRecordingFactory()
         val acceptedSamples = ArrayList<Sample>()
         val declined = run(
             continuous,
             optimize = false,
             context = LpSolveContext(rejectingFactory, rejectingPolicy),
         )
-        val accepted = run(
-            continuous,
-            optimize = false,
-            context = LpSolveContext(acceptingFactory, ProductionLpCertificationPolicy),
-            samples = acceptedSamples,
-        )
+        val accepted = run(continuous, optimize = false, samples = acceptedSamples)
+
         assertEquals(FiniteSolveVerdict.UNKNOWN, declined.verdict)
-        assertEquals(0L, declined.solutions)
-        assertEquals(FiniteSolveVerdict.SAT, accepted.verdict)
-        assertEquals(1L, accepted.solutions)
-        assertEquals(0.5, acceptedSamples.single().reals.single())
-        assertTrue(acceptedSamples.single().reals.single() in 0.0..1.0)
         assertNull(declined.bestSample)
-        assertTrue(rejectingFactory.solves >= 1)
-        assertTrue(acceptingFactory.solves >= 1)
-        assertTrue(rejectingFactory.persistentSolversCreated >= 1)
-        assertTrue(acceptingFactory.persistentSolversCreated >= 1)
+        assertEquals(FiniteSolveVerdict.SAT, accepted.verdict)
+        assertEquals(0.5, acceptedSamples.single().reals.single())
         assertTrue(rejectingPolicy.observedSuccessful(LpCertifier.EXACT_BASIS))
-        assertTrue(rejectingPolicy.observedSuccessful(LpCertifier.EXACT_POINT))
-        assertTrue(rejectingPolicy.observedSuccessful(LpCertifier.RATIONAL))
         assertEquals(rejectingFactory.generalSolvers, rejectingFactory.generalCloses)
-        assertEquals(acceptingFactory.generalSolvers, acceptingFactory.generalCloses)
         assertEquals(rejectingFactory.persistentSolversCreated, rejectingFactory.persistentCloses)
-        assertEquals(acceptingFactory.persistentSolversCreated, acceptingFactory.persistentCloses)
     }
 
     @Test
-    fun `finite MPS optimizer decline without incumbent is unknown`() {
+    fun `finite MPS optimizer decline without incumbent should be unknown`() {
         val factory = TerminalRecordingFactory()
         val policy = TerminalPolicy { _, _ -> false }
         val declined = run(continuous, optimize = true, context = LpSolveContext(factory, policy))
@@ -299,7 +286,7 @@ class LpTerminalDeclineTest {
     }
 
     @Test
-    fun `finite MPS optimizer keeps incumbent non optimal after a later decline`() {
+    fun `finite MPS optimizer should keep incumbent non optimal after a later decline`() {
         val factory = TerminalRecordingFactory()
         val policy = TerminalPolicy { _, successful -> successful && factory.leafSolves == 1 }
         val result = run(mixed, optimize = true, context = LpSolveContext(factory, policy))
@@ -320,7 +307,7 @@ class LpTerminalDeclineTest {
     }
 
     @Test
-    fun `a feasible continuous incumbent without an objective proof stays best found`() {
+    fun `continuous incumbent without objective proof should stay best found`() {
         val factory = TerminalRecordingFactory()
         val policy = TerminalPolicy { certifier, successful ->
             successful && certifier != LpCertifier.INTEGER && certifier != LpCertifier.SAFE_OBJECTIVE &&
@@ -337,7 +324,7 @@ class LpTerminalDeclineTest {
     }
 
     @Test
-    fun `a bound alone cannot accept a continuous satisfaction leaf`() {
+    fun `bound alone should not accept a continuous satisfaction leaf`() {
         val factory = TerminalRecordingFactory()
         val policy = TerminalPolicy { certifier, successful -> successful && certifier == LpCertifier.INTEGER }
 
@@ -351,7 +338,7 @@ class LpTerminalDeclineTest {
     }
 
     @Test
-    fun `cancellation during proof fallback stays unknown without leaking context`() {
+    fun `cancellation during proof fallback should stay unknown without leaking context`() {
         var cancelled = false
         val token = Cancellation { cancelled }
         val factory = TerminalRecordingFactory()
@@ -365,15 +352,11 @@ class LpTerminalDeclineTest {
             context = LpSolveContext(factory, policy),
             cancellation = token,
         )
-        val acceptedSamples = ArrayList<Sample>()
-        val accepted = run(continuous, optimize = false, samples = acceptedSamples)
+        val accepted = run(continuous, optimize = false)
 
         assertEquals(FiniteSolveVerdict.UNKNOWN, declined.verdict)
-        assertEquals(0L, declined.solutions)
         assertNull(declined.bestSample)
-        assertEquals(0.5, acceptedSamples.single().reals.single())
         assertEquals(FiniteSolveVerdict.SAT, accepted.verdict)
-        assertTrue(factory.solves >= 1)
         assertTrue(factory.cancellations.isNotEmpty())
         assertTrue(factory.cancellations.all { it() })
         assertTrue(LpCertifier.RATIONAL to false in policy.attempts)

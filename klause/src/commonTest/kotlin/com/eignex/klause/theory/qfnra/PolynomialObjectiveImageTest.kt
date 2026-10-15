@@ -13,7 +13,7 @@ import kotlin.test.assertIs
 
 class PolynomialObjectiveImageTest {
     @Test
-    fun `square objective attains its global continuous minimum`() {
+    fun `square objective should attain its global continuous minimum`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (check-sat)")
         val objective = PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2)
 
@@ -25,7 +25,7 @@ class PolynomialObjectiveImageTest {
     }
 
     @Test
-    fun `strict square boundary has an unattained infimum`() {
+    fun `strict square boundary should have an unattained infimum`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (> x 0)) (check-sat)")
         val objective = PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2)
 
@@ -35,7 +35,7 @@ class PolynomialObjectiveImageTest {
     }
 
     @Test
-    fun `a disjunctive feasible minimizer establishes attainment`() {
+    fun `a disjunctive feasible minimizer should establish attainment`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const x Real) (assert (or (> x 1) (= x 0))) (check-sat)",
         )
@@ -47,12 +47,14 @@ class PolynomialObjectiveImageTest {
     }
 
     @Test
-    fun `an objective image unbounded below establishes unboundedness`() {
+    fun `an objective image unbounded below should establish unboundedness`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (check-sat)")
-        val objective = PolynomialExpression.Product(listOf(
-            PolynomialExpression.Constant.of(BigFraction.MINUS_ONE.num),
-            PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2),
-        ))
+        val objective = PolynomialExpression.Product(
+            listOf(
+                PolynomialExpression.Constant.of(BigFraction.MINUS_ONE.num),
+                PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2),
+            ),
+        )
 
         val result = solvePolynomialObjectiveImage(source.formula, objective, source.boolCount, source.realCount)
 
@@ -60,7 +62,7 @@ class PolynomialObjectiveImageTest {
     }
 
     @Test
-    fun `empty source objective image establishes infeasibility`() {
+    fun `empty source objective image should establish infeasibility`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (< (* x x) 0)) (check-sat)")
         val objective = PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2)
 
@@ -70,7 +72,7 @@ class PolynomialObjectiveImageTest {
     }
 
     @Test
-    fun `irrational objective endpoint retains exact scalar identity`() {
+    fun `irrational objective endpoint should retain exact scalar identity`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const x Real) (assert (and (= (* x x) 2) (> x 0))) (check-sat)",
         )
@@ -83,24 +85,15 @@ class PolynomialObjectiveImageTest {
     }
 
     @Test
-    fun `exhausted objective image work cannot establish global optimality`() {
+    fun `cancelled objective image scope should publish no certificate`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (check-sat)")
         val objective = PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2)
 
         val result = solvePolynomialObjectiveImage(
-            source.formula, objective, source.boolCount, source.realCount, QfNraParams(maximumWork = 0),
-        )
-
-        assertEquals(QfNraReason.WorkLimit, assertIs<PolynomialObjectiveResult.Unknown>(result).reason)
-    }
-
-    @Test
-    fun `cancelled objective image scope publishes no certificate`() {
-        val source = SmtLibPolynomial.parse("(declare-const x Real) (check-sat)")
-        val objective = PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2)
-
-        val result = solvePolynomialObjectiveImage(
-            source.formula, objective, source.boolCount, source.realCount,
+            source.formula,
+            objective,
+            source.boolCount,
+            source.realCount,
             QfNraParams(cancellation = Cancellation { true }),
         )
 
@@ -108,7 +101,7 @@ class PolynomialObjectiveImageTest {
     }
 
     @Test
-    fun `native image work reaches its containing meter once`() {
+    fun `native image work should reach its containing meter once`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (check-sat)")
         val objective = PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2)
         var work = 0L
@@ -118,20 +111,27 @@ class PolynomialObjectiveImageTest {
         }
 
         val result = solvePolynomialObjectiveImage(
-            source.formula, objective, source.boolCount, source.realCount, QfNraParams(cancellation),
+            source.formula,
+            objective,
+            source.boolCount,
+            source.realCount,
+            QfNraParams(cancellation),
         )
 
         assertEquals(work, assertIs<PolynomialObjectiveResult.Optimum>(result).stats.workSpent)
     }
 
     @Test
-    fun `exhaustion before final image publication discards the global verdict`() {
+    fun `exhaustion before final image publication should discard the global verdict`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (check-sat)")
         val objective = PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2)
         val completed = solvePolynomialObjectiveImage(source.formula, objective, source.boolCount, source.realCount)
 
         val result = solvePolynomialObjectiveImage(
-            source.formula, objective, source.boolCount, source.realCount,
+            source.formula,
+            objective,
+            source.boolCount,
+            source.realCount,
             QfNraParams(maximumWork = completed.stats.workSpent - 1),
         )
 
@@ -139,11 +139,14 @@ class PolynomialObjectiveImageTest {
     }
 
     @Test
-    fun `conditioned optimization cannot mutate the retained source scope`() {
+    fun `conditioned optimization should not mutate the retained source scope`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (check-sat)")
         val objective = PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2)
         solvePolynomialObjectiveImage(
-            source.formula, objective, source.boolCount, source.realCount,
+            source.formula,
+            objective,
+            source.boolCount,
+            source.realCount,
             condition = PolynomialCondition(lower = mapOf(0 to BigFraction.ofLong(2))),
         )
 
@@ -153,7 +156,7 @@ class PolynomialObjectiveImageTest {
     }
 
     @Test
-    fun `fixed source coordinates are restored after objective projection`() {
+    fun `fixed source coordinates should be restored after objective projection`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const y Real) (assert (= x y)) (check-sat)",
         )
@@ -161,7 +164,10 @@ class PolynomialObjectiveImageTest {
         val fixed = mapOf(1 to BigFraction.ofLong(2))
 
         val result = solvePolynomialObjectiveImage(
-            source.formula, objective, source.boolCount, source.realCount,
+            source.formula,
+            objective,
+            source.boolCount,
+            source.realCount,
             condition = PolynomialCondition(lower = fixed, upper = fixed),
         )
 

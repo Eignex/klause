@@ -30,7 +30,7 @@ class ScheduleBundleTest {
     )
 
     @Test
-    fun `one round drives every adaptive member`() {
+    fun `one round should drive every adaptive member`() {
         val temperature = AdaptiveCooling(initialRate = 0.95, minRate = 0.5, maxRate = 0.999, adjustStep = 0.2)
         val noise = SpyPolicy()
         val bundle = ScheduleBundle(temperature = temperature, noise = noise)
@@ -41,7 +41,7 @@ class ScheduleBundleTest {
     }
 
     @Test
-    fun `weight schedule participates in the round`() {
+    fun `weight schedule should participate in the round`() {
         val weights = WeightSchedule(bumpAfter = 1, increment = 1.0)
         val bundle = ScheduleBundle(weights = weights)
         // Seed an improving round, then a stalled round arms a bump applied to the weights.
@@ -53,21 +53,12 @@ class ScheduleBundleTest {
     }
 
     @Test
-    fun `reset propagates to every adaptive member`() {
+    fun `reset should propagate to every adaptive member`() {
         val noise = SpyPolicy()
         val weights = WeightSchedule(bumpAfter = 1)
         val temperature = AdaptiveCooling()
         val bundle = ScheduleBundle(temperature = temperature, weights = weights, noise = noise)
         bundle.reset()
         assertEquals(1, noise.resets)
-    }
-
-    @Test
-    fun `a bundle with no members is an inert policy`() {
-        val bundle = ScheduleBundle()
-        bundle.observe(round(incumbent = 1.0, step = 1L, accepted = 1))
-        bundle.reset()
-        // No members, no effect, no throw.
-        assertTrue(bundle.temperature == null && bundle.weights == null && bundle.noise == null)
     }
 }

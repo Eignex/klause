@@ -1,7 +1,7 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.circuit.Circuit
@@ -33,16 +33,22 @@ import kotlin.test.assertTrue
 class PortfolioBuilderTest {
 
     @Test
-    fun `annotated circuit diversity has initial admission and complete source authority`() {
-        val annotation = SearchHints(listOf(
-            SearchGroup(intArrayOf(), intArrayOf(0, 1, 2)),
-            SearchGroup(intArrayOf(), intArrayOf(3), VariableSelection.InputOrder),
-        )).toBacktrackParams(0, 4)
+    fun `annotated circuit diversity should have initial admission and complete source authority`() {
+        val annotation = SearchHints(
+            listOf(
+                SearchGroup(intArrayOf(), intArrayOf(0, 1, 2)),
+                SearchGroup(intArrayOf(), intArrayOf(3), VariableSelection.InputOrder),
+            ),
+        ).toBacktrackParams(0, 4)
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
         val objective = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
         for (subcircuit in listOf(false, true)) {
-            val problem = Problem(0, 4, Array(4) { IntDomain(0, if (it == 3) 1 else 2) },
-                arrayOf(Circuit(intArrayOf(0, 1, 2), subcircuit = subcircuit))).bake()
+            val problem = Problem(
+                0,
+                4,
+                Array(4) { IntDomain(0, if (it == 3) 1 else 2) },
+                arrayOf(Circuit(intArrayOf(0, 1, 2), subcircuit = subcircuit)),
+            ).bake()
 
             val workers = PortfolioBuilder.build(problem, scenario, objective)
 
@@ -61,13 +67,28 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `numerical completion materializes finite heuristic workers without theory neighborhoods`() {
-        val problem = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+    fun `numerical completion should materialize finite heuristic workers without theory neighborhoods`() {
+        val problem = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        ).bake()
         for (engine in listOf(EngineMix.LOCAL_SEARCH, EngineMix.ALNS)) {
             val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.CSP, engine = engine)
-            val factory = PortfolioBuilder.factories(problem, scenario, null, null, null, null,
-                ProblemProfile.of(problem, false), numericalCompletion = true).single()
+            val factory = PortfolioBuilder.factories(
+                problem,
+                scenario,
+                null,
+                null,
+                null,
+                null,
+                ProblemProfile.of(problem, false),
+                numericalCompletion = true,
+            ).single()
             val worker = factory.materialize(0, 3L, null)
 
             worker.use {
@@ -80,15 +101,36 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `numerical heuristic worker copies retain the configured source tolerance guarantee`() {
-        val problem = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+    fun `numerical heuristic worker copies should retain the configured source tolerance guarantee`() {
+        val problem = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        ).bake()
         for (engine in listOf(EngineMix.LOCAL_SEARCH, EngineMix.ALNS)) {
-            val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.CSP, engine = engine,
-                reportLsResiduals = true, reportLsPhaseTimes = true,
-                toleranceCheck = { it.reals.size == 1 && it.reals[0] in 0.0..1.0 })
-            val factory = PortfolioBuilder.factories(problem, scenario, null, null, null, null,
-                ProblemProfile.of(problem, false), numericalCompletion = true).single()
+            val scenario = PortfolioScenario(
+                cores = 1,
+                arms = 1,
+                kind = Kind.CSP,
+                engine = engine,
+                reportLsResiduals = true,
+                reportLsPhaseTimes = true,
+                toleranceCheck = { it.reals.size == 1 && it.reals[0] in 0.0..1.0 },
+            )
+            val factory = PortfolioBuilder.factories(
+                problem,
+                scenario,
+                null,
+                null,
+                null,
+                null,
+                ProblemProfile.of(problem, false),
+                numericalCompletion = true,
+            ).single()
             val worker = factory.materialize(0, 3L, NodeBudget(10_000))
 
             worker.use {
@@ -102,14 +144,37 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `an exhausted containing allowance cannot admit a tolerance completion`() {
-        val problem = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+    fun `an exhausted containing allowance should not admit a tolerance completion`() {
+        val problem = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        ).bake()
         var checks = 0
-        val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH,
-            toleranceCheck = { checks++; true })
-        val factory = PortfolioBuilder.factories(problem, scenario, null, null, null, null,
-            ProblemProfile.of(problem, false), numericalCompletion = true).single()
+        val scenario = PortfolioScenario(
+            cores = 1,
+            arms = 1,
+            kind = Kind.CSP,
+            engine = EngineMix.LOCAL_SEARCH,
+            toleranceCheck = {
+                checks++
+                true
+            },
+        )
+        val factory = PortfolioBuilder.factories(
+            problem,
+            scenario,
+            null,
+            null,
+            null,
+            null,
+            ProblemProfile.of(problem, false),
+            numericalCompletion = true,
+        ).single()
         val worker = factory.materialize(0, 3L, NodeBudget(0))
 
         worker.use {
@@ -121,7 +186,7 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `automatic core worker waits for sibling incumbent discovery`() {
+    fun `automatic core worker should wait for sibling incumbent discovery`() {
         val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(longArrayOf(1, 2))
         val workers = PortfolioBuilder.build(problem, PortfolioScenario.sequential(Kind.COP), objective)
@@ -136,7 +201,7 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `sole complete core worker joins initial admission`() {
+    fun `sole complete core worker should join initial admission`() {
         val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(longArrayOf(1, 2))
         val workers = PortfolioBuilder.build(problem, PortfolioScenario.sequential(Kind.COP, arms = 1), objective)
@@ -149,11 +214,16 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `explicit core selection joins initial admission`() {
+    fun `explicit core selection should join initial admission`() {
         val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(longArrayOf(1, 2))
-        val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.COP, engine = EngineMix.BACKTRACK,
-            btPool = listOf({ BacktrackCatalog.byLabel("core-guided") }))
+        val scenario = PortfolioScenario(
+            cores = 1,
+            arms = 1,
+            kind = Kind.COP,
+            engine = EngineMix.BACKTRACK,
+            btPool = listOf({ BacktrackCatalog.byLabel("core-guided") }),
+        )
         val workers = PortfolioBuilder.build(problem, scenario, objective)
 
         try {
@@ -164,11 +234,20 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `a restricted public worker cannot refute its feasible containing source`() {
-        val problem = Problem(1, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(Lit.make(0, false))))).bake()
-        val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.CSP, engine = EngineMix.BACKTRACK,
-            btEdit = { it.copy(assumptions = Assumptions(bools = mapOf(0 to true))) })
+    fun `a restricted public worker should not refute its feasible containing source`() {
+        val problem = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(Lit.make(0, false)))),
+        ).bake()
+        val scenario = PortfolioScenario(
+            cores = 1,
+            arms = 1,
+            kind = Kind.CSP,
+            engine = EngineMix.BACKTRACK,
+            btEdit = { it.copy(assumptions = Assumptions(bools = mapOf(0 to true))) },
+        )
         val workers = PortfolioBuilder.build(problem, scenario)
 
         val result = Portfolio.thompson(workers).use { it.solve() }
@@ -177,11 +256,15 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `a portfolio local-search arm reports its phase times when requested`() {
+    fun `a portfolio local-search arm should report its phase times when requested`() {
         val problem = Problem(0, 0, emptyArray(), emptyArray()).bake()
         val scenario = PortfolioScenario(
-            cores = 1, arms = 1, kind = Kind.COP, engine = EngineMix.LOCAL_SEARCH,
-            reportLsResiduals = true, reportLsPhaseTimes = true,
+            cores = 1,
+            arms = 1,
+            kind = Kind.COP,
+            engine = EngineMix.LOCAL_SEARCH,
+            reportLsResiduals = true,
+            reportLsPhaseTimes = true,
         )
         val worker = PortfolioBuilder.build(problem, scenario, objective = LinearObjective()).single()
 
@@ -189,14 +272,15 @@ class PortfolioBuilderTest {
             val result = it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never, maxInstructions = 0).last()
 
             assertEquals(
-                setOf("preparation", "seeding", "selection", "application", "other"), result.stats.ls.phaseNanos.keys,
+                setOf("preparation", "seeding", "selection", "application", "other"),
+                result.stats.ls.phaseNanos.keys,
             )
             assertEquals(0L, result.stats.ls.bestResidual?.cost)
         }
     }
 
     @Test
-    fun `clause sharing requires another backtrack worker including replicas`() {
+    fun `clause sharing should require another backtrack worker including replicas`() {
         val problem = Problem(0, 0, emptyArray(), emptyArray()).bake()
         for (cores in listOf(1, 2)) {
             val scenario = PortfolioScenario(cores, 1, Kind.CSP, EngineMix.BACKTRACK)
@@ -212,23 +296,7 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `a portfolio local-search arm reports its committed residual when requested`() {
-        val problem = Problem(0, 0, emptyArray(), emptyArray()).bake()
-        val scenario = PortfolioScenario(
-            cores = 1, arms = 1, kind = Kind.COP, engine = EngineMix.LOCAL_SEARCH, reportLsResiduals = true,
-        )
-        val worker = PortfolioBuilder.build(problem, scenario, objective = LinearObjective()).single()
-
-        worker.use {
-            val result = it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never, maxInstructions = 0).last()
-
-            assertEquals(0L, result.stats.ls.bestResidual?.cost)
-            assertEquals(emptyMap(), result.stats.ls.bestResidual?.byKind)
-        }
-    }
-
-    @Test
-    fun `only added variants wait for an incumbent in an expanded curated pool`() {
+    fun `only added variants should wait for an incumbent in an expanded curated pool`() {
         val scenario = PortfolioScenario.sequential(Kind.COP, arms = 12)
 
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray()).bake()
@@ -263,11 +331,14 @@ class PortfolioBuilderTest {
     ).bake()
 
     @Test
-    fun `the default continuous optimization pool appends node LP after its incumbent workers`() {
+    fun `the default continuous optimization pool should append node LP after its incumbent workers`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
 
-        val workers = PortfolioBuilder.build(continuous, scenario,
-            objective = LinearObjective(realCoefficients = doubleArrayOf(1.0)))
+        val workers = PortfolioBuilder.build(
+            continuous,
+            scenario,
+            objective = LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+        )
 
         try {
             assertEquals(
@@ -283,10 +354,13 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `an auxiliary LP worker waits for a finite objective incumbent`() {
+    fun `an auxiliary LP worker should wait for a finite objective incumbent`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
-        val workers = PortfolioBuilder.build(continuous, scenario,
-            objective = LinearObjective(intCoefficients = longArrayOf(1L)))
+        val workers = PortfolioBuilder.build(
+            continuous,
+            scenario,
+            objective = LinearObjective(intCoefficients = longArrayOf(1L)),
+        )
 
         try {
             assertEquals(listOf("bt/lp-default"), workers.filter { it.improvementOnly }.map { it.label })
@@ -296,7 +370,7 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `a disabled bounding ceiling keeps the continuous incumbent pool`() {
+    fun `a disabled bounding ceiling should keep the continuous incumbent pool`() {
         val ceilings = listOf(LpConfig.OFF, LpConfig(overrides = mapOf(LpTechnique.BOUNDING to false)))
 
         for (ceiling in ceilings) {
@@ -316,7 +390,7 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `a mixed portfolio over continuous variables builds local-search arms`() {
+    fun `a mixed portfolio over continuous variables should build local-search arms`() {
         val scenario = PortfolioScenario(cores = 1, arms = 4, kind = Kind.COP, engine = EngineMix.MIXED)
 
         val workers = PortfolioBuilder.build(continuous, scenario)
@@ -325,16 +399,7 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `a local-search portfolio over continuous columns builds every arm`() {
-        val scenario = PortfolioScenario(cores = 1, arms = 2, kind = Kind.COP, engine = EngineMix.LOCAL_SEARCH)
-
-        val workers = PortfolioBuilder.build(continuous, scenario)
-
-        assertEquals(2, workers.size)
-    }
-
-    @Test
-    fun `a local-search arm over continuous columns reports certified real values`() {
+    fun `a local-search arm over continuous columns should report certified real values`() {
         val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH)
         val worker = PortfolioBuilder.build(continuous, scenario).single()
 

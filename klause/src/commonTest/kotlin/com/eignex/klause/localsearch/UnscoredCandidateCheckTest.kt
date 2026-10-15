@@ -5,8 +5,8 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -14,7 +14,7 @@ import kotlin.test.assertIs
 
 class UnscoredCandidateCheckTest {
     @Test
-    fun `full integer coordinates decide a propagation only product`() {
+    fun `full integer coordinates should decide a propagation only product`() {
         val factor = object : Factor by Product(0, 1, 2), Propagator {
             override fun propagate(state: PropagationState, factorId: Int): Boolean {
                 val domains = state.intDomains

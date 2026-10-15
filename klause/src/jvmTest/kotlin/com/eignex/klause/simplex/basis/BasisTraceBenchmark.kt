@@ -7,7 +7,6 @@ import java.nio.file.Path
 import kotlin.io.path.extension
 import kotlin.math.max
 
-/** Explicit real-basis corpus tool. Ordinary test discovery never runs capture or timing. */
 fun main(args: Array<String>) {
     val command = args.firstOrNull() ?: "list"
     val options = args.drop(1).associate { argument ->
@@ -43,7 +42,9 @@ private fun compareDense(options: Map<String, String>) {
             for (arm in order) {
                 val report = BasisTraceReplay.replay(trace, factories[arm])
                 val fields = commonFields("compare-dense", trace, artifactSha, report, 1) + listOf(
-                    "pair" to pair, "arm" to if (arm == 0) "sparse" else "selected", "selectedFirst" to (pair % 2 == 1),
+                    "pair" to pair,
+                    "arm" to if (arm == 0) "sparse" else "selected",
+                    "selectedFirst" to (pair % 2 == 1),
                 )
                 println(json(*fields.toTypedArray()))
                 check(report.stateErrors == 0) { "dense comparison failed: ${report.errors}" }

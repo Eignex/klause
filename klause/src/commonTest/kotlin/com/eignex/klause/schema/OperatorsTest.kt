@@ -8,9 +8,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class OperatorsTest {
-
     @Test
-    fun `at most at top level emits a cardinality bounded by the given max`() {
+    fun `atMost at top level should emit a cardinality bounded by the given max`() {
         class S : VariableSchema() {
             val a by boolVar()
             val b by boolVar()
@@ -25,7 +24,7 @@ class OperatorsTest {
     }
 
     @Test
-    fun `at least nested reifies`() {
+    fun `atLeast under implies should compile to a reified cardinality`() {
         class S : VariableSchema() {
             val flag by boolVar()
             val a by boolVar()

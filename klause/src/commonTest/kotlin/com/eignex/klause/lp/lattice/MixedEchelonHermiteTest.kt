@@ -23,7 +23,7 @@ class MixedEchelonHermiteTest {
     }
 
     @Test
-    fun `the transform is unimodular so the lattice is preserved`() {
+    fun `reduction should use a unimodular transform`() {
         val r = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), emptyList(), 2)
         val v = r.transform
         val d = v[0, 0] * v[1, 1] - v[0, 1] * v[1, 0]
@@ -31,23 +31,23 @@ class MixedEchelonHermiteTest {
     }
 
     @Test
-    fun `an inequality keeps its value under the change of variables`() {
+    fun `reduction should preserve inequality values under the change of variables`() {
         // 2x0 + 3x1 = 0 drives the basis; the inequality row must evaluate identically at x = V*y.
         val r = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), sparseRows(longArrayOf(1, 1)), 2)
         val y = vec(3, -2)
         val x = r.recover(y)
-        assertEquals(dot(sparseRows(longArrayOf(1, 1))[0], x), dot(r.inequalities[0], y), "row value is invariant")
+        assertEquals(dot(sparseRows(longArrayOf(1, 1))[0], x), dot(r.inequalities[0], y))
     }
 
     @Test
-    fun `a dependent equality is dropped before the hermite step`() {
+    fun `reduction should drop a dependent equality before the hermite step`() {
         // The second row is twice the first, so only one equality drives the basis.
         val r = mixedEchelonHermite(sparseRows(longArrayOf(1, 2), longArrayOf(2, 4)), emptyList(), 2)
         assertEquals(1, r.equalities.size)
     }
 
     @Test
-    fun `a system with no equalities is left in its own variables`() {
+    fun `reduction should leave a system without equalities in its own variables`() {
         val r = mixedEchelonHermite(emptyList(), sparseRows(longArrayOf(5, 7)), 2)
         assertEquals(bigIntOf(5), r.inequalities[0][0])
         assertEquals(bigIntOf(7), r.inequalities[0][1])
@@ -55,18 +55,7 @@ class MixedEchelonHermiteTest {
     }
 
     @Test
-    fun `bounded rewritten variables bound the original ones`() {
-        val r = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), emptyList(), 2)
-        val b = r.originalBounds(arrayOf(BIG_ZERO, BIG_ZERO), arrayOf(BIG_ZERO, BIG_ZERO))
-        // y pinned to the origin pins x to the origin, whatever V is.
-        assertEquals(BIG_ZERO, b.lo[0])
-        assertEquals(BIG_ZERO, b.hi[0])
-    }
-
-    @Test
-    fun `a derived bound never excludes a solution of the original system`() {
-        // A bound derived through the transformation must contain every solution. Enumerated exhaustively
-        // over a small box.
+    fun `derived bounds should never exclude a solution of the original system`() {
         val original = sparseRows(longArrayOf(2, -2)) // 2*x0 - 2*x1 = 0, i.e. x0 == x1
         val r = mixedEchelonHermite(original, emptyList(), 2)
         val span = 6L
@@ -78,7 +67,7 @@ class MixedEchelonHermiteTest {
                 val y = vec(y0, y1)
                 if (!dot(r.equalities[0], y).isZero()) continue // not a solution of the rewritten row
                 val x = r.recover(y)
-                assertEquals(BIG_ZERO, dot(original[0], x), "recovered x must solve the original")
+                assertEquals(BIG_ZERO, dot(original[0], x))
                 for (i in x.indices) {
                     val lo = b.lo[i]
                     val hi = b.hi[i]

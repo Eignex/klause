@@ -8,15 +8,15 @@ import kotlin.test.assertTrue
 class LongArrayListTest {
 
     @Test
-    fun `add grows past initial capacity and preserves order`() {
+    fun `add should grow past initial capacity and preserve order`() {
         val list = LongArrayList(initialCapacity = 2)
-        for (i in 0 until 100) list.add(i * 3_000_000_000L) // values beyond Int range
+        for (i in 0 until 100) list.add(i * 3_000_000_000L)
         assertEquals(100, list.size)
         for (i in 0 until 100) assertEquals(i * 3_000_000_000L, list[i])
     }
 
     @Test
-    fun `removeAt swap-removes the tail into the gap`() {
+    fun `removeAt should swap the tail into the gap`() {
         val list = LongArrayList()
         for (v in longArrayOf(10, 20, 30, 40)) list.add(v)
         list.removeAt(1)
@@ -25,7 +25,7 @@ class LongArrayListTest {
     }
 
     @Test
-    fun `removeValue removes first occurrence and reports presence`() {
+    fun `removeValue should remove the first occurrence and report presence`() {
         val list = LongArrayList()
         for (v in longArrayOf(5, 7, 5, 9)) list.add(v)
         assertTrue(list.removeValue(5))
@@ -35,7 +35,7 @@ class LongArrayListTest {
     }
 
     @Test
-    fun `insertAt shifts the tail right`() {
+    fun `insertAt should shift the tail right`() {
         val list = LongArrayList()
         for (v in longArrayOf(1, 2, 3)) list.add(v)
         list.insertAt(1, 99)
@@ -43,7 +43,7 @@ class LongArrayListTest {
     }
 
     @Test
-    fun `truncateTo drops the suffix and is a no-op when not shrinking`() {
+    fun `truncateTo should drop the suffix and be a no-op when not shrinking`() {
         val list = LongArrayList()
         for (v in 0L until 6L) list.add(v)
         list.truncateTo(3)
@@ -53,7 +53,7 @@ class LongArrayListTest {
     }
 
     @Test
-    fun `indexOf contains last toSet and clear`() {
+    fun `indexOf contains last toSet and clear should reflect the live elements`() {
         val list = LongArrayList()
         for (v in longArrayOf(4, 4, 8)) list.add(v)
         assertEquals(0, list.indexOf(4))
@@ -66,7 +66,7 @@ class LongArrayListTest {
     }
 
     @Test
-    fun `sort orders ascending and descending including out-of-int-range values`() {
+    fun `sort should order ascending and descending including values beyond Int range`() {
         val list = LongArrayList()
         for (v in longArrayOf(3, -10_000_000_000L, 0, 9_000_000_000L, -3)) list.add(v)
         list.sort()
@@ -76,12 +76,11 @@ class LongArrayListTest {
     }
 
     @Test
-    fun `forEach visits every element in order`() {
+    fun `forEach should visit every element in order`() {
         val list = LongArrayList()
         for (v in longArrayOf(2, 4, 6)) list.add(v)
         val seen = ArrayList<Long>()
         list.forEach { seen.add(it) }
         assertEquals(listOf(2L, 4L, 6L), seen)
     }
-
 }

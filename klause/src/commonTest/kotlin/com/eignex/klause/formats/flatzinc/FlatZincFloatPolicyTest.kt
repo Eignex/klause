@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 
 class FlatZincFloatPolicyTest {
     @Test
-    fun `integer images do not enumerate oversized or rounded domains`() {
+    fun `integer images should not enumerate oversized or rounded domains`() {
         for (domain in listOf("0..1000000000000", "{9007199254740993}")) {
             val source = """
                 var $domain: n;
@@ -29,7 +29,7 @@ class FlatZincFloatPolicyTest {
     }
 
     @Test
-    fun `conditional and mixed disjunctions do not provide finite float domains`() {
+    fun `conditional and mixed disjunctions should not provide finite float domains`() {
         val covers = listOf(
             "bool_clause([a, b], [other])",
             "bool_clause([a, b, other], [])",
@@ -61,7 +61,7 @@ class FlatZincFloatPolicyTest {
     }
 
     @Test
-    fun `disjunctive choices count toward the finite expansion limit`() {
+    fun `disjunctive choices should count toward the finite expansion limit`() {
         val source = """
             var 0.0..1.0: x;
             var 0.0..1.0: y;
@@ -90,7 +90,7 @@ class FlatZincFloatPolicyTest {
     }
 
     @Test
-    fun `default products preserve finite choices and intermediate values`() {
+    fun `default products should preserve finite choices and intermediate values`() {
         val program = parseFlatZinc(
             """
             var 1..1: i;
@@ -117,7 +117,7 @@ class FlatZincFloatPolicyTest {
     }
 
     @Test
-    fun `a nonlinear continuation falls back without rounding unrelated choices`() {
+    fun `a nonlinear continuation should fall back without rounding unrelated choices`() {
         val program = parseFlatZinc(
             """
             var 0.0..1.0: x;
@@ -151,7 +151,7 @@ class FlatZincFloatPolicyTest {
     }
 
     @Test
-    fun `finite expansion counts repeated entries and product alternatives`() {
+    fun `finite expansion should count repeated entries and product alternatives`() {
         val cases = listOf("0.125, 0.125, 0.375" to true, "0.125, 0.125, 0.125, 0.375" to false)
         for ((entries, exactExpected) in cases) {
             val model = FlatZincParser(
@@ -177,7 +177,7 @@ class FlatZincFloatPolicyTest {
     }
 
     @Test
-    fun `exact mode declines an oversized finite encoding`() {
+    fun `exact mode should decline an oversized finite encoding`() {
         for (result in listOf("x", "0.125")) {
             val model = FlatZincParser(
                 FlatZincLexer(
@@ -200,7 +200,7 @@ class FlatZincFloatPolicyTest {
     }
 
     @Test
-    fun `finite open floats retain choices outside the grid clamp`() {
+    fun `finite open floats should retain choices outside the grid clamp`() {
         val program = parseFlatZinc(
             """
             var 1..1: i;
@@ -217,14 +217,14 @@ class FlatZincFloatPolicyTest {
     }
 
     @Test
-    fun `continuous components without finite choices use the grid`() {
+    fun `continuous components without finite choices should use the grid`() {
         val program = parseFlatZinc("var 0.0..1.0: x; constraint float_le(x, 0.5); solve satisfy;", floatBuckets = 2)
 
         assertFalse(program.floatVarsByName.getValue("x").lpOnly)
     }
 
     @Test
-    fun `unconstrained non-objective floats do not add grid search variables`() {
+    fun `unconstrained non-objective floats should not add grid search variables`() {
         val program = parseFlatZinc(
             """
             var float: unused;
@@ -240,7 +240,7 @@ class FlatZincFloatPolicyTest {
     }
 
     @Test
-    fun `an unconstrained float objective keeps the default grid policy`() {
+    fun `an unconstrained float objective should keep the default grid policy`() {
         for (goal in listOf("minimize", "maximize")) {
             val program = parseFlatZinc("var 0.0..1.0: x; solve $goal x;", floatBuckets = 2)
 
@@ -250,7 +250,7 @@ class FlatZincFloatPolicyTest {
     }
 
     @Test
-    fun `finite float lowering rejects constant division by zero`() {
+    fun `finite float lowering should reject constant division by zero`() {
         for (exact in listOf(false, true)) {
             val error = assertFailsWith<FlatZincParseException> {
                 parseFlatZinc(

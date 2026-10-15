@@ -6,15 +6,15 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.factor.arithmetic.RealProduct
-import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -45,7 +45,6 @@ import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
-import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.pipelineRequest
@@ -63,13 +62,21 @@ import kotlin.test.assertTrue
 
 class SourceStrategyTest {
     @Test
-    fun `source optimization closes integer bounds before exact continuous preparation`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2).excludeValue(1)),
-            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0),
+    fun `source optimize should close open integer bounds before exact continuous preparation`() {
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2).excludeValue(1)),
+            arrayOf(
+                RealProduct(0, 0, 1, 1.0, 1.0),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-                AllDifferent(intArrayOf(0, 1), 0, 3)),
-            openIntHi = booleanArrayOf(true, false), numRealVars = 2,
-            realLower = doubleArrayOf(1.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+                AllDifferent(intArrayOf(0, 1), 0, 3),
+            ),
+            openIntHi = booleanArrayOf(true, false),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+        )
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 0))
 
         val result = BacktrackSolver.source(source).optimize(objective).result
@@ -82,12 +89,17 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `mixed products outside binary integer precision retain exact completion`() {
+    fun `source solve should keep exact products beyond double integer precision`() {
         val integer = 9007199254740993L
-        val source = Problem(0, 1, arrayOf(IntDomain(integer, integer)),
-            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0)), numRealVars = 2,
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(integer, integer)),
+            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0)),
+            numRealVars = 2,
             realLower = doubleArrayOf(1.0, 9007199254740992.0),
-            realUpper = doubleArrayOf(1.0, 9007199254740994.0))
+            realUpper = doubleArrayOf(1.0, 9007199254740994.0),
+        )
 
         val result = BacktrackSolver.source(source).solve()
 
@@ -97,15 +109,27 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `bounded conditioned products retain finite holes beside an open linear integer`() {
-        val source = Problem(0, 3, arrayOf(IntDomain(0, 2).excludeValue(1), IntDomain(0, 2), IntDomain(0, 1)),
-            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0), AllDifferent(intArrayOf(0, 1), 0, 3),
-                Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 0)),
-            openIntHi = booleanArrayOf(false, false, true), numRealVars = 2,
-            realLower = doubleArrayOf(1.0, 2.0), realUpper = doubleArrayOf(1.0, 2.0))
-        val params = PolynomialTheoryParams(maximumWork = 0, strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 128, randomSeed = 17),
-        ))
+    fun `source solve should keep finite holes beside an open linear integer`() {
+        val source = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 2).excludeValue(1), IntDomain(0, 2), IntDomain(0, 1)),
+            arrayOf(
+                RealProduct(0, 0, 1, 1.0, 1.0),
+                AllDifferent(intArrayOf(0, 1), 0, 3),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 0),
+            ),
+            openIntHi = booleanArrayOf(false, false, true),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 2.0),
+            realUpper = doubleArrayOf(1.0, 2.0),
+        )
+        val params = PolynomialTheoryParams(
+            maximumWork = 0,
+            strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 128, randomSeed = 17),
+            ),
+        )
 
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
             val witness = assertIs<OpenTheoryResult.Sat>(strategy.solve(params)).assignment
@@ -118,12 +142,21 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `conditioned products share one source integer across arithmetic checks`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
-            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0), RealProduct(0, 0, 2, 1.0, 1.0),
-                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0)),
-            openIntHi = booleanArrayOf(false, true), numRealVars = 3,
-            realLower = doubleArrayOf(1.0, 0.0, 1.0), realUpper = doubleArrayOf(1.0, 0.0, 1.0))
+    fun `source solve should share one integer across product checks`() {
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf(
+                RealProduct(0, 0, 1, 1.0, 1.0),
+                RealProduct(0, 0, 2, 1.0, 1.0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+            ),
+            openIntHi = booleanArrayOf(false, true),
+            numRealVars = 3,
+            realLower = doubleArrayOf(1.0, 0.0, 1.0),
+            realUpper = doubleArrayOf(1.0, 0.0, 1.0),
+        )
 
         val result = BacktrackSolver.source(source).solve()
 
@@ -131,17 +164,27 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `a spent polynomial allowance does not block proved finite completion`() {
-        val source = Problem(0, 2,
-            arrayOf(IntDomain(0, 2), IntDomain(0, 2).excludeValue(1)), arrayOf(
+    fun `source solve should complete finitely with zero polynomial work allowance`() {
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2).excludeValue(1)),
+            arrayOf(
                 RealProduct(0, 0, 1, 1.0, 1.0),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
                 AllDifferent(intArrayOf(0, 1), 0, 3),
-            ), openIntHi = booleanArrayOf(true, false), numRealVars = 2,
-            realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
-        val params = PolynomialTheoryParams(maximumWork = 0, strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 128, randomSeed = 17),
-        ))
+            ),
+            openIntHi = booleanArrayOf(true, false),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 1.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+        )
+        val params = PolynomialTheoryParams(
+            maximumWork = 0,
+            strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 128, randomSeed = 17),
+            ),
+        )
 
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
             val witness = assertIs<OpenTheoryResult.Sat>(strategy.solve(params)).assignment
@@ -153,9 +196,16 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `a spent polynomial allowance withholds required continuous completion`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
-            realLower = doubleArrayOf(-2.0, 1.0), realUpper = doubleArrayOf(2.0, 1.0))
+    fun `source solve should report budget exhausted when continuous completion needs polynomial work`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(ContinuousProduct(0, 0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, 1.0),
+            realUpper = doubleArrayOf(2.0, 1.0),
+        )
 
         val result = BacktrackSolver.source(source).solve(PolynomialTheoryParams(maximumWork = 0))
 
@@ -163,14 +213,26 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `a source invocation opens selected inert deduction and checks its witness`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
+    fun `source solve should open an inert propagation projection and check its witness`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
+        )
         var openings = 0
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
-            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
-                "The original source is checked at complete points.") { openings++; NoPropagator }
-        })
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider {
+                PropagationProjection(
+                    PropagationCapability.INERT,
+                    AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                    "The original source is checked at complete points.",
+                ) {
+                    openings++
+                    NoPropagator
+                }
+            },
+        )
 
         val result = BacktrackSolver.source(source).withProjectionProviders(providers)
             .solve(BacktrackParams(randomSeed = 1, maxDecisions = 10))
@@ -182,7 +244,7 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `a source scorer refusal does not refuse complete traversal`() {
+    fun `scorer refusal should only make local search unsupported`() {
         val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0))))
         val providers = FactorProjectionProviders(scoring = ScoringProjectionProvider { null })
 
@@ -194,17 +256,23 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `an alternate scheduling scorer accepts starts outside the dense timeline range`() {
+    fun `custom scorer should accept cumulative starts beyond Int range`() {
         val lower = Int.MAX_VALUE.toLong() + 10
-        val source = Problem(0, 1, arrayOf(IntDomain(lower, lower + 2)),
-            arrayOf(Cumulative(intArrayOf(0), longArrayOf(1), longArrayOf(1), 1)))
-        val providers = FactorProjectionProviders(scoring = ScoringProjectionProvider {
-            ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { _, _ ->
-                object : Invariant {
-                    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = false
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(lower, lower + 2)),
+            arrayOf(Cumulative(intArrayOf(0), longArrayOf(1), longArrayOf(1), 1)),
+        )
+        val providers = FactorProjectionProviders(
+            scoring = ScoringProjectionProvider {
+                ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { _, _ ->
+                    object : Invariant {
+                        override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = false
+                    }
                 }
-            }
-        })
+            },
+        )
 
         val result = LocalSearchSolver.source(source).withProjectionProviders(providers)
             .solve(LocalSearchParams(randomSeed = 1, maxFlips = 1))
@@ -214,12 +282,14 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `compiled squares preserve exact original coordinates through both strategies`() {
+    fun `compiled square should yield exact algebraic coordinates for both strategies`() {
         val x = FloatHandle("x", -2.0, 2.0)
-        val compiled = SchemaDef<SchemaEntry>(mapOf(
-            "x" to FloatSpec(-2.0, 2.0, 5),
-            "square" to NamedConstraint((x * x) eq 2.0),
-        )).compile()
+        val compiled = SchemaDef<SchemaEntry>(
+            mapOf(
+                "x" to FloatSpec(-2.0, 2.0, 5),
+                "square" to NamedConstraint((x * x) eq 2.0),
+            ),
+        ).compile()
         val strategies = listOf(BacktrackSolver.source(compiled), LocalSearchSolver.source(compiled))
 
         for (strategy in strategies) {
@@ -231,13 +301,16 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `compiled products keep both original operand namespaces`() {
+    fun `compiled product should keep exact coordinates of both operands`() {
         val x = FloatHandle("x", 0.0, 2.0)
         val y = FloatHandle("y", 0.0, 2.0)
-        val compiled = SchemaDef<SchemaEntry>(mapOf(
-            "x" to FloatSpec(0.0, 2.0, 5), "y" to FloatSpec(0.0, 2.0, 5),
-            "product" to NamedConstraint((x * y) eq 1.0),
-        )).compile()
+        val compiled = SchemaDef<SchemaEntry>(
+            mapOf(
+                "x" to FloatSpec(0.0, 2.0, 5),
+                "y" to FloatSpec(0.0, 2.0, 5),
+                "product" to NamedConstraint((x * y) eq 1.0),
+            ),
+        ).compile()
         val factor = compiled.problem.factors.filterIsInstance<ContinuousProduct>().single()
         for (strategy in listOf(BacktrackSolver.source(compiled), LocalSearchSolver.source(compiled))) {
             val witness = assertIs<OpenTheoryResult.Sat>(strategy.solve()).assignment
@@ -252,7 +325,7 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `schema chains preserve their shared exact product coordinates`() {
+    fun `schema product chain should yield exact shared coordinates`() {
         val schema = object : VariableSchema() {
             val x by floatVar(-2.0, 2.0, 5)
             val cube by constraint { (x * x * x) eq x }
@@ -269,14 +342,18 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `finite globals remain in the source beside exact continuous completion`() {
+    fun `source solve should satisfy finite globals beside exact continuous completion`() {
         val source = Problem(
-            0, 2, Array(2) { IntDomain(0, 1) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             arrayOf<Factor>(
                 Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
                 ContinuousProduct(0, 0, 1),
             ),
-            numRealVars = 2, realLower = doubleArrayOf(-2.0, 2.0), realUpper = doubleArrayOf(2.0, 2.0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, 2.0),
+            realUpper = doubleArrayOf(2.0, 2.0),
         )
 
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
@@ -291,14 +368,24 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `finite linear completion preserves exact original continuous coordinates`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
-            Table(intArrayOf(0), longArrayOf(1)),
-            Linear(intArrayOf(0), doubleArrayOf(0.1), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.3),
-        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
-        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 16, randomSeed = 17),
-        ))
+    fun `source solve should keep exact reals in finite linear completion`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
+            arrayOf<Factor>(
+                Table(intArrayOf(0), longArrayOf(1)),
+                Linear(intArrayOf(0), doubleArrayOf(0.1), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.3),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-1.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        val params = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 16, randomSeed = 17),
+            ),
+        )
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
             val witness = assertIs<OpenTheoryResult.Sat>(strategy.solve(params)).assignment
             val real = assertNotNull(assertIs<OpenTheoryAssignment.Sampled>(witness).sample.exactReals)[0]
@@ -310,19 +397,7 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `finite strategy controls retain original Boolean clauses`() {
-        val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))))
-
-        for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
-            val witness = assertIs<OpenTheoryResult.Sat>(strategy.solve()).assignment
-
-            assertEquals(true, witness.boolValue(0))
-        }
-    }
-
-
-    @Test
-    fun `source factors without execution checks explicitly decline before finite construction`() {
+    fun `source solve should be unsupported for factors without execution checks`() {
         val unchecked = object : Factor by Clause(intArrayOf(Lit.make(0, true))) {
             override val linearForm: LinearForm? = null
         }
@@ -335,9 +410,16 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `factory and direct pipeline witnesses satisfy the same original square`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(ContinuousProduct(0, 0, 1)), numRealVars = 2,
-            realLower = doubleArrayOf(-2.0, 2.0), realUpper = doubleArrayOf(2.0, 2.0))
+    fun `strategy solve and direct pipeline should both satisfy the original square`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(ContinuousProduct(0, 0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, 2.0),
+            realUpper = doubleArrayOf(2.0, 2.0),
+        )
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
             val direct = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = strategy.engine).result
             val facade = strategy.solve()
@@ -351,15 +433,24 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `polynomial assumptions remain scoped across source operations`() {
-        val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(ContinuousProduct(0, 0, 1)), numRealVars = 2,
-            realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 0.0))
+    fun `polynomial assumptions should be scoped to a single solve`() {
+        val source = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(ContinuousProduct(0, 0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-1.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 0.0),
+        )
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
             for (pin in listOf(true, false)) {
-                val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-                    assumptions = Assumptions(bools = mapOf(0 to pin)),
-                    localSearch = LocalSearchParams(maxFlips = 2, randomSeed = 17),
-                ))
+                val params = PolynomialTheoryParams(
+                    strategy = PolynomialStrategyParams(
+                        assumptions = Assumptions(bools = mapOf(0 to pin)),
+                        localSearch = LocalSearchParams(maxFlips = 2, randomSeed = 17),
+                    ),
+                )
 
                 val witness = assertIs<OpenTheoryResult.Sat>(strategy.solve(params)).assignment
 
@@ -369,9 +460,16 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `cancellation withholds publication without retaining a cancelled invocation`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(ContinuousProduct(0, 0, 1)), numRealVars = 2,
-            realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 0.0))
+    fun `cancelled solve should not affect a later solve`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(ContinuousProduct(0, 0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-1.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 0.0),
+        )
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
             val cancelled = strategy.solve(PolynomialTheoryParams(cancellation = Cancellation { true }))
             assertEquals(TerminationReason.Cancelled, assertIs<OpenTheoryResult.Unknown>(cancelled).reason)
@@ -381,15 +479,24 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `wide open integers retain exact values outside an invented finite window`() {
+    fun `source solve should keep wide open integer values exact`() {
         val value = parseBigInt("18446744073709551617")
-        val source = Problem(0, 1, arrayOf(IntDomain(-3, 3)), arrayOf<Factor>(
-            Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, value),
-        ), openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true))
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(-3, 3)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, value),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
-            val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-                localSearch = LocalSearchParams(maxFlips = 4, maxInstructions = 1000, randomSeed = 17),
-            ))
+            val params = PolynomialTheoryParams(
+                strategy = PolynomialStrategyParams(
+                    localSearch = LocalSearchParams(maxFlips = 4, maxInstructions = 1000, randomSeed = 17),
+                ),
+            )
 
             val witness = assertIs<OpenTheoryResult.Sat>(strategy.solve(params)).assignment
 
@@ -398,10 +505,17 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `open scoped pins explicitly decline without changing the original model`() {
-        val source = Problem(1, 1, arrayOf(IntDomain(-3, 3)), arrayOf<Factor>(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 42),
-        ), openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true))
+    fun `open source solve should decline boolean pins without changing the model`() {
+        val source = Problem(
+            1,
+            1,
+            arrayOf(IntDomain(-3, 3)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 42),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
         val strategy = BacktrackSolver.source(source)
 
         val result = strategy.solve(BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to true))))
@@ -411,21 +525,37 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `deduction scopes explicitly decline on every source route`() {
+    fun `source solve should decline deduction scopes on every route`() {
         val finite = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-        val open = Problem(0, 1, arrayOf(IntDomain(-3, 3)), arrayOf<Factor>(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 42),
-        ), openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true))
-        val polynomial = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(ContinuousProduct(0, 0, 1)),
-            numRealVars = 2, realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 0.0))
+        val open = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(-3, 3)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 42),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+        val polynomial = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
+            arrayOf<Factor>(ContinuousProduct(0, 0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-1.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 0.0),
+        )
         val assumptions = Assumptions.None.withTightenedMin(0, 1)
         for (source in listOf(finite, open, polynomial)) {
             for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
                 val common = PolynomialTheoryParams(strategy = PolynomialStrategyParams(assumptions = assumptions))
-                val native = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-                    backtrack = BacktrackParams(assumptions = assumptions),
-                    localSearch = LocalSearchParams(assumptions = assumptions),
-                ))
+                val native = PolynomialTheoryParams(
+                    strategy = PolynomialStrategyParams(
+                        backtrack = BacktrackParams(assumptions = assumptions),
+                        localSearch = LocalSearchParams(assumptions = assumptions),
+                    ),
+                )
                 for (params in listOf(common, native)) {
                     val result = strategy.solve(params)
 
@@ -436,45 +566,81 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `source optimization explicitly declines deduction scopes`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(-3, 3)), arrayOf<Factor>(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 42),
-        ), openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true))
-        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            assumptions = Assumptions.None.withIntHole(0, 0),
-        ))
+    fun `source optimize should decline deduction scopes`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(-3, 3)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 42),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+        val params = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                assumptions = Assumptions.None.withIntHole(0, 0),
+            ),
+        )
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
             val open = assertIs<OpenTheoryExecution.Optimize>(strategy.optimizeOpen(objective, params)).result
             val polynomial = strategy.optimize(objective, params).result
 
             assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryOptimum.Bounded>(open).reason)
-            assertEquals(TerminationReason.Unsupported,
-                assertIs<QuadraticOptimizationResult.Unknown>(polynomial).reason)
+            assertEquals(
+                TerminationReason.Unsupported,
+                assertIs<QuadraticOptimizationResult.Unknown>(polynomial).reason,
+            )
         }
     }
 
     @Test
-    fun `source satisfaction declines tolerance acceptance before invoking the hook`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
-            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.3),
-        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+    fun `source solve should decline tolerance checks without invoking them`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.3),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-1.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         var calls = 0
 
-        val result = BacktrackSolver.source(source).solve(BacktrackParams(toleranceCheck = { calls++; true }))
+        val result = BacktrackSolver.source(source).solve(
+            BacktrackParams(toleranceCheck = {
+                calls++
+                true
+            }),
+        )
 
         assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(result).reason)
         assertEquals(0, calls)
     }
 
     @Test
-    fun `source operations decline unbound component factories without invoking them`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(ContinuousProduct(0, 0, 1)), numRealVars = 2,
-            realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 0.0))
+    fun `source operations should decline component factories without invoking them`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(ContinuousProduct(0, 0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-1.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 0.0),
+        )
         var calls = 0
-        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            backtrack = BacktrackParams(componentFactory = { calls++; emptyList() }),
-        ))
+        val params = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                backtrack = BacktrackParams(componentFactory = {
+                    calls++
+                    emptyList()
+                }),
+            ),
+        )
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
             val solve = strategy.solve(params)
             val optimize = strategy.optimize(LinearObjective(realCoefficients = doubleArrayOf(0.0, 1.0)), params).result
@@ -486,9 +652,16 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `exact polynomial local search explicitly declines finite event hooks`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(ContinuousProduct(0, 0, 1)), numRealVars = 2,
-            realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 0.0))
+    fun `polynomial local search should decline event hooks without invoking them`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(ContinuousProduct(0, 0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-1.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 0.0),
+        )
         var calls = 0
         val params = LocalSearchParams(onEvent = { calls++ })
         val strategy = LocalSearchSolver.source(source)
@@ -502,14 +675,22 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `source optimization preserves exact original products and heuristic authority`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(ContinuousProduct(0, 0, 1)), numRealVars = 2,
+    fun `source optimize should keep exact products and engine specific optimality`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(ContinuousProduct(0, 0, 1)),
+            numRealVars = 2,
             realLower = doubleArrayOf(-1.0, Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(1.0, Double.POSITIVE_INFINITY))
+            realUpper = doubleArrayOf(1.0, Double.POSITIVE_INFINITY),
+        )
         val objective = LinearObjective(constant = 7, realCoefficients = doubleArrayOf(0.0, 1.0))
-        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17),
-        ))
+        val params = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17),
+            ),
+        )
 
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
             val execution = strategy.optimize(objective, params)
@@ -522,22 +703,32 @@ class SourceStrategyTest {
             if (strategy.engine == FiniteEngine.LOCAL_SEARCH) {
                 assertIs<QuadraticOptimizationResult.BestFound>(result)
                 assertTrue(result.stats.ls.moves.sum > 0)
-            } else assertIs<QuadraticOptimizationResult.Optimal>(result)
+            } else {
+                assertIs<QuadraticOptimizationResult.Optimal>(result)
+            }
             assertTrue(execution.nativeWork > 0)
         }
     }
 
-
     @Test
-    fun `open optimization retains exact wide integer objective values`() {
+    fun `open optimize should keep exact wide integer objective values`() {
         val value = parseBigInt("18446744073709551617")
-        val source = Problem(0, 1, arrayOf(IntDomain(-3, 3)), arrayOf<Factor>(
-            Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, value),
-        ), openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true))
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(-3, 3)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, value),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 2, maxInstructions = 1000, randomSeed = 17),
-        ))
+        val params = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 2, maxInstructions = 1000, randomSeed = 17),
+            ),
+        )
 
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
             val execution = assertIs<OpenTheoryExecution.Optimize>(strategy.optimizeOpen(objective, params))
@@ -551,14 +742,20 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `open integer sources explicitly decline bounded polynomial optimization`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(-3, 3)), arrayOf<Factor>(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 42),
-        ), openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true))
+    fun `polynomial optimize should decline open integer sources`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(-3, 3)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 42),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
 
         val result = BacktrackSolver.source(source).optimize(LinearObjective(intCoefficients = longArrayOf(1))).result
 
         assertEquals(TerminationReason.Unsupported, assertIs<QuadraticOptimizationResult.Unknown>(result).reason)
     }
-
 }

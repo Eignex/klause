@@ -13,15 +13,15 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PreparingMinimizeTest {
     @Test
-    fun `a preparation time boundary publishes no incumbent before resuming`() {
+    fun `a preparation time boundary should publish no incumbent before resuming`() {
         val fixture = FiniteCutoffKnapsackFixture
         val samples = mutableListOf<MinimizeResult.WithSample>()
         PreparingMinimize(BacktrackSolver(fixture.problem), fixture.objective, fixture.params).use { search ->
@@ -41,9 +41,11 @@ class PreparingMinimizeTest {
     }
 
     @Test
-    fun `preparation slices preserve the optimum and propagation work`() {
+    fun `preparation slices should preserve the optimum and propagation work`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
             Array(2048) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1) },
         ).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1L))
@@ -70,10 +72,11 @@ class PreparingMinimizeTest {
     }
 
     @Test
-    fun `an installation failure closes the retained handle`() {
+    fun `an installation failure should close the retained handle`() {
         val fixture = FiniteCutoffKnapsackFixture
         val search = PreparingMinimize(
-            BacktrackSolver(fixture.problem), fixture.objective,
+            BacktrackSolver(fixture.problem),
+            fixture.objective,
             fixture.params.copy(assumptions = Assumptions.None.withInt(Int.MAX_VALUE, 1)),
         )
 
@@ -89,9 +92,11 @@ class PreparingMinimizeTest {
     }
 
     @Test
-    fun `a construction refutation preserves shared cutoff result semantics`() {
+    fun `a construction refutation should preserve shared cutoff result semantics`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
             arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, -1)),
         ).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1L))
@@ -105,7 +110,7 @@ class PreparingMinimizeTest {
     }
 
     @Test
-    fun `cancellation at installation handoff leaves search for a later slice`() {
+    fun `cancellation at installation handoff should leave search for a later slice`() {
         val fixture = FiniteCutoffKnapsackFixture
         PreparingMinimize(BacktrackSolver(fixture.problem), fixture.objective, fixture.params).use { search ->
             val samples = mutableListOf<MinimizeResult.WithSample>()
@@ -124,5 +129,4 @@ class PreparingMinimizeTest {
             assertEquals(-4.0, result.objective)
         }
     }
-
 }

@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 
 class LpBasisTest {
     @Test
-    fun `headings are ordered unique and owned`() {
+    fun `headings should be ordered unique and owned`() {
         val headings = mutableListOf(2, 1)
         val statuses = mutableListOf(ExactLpStatus.AT_LOWER, ExactLpStatus.BASIC, ExactLpStatus.BASIC)
         val basis = ExactLpBasis(headings, statuses)
@@ -33,7 +33,7 @@ class LpBasisTest {
     }
 
     @Test
-    fun `nonbasic seats require an existing closure side`() {
+    fun `nonbasic seats should require an existing closure side`() {
         val zero = ExactLpSide(ExactLpNumber.of(0L))
         val one = ExactLpSide(ExactLpNumber.of(1L))
         val cases = listOf(
@@ -65,7 +65,7 @@ class LpBasisTest {
     }
 
     @Test
-    fun `crossed or strict equal bounds cannot supply any valid basis`() {
+    fun `crossed or strict equal bounds should admit no valid basis`() {
         val zero = ExactLpSide(ExactLpNumber.of(0L))
         for (bounds in listOf(
             ExactLpBounds(zero.copy(strict = true), zero),
@@ -88,7 +88,7 @@ class LpBasisTest {
     }
 
     @Test
-    fun `fixed conversion retains exact source status and basis order`() {
+    fun `fixed conversion should retain exact source status and basis order`() {
         val zero = ExactLpSide(ExactLpNumber.of(0L))
         val model = ExactLpModel(
             listOf(emptyList()),
@@ -108,5 +108,4 @@ class LpBasisTest {
         assertTrue(converted.model.hasUpper[0])
         assertEquals(0L, converted.model.upper[0])
     }
-
 }

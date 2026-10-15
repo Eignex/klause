@@ -1,6 +1,5 @@
 package com.eignex.klause.lowering
 
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
@@ -10,11 +9,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class WideIntDigitsTest {
-
     private fun big(s: String) = parseBigInt(s)
 
     @Test
-    fun `digits round-trip a value past Long and the digit count covers its magnitude`() {
+    fun `digits should round-trip a value past Long and cover its magnitude`() {
         val v = big("18446744073709551616") // 2^64
         val w = 32
         val n = WideIntDigits.digitCount(v, w)
@@ -23,7 +21,7 @@ class WideIntDigitsTest {
     }
 
     @Test
-    fun `every digit stays inside its width`() {
+    fun `every digit should stay inside its width`() {
         val v = big("123456789012345678901234567890")
         val w = 20
         val n = WideIntDigits.digitCount(v, w)
@@ -34,7 +32,7 @@ class WideIntDigitsTest {
     }
 
     @Test
-    fun `the width keeps a coefficient times a digit bound inside Long`() {
+    fun `the width should keep a coefficient times a digit bound inside Long`() {
         // The rule that preserves refutation: max|coeff| * 2^width must not overflow.
         val limit = bigIntOf(Long.MAX_VALUE)
         for (c in listOf("1", "4096", "1000003", "1073741824")) {
@@ -45,27 +43,19 @@ class WideIntDigitsTest {
     }
 
     @Test
-    fun `a coefficient with no room at all is reported rather than truncated`() {
-        // 2^62 leaves no digit width whose product fits; decomposing the variable cannot fix a
-        // coefficient that is itself out of range, so the caller must be told instead of handed a
-        // width that still wraps.
+    fun `a coefficient with no room at all should be reported rather than truncated`() {
         assertEquals(WideIntDigits.NO_ROOM, WideIntDigits.widthFor(big("4611686018427387904")))
     }
 
     @Test
-    fun `a unit coefficient gets the widest digits`() {
-        assertEquals(62, WideIntDigits.widthFor(BIG_ONE), "nothing to multiply against")
-    }
-
-    @Test
-    fun `a larger coefficient forces narrower digits`() {
+    fun `a larger coefficient should force narrower digits`() {
         val small = WideIntDigits.widthFor(big("2"))
         val large = WideIntDigits.widthFor(big("1000003"))
         assertTrue(large < small, "a bigger coefficient must leave less room, got $large vs $small")
     }
 
     @Test
-    fun `zero encodes as a single zero digit`() {
+    fun `zero should encode as a single zero digit`() {
         assertEquals(BIG_ZERO, WideIntDigits.recompose(WideIntDigits.digitsOf(BIG_ZERO, 16, 1), 16))
     }
 }

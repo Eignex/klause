@@ -11,11 +11,22 @@ import kotlin.test.assertEquals
 
 class GridArrayMinMaxInvariantTest {
     @Test
-    fun `grid move deltas preserve result and operand aliases`() {
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 2) }, arrayOf(
-            GridArrayMinMax(intArrayOf(0, 0, 1), DoubleArray(3) { 1.0 }, DoubleArray(3),
-                BooleanArray(3), 1000L, max = false),
-        ))
+    fun `grid move deltas should preserve result and operand aliases`() {
+        val source = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
+            arrayOf(
+                GridArrayMinMax(
+                    intArrayOf(0, 0, 1),
+                    DoubleArray(3) { 1.0 },
+                    DoubleArray(3),
+                    BooleanArray(3),
+                    1000L,
+                    max = false,
+                ),
+            ),
+        )
         val state = LocalSearchState(source.bake(), Random(0))
         state.assignment.setInt(0, 2)
         state.assignment.setInt(1, 1)

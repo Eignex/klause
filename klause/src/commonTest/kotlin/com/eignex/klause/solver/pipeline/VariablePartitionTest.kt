@@ -28,33 +28,28 @@ class VariablePartitionTest {
     private fun row(vararg vars: Int) = Linear(LongArray(vars.size) { 1L }, vars.toList().toIntArray(), LinearOp.LE, 5L)
 
     @Test
-    fun `one global drags only the columns it mentions into the search set`() {
+    fun `global should drag only the columns it mentions into the search set`() {
         val alldiff = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 11)
         val partition = problemOf(3, alldiff, row(2)).variablePartition()
-        assertEquals(1, partition.theoryEligibleCount, "only the linear-only column is eligible")
+        assertEquals(1, partition.theoryEligibleCount)
         assertTrue(partition.isTheoryEligible(2))
     }
 
     @Test
-    fun `an unknown factor kind keeps its columns in the search set`() {
-        // A factor kind the partition knows nothing about still has its declaration read: the demand
-        // comes from what the factor states, not from the kind being recognized.
+    fun `unknown factor kind should keep its columns in the search set`() {
         assertFalse(
             problemOf(1, cpOnlyFactor(MixedVars(spanInts = intArrayOf(0)))).variablePartition().isTheoryEligible(0),
         )
     }
 
     @Test
-    fun `a column a CP-only factor merely bounds must still be searched`() {
-        // CP has to own every column of a factor it is left holding, whether that factor enumerates the
-        // column or only reads its bounds — otherwise the column is handed to a theory that cannot see
-        // the constraint.
+    fun `column a CP-only factor only bounds should still be searched`() {
+        // A theory owning the column could not see the CP factor that reads its bounds.
         val boundsOnly = cpOnlyFactor(MixedVars(boundInts = intArrayOf(0)))
 
         assertFalse(problemOf(1, boundsOnly).variablePartition().isTheoryEligible(0))
     }
 
-    /** A factor no theory lane can hold, declaring exactly [variables]. */
     private fun cpOnlyFactor(variables: VarList) = object : Factor {
         override val variables: VarList = variables
         override fun remap(mapping: VarRemap): Factor = this

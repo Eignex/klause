@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class RewardLedgerTest {
 
     @Test
-    fun `the same credit over more work scores lower`() {
+    fun `the same credit over more work should score lower`() {
         fun rewardFor(work: Long): Double {
             val ledger = RewardLedger(2)
             ledger.credit(0, Signal.Improvement, 4.0)
@@ -25,7 +25,7 @@ class RewardLedgerTest {
     }
 
     @Test
-    fun `credit posted to an idle arm settles at its next segment`() {
+    fun `credit posted to an idle arm should settle at its next segment`() {
         val ledger = RewardLedger(2)
         ledger.credit(0, Signal.Improvement, 4.0)
         ledger.settle(0, 100)
@@ -37,7 +37,7 @@ class RewardLedgerTest {
     }
 
     @Test
-    fun `an arm is not scored on a signal it cannot earn`() {
+    fun `an arm should not be scored on a signal it cannot earn`() {
         // Arm 0 is backtrack, arm 1 local search: only arm 1 can lower violation.
         val ledger = RewardLedger(2) { arm, signal -> signal != Signal.Violation || arm == 1 }
         ledger.credit(1, Signal.Violation, 0.5)
@@ -48,7 +48,7 @@ class RewardLedgerTest {
     }
 
     @Test
-    fun `a new phase forgets the pooled rates`() {
+    fun `a new phase should forget the pooled rates`() {
         val ledger = RewardLedger(2)
         ledger.credit(0, Signal.Improvement, 1_000.0)
         ledger.settle(0, 100)
@@ -65,7 +65,7 @@ class RewardLedgerTest {
     )
 
     @Test
-    fun `root fixings an arm already showed earn nothing again`() {
+    fun `root fixings an arm already showed should earn nothing again`() {
         val ledger = RewardLedger(1)
         val progress = ProgressCredit(1)
         progress.observe(ledger, 0, stats(rootFixed = 5.0))
@@ -77,7 +77,7 @@ class RewardLedgerTest {
     }
 
     @Test
-    fun `glue clauses earn only their growth`() {
+    fun `glue clauses should earn only their growth`() {
         val ledger = RewardLedger(1)
         val progress = ProgressCredit(1)
         val search = SearchStats(glueClauses = SumResult(3.0))
@@ -90,7 +90,7 @@ class RewardLedgerTest {
     }
 
     @Test
-    fun `only lowering the record violation earns credit`() {
+    fun `only lowering the record violation should earn credit`() {
         val ledger = RewardLedger(3)
         val progress = ProgressCredit(3)
         progress.observe(ledger, 0, stats(violation = 8.0))

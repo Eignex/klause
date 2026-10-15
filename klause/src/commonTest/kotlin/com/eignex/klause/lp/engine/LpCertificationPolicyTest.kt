@@ -26,7 +26,7 @@ private class RecordingCertificationPolicy(private val accept: Boolean) : LpCert
 class LpCertificationPolicyTest {
 
     @Test
-    fun `forced decline rejects supplied certificates on legacy and retained models`() {
+    fun `forced decline should reject supplied certificates on legacy and retained models`() {
         val source = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
         val retained = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
         for (model in listOf(source, retained)) {
@@ -42,7 +42,7 @@ class LpCertificationPolicyTest {
     }
 
     @Test
-    fun `forced decline bypasses basis point safe and rational recovery`() {
+    fun `forced decline should bypass basis point safe and rational recovery`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.5)
@@ -64,7 +64,7 @@ class LpCertificationPolicyTest {
     }
 
     @Test
-    fun `policies are isolated between solve contexts`() {
+    fun `policies should be isolated between solve contexts`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 3L, cost = 1L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
@@ -82,7 +82,7 @@ class LpCertificationPolicyTest {
     }
 
     @Test
-    fun `open refutation forwards the solve context`() {
+    fun `open refutation should forward the solve context`() {
         val rows = listOf(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
@@ -101,7 +101,7 @@ class LpCertificationPolicyTest {
     }
 
     @Test
-    fun `leaf real feasibility forwards factory and policy`() {
+    fun `leaf real feasibility should forward factory and policy`() {
         val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 3L)
         val problem = Problem(
             numBoolVars = 0,

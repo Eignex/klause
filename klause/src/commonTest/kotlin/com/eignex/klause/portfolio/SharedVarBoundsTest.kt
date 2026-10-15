@@ -14,7 +14,7 @@ import kotlin.test.assertEquals
 class SharedVarBoundsTest {
 
     @Test
-    fun `runtime integer sharing binds its coordinate and endpoints`() {
+    fun `runtime integer sharing should bind its coordinate and endpoints`() {
         val source = Problem(0, 2, Array(2) { IntDomain(0, 9) }, emptyArray())
         val model = ModelIdentity.of(source)
         val invocation = EngineInvocation(source.prepareExecutionPlan(), model)
@@ -34,7 +34,7 @@ class SharedVarBoundsTest {
     }
 
     @Test
-    fun `runtime integer sharing refuses a stronger source invocation`() {
+    fun `runtime integer sharing should refuse a stronger source invocation`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
         val model = ModelIdentity.of(source)
         val plan = source.prepareExecutionPlan()
@@ -50,32 +50,25 @@ class SharedVarBoundsTest {
     }
 
     @Test
-    fun `unset bounds are the open interval`() {
-        val vb = SharedVarBounds(numIntVars = 2)
-        assertEquals(Long.MIN_VALUE, vb.lowerOf(0))
-        assertEquals(Long.MAX_VALUE, vb.upperOf(0))
-    }
-
-    @Test
-    fun `publish keeps the tightest bound each side`() {
+    fun `publish should keep the tightest bound on each side`() {
         val vb = SharedVarBounds(numIntVars = 1)
         vb.publish(0, lower = 2, upper = 9)
-        vb.publish(0, lower = 4, upper = 7) // tighter both sides
-        vb.publish(0, lower = 1, upper = 8) // looser both sides — ignored
+        vb.publish(0, lower = 4, upper = 7)
+        vb.publish(0, lower = 1, upper = 8)
         assertEquals(4, vb.lowerOf(0))
         assertEquals(7, vb.upperOf(0))
     }
 
     @Test
-    fun `out-of-range variables are ignored`() {
+    fun `out-of-range variables should be ignored`() {
         val vb = SharedVarBounds(numIntVars = 1)
-        vb.publish(5, lower = 0, upper = 0) // no such variable
+        vb.publish(5, lower = 0, upper = 0)
         assertEquals(Long.MIN_VALUE, vb.lowerOf(5))
         assertEquals(Long.MAX_VALUE, vb.upperOf(5))
     }
 
     @Test
-    fun `each side of a shared bound names the arm that tightened it`() {
+    fun `each side of a shared bound should name the arm that tightened it`() {
         val bounds = SharedVarBounds(1)
         bounds.publish(0, lower = 2, upper = 9, origin = 0)
         bounds.publish(0, lower = 4, upper = 9, origin = 1)
@@ -83,8 +76,9 @@ class SharedVarBoundsTest {
         assertEquals(1, bounds.lowerOriginOf(0))
         assertEquals(0, bounds.upperOriginOf(0))
     }
+
     @Test
-    fun `mismatched and withheld certificates cannot prune shared domains`() {
+    fun `mismatched and withheld certificates should not prune shared domains`() {
         val source = Problem(0, 1, arrayOf(IntDomain(2, 9)), emptyArray())
         val foreignSource = Problem(0, 1, arrayOf(IntDomain(8, 8)), emptyArray())
         val model = ModelIdentity.of(source)

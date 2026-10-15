@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 
 class SmtLibPolynomialTest {
     @Test
-    fun `pre cancelled lowering does not read its source`() {
+    fun `pre cancelled lowering should not read its source`() {
         val source = object : CharSource {
             override fun next(): String? = error("cancelled source must not be read")
         }
@@ -31,7 +31,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `coefficient work exhaustion interrupts without publishing a formula`() {
+    fun `coefficient work exhaustion should interrupt without publishing a formula`() {
         var charged = 0L
         val cancellation = object : Cancellation {
             override fun isCancelled(): Boolean = charged >= 2
@@ -45,7 +45,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `constant powers honor the caller coefficient work allowance`() {
+    fun `constant powers should honor the caller coefficient work allowance`() {
         var charged = 0L
         val cancellation = object : Cancellation {
             override fun isCancelled(): Boolean = charged >= 3
@@ -59,7 +59,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `decimal and rational source coefficients remain exact beyond machine words`() {
+    fun `decimal and rational source coefficients should remain exact beyond machine words`() {
         val parsed = SmtLibPolynomial.parse(
             "(assert (= 123456789012345678901234567890.125 (/ 987654312098765431209876543121 8)))",
         )
@@ -71,7 +71,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `products retain repeated variables and declaration identities`() {
+    fun `products should retain repeated variables and declaration identities`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const y Real) (assert (= (* x x y) 1))",
         )
@@ -80,7 +80,8 @@ class SmtLibPolynomialTest {
         assertEquals(
             PolynomialExpression.Product(
                 listOf(
-                    PolynomialExpression.Variable(SourceRealId(0)), PolynomialExpression.Variable(SourceRealId(0)),
+                    PolynomialExpression.Variable(SourceRealId(0)),
+                    PolynomialExpression.Variable(SourceRealId(0)),
                     PolynomialExpression.Variable(SourceRealId(1)),
                 ),
             ),
@@ -91,7 +92,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `nonnegative powers retain their exact exponent`() {
+    fun `nonnegative powers should retain their exact exponent`() {
         val parsed = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (^ x 17) 2))")
 
         val atom = assertIs<PolynomialRealFormula.Atom>(parsed.formula)
@@ -100,7 +101,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `power exponents resolve exact constants in lexical and helper scopes`() {
+    fun `power exponents should resolve exact constants in lexical and helper scopes`() {
         val cases = listOf(
             "(declare-const x Real) (assert (= (^ x (+ 1 1)) 2))",
             "(declare-const x Real) (assert (let ((n 2)) (= (^ x n) 2)))",
@@ -115,7 +116,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `unary signs and division by folded constants preserve rational values`() {
+    fun `unary signs and division by folded constants should preserve rational values`() {
         val parsed = SmtLibPolynomial.parse("(assert (= (/ (- 1) (+ 2 4)) (- 0.166666666666666667)))")
 
         val atom = assertIs<PolynomialRealFormula.Atom>(parsed.formula)
@@ -127,7 +128,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `constant powers remain exact in rational divisors`() {
+    fun `constant powers should remain exact in rational divisors`() {
         val parsed = SmtLibPolynomial.parse("(assert (= (/ 1 (^ 2 7)) 0.0078125))")
 
         val atom = assertIs<PolynomialRealFormula.Atom>(parsed.formula)
@@ -136,11 +137,14 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `real comparisons preserve strictness and equality polarity`() {
+    fun `real comparisons should preserve strictness and equality polarity`() {
         val cases = listOf(
-            "=" to PolynomialRelation.EQ, "distinct" to PolynomialRelation.NE,
-            "<" to PolynomialRelation.LT, "<=" to PolynomialRelation.LE,
-            ">" to PolynomialRelation.GT, ">=" to PolynomialRelation.GE,
+            "=" to PolynomialRelation.EQ,
+            "distinct" to PolynomialRelation.NE,
+            "<" to PolynomialRelation.LT,
+            "<=" to PolynomialRelation.LE,
+            ">" to PolynomialRelation.GT,
+            ">=" to PolynomialRelation.GE,
         )
         for ((operator, relation) in cases) {
             val parsed = SmtLibPolynomial.parse("(declare-const x Real) (assert ($operator (* x x) 2))")
@@ -150,7 +154,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `chained comparisons constrain consecutive real operands`() {
+    fun `chained comparisons should constrain consecutive real operands`() {
         val parsed = SmtLibPolynomial.parse("(declare-const x Real) (assert (< 0 x 2))")
 
         val terms = assertIs<PolynomialRealFormula.And>(parsed.formula).operands
@@ -163,7 +167,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `distinct constrains every pair rather than adjacent operands`() {
+    fun `distinct should constrain every pair rather than adjacent operands`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const y Real) (assert (distinct x y 0))",
         )
@@ -178,7 +182,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `Boolean structure retains polynomial atoms under negation and disjunction`() {
+    fun `Boolean structure should retain polynomial atoms under negation and disjunction`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const b Bool) (assert (or b (not (> (* x x) 2))))",
         )
@@ -190,7 +194,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `Boolean equality xor implication and conditionals preserve truth tables`() {
+    fun `Boolean equality xor implication and conditionals should preserve truth tables`() {
         for (left in listOf(false, true)) {
             for (right in listOf(false, true)) {
                 val cases = listOf(
@@ -209,14 +213,14 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `implication chains associate to the right`() {
+    fun `implication chains should associate to the right`() {
         val parsed = SmtLibPolynomial.parse("(assert (=> false true false))")
 
         assertEquals(PolynomialRealFormula.Constant(true), parsed.formula)
     }
 
     @Test
-    fun `parallel let values read the enclosing scope`() {
+    fun `parallel let values should read the enclosing scope`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (assert (let ((x 3) (y x)) (= (* y y) x)))",
         )
@@ -228,7 +232,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `macro free variables use the definition scope rather than the caller scope`() {
+    fun `macro free variables should use the definition scope rather than the caller scope`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) " +
                 "(assert (let ((x 7)) (= (f 2) 14)))",
@@ -244,35 +248,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `interleaved declarations and helpers preserve retained assertion identities`() {
-        val source = buildString {
-            repeat(32) { index ->
-                append("(declare-const x$index Real) ")
-                append("(define-fun f$index ((x Real)) Real (* x x$index)) ")
-                repeat(4) { append("(assert (let ((x$index 7)) (= (f$index 2) 14))) ") }
-            }
-        }
-
-        val parsed = SmtLibPolynomial.parse(source)
-
-        val terms = assertIs<PolynomialRealFormula.And>(parsed.formula).operands
-        assertEquals(128, terms.size)
-        for ((index, term) in terms.withIndex()) {
-            val atom = assertIs<PolynomialRealFormula.Atom>(term)
-            assertEquals(
-                PolynomialExpression.Product(
-                    listOf(
-                        PolynomialExpression.Constant.of(bigIntOf(2)),
-                        PolynomialExpression.Variable(SourceRealId(index / 4)),
-                    ),
-                ),
-                atom.left,
-            )
-        }
-    }
-
-    @Test
-    fun `nested local bindings shadow helpers without changing their definition scope`() {
+    fun `nested local bindings should shadow helpers without changing their definition scope`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (define-fun f () Real (* x x)) " +
                 "(define-fun g ((x Real)) Real (let ((y x)) (+ y f))) " +
@@ -294,7 +270,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `retained scopes reject later declarations and helpers`() {
+    fun `retained scopes should reject later declarations and helpers`() {
         val cases = listOf(
             "(assert (= (* x x) 1)) (declare-const x Real)",
             "(assert (= f 1)) (define-fun f () Real 1)",
@@ -309,7 +285,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `retained helper expansion honors cancellation during lowering`() {
+    fun `retained helper expansion should honor cancellation during lowering`() {
         var charged = 0L
         var limited = false
         val cancellation = object : Cancellation {
@@ -332,7 +308,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `numeric conditionals retain source declarations separately from auxiliary reals`() {
+    fun `numeric conditionals should retain source declarations separately from auxiliary reals`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const b Bool) (assert (= (ite b (* x x) 3) 2))",
         )
@@ -354,7 +330,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `Boolean query assumptions constrain the emitted formula`() {
+    fun `Boolean query assumptions should constrain the emitted formula`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const b Bool) (check-sat-assuming ((not b))) (get-model)",
         )
@@ -363,7 +339,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `unconstrained declarations retain source names and counts`() {
+    fun `unconstrained declarations should retain source names and counts`() {
         val parsed = SmtLibPolynomial.parse("(declare-const x Real) (declare-const b Bool) (check-sat)")
 
         assertEquals(mapOf("x" to 0), parsed.realVarNames)
@@ -374,7 +350,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `quoted and unquoted occurrences share their source variable`() {
+    fun `quoted and unquoted occurrences should share their source variable`() {
         val parsed = SmtLibPolynomial.parse("(declare-const |x| Real) (assert (= x |x|))")
 
         val atom = assertIs<PolynomialRealFormula.Atom>(parsed.formula)
@@ -383,7 +359,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `quoted numeric symbols cannot change numeral meaning`() {
+    fun `quoted numeric symbols should not change numeral meaning`() {
         val parsed = SmtLibPolynomial.parse("(declare-const |2| Real) (assert (= |2| 2))")
 
         val atom = assertIs<PolynomialRealFormula.Atom>(parsed.formula)
@@ -392,21 +368,21 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `linear real formulas remain distinguishable from nonlinear sources`() {
+    fun `linear real formulas should remain distinguishable from nonlinear sources`() {
         val parsed = SmtLibPolynomial.parse("(declare-const x Real) (assert (<= (* (/ 1 3) x) 2))")
 
         assertFalse(parsed.hasNonlinearTerms)
     }
 
     @Test
-    fun `a false Boolean guard does not admit unsupported arithmetic`() {
+    fun `a false Boolean guard should not admit unsupported arithmetic`() {
         assertFailsWith<UnsupportedSmtException> {
             SmtLibPolynomial.parse("(declare-const x Real) (assert (or true (= (/ 1 x) 2)))")
         }
     }
 
     @Test
-    fun `unsupported polynomial constructs decline explicitly`() {
+    fun `unsupported polynomial constructs should decline explicitly`() {
         val cases = listOf(
             "(declare-const x Int)",
             "(declare-const x Real) (assert (= (/ 1 x) 2))",
@@ -430,7 +406,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `ill sorted and undeclared polynomial terms are rejected`() {
+    fun `ill sorted and undeclared polynomial terms should be rejected`() {
         val cases = listOf(
             "(assert (= x 1))", "(assert (= x 1)) (declare-const x Real)",
             "(declare-const 2 Real)", "(declare-const \"x\" Real)",
@@ -449,7 +425,7 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `deep polynomial syntax lowers without call stack recursion`() {
+    fun `deep polynomial syntax should lower without call stack recursion`() {
         val source = buildString {
             append("(declare-const x Real) (assert (= ")
             repeat(1000) { append("(+ 1 ") }

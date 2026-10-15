@@ -22,7 +22,6 @@ import kotlin.test.assertTrue
 
 class WideLinearPropagatorTest {
 
-    // 2^64 — one past the signed 64-bit range, so it can only live in the wide coefficient lane.
     private val w = parseBigInt("18446744073709551616")
 
     private fun problem(factor: Factor, xHi: Long = 5, yHi: Long = 5) = Problem(
@@ -33,16 +32,15 @@ class WideLinearPropagatorTest {
     )
 
     @Test
-    fun `a wide coefficient tightens a variable domain`() {
-        // 2^64·x + 2^64·y ≤ 2·2^64  ⇔  x + y ≤ 2. Pinning y = 1 forces x ≤ 1.
+    fun `a wide coefficient should tighten a variable domain`() {
         val row = Linear(intArrayOf(0, 1), arrayOf(w, w), LinearOp.LE, w * bigIntOf(2))
         val s = PropagationSession(problem(row))
         assertTrue(s.pinInt(1, 1) !is PropagationResult.Unsat)
-        assertEquals(1L, s.intDomain(0).max, "x's max must be tightened to 1 through the wide coefficient")
+        assertEquals(1L, s.intDomain(0).max)
     }
 
     @Test
-    fun `wide linear deductions are implied by their reasons under carved holes`() {
+    fun `wide linear deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x1DE0)
         for (op in LinearOp.entries) {
             repeat(75) { iter ->
@@ -75,8 +73,7 @@ class WideLinearPropagatorTest {
     }
 
     @Test
-    fun `a wide bound cites only the side of the sum it reads`() {
-        // 2^64·(x + y) <= 5·2^64 with x >= 3 forces y <= 2; x's upper bound plays no part.
+    fun `a wide bound should cite only the side of the sum it reads`() {
         val row = Linear(intArrayOf(0, 1), arrayOf(w, w), LinearOp.LE, w * bigIntOf(5L))
         val problem = problem(row, xHi = 9, yHi = 9)
         val state = PropagationState(problem, Assumptions.None)

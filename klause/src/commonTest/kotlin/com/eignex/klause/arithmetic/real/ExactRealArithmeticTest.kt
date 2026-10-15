@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 
 class ExactRealArithmeticTest {
     @Test
-    fun `log of two retains a symbolic authoritative value`() {
+    fun `log of two should retain a symbolic authoritative value`() {
         val arithmetic = arithmetic()
 
         val value = arithmetic.function(ExactRealFunction.LOG, arithmetic.rational(q(2)))
@@ -23,7 +23,7 @@ class ExactRealArithmeticTest {
     }
 
     @Test
-    fun `inverse functions preserve the original exact scalar`() {
+    fun `inverse functions should preserve the original exact scalar`() {
         val arithmetic = arithmetic()
         val original = arithmetic.rational(q(2))
         val logarithm = arithmetic.function(ExactRealFunction.LOG, original)
@@ -34,7 +34,7 @@ class ExactRealArithmeticTest {
     }
 
     @Test
-    fun `logarithm of exponential has exact original negative value`() {
+    fun `logarithm of exponential should have the exact original negative value`() {
         val arithmetic = arithmetic()
         val original = arithmetic.rational(q(-8))
         val exponential = arithmetic.function(ExactRealFunction.EXP, original)
@@ -45,7 +45,7 @@ class ExactRealArithmeticTest {
     }
 
     @Test
-    fun `logarithm rejects an invalid exact domain`() {
+    fun `logarithm should reject an invalid exact domain`() {
         val arithmetic = arithmetic()
 
         assertFailsWith<RealDomainInvalid> {
@@ -54,7 +54,7 @@ class ExactRealArithmeticTest {
     }
 
     @Test
-    fun `trigonometric identity is checked symbolically`() {
+    fun `trigonometric identity should be checked symbolically`() {
         val arithmetic = arithmetic()
         val x = arithmetic.function(ExactRealFunction.EXP, arithmetic.rational(q(1)))
         val sine = arithmetic.power(arithmetic.function(ExactRealFunction.SIN, x), 2)
@@ -66,7 +66,7 @@ class ExactRealArithmeticTest {
     }
 
     @Test
-    fun `symbolic cancellation retains exact zero`() {
+    fun `symbolic cancellation should retain exact zero`() {
         val arithmetic = arithmetic()
         val value = arithmetic.function(ExactRealFunction.EXP, arithmetic.rational(q(1)))
 
@@ -76,7 +76,7 @@ class ExactRealArithmeticTest {
     }
 
     @Test
-    fun `rational multiples of pi retain exact special values`() {
+    fun `rational multiples of pi should retain exact special values`() {
         val arithmetic = arithmetic()
         val halfPi = arithmetic.multiply(listOf(arithmetic.rational(q(1) * q(2).reciprocal()), arithmetic.pi()))
 
@@ -88,7 +88,7 @@ class ExactRealArithmeticTest {
     }
 
     @Test
-    fun `algebraic leaves preserve their exact polynomial coordinate`() {
+    fun `algebraic leaves should preserve their exact polynomial coordinate`() {
         val arithmetic = arithmetic()
         val root = arithmetic.algebraic.roots(RationalPolynomial(listOf(q(-2), q(0), q(1)))).last()
 
@@ -99,7 +99,7 @@ class ExactRealArithmeticTest {
     }
 
     @Test
-    fun `insufficient interval refinement gives no equality verdict`() {
+    fun `insufficient interval refinement should give no equality verdict`() {
         val arithmetic = arithmetic()
         val exponential = arithmetic.function(ExactRealFunction.EXP, arithmetic.rational(q(1)))
         val interval = arithmetic.enclose(exponential, 4)
@@ -111,7 +111,8 @@ class ExactRealArithmeticTest {
     }
 
     private fun arithmetic(): ExactRealArithmetic = ExactRealArithmetic(
-        TranscendentalArithmetic(), AlgebraicArithmetic(),
+        TranscendentalArithmetic(),
+        AlgebraicArithmetic(),
     )
 
     private fun q(value: Long): BigFraction = BigFraction.ofLong(value)

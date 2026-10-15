@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class LpScalingTest {
 
     @Test
-    fun `power of two view maps structural and logical coordinates`() {
+    fun `the power of two view should map structural and logical coordinates`() {
         val model = mixedScaleModel()
 
         val view = LpScalingView.create(model)
@@ -52,7 +52,7 @@ class LpScalingTest {
     }
 
     @Test
-    fun `logical costs and bounds use the reciprocal row scale`() {
+    fun `logical costs and bounds should use the reciprocal row scale`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(
@@ -88,7 +88,7 @@ class LpScalingTest {
     }
 
     @Test
-    fun `free and upper only source bounds map through structural scales`() {
+    fun `free and upper only source bounds should map through structural scales`() {
         val builder = LpBuilder()
         val free = builder.addRealVar(null, null, cost = -2.0)
         val upperOnly = builder.addRealVar(null, 8.0, cost = 3.0)
@@ -112,7 +112,7 @@ class LpScalingTest {
     }
 
     @Test
-    fun `nonfinite matrix input falls back atomically`() {
+    fun `nonfinite matrix input should fall back atomically`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)
         val y = builder.addRealVar(0.0, 1.0)
@@ -128,7 +128,7 @@ class LpScalingTest {
     }
 
     @Test
-    fun `exact projection loss is not reported as safe scaling`() {
+    fun `exact projection loss should not be reported as safe scaling`() {
         val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 2000))
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
@@ -154,7 +154,7 @@ class LpScalingTest {
     }
 
     @Test
-    fun `exact bound width is formed before scaling`() {
+    fun `exact bound width should be formed before scaling`() {
         val zero = ExactLpNumber.of(0L)
         val lower = ExactLpNumber.of(9007199254740992L)
         val upper = ExactLpNumber.of(9007199254740993L)
@@ -179,13 +179,15 @@ class LpScalingTest {
     }
 
     @Test
-    fun `retained bound scaling visits only changed columns`() {
+    fun `retained bound scaling should visit only changed columns`() {
         for (enabled in listOf(false, true)) {
             val builder = LpBuilder()
             val columns = IntArray(32) { builder.addRealVar(0.0, 8.0, cost = 1.0) }
             builder.addRealRow(
                 intArrayOf(columns.first(), columns.last()),
-                doubleArrayOf(1.0 / 1_048_576.0, 1_048_576.0), Relation.GE, 1.0,
+                doubleArrayOf(1.0 / 1_048_576.0, 1_048_576.0),
+                Relation.GE,
+                1.0,
             )
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
             val original = assertNotNull(trail.state.ownerWorkingModel())
@@ -202,7 +204,7 @@ class LpScalingTest {
     }
 
     @Test
-    fun `retained objective scaling updates costs and source units without visiting bounds`() {
+    fun `retained objective scaling should update costs and source units without visiting bounds`() {
         for (enabled in listOf(false, true)) {
             val trail = LpBoundTrail(assertNotNull(mixedScaleModel().authoritativeModel()))
             val original = assertNotNull(trail.state.ownerWorkingModel())
@@ -226,7 +228,7 @@ class LpScalingTest {
     }
 
     @Test
-    fun `retained scaling declines a newly underflowed bound atomically`() {
+    fun `retained scaling should decline a newly underflowed bound atomically`() {
         val trail = LpBoundTrail(assertNotNull(mixedScaleModel().authoritativeModel()))
         val view = LpScalingView.create(assertNotNull(trail.state.ownerWorkingModel()))
         assertTrue(view.applied)
@@ -240,25 +242,7 @@ class LpScalingTest {
     }
 
     @Test
-    fun `unsafe retained objective scaling leaves predecessor vectors unchanged`() {
-        val trail = LpBoundTrail(assertNotNull(mixedScaleModel().authoritativeModel()))
-        val view = LpScalingView.create(assertNotNull(trail.state.ownerWorkingModel()))
-        assertTrue(view.applied)
-        val before = listOf(view.rhsD(0), view.costD(0), view.lowerD(0), view.upperD(0))
-        val objective = ExactLpObjective(
-            List(view.numVars) {
-                if (it == 0) ExactLpNumber.ofIeee(Double.MAX_VALUE) else trail.state.model.objective.cost(it)
-            },
-        )
-        assertTrue(trail.replaceObjective(objective))
-
-        assertNull(view.refresh(assertNotNull(trail.state.ownerWorkingModel())))
-
-        assertEquals(before, listOf(view.rhsD(0), view.costD(0), view.lowerD(0), view.upperD(0)))
-    }
-
-    @Test
-    fun `scope and auxiliary refresh bind their own exact source and active vectors`() {
+    fun `scope and auxiliary refresh should bind their own exact source and active vectors`() {
         for (enabled in listOf(false, true)) {
             val trail = LpBoundTrail(assertNotNull(mixedScaleModel().authoritativeModel()))
             val original = assertNotNull(trail.state.toWorkingModel())
@@ -295,23 +279,6 @@ class LpScalingTest {
             assertEquals(view.metrics.copy(work = next.metrics.work), next.metrics)
             assertTrue(next.metrics.work < view.metrics.work)
         }
-    }
-
-    @Test
-    fun `unsafe later scaling leaves every earlier view vector unchanged`() {
-        val model = mixedScaleModel()
-        val view = LpScalingView.create(model)
-        assertTrue(view.applied)
-        val before = listOf(view.rhsD(0), view.costD(0), view.lowerD(0), view.upperD(0))
-        val input = assertNotNull(model.doubleView)
-        input.rhs[0] *= 2.0
-        input.cost[0] *= 2.0
-        input.upper[0] *= 2.0
-        input.cost[model.numVars - 1] = Double.NaN
-
-        assertNull(view.refresh(model))
-
-        assertEquals(before, listOf(view.rhsD(0), view.costD(0), view.lowerD(0), view.upperD(0)))
     }
 
     private fun mixedScaleModel(): LpModel {

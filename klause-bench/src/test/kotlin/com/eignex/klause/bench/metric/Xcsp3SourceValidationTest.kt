@@ -11,7 +11,7 @@ import kotlin.test.assertNull
 
 class Xcsp3SourceValidationTest {
     @Test
-    fun `the final multiline instantiation is retained without diagnostics`() {
+    fun `the final multiline instantiation should be retained without diagnostics`() {
         val witness = "<instantiation>\n<list>x</list><values>2</values>\n</instantiation>"
         val raw = "o 1\nv <instantiation><list>x</list><values>1</values></instantiation>\n" +
             "o 2\ns SATISFIABLE\nv <instantiation>\nv <list>x</list><values>2</values>\n" +
@@ -23,7 +23,7 @@ class Xcsp3SourceValidationTest {
     }
 
     @Test
-    fun `a trailing incomplete instantiation cannot reuse an earlier witness`() {
+    fun `a trailing incomplete instantiation should not reuse an earlier witness`() {
         val raw = "o 1\nv <instantiation><list>x</list><values>1</values></instantiation>\n" +
             "o 2\nv <instantiation><list>x</list>\n"
 
@@ -32,7 +32,7 @@ class Xcsp3SourceValidationTest {
     }
 
     @Test
-    fun `a successful checker returns its complete structured result`() {
+    fun `a successful checker should return its complete structured result`() {
         val valid = Xcsp3SourceChecker.result("valid", "checked", "v <instantiation/>")
         val log = "OK\t10\n" + Xcsp3SourceValidation.RESULT_PREFIX + Reports.json.encodeToString(valid)
 
@@ -41,7 +41,7 @@ class Xcsp3SourceValidationTest {
 
     @ParameterizedTest
     @CsvSource("1,structured", "0,missing", "0,malformed")
-    fun `failed incomplete and malformed checker output remains unchecked`(exit: Int, form: String) {
+    fun `failed incomplete and malformed checker output should remain unchecked`(exit: Int, form: String) {
         val output = when (form) {
             "structured" -> Xcsp3SourceValidation.RESULT_PREFIX +
                 Reports.json.encodeToString(Xcsp3SourceChecker.result("valid", "checked", "v <instantiation/>"))

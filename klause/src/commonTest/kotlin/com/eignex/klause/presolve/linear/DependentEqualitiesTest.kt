@@ -10,7 +10,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DependentEqualitiesTest {
-
     private fun eq(coeffs: IntArray, vars: IntArray, bound: Int) = Linear(coeffs, vars, LinearOp.EQ, bound)
 
     private fun problem(vararg factors: Linear) = Problem(0, 3, Array(3) { IntDomain(0, 10) }, factors.toList())
@@ -18,8 +17,7 @@ class DependentEqualitiesTest {
     private fun dropped(p: Problem) = DependentEqualities.dropImplied(p, Cancellation.Never)
 
     @Test
-    fun `an equality that is the sum of two others is dropped and they are kept`() {
-        // x + y = 3 and y + z = 4 imply x + 2y + z = 7, which no pairwise rule sees.
+    fun `an equality that is the sum of two others should be dropped`() {
         val p = problem(
             eq(intArrayOf(1, 1), intArrayOf(0, 1), 3),
             eq(intArrayOf(1, 1), intArrayOf(1, 2), 4),
@@ -30,8 +28,7 @@ class DependentEqualitiesTest {
     }
 
     @Test
-    fun `an equality block with no rational solution refutes the model`() {
-        // The same three rows with the sum stated as 8: the block reduces to 0 = 1.
+    fun `an equality block with no rational solution should refute the model`() {
         val p = problem(
             eq(intArrayOf(1, 1), intArrayOf(0, 1), 3),
             eq(intArrayOf(1, 1), intArrayOf(1, 2), 4),
@@ -42,7 +39,7 @@ class DependentEqualitiesTest {
     }
 
     @Test
-    fun `an inequality the equalities imply is not read`() {
+    fun `an inequality the equalities imply should not be read`() {
         val p = problem(
             eq(intArrayOf(1, 1), intArrayOf(0, 1), 3),
             eq(intArrayOf(1, 1), intArrayOf(1, 2), 4),

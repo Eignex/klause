@@ -3,8 +3,8 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
-import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticCoefficient
 import com.eignex.klause.ir.QuadraticObjectiveSpec
@@ -29,27 +29,41 @@ class QuadraticStrategyAdaptersTest(private val engine: FiniteEngine) {
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun engines(): List<Array<FiniteEngine>> = listOf(
-            FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS, FiniteEngine.MIXED,
+            FiniteEngine.BACKTRACK,
+            FiniteEngine.LOCAL_SEARCH,
+            FiniteEngine.ALNS,
+            FiniteEngine.MIXED,
         ).map { arrayOf(it) }
     }
 
     @Test
-    fun `mixed quadratic terms optimize the source integers and exact real completions`() {
+    fun `mixed quadratic terms should optimize source integers and exact real completions`() {
         val source = Problem(
-            0, 1, arrayOf(IntDomain(-1, 2)), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(-3.0), realUpper = doubleArrayOf(3.0),
+            0,
+            1,
+            arrayOf(IntDomain(-1, 2)),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-3.0),
+            realUpper = doubleArrayOf(3.0),
         )
         val i = QuadraticVariable.Int(SourceIntId(0))
         val x = QuadraticVariable.Real(SourceRealId(0))
-        val objective = QuadraticObjectiveSpec(listOf(
-            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x),
-            QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-2), i, x),
-            QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(2), i, i),
-            QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-2), i),
-        ), QuadraticCoefficient.ONE)
-        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 10000, randomSeed = 17), alnsIterations = 2,
-        ))
+        val objective = QuadraticObjectiveSpec(
+            listOf(
+                QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x),
+                QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-2), i, x),
+                QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(2), i, i),
+                QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-2), i),
+            ),
+            QuadraticCoefficient.ONE,
+        )
+        val params = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 10000, randomSeed = 17),
+                alnsIterations = 2,
+            ),
+        )
 
         val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, params, engine)
 
@@ -62,7 +76,9 @@ class QuadraticStrategyAdaptersTest(private val engine: FiniteEngine) {
         if (engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.MIXED) {
             assertEquals(1L, result.incumbent.sample.intValue(0))
             assertEquals(BigFraction.ZERO, assertIs<QuadraticOptimizationResult.Optimal>(result).bound.value.rational)
-        } else assertIs<QuadraticOptimizationResult.BestFound>(result)
+        } else {
+            assertIs<QuadraticOptimizationResult.BestFound>(result)
+        }
         if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
             assertTrue(result.stats.ls.moves.sum > 0)
         }
@@ -71,21 +87,31 @@ class QuadraticStrategyAdaptersTest(private val engine: FiniteEngine) {
     }
 
     @Test
-    fun `quadratic workers enforce the same captured source assumption`() {
+    fun `quadratic workers should enforce the same captured source assumption`() {
         val source = Problem(
-            0, 1, arrayOf(IntDomain(1, 2)), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
+            0,
+            1,
+            arrayOf(IntDomain(1, 2)),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-1.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val i = QuadraticVariable.Int(SourceIntId(0))
         val x = QuadraticVariable.Real(SourceRealId(0))
-        val objective = QuadraticObjectiveSpec(listOf(
-            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, i, i),
-            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x),
-        ))
-        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            assumptions = Assumptions.None.withInt(0, 2),
-            localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17), alnsIterations = 1,
-        ))
+        val objective = QuadraticObjectiveSpec(
+            listOf(
+                QuadraticObjectiveTerm(QuadraticCoefficient.ONE, i, i),
+                QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x),
+            ),
+        )
+        val params = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                assumptions = Assumptions.None.withInt(0, 2),
+                localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17),
+                alnsIterations = 1,
+            ),
+        )
 
         val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, params, engine)
 
@@ -95,9 +121,11 @@ class QuadraticStrategyAdaptersTest(private val engine: FiniteEngine) {
     }
 
     @Test
-    fun `quadratic optimization retains finite global constraint semantics`() {
+    fun `quadratic optimization should keep finite global constraint semantics`() {
         val source = Problem(
-            0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
             arrayOf(
                 AllDifferent(intArrayOf(0, 1), 0, 3),
                 Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 1), 1),
@@ -105,13 +133,18 @@ class QuadraticStrategyAdaptersTest(private val engine: FiniteEngine) {
         )
         val first = QuadraticVariable.Int(SourceIntId(0))
         val second = QuadraticVariable.Int(SourceIntId(1))
-        val objective = QuadraticObjectiveSpec(listOf(
-            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, first, first),
-            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, second, second),
-        ))
-        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 1000, randomSeed = 17), alnsIterations = 2,
-        ))
+        val objective = QuadraticObjectiveSpec(
+            listOf(
+                QuadraticObjectiveTerm(QuadraticCoefficient.ONE, first, first),
+                QuadraticObjectiveTerm(QuadraticCoefficient.ONE, second, second),
+            ),
+        )
+        val params = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 1000, randomSeed = 17),
+                alnsIterations = 2,
+            ),
+        )
 
         val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, params, engine)
 
@@ -122,28 +155,41 @@ class QuadraticStrategyAdaptersTest(private val engine: FiniteEngine) {
         assertEquals(BigFraction.ofLong(left * left + right * right), result.incumbent.value.rational)
         if (engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.MIXED) {
             assertEquals(BigFraction.ONE, assertIs<QuadraticOptimizationResult.Optimal>(result).bound.value.rational)
-        } else assertIs<QuadraticOptimizationResult.BestFound>(result)
+        } else {
+            assertIs<QuadraticOptimizationResult.BestFound>(result)
+        }
     }
 
     @Test
-    fun `source point equalities seed checked quadratic neighborhood incumbents`() {
+    fun `source point equalities should seed checked quadratic neighborhood incumbents`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const y Real) (assert (and (= x 1) (= y 2))) (check-sat)",
         )
         val source = PolynomialRealProblem(
-            parsed.formula, parsed.realCount, parsed.boolCount, parsed.sourceRealCount,
-            parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames,
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.sourceRealCount,
+            parsed.sourceBoolCount,
+            parsed.realVarNames,
+            parsed.boolVarNames,
         ).pipelineRequest()
         val x = QuadraticVariable.Real(SourceRealId(0))
         val y = QuadraticVariable.Real(SourceRealId(1))
-        val objective = QuadraticObjectiveSpec(listOf(
-            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x),
-            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, y),
-            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, y, y),
-        ))
-        val params = PolynomialTheoryParams(maximumWork = 100000, strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17), alnsIterations = 1,
-        ))
+        val objective = QuadraticObjectiveSpec(
+            listOf(
+                QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x),
+                QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, y),
+                QuadraticObjectiveTerm(QuadraticCoefficient.ONE, y, y),
+            ),
+        )
+        val params = PolynomialTheoryParams(
+            maximumWork = 100000,
+            strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17),
+                alnsIterations = 1,
+            ),
+        )
 
         val execution = OpenTheoryPipeline.minimize(source, objective, params, engine)
 
@@ -152,19 +198,28 @@ class QuadraticStrategyAdaptersTest(private val engine: FiniteEngine) {
     }
 
     @Test
-    fun `quadratic neighborhoods keep conditional auxiliaries private after source capture`() {
+    fun `quadratic neighborhoods should keep conditional auxiliaries private after source capture`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const b Bool) (declare-const x Real) (assert (= x (ite b 0 0))) (check-sat)",
         )
         val source = PolynomialRealProblem(
-            parsed.formula, parsed.realCount, parsed.boolCount, parsed.sourceRealCount,
-            parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames,
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.sourceRealCount,
+            parsed.sourceBoolCount,
+            parsed.realVarNames,
+            parsed.boolVarNames,
         ).pipelineRequest()
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
-        val params = PolynomialTheoryParams(maximumWork = 200000, strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 20000, randomSeed = 17), alnsIterations = 2,
-        ))
+        val params = PolynomialTheoryParams(
+            maximumWork = 200000,
+            strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 20000, randomSeed = 17),
+                alnsIterations = 2,
+            ),
+        )
 
         val execution = OpenTheoryPipeline.minimize(source, objective, params, engine)
 
@@ -175,5 +230,4 @@ class QuadraticStrategyAdaptersTest(private val engine: FiniteEngine) {
             assertTrue(result.stats.ls.moves.sum > 1.0)
         }
     }
-
 }

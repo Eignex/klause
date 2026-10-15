@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class TranscendentalArithmeticTest {
     @Test
-    fun `special values have point enclosures`() {
+    fun `special values should have point enclosures`() {
         val arithmetic = TranscendentalArithmetic()
         val zero = RationalEnclosure.point(q(0))
 
@@ -20,7 +20,7 @@ class TranscendentalArithmeticTest {
     }
 
     @Test
-    fun `exponential refinement lies inside exact coarse bounds`() {
+    fun `exponential refinement should lie inside exact coarse bounds`() {
         val arithmetic = TranscendentalArithmetic()
         val input = RationalEnclosure.point(q(1))
 
@@ -33,7 +33,7 @@ class TranscendentalArithmeticTest {
     }
 
     @Test
-    fun `negative exponential reduction preserves reciprocal bounds`() {
+    fun `negative exponential reduction should preserve reciprocal bounds`() {
         val arithmetic = TranscendentalArithmetic()
         val positive = arithmetic.exp(RationalEnclosure.point(q(8)), 4)
 
@@ -43,7 +43,7 @@ class TranscendentalArithmeticTest {
     }
 
     @Test
-    fun `log scale reduction preserves rational bounds near zero`() {
+    fun `log scale reduction should preserve rational bounds near zero`() {
         val arithmetic = TranscendentalArithmetic()
         val input = RationalEnclosure.point(q(1) * q(256).reciprocal())
 
@@ -53,7 +53,7 @@ class TranscendentalArithmeticTest {
     }
 
     @Test
-    fun `log refuses nonpositive and crossing domains`() {
+    fun `log should refuse nonpositive and crossing domains`() {
         val arithmetic = TranscendentalArithmetic()
 
         assertFailsWith<IllegalArgumentException> { arithmetic.log(RationalEnclosure.point(q(0)), 4) }
@@ -61,7 +61,7 @@ class TranscendentalArithmeticTest {
     }
 
     @Test
-    fun `pi enclosure refines without floating constants`() {
+    fun `pi enclosure should refine without floating constants`() {
         val arithmetic = TranscendentalArithmetic()
         val coarse = arithmetic.pi(2)
 
@@ -72,7 +72,7 @@ class TranscendentalArithmeticTest {
     }
 
     @Test
-    fun `range reduction proves a large argument has negative sine`() {
+    fun `range reduction should prove a large argument has negative sine`() {
         val arithmetic = TranscendentalArithmetic()
 
         val result = arithmetic.sin(RationalEnclosure.point(q(100)), 12)
@@ -81,7 +81,7 @@ class TranscendentalArithmeticTest {
     }
 
     @Test
-    fun `trigonometric boxes keep interior extrema`() {
+    fun `trigonometric boxes should keep interior extrema`() {
         val arithmetic = TranscendentalArithmetic()
 
         val result = arithmetic.cos(RationalEnclosure(q(-1), q(1)), 4)
@@ -90,7 +90,7 @@ class TranscendentalArithmeticTest {
     }
 
     @Test
-    fun `strict rational separation does not collapse a near zero sine`() {
+    fun `strict rational separation should not collapse a near zero sine`() {
         val arithmetic = TranscendentalArithmetic()
         val input = q(1) * q(1000000).reciprocal()
 
@@ -101,14 +101,14 @@ class TranscendentalArithmeticTest {
     }
 
     @Test
-    fun `cancelled arithmetic publishes no enclosure`() {
+    fun `cancelled arithmetic should publish no enclosure`() {
         val arithmetic = TranscendentalArithmetic(cancellation = Cancellation { true })
 
         assertFailsWith<TranscendentalInterrupted> { arithmetic.exp(RationalEnclosure.point(q(0)), 4) }
     }
 
     @Test
-    fun `work cap is shared across refinements`() {
+    fun `work cap should be shared across refinements`() {
         val arithmetic = TranscendentalArithmetic(maximumWork = 2)
         arithmetic.exp(RationalEnclosure.point(q(0)), 4)
 
@@ -116,7 +116,7 @@ class TranscendentalArithmeticTest {
     }
 
     @Test
-    fun `representation cap declines before a large squaring`() {
+    fun `representation cap should decline before a large squaring`() {
         val arithmetic = TranscendentalArithmetic(maximumBits = 32)
 
         assertFailsWith<TranscendentalResourceLimit> { arithmetic.exp(RationalEnclosure.point(q(100)), 4) }

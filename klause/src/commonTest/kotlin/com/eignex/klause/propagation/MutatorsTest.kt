@@ -21,7 +21,7 @@ class MutatorsTest {
     }
 
     @Test
-    fun `an equality decision is its eq literal and explains both bounds by it`() {
+    fun `an equality decision should be its eq literal and explain both bounds by it`() {
         val s = freshState(hi = 5)
         val ge = s.atomVarGe(0, 3)
         val le = s.atomVarLe(0, 3)
@@ -37,7 +37,7 @@ class MutatorsTest {
     }
 
     @Test
-    fun `a bound decision that snaps past a hole is the only unexplained literal at its level`() {
+    fun `a bound decision that snaps past a hole should be the only unexplained literal at its level`() {
         // 3 is carved at level 1, so deciding v >= 3 at level 2 lands the bound on 4. The landed bound must rest on
         // the decision and the hole, and the decision on nothing; were they to cite each other, no literal at the
         // level would be left for 1UIP to stop at.
@@ -59,7 +59,7 @@ class MutatorsTest {
     }
 
     @Test
-    fun `a value a bound decision sweeps past cites the decided bound`() {
+    fun `a value a bound decision sweeps past should cite the decided bound`() {
         val s = freshState(hi = 5)
         val eq = s.atomVarEq(0, 2)
 

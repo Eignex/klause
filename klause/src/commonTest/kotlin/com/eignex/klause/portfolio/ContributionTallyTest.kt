@@ -12,7 +12,7 @@ class ContributionTallyTest {
     }
 
     @Test
-    fun `uses add up per kind and origin`() {
+    fun `uses should add up per kind and origin`() {
         val tally = ContributionTally()
         tally.note(Contribution.Clause, 2, 3.0)
         tally.note(Contribution.Clause, 2, 1.0)
@@ -22,7 +22,7 @@ class ContributionTallyTest {
     }
 
     @Test
-    fun `a use naming no origin is ignored`() {
+    fun `a use naming no origin should be ignored`() {
         val tally = ContributionTally()
 
         tally.note(Contribution.Bound, -1)
@@ -31,7 +31,7 @@ class ContributionTallyTest {
     }
 
     @Test
-    fun `draining resets the counts`() {
+    fun `draining should reset the counts`() {
         val tally = ContributionTally()
         tally.note(Contribution.Bound, 1)
         drained(tally)

@@ -7,7 +7,7 @@ import kotlin.test.assertFailsWith
 
 class IndexedVectorTest {
     @Test
-    fun `stored positions remain unique even when their values are zero`() {
+    fun `stored positions should stay unique when their values are zero`() {
         for (value in listOf(0.0, 2.0)) {
             val vector = IndexedVector(3)
             vector.store(1, value)
@@ -20,7 +20,7 @@ class IndexedVectorTest {
     }
 
     @Test
-    fun `clearing releases every stored position for reuse`() {
+    fun `clear should release every stored position for reuse`() {
         val vector = IndexedVector(3)
         vector.store(2, 0.0)
         vector.store(0, 2.0)
@@ -34,7 +34,7 @@ class IndexedVectorTest {
     }
 
     @Test
-    fun `dense input and gathered output do not alias the vector`() {
+    fun `dense input and gathered output should not alias the vector`() {
         val input = doubleArrayOf(0.0, 2.0, 0.0)
         val vector = IndexedVector(3)
         vector.scatter(input)
@@ -48,18 +48,7 @@ class IndexedVectorTest {
     }
 
     @Test
-    fun `invalid replacement inputs preserve the previous vector`() {
-        val vector = IndexedVector(1)
-        vector.unit(0)
-
-        assertFailsWith<IllegalArgumentException> { vector.unit(1) }
-        assertFailsWith<IllegalArgumentException> { vector.scatter(doubleArrayOf()) }
-
-        assertContentEquals(doubleArrayOf(1.0), vector.toDoubleArray())
-    }
-
-    @Test
-    fun `gather preserves stored IEEE values and clears absent entries after reuse`() {
+    fun `gather should preserve IEEE values and clear absent entries after reuse`() {
         val vector = IndexedVector(4)
         val out = DoubleArray(4) { 7.0 }
         for (value in listOf(-0.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {

@@ -23,7 +23,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ImplicationGraphTest {
-
     private val cap = 1024
 
     private fun isFeasible(problem: Problem, sample: Sample): Boolean {
@@ -33,7 +32,6 @@ class ImplicationGraphTest {
         return problem.propagate(a) !is PropagationResult.Unsat
     }
 
-    /** The problem [Presolve.reduceImplicationGraph] reduces [problem] to, materialized from its delta. */
     private fun reduced(problem: Problem, objectiveBoolVars: Set<Int> = emptySet()): Problem {
         val baked = problem.bake()
         val delta = Presolve.reduceImplicationGraph(baked, cap, objectiveBoolVars = objectiveBoolVars)
@@ -41,7 +39,7 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun `keeps equivalent cardinality literals distinct`() {
+    fun `merging should keep equivalent cardinality literals distinct`() {
         val problem = Problem(
             numBoolVars = 2,
             numIntVars = 0,
@@ -58,9 +56,7 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun `anti-equivalent variables are not merged`() {
-        // (!b0 | !b1) and (b0 | b1) make b0 <-> !b1. Substitution preserves polarity and cannot express
-        // the flip, so neither variable is merged and both still appear in the factors.
+    fun `anti-equivalent variables should not be merged`() {
         val problem = Problem(
             numBoolVars = 2,
             numIntVars = 0,
@@ -70,13 +66,11 @@ class ImplicationGraphTest {
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             ),
         )
-        assertTrue(reduced(problem).factors.any { 1 in it.boolVars }, "anti-equivalent b1 must not be merged away")
+        assertTrue(reduced(problem).factors.any { 1 in it.boolVars })
     }
 
     @Test
-    fun `an objective variable is never merged`() {
-        // b0 <-> b1, but b1 is read by the objective: it must keep a constrained variable, so the pass
-        // leaves both untouched even though they are equivalent.
+    fun `an objective variable should never be merged`() {
         val problem = Problem(
             numBoolVars = 2,
             numIntVars = 0,
@@ -86,16 +80,11 @@ class ImplicationGraphTest {
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(0, true))),
             ),
         )
-        assertTrue(
-            reduced(problem, objectiveBoolVars = setOf(1)).factors.any { 1 in it.boolVars },
-            "an objective variable must not be merged",
-        )
+        assertTrue(reduced(problem, objectiveBoolVars = setOf(1)).factors.any { 1 in it.boolVars })
     }
 
     @Test
-    fun `an unmerged equivalence cycle keeps the binaries that state it`() {
-        // b0, b1, b2 pairwise equivalent, all read by the objective so none merges. Every binary is
-        // entailed by the other five, but dropping them all would leave the three variables free.
+    fun `an unmerged equivalence cycle should keep the binaries that state it`() {
         val pairs = listOf(0 to 1, 1 to 0, 1 to 2, 2 to 1, 0 to 2, 2 to 0)
         val problem = Problem(
             numBoolVars = 3,
@@ -107,13 +96,11 @@ class ImplicationGraphTest {
         val reduced = reduced(problem, objectiveBoolVars = setOf(0, 1, 2))
 
         val split = Sample(booleanArrayOf(true, false, false), LongArray(0))
-        assertTrue(!isFeasible(reduced, split), "the reduced model still forbids splitting the equivalence")
+        assertTrue(!isFeasible(reduced, split))
     }
 
     @Test
-    fun `an equivalence a row reads is renamed on a model with an open column`() {
-        // b0 <-> b1 from the binaries alone; b1 also reifies a row over an open column, so the rename has
-        // to reach the row and the rebuild has to restore b1 from b0.
+    fun `an equivalence a row reads should be renamed on a model with an open column`() {
         val open = Bits(1).also { it.set(0) }
         val problem = Problem(
             numBoolVars = 2,
@@ -127,10 +114,9 @@ class ImplicationGraphTest {
 
         val delta = Presolve.reduceSourceImplicationGraph(problem, Cancellation.Never, emptySet())
 
-        val reduced = assertNotNull(problem.withSourcePassDelta(delta), "the rename must not refute")
-        assertTrue(reduced.factors.none { 1 in it.boolVars }, "b1 should be substituted away")
+        val reduced = assertNotNull(problem.withSourcePassDelta(delta))
+        assertTrue(reduced.factors.none { 1 in it.boolVars })
         val lifted = booleanArrayOf(true, false).also { delta.rebuild.rebuildInto(it) }
-        assertEquals(listOf(true, true), lifted.toList(), "b1 takes its representative's value")
+        assertEquals(listOf(true, true), lifted.toList())
     }
-
 }

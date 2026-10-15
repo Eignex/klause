@@ -20,7 +20,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class BoundedVariableEliminationTest {
-
     private fun pos(v: Int) = Lit.make(v, true)
     private fun neg(v: Int) = Lit.make(v, false)
     private fun clause(vararg lits: Int) = Clause(lits)
@@ -28,7 +27,6 @@ class BoundedVariableEliminationTest {
     private fun sat(factors: Array<Factor>, a: BooleanArray): Boolean =
         factors.filterIsInstance<Clause>().all { c -> c.literals.any { Lit.evaluate(it, a[Lit.variable(it)]) } }
 
-    /** Run BVE and assert soundness over the whole `2^numBool` assignment space; returns the reduced problem. */
     private fun checkBve(numBool: Int, clauses: List<Clause>, objectiveBoolVars: Set<Int> = emptySet()): Problem {
         val problem = Problem(numBool, 0, emptyArray(), clauses).bake()
         val delta = Presolve.eliminateBoolVars(problem, objectiveBoolVars)
@@ -60,16 +58,13 @@ class BoundedVariableEliminationTest {
         problem.factors.filterIsInstance<Clause>().any { c -> c.literals.any { Lit.variable(it) == v } }
 
     @Test
-    fun `discards tautological resolvents`() {
-        // (a ∨ b) ∧ (¬a ∨ ¬b): the only resolvent (b ∨ ¬b) is a tautology, so a eliminates with 0 clauses.
+    fun `elimination should discard tautological resolvents`() {
         val reduced = checkBve(2, listOf(clause(pos(0), pos(1)), clause(neg(0), neg(1))))
-        assertTrue(!mentions(reduced, 0), "a is eliminated")
+        assertTrue(!mentions(reduced, 0))
     }
 
     @Test
-    fun `does not eliminate when resolution would grow the clause count`() {
-        // a has 2 positive and 3 negative occurrences: 6 resolvents > 5 originals — unbounded, kept. The
-        // neighbours are protected so a is the sole candidate (else they pure-eliminate a's clauses first).
+    fun `elimination should not apply when resolution would grow the clause count`() {
         val reduced = checkBve(
             6,
             listOf(
@@ -81,12 +76,11 @@ class BoundedVariableEliminationTest {
             ),
             objectiveBoolVars = setOf(1, 2, 3, 4, 5),
         )
-        assertTrue(mentions(reduced, 0), "the unbounded variable is left in place")
+        assertTrue(mentions(reduced, 0))
     }
 
     @Test
-    fun `chained eliminations reconstruct in the right order`() {
-        // Two eliminable variables whose clauses interlock, exercising reverse-order reconstruction.
+    fun `chained eliminations should reconstruct in reverse order`() {
         checkBve(
             5,
             listOf(
@@ -99,9 +93,7 @@ class BoundedVariableEliminationTest {
     }
 
     @Test
-    fun `an eliminated variable is recovered on a model with an open column`() {
-        // Resolution reads only the clause database, so an open integer column beside it is untouched —
-        // the reduction the finite lane cannot reach on this model.
+    fun `an eliminated variable should be recovered on a model with an open column`() {
         val open = Bits(1).also { it.set(0) }
         val problem = Problem(
             numBoolVars = 3,
@@ -115,9 +107,8 @@ class BoundedVariableEliminationTest {
 
         val delta = Presolve.eliminateSourceBoolVars(problem, emptySet(), Cancellation.Never)
 
-        val reduced = assertNotNull(problem.withSourcePassDelta(delta), "the elimination must not refute")
-        assertTrue(!delta.rebuild.isEmpty, "the eliminated column is carried as a rebuild")
-        // Every assignment of the reduced model lifts to one the original satisfies.
+        val reduced = assertNotNull(problem.withSourcePassDelta(delta))
+        assertTrue(!delta.rebuild.isEmpty)
         for (mask in 0 until (1 shl problem.numBoolVars)) {
             val solved = BooleanArray(problem.numBoolVars) { ((mask shr it) and 1) == 1 }
             if (!sat(reduced.factors, solved)) continue
@@ -127,9 +118,7 @@ class BoundedVariableEliminationTest {
     }
 
     @Test
-    fun `an integer column keeps a boolean the rows read out of reach`() {
-        // b0 is read by a reified row, so it is ineligible however its clauses look — the rule that makes
-        // resolution safe before a finite projection exists.
+    fun `a boolean read by an integer row should not be eliminated`() {
         val open = Bits(1).also { it.set(0) }
         val problem = Problem(
             numBoolVars = 2,
@@ -143,9 +132,6 @@ class BoundedVariableEliminationTest {
         val delta = Presolve.eliminateSourceBoolVars(problem, emptySet(), Cancellation.Never)
 
         val reduced = assertNotNull(problem.withSourcePassDelta(delta))
-        assertTrue(
-            reduced.factors.any { f -> f.boolVars.any { it == 0 } },
-            "a boolean an integer row reads stays referenced rather than being resolved away",
-        )
+        assertTrue(reduced.factors.any { f -> f.boolVars.any { it == 0 } })
     }
 }

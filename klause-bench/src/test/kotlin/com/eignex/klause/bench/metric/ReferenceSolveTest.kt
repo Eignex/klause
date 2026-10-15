@@ -14,7 +14,7 @@ class ReferenceSolveTest {
     private val ref = ProblemRef("absent", Format.XCSP3, corpus("absent.xml"), Category.CSP, Expected.Unknown)
 
     @Test
-    fun `default and explicit XCSP references identify cp-sat`() {
+    fun `default and explicit XCSP references should identify cp-sat`() {
         val labels = listOf(null, "cp-sat").map { solver ->
             ReferenceSolve.solverIdFor(ref, "cp-sat", solver)
         }
@@ -23,7 +23,7 @@ class ReferenceSolveTest {
     }
 
     @Test
-    fun `unsupported XCSP solvers are rejected before reference invocation`() {
+    fun `unsupported XCSP solvers should be rejected before reference invocation`() {
         val errors = listOf("ace", "choco", "unknown").map { solver ->
             assertFailsWith<IllegalArgumentException> {
                 ReferenceSolve.run(ref, "cp-sat", SolverInvocation.Settings(), Budget(1), solver)
@@ -39,7 +39,7 @@ class ReferenceSolveTest {
     }
 
     @Test
-    fun `unsupported XCSP backends are rejected before reference invocation`() {
+    fun `unsupported XCSP backends should be rejected before reference invocation`() {
         val error = assertFailsWith<IllegalArgumentException> {
             ReferenceSolve.run(ref, "choco", SolverInvocation.Settings(), Budget(1))
         }
@@ -48,7 +48,7 @@ class ReferenceSolveTest {
     }
 
     @Test
-    fun `unsupported XCSP solve-one requests fail before recording a verdict`() {
+    fun `unsupported XCSP solve-one requests should fail before recording a verdict`() {
         val error = assertFailsWith<IllegalArgumentException> {
             SolveMetric.solveOne(ref, Budget(1), SolveMetric.REFERENCE, referenceSolver = "ace")
         }

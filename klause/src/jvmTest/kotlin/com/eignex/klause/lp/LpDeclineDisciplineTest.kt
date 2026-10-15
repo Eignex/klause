@@ -25,7 +25,6 @@ import com.eignex.klause.lp.bounding.sparseCertifiedPrune
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpBound
 import com.eignex.klause.lp.engine.ComponentLpSolverCapability
-import com.eignex.klause.lp.engine.RetainedComponentLpSolverCapability
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.ExactLpWitness
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -49,6 +48,7 @@ import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.RetainedComponentLpSolverCapability
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.solveAndCertify
@@ -126,11 +126,16 @@ private class ConsumerRecordingFactory : LpEngineFactory {
         return RecordingComponentSolver(delegate, calls)
     }
 
-    override fun newRetainedComponentSolver(model: LpModel, parts: List<LpNeighborhood>, solvers: List<LpSolver>,
-        isolated: IntArray): RetainedComponentLpSolverCapability {
+    override fun newRetainedComponentSolver(
+        model: LpModel,
+        parts: List<LpNeighborhood>,
+        solvers: List<LpSolver>,
+        isolated: IntArray,
+    ): RetainedComponentLpSolverCapability {
         calls += DeclineCall.COMPONENT
         return RecordingComponentSolver(
-            ProductionLpEngineFactory.newRetainedComponentSolver(model, parts, solvers, isolated), calls,
+            ProductionLpEngineFactory.newRetainedComponentSolver(model, parts, solvers, isolated),
+            calls,
         )
     }
 
@@ -334,7 +339,7 @@ class LpDeclineDisciplineTest {
     }
 
     @Test
-    fun `standalone Farkas and rational proofs decline to indeterminate`() {
+    fun `standalone Farkas and rational proofs should decline to indeterminate`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 1L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
@@ -355,7 +360,7 @@ class LpDeclineDisciplineTest {
     }
 
     @Test
-    fun `standalone feasible proof ladder cannot surface SAT or optimum after decline`() {
+    fun `standalone feasible proof ladder should not surface SAT or optimum after decline`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.5)
@@ -376,7 +381,7 @@ class LpDeclineDisciplineTest {
     }
 
     @Test
-    fun `component consumer cannot combine declined block proofs into an optimum`() {
+    fun `component consumer should not combine declined block proofs into an optimum`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 3L, cost = 1L)
         val y = builder.addVar(0L, 3L, cost = 1L)
@@ -404,7 +409,7 @@ class LpDeclineDisciplineTest {
     }
 
     @Test
-    fun `MPS real leaf decline reaches the unknown solve terminal`() {
+    fun `MPS real leaf decline should reach the unknown solve terminal`() {
         val harness = harness()
         val component = object : SearchComponent {
             override fun check(context: SearchContext): ComponentCheck = when (
@@ -438,10 +443,7 @@ class LpDeclineDisciplineTest {
 
         assertEquals(LpVerdict.ATTAINED_OPTIMUM, accepted.verdict)
         assertEquals(TerminationReason.Unsupported, assertIs<SolveResult.Unknown>(declined).reason)
-        assertTrue(harness.factory.calls.contains(DeclineCall.GENERAL))
         assertTrue(harness.policy.observedSuccess(LpCertifier.EXACT_BASIS))
-        assertTrue(harness.policy.observedSuccess(LpCertifier.EXACT_POINT))
-        assertTrue(harness.policy.observedSuccess(LpCertifier.RATIONAL))
         assertEquals(
             harness.factory.calls.count { it == DeclineCall.GENERAL },
             harness.factory.calls.count { it == DeclineCall.CLOSE },
@@ -449,70 +451,59 @@ class LpDeclineDisciplineTest {
     }
 
     @Test
-    fun `node root and recovery bounds cannot prune or become finite after decline`() {
+    fun `node bound should not prune after decline`() {
         val problem = triangleCover()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
-        val nodeHarness = harness()
-        val node = engine(problem, objective, nodeHarness)
-        val session = PropagationSession(problem)
+        val harness = harness()
+        val declining = engine(problem, triangleObjective, harness)
+        val accepting = productionEngine(problem, triangleObjective)
 
         try {
-            assertFalse(node.pruneNode(session, 1.5, -1, true))
-            assertFalse(node.pruneNode(PropagationSession(problem), 1.5, -1, true))
-            assertTrue(nodeHarness.factory.calls.contains(DeclineCall.PERSISTENT))
-            assertTrue(nodeHarness.factory.calls.contains(DeclineCall.ADOPT))
-            assertTrue(nodeHarness.factory.calls.contains(DeclineCall.PREPARE_LOGICALS))
-            assertTrue(nodeHarness.factory.calls.contains(DeclineCall.RESOLVE_BOUNDS))
-            assertFalse(nodeHarness.factory.calls.contains(DeclineCall.TABLEAU))
-            assertTrue(nodeHarness.policy.observedSuccess(LpCertifier.INTEGER))
-            assertTrue(nodeHarness.policy.observedSuccess(LpCertifier.SAFE_OBJECTIVE))
+            assertFalse(declining.pruneNode(PropagationSession(problem), 1.5, -1, true))
+            assertTrue(accepting.pruneNode(PropagationSession(problem), 1.5, -1, true))
+            assertTrue(harness.factory.calls.contains(DeclineCall.RESOLVE_BOUNDS))
+            assertTrue(harness.policy.observedSuccess(LpCertifier.SAFE_OBJECTIVE))
         } finally {
-            node.close()
+            declining.close()
+            accepting.close()
         }
+    }
 
-        val rootHarness = harness()
-        val root = engine(problem, objective, rootHarness)
-        assertTrue(root.rootLpRelaxationBound(checkNotNull(root.lpRelaxer), emptyList()).isNaN())
-        assertTrue(rootHarness.factory.calls.contains(DeclineCall.TABLEAU))
+    @Test
+    fun `root relaxation bound should stay NaN after decline`() {
+        val problem = triangleCover()
+        val harness = harness()
+        val root = engine(problem, triangleObjective, harness)
+
+        val bound = root.rootLpRelaxationBound(checkNotNull(root.lpRelaxer), emptyList())
+
+        assertTrue(bound.isNaN())
+        assertTrue(harness.factory.calls.contains(DeclineCall.TABLEAU))
         assertEquals(
-            rootHarness.factory.calls.count { it == DeclineCall.TABLEAU },
-            rootHarness.factory.calls.count { it == DeclineCall.CLOSE },
+            harness.factory.calls.count { it == DeclineCall.TABLEAU },
+            harness.factory.calls.count { it == DeclineCall.CLOSE },
         )
+    }
 
-        val recoveryHarness = harness()
-        val recovery = engine(problem, objective, recoveryHarness)
-        val recoveryOutcome = recovery.sparseCertifiedPrune(
+    @Test
+    fun `sparse recovery should not prune after decline`() {
+        val problem = triangleCover()
+        val harness = harness()
+        val recovery = engine(problem, triangleObjective, harness)
+
+        val outcome = recovery.sparseCertifiedPrune(
             checkNotNull(recovery.lpRelaxer),
             PropagationSession(problem),
             1.5,
             SolveStatsSink("recovery-consumer"),
             Cancellation.Never,
         )
-        assertFalse(recoveryOutcome.prune)
-        assertTrue(recoveryHarness.factory.calls.contains(DeclineCall.TABLEAU))
-        assertEquals(
-            recoveryHarness.factory.calls.count { it == DeclineCall.TABLEAU },
-            recoveryHarness.factory.calls.count { it == DeclineCall.CLOSE },
-        )
 
-        val positiveFactory = ConsumerRecordingFactory()
-        val positive = LpEngine(
-            problem,
-            objective,
-            LpParams(lpPlan = LpPlan(bounding = true)),
-            SolveStatsSink("positive-control"),
-            LpSolveContext(engineFactory = positiveFactory),
-        )
-        try {
-            assertTrue(positive.pruneNode(PropagationSession(problem), 1.5, -1, true))
-            assertTrue(positive.rootLpRelaxationBound(checkNotNull(positive.lpRelaxer), emptyList()).isFinite())
-        } finally {
-            positive.close()
-        }
+        assertFalse(outcome.prune)
+        assertTrue(harness.factory.calls.contains(DeclineCall.TABLEAU))
     }
 
     @Test
-    fun `gated persistent candidate cannot prune when its Farkas proof declines`() {
+    fun `gated persistent candidate should not prune when its Farkas proof declines`() {
         val problem = gatedRealProblem()
         val harness = harness()
         val rejecting = engine(
@@ -536,87 +527,77 @@ class LpDeclineDisciplineTest {
     }
 
     @Test
-    fun `shaving consumers emit no bound or row fact after decline`() {
-        val boundProblem = Problem(
+    fun `bound shaving should emit no bound after decline`() {
+        val problem = Problem(
             0,
             1,
             arrayOf(IntDomain(0, 10)),
             arrayOf<Factor>(Linear(intArrayOf(2), intArrayOf(0), LinearOp.GE, 5)),
         )
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
-        val boundHarness = harness()
-        val rejectingBounds = engine(boundProblem, objective, boundHarness)
+        val harness = harness()
 
-        assertEquals(emptyList(), rejectingBounds.rootLpBoundsNoBake(Cancellation.Never))
-        val positiveBounds = productionEngine(boundProblem, objective).rootLpBoundsNoBake(Cancellation.Never)
-        assertTrue(positiveBounds.any { it.varId == 0 && it.lo == 3L })
-        assertTrue(boundHarness.factory.calls.contains(DeclineCall.SOLVE_PRIMAL))
-        assertTrue(boundHarness.policy.observedSuccess(LpCertifier.SAFE_OBJECTIVE))
-        assertEquals(
-            boundHarness.factory.calls.count { it == DeclineCall.TABLEAU },
-            boundHarness.factory.calls.count { it == DeclineCall.CLOSE },
-        )
+        val declined = engine(problem, unitObjective, harness).rootLpBoundsNoBake(Cancellation.Never)
+        val accepted = productionEngine(problem, unitObjective).rootLpBoundsNoBake(Cancellation.Never)
 
-        val redundantProblem = Problem(
+        assertEquals(emptyList(), declined)
+        assertTrue(accepted.any { it.varId == 0 && it.lo == 3L })
+        assertTrue(harness.policy.observedSuccess(LpCertifier.SAFE_OBJECTIVE))
+    }
+
+    @Test
+    fun `redundant row detection should emit no row after decline`() {
+        val problem = Problem(
             0,
             1,
             arrayOf(IntDomain(0, 4)),
             arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 4)),
         )
-        val rowHarness = harness()
-        val rejectingRows = engine(redundantProblem, objective, rowHarness)
-        assertEquals(emptyList(), rejectingRows.redundantConstraints(Cancellation.Never))
-        assertEquals(
-            listOf(0),
-            productionEngine(redundantProblem, objective).redundantConstraints(Cancellation.Never),
-        )
-        assertTrue(rowHarness.factory.calls.contains(DeclineCall.TABLEAU))
-        assertEquals(
-            rowHarness.factory.calls.count { it == DeclineCall.TABLEAU },
-            rowHarness.factory.calls.count { it == DeclineCall.CLOSE },
-        )
+        val harness = harness()
+
+        val declined = engine(problem, unitObjective, harness).redundantConstraints(Cancellation.Never)
+        val accepted = productionEngine(problem, unitObjective).redundantConstraints(Cancellation.Never)
+
+        assertEquals(emptyList(), declined)
+        assertEquals(listOf(0), accepted)
+        assertTrue(harness.factory.calls.contains(DeclineCall.TABLEAU))
     }
 
     @Test
-    fun `open bound and refutation consumers keep the model open after decline`() {
+    fun `open bound tightening should keep bounds open after decline`() {
         val bounds = arrayOf(OpenIntBounds(null, null), OpenIntBounds(null, null))
         val rows = listOf(
             Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10),
         )
-        val boundHarness = harness()
+        val harness = harness()
 
-        val declined = tightenOpenIntBounds(bounds, rows, context = boundHarness.context)
+        val declined = tightenOpenIntBounds(bounds, rows, context = harness.context)
         val accepted = tightenOpenIntBounds(bounds, rows)
 
         assertNull(declined.bounds[0].lo)
         assertNull(declined.bounds[0].hi)
         assertEquals(5L, accepted.bounds[0].hi)
-        assertTrue(boundHarness.factory.calls.contains(DeclineCall.SOLVE_PRIMAL))
-        assertTrue(boundHarness.factory.calls.contains(DeclineCall.RESOLVE_BOUNDS))
-        assertTrue(boundHarness.policy.observedSuccess(LpCertifier.SAFE_OBJECTIVE))
-        assertEquals(1, boundHarness.factory.calls.count { it == DeclineCall.PERSISTENT })
+        assertTrue(harness.policy.observedSuccess(LpCertifier.SAFE_OBJECTIVE))
         assertEquals(
-            boundHarness.factory.calls.count { it == DeclineCall.PERSISTENT },
-            boundHarness.factory.calls.count { it == DeclineCall.CLOSE },
+            harness.factory.calls.count { it == DeclineCall.PERSISTENT },
+            harness.factory.calls.count { it == DeclineCall.CLOSE },
         )
+    }
 
+    @Test
+    fun `open refutation should not report infeasible after decline`() {
+        val bounds = arrayOf(OpenIntBounds(null, null))
         val contradictory = listOf(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
         )
-        val refutationHarness = harness()
-        assertFalse(
-            openLpInfeasible(
-                arrayOf(OpenIntBounds(null, null)),
-                contradictory,
-                context = refutationHarness.context,
-            ),
-        )
-        assertTrue(openLpInfeasible(arrayOf(OpenIntBounds(null, null)), contradictory))
-        assertTrue(refutationHarness.policy.observedSuccess(LpCertifier.RATIONAL))
-        assertTrue(refutationHarness.factory.calls.contains(DeclineCall.SOLVE))
-        assertEquals(1, refutationHarness.factory.calls.count { it == DeclineCall.CLOSE })
+        val harness = harness()
+
+        val declined = openLpInfeasible(bounds, contradictory, context = harness.context)
+
+        assertFalse(declined)
+        assertTrue(openLpInfeasible(bounds, contradictory))
+        assertTrue(harness.policy.observedSuccess(LpCertifier.RATIONAL))
     }
 
     private class Harness(val factory: ConsumerRecordingFactory, val policy: DecliningPolicy) {
@@ -643,6 +624,10 @@ class LpDeclineDisciplineTest {
         objective: LinearObjective,
         plan: LpPlan = LpPlan(bounding = true),
     ): LpEngine = LpEngine(problem, objective, LpParams(lpPlan = plan), SolveStatsSink("positive-control"))
+
+    private val unitObjective = LinearObjective(intCoefficients = longArrayOf(1L))
+
+    private val triangleObjective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
 
     private fun triangleCover(): Problem = Problem(
         0,

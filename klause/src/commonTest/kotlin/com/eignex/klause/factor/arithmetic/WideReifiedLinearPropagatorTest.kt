@@ -22,10 +22,8 @@ import kotlin.test.assertTrue
 
 class WideReifiedLinearPropagatorTest {
 
-    // 2^64 — one past the signed 64-bit range, so it can only live in the wide coefficient lane.
     private val w = parseBigInt("18446744073709551616")
 
-    // bool 0 = aux; int 0 = x, int 1 = y.
     private fun problem(factor: Factor, xHi: Long = 5, yHi: Long = 5) = Problem(
         numBoolVars = 1,
         numIntVars = 2,
@@ -34,11 +32,20 @@ class WideReifiedLinearPropagatorTest {
     )
 
     @Test
-    fun `incremental wide reification follows interior target membership through rollback`() {
+    fun `incremental wide reification should follow interior target membership through rollback`() {
         for (op in listOf(LinearOp.EQ, LinearOp.NE)) {
             for (coefficient in listOf(w, -w)) {
-                val problem = problem(ReifiedLinear(0, intArrayOf(0), arrayOf(coefficient), op,
-                    coefficient * bigIntOf(2L)), xHi = 4L, yHi = 0L)
+                val problem = problem(
+                    ReifiedLinear(
+                        0,
+                        intArrayOf(0),
+                        arrayOf(coefficient),
+                        op,
+                        coefficient * bigIntOf(2L),
+                    ),
+                    xHi = 4L,
+                    yHi = 0L,
+                )
                 val state = PropagationState(problem, Assumptions.None)
                 state.undoLogging = true
                 assertNull(state.runToFixpoint(allFactors = true))
@@ -68,7 +75,7 @@ class WideReifiedLinearPropagatorTest {
     }
 
     @Test
-    fun `nonintegral wide single term targets decide both reification polarities`() {
+    fun `nonintegral wide single term targets should decide both reification polarities`() {
         for (op in listOf(LinearOp.EQ, LinearOp.NE)) {
             val factor = ReifiedLinear(0, intArrayOf(0), arrayOf(w), op, w * bigIntOf(2L) + BIG_ONE)
             val session = PropagationSession(problem(factor, xHi = 4L, yHi = 0L))
@@ -78,7 +85,7 @@ class WideReifiedLinearPropagatorTest {
     }
 
     @Test
-    fun `wide reified linear deductions are implied by their reasons under carved holes`() {
+    fun `wide reified linear deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x1DE1)
         for (op in LinearOp.entries) {
             repeat(75) { iter ->

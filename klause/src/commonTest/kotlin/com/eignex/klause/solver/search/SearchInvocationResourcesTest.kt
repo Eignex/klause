@@ -7,7 +7,7 @@ import kotlin.test.assertSame
 
 class SearchInvocationResourcesTest {
     @Test
-    fun `resources close once in reverse registration order`() {
+    fun `resources should close once in reverse registration order`() {
         val closed = ArrayList<Int>()
         val resources = SearchInvocationResources()
         val first = resources.own(AutoCloseable { closed += 1 })
@@ -21,14 +21,24 @@ class SearchInvocationResourcesTest {
     }
 
     @Test
-    fun `cleanup attempts all resources after its first failure`() {
+    fun `cleanup should attempt all resources after its first failure`() {
         val first = IllegalStateException("first")
         val second = IllegalArgumentException("second")
         val closed = ArrayList<Int>()
         val resources = SearchInvocationResources()
         resources.own(AutoCloseable { closed += 1 })
-        resources.own(AutoCloseable { closed += 2; throw second })
-        resources.own(AutoCloseable { closed += 3; throw first })
+        resources.own(
+            AutoCloseable {
+                closed += 2
+                throw second
+            },
+        )
+        resources.own(
+            AutoCloseable {
+                closed += 3
+                throw first
+            },
+        )
 
         assertSame(first, assertFailsWith<IllegalStateException> { resources.close() })
 
@@ -38,7 +48,7 @@ class SearchInvocationResourcesTest {
     }
 
     @Test
-    fun `cleanup preserves the primary failure without self suppression`() {
+    fun `cleanup should preserve the primary failure without self suppression`() {
         val primary = IllegalArgumentException("primary")
         val cleanup = IllegalStateException("cleanup")
         val resources = SearchInvocationResources()
@@ -51,10 +61,15 @@ class SearchInvocationResourcesTest {
     }
 
     @Test
-    fun `reentrant cleanup cannot release a resource twice`() {
+    fun `reentrant cleanup should not release a resource twice`() {
         var closes = 0
         val resources = SearchInvocationResources()
-        resources.own(AutoCloseable { closes++; resources.close() })
+        resources.own(
+            AutoCloseable {
+                closes++
+                resources.close()
+            },
+        )
 
         resources.close()
 

@@ -8,7 +8,7 @@ import kotlin.test.assertFailsWith
 
 class PolynomialExpressionTest {
     @Test
-    fun `structural equality retains shared repeated subexpressions`() {
+    fun `structural equality should retain shared repeated subexpressions`() {
         var first: PolynomialExpression = PolynomialExpression.Variable(SourceRealId(0))
         var second: PolynomialExpression = PolynomialExpression.Variable(SourceRealId(0))
         repeat(30) {
@@ -20,7 +20,7 @@ class PolynomialExpressionTest {
     }
 
     @Test
-    fun `separately built deep equal structures compare without call stack recursion`() {
+    fun `separately built deep equal expressions should compare without call stack recursion`() {
         var first: PolynomialExpression = PolynomialExpression.Variable(SourceRealId(0))
         var second: PolynomialExpression = PolynomialExpression.Variable(SourceRealId(0))
         repeat(1000) {
@@ -33,7 +33,7 @@ class PolynomialExpressionTest {
     }
 
     @Test
-    fun `rational coefficient identity uses reduced values and a positive denominator`() {
+    fun `rational coefficient identity should use reduced values and a positive denominator`() {
         val reduced = PolynomialExpression.Constant.of(parseBigInt("123456789012345678901234567890"), bigIntOf(8))
         val equivalent = PolynomialExpression.Constant.of(parseBigInt("-246913578024691357802469135780"), bigIntOf(-16))
 
@@ -42,7 +42,7 @@ class PolynomialExpressionTest {
     }
 
     @Test
-    fun `zero coefficients have one structural identity`() {
+    fun `zero coefficients should have one structural identity`() {
         val zero = PolynomialExpression.Constant.of(bigIntOf(0))
         val fraction = PolynomialExpression.Constant.of(bigIntOf(0), bigIntOf(-29))
 
@@ -50,7 +50,7 @@ class PolynomialExpressionTest {
     }
 
     @Test
-    fun `polynomial operand storage is independent of caller mutations`() {
+    fun `polynomial operand storage should be independent of caller mutations`() {
         val variable = PolynomialExpression.Variable(SourceRealId(0))
         val operands = mutableListOf<PolynomialExpression>(variable, variable)
         val sum = PolynomialExpression.Sum(operands)
@@ -65,11 +65,12 @@ class PolynomialExpressionTest {
     }
 
     @Test
-    fun `alias remaps retain repeated variables and exact signed coefficients`() {
+    fun `alias remaps should retain repeated variables and exact signed coefficients`() {
         val coefficient = PolynomialExpression.Constant.of(bigIntOf(-1), bigIntOf(3))
         val expression = PolynomialExpression.Product(
             listOf(
-                coefficient, PolynomialExpression.Variable(SourceRealId(0)),
+                coefficient,
+                PolynomialExpression.Variable(SourceRealId(0)),
                 PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(1)), 3),
             ),
         )
@@ -80,7 +81,8 @@ class PolynomialExpressionTest {
         assertEquals(
             PolynomialExpression.Product(
                 listOf(
-                    coefficient, PolynomialExpression.Variable(SourceRealId(4)),
+                    coefficient,
+                    PolynomialExpression.Variable(SourceRealId(4)),
                     PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(4)), 3),
                 ),
             ),
@@ -89,7 +91,7 @@ class PolynomialExpressionTest {
     }
 
     @Test
-    fun `removing a referenced polynomial real is rejected`() {
+    fun `removing a referenced polynomial real should be rejected`() {
         val expression = PolynomialExpression.Variable(SourceRealId(0))
 
         assertFailsWith<IllegalArgumentException> {
@@ -98,14 +100,14 @@ class PolynomialExpressionTest {
     }
 
     @Test
-    fun `negative powers are rejected`() {
+    fun `negative powers should be rejected`() {
         assertFailsWith<IllegalArgumentException> {
             PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), -1)
         }
     }
 
     @Test
-    fun `zero coefficient denominators are rejected`() {
+    fun `zero coefficient denominators should be rejected`() {
         assertFailsWith<IllegalArgumentException> {
             PolynomialExpression.Constant.of(bigIntOf(1), bigIntOf(0))
         }

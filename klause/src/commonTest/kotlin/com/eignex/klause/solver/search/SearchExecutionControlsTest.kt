@@ -15,7 +15,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class SearchExecutionControlsTest {
     @Test
-    fun `invocation controls preserve the caller meter and deadline`() {
+    fun `invocation controls should preserve the caller meter and deadline`() {
         var charged = 0L
         val deadline = Cancellation.after(1000.milliseconds)
         val meter = WorkMeter { charged += it }
@@ -35,7 +35,7 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `expired deadline has a timeout cause`() {
+    fun `expired deadline should have a timeout cause`() {
         val controls = SearchExecutionControlAdapter(Cancellation.after((-1).milliseconds))
         val session = SearchSession(emptyList(), executionControls = controls)
 
@@ -45,7 +45,7 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `external cancellation has a cancellation cause`() {
+    fun `external cancellation should have a cancellation cause`() {
         val controls = SearchExecutionControlAdapter(Cancellation { true })
         val session = SearchSession(emptyList(), executionControls = controls)
 
@@ -55,7 +55,7 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `native work exhaustion keeps its own cause and cumulative currency`() {
+    fun `native work exhaustion should keep its own cause and cumulative currency`() {
         val work = OpenTheoryWorkSink(1)
         val controls = SearchExecutionControlAdapter(accounting = OpenTheoryExecutionAccounting(work))
         val session = SearchSession(emptyList(), executionControls = controls)
@@ -70,7 +70,7 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `check exhaustion is distinct from work exhaustion`() {
+    fun `check exhaustion should be distinct from work exhaustion`() {
         val work = OpenTheoryWorkSink()
         val component = object : SearchComponent {
             override fun check(context: SearchContext): ComponentCheck =
@@ -86,7 +86,7 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `decision exhaustion is distinct from work exhaustion`() {
+    fun `decision exhaustion should be distinct from work exhaustion`() {
         val controls = SearchExecutionControlAdapter()
         val session = SearchSession(emptyList(), executionControls = controls)
 
@@ -96,13 +96,13 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `representation decline does not imply resource exhaustion`() {
+    fun `representation decline should not imply resource exhaustion`() {
         val controls = SearchExecutionControlAdapter()
         val session = SearchSession(
             listOf(object : SearchComponent {
-            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
-        }),
-            executionControls = controls
+                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
+            }),
+            executionControls = controls,
         )
 
         assertIs<SearchResult.Indeterminate>(session.solve(0))
@@ -111,18 +111,21 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `injected native limits retain their typed refusal causes`() {
+    fun `injected native limits should retain their typed refusal causes`() {
         for (cause in listOf(SearchStopCause.CheckAllowance, SearchStopCause.DecisionAllowance)) {
             val controls = SearchExecutionControlAdapter(
                 accounting = object : SearchExecutionAccounting {
-                override val stopCause = cause
-                override fun consumeCheck(): Boolean = false
-                override fun canCommitDecision(): Boolean = false
-            }
+                    override val stopCause = cause
+                    override fun consumeCheck(): Boolean = false
+                    override fun canCommitDecision(): Boolean = false
+                },
             )
 
-            val accepted = if (cause == SearchStopCause.CheckAllowance) controls.consumeCheck()
-                else controls.canCommitDecision()
+            val accepted = if (cause == SearchStopCause.CheckAllowance) {
+                controls.consumeCheck()
+            } else {
+                controls.canCommitDecision()
+            }
 
             assertFalse(accepted)
 
@@ -131,17 +134,20 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `an unresolved branch retains its cause after a later complete check`() {
+    fun `an unresolved branch should retain its cause after a later complete check`() {
         val controls = SearchExecutionControlAdapter()
-        val session = SearchSession(listOf(object : SearchComponent {
-            override fun check(context: SearchContext): ComponentCheck = if (context.boolValue(0) == true) {
-                controls.reportStop(SearchStopCause.OperationAllowance)
-                ComponentCheck.Indeterminate
-            } else {
-                controls.beginOperation()
-                ComponentCheck.Infeasible()
-            }
-        }), executionControls = controls)
+        val session = SearchSession(
+            listOf(object : SearchComponent {
+                override fun check(context: SearchContext): ComponentCheck = if (context.boolValue(0) == true) {
+                    controls.reportStop(SearchStopCause.OperationAllowance)
+                    ComponentCheck.Indeterminate
+                } else {
+                    controls.beginOperation()
+                    ComponentCheck.Infeasible()
+                }
+            }),
+            executionControls = controls,
+        )
 
         assertIs<SearchResult.Indeterminate>(session.solve(1))
 
@@ -149,7 +155,7 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `an expired slice does not become lifetime cancellation after resumption`() {
+    fun `an expired slice should not become lifetime cancellation after resumption`() {
         var cancelled = false
         var firstCheck = true
         val controls = SearchExecutionControlAdapter(Cancellation { cancelled })
@@ -163,9 +169,12 @@ class SearchExecutionControlsTest {
             }
         }
         val session = SearchSession(listOf(component), executionControls = controls)
-        val run = session.openRun(1, lifecycle = object : SearchRunLifecycle {
-            override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
-        })
+        val run = session.openRun(
+            1,
+            lifecycle = object : SearchRunLifecycle {
+                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+            },
+        )
         assertIs<SearchRunEvent.Paused>(run.next())
         cancelled = false
 
@@ -175,11 +184,14 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `a fresh traversal clears only its own decision diagnostic`() {
+    fun `a fresh traversal should clear only its own decision diagnostic`() {
         val controls = SearchExecutionControlAdapter()
-        val session = SearchSession(listOf(object : SearchComponent {
-            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
-        }), executionControls = controls)
+        val session = SearchSession(
+            listOf(object : SearchComponent {
+                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
+            }),
+            executionControls = controls,
+        )
         assertIs<SearchResult.Indeterminate>(session.solve(1, SearchSolveParams(maxDecisions = 0)))
         assertEquals(SearchStopCause.DecisionAllowance, controls.stopCause)
 
@@ -189,7 +201,7 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `native allowance exhaustion precedes concurrent external cancellation`() {
+    fun `native allowance exhaustion should precede concurrent external cancellation`() {
         val work = OpenTheoryWorkSink(0)
         work.hasAllowance()
         val controls = SearchExecutionControlAdapter(Cancellation { true }, OpenTheoryExecutionAccounting(work))
@@ -198,7 +210,7 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `controls cannot be replaced after component initialization`() {
+    fun `controls should not be replaceable after component initialization`() {
         val session = SearchSession(emptyList())
         session.initialize()
 
@@ -208,7 +220,7 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `a local operation stop preserves the containing allowance cause`() {
+    fun `a local operation stop should preserve the containing allowance cause`() {
         val controls = SearchExecutionControlAdapter()
         controls.reportStop(SearchStopCause.CheckAllowance)
 
@@ -218,7 +230,7 @@ class SearchExecutionControlsTest {
     }
 
     @Test
-    fun `a new component operation clears only a local decline`() {
+    fun `a new component operation should clear only a local decline`() {
         val controls = SearchExecutionControlAdapter()
         controls.reportStop(SearchStopCause.OperationAllowance)
 

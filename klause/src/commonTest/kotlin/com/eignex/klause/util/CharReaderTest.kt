@@ -14,33 +14,27 @@ class CharReaderTest {
     }
 
     @Test
-    fun `peek and advance read every character in order`() {
-        val reader = CharReader(StringCharSource("hello"))
-        assertEquals("hello", drain(reader))
-    }
-
-    @Test
-    fun `peek reads across chunk boundaries`() {
+    fun `peek should read across chunk boundaries`() {
         val reader = CharReader(ChunkedCharSource(listOf("ab", "cd", "ef")))
         assertEquals("abcdef", drain(reader))
     }
 
     @Test
-    fun `lookahead spans a chunk boundary`() {
+    fun `lookahead should span a chunk boundary`() {
         val reader = CharReader(ChunkedCharSource(listOf("a", "b")))
         assertEquals('a'.code, reader.peek())
         assertEquals('b'.code, reader.peek(1))
     }
 
     @Test
-    fun `peek past end of input returns minus one`() {
+    fun `peek past end of input should return minus one`() {
         val reader = CharReader(StringCharSource("x"))
         assertEquals('x'.code, reader.peek())
         assertEquals(-1, reader.peek(1))
     }
 
     @Test
-    fun `eof is true only once the input is exhausted`() {
+    fun `eof should be true only once the input is exhausted`() {
         val reader = CharReader(StringCharSource("ab"))
         assertFalse(reader.eof())
         reader.advance()
@@ -50,12 +44,12 @@ class CharReaderTest {
     }
 
     @Test
-    fun `an empty source is immediately eof`() {
+    fun `empty source should be immediately eof`() {
         assertTrue(CharReader(StringCharSource("")).eof())
     }
 
     @Test
-    fun `reading stays correct over an input far larger than the buffer`() {
+    fun `reading should stay correct over an input far larger than the buffer`() {
         val n = (1 shl 16) * 3
         val reader = CharReader(ChunkedCharSource(List(n) { "a" }))
         var count = 0

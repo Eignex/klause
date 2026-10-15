@@ -13,7 +13,7 @@ import org.junit.jupiter.api.condition.OS
 class XcspArchiveReplayTest {
     @Test
     @EnabledOnOs(OS.LINUX)
-    fun `checker diagnostics admit only successful structured source receipts`() {
+    fun `checker diagnostics should admit only successful structured source receipts`() {
         val directory = Files.createTempDirectory("archive-checker-receipt-").toFile()
         try {
             val worker = directory.resolve("replay.py")
@@ -41,7 +41,7 @@ class XcspArchiveReplayTest {
 
     @Test
     @EnabledOnOs(OS.LINUX)
-    fun `archive extraction accepts distribution roots and refuses escaping members`() {
+    fun `archive extraction should accept distribution roots and refuse escaping members`() {
         val directory = Files.createTempDirectory("archive-extraction-").toFile()
         try {
             val worker = directory.resolve("replay.py")
@@ -77,14 +77,14 @@ class XcspArchiveReplayTest {
     }
 
     @Test
-    fun `an oversized compressed request is rejected before decoding`() {
+    fun `an oversized compressed request should be rejected before decoding`() {
         assertFailsWith<IllegalArgumentException> {
             XcspArchiveReplay.decode("a".repeat(XcspArchiveReplay.MAX_COMPRESSED_BYTES * 2))
         }
     }
 
     @Test
-    fun `an expanded request cannot exceed the decompression allowance`() {
+    fun `an expanded request should not exceed the decompression allowance`() {
         val output = ByteArrayOutputStream()
         GZIPOutputStream(output).use { it.write(ByteArray(XcspArchiveReplay.MAX_REQUEST_BYTES + 1)) }
 
@@ -94,7 +94,7 @@ class XcspArchiveReplayTest {
     }
 
     @Test
-    fun `duplicate request keys cannot change replay admission`() {
+    fun `duplicate request keys should not change replay admission`() {
         val output = ByteArrayOutputStream()
         GZIPOutputStream(output).use { it.write("{\"archives\":[],\"archives\":[{}]}".toByteArray()) }
 

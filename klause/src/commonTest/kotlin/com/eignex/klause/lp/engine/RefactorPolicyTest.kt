@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class RefactorPolicyTest {
     @Test
-    fun `hard cap triggers exactly after sixty four accepted updates`() {
+    fun `hard cap should trigger exactly after sixty four accepted updates`() {
         val policy = RefactorPolicy()
         policy.recordFactorization(factorNnz = 100, buildWork = 10_000L, pivotSpread = 0.5)
 
@@ -26,7 +26,7 @@ class RefactorPolicyTest {
     }
 
     @Test
-    fun `sampled residual triggers once until the basis generation advances`() {
+    fun `sampled residual should trigger once until the basis generation advances`() {
         val policy = RefactorPolicy()
         policy.recordFactorization(factorNnz = 20, buildWork = 1_000L, pivotSpread = 0.5)
         repeat(8) { policy.recordBasisSolve(10L) }
@@ -46,7 +46,7 @@ class RefactorPolicyTest {
     }
 
     @Test
-    fun `adaptive triggers require eight updates and use fresh factor fill`() {
+    fun `adaptive triggers should require eight updates and use fresh factor fill`() {
         val policy = RefactorPolicy()
         policy.recordFactorization(factorNnz = 100, buildWork = 10_000L, pivotSpread = 0.25)
         repeat(7) { policy.recordAcceptedUpdate(1L) }
@@ -58,7 +58,7 @@ class RefactorPolicyTest {
     }
 
     @Test
-    fun `unknown and saturated work cannot create a synthetic trigger`() {
+    fun `unknown and saturated work should not create a synthetic trigger`() {
         val unknown = RefactorPolicy()
         unknown.recordFactorization(factorNnz = 10, buildWork = null, pivotSpread = Double.NaN)
         repeat(8) {
@@ -80,7 +80,7 @@ class RefactorPolicyTest {
     }
 
     @Test
-    fun `aggregate overflow disables adaptive work triggers`() {
+    fun `aggregate overflow should disable adaptive work triggers`() {
         val policy = RefactorPolicy()
         policy.recordFactorization(factorNnz = 10, buildWork = 100L, pivotSpread = 1.0)
         repeat(8) { policy.recordAcceptedUpdate(0L) }
@@ -93,7 +93,7 @@ class RefactorPolicyTest {
     }
 
     @Test
-    fun `backend advice precedes hard cap and numerical policy triggers`() {
+    fun `backend advice should precede hard cap and numerical policy triggers`() {
         val policy = RefactorPolicy()
         policy.recordFactorization(factorNnz = 1, buildWork = 1L, pivotSpread = 1.0)
         repeat(64) { policy.recordAcceptedUpdate(1L) }

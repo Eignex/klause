@@ -8,9 +8,10 @@ import kotlin.test.assertNull
 
 class QuadraticCandidatesTest {
     @Test
-    fun `rational reconstruction certifies a coupled convex stationary point`() {
+    fun `rational reconstruction should certify a coupled convex stationary point`() {
         val model = QuadraticModel(
-            listOf(q(-4), q(-6)), listOf(listOf(q(2), q(1)), listOf(q(1), q(2))),
+            listOf(q(-4), q(-6)),
+            listOf(listOf(q(2), q(1)), listOf(q(1), q(2))),
         )
         val checker = QuadraticCertification()
 
@@ -22,9 +23,10 @@ class QuadraticCandidatesTest {
     }
 
     @Test
-    fun `active source row reconstructs a boundary optimum`() {
+    fun `active source row should reconstruct a boundary optimum`() {
         val model = QuadraticModel(
-            listOf(q(0)), listOf(listOf(q(2))),
+            listOf(q(0)),
+            listOf(listOf(q(2))),
             rows = listOf(QuadraticRow(listOf(q(-1)), q(-2), QuadraticRowRelation.LE)),
         )
 
@@ -36,9 +38,10 @@ class QuadraticCandidatesTest {
     }
 
     @Test
-    fun `equality rows remain active without a numerical selection`() {
+    fun `equality rows should remain active without a numerical selection`() {
         val model = QuadraticModel(
-            listOf(q(0)), listOf(listOf(q(2))),
+            listOf(q(0)),
+            listOf(listOf(q(2))),
             rows = listOf(QuadraticRow(listOf(q(1)), q(3), QuadraticRowRelation.EQ)),
         )
 
@@ -49,9 +52,11 @@ class QuadraticCandidatesTest {
     }
 
     @Test
-    fun `inconsistent active equations produce no candidate`() {
+    fun `inconsistent active equations should produce no candidate`() {
         val model = QuadraticModel(
-            listOf(q(0)), listOf(listOf(q(2))), rows = listOf(
+            listOf(q(0)),
+            listOf(listOf(q(2))),
+            rows = listOf(
                 QuadraticRow(listOf(q(1)), q(2), QuadraticRowRelation.EQ),
                 QuadraticRow(listOf(q(1)), q(3), QuadraticRowRelation.EQ),
             ),
@@ -61,9 +66,10 @@ class QuadraticCandidatesTest {
     }
 
     @Test
-    fun `numerical active proposal still requires exact certificate verification`() {
+    fun `numerical active proposal should still require exact certificate verification`() {
         val model = QuadraticModel(
-            listOf(q(0)), listOf(listOf(q(2))),
+            listOf(q(0)),
+            listOf(listOf(q(2))),
             rows = listOf(QuadraticRow(listOf(q(-1)), q(-2), QuadraticRowRelation.LE)),
         )
         val candidates = QuadraticCandidates()

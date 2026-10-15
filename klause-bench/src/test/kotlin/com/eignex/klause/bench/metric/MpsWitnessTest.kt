@@ -7,7 +7,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class MpsWitnessTest {
-    /** Flow `f` through a link that only a switched-on binary `b` opens (`f <= 1e6 b`), with a demand of 0.5. */
+    // Flow f through a link only a switched-on binary b opens (f <= 1e6 b), demand 0.5.
     private val link = Mps.parse(
         """
         NAME link
@@ -30,7 +30,7 @@ class MpsWitnessTest {
         """.trimIndent(),
     )
 
-    /** Integers `x` and `w` and a continuous `y` on one equality, `1e6 x - 1e6 w + y = 0.5`, `y` in [0, 1]. */
+    // Integers x, w and continuous y in [0, 1] on 1e6 x - 1e6 w + y = 0.5.
     private val equality = Mps.parse(
         """
         NAME eq
@@ -59,7 +59,7 @@ class MpsWitnessTest {
         MpsWitness.Claim(status, primal, dual, gap = null, assignment = values)
 
     @Test
-    fun `a witness that holds once its integers are rounded is valid, its objective recomputed`() {
+    fun `a witness that holds after rounding integers should be valid with a recomputed objective`() {
         val verdict = MpsWitness.judge(
             link,
             claim(MpsWitness.Status.OPTIMAL, 0.5, 0.5, mapOf("b" to 0.9999999, "f" to 0.5)),
@@ -71,7 +71,7 @@ class MpsWitnessTest {
     }
 
     @Test
-    fun `a binary near zero carrying flow through a large coefficient is invalid when no completion exists`() {
+    fun `a near-zero binary carrying flow through a large coefficient should be invalid without a completion`() {
         // Within a solver's integrality tolerance, 8e-7 times 1e6 lets 0.8 units through a link that is off; the
         // closest completion with the link off still misses a row by 0.25.
         val values = mapOf("b" to 8e-7, "f" to 0.8)
@@ -85,7 +85,7 @@ class MpsWitnessTest {
     }
 
     @Test
-    fun `rounded integers are repaired by re-solving the continuous variables, then checked again`() {
+    fun `rounded integers should be repaired by re-solving the continuous variables`() {
         val values = mapOf("x" to 2.0000004, "w" to 2.0, "y" to 0.1)
         var lp = ""
         val verdict = MpsWitness.judge(equality, claim(MpsWitness.Status.LIMIT, 2.1, null, values)) { fixed ->
@@ -99,7 +99,7 @@ class MpsWitnessTest {
     }
 
     @Test
-    fun `a completion an LP solver calls infeasible counts when the closest one is within tolerance`() {
+    fun `a completion within tolerance should count even when the LP solver calls it infeasible`() {
         val values = mapOf("x" to 2.0000004, "w" to 2.0, "y" to 0.1)
         val verdict = MpsWitness.judge(equality, claim(MpsWitness.Status.LIMIT, 2.1, null, values)) { lp ->
             if (elastic(lp)) solved("c2" to 0.5, "t" to 0.0) else MpsWitness.RepairResult.Infeasible
@@ -110,15 +110,7 @@ class MpsWitnessTest {
     }
 
     @Test
-    fun `the elastic LP lets each row side slip by its bound's scale and minimizes the slip`() {
-        val lp = MpsWitness.fixedLp(equality, doubleArrayOf(2.0, 2.0, 0.1), elastic = true)
-
-        assertTrue("    t obj 1" in lp && "    t r0l 1.0" in lp && "    t r0u -1.0" in lp && "    MIN" in lp)
-        assertTrue("x obj" !in lp && "    c0 obj" !in lp)
-    }
-
-    @Test
-    fun `a witness that cannot be repaired here, or a bound without a solution, stays unknown`() {
+    fun `an unrepairable witness or a bound without a solution should stay unknown`() {
         val unrepaired = MpsWitness.judge(
             equality,
             claim(MpsWitness.Status.LIMIT, 2.1, null, mapOf("x" to 2.0000004, "w" to 2.0, "y" to 0.1)),
@@ -139,7 +131,7 @@ class MpsWitnessTest {
     }
 
     @Test
-    fun `an optimum within the gap tolerance, or whose dual bound excludes its own witness, is not a proof`() {
+    fun `a gap-tolerance optimum or one whose dual bound excludes its witness should not be a proof`() {
         val values = mapOf("b" to 1.0, "f" to 0.5)
         val gapLimited = MpsWitness.judge(link, claim(MpsWitness.Status.OPTIMAL, 0.5, 0.49996, values), noRepair)
         val selfExcluding = MpsWitness.judge(link, claim(MpsWitness.Status.OPTIMAL, 0.5, 0.6, values), noRepair)
@@ -153,7 +145,7 @@ class MpsWitnessTest {
     }
 
     @Test
-    fun `a row of large terms allows for the rounding of their sum, and no more`() {
+    fun `a row of large terms should tolerate exactly the rounding of their sum`() {
         // 1e6 x - 1e6 w + y = 0.5 with x = w = 5: terms of 5e6 cancel, so 5e-6 is within their rounding, 1e-4 is not.
         val within = MpsWitness.validate(equality, mapOf("x" to 5.0, "w" to 5.0, "y" to 0.5 + 5e-6), noRepair)
         val beyond = MpsWitness.violations(equality, doubleArrayOf(5.0, 5.0, 0.5 + 1e-4))

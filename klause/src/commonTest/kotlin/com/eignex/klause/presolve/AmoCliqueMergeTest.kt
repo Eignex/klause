@@ -13,7 +13,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class AmoCliqueMergeTest {
-
     private fun pos(v: Int) = Lit.make(v, true)
     private fun neg(v: Int) = Lit.make(v, false)
     private fun clause(vararg lits: Int) = Clause(lits)
@@ -55,7 +54,7 @@ class AmoCliqueMergeTest {
     private fun cardinalities(p: Problem) = p.factors.filterIsInstance<Cardinality>().size
 
     @Test
-    fun `keeps clauses when cancellation follows clique analysis`() {
+    fun `clauses should be kept when cancellation follows clique analysis`() {
         val problem = Problem(
             3,
             0,
@@ -70,17 +69,14 @@ class AmoCliqueMergeTest {
     }
 
     @Test
-    fun `merges a triangle of binary clauses into one at-most-one`() {
-        // (a∨b) ∧ (a∨c) ∧ (b∨c) ≡ at-most-one of {¬a,¬b,¬c}: three binary clauses collapse to one.
+    fun `a triangle of binary clauses should merge into one at-most-one`() {
         val reduced = checkMerge(3, listOf(clause(pos(0), pos(1)), clause(pos(0), pos(2)), clause(pos(1), pos(2))))
-        assertEquals(0, clauses(reduced), "the binary clauses are removed")
-        assertEquals(1, cardinalities(reduced), "one at-most-one replaces them")
+        assertEquals(0, clauses(reduced))
+        assertEquals(1, cardinalities(reduced))
     }
 
     @Test
-    fun `folds an at-most-one clique plus a matching clause into an exactly-one`() {
-        // The triangle gives at-most-one of {¬a,¬b,¬c}; the clause (¬a∨¬b∨¬c) is at-least-one over the
-        // same literals. Together they are exactly-one, replacing all four constraints.
+    fun `an at-most-one clique plus a matching clause should fold into an exactly-one`() {
         val reduced = checkMerge(
             3,
             listOf(
@@ -90,15 +86,15 @@ class AmoCliqueMergeTest {
                 clause(neg(0), neg(1), neg(2)),
             ),
         )
-        assertEquals(0, clauses(reduced), "the clauses fold away")
+        assertEquals(0, clauses(reduced))
         val cards = reduced.factors.filterIsInstance<Cardinality>()
         assertEquals(1, cards.size)
-        assertEquals(1, cards[0].min, "an exactly-one is materialised")
+        assertEquals(1, cards[0].min)
         assertEquals(1, cards[0].max)
     }
 
     @Test
-    fun `preserves the feasible set on a mixed formula`() {
+    fun `clique merging should preserve the feasible set on a mixed formula`() {
         checkMerge(
             4,
             listOf(

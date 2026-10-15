@@ -17,7 +17,7 @@ class TriangularBoundsTest {
     private fun sides(vararg v: Long?): Array<BigInt?> = Array(v.size) { i -> v[i]?.let { big(it) } }
 
     @Test
-    fun `a later row bounds its pivot from the column already bounded`() {
+    fun `later row should bound its pivot from an already bounded column`() {
         // y0 in [0, 10]; y0 + y1 in [0, 12]  =>  y1 <= 12 - 0 = 12 and y1 >= 0 - 10 = -10.
         val h = sparseRows(longArrayOf(1, 0), longArrayOf(1, 1))
         val b = triangularBounds(h, 2, sides(0, 0), sides(10, 12))
@@ -26,7 +26,7 @@ class TriangularBoundsTest {
     }
 
     @Test
-    fun `a negative pivot exchanges the two sides`() {
+    fun `negative pivot should exchange the two sides`() {
         // -2·y0 in [-4, 6]  =>  y0 in [ceil(6 / -2), floor(-4 / -2)] = [-3, 2].
         val b = triangularBounds(sparseRows(longArrayOf(-2)), 1, sides(-4), sides(6))
         assertEquals(big(-3), b.lo[0])
@@ -34,7 +34,7 @@ class TriangularBoundsTest {
     }
 
     @Test
-    fun `division rounds inward so the bound admits no extra integer`() {
+    fun `division should round inward so the bound admits no extra integer`() {
         // 3·y0 <= 7  =>  y0 <= 2, not 2.33; 3·y0 >= -7  =>  y0 >= -2.
         val b = triangularBounds(sparseRows(longArrayOf(3)), 1, sides(-7), sides(7))
         assertEquals(big(-2), b.lo[0])
@@ -42,28 +42,27 @@ class TriangularBoundsTest {
     }
 
     @Test
-    fun `an unbounded row side leaves that direction open`() {
+    fun `unbounded row side should leave that direction open`() {
         val b = triangularBounds(sparseRows(longArrayOf(1)), 1, sides(null), sides(5))
-        assertNull(b.lo[0], "no lower bound is implied")
+        assertNull(b.lo[0])
         assertEquals(big(5), b.hi[0])
     }
 
     @Test
-    fun `an open earlier column leaves the pivot open on the side it feeds`() {
+    fun `open earlier column should leave the pivot open on the side it feeds`() {
         // y0 is open above; y0 + y1 <= 12 then implies no lower bound for y1.
         val h = sparseRows(longArrayOf(1, 0), longArrayOf(1, 1))
         val b = triangularBounds(h, 2, sides(0, 0), sides(null, 12))
         assertNull(b.hi[0])
-        assertNull(b.lo[1], "an open rest-term cannot bound the pivot below")
+        assertNull(b.lo[1])
         assertEquals(big(12), b.hi[1])
     }
 
     @Test
-    fun `bounds past Long are derived exactly`() {
+    fun `bounds past Long should be derived exactly`() {
         // 8·y0 <= 2^70, whose bound no Long domain could hold.
         val huge = BIG_ONE shl 70
         val b = triangularBounds(sparseRows(longArrayOf(8)), 1, sides(0), arrayOf(huge))
         assertEquals(BIG_ONE shl 67, b.hi[0])
     }
-
 }

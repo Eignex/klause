@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 
 class AbsTest {
     @Test
-    fun `finite solutions agree with the source absolute value over domains with holes`() {
+    fun `finite solutions should agree with the source absolute value over domains with holes`() {
         val source = Problem(
             0,
             2,
@@ -26,19 +26,19 @@ class AbsTest {
 
         assertEquals(
             setOf(
-            listOf(-4L, 4L),
-            listOf(-1L, 1L),
-            listOf(0L, 0L),
-            listOf(1L, 1L),
-            listOf(2L, 2L),
-            listOf(4L, 4L),
-        ),
-            solutions
+                listOf(-4L, 4L),
+                listOf(-1L, 1L),
+                listOf(0L, 0L),
+                listOf(1L, 1L),
+                listOf(2L, 2L),
+                listOf(4L, 4L),
+            ),
+            solutions,
         )
     }
 
     @Test
-    fun `inverse filtering removes unsupported signs and magnitudes`() {
+    fun `inverse filtering should remove unsupported signs and magnitudes`() {
         val source = Problem(0, 2, arrayOf(IntDomain(-5, 5).excludeValue(4), IntDomain(3, 4)), arrayOf(Abs(0, 1)))
         val session = PropagationSession(source)
 
@@ -46,7 +46,7 @@ class AbsTest {
     }
 
     @Test
-    fun `minimum signed operand has no finite absolute value`() {
+    fun `minimum signed operand should have no finite absolute value`() {
         val source = Problem(
             0,
             2,
@@ -58,14 +58,15 @@ class AbsTest {
     }
 
     @Test
-    fun `maximum magnitude remains representable`() {
+    fun `maximum magnitude should remain representable`() {
         val source = Problem(
-            0, 2,
+            0,
+            2,
             arrayOf(
-            IntDomain(-Long.MAX_VALUE, -Long.MAX_VALUE),
-            IntDomain(0L, Long.MAX_VALUE),
-        ),
-            arrayOf(Abs(0, 1))
+                IntDomain(-Long.MAX_VALUE, -Long.MAX_VALUE),
+                IntDomain(0L, Long.MAX_VALUE),
+            ),
+            arrayOf(Abs(0, 1)),
         )
         val session = PropagationSession(source)
 
@@ -74,7 +75,7 @@ class AbsTest {
     }
 
     @Test
-    fun `result aliases retain precisely the nonnegative solutions`() {
+    fun `result aliases should retain precisely the nonnegative solutions`() {
         val source = Problem(0, 1, arrayOf(IntDomain(-2, 2)), arrayOf(Abs(0, 0)))
 
         val solutions = BacktrackSolver(source.bake()).enumerate().map { it.ints.single() }.toSet()
@@ -83,7 +84,7 @@ class AbsTest {
     }
 
     @Test
-    fun `noninjective remapping keeps both semantic roles`() {
+    fun `noninjective remapping should keep both semantic roles`() {
         val source = Abs(0, 1)
         val mapping = VarRemap(intArrayOf(), intArrayOf(2, 2))
         val mapped = source.remap(mapping)

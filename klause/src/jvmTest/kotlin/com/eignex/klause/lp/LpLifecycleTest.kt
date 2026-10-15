@@ -15,7 +15,6 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpBound
 import com.eignex.klause.lp.engine.ComponentLpSolverCapability
-import com.eignex.klause.lp.engine.RetainedComponentLpSolverCapability
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.ExactLpWitness
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -33,6 +32,7 @@ import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpCertificationPolicy
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.lp.engine.RetainedComponentLpSolverCapability
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.propagation.Assumptions
@@ -138,8 +138,12 @@ private class LifecycleFactory : LpEngineFactory {
         }
     }
 
-    override fun newRetainedComponentSolver(model: LpModel, parts: List<LpNeighborhood>, solvers: List<LpSolver>,
-        isolated: IntArray): RetainedComponentLpSolverCapability {
+    override fun newRetainedComponentSolver(
+        model: LpModel,
+        parts: List<LpNeighborhood>,
+        solvers: List<LpSolver>,
+        isolated: IntArray,
+    ): RetainedComponentLpSolverCapability {
         val delegate = ProductionLpEngineFactory.newRetainedComponentSolver(model, parts, solvers, isolated)
         val record = record(LifecycleKind.COMPONENT)
         return object : RetainedComponentLpSolverCapability by delegate {
@@ -251,7 +255,7 @@ private class LifecycleFactory : LpEngineFactory {
 
 class LpLifecycleTest {
     @Test
-    fun `solve closes persistent solvers before returning`() {
+    fun `solve should close persistent solvers before returning`() {
         val factory = LifecycleFactory()
         val solver = BacktrackSolver(enumerationProblem().bake(), context(factory))
 
@@ -261,7 +265,7 @@ class LpLifecycleTest {
     }
 
     @Test
-    fun `LP refuted UNSAT terminal closes its persistent solver`() {
+    fun `LP refuted UNSAT terminal should close its persistent solver`() {
         val factory = LifecycleFactory()
         val solver = BacktrackSolver(lpInfeasibleProblem().bake(), context(factory))
 
@@ -271,7 +275,7 @@ class LpLifecycleTest {
     }
 
     @Test
-    fun `paused resumable search retains factors until explicit close`() {
+    fun `paused resumable search should retain factors until explicit close`() {
         val factory = LifecycleFactory()
         val search = BacktrackSolver(wideProblem().bake(), context(factory)).resumable(
             objective(),
@@ -283,7 +287,7 @@ class LpLifecycleTest {
         assertFalse(beforeResume.closed)
         val operations = beforeResume.operations
 
-        // A slice can repay an earlier one's overrun without exploring, so resume until the search moves on.
+        // A slice can repay an earlier overrun without exploring.
         repeat(RESUME_ATTEMPTS) {
             if (beforeResume.operations == operations) {
                 assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceNodes = 1L) {})
@@ -299,7 +303,7 @@ class LpLifecycleTest {
     }
 
     @Test
-    fun `repair rebind failure closes retained factors and preserves the primary failure`() {
+    fun `repair rebind failure should close retained factors and keep the primary failure`() {
         var starts = 0
         val exchange = object : ClauseExchange {
             override fun onRestart(session: PropagationSession) = Unit
@@ -333,7 +337,7 @@ class LpLifecycleTest {
     }
 
     @Test
-    fun `callback failure closes the resumable owner and preserves the primary failure`() {
+    fun `callback failure should close the resumable owner and keep the primary failure`() {
         val factory = LifecycleFactory().also { it.failPersistentClose = true }
         val search = BacktrackSolver(wideProblem().bake(), context(factory)).resumable(
             objective(),
@@ -350,7 +354,7 @@ class LpLifecycleTest {
     }
 
     @Test
-    fun `replacement closes the displaced solver`() {
+    fun `replacement should close the displaced solver`() {
         val factory = LifecycleFactory()
         val engine = reifiedEngine(factory)
         engine.pruneNode(PropagationSession(reifiedProblem()), Double.POSITIVE_INFINITY, -1, true)
@@ -365,7 +369,7 @@ class LpLifecycleTest {
     }
 
     @Test
-    fun `close failure does not prevent releasing the other owned solver`() {
+    fun `close failure should not prevent releasing the other owned solver`() {
         val factory = LifecycleFactory().also {
             it.failCloseAt = 0
             it.gatedSolveDeclines = true

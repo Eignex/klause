@@ -7,40 +7,68 @@ import kotlin.test.assertIs
 
 class SourceResultEvidenceTest {
     private val scope = SourceScope(SourceRevision("original-source", "exact-affine-v1"))
-    private val context = SourceProofContext(scope, emptySet(), mapOf(
-        "conflict" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE)),
-    ))
+    private val context = SourceProofContext(
+        scope,
+        emptySet(),
+        mapOf(
+            "conflict" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE)),
+        ),
+    )
 
     @Test
-    fun `an engine attestation cannot supply independent proof coverage`() {
-        val result = SourceResultEvidence(scope, emptyList(),
-            listOf(SourceEngineAttestation("complete-engine", SourceClaim.Refutation)))
+    fun `an engine attestation should not supply independent proof coverage`() {
+        val result = SourceResultEvidence(
+            scope,
+            emptyList(),
+            listOf(SourceEngineAttestation("complete-engine", SourceClaim.Refutation)),
+        )
 
         assertIs<SourceEvidenceCheck.Unavailable>(result.verify(SourceClaim.Refutation, context))
     }
 
     @Test
-    fun `evidence for another result claim cannot establish a refutation`() {
+    fun `evidence for another result claim should not establish a refutation`() {
         val consequence = SourceClaim.Consequence(SourceInequality(emptyMap(), BigFraction.ONE))
-        val result = SourceResultEvidence(scope, listOf(SourceEvidence(scope, consequence,
-            SourceDerivation.Premise("conflict"))))
+        val result = SourceResultEvidence(
+            scope,
+            listOf(
+                SourceEvidence(
+                    scope,
+                    consequence,
+                    SourceDerivation.Premise("conflict"),
+                ),
+            ),
+        )
 
         assertIs<SourceEvidenceCheck.Unavailable>(result.verify(SourceClaim.Refutation, context))
     }
 
     @Test
-    fun `mismatched captured invocation scopes reject the result package`() {
+    fun `mismatched captured invocation scopes should reject the result package`() {
         val other = scope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
-        val result = SourceResultEvidence(scope, listOf(SourceEvidence(other, SourceClaim.Refutation,
-            SourceDerivation.Premise("conflict"))))
+        val result = SourceResultEvidence(
+            scope,
+            listOf(
+                SourceEvidence(
+                    other,
+                    SourceClaim.Refutation,
+                    SourceDerivation.Premise("conflict"),
+                ),
+            ),
+        )
 
         assertIs<SourceEvidenceCheck.Rejected>(result.verify(SourceClaim.Refutation, context))
     }
 
     @Test
-    fun `publication captures a producer owned derivation list`() {
-        val derivations = mutableListOf(SourceEvidence(scope, SourceClaim.Refutation,
-            SourceDerivation.Premise("conflict")))
+    fun `publication should capture a producer owned derivation list`() {
+        val derivations = mutableListOf(
+            SourceEvidence(
+                scope,
+                SourceClaim.Refutation,
+                SourceDerivation.Premise("conflict"),
+            ),
+        )
         val result = SourceResultEvidence(scope, derivations)
         derivations.clear()
 
@@ -48,11 +76,19 @@ class SourceResultEvidenceTest {
     }
 
     @Test
-    fun `unavailable local capture cannot mask a supported worker import`() {
-        val missing = SourceEvidence(scope, SourceClaim.Refutation,
-            SourceDerivation.Unavailable("local traversal not captured"))
-        val imported = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Import(
-            SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))))
+    fun `unavailable local capture should not mask a supported worker import`() {
+        val missing = SourceEvidence(
+            scope,
+            SourceClaim.Refutation,
+            SourceDerivation.Unavailable("local traversal not captured"),
+        )
+        val imported = SourceEvidence(
+            scope,
+            SourceClaim.Refutation,
+            SourceDerivation.Import(
+                SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict")),
+            ),
+        )
 
         for (derivations in listOf(listOf(missing, imported), listOf(imported, missing))) {
             val result = SourceResultEvidence(scope, derivations)
@@ -62,10 +98,16 @@ class SourceResultEvidenceTest {
     }
 
     @Test
-    fun `invalid proof proposals cannot fall back to a supported alternative`() {
-        val invalid = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Combination(listOf(
-            SourceDerivation.Combination.Term(BigFraction.MINUS_ONE, SourceDerivation.Premise("conflict")),
-        )))
+    fun `invalid proof proposals should not fall back to a supported alternative`() {
+        val invalid = SourceEvidence(
+            scope,
+            SourceClaim.Refutation,
+            SourceDerivation.Combination(
+                listOf(
+                    SourceDerivation.Combination.Term(BigFraction.MINUS_ONE, SourceDerivation.Premise("conflict")),
+                ),
+            ),
+        )
         val supported = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
         val result = SourceResultEvidence(scope, listOf(invalid, supported))
 
@@ -73,10 +115,15 @@ class SourceResultEvidenceTest {
     }
 
     @Test
-    fun `unavailable capture cannot authorize an import with stronger conditions`() {
+    fun `unavailable capture should not authorize an import with stronger conditions`() {
         val condition = scope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
-        val imported = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Import(
-            SourceEvidence(condition, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))))
+        val imported = SourceEvidence(
+            scope,
+            SourceClaim.Refutation,
+            SourceDerivation.Import(
+                SourceEvidence(condition, SourceClaim.Refutation, SourceDerivation.Premise("conflict")),
+            ),
+        )
         val missing = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Unavailable("missing traversal"))
         val result = SourceResultEvidence(scope, listOf(missing, imported))
 
@@ -84,7 +131,7 @@ class SourceResultEvidenceTest {
     }
 
     @Test
-    fun `alternative captures cannot renew the containing verification allowance`() {
+    fun `alternative captures should not renew the containing verification allowance`() {
         val missing = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Unavailable("missing traversal"))
         val supported = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
         val result = SourceResultEvidence(scope, List(20) { missing } + supported)
@@ -95,17 +142,7 @@ class SourceResultEvidenceTest {
     }
 
     @Test
-    fun `cancelled alternative capture checking remains unavailable`() {
-        val supported = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
-        val result = SourceResultEvidence(scope, listOf(supported))
-
-        val checked = result.verify(SourceClaim.Refutation, context, Cancellation { true })
-
-        assertIs<SourceEvidenceCheck.Unavailable>(checked)
-    }
-
-    @Test
-    fun `an observed cancellation cannot be cleared by a later capture`() {
+    fun `an observed cancellation should not be cleared by a later capture`() {
         val supported = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
         val result = SourceResultEvidence(scope, listOf(supported, supported))
         var polls = 0

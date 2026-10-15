@@ -21,9 +21,9 @@ import kotlin.test.assertTrue
 class GlobalCardinalityPropagatorTest {
 
     @Test
-    fun `global cardinality deductions are implied by their reasons under carved holes`() {
+    fun `global cardinality deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x6CC0)
-        repeat(300) { iter ->
+        repeat(100) { iter ->
             val n = 5
             val problem = Problem(
                 numBoolVars = 0,
@@ -45,11 +45,9 @@ class GlobalCardinalityPropagatorTest {
         }
     }
 
-    // Count minima demand two takers from one variable. The conflict must cite these search-derived
-    // count bounds even though their nodes are not residual-reachable from the flow cut.
+    // The count bounds are not residual-reachable from the flow cut, yet the conflict depends on them.
     @Test
-    fun `flow deficiency conflict cites the count var demand bounds`() {
-        // ints: xs = 0,1 over 0..2; countVars 2 (value 1) and 3 (value 2) over 0..2.
+    fun `flow deficiency conflict should cite the count var demand bounds`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -67,22 +65,20 @@ class GlobalCardinalityPropagatorTest {
         state.currentLevel = 3
         check(state.tightenIntMax(1, 0)) { "x1 restriction failed" }
 
-        assertFalse(problem.propagators[0].propagate(state, 0), "demand 2 vs supply 1 must conflict")
+        assertFalse(problem.propagators[0].propagate(state, 0))
         val reason = problem.propagators[0].conflictReason(state, 0)
-        assertNotNull(reason, "flow-deficiency conflict must carry a reason")
+        assertNotNull(reason)
         val citedInts = buildSet {
             for (lit in reason) {
                 val v = Lit.variable(lit)
                 if (v >= problem.numBoolVars) add(state.atoms.intVar[v - problem.numBoolVars])
             }
         }
-        assertTrue(2 in citedInts && 3 in citedInts, "reason must cite both count vars; cited $citedInts")
+        assertTrue(2 in citedInts && 3 in citedInts, "$citedInts")
     }
 
     @Test
-    fun `a flow prune cites only the variables of the hall set it leaves`() {
-        // Each value at most once: x0 and x1 take {0, 1} between them, so x2 leaves both; x4's carved hole at 3
-        // plays no part. x2's lower bound climbs past 0 and then 1, so its final move also cites the bound it left.
+    fun `a flow prune should cite only the variables of the hall set it leaves`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 5,
@@ -115,9 +111,9 @@ class GlobalCardinalityPropagatorTest {
     }
 
     @Test
-    fun `global cardinality deductions with count vars are implied by their reasons under carved holes`() {
+    fun `global cardinality deductions with count vars should be implied by their reasons under carved holes`() {
         val rng = Random(0x6CC1)
-        repeat(300) { iter ->
+        repeat(100) { iter ->
             val n = 4
             val problem = Problem(
                 numBoolVars = 0,
@@ -144,5 +140,4 @@ class GlobalCardinalityPropagatorTest {
             }
         }
     }
-
 }

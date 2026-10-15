@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 class LpNeighborhoodTest {
 
     @Test
-    fun `exact neighborhoods retain full support when traversal reverses row order`() {
+    fun `exact neighborhoods should retain full support when traversal reverses row order`() {
         val (base, x) = chain()
         val state = LpExactState(assertNotNull(base.authoritativeModel()))
         val working = assertNotNull(state.toWorkingModel())
@@ -38,7 +38,6 @@ class LpNeighborhoodTest {
         assertTrue((0 until restricted.numVars).all { restricted.objective.cost(it).value.isZero })
     }
 
-    // Chain x0 <= x1 <= x2 <= 5: three rows, each linking to the next variable.
     private fun chain(): Pair<LpModel, IntArray> {
         val b = LpBuilder()
         val x0 = b.addVar(0L, 100L)
@@ -55,11 +54,11 @@ class LpNeighborhoodTest {
         val (base, x) = chain()
         val idx = base.rowIndex()
         val capped = base.columnNeighborhood(intArrayOf(x[0]), maxRows = 1, rowIndex = idx)
-        assertEquals(1, capped.model.m, "one row within the cap")
-        assertEquals(2, capped.model.n, "the accepted row keeps its whole support")
+        assertEquals(1, capped.model.m)
+        assertEquals(2, capped.model.n)
         assertTrue(capped.colOf(x[0]) >= 0)
         assertTrue(capped.colOf(x[1]) >= 0)
-        assertEquals(-1, capped.colOf(x[2]), "a column beyond the cap stays outside")
+        assertEquals(-1, capped.colOf(x[2]))
     }
 
     @Test
@@ -71,9 +70,9 @@ class LpNeighborhoodTest {
         val base = b.build(Sense.MINIMIZE)
         val nb = base.columnNeighborhood(intArrayOf(x0), maxRows = 4, rowIndex = base.rowIndex())
         val c = nb.colOf(x0)
-        assertEquals(base.upper[x0], nb.model.upper[c], "shifted column range carries over")
+        assertEquals(base.upper[x0], nb.model.upper[c])
         assertEquals(base.loShift[x0], nb.model.loShift[c])
-        assertTrue(nb.model.hasUpper[nb.model.slackCol(0)], "the equality row keeps its fixed slack")
+        assertTrue(nb.model.hasUpper[nb.model.slackCol(0)])
     }
 
     @Test

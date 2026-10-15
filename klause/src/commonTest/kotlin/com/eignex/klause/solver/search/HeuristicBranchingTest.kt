@@ -9,7 +9,7 @@ import kotlin.test.assertNull
 class HeuristicBranchingTest {
 
     @Test
-    fun `offers the false polarity before the true one`() {
+    fun `heuristic branching should offer the false polarity before the true one`() {
         val session = SearchSession(emptyList())
         val branching = HeuristicBooleanBranching(Vsids(), numBoolVars = 1)
 
@@ -19,7 +19,7 @@ class HeuristicBranchingTest {
     }
 
     @Test
-    fun `splits the variable an asserting clause implicated`() {
+    fun `heuristic branching should split the variable an asserting clause implicated`() {
         val session = SearchSession(emptyList())
         val branching = HeuristicBooleanBranching(Vsids(), numBoolVars = 4)
         branching.alternatives(session)
@@ -31,7 +31,7 @@ class HeuristicBranchingTest {
     }
 
     @Test
-    fun `splits the variable the failed decision names when no clause was learned`() {
+    fun `heuristic branching should split the failed decision variable when no clause was learned`() {
         val session = SearchSession(emptyList())
         val branching = HeuristicBooleanBranching(Vsids(), numBoolVars = 4)
         branching.alternatives(session)
@@ -43,7 +43,7 @@ class HeuristicBranchingTest {
     }
 
     @Test
-    fun `re-offers a freed variable ahead of one no conflict has touched`() {
+    fun `heuristic branching should re-offer a freed variable ahead of one no conflict touched`() {
         val session = SearchSession(emptyList())
         val branching = HeuristicBooleanBranching(Vsids(), numBoolVars = 4)
         session.openRun(numBoolVars = 4, booleanBranching = branching)
@@ -59,7 +59,7 @@ class HeuristicBranchingTest {
     }
 
     @Test
-    fun `reports no split once every Boolean is assigned`() {
+    fun `heuristic branching should report no split once every Boolean is assigned`() {
         val session = SearchSession(emptyList())
         val branching = HeuristicBooleanBranching(Vsids(), numBoolVars = 1)
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
@@ -68,7 +68,7 @@ class HeuristicBranchingTest {
     }
 
     @Test
-    fun `finds a model on a clause set whose first branch conflicts`() {
+    fun `heuristic branching should find a model when the first branch conflicts`() {
         val session = SearchSession(
             listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3))))),
         )

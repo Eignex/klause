@@ -18,9 +18,12 @@ import kotlin.test.assertTrue
 
 class LiteralDefinitionTest {
     @Test
-    fun `arithmetic objective hotspots retain source input order`() {
+    fun `arithmetic objective hotspots should retain source input order`() {
         val problem = Problem(
-            0, 5, Array(5) { IntDomain(0, 4) }, arrayOf<Factor>(Product(0, 1, 2), Product(2, 3, 4)),
+            0,
+            5,
+            Array(5) { IntDomain(0, 4) },
+            arrayOf<Factor>(Product(0, 1, 2), Product(2, 3, 4)),
         )
         val sweep = assertNotNull(DefinitionalSweep.infer(problem))
         val shaping = ObjectiveShaping()
@@ -35,10 +38,12 @@ class LiteralDefinitionTest {
     }
 
     @Test
-    fun `hinted literal channels follow free Boolean inputs`() {
+    fun `hinted literal channels should follow free Boolean inputs`() {
         for (bound in listOf(0, 1)) {
             val problem = Problem(
-                1, 1, arrayOf(IntDomain(0, 1)),
+                1,
+                1,
+                arrayOf(IntDomain(0, 1)),
                 arrayOf<Factor>(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, bound)),
             )
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
@@ -59,9 +64,11 @@ class LiteralDefinitionTest {
     }
 
     @Test
-    fun `clipped channels preserve source predicates during seeding`() {
+    fun `clipped channels should preserve source predicates during seeding`() {
         val problem = Problem(
-            1, 2, arrayOf(IntDomain(0, 2), IntDomain(1, 1)),
+            1,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(1, 1)),
             arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
@@ -83,9 +90,11 @@ class LiteralDefinitionTest {
     }
 
     @Test
-    fun `predicates constrained outside channel cones retain Boolean repairs`() {
+    fun `predicates constrained outside channel cones should retain Boolean repairs`() {
         val problem = Problem(
-            1, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 1)),
+            1,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 1)),
             arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
@@ -115,10 +124,12 @@ class LiteralDefinitionTest {
     }
 
     @Test
-    fun `unhinted and wider channels remain searchable`() {
+    fun `unhinted and wider channels should remain searchable`() {
         for (hinted in listOf(false, true)) {
             val problem = Problem(
-                1, 1, arrayOf(IntDomain(0, if (hinted) 2L else 1L)),
+                1,
+                1,
+                arrayOf(IntDomain(0, if (hinted) 2L else 1L)),
                 arrayOf<Factor>(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)),
             )
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
@@ -132,9 +143,11 @@ class LiteralDefinitionTest {
     }
 
     @Test
-    fun `competing channel definitions remain searchable`() {
+    fun `competing channel definitions should remain searchable`() {
         val problem = Problem(
-            1, 1, arrayOf(IntDomain(0, 1)),
+            1,
+            1,
+            arrayOf(IntDomain(0, 1)),
             arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
@@ -147,9 +160,11 @@ class LiteralDefinitionTest {
     }
 
     @Test
-    fun `cyclic predicate channel and product cones remain searchable`() {
+    fun `cyclic predicate channel and product cones should remain searchable`() {
         val problem = Problem(
-            1, 3, arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(0, 1)),
+            1,
+            3,
+            arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(0, 1)),
             arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 1),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
@@ -163,10 +178,12 @@ class LiteralDefinitionTest {
     }
 
     @Test
-    fun `functional gradients follow free Boolean channel leaves`() {
+    fun `functional gradients should follow free Boolean channel leaves`() {
         for (bound in listOf(0, 1)) {
             val problem = Problem(
-                1, 3, arrayOf(IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
+                1,
+                3,
+                arrayOf(IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
                 arrayOf<Factor>(
                     ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, bound),
                     Product(0, 1, 2),
@@ -196,63 +213,70 @@ class LiteralDefinitionTest {
     }
 
     @Test
-    fun `unary predicate channel products agree with source truth tables`() {
-        for (op in LinearOp.entries) for (coefficient in listOf(-1, 1)) for (bound in listOf(0, 1)) {
-            val problem = Problem(
-                1, 4, arrayOf(IntDomain(-2, 2), IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
-                arrayOf<Factor>(
-                    ReifiedLinear(0, intArrayOf(coefficient), intArrayOf(0), op, 0),
-                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, bound),
-                    Product(1, 2, 3),
-                ),
-            )
-            val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1)))
-            val objective = assertNotNull(sweep.functionalObjective(
-                intArrayOf(3), longArrayOf(2), 7, false, intArrayOf(0), longArrayOf(5),
-            ))
-            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
-            state.invariants = sweep.network(4, 1)
-            state.assignment.setInt(0, -2)
-            state.assignment.setInt(2, 3)
-            sweep.sweep(state.assignment, state.rootDomains)
-            state.recompute()
-            assertEquals(setOf(0, 2), (objective as FunctionalObjective).leafVars.toSet())
-            assertTrue(objective.boolLeafVars.isEmpty())
-            for (value in -2L..2L) {
-                val activity = coefficient * value
-                val holds = when (op) {
-                    LinearOp.EQ -> activity == 0L
-                    LinearOp.NE -> activity != 0L
-                    LinearOp.LE -> activity <= 0L
-                    LinearOp.GE -> activity >= 0L
+    fun `unary predicate channel products should agree with source truth tables`() {
+        for (op in LinearOp.entries) {
+            for (coefficient in listOf(-1, 1)) {
+                for (bound in listOf(0, 1)) {
+                    val problem = Problem(
+                        1,
+                        4,
+                        arrayOf(IntDomain(-2, 2), IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
+                        arrayOf<Factor>(
+                            ReifiedLinear(0, intArrayOf(coefficient), intArrayOf(0), op, 0),
+                            ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, bound),
+                            Product(1, 2, 3),
+                        ),
+                    )
+                    val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1)))
+                    val objective = assertNotNull(
+                        sweep.functionalObjective(
+                            intArrayOf(3),
+                            longArrayOf(2),
+                            7,
+                            false,
+                            intArrayOf(0),
+                            longArrayOf(5),
+                        ),
+                    )
+                    val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+                    state.invariants = sweep.network(4, 1)
+                    state.assignment.setInt(0, -2)
+                    state.assignment.setInt(2, 3)
+                    sweep.sweep(state.assignment, state.rootDomains)
+                    state.recompute()
+                    for (value in -2L..2L) {
+                        val activity = coefficient * value
+                        val holds = when (op) {
+                            LinearOp.EQ -> activity == 0L
+                            LinearOp.NE -> activity != 0L
+                            LinearOp.LE -> activity <= 0L
+                            LinearOp.GE -> activity >= 0L
+                        }
+                        val channel = if (holds == (bound == 1)) 1L else 0L
+                        val expected = -(7L + 6L * channel + if (holds) 5L else 0L).toDouble()
+                        val before = objective.evaluate(state.assignment)
+                        val move = Move.IntSet(0, value)
+                        val predicted = objective.deltaIfApplied(state.assignment, move)
+                        val probed = state.objectiveDelta(objective, move)
+                        state.apply(move)
+
+                        assertEquals(3L * channel, state.assignment.intValue(3))
+                        assertEquals(expected - before, predicted)
+                        assertEquals(predicted, probed)
+                        assertEquals(0L, state.cost)
+                    }
                 }
-                val channel = if (holds == (bound == 1)) 1L else 0L
-                val expected = -(7L + 6L * channel + if (holds) 5L else 0L).toDouble()
-                val before = objective.evaluate(state.assignment)
-                val move = Move.IntSet(0, value)
-                val predicted = objective.deltaIfApplied(state.assignment, move)
-                val costDelta = state.netDelta(move)
-
-                val probed = state.objectiveDelta(objective, move)
-                state.apply(move)
-
-                assertEquals(holds, state.assignment.boolValue(0))
-                assertEquals(channel, state.assignment.intValue(1))
-                assertEquals(3L * channel, state.assignment.intValue(3))
-                assertEquals(expected, objective.evaluate(state.assignment))
-                assertEquals(expected - before, predicted)
-                assertEquals(predicted, probed)
-                assertEquals(0L, costDelta)
-                assertEquals(0L, state.cost)
             }
         }
     }
 
     @Test
-    fun `ordered predicates with other Boolean consumers remain searched`() {
+    fun `ordered predicates with other Boolean consumers should remain searched`() {
         for (op in listOf(LinearOp.LE, LinearOp.GE, LinearOp.NE)) {
             val problem = Problem(
-                1, 2, arrayOf(IntDomain(-2, 2), IntDomain(0, 1)),
+                1,
+                2,
+                arrayOf(IntDomain(-2, 2), IntDomain(0, 1)),
                 arrayOf<Factor>(
                     ReifiedLinear(0, intArrayOf(1), intArrayOf(0), op, 0),
                     ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),

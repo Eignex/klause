@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 class CorpusFilesTest {
 
     @Test
-    fun `readText returns the plain text of a compressed instance`() {
+    fun `readText should return the plain text of a compressed instance`() {
         val root = Files.createTempDirectory("corpusfiles").toFile()
         try {
             val body = "p cnf 2 1\n1 -2 0\n"
@@ -23,7 +23,7 @@ class CorpusFilesTest {
     }
 
     @Test
-    fun `compressTree compresses instances in place and leaves MiniZinc sources plain`() {
+    fun `compressTree should compress instances in place and leave MiniZinc sources plain`() {
         val root = Files.createTempDirectory("corpusfiles").toFile()
         try {
             File(root, "fam").mkdirs()

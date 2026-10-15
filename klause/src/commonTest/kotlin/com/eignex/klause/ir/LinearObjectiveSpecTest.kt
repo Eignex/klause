@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 
 class LinearObjectiveSpecTest {
     @Test
-    fun `lowered objective coefficients retain their captured meaning`() {
+    fun `lowered objective coefficients should retain their captured meaning`() {
         val coefficients = longArrayOf(3)
         val spec = LinearObjectiveSpec(intCoefficients = coefficients)
         val copied = spec.copy()

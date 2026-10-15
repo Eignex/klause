@@ -36,25 +36,25 @@ class LpHintsTest {
     }
 
     @Test
-    fun `a fractional lp value puts the floor split first`() {
+    fun `a fractional lp value should put the floor split first`() {
         val ordered = recordedHints(3.7).order(VarRef.IntVar(0), (0L..10L).asSequence())
         assertEquals(3L, ordered.first())
     }
 
     @Test
-    fun `an integral lp value puts the nearest value first`() {
+    fun `an integral lp value should put the nearest value first`() {
         val ordered = recordedHints(4.0).order(VarRef.IntVar(0), (0L..10L).asSequence())
         assertEquals(4L, ordered.first())
     }
 
     @Test
-    fun `values stay unordered without a recorded solve`() {
+    fun `values should stay unordered without a recorded solve`() {
         val ordered = LpHints(numIntVars = 1, numBoolVars = 0).order(VarRef.IntVar(0), (5L..9L).asSequence())
         assertEquals(5L, ordered.first())
     }
 
     @Test
-    fun `clearing hints restores the configured value order`() {
+    fun `clearing hints should restore the configured value order`() {
         val hints = recordedHints(3.7)
 
         hints.clear()
@@ -63,7 +63,7 @@ class LpHintsTest {
     }
 
     @Test
-    fun `the branch score weighs a real row's share of the reduced cost`() {
+    fun `the branch score should weigh a real row's share of the reduced cost`() {
         // x in [0,10] sits only in the real row 0.5x <= 3; a dual of -4 on it gives x a reduced cost of 2.
         val b = LpBuilder()
         val x = b.addVar(0, 10, cost = 0)

@@ -14,7 +14,7 @@ class ProblemFormatTest {
     }
 
     @Test
-    fun `an smt-lib maximization reports its sense even when its model has an open column`() {
+    fun `an smt-lib maximization should report its sense even with an open column`() {
         val source = file(
             ".smt2",
             "(set-logic QF_LIA)\n(declare-const x Int)\n(assert (<= x 3))\n(maximize x)\n(check-sat)",

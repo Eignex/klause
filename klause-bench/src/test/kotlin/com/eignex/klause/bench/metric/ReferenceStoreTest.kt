@@ -6,7 +6,7 @@ import kotlin.test.assertNull
 
 class ReferenceStoreTest {
     @Test
-    fun `exact objectives survive CSV and order references in either direction`() {
+    fun `exact objectives should survive CSV and order references in either direction`() {
         val boundaries = listOf(
             "9007199254740992" to "9007199254740993",
             "9223372036854775808" to "9223372036854775809",
@@ -29,18 +29,18 @@ class ReferenceStoreTest {
     }
 
     @Test
-    fun `a legacy oracle-only row decodes with blank features`() {
+    fun `an oracle-only row should decode with blank features`() {
         val e = ReferenceStore.parseRow("hakank,queens/q8,false,8.0,true,true,912,300000")
         assertEquals("hakank", e.suite)
         assertEquals(8.0, e.objective)
-        assertEquals("", e.format, "features absent in a pre-classify row")
+        assertEquals("", e.format)
         assertEquals("", e.structure)
         assertNull(e.numGlobal)
         assertNull(e.boolHeavy)
     }
 
     @Test
-    fun `a full row decodes its feature columns`() {
+    fun `a full row should decode its feature columns`() {
         val e = ReferenceStore.parseRow(
             "minizinc-benchmarks,q/q8,false,8.0,true,true,912,300000,minizinc,global,3,1,false",
         )
@@ -52,7 +52,7 @@ class ReferenceStoreTest {
     }
 
     @Test
-    fun `a row judged another way replaces a stored proof, a weaker one of the same version does not`() {
+    fun `a differently judged row should replace a stored proof but a weaker same-version row should not`() {
         val proof = ReferenceStore.parseRow("miplib2017,neos4,false,-4.84543837043946E10,true,true,900,60000", "highs")
         val corrected = proof.copy(
             objective = -4.86034407505895E10,

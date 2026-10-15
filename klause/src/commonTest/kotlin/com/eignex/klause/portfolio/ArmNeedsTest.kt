@@ -25,9 +25,9 @@ class ArmNeedsTest {
     ).bake()
 
     @Test
-    fun `continuous majority counts real coordinates against all discrete coordinates`() {
+    fun `continuous majority should count real coordinates against all discrete coordinates`() {
         for (
-            (counts, expected) in listOf(
+        (counts, expected) in listOf(
             Triple(0, 1, 1) to false,
             Triple(0, 1, 2) to true,
             Triple(2, 1, 2) to false,
@@ -51,7 +51,7 @@ class ArmNeedsTest {
     }
 
     @Test
-    fun `integer domain bounds identify binary pools`() {
+    fun `integer domain bounds should identify binary pools`() {
         for ((upper, binary) in listOf(1L to true, 5L to false)) {
             val model = linearModel(upper)
 
@@ -62,7 +62,7 @@ class ArmNeedsTest {
     }
 
     @Test
-    fun `an lp ceiling of off leaves nothing to relax`() {
+    fun `an lp ceiling of off should leave nothing to relax`() {
         val model = linearModel()
         val facts = ProblemFacts.of(model, ProblemProfile.of(model, optimizing = true), LpConfig(LpEmphasis.OFF))
 
@@ -70,7 +70,7 @@ class ArmNeedsTest {
     }
 
     @Test
-    fun `unused real declarations preserve the integer linear model fact`() {
+    fun `unused real declarations should preserve the integer linear model fact`() {
         val model = Problem(
             0,
             2,
@@ -87,7 +87,7 @@ class ArmNeedsTest {
     }
 
     @Test
-    fun `disabled LP omits the integer linear companion`() {
+    fun `disabled LP should omit the integer linear companion`() {
         val model = linearModel()
         val facts = ProblemFacts.of(model, ProblemProfile.of(model, optimizing = true), LpConfig.OFF)
 

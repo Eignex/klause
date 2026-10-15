@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class BitsTest {
 
     @Test
-    fun `set and get round-trip across word boundaries`() {
+    fun `set and get should round-trip across word boundaries`() {
         val b = Bits(130)
         b.set(0)
         b.set(63)
@@ -24,7 +24,7 @@ class BitsTest {
     }
 
     @Test
-    fun `or and andNot ops`() {
+    fun `or and andNot should combine bit sets`() {
         val a = Bits.of(10, intArrayOf(0, 2, 4, 6, 8))
         val b = Bits.of(10, intArrayOf(2, 3, 4))
         val u = a.copy().also { it.orInPlace(b) }
@@ -34,7 +34,7 @@ class BitsTest {
     }
 
     @Test
-    fun `containsAll subset semantics`() {
+    fun `containsAll should follow subset semantics`() {
         val universe = Bits.full(10)
         val sub = Bits.of(10, intArrayOf(2, 5, 7))
         assertTrue(universe.containsAll(sub))
@@ -43,7 +43,7 @@ class BitsTest {
     }
 
     @Test
-    fun `forEachSet iterates in ascending order`() {
+    fun `forEachSet should iterate in ascending order`() {
         val b = Bits.of(200, intArrayOf(199, 0, 63, 64, 100))
         val seen = mutableListOf<Int>()
         b.forEachSet { seen.add(it) }
@@ -51,7 +51,7 @@ class BitsTest {
     }
 
     @Test
-    fun `companion set has and clear round trip across words`() {
+    fun `companion set has and clear should round-trip across words`() {
         val bits = LongArray(3)
         Bits.set(bits, 0)
         Bits.set(bits, 63)
@@ -69,7 +69,7 @@ class BitsTest {
     }
 
     @Test
-    fun `fillRange sets a half open range across word boundaries`() {
+    fun `fillRange should set a half open range across word boundaries`() {
         val bits = LongArray(3)
         Bits.fillRange(bits, 61, 67)
         for (i in 0..60) assertFalse(Bits.has(bits, i), "bit $i")
@@ -78,7 +78,7 @@ class BitsTest {
     }
 
     @Test
-    fun `clearBelow clears only bits below exclusive boundary`() {
+    fun `clearBelow should clear only bits below the exclusive boundary`() {
         val bits = LongArray(3)
         Bits.fillRange(bits, 0, 140)
         Bits.clearBelow(bits, 65)
@@ -87,7 +87,7 @@ class BitsTest {
     }
 
     @Test
-    fun `clearAbove clears only bits above inclusive boundary`() {
+    fun `clearAbove should clear only bits above the inclusive boundary`() {
         val bits = LongArray(3)
         Bits.fillRange(bits, 0, 140)
         Bits.clearAbove(bits, 65)
@@ -96,7 +96,7 @@ class BitsTest {
     }
 
     @Test
-    fun `firstSet and lastSet return sentinel for empty and extremes for populated`() {
+    fun `firstSet and lastSet should return a sentinel when empty and the extremes otherwise`() {
         val empty = LongArray(2)
         assertEquals(-1, Bits.firstSet(empty))
         assertEquals(-1, Bits.lastSet(empty))

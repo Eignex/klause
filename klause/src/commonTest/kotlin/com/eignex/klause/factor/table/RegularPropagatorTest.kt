@@ -16,14 +16,8 @@ import kotlin.test.assertEquals
 
 class RegularPropagatorTest {
 
-    /**
-     * Soundness gate for the sharpened forward-collapse conflict reason. Uses a DFA with dead
-     * transitions ("no two consecutive 1s") so early-prefix infeasibility fires the collapse
-     * path. Under the full CDCL backtracker (VSIDS + clause forgetting) enumeration must equal
-     * the brute-force accepted set; an unsound prefix reason would drop a feasible suffix.
-     */
     @Test
-    fun `regular deductions are implied by their reasons under carved holes`() {
+    fun `regular deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x7E61)
         repeat(300) { iter ->
             val n = 5
@@ -56,8 +50,7 @@ class RegularPropagatorTest {
     }
 
     @Test
-    fun `a regular prune cites only the symbols its cut of the automaton crosses`() {
-        // No two consecutive 1s: with x1 = 1, x0 cannot be 1, and x3 <> 1 plays no part in that.
+    fun `a regular prune should cite only the symbols its cut of the automaton crosses`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -87,5 +80,4 @@ class RegularPropagatorTest {
         }
         assertEquals(listOf(Triple(1, AtomKind.LE, 1L)), cited)
     }
-
 }

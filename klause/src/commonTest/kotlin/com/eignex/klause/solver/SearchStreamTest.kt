@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class SearchStreamTest {
     @Test
-    fun `a shared search and cleanup failure is not suppressed onto itself`() {
+    fun `stream should not suppress a failure onto itself when search and cleanup share it`() {
         val failure = IllegalArgumentException("shared failure")
         val stream = PullSearchStream<Int>(pull = { throw failure }, release = { throw failure })
 
@@ -20,7 +20,7 @@ class SearchStreamTest {
     }
 
     @Test
-    fun `closing a buffered cursor discards its value and releases once`() {
+    fun `close should discard a buffered value and release once`() {
         var releases = 0
         val stream = PullSearchStream(pull = { 1 }, release = { releases++ })
         assertTrue(stream.hasNext())
@@ -32,7 +32,7 @@ class SearchStreamTest {
     }
 
     @Test
-    fun `terminal values remain readable after resources release`() {
+    fun `terminal value should stay readable after release`() {
         var releases = 0
         val stream = PullSearchStream(pull = { 1 }, release = { releases++ }, terminal = { true })
         assertTrue(stream.hasNext())
@@ -45,7 +45,7 @@ class SearchStreamTest {
     }
 
     @Test
-    fun `search failures preserve cleanup failures as suppressed`() {
+    fun `search failure should carry the cleanup failure as suppressed`() {
         val failure = IllegalArgumentException("search")
         val cleanup = IllegalStateException("cleanup")
         val stream = PullSearchStream<Int>(pull = { throw failure }, release = { throw cleanup })
@@ -56,7 +56,7 @@ class SearchStreamTest {
     }
 
     @Test
-    fun `search streams reject a second iterator`() {
+    fun `search stream should reject a second iterator`() {
         val stream = sequenceOf(1).asSearchStream()
         assertEquals(listOf(1), stream.toList())
         assertFailsWith<IllegalStateException> { stream.iterator() }

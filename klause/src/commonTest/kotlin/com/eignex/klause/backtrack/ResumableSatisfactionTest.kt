@@ -23,12 +23,14 @@ import kotlin.test.assertTrue
 
 class ResumableSatisfactionTest {
     @Test
-    fun `closing a deferred root disposes its peer once`() {
+    fun `closing a deferred root should dispose its peer once`() {
         var closed = 0
         val component = object : PreparingSearchComponent, AutoCloseable {
             override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> =
                 sequenceOf(ComponentResult.Consistent).iterator()
-            override fun close() { closed++ }
+            override fun close() {
+                closed++
+            }
         }
         val search = BacktrackSolver(pigeonhole(3, 2).bake()).resumableSolve(
             BacktrackParams(componentFactory = { listOf(component) }),
@@ -42,7 +44,7 @@ class ResumableSatisfactionTest {
     }
 
     @Test
-    fun `component preparation waits for a slice and initializes once`() {
+    fun `component preparation should wait for a slice and initialize once`() {
         var batches = 0
         val component = object : PreparingSearchComponent {
             override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> = sequence {
@@ -66,9 +68,6 @@ class ResumableSatisfactionTest {
         assertEquals(3, batches)
     }
 
-
-
-    /** Pigeons into holes, clause-encoded so propagation alone cannot settle it and the search must branch. */
     private fun pigeonhole(pigeons: Int, holes: Int): Problem {
         fun lit(p: Int, h: Int) = Lit.make(p * holes + h, true)
         val factors = ArrayList<Factor>()
@@ -91,7 +90,7 @@ class ResumableSatisfactionTest {
     }
 
     @Test
-    fun `resuming preserves native learning and deduction counters`() {
+    fun `resuming should preserve native learning and deduction counters`() {
         val solver = BacktrackSolver(pigeonhole(4, 3).bake())
         val params = BacktrackParams(randomSeed = 1L)
         val complete = solver.solve(params)
@@ -107,7 +106,7 @@ class ResumableSatisfactionTest {
     }
 
     @Test
-    fun `a work-budgeted slice pauses before the search finishes`() {
+    fun `a work-budgeted slice should pause before the search finishes`() {
         val search = handle(pigeonhole(6, 5))
 
         assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceNodes = 1L))
@@ -115,7 +114,7 @@ class ResumableSatisfactionTest {
     }
 
     @Test
-    fun `a fired run token ends the search instead of pausing it`() {
+    fun `a fired run token should end the search instead of pausing it`() {
         val search = handle(pigeonhole(6, 5))
 
         val verdict = search.runSlice(Cancellation { true }, Long.MAX_VALUE, sliceNodes = 1_000_000L)
@@ -125,15 +124,16 @@ class ResumableSatisfactionTest {
     }
 
     @Test
-    fun `a constructor refutation returns even with no slice work allowance`() {
+    fun `a constructor refutation should return even with no slice work allowance`() {
         val search = handle(pigeonhole(2, 1))
 
         val verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceNodes = 0L)
 
         assertIs<SolveResult.Unsat>(verdict)
     }
+
     @Test
-    fun `cancelled construction cannot report a partial root verdict`() {
+    fun `cancelled construction should not report a partial root verdict`() {
         val solver = BacktrackSolver(pigeonhole(3, 2).bake())
 
         assertFailsWith<SearchInitializationCancelled> {
@@ -144,7 +144,7 @@ class ResumableSatisfactionTest {
     }
 
     @Test
-    fun `an indeterminate node only root ends with no slice work`() {
+    fun `an indeterminate node-only root should end with no slice work`() {
         val component = object : SearchComponent {
             override fun initialize(context: SearchContext): ComponentResult = ComponentResult.Indeterminate
         }
@@ -159,7 +159,7 @@ class ResumableSatisfactionTest {
     }
 
     @Test
-    fun `resuming satisfaction does not renew the solve node allowance`() {
+    fun `resuming satisfaction should not renew the solve node allowance`() {
         val budget = NodeBudget(3L)
         val search = BacktrackSolver(pigeonhole(6, 5).bake()).resumableSolve(BacktrackParams(nodeBudget = budget))
 
@@ -169,8 +169,9 @@ class ResumableSatisfactionTest {
         assertEquals(3L, budget.spent)
         assertEquals(3.0, result.stats.search.nodes.sum)
     }
+
     @Test
-    fun `a resumed handle retains its bound lifetime cancellation scope`() {
+    fun `a resumed handle should retain its bound lifetime cancellation scope`() {
         var cancelled = false
         val search = BacktrackSolver(pigeonhole(6, 5).bake()).resumableSolve(
             BacktrackParams().withLifetimeCancellation(Cancellation { cancelled }),
@@ -183,5 +184,4 @@ class ResumableSatisfactionTest {
         assertIs<SolveResult.Unknown>(result)
         assertTrue(search.isDone)
     }
-
 }

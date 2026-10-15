@@ -11,10 +11,12 @@ import kotlin.test.assertEquals
 
 class ChannelingSinkTest {
     @Test
-    fun `binary channels track the final parity of repeated indicator flips`() {
+    fun `binary channels should track the final parity of repeated indicator flips`() {
         for (flips in listOf(1, 2, 3)) {
             val problem = Problem(
-                1, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 1)),
+                1,
+                2,
+                arrayOf(IntDomain(0, 2), IntDomain(0, 1)),
                 arrayOf<Factor>(ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1)),
             )
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))

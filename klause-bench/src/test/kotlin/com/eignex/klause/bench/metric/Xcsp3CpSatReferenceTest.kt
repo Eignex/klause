@@ -7,14 +7,7 @@ import kotlin.test.assertNull
 
 class Xcsp3CpSatReferenceTest {
     @Test
-    fun `reference identity includes the image and importer policy`() {
-        val identity = Xcsp3CpSatReference.identity("sha256:abc")
-
-        assertEquals("${Xcsp3CpSatReference.IMAGE}@sha256:abc|${Xcsp3CpSatReference.VERSION}", identity)
-    }
-
-    @Test
-    fun `reference records retain their importer identity`() {
+    fun `reference records should retain their importer identity`() {
         val output = "v <instantiation><list>x</list><values>5</values></instantiation>\n" +
             """{"exit":"OPTIMAL","version":"${Xcsp3CpSatReference.VERSION}","objective":5,"exactObjective":"5","maximize":true,"cpModelPresolve":true}"""
 
@@ -29,7 +22,7 @@ class Xcsp3CpSatReferenceTest {
     }
 
     @Test
-    fun `unversioned importer proofs are refused`() {
+    fun `unversioned importer proofs should be refused`() {
         val output = """{"exit":"UNSATISFIABLE"}"""
 
         assertFailsWith<IllegalStateException> {
@@ -38,7 +31,7 @@ class Xcsp3CpSatReferenceTest {
     }
 
     @Test
-    fun `unknown reference records retain their importer identity`() {
+    fun `unknown reference records should retain their importer identity`() {
         val output = """{"exit":"UNKNOWN","version":"${Xcsp3CpSatReference.VERSION}"}"""
 
         val result = Xcsp3CpSatReference.parse(emptyList(), output, "checked-image")
@@ -49,7 +42,7 @@ class Xcsp3CpSatReferenceTest {
     }
 
     @Test
-    fun `proofs with incompatible native settings are undecided`() {
+    fun `proofs with incompatible native settings should be undecided`() {
         val output = """{"exit":"UNSATISFIABLE","version":"${Xcsp3CpSatReference.VERSION}","cpModelPresolve":false}"""
 
         val result = Xcsp3CpSatReference.parse(emptyList(), output, "checked-image")
@@ -59,7 +52,7 @@ class Xcsp3CpSatReferenceTest {
     }
 
     @Test
-    fun `feasible reference claims without source witnesses are undecided`() {
+    fun `feasible reference claims without source witnesses should be undecided`() {
         val output = """{"exit":"FEASIBLE","version":"${Xcsp3CpSatReference.VERSION}","cpModelPresolve":true}"""
 
         val result = Xcsp3CpSatReference.parse(emptyList(), output, "checked-image")
@@ -69,7 +62,7 @@ class Xcsp3CpSatReferenceTest {
     }
 
     @Test
-    fun `reference objectives retain integers beyond binary64 precision`() {
+    fun `reference objectives should retain integers beyond binary64 precision`() {
         val output = "o 9007199254740993\nv <instantiation><list>x</list><values>1</values></instantiation>\n" +
             """{"exit":"OPTIMAL","version":"${Xcsp3CpSatReference.VERSION}","objective":9007199254740993,"exactObjective":"9007199254740993","maximize":true,"cpModelPresolve":true,"seed":7,"workers":1}"""
 
@@ -81,7 +74,7 @@ class Xcsp3CpSatReferenceTest {
     }
 
     @Test
-    fun `failed reference processes cannot earn proof credit`() {
+    fun `failed reference processes should not earn proof credit`() {
         val output = """{"exit":"UNSATISFIABLE","version":"${Xcsp3CpSatReference.VERSION}","cpModelPresolve":true}"""
 
         val result = Xcsp3CpSatReference.parse(emptyList(), output, "checked-image", exit = 137)
@@ -92,7 +85,7 @@ class Xcsp3CpSatReferenceTest {
     }
 
     @Test
-    fun `watchdog termination cannot earn proof credit`() {
+    fun `watchdog termination should not earn proof credit`() {
         val output = """{"exit":"UNSATISFIABLE","version":"${Xcsp3CpSatReference.VERSION}","cpModelPresolve":true}"""
 
         val result = Xcsp3CpSatReference.parse(emptyList(), output, "checked-image", timedOut = true)

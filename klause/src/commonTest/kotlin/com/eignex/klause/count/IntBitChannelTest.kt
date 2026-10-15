@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
 class IntBitChannelTest {
 
     @Test
-    fun `integer channels scopes and hashes preserve source metadata`() {
+    fun `integer channels scopes and hashes should preserve source metadata`() {
         val base = Problem(
             1, 1, arrayOf(IntDomain(0, 1)), arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
             impliedFactorMask = booleanArrayOf(true), hasSymmetryBreaking = true,
@@ -51,7 +51,7 @@ class IntBitChannelTest {
     ).bake()
 
     @Test
-    fun `channelling keeps the base columns invented sides and closes the ones it appends`() {
+    fun `channelling should keep invented base sides open and close the appended bits`() {
         val open = Problem(
             numBoolVars = 0,
             numIntVars = 1,
@@ -62,19 +62,16 @@ class IntBitChannelTest {
 
         val channelled = IntBitChannel.channel(open, intArrayOf(0)).problem
 
-        assertTrue(
-            channelled.intBounds.isOpenUpper(0),
-            "an invented endpoint must not read back as declared",
-        )
-        assertEquals(4, channelled.numIntVars, "one base column plus its three channel bits")
+        assertTrue(channelled.intBounds.isOpenUpper(0))
+        assertEquals(4, channelled.numIntVars)
         for (v in 1 until channelled.numIntVars) {
-            assertTrue(channelled.intBounds.hasUpper(v), "channel column $v is a declared 0/1 bit")
-            assertTrue(channelled.intBounds.hasLower(v), "channel column $v is a declared 0/1 bit")
+            assertTrue(channelled.intBounds.hasUpper(v), "column $v")
+            assertTrue(channelled.intBounds.hasLower(v), "column $v")
         }
     }
 
     @Test
-    fun `a column spanning more than the Long range is rejected rather than encoded as a constant`() {
+    fun `column spanning more than the Long range should be rejected`() {
         val clamp = 1L shl 62
         val base = ints(listOf(IntDomain(-clamp, clamp)))
 
@@ -82,7 +79,7 @@ class IntBitChannelTest {
     }
 
     @Test
-    fun `non power of two domain prunes out of range bit patterns`() {
+    fun `non power of two domain should prune out of range bit patterns`() {
         // 6 values over width-3 bits: patterns 6 and 7 land outside [0,5] and must be infeasible.
         val base = ints(listOf(IntDomain(0, 5)))
         val ch = IntBitChannel.channel(base, intArrayOf(0))
@@ -94,7 +91,7 @@ class IntBitChannelTest {
     }
 
     @Test
-    fun `no requested vars returns the base problem unchanged`() {
+    fun `channel with no requested vars should return the base problem unchanged`() {
         val base = ints(listOf(IntDomain(0, 3)))
         val ch = IntBitChannel.channel(base, intArrayOf())
         assertEquals(base, ch.problem)

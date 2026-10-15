@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
 class WcnfModeTest {
 
     @Test
-    fun `weighted unit moves update source literals and exact penalties together`() {
+    fun `weighted unit moves should update source literals and exact penalties together`() {
         val decoded = Dimacs.parseWcnf("3 1 0\n7 -2 0\n").toProblem()
         val solvable = linearSolvable(decoded.problem, decoded.objective, false, { "" }, boolFolds = decoded.boolFolds)
         val sweep = assertNotNull(solvable.definitionalSweep)
@@ -56,7 +56,7 @@ class WcnfModeTest {
     }.absolutePath
 
     @Test
-    fun `a new-format weighted instance proves the minimum-cost solution`() {
+    fun `a new-format weighted instance should prove the minimum-cost solution`() {
         val out = capture { main(arrayOf("-e", "bt", wcnf("h 1 2 0\n3 -1 0\n1 -2 0\n"))) }
         assertTrue("s OPTIMUM FOUND" in out, out)
         assertTrue("o 1" in out.lines().map { it.trim() }, "expected optimum cost 1: $out")
@@ -65,20 +65,20 @@ class WcnfModeTest {
     }
 
     @Test
-    fun `an old-format p wcnf instance routes and proves its optimum`() {
+    fun `an old-format p wcnf instance should route and prove its optimum`() {
         val out = capture { main(arrayOf("-e", "bt", wcnf("p wcnf 3 4 10\n10 1 2 3 0\n1 -1 0\n2 -2 0\n3 -3 0\n"))) }
         assertTrue("s OPTIMUM FOUND" in out, out)
         assertTrue("o 1" in out.lines().map { it.trim() }, "expected optimum cost 1: $out")
     }
 
     @Test
-    fun `infeasible hard clauses print s UNSATISFIABLE`() {
+    fun `infeasible hard clauses should print s UNSATISFIABLE`() {
         val out = capture { main(arrayOf(wcnf("h 1 0\nh -1 0\n2 -2 0\n"))) }
         assertTrue("s UNSATISFIABLE" in out, out)
     }
 
     @Test
-    fun `the wcnf extension and the explicit format both route to the WCNF front-end`() {
+    fun `the wcnf extension and the explicit format should both route to the WCNF front-end`() {
         val path = wcnf("h 1 0\n1 -1 0\n")
         val byExt = capture { main(arrayOf("-e", "bt", path)) }
         val byFormat = capture { main(arrayOf("-e", "bt", "--format", "wcnf", path)) }

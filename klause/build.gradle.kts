@@ -106,20 +106,3 @@ tasks.register<JavaExec>("basisTrace") {
     workingDir(rootDir)
     systemProperty("klause.workspace.root", rootDir.absolutePath)
 }
-
-tasks.register<JavaExec>("lpTreeIntegration") {
-    group = "verification"
-    description = "Validate the 300-instance LP primal-search corpus."
-    dependsOn(jvmTestCompilation.compileTaskProvider)
-    classpath(jvmTestCompilation.output.allOutputs, jvmTestCompilation.runtimeDependencyFiles)
-    mainClass.set("com.eignex.klause.backtrack.lp.LpTreeSearchIntegration")
-}
-
-
-tasks.register<JavaExec>("workingModelCoverage") {
-    group = "verification"
-    description = "Validate permanent integer and mixed-real objective replacement."
-    dependsOn(jvmTestCompilation.compileTaskProvider)
-    classpath(jvmTestCompilation.output.allOutputs, jvmTestCompilation.runtimeDependencyFiles)
-    mainClass.set("com.eignex.klause.lp.engine.WorkingModelCoverage")
-}

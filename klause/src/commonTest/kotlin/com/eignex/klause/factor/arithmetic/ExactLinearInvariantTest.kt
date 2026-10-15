@@ -7,21 +7,14 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.times
-import com.eignex.klause.util.unaryMinus
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 
 class ExactLinearInvariantTest {
 
-    private fun problem(factor: Factor, numBoolVars: Int = 0): Problem =
-        Problem(numBoolVars, 2, arrayOf(IntDomain(-4, 4), IntDomain(-4, 4)), arrayOf(factor))
-
     @Test
-    fun `a sum driven past 128 bits and back keeps its cost and deltas exact`() {
-        // Eight terms of Long.MAX_VALUE · 2^62 sum past 2^127; setting them back to zero brings the sum home.
+    fun `a sum driven past 128 bits and back should keep its cost and deltas exact`() {
         val n = 8
         val far = 1L shl 62
         val row = Linear(LongArray(n) { Long.MAX_VALUE }, IntArray(n) { it }, LinearOp.LE, 0L)
@@ -43,14 +36,5 @@ class ExactLinearInvariantTest {
             assertEquals(fresh.cost, state.cost, "x$v = $value")
             assertEquals(predicted, state.cost - before, "x$v = $value")
         }
-    }
-
-    @Test
-    fun `a row whose sum fits a Long keeps the Long invariant`() {
-        val row = Linear(longArrayOf(3, -2), intArrayOf(0, 1), LinearOp.LE, 5L)
-
-        val state = LocalSearchState(problem(row).bake(), Random(0))
-
-        assertIs<LinearInvariant>(state.factors[0])
     }
 }

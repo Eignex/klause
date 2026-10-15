@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 
 class AllowanceSettingTest {
     @Test
-    fun `automatic unlimited and zero settings remain distinct`() {
+    fun `automatic unlimited and zero settings should remain distinct`() {
         val settings = listOf("auto", "unlimited", "0").map {
             takeAllowanceSetting(mutableListOf("node-limit=$it"), "node-limit")
         }
@@ -23,7 +23,7 @@ class AllowanceSettingTest {
     }
 
     @Test
-    fun `duplicate equal settings are consumed once`() {
+    fun `duplicate equal settings should be consumed once`() {
         val params = mutableListOf("node-limit=7", "seed=3", "node-limit=7")
 
         assertEquals(AllowanceSetting.Remaining(7L), takeAllowanceSetting(params, "node-limit"))
@@ -31,21 +31,21 @@ class AllowanceSettingTest {
     }
 
     @Test
-    fun `conflicting settings are rejected`() {
+    fun `conflicting settings should be rejected`() {
         assertFailsWith<CliUsageException> {
             takeAllowanceSetting(mutableListOf("node-limit=0", "node-limit=unlimited"), "node-limit")
         }
     }
 
     @Test
-    fun `negative remaining allowance is rejected`() {
+    fun `negative remaining allowance should be rejected`() {
         assertFailsWith<CliUsageException> {
             takeAllowanceSetting(mutableListOf("node-limit=-1"), "node-limit")
         }
     }
 
     @Test
-    fun `zero preparation allowance stops routing and stays exhausted for presolve`() {
+    fun `zero preparation allowance should stop routing and stay exhausted for presolve`() {
         val common = CommonOptions().apply { engineParams.add("presolve-work-limit=0") }
 
         assertTrue(common.routingCancellation()())
@@ -59,7 +59,7 @@ class AllowanceSettingTest {
     }
 
     @Test
-    fun `unlimited preparation work retains its separate phase deadline`() {
+    fun `unlimited preparation work should retain its separate phase deadline`() {
         val common = CommonOptions().apply { engineParams.add("presolve-work-limit=unlimited") }
 
         val (stop, budget) = SolveCore.presolveAllowance(common, Cancellation.Never)

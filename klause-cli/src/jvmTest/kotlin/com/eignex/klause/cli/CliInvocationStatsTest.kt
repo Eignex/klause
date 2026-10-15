@@ -14,14 +14,14 @@ import kotlin.test.assertFalse
 
 class CliInvocationStatsTest {
     @Test
-    fun `unmeasured frontend phases and backend remain absent`() {
+    fun `unmeasured frontend phases and backend should remain absent`() {
         val pairs = cliInvocationStats(CommonOptions(), SolvablePipeline.Refuted).pairs(SolveStats.EMPTY).toMap()
 
         assertEquals(mapOf("solvePipeline" to "refuted"), pairs)
     }
 
     @Test
-    fun `interrupted source admission reports load without routing or a solve backend`() {
+    fun `interrupted source admission should report load without routing or a solve backend`() {
         val common = CommonOptions().apply { loadElapsedMs = 7L }
         val pipeline = SolvablePipeline.Interrupted(TerminationReason.Timeout)
 
@@ -31,7 +31,7 @@ class CliInvocationStatsTest {
     }
 
     @Test
-    fun `routing snapshots retain measured zero and stay owned by their invocation`() {
+    fun `routing snapshots should retain measured zero and stay owned by their invocation`() {
         val common = CommonOptions().apply {
             loadElapsedMs = 7L
             logRoute(SourceProblemRoute.Refuted, 0L)
@@ -48,9 +48,13 @@ class CliInvocationStatsTest {
     }
 
     @Test
-    fun `declared theory and reported backend stay distinct from the selected pipeline`() {
+    fun `declared theory and reported backend should stay distinct from the selected pipeline`() {
         val model = Problem(
-            0, 0, emptyArray(), emptyList(), numRealVars = 1,
+            0,
+            0,
+            emptyArray(),
+            emptyList(),
+            numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         )
@@ -65,7 +69,7 @@ class CliInvocationStatsTest {
     }
 
     @Test
-    fun `open local search does not acquire a declared complete theory`() {
+    fun `open local search should not acquire a declared complete theory`() {
         val model = Problem(0, 0, emptyArray(), emptyList())
         val pipeline = SolvablePipeline.OpenLocalSearch(model, { "" })
 
@@ -75,7 +79,7 @@ class CliInvocationStatsTest {
     }
 
     @Test
-    fun `open search deductions alone do not imply native CP phase measurements`() {
+    fun `open search deductions alone should not imply native CP phase measurements`() {
         val stats = SolveStats(
             run = RunStats(backend = "exact-lira"),
             search = SearchStats(propagations = SumResult(13.0)),
@@ -87,11 +91,15 @@ class CliInvocationStatsTest {
     }
 
     @Test
-    fun `native CP phases preserve their aggregate and root subset scopes`() {
-        val stats = SolveStats(search = SearchStats(
-            propagationWork = SumResult(17.0), rootPropagationWork = SumResult(5.0),
-            propagationNanos = SumResult(3_500_000.0), rootPropagationNanos = SumResult(500_000.0),
-        ))
+    fun `native CP phases should preserve their aggregate and root subset scopes`() {
+        val stats = SolveStats(
+            search = SearchStats(
+                propagationWork = SumResult(17.0),
+                rootPropagationWork = SumResult(5.0),
+                propagationNanos = SumResult(3_500_000.0),
+                rootPropagationNanos = SumResult(500_000.0),
+            ),
+        )
 
         val pairs = cliInvocationStats(CommonOptions(), SolvablePipeline.FiniteCp).pairs(stats).toMap()
 

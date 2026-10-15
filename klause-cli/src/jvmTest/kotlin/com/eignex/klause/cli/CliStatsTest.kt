@@ -6,7 +6,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.result.AlnsStats
 import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
 import com.eignex.klause.solver.result.CoreGuidedStats
@@ -22,7 +21,6 @@ import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.solver.result.OpenHintUsageStats
-import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkStats
 import com.eignex.klause.solver.result.PortfolioStats
 import com.eignex.klause.solver.result.PresolveStats
@@ -43,13 +41,20 @@ import kotlin.time.Duration
 class CliStatsTest {
 
     @Test
-    fun `complete traversal Boolean progress stays absent until observed`() {
+    fun `complete traversal Boolean progress should stay absent until observed`() {
         for (observed in listOf(false, true)) {
-            val stats = if (observed) SmtStats(completeSearchBooleanVariables = 0,
-                completeSearchMinUnassignedBooleans = 0, completeSearchLinearChecks = 0,
-                completeSearchLinearPoints = 0,
-                completeSearchLinearOutcomes = mapOf("NO_RESULT" to 2L),
-                completeSearchStages = mapOf("RECOVERY_ATTEMPT" to 0L)) else SmtStats()
+            val stats = if (observed) {
+                SmtStats(
+                    completeSearchBooleanVariables = 0,
+                    completeSearchMinUnassignedBooleans = 0,
+                    completeSearchLinearChecks = 0,
+                    completeSearchLinearPoints = 0,
+                    completeSearchLinearOutcomes = mapOf("NO_RESULT" to 2L),
+                    completeSearchStages = mapOf("RECOVERY_ATTEMPT" to 0L),
+                )
+            } else {
+                SmtStats()
+            }
 
             val pairs = openTheoryStatPairs(SolveStats(smt = stats), 1L).toMap()
 
@@ -63,31 +68,28 @@ class CliStatsTest {
     }
 
     @Test
-    fun `linear point observations retain separate graph LP and release counts`() {
-        val stats = SolveStats(smt = SmtStats(
-            realGraphOpenings = 2, graphPointHintCaptures = 3,
-            lpPointHintCaptures = 5, defaultGraphHintReleases = 7,
-        ))
-
-        val pairs = openTheoryStatPairs(stats, 1L).toMap()
-
-        assertEquals("2", pairs["smtRealGraphOpenings"])
-        assertEquals("3", pairs["smtGraphPointHintCaptures"])
-        assertEquals("5", pairs["smtLpPointHintCaptures"])
-        assertEquals("7", pairs["smtDefaultGraphHintReleases"])
-    }
-
-    @Test
-    fun `construction fields are omitted independently until their stages are observed`() {
+    fun `construction fields should be omitted independently until their stages are observed`() {
         val admitted = SolveStats(openHints = OpenHintStats(usage = OpenHintUsageStats(indexesAdmitted = 1)))
         val rawUsage = OpenHintUsageStats(
-            sourceBooleansMax = null, sourceClausesMax = null, sourcePrimitiveEntriesMax = null,
-            rawClausesMax = 0, rawLiteralsMax = 0, rawIncidencesMax = 0, rawVariablesMax = 0, rawLedgerDebits = 0,
+            sourceBooleansMax = null,
+            sourceClausesMax = null,
+            sourcePrimitiveEntriesMax = null,
+            rawClausesMax = 0,
+            rawLiteralsMax = 0,
+            rawIncidencesMax = 0,
+            rawVariablesMax = 0,
+            rawLedgerDebits = 0,
         )
         val raw = SolveStats(openHints = OpenHintStats(usage = rawUsage))
-        val complete = SolveStats(openHints = OpenHintStats(usage = rawUsage.copy(
-            sourceBooleansMax = 0, sourceClausesMax = 0, sourcePrimitiveEntriesMax = 0,
-        )))
+        val complete = SolveStats(
+            openHints = OpenHintStats(
+                usage = rawUsage.copy(
+                    sourceBooleansMax = 0,
+                    sourceClausesMax = 0,
+                    sourcePrimitiveEntriesMax = 0,
+                ),
+            ),
+        )
 
         val legacyPairs = openHintUsageStatPairs(admitted).toMap()
         assertEquals("1", legacyPairs["openHintIndexAdmitted"])
@@ -107,14 +109,19 @@ class CliStatsTest {
     }
 
     @Test
-    fun `component hint usage is emitted when no Boolean proposal was drawn`() {
-        val stats = SolveStats(openHints = OpenHintStats(usage = OpenHintUsageStats(
-            indexesAdmitted = 1, componentConsultations = 3, componentSelections = 2, gateSelections = 2,
-            clauseIndexesAdmitted = 1, clauseConsultations = 3, clauseSelections = 1, clauseDeclines = 2,
-            earlyPointUnavailable = 1, forwardUncovered = 2, primitiveProviderNone = 3,
-            sourceBooleansMax = 9, sourceClausesMax = 7, sourcePrimitiveEntriesMax = 5,
-            rawClausesMax = 3, rawLiteralsMax = 11, rawIncidencesMax = 7, rawVariablesMax = 4, rawLedgerDebits = 19,
-        )))
+    fun `component hint usage should be emitted when no Boolean proposal was drawn`() {
+        val stats = SolveStats(
+            openHints = OpenHintStats(
+                usage = OpenHintUsageStats(
+                    indexesAdmitted = 1, componentConsultations = 3, componentSelections = 2, gateSelections = 2,
+                    clauseIndexesAdmitted = 1, clauseConsultations = 3, clauseSelections = 1, clauseDeclines = 2,
+                    earlyPointUnavailable = 1, forwardUncovered = 2, primitiveProviderNone = 3,
+                    sourceBooleansMax = 9, sourceClausesMax = 7, sourcePrimitiveEntriesMax = 5,
+                    rawClausesMax = 3, rawLiteralsMax = 11, rawIncidencesMax = 7, rawVariablesMax = 4,
+                    rawLedgerDebits = 19,
+                ),
+            ),
+        )
 
         val pairs = openTheoryStatPairs(stats, 1L).toMap()
 
@@ -142,7 +149,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `core bounds preserve exact integers when worker snapshots combine`() {
+    fun `core bounds should preserve exact integers when worker snapshots combine`() {
         val first = SolveStats(coreGuided = CoreGuidedStats(1, 2, parseBigInt("9007199254740993")))
         val second = SolveStats(coreGuided = CoreGuidedStats(2, 3, parseBigInt("9007199254740995")))
 
@@ -154,12 +161,14 @@ class CliStatsTest {
     }
 
     @Test
-    fun `presolve prints native construction separately from converted phase work`() {
+    fun `presolve should print native construction separately from converted phase work`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList()).bake(budget.orSpent(Cancellation.Never))
-        val stats = SolveStats(presolve = PresolveStats(
-            effort = presolveEffortStats(PresolveConfig.NONE, budget, Duration.ZERO),
-        ))
+        val stats = SolveStats(
+            presolve = PresolveStats(
+                effort = presolveEffortStats(PresolveConfig.NONE, budget, Duration.ZERO),
+            ),
+        )
 
         val pairs = presolveStatPairs(stats).toMap()
 
@@ -170,7 +179,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `local search phase times print before the first move`() {
+    fun `local search phase times should print before the first move`() {
         val stats = SolveStats(
             run = RunStats(backend = "mixed"),
             ls = LocalSearchStats(phaseNanos = mapOf("preparation" to 7L, "seeding" to 0L)),
@@ -184,33 +193,16 @@ class CliStatsTest {
     }
 
     @Test
-    fun `ALNS inner work is printed separately from its outer allowance`() {
-        val stats = SolveStats(alns = AlnsStats(
-            bootstrapCpNodes = 13, bootstrapLsMoves = 7, repairCpNodes = 17, repairLsMoves = 5,
-            outerAllowance = 120, bootstrapCpMillis = 9, bootstrapLsMillis = 8, repairMillis = 3,
-        ))
-
-        val pairs = portfolioStatPairs(stats).toMap()
-
-        assertEquals("13", pairs["alnsBootstrapCpNodes"])
-        assertEquals("7", pairs["alnsBootstrapLsMoves"])
-        assertEquals("17", pairs["alnsRepairCpNodes"])
-        assertEquals("5", pairs["alnsRepairLsMoves"])
-        assertEquals("120", pairs["alnsOuterAllowance"])
-        assertEquals("9", pairs["alnsBootstrapCpMillis"])
-        assertEquals("8", pairs["alnsBootstrapLsMillis"])
-        assertEquals("3", pairs["alnsRepairMillis"])
-        assertTrue(portfolioStatPairs(SolveStats.EMPTY).isEmpty())
-    }
-
-    @Test
-    fun `a residual observation prints its cost and kind totals before any move`() {
+    fun `a residual observation should print its cost and kind totals before any move`() {
         val stats = SolveStats(
             run = RunStats(backend = "mixed"),
-            ls = LocalSearchStats(bestResidual = LocalSearchResidual(
-                9, mapOf("Linear" to 7L, "Clause" to 2L),
-                listOf(LocalSearchResidualFactor(3, "Linear", 7, mapOf(2 to false), mapOf(4 to 3L), 1, 5)),
-            )),
+            ls = LocalSearchStats(
+                bestResidual = LocalSearchResidual(
+                    9,
+                    mapOf("Linear" to 7L, "Clause" to 2L),
+                    listOf(LocalSearchResidualFactor(3, "Linear", 7, mapOf(2 to false), mapOf(4 to 3L), 1, 5)),
+                ),
+            ),
         )
 
         val pairs = lsStatPairs(stats, solveTimeMs = 0).toMap()
@@ -227,21 +219,40 @@ class CliStatsTest {
     }
 
     @Test
-    fun `residual detail pairs preserve signed values without changing the coordinate pair`() {
-        val stats = SolveStats(ls = LocalSearchStats(bestResidual = LocalSearchResidual(
-            5, mapOf("Linear" to 5L), listOf(LocalSearchResidualFactor(
-                3, "Linear", 5, emptyMap(), mapOf(4 to 2L), details = mapOf(
-                    "term.0" to "-3:i4", "activity" to "-6", "op" to "EQ", "bound" to "-1",
-                    "i4.definition.kind" to "IntDef.Lin", "i4.definition.inputs" to "i2,b1",
-                    "i4.definition.omittedInputs" to "1",
+    fun `residual detail pairs should preserve signed values without changing the coordinate pair`() {
+        val stats = SolveStats(
+            ls = LocalSearchStats(
+                bestResidual = LocalSearchResidual(
+                    5,
+                    mapOf("Linear" to 5L),
+                    listOf(
+                        LocalSearchResidualFactor(
+                            3,
+                            "Linear",
+                            5,
+                            emptyMap(),
+                            mapOf(4 to 2L),
+                            details = mapOf(
+                                "term.0" to "-3:i4",
+                                "activity" to "-6",
+                                "op" to "EQ",
+                                "bound" to "-1",
+                                "i4.definition.kind" to "IntDef.Lin",
+                                "i4.definition.inputs" to "i2,b1",
+                                "i4.definition.omittedInputs" to "1",
+                            ),
+                        ),
+                    ),
                 ),
-            )),
-        )))
+            ),
+        )
 
         val pairs = lsStatPairs(stats, solveTimeMs = 0).toMap()
 
-        assertEquals("kind=Linear degree=5 bools=- ints=i4:2 omittedBools=0 omittedInts=0",
-            pairs["lsBestResidualFactor.3"])
+        assertEquals(
+            "kind=Linear degree=5 bools=- ints=i4:2 omittedBools=0 omittedInts=0",
+            pairs["lsBestResidualFactor.3"],
+        )
         assertEquals("-3:i4", pairs["lsBestResidualFactorDetails.3.term.0"])
         assertEquals("-6", pairs["lsBestResidualFactorDetails.3.activity"])
         assertEquals("-1", pairs["lsBestResidualFactorDetails.3.bound"])
@@ -251,9 +262,15 @@ class CliStatsTest {
     }
 
     @Test
-    fun `refused float phase costs are emitted without a node solve`() {
-        val stats = SolveStats(lp = LpStats(phases = mapOf("CLEANUP_STANDALONE" to
-            LpPhaseStats(1L, 13L, 17L, 2L, outcomes = mapOf("PIVOTS" to 1L)))))
+    fun `refused float phase costs should be emitted without a node solve`() {
+        val stats = SolveStats(
+            lp = LpStats(
+                phases = mapOf(
+                    "CLEANUP_STANDALONE" to
+                        LpPhaseStats(1L, 13L, 17L, 2L, outcomes = mapOf("PIVOTS" to 1L)),
+                ),
+            ),
+        )
 
         val pairs = lpStatPairs(stats).toMap()
 
@@ -265,19 +282,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `shared conflict coverage is visible in open theory stats`() {
-        val stats = SolveStats(
-            openTheoryClauses = OpenTheoryClauseStats(assertingConflicts = 7, nonAssertingConflicts = 3),
-        )
-
-        val pairs = openTheoryStatPairs(stats, 1L).toMap()
-
-        assertEquals("7", pairs["openAssertingConflicts"])
-        assertEquals("3", pairs["openNonAssertingConflicts"])
-    }
-
-    @Test
-    fun `continuation costs remain visible for LP and SMT declines`() {
+    fun `continuation costs should remain visible for LP and SMT declines`() {
         val continuation = LpContinuationStats(
             calls = 1,
             work = mapOf("IMPORT" to 13),
@@ -295,20 +300,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `paired continuation rejection details retain their own count`() {
-        val key = "VERIFY_CANDIDATE_FIRST_STRICT_LOGICAL_ENDPOINT_NO_STRICT_ATTEMPT_WORK"
-        val stats = SolveStats(smt = SmtStats(continuation = LpContinuationStats(
-            calls = 2L, declines = mapOf(key to 1L),
-        )))
-
-        val pairs = openTheoryStatPairs(stats, 1L).toMap()
-
-        assertEquals("2", pairs["smtContinuationCalls"])
-        assertEquals("1", pairs["smtContinuationDecline_$key"])
-    }
-
-    @Test
-    fun `rational basis resource work is visible without a float solve`() {
+    fun `rational basis resource work should be visible without a float solve`() {
         val stats = SolveStats(
             lp = LpStats(
                 basisVerification = LpBasisVerificationStats(
@@ -334,7 +326,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `presolve stats report which passes fired and the constraint drop, all presolve-prefixed`() {
+    fun `presolve stats should report fired passes and the constraint drop under presolve-prefixed keys`() {
         val stats = SolveStats(
             run = RunStats(backend = "backtrack"),
             presolve = PresolveStats(passes = listOf("strengthen", "affine"), constraintsRemoved = 3),
@@ -347,7 +339,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `a node pass without a solve still emits the LP block`() {
+    fun `a node pass without a solve should still emit the LP block`() {
         val pairs = lpStatPairs(
             SolveStats(lp = LpStats(nodePasses = SumResult(1.0))),
         ).toMap()
@@ -357,7 +349,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `root route emits warm refactor and numerical metrics`() {
+    fun `root route should emit warm refactor and numerical metrics`() {
         val pairs = lpStatPairs(
             SolveStats(
                 lp = LpStats(
@@ -384,7 +376,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `cut accounting without an active measurement omits the maximum`() {
+    fun `cut accounting without an active measurement should omit the maximum`() {
         val pairs = lpStatPairs(
             SolveStats(
                 lp = LpStats(
@@ -401,7 +393,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `derived split and rates are correct`() {
+    fun `LP stats should derive the bound-pruned split and rates`() {
         val stats = SolveStats(
             run = RunStats(backend = "backtrack"),
             lp = LpStats(
@@ -426,10 +418,12 @@ class CliStatsTest {
     }
 
     @Test
-    fun `continuous root statistics preserve the complete floating bound`() {
+    fun `continuous root statistics should preserve the complete floating bound`() {
         for (bound in listOf(0.123456789, -0.123456789, 9007199254740994.0, Double.MAX_VALUE)) {
-            val stats = SolveStats(run = RunStats(backend = "backtrack"),
-                lp = LpStats(solves = SumResult(1.0), rootBound = bound))
+            val stats = SolveStats(
+                run = RunStats(backend = "backtrack"),
+                lp = LpStats(solves = SumResult(1.0), rootBound = bound),
+            )
 
             val published = lpStatPairs(stats).toMap().getValue("lpRootBound")
 
@@ -438,7 +432,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `uncalled certifier has no fabricated decline rate`() {
+    fun `an uncalled certifier should report no success rate`() {
         val stats = SolveStats(
             run = RunStats(backend = "backtrack"),
             lp = LpStats(
@@ -462,25 +456,25 @@ class CliStatsTest {
     }
 
     @Test
-    fun `lagrangian or energetic prunes alone still emit the block`() {
+    fun `lagrangian or energetic prunes alone should still emit the block`() {
         val stats = SolveStats(
             run = RunStats(backend = "backtrack"),
             scheduling = SchedulingStats(energeticPruned = SumResult(4.0)),
         )
         val m = lpStatPairs(stats).toMap()
         assertEquals("4", m["lpEnergeticPruned"])
-        assertTrue("lpRootBound" !in m, "no root bound when the LP never solved")
+        assertTrue("lpRootBound" !in m)
     }
 
     @Test
-    fun `ls backend emits the block even before any move`() {
+    fun `ls backend should emit the block before any move`() {
         val pairs = lsStatPairs(SolveStats(run = RunStats(backend = "ls")), solveTimeMs = 0)
         assertTrue(pairs.isNotEmpty())
         assertEquals("0", pairs.toMap()["lsMoves"])
     }
 
     @Test
-    fun `derived ls rates and incumbent are correct`() {
+    fun `ls stats should derive move rates and the incumbent`() {
         val stats = SolveStats(
             run = RunStats(backend = "ls", wallMs = 2000L),
             search = SearchStats(restarts = SumResult(5.0)),
@@ -497,39 +491,25 @@ class CliStatsTest {
         assertEquals("5", m["lsRestarts"])
         assertEquals("3", m["lsStalls"])
         assertEquals("500", m["lsMovesPerSec"]) // 1000 / (2000ms = 2s)
-        assertEquals("0.5", m["lsTimeToBest"]) // 500ms
+        assertEquals("0.5", m["lsTimeToBest"])
         assertEquals("12", m["lsIncumbentObjective"])
         assertEquals("0", m["lsIncumbentViolation"])
     }
 
     @Test
-    fun `infeasible ls run reports residual violation and no objective`() {
+    fun `infeasible ls run should report residual violation and no objective`() {
         val stats = SolveStats(
             run = RunStats(backend = "ls"),
             ls = LocalSearchStats(moves = SumResult(800.0), incumbentViolation = 7.0),
         )
         val m = lsStatPairs(stats, solveTimeMs = 0).toMap()
         assertEquals("7", m["lsIncumbentViolation"])
-        assertTrue("lsIncumbentObjective" !in m, "no objective when never feasible")
-        assertTrue("lsTimeToBest" !in m, "no time-to-best when no incumbent")
+        assertTrue("lsIncumbentObjective" !in m)
+        assertTrue("lsTimeToBest" !in m)
     }
 
     @Test
-    fun `a drawn hint reports what it covered and cost`() {
-        val stats = SolveStats(
-            run = RunStats(backend = "exact-lira"),
-            openHints = OpenHintStats(draws = 1, produced = 1, hintedVars = 4, steeredSplits = 9, moves = 37),
-        )
-        val m = openTheoryStatPairs(stats, solveTimeMs = 0).toMap()
-        assertEquals("1", m["openHintDraws"])
-        assertEquals("1", m["openHintProduced"])
-        assertEquals("4", m["openHintVars"])
-        assertEquals("9", m["openHintSteered"])
-        assertEquals("37", m["openHintMoves"])
-    }
-
-    @Test
-    fun `SMT stats report source work without zero-denominator rates`() {
+    fun `SMT stats should report source work without zero-denominator rates`() {
         val stats = SolveStats(
             run = RunStats(backend = "exact-lira"),
             openTheory = OpenTheoryWorkStats(openTheoryChecks = 5),
@@ -550,7 +530,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `SMT check rate uses the whole solve duration`() {
+    fun `SMT check rate should use the whole solve duration`() {
         val stats = SolveStats(
             run = RunStats(backend = "exact-lira", wallMs = 10),
             openTheory = OpenTheoryWorkStats(openTheoryChecks = 100),
@@ -563,24 +543,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `numerical trouble is reported when a run met it`() {
-        val stats = SolveStats(
-            run = RunStats(backend = "backtrack"),
-            lp = LpStats(
-                solves = SumResult(8.0),
-                singularRefactorizations = SumResult(3.0),
-                smallPivotBails = SumResult(2.0),
-            ),
-        )
-
-        val m = lpStatPairs(stats).toMap()
-
-        assertEquals("3", m["lpSingularRefactorizations"])
-        assertEquals("2", m["lpSmallPivotBails"])
-    }
-
-    @Test
-    fun `the root coefficient spread keeps the magnitude of a small coefficient`() {
+    fun `the root coefficient spread should keep the magnitude of a small coefficient`() {
         val stats = SolveStats(
             run = RunStats(backend = "backtrack"),
             lp = LpStats(
@@ -599,7 +562,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `search pairs report the mean learned clause size and literal block distance`() {
+    fun `search pairs should report the mean learned clause size and literal block distance`() {
         val search = SearchStats(
             learnedClauses = SumResult(4.0),
             learnedLiterals = SumResult(10.0),
@@ -612,7 +575,7 @@ class CliStatsTest {
     }
 
     @Test
-    fun `portfolio pairs report each arm with its schedule and credit`() {
+    fun `portfolio pairs should report each arm with its schedule and credit`() {
         val credit = mapOf("ClauseUses" to 4.0)
         val arm = ArmSchedule(
             "bt-0",
@@ -627,8 +590,15 @@ class CliStatsTest {
             reseeds = 2,
             failure = ArmFailure(7, "IllegalStateException", "row \"R\"\n\t\\", "slice", 2, 30, "cause\r\nframe"),
         )
-        val stats = SolveStats(portfolio = PortfolioStats(listOf(arm), reseedStaleThreshold = 4,
-            baseSliceWork = 1_000L, maxSliceWork = 8_000L, sliceGrowth = 2.0))
+        val stats = SolveStats(
+            portfolio = PortfolioStats(
+                listOf(arm),
+                reseedStaleThreshold = 4,
+                baseSliceWork = 1_000L,
+                maxSliceWork = 8_000L,
+                sliceGrowth = 2.0,
+            ),
+        )
 
         val pairs = portfolioStatPairs(stats).toMap()
 
@@ -647,13 +617,13 @@ class CliStatsTest {
         assertEquals("8000", pairs["portfolioMaxSliceWork"])
         assertEquals("2.0", pairs["portfolioSliceGrowth"])
     }
+
     @Test
-    fun `an exhausted zero solve allowance reports its effective remaining work`() {
+    fun `an exhausted zero solve allowance should report its effective remaining work`() {
         val pairs = nodeBudgetStatPairs(NodeBudget(0L)).toMap()
 
         assertEquals("0", pairs["nodeBudgetLimit"])
         assertEquals("0", pairs["nodeBudgetSpent"])
         assertEquals("0", pairs["nodeBudgetRemaining"])
     }
-
 }

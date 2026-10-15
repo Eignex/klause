@@ -27,7 +27,7 @@ class OpbModeTest {
     }.absolutePath
 
     @Test
-    fun `a satisfiable pseudo-boolean instance prints s SATISFIABLE with a full literal model line`() {
+    fun `a satisfiable pseudo-boolean instance should print s SATISFIABLE with a full literal model line`() {
         val out = capture { main(arrayOf(opb("+1 x1 +1 x2 +1 x3 >= 2 ;\n"))) }
         assertTrue("s SATISFIABLE" in out, out)
         val model = out.lines().first { it.startsWith("v ") }.removePrefix("v ").trim().split(" ")
@@ -39,7 +39,7 @@ class OpbModeTest {
     }
 
     @Test
-    fun `the model line lists only declared variables not reified product indicators`() {
+    fun `the model line should list only declared variables not reified product indicators`() {
         val out = capture { main(arrayOf(opb("+1 x1 x2 >= 1 ;\n"))) }
         assertTrue("s SATISFIABLE" in out, out)
         val model = out.lines().first { it.startsWith("v ") }.removePrefix("v ").trim().split(" ")
@@ -47,7 +47,7 @@ class OpbModeTest {
     }
 
     @Test
-    fun `an optimisation instance proves the objective optimum`() {
+    fun `an optimisation instance should prove the objective optimum`() {
         val out = capture {
             main(
                 arrayOf(
@@ -67,13 +67,13 @@ class OpbModeTest {
     }
 
     @Test
-    fun `an infeasible instance prints s UNSATISFIABLE`() {
+    fun `an infeasible instance should print s UNSATISFIABLE`() {
         val out = capture { main(arrayOf(opb("+1 x1 >= 1 ;\n+1 x1 <= 0 ;\n"))) }
         assertTrue("s UNSATISFIABLE" in out, out)
     }
 
     @Test
-    fun `the opb extension and the explicit format both route to the OPB front-end`() {
+    fun `the opb extension and the explicit format should both route to the OPB front-end`() {
         val path = opb("+1 x1 >= 1 ;\n")
         val byExt = capture { main(arrayOf(path)) }
         val byFormat = capture { main(arrayOf("--format", "opb", path)) }

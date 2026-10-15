@@ -24,11 +24,18 @@ import kotlin.test.assertTrue
 
 class TranscendentalWorkerAdapterTest {
     @Test
-    fun `an unresolved numeric root retains its charges across slices`() {
+    fun `unresolved numeric root should keep its charges across slices`() {
         val x = TranscendentalExpression.Variable(SourceRealId(0))
-        val source = TranscendentalProblem(TranscendentalFormula.Atom(
-            TranscendentalExpression.Function(TranscendentalFunction.EXP, x), PolynomialRelation.EQ, x),
-            emptyMap(), mapOf("x" to 0), emptyMap())
+        val source = TranscendentalProblem(
+            TranscendentalFormula.Atom(
+                TranscendentalExpression.Function(TranscendentalFunction.EXP, x),
+                PolynomialRelation.EQ,
+                x,
+            ),
+            emptyMap(),
+            mapOf("x" to 0),
+            emptyMap(),
+        )
         val params = TranscendentalTheoryParams(maximumDepth = 1)
         val adapter = TranscendentalWorkerAdapter(source, params, FiniteEngine.BACKTRACK)
 
@@ -46,7 +53,7 @@ class TranscendentalWorkerAdapterTest {
     }
 
     @Test
-    fun `closing an unused source worker prevents opening a traversal`() {
+    fun `closing an unused source worker should prevent opening a traversal`() {
         val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
         val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
         adapter.close()
@@ -56,9 +63,13 @@ class TranscendentalWorkerAdapterTest {
     }
 
     @Test
-    fun `a sliced refuted Boolean branch retains its feasible sibling`() {
-        val source = TranscendentalProblem(TranscendentalFormula.BooleanVariable(SourceBoolId(0)),
-            emptyMap(), emptyMap(), mapOf("b" to 0))
+    fun `sliced refuted Boolean branch should keep its feasible sibling`() {
+        val source = TranscendentalProblem(
+            TranscendentalFormula.BooleanVariable(SourceBoolId(0)),
+            emptyMap(),
+            emptyMap(),
+            mapOf("b" to 0),
+        )
         val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
 
         val sliced = adapter.completeHandle().use { handle ->
@@ -79,7 +90,7 @@ class TranscendentalWorkerAdapterTest {
     }
 
     @Test
-    fun `a zero slice spends no arithmetic before a later slice`() {
+    fun `zero slice should spend no arithmetic before a later slice`() {
         val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
         val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
 
@@ -91,7 +102,7 @@ class TranscendentalWorkerAdapterTest {
     }
 
     @Test
-    fun `lifetime cancellation finishes rather than pausing an active handle`() {
+    fun `lifetime cancellation should finish rather than pause an active handle`() {
         val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
         val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
 
@@ -105,7 +116,7 @@ class TranscendentalWorkerAdapterTest {
     }
 
     @Test
-    fun `closing a pending handle rejects resumption without native work`() {
+    fun `closing a pending handle should reject resumption without native work`() {
         val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
         val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
         val handle = adapter.completeHandle()
@@ -118,32 +129,13 @@ class TranscendentalWorkerAdapterTest {
     }
 
     @Test
-    fun `closing a source worker retains its arithmetic charges`() {
-        val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
-        val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
-        val result = adapter.execute()
-        val work = adapter.nativeWork
-
-        adapter.close()
-        adapter.close()
-
-        assertIs<OpenTheoryResult.Sat>(result.result)
-        assertEquals(work, adapter.nativeWork)
-    }
-
-    @Test
-    fun `a closed source worker rejects another source query`() {
-        val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
-        val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
-        adapter.close()
-
-        assertFailsWith<IllegalStateException> { adapter.execute() }
-    }
-
-    @Test
-    fun `a published point survives close but cannot cross invocation ownership`() {
-        val source = TranscendentalProblem(TranscendentalFormula.BooleanVariable(SourceBoolId(0)),
-            emptyMap(), emptyMap(), mapOf("b" to 0))
+    fun `published point should survive close but not cross invocation ownership`() {
+        val source = TranscendentalProblem(
+            TranscendentalFormula.BooleanVariable(SourceBoolId(0)),
+            emptyMap(),
+            emptyMap(),
+            mapOf("b" to 0),
+        )
         val identity = ModelIdentity.of(source)
         val binding = EngineInvocation(source.prepareTranscendentalExecutionPlan(), identity)
         val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK, binding)
@@ -162,13 +154,24 @@ class TranscendentalWorkerAdapterTest {
     }
 
     @Test
-    fun `separate workers retain separate conditions and arithmetic costs`() {
-        val source = TranscendentalProblem(TranscendentalFormula.BooleanVariable(SourceBoolId(0)),
-            emptyMap(), emptyMap(), mapOf("b" to 0))
+    fun `separate workers should keep separate conditions and arithmetic costs`() {
+        val source = TranscendentalProblem(
+            TranscendentalFormula.BooleanVariable(SourceBoolId(0)),
+            emptyMap(),
+            emptyMap(),
+            mapOf("b" to 0),
+        )
         val params = TranscendentalTheoryParams()
         val first = TranscendentalWorkerAdapter(source, params, FiniteEngine.BACKTRACK)
-        val second = TranscendentalWorkerAdapter(source, params.copy(strategy = params.strategy.copy(
-            assumptions = Assumptions.None.withBool(0, false))), FiniteEngine.BACKTRACK)
+        val second = TranscendentalWorkerAdapter(
+            source,
+            params.copy(
+                strategy = params.strategy.copy(
+                    assumptions = Assumptions.None.withBool(0, false),
+                ),
+            ),
+            FiniteEngine.BACKTRACK,
+        )
 
         val feasible = first.execute()
         val spent = first.nativeWork

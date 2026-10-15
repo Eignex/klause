@@ -11,8 +11,7 @@ import kotlin.test.Test
 class ReifiedPseudoBooleanPropagatorTest {
 
     @Test
-    fun `reified pseudo-boolean deductions are implied by their reasons with the indicator on variable zero`() {
-        // The indicator on Boolean variable 0 makes its true literal the integer 0.
+    fun `reified pseudo-boolean deductions should be implied by their reasons with the indicator on variable zero`() {
         val rng = Random(0x9B0)
         repeat(300) { iter ->
             val n = 4

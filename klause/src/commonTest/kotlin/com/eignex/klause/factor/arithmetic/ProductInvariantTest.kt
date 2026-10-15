@@ -1,24 +1,24 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.localsearch.BuiltInScoringProjectionProvider
+import com.eignex.klause.localsearch.LocalSearchModel
+import com.eignex.klause.localsearch.LocalSearchProblem
+import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
+import com.eignex.klause.localsearch.ScoringProjectionProvider
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
-import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.localsearch.BuiltInScoringProjectionProvider
-import com.eignex.klause.localsearch.LocalSearchProblem
-import com.eignex.klause.localsearch.ScoringProjectionProvider
-import com.eignex.klause.solver.FactorProjectionProviders
-import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.localsearch.LocalSearchModel
-import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.localsearch.Move
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,11 +26,15 @@ import kotlin.test.assertTrue
 
 class ProductInvariantTest {
     @Test
-    fun `predicted alias moves agree with whole factor grading`() {
+    fun `predicted alias moves should agree with whole factor grading`() {
         for (roles in listOf(Triple(0, 0, 1), Triple(0, 1, 0), Triple(1, 0, 0), Triple(0, 0, 0))) {
             val (a, b, result) = roles
-            val problem = Problem(0, 2, Array(2) { IntDomain(-10, 10) },
-                arrayOf<Factor>(Product(a, b, result)))
+            val problem = Problem(
+                0,
+                2,
+                Array(2) { IntDomain(-10, 10) },
+                arrayOf<Factor>(Product(a, b, result)),
+            )
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
             for (other in listOf(0L, 1L, -1L, 4L)) {
                 for ((old, target) in listOf(2L to 3L, -2L to -3L, 0L to 1L, 1L to 0L)) {
@@ -49,11 +53,15 @@ class ProductInvariantTest {
     }
 
     @Test
-    fun `committed alias moves agree with whole factor grading`() {
+    fun `committed alias moves should agree with whole factor grading`() {
         for (roles in listOf(Triple(0, 0, 1), Triple(0, 1, 0), Triple(1, 0, 0), Triple(0, 0, 0))) {
             val (a, b, result) = roles
-            val problem = Problem(0, 2, Array(2) { IntDomain(-10, 10) },
-                arrayOf<Factor>(Product(a, b, result)))
+            val problem = Problem(
+                0,
+                2,
+                Array(2) { IntDomain(-10, 10) },
+                arrayOf<Factor>(Product(a, b, result)),
+            )
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
             for (other in listOf(0L, 1L, -1L, 4L)) {
                 for ((old, target) in listOf(2L to 3L, -2L to -3L, 0L to 1L, 1L to 0L)) {
@@ -79,12 +87,16 @@ class ProductInvariantTest {
     }
 
     @Test
-    fun `alias repair candidates do not increase the whole residual`() {
+    fun `alias repair candidates should not increase the whole residual`() {
         for (roles in listOf(Triple(0, 0, 1), Triple(0, 1, 0), Triple(1, 0, 0), Triple(0, 0, 0))) {
             for (other in listOf(3L, 5L, 8L)) {
                 val (a, b, result) = roles
-                val problem = Problem(0, 2, Array(2) { IntDomain(-10, 10).excludeValue(7) },
-                    arrayOf<Factor>(Product(a, b, result)))
+                val problem = Problem(
+                    0,
+                    2,
+                    Array(2) { IntDomain(-10, 10).excludeValue(7) },
+                    arrayOf<Factor>(Product(a, b, result)),
+                )
                 val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
                 state.assignment.setInt(0, 2)
                 state.assignment.setInt(1, other)
@@ -116,17 +128,23 @@ class ProductInvariantTest {
             }
         }
     }
+
     @Test
-    fun `wide alias moves retain saturated full grading`() {
+    fun `wide alias moves should retain saturated full grading`() {
         for (roles in listOf(Triple(0, 0, 1), Triple(0, 1, 0), Triple(1, 0, 0), Triple(0, 0, 0))) {
             for ((old, target) in listOf(
-                3037000499L to 3037000500L, Long.MAX_VALUE - 1 to Long.MAX_VALUE,
-                Long.MIN_VALUE to Long.MIN_VALUE + 1, -1L to 0L,
+                3037000499L to 3037000500L,
+                Long.MAX_VALUE - 1 to Long.MAX_VALUE,
+                Long.MIN_VALUE to Long.MIN_VALUE + 1,
+                -1L to 0L,
             )) {
                 val (a, b, result) = roles
-                val problem = Problem(0, 2,
+                val problem = Problem(
+                    0,
+                    2,
                     arrayOf(IntDomain(minOf(old, target), maxOf(old, target)), IntDomain(-1, -1)),
-                    arrayOf<Factor>(Product(a, b, result)))
+                    arrayOf<Factor>(Product(a, b, result)),
+                )
                 val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
                 state.assignment.setInt(0, old)
                 state.assignment.setInt(1, -1)
@@ -144,9 +162,13 @@ class ProductInvariantTest {
     }
 
     @Test
-    fun `alias repairs respect frozen coordinates and domain holes`() {
-        val problem = Problem(0, 2, arrayOf(IntDomain(1, 4).excludeValue(3), IntDomain(8, 8)),
-            arrayOf<Factor>(Product(0, 0, 1)))
+    fun `alias repairs should respect frozen coordinates and domain holes`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(1, 4).excludeValue(3), IntDomain(8, 8)),
+            arrayOf<Factor>(Product(0, 0, 1)),
+        )
         for (frozen in listOf(false, true)) {
             val assumptions = if (frozen) Assumptions.None.withInt(0, 2L) else Assumptions.None
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(1), assumptions)
@@ -161,18 +183,23 @@ class ProductInvariantTest {
     }
 
     @Test
-    fun `selected scoring projections preserve aliases introduced by remapping`() {
+    fun `selected scoring projections should preserve aliases introduced by remapping`() {
         val original = Product(2, 3, 4)
         val source = Problem(0, 5, Array(5) { IntDomain(-10, 10) }, arrayOf<Factor>(original))
-        val selected = FactorProjectionProviders(scoring = ScoringProjectionProvider { factor ->
-            if (factor !== original) null else BuiltInScoringProjectionProvider.select(factor)
-        }).prepare(source)
+        val selected = FactorProjectionProviders(
+            scoring = ScoringProjectionProvider { factor ->
+                if (factor !== original) null else BuiltInScoringProjectionProvider.select(factor)
+            },
+        ).prepare(source)
         for (roles in listOf(Triple(0, 0, 1), Triple(0, 1, 0), Triple(1, 0, 0), Triple(0, 0, 0))) {
             val (a, b, result) = roles
             val mapped = original.remap(VarRemap(intArrayOf(), intArrayOf(-1, -1, a, b, result)))
             val view = Problem(0, 2, Array(2) { IntDomain(-10, 10) }, arrayOf(mapped))
-            val state = LocalSearchState(LocalSearchModel.open(view), Random(1),
-                projection = LocalSearchProblem(view, selected.projected(view, intArrayOf(0))))
+            val state = LocalSearchState(
+                LocalSearchModel.open(view),
+                Random(1),
+                projection = LocalSearchProblem(view, selected.projected(view, intArrayOf(0))),
+            )
             state.assignment.setInt(0, 2)
             state.assignment.setInt(1, 4)
             state.recompute()
@@ -197,7 +224,7 @@ class ProductInvariantTest {
     }
 
     @Test
-    fun `overflowed products cannot satisfy a saturated result endpoint`() {
+    fun `overflowed products should not satisfy a saturated result endpoint`() {
         for ((product, values) in listOf(
             Product(0, 1, 0) to longArrayOf(Long.MAX_VALUE, 2, 0),
             Product(0, 1, 0) to longArrayOf(Long.MIN_VALUE, 2, 0),
@@ -208,8 +235,10 @@ class ProductInvariantTest {
             val problem = Problem(0, 3, Array(3) { IntDomain(values[it], values[it]) }, arrayOf<Factor>(product))
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
             for (id in values.indices) state.assignment.setInt(id, values[id])
-            val raw = (bigIntOf(values[product.a]) * bigIntOf(values[product.b]) -
-                bigIntOf(values[product.result])).abs()
+            val raw = (
+                bigIntOf(values[product.a]) * bigIntOf(values[product.b]) -
+                    bigIntOf(values[product.result])
+                ).abs()
             val capped = if (raw > bigIntOf(Long.MAX_VALUE)) Long.MAX_VALUE else raw.toLongExact()
 
             state.recompute()
@@ -218,5 +247,4 @@ class ProductInvariantTest {
             assertEquals(compressViolation(capped, state.violationSoftCap).toLong(), state.cost)
         }
     }
-
 }

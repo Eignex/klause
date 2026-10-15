@@ -5,14 +5,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class PresolveRoundEngineTest {
-
-    /** A host whose passes change the scripted number of units on each successive run. */
     private class ScriptedHost(
         private val size: Long,
         private val changes: Map<PresolvePass, List<Long>>,
         private val decreasingComplexity: Boolean = false,
-    ) :
-        PresolveRoundEngine.RoundHost {
+    ) : PresolveRoundEngine.RoundHost {
         val runs = ArrayList<PresolvePass>()
         private var units = 0L
 
@@ -37,7 +34,7 @@ class PresolveRoundEngineTest {
     }
 
     @Test
-    fun `a lower abort fraction retains productive rounds`() {
+    fun `a lower abort fraction should retain productive rounds`() {
         val pass = PresolvePass.STRENGTHEN_COEFFICIENTS
         val stopped = ScriptedHost(10_000, mapOf(pass to listOf(5L, 5L)), decreasingComplexity = true)
         val continued = ScriptedHost(10_000, mapOf(pass to listOf(5L, 5L)), decreasingComplexity = true)
@@ -50,7 +47,7 @@ class PresolveRoundEngineTest {
     }
 
     @Test
-    fun `a round cap stops a productive schedule`() {
+    fun `a round cap should stop a productive schedule`() {
         val pass = PresolvePass.STRENGTHEN_COEFFICIENTS
         val host = ScriptedHost(10_000, mapOf(pass to listOf(100L, 100L, 100L)), decreasingComplexity = true)
 
@@ -60,7 +57,7 @@ class PresolveRoundEngineTest {
     }
 
     @Test
-    fun `a cheap pass reruns after its own change`() {
+    fun `a cheap pass should rerun after its own change`() {
         val host = ScriptedHost(1_000, mapOf(PresolvePass.STRENGTHEN_COEFFICIENTS to listOf(2L)))
 
         val runs = runs(listOf(PresolvePass.STRENGTHEN_COEFFICIENTS), host)
@@ -69,7 +66,7 @@ class PresolveRoundEngineTest {
     }
 
     @Test
-    fun `an expensive pass reruns once others change a large enough share of the model`() {
+    fun `an expensive pass should rerun once others change a large enough share of the model`() {
         val host = ScriptedHost(1_000, mapOf(PresolvePass.STRENGTHEN_COEFFICIENTS to listOf(10L)))
 
         val runs = runs(listOf(PresolvePass.AGGREGATE_SUB_SUMS, PresolvePass.STRENGTHEN_COEFFICIENTS), host)

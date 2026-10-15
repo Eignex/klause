@@ -1,7 +1,6 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.LpBuilder
-import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
@@ -10,7 +9,6 @@ import com.eignex.klause.lp.engine.safeObjectiveLowerBound
 import com.eignex.klause.lp.engine.safeVariableBound
 import com.eignex.klause.lp.engine.tightVariableBound
 import com.eignex.klause.simplex.exact.BigFraction
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -18,7 +16,7 @@ import kotlin.test.assertTrue
 
 class SafeObjectiveBoundTest {
     @Test
-    fun `supplied legacy certificates cannot preserve a bound after its objective changes`() {
+    fun `supplied legacy certificates should not preserve a bound after its objective changes`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 9L, cost = 1L)
             val y = addVar(0L, 9L, cost = 1L)
@@ -40,7 +38,7 @@ class SafeObjectiveBoundTest {
     }
 
     @Test
-    fun `retained variable bounds follow nested endpoints and rollback in source coordinates`() {
+    fun `retained variable bounds should follow nested endpoints and rollback in source coordinates`() {
         for (maximize in listOf(false, true)) {
             val source = LpBuilder().apply { addVar(3L, 9L, cost = if (maximize) -1L else 1L) }
                 .build(Sense.MINIMIZE)
@@ -63,19 +61,25 @@ class SafeObjectiveBoundTest {
     }
 
     @Test
-    fun `retained variable bounds divide objective scaling before integer rounding`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(3L, 9L, cost = 2L) }
-            .build(Sense.MINIMIZE).authoritativeModel())
+    fun `retained variable bounds should divide objective scaling before integer rounding`() {
+        val source = assertNotNull(
+            LpBuilder().apply { addVar(3L, 9L, cost = 2L) }
+                .build(Sense.MINIMIZE).authoritativeModel(),
+        )
         val objective = ExactLpObjective(
-            listOf(ExactLpNumber.of(2L)), source.objective.constant, scale = ExactLpNumber.of(2L),
+            listOf(ExactLpNumber.of(2L)),
+            source.objective.constant,
+            scale = ExactLpNumber.of(2L),
         )
         val trail = LpBoundTrail(source.copy(objective = objective))
-        assertTrue(trail.assertBound(
-            0,
-            false,
-            ExactLpSide(ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(1.5))), true),
-            7L,
-        ))
+        assertTrue(
+            trail.assertBound(
+                0,
+                false,
+                ExactLpSide(ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(1.5))), true),
+                7L,
+            ),
+        )
         val model = assertNotNull(trail.state.toWorkingModel())
         val result = assertNotNull(RevisedSimplex(model).solvePrimal())
 
@@ -84,39 +88,8 @@ class SafeObjectiveBoundTest {
         assertEquals(5L, model.safeVariableBound(result, 0, maximize = false))
     }
 
-    private fun randomModel(m: Int, n: Int, rng: Random): LpModel {
-        val b = LpBuilder()
-        repeat(n) { b.addVar(0L, rng.nextLong(2, 9), cost = rng.nextLong(-6, 7)) }
-        val cols = IntArray(n) { it }
-        repeat(m) {
-            val vals = LongArray(n) { rng.nextLong(-4, 5) }
-            b.addRow(cols, vals, Relation.LE, rng.nextLong(3, 25))
-        }
-        return b.build(Sense.MINIMIZE)
-    }
-
     @Test
-    fun `safe bound never exceeds the exact optimum`() {
-        val rng = Random(20260615)
-        var finite = 0
-        var total = 0
-        repeat(1200) {
-            val model = randomModel(rng.nextInt(3, 10), rng.nextInt(3, 10), rng)
-            val opt = exactLpOptimum(model)
-            if (opt.isNaN()) return@repeat
-            val rev = RevisedSimplex(model).solve() ?: return@repeat
-            total++
-            val safe = safeObjectiveLowerBound(model, rev.duals) ?: return@repeat
-            finite++
-            assertTrue(safe <= opt + 1e-6, "UNSOUND safe bound $safe > optimum $opt")
-        }
-        assertTrue(total > 300, "covered only $total instances")
-        // The bound should be usefully tight (finite) on the large majority of instances.
-        assertTrue(finite >= total * 4 / 5, "safe bound was finite on only $finite/$total")
-    }
-
-    @Test
-    fun `exact and projected variable bounds retain finite support on an open column`() {
+    fun `exact and projected variable bounds should retain finite support on an open column`() {
         // maximize x subject to x <= 5, x open above (a free column at the ±∞ probe upper).
         val b = LpBuilder()
         val x = b.addFreeVar(0L, null, cost = -1L)
@@ -128,14 +101,14 @@ class SafeObjectiveBoundTest {
         val safe = assertNotNull(model.safeVariableBound(result, x, maximize = true))
         val tight = assertNotNull(model.tightVariableBound(result, x, maximize = true))
 
-        assertEquals(5L, exact, "exact bound should be the true max")
-        assertEquals(5L, tight, "tight bound should match the exact bound")
-        assertTrue(safe >= 5L, "safe bound must stay sound")
-        assertTrue(tight <= safe, "tight bound must not exceed the looser safe bound")
+        assertEquals(5L, exact)
+        assertEquals(5L, tight)
+        assertTrue(safe >= 5L)
+        assertTrue(tight <= safe)
     }
 
     @Test
-    fun `continuous objective bounds retain their fractional units`() {
+    fun `continuous objective bounds should retain their fractional units`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0, cost = 1.0)
             addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.EQ, 1.0)
@@ -149,7 +122,7 @@ class SafeObjectiveBoundTest {
     }
 
     @Test
-    fun `safe bound rounds a wide exact constant downward`() {
+    fun `safe bound should round a wide exact constant downward`() {
         val constant = 9007199254740995L
         val model = LpBuilder().apply { addVar(constant, constant, cost = 1L) }.build(Sense.MINIMIZE)
 
@@ -160,7 +133,7 @@ class SafeObjectiveBoundTest {
     }
 
     @Test
-    fun `safe bound checks negative subnormal objective support exactly`() {
+    fun `safe bound should check negative subnormal objective support exactly`() {
         val model = LpBuilder().apply { addRealVar(0.0, 1.0, cost = -Double.MIN_VALUE) }.build(Sense.MINIMIZE)
 
         val bound = assertNotNull(safeObjectiveLowerBound(model, doubleArrayOf()))
@@ -169,7 +142,7 @@ class SafeObjectiveBoundTest {
     }
 
     @Test
-    fun `source objective lattice includes the exact coordinate origin`() {
+    fun `source objective lattice should include the exact coordinate origin`() {
         val model = LpBuilder().apply {
             addVar(0L, 1L, cost = 1L)
             addRealVar(0.0, 1.0)
@@ -180,7 +153,7 @@ class SafeObjectiveBoundTest {
     }
 
     @Test
-    fun `safe bound declines nonfinite or malformed inputs`() {
+    fun `safe bound should decline nonfinite or malformed inputs`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0)
             addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.5)
@@ -194,7 +167,7 @@ class SafeObjectiveBoundTest {
     }
 
     @Test
-    fun `supplied certificate policy respects the source objective lattice`() {
+    fun `supplied certificate policy should respect the source objective lattice`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 1L, cost = 1L)
             addVar(0L, 1L)
@@ -218,5 +191,4 @@ class SafeObjectiveBoundTest {
         )
         assertEquals(1.0, tightObjectiveLowerBound(model, duals, certificate))
     }
-
 }

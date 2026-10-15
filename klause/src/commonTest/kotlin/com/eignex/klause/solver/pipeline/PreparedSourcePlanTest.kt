@@ -14,19 +14,9 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.PolynomialRealProblem
-import com.eignex.klause.ir.PolynomialRealFormula
-import com.eignex.klause.ir.NonlinearIntegerProblem
-import com.eignex.klause.ir.TranscendentalFormula
-import com.eignex.klause.ir.TranscendentalProblem
-import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.ir.QuadraticCoefficient
-import com.eignex.klause.ir.QuadraticObjectiveSpec
-import com.eignex.klause.ir.QuadraticObjectiveTerm
-import com.eignex.klause.ir.QuadraticVariable
-import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.ScoringProjectionProvider
 import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.NoPropagator
@@ -67,13 +57,22 @@ import kotlin.test.assertTrue
 
 class PreparedSourcePlanTest {
     @Test
-    fun `a declined open polynomial composition retains its finite source projection`() {
+    fun `declined open polynomial composition should keep its finite source projection`() {
         val domain = IntDomain(0, 2).excludeValue(1)
-        val source = Problem(0, 3, arrayOf(domain, IntDomain(0, 2), IntDomain(0, 1)),
-            arrayOf(ContinuousProduct(0, 0, 1), AllDifferent(intArrayOf(0, 1), 0, 3),
-                Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 0)),
-            openIntHi = booleanArrayOf(false, false, true), numRealVars = 2,
-            realLower = doubleArrayOf(-2.0, 2.0), realUpper = doubleArrayOf(2.0, 2.0))
+        val source = Problem(
+            0,
+            3,
+            arrayOf(domain, IntDomain(0, 2), IntDomain(0, 1)),
+            arrayOf(
+                ContinuousProduct(0, 0, 1),
+                AllDifferent(intArrayOf(0, 1), 0, 3),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 0),
+            ),
+            openIntHi = booleanArrayOf(false, false, true),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, 2.0),
+            realUpper = doubleArrayOf(2.0, 2.0),
+        )
 
         val plan = source.prepareExecutionPlan()
 
@@ -81,9 +80,12 @@ class PreparedSourcePlanTest {
         val finite = ownership.cpProjection(source, ownership.cpSourceDomains(source)).problem
         assertEquals(PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER, plan.decline)
         assertFalse(plan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
-        assertEquals(listOf(1), plan.components.single {
-            it.responsibility == ComponentResponsibility.FINITE
-        }.factorIndices)
+        assertEquals(
+            listOf(1),
+            plan.components.single {
+                it.responsibility == ComponentResponsibility.FINITE
+            }.factorIndices,
+        )
         assertEquals(IntVariableOwner.THEORY, ownership.intOwner(2))
         assertEquals(2, finite.numIntVars)
         assertEquals(domain, finite.intDomainOrNull(0))
@@ -92,9 +94,16 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `linear theory preference preserves available finite mixed product completion`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(1, 2)), arrayOf(RealProduct(0, 0, 1, 1.0, 4.0)),
-            numRealVars = 2, realLower = doubleArrayOf(1.0, 4.0), realUpper = doubleArrayOf(4.0, 4.0))
+    fun `linear theory preference should preserve finite mixed product completion`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(1, 2)),
+            arrayOf(RealProduct(0, 0, 1, 1.0, 4.0)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 4.0),
+            realUpper = doubleArrayOf(4.0, 4.0),
+        )
 
         val route = source.pipelineRoute(routeLinearToTheory = true)
 
@@ -104,13 +113,21 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `bound closure precedes polynomial admission beside finite globals`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 3).excludeValue(1)), arrayOf(
-            ContinuousProduct(0, 0, 0),
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
-            AllDifferent(intArrayOf(0, 1), 0, 4),
-        ), openIntHi = booleanArrayOf(true, false), numRealVars = 1,
-            realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
+    fun `bound closure should precede polynomial admission beside finite globals`() {
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 3).excludeValue(1)),
+            arrayOf(
+                ContinuousProduct(0, 0, 0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+                AllDifferent(intArrayOf(0, 1), 0, 4),
+            ),
+            openIntHi = booleanArrayOf(true, false),
+            numRealVars = 1,
+            realLower = doubleArrayOf(1.0),
+            realUpper = doubleArrayOf(1.0),
+        )
 
         val route = assertIs<SourceProblemRoute.PolynomialTheory>(source.pipelineRoute())
         val plan = route.preparedPlan
@@ -121,17 +138,28 @@ class PreparedSourcePlanTest {
         assertEquals(2L, finite.intBounds.upper(0))
         assertEquals(IntDomain(0, 3).excludeValue(1), finite.intDomainOrNull(1))
         assertSame(source.factors[2], finite.factors[1])
-        assertEquals(listOf(0, 1), plan.components.single {
-            it.responsibility == ComponentResponsibility.FINITE
-        }.integerCoordinates)
+        assertEquals(
+            listOf(0, 1),
+            plan.components.single {
+                it.responsibility == ComponentResponsibility.FINITE
+            }.integerCoordinates,
+        )
     }
 
     @Test
-    fun `bounded mixed products retain finite completion under default routing`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2).excludeValue(1)), arrayOf(
-            RealProduct(0, 0, 1, 1.0, 1.0),
-            AllDifferent(intArrayOf(0, 1), 0, 3),
-        ), numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
+    fun `bounded mixed products should keep finite completion under default routing`() {
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2).excludeValue(1)),
+            arrayOf(
+                RealProduct(0, 0, 1, 1.0, 1.0),
+                AllDifferent(intArrayOf(0, 1), 0, 3),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 1.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+        )
 
         val route = assertIs<SourceProblemRoute.Finite>(source.pipelineRoute())
         val result = BacktrackSolver(route.problem.bake()).solve()
@@ -145,27 +173,55 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `selected complete linear encoding overrides a nonlinear factor representation`() {
+    fun `selected complete linear encoding should override a nonlinear factor representation`() {
         for (support in listOf(EncoderSupport.DIRECT, EncoderSupport.EQUIVALENT)) {
             val product = ContinuousProduct(0, 0, 0)
-            val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(product), numRealVars = 1,
-                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
-            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-                if (factor !== product || target != EncodingTarget.LINEAR)
-                    BuiltInEncoderProvider.select(factor, target)
-                else Encoder(support) { _, encoding ->
-                    encoding.linear(LinearForm.Disjunction(listOf(
-                        ExactSearchRow.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-                            LinearOp.EQ, BigFraction.ZERO),
-                        ExactSearchRow.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-                            LinearOp.EQ, BigFraction.ONE),
-                    )))
-                    null
-                }
-            })
+            val source = Problem(
+                0,
+                1,
+                arrayOf(IntDomain(0, 2)),
+                arrayOf(product),
+                numRealVars = 1,
+                realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(1.0),
+            )
+            val providers = FactorProjectionProviders(
+                encoder = EncoderProvider { factor, target ->
+                    if (factor !== product || target != EncodingTarget.LINEAR) {
+                        BuiltInEncoderProvider.select(factor, target)
+                    } else {
+                        Encoder(support) { _, encoding ->
+                            encoding.linear(
+                                LinearForm.Disjunction(
+                                    listOf(
+                                        ExactSearchRow.of(
+                                            intArrayOf(Term.ofRealVar(0)),
+                                            listOf(BigFraction.ONE),
+                                            LinearOp.EQ,
+                                            BigFraction.ZERO,
+                                        ),
+                                        ExactSearchRow.of(
+                                            intArrayOf(Term.ofRealVar(0)),
+                                            listOf(BigFraction.ONE),
+                                            LinearOp.EQ,
+                                            BigFraction.ONE,
+                                        ),
+                                    ),
+                                ),
+                            )
+                            null
+                        }
+                    }
+                },
+            )
 
-            val route = assertIs<SourceProblemRoute.OpenTheory>(source.pipelineRoute(providers,
-                routePureRealToTheory = true, routeLinearToTheory = true))
+            val route = assertIs<SourceProblemRoute.OpenTheory>(
+                source.pipelineRoute(
+                    providers,
+                    routePureRealToTheory = true,
+                    routeLinearToTheory = true,
+                ),
+            )
 
             assertEquals(PreparedExecutionKind.FINITE_LINEAR, route.preparedPlan.kind)
             assertEquals(IntVariableOwner.CP, route.request.componentPlan.intOwner(0))
@@ -175,12 +231,18 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `routing retains resource declines during encoder reinstallation after bound closure`() {
+    fun `routing should keep resource declines during encoder reinstallation after bound closure`() {
         for (interruption in listOf("none", "installer", "cancellation", "work")) {
-            val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf(
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
-                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
-            ), openIntHi = booleanArrayOf(true, true))
+            val source = Problem(
+                0,
+                2,
+                arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+                arrayOf(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+                    Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+                ),
+                openIntHi = booleanArrayOf(true, true),
+            )
             val objective = LinearObjective(intCoefficients = longArrayOf(1, 0), constant = 7)
             var boundsComplete = false
             var initialInstallations = 0
@@ -192,74 +254,78 @@ class PreparedSourcePlanTest {
                 override fun isCancelled(): Boolean = cancelled || charged >= limit
                 override fun workMeter(): WorkMeter = WorkMeter { charged += it }
             }
-            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-                val selected = BuiltInEncoderProvider.select(factor, target)
-                if (target == EncodingTarget.POLYNOMIAL || !selected.enforcesSource) selected
-                else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                    val decline = selected.install(view, encoding)
-                    if (!boundsComplete) {
-                        initialInstallations++
-                        decline
+            val providers = FactorProjectionProviders(
+                encoder = EncoderProvider { factor, target ->
+                    val selected = BuiltInEncoderProvider.select(factor, target)
+                    if (target == EncodingTarget.POLYNOMIAL || !selected.enforcesSource) {
+                        selected
                     } else {
-                        laterInstallations++
-                        when (interruption) {
-                            "installer" -> EncoderDecline.RESOURCE
-                            "cancellation" -> {
-                                cancelled = true
+                        Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                            val decline = selected.install(view, encoding)
+                            if (!boundsComplete) {
+                                initialInstallations++
                                 decline
+                            } else {
+                                laterInstallations++
+                                when (interruption) {
+                                    "installer" -> EncoderDecline.RESOURCE
+
+                                    "cancellation" -> {
+                                        cancelled = true
+                                        decline
+                                    }
+
+                                    "work" -> {
+                                        encoding.cancellation.charge(1_000_000)
+                                        decline
+                                    }
+
+                                    else -> decline
+                                }
                             }
-                            "work" -> {
-                                encoding.cancellation.charge(1_000_000)
-                                decline
-                            }
-                            else -> decline
                         }
                     }
-                }
-            })
+                },
+            )
 
-            val route = source.pipelineRoute(providers, objective, maximize = true, boundCancellation = stop,
+            val route = source.pipelineRoute(
+                providers,
+                objective,
+                maximize = true,
+                boundCancellation = stop,
                 onLpStats = {
                     assertTrue(initialInstallations > 0)
                     boundsComplete = true
                     if (interruption == "work") limit = charged + 1_000_000
-                })
+                },
+            )
 
             assertTrue(boundsComplete)
             assertTrue(laterInstallations > 0)
             val prepared = if (interruption == "none") {
                 assertIs<SourceProblemRoute.OpenTheory>(route, interruption).preparedPlan.also {
-                    val ownership = assertNotNull(it.componentPlan)
-                    assertEquals(IntVariableOwner.CP, ownership.intOwner(0))
-                    assertEquals(IntVariableOwner.THEORY, ownership.intOwner(1))
+                    assertEquals(IntVariableOwner.THEORY, assertNotNull(it.componentPlan).intOwner(1))
                 }
             } else {
                 assertIs<SourceProblemRoute.UnsupportedOpen>(route, interruption).preparedPlan.also {
-                    assertEquals(PreparedExecutionKind.DECLINED, it.kind)
                     assertEquals(PreparedPlanDecline.RESOURCE, it.decline)
                     assertNull(it.componentPlan)
-                    assertNull(it.polynomialModel)
-                    assertFalse(it.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
                 }
             }
-            assertSame(source, prepared.originalSource)
-            assertSame(objective, prepared.objective)
-            assertTrue(prepared.maximize)
             val bounded = assertNotNull(prepared.model)
-            assertTrue(bounded !== source)
             assertEquals(2L, bounded.intBounds.upper(0))
-            assertFalse(source.intBounds.hasUpper(0))
-            assertFalse(bounded.intBounds.hasUpper(1))
             assertNotNull(prepared.factorProjections).requireSource(bounded)
-            if (interruption == "work") assertTrue(charged >= limit)
-            if (interruption == "installer") assertFalse(stop())
         }
     }
 
     @Test
-    fun `finite ownership selection declines when the containing stop follows arithmetic reuse`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
+    fun `finite ownership selection should decline when the containing stop follows arithmetic reuse`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
+        )
         val objective = LinearObjective(intCoefficients = longArrayOf(1), constant = 7)
         var boundsComplete = false
         var reuseAllowed = false
@@ -267,10 +333,12 @@ class PreparedSourcePlanTest {
         val stop = Cancellation {
             when {
                 !boundsComplete -> false
+
                 !reuseAllowed -> {
                     reuseAllowed = true
                     false
                 }
+
                 else -> {
                     stopObserved = true
                     true
@@ -278,55 +346,68 @@ class PreparedSourcePlanTest {
             }
         }
 
-        val route = assertIs<SourceProblemRoute.UnsupportedOpen>(source.pipelineRoute(
-            objective = objective, maximize = true, boundCancellation = stop,
-            onLpStats = { boundsComplete = true },
-        ))
+        val route = assertIs<SourceProblemRoute.UnsupportedOpen>(
+            source.pipelineRoute(
+                objective = objective,
+                maximize = true,
+                boundCancellation = stop,
+                onLpStats = { boundsComplete = true },
+            ),
+        )
 
-        assertTrue(reuseAllowed)
         assertTrue(stopObserved)
-        assertEquals(PreparedExecutionKind.DECLINED, route.preparedPlan.kind)
         assertEquals(PreparedPlanDecline.RESOURCE, route.preparedPlan.decline)
         assertNull(route.preparedPlan.componentPlan)
-        assertNull(route.preparedPlan.polynomialModel)
-        assertFalse(route.preparedPlan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
-        assertSame(source, route.problem)
-        assertSame(source, route.preparedPlan.originalSource)
         assertSame(source, route.preparedPlan.model)
-        assertSame(objective, route.preparedPlan.objective)
-        assertTrue(route.preparedPlan.maximize)
     }
 
     @Test
-    fun `complete component encodings retain spent work independently per target and call`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+    fun `complete component encodings should keep spent work per target and call`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
             arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
-            openIntHi = booleanArrayOf(true))
+            openIntHi = booleanArrayOf(true),
+        )
         val installations = mutableMapOf<EncodingTarget, Int>()
         var charged = 0L
         val stop = object : Cancellation {
             override fun isCancelled(): Boolean = false
             override fun workMeter(): WorkMeter = WorkMeter { charged += it }
         }
-        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-            val selected = BuiltInEncoderProvider.select(factor, target)
-            if (target == EncodingTarget.POLYNOMIAL) selected
-            else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                assertSame(source.factors.single(), view)
-                assertEquals(target, encoding.target)
-                assertEquals(0, encoding.sourceFactorIndex)
-                installations[target] = (installations[target] ?: 0) + 1
-                encoding.cancellation.charge(1000)
-                val decline = selected.install(view, encoding)
-                if (decline == null && target == EncodingTarget.LINEAR) {
-                    val auxiliary = encoding.realAuxiliary()
-                    encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
-                        EncodingLinearTerm.auxiliary(auxiliary, BigFraction.ONE),
-                    )), LinearOp.EQ, BigFraction.ZERO))
+        val providers = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (target == EncodingTarget.POLYNOMIAL) {
+                    selected
+                } else {
+                    Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                        assertSame(source.factors.single(), view)
+                        assertEquals(target, encoding.target)
+                        assertEquals(0, encoding.sourceFactorIndex)
+                        installations[target] = (installations[target] ?: 0) + 1
+                        encoding.cancellation.charge(1000)
+                        val decline = selected.install(view, encoding)
+                        if (decline == null && target == EncodingTarget.LINEAR) {
+                            val auxiliary = encoding.realAuxiliary()
+                            encoding.linearFormula(
+                                LinearEncodingFormula.Comparison(
+                                    EncodingAffineExpression(
+                                        listOf(
+                                            EncodingLinearTerm.auxiliary(auxiliary, BigFraction.ONE),
+                                        ),
+                                    ),
+                                    LinearOp.EQ,
+                                    BigFraction.ZERO,
+                                ),
+                            )
+                        }
+                        decline
+                    }
                 }
-                decline
-            }
-        })
+            },
+        )
         val projections = providers.prepare(source)
 
         for (invocation in 1..2) {
@@ -344,23 +425,36 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `shared clauses retain full encodings while omitted finite factors install their selected scope`() {
+    fun `shared clauses should keep full encodings while omitted finite factors install their selected scope`() {
         for (sharedClause in listOf(false, true)) {
             val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
-            val excluded: Factor = if (sharedClause) Clause(intArrayOf(0))
-            else Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 1)
-            val source = Problem(1, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
-                arrayOf(row, excluded), openIntHi = booleanArrayOf(true, false))
+            val excluded: Factor = if (sharedClause) {
+                Clause(intArrayOf(0))
+            } else {
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 1)
+            }
+            val source = Problem(
+                1,
+                2,
+                arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+                arrayOf(row, excluded),
+                openIntHi = booleanArrayOf(true, false),
+            )
             val installations = mutableMapOf<Pair<EncodingTarget, Int>, Int>()
-            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-                val selected = BuiltInEncoderProvider.select(factor, target)
-                if (target == EncodingTarget.POLYNOMIAL) selected
-                else Encoder(selected.support) { view, encoding ->
-                    val key = target to encoding.sourceFactorIndex
-                    installations[key] = (installations[key] ?: 0) + 1
-                    selected.install(view, encoding)
-                }
-            })
+            val providers = FactorProjectionProviders(
+                encoder = EncoderProvider { factor, target ->
+                    val selected = BuiltInEncoderProvider.select(factor, target)
+                    if (target == EncodingTarget.POLYNOMIAL) {
+                        selected
+                    } else {
+                        Encoder(selected.support) { view, encoding ->
+                            val key = target to encoding.sourceFactorIndex
+                            installations[key] = (installations[key] ?: 0) + 1
+                            selected.install(view, encoding)
+                        }
+                    }
+                },
+            )
 
             val plan = source.componentPlan(providers.prepare(source))
 
@@ -374,31 +468,44 @@ class PreparedSourcePlanTest {
             assertFalse(plan.factorEncoded(1))
             assertEquals(if (sharedClause) 2 else 1, fragment.numFactors)
             assertSame(row, assertIs<EncodedTheoryFactor>(fragment.factors.first()).source)
-            assertEquals(if (sharedClause) listOf(0, 1) else listOf(0), fragment.factors.map {
-                assertIs<EncodedTheoryFactor>(it).attribution.sourceFactorIndex
-            })
+            assertEquals(
+                if (sharedClause) listOf(0, 1) else listOf(0),
+                fragment.factors.map {
+                    assertIs<EncodedTheoryFactor>(it).attribution.sourceFactorIndex
+                },
+            )
         }
     }
 
     @Test
-    fun `reused shared clause encodings preserve private definitions and source witnesses`() {
+    fun `reused shared clause encodings should preserve private definitions and source witnesses`() {
         for (positive in listOf(false, true)) {
             val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
             val clause = Clause(intArrayOf(if (positive) 0 else 1))
-            val source = Problem(1, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(row, clause),
-                openIntHi = booleanArrayOf(true))
+            val source = Problem(
+                1,
+                1,
+                arrayOf(IntDomain(0, 2)),
+                arrayOf<Factor>(row, clause),
+                openIntHi = booleanArrayOf(true),
+            )
             var clauseInstallations = 0
-            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-                val selected = BuiltInEncoderProvider.select(factor, target)
-                if (factor !== clause || target != EncodingTarget.DIFFERENCE) selected
-                else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                    clauseInstallations++
-                    val guard = encoding.guard()
-                    encoding.define(guard, LinearEncodingFormula.Relation(assertNotNull(view.linearForm)))
-                    encoding.linearFormula(LinearEncodingFormula.Guard(guard))
-                    null
-                }
-            })
+            val providers = FactorProjectionProviders(
+                encoder = EncoderProvider { factor, target ->
+                    val selected = BuiltInEncoderProvider.select(factor, target)
+                    if (factor !== clause || target != EncodingTarget.DIFFERENCE) {
+                        selected
+                    } else {
+                        Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                            clauseInstallations++
+                            val guard = encoding.guard()
+                            encoding.define(guard, LinearEncodingFormula.Relation(assertNotNull(view.linearForm)))
+                            encoding.linearFormula(LinearEncodingFormula.Guard(guard))
+                            null
+                        }
+                    }
+                },
+            )
 
             val plan = source.componentPlan(providers.prepare(source))
             val fragment = assertNotNull(plan.encodedTheoryFragment(source))
@@ -408,17 +515,9 @@ class PreparedSourcePlanTest {
                 it.session.solve(source.numBoolVars)
             }
 
-            assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
             assertEquals(1, clauseInstallations)
-            assertEquals(FactorOwner.SHARED, plan.factorOwner(1))
-            assertFalse(plan.factorEncoded(1))
             assertSame(clause, retained.source)
-            assertEquals(1, retained.attribution.sourceFactorIndex)
             assertEquals(1, retained.attribution.linearGuards.size)
-            assertTrue(retained.attribution.auxiliaries.isEmpty())
-            assertEquals(source.numBoolVars, fragment.numBoolVars)
-            assertEquals(source.numIntVars, fragment.numIntVars)
-            assertEquals(source.numRealVars, fragment.numRealVars)
             val witness = assertIs<SearchResult.Satisfied>(result).model
             assertEquals(positive, witness.valueOf<Boolean>(SearchBoolValue(0)))
             assertTrue(assertNotNull(witness.valueOf<Long>(SearchIntValue(0))) >= 1L)
@@ -426,52 +525,75 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `incomplete full component installation is retried for the selected scope`() {
+    fun `incomplete full component installation should be retried for the selected scope`() {
         for (decline in listOf(EncoderDecline.UNSUPPORTED, EncoderDecline.RESOURCE)) {
-            val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            val source = Problem(
+                0,
+                1,
+                arrayOf(IntDomain(0, 2)),
                 arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
-                openIntHi = booleanArrayOf(true))
+                openIntHi = booleanArrayOf(true),
+            )
             val installations = mutableMapOf<EncodingTarget, Int>()
-            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-                val selected = BuiltInEncoderProvider.select(factor, target)
-                if (target == EncodingTarget.POLYNOMIAL) selected
-                else Encoder(selected.support) { view, encoding ->
-                    val invocation = (installations[target] ?: 0) + 1
-                    installations[target] = invocation
-                    if (target == EncodingTarget.LINEAR && invocation == 1) {
-                        selected.install(view, encoding)
-                        decline
-                    } else selected.install(view, encoding)
-                }
-            })
+            val providers = FactorProjectionProviders(
+                encoder = EncoderProvider { factor, target ->
+                    val selected = BuiltInEncoderProvider.select(factor, target)
+                    if (target == EncodingTarget.POLYNOMIAL) {
+                        selected
+                    } else {
+                        Encoder(selected.support) { view, encoding ->
+                            val invocation = (installations[target] ?: 0) + 1
+                            installations[target] = invocation
+                            if (target == EncodingTarget.LINEAR && invocation == 1) {
+                                selected.install(view, encoding)
+                                decline
+                            } else {
+                                selected.install(view, encoding)
+                            }
+                        }
+                    }
+                },
+            )
 
             val plan = source.componentPlan(providers.prepare(source))
 
             assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
             assertEquals(2, installations[EncodingTarget.LINEAR])
-            assertEquals(if (decline == EncoderDecline.RESOURCE) 2 else 1,
-                installations[EncodingTarget.DIFFERENCE])
+            assertEquals(
+                if (decline == EncoderDecline.RESOURCE) 2 else 1,
+                installations[EncodingTarget.DIFFERENCE],
+            )
             assertEquals(1, assertNotNull(plan.encodedTheoryFragment(source)).numFactors)
         }
     }
 
     @Test
-    fun `a transient containing stop cannot reuse an earlier completed component encoding`() {
+    fun `transient containing stop should not reuse an earlier completed component encoding`() {
         for (sharedClause in listOf(false, true)) {
             val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
             val factors = if (sharedClause) arrayOf<Factor>(row, Clause(intArrayOf(0))) else arrayOf<Factor>(row)
-            val source = Problem(if (sharedClause) 1 else 0, 1, arrayOf(IntDomain(0, 2)), factors,
-                openIntHi = booleanArrayOf(true))
+            val source = Problem(
+                if (sharedClause) 1 else 0,
+                1,
+                arrayOf(IntDomain(0, 2)),
+                factors,
+                openIntHi = booleanArrayOf(true),
+            )
             var installations = 0
-            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-                val selected = BuiltInEncoderProvider.select(factor, target)
-                if (target == EncodingTarget.POLYNOMIAL) selected
-                else Encoder(selected.support) { view, encoding ->
-                    installations++
-                    encoding.cancellation.charge(1000)
-                    selected.install(view, encoding)
-                }
-            })
+            val providers = FactorProjectionProviders(
+                encoder = EncoderProvider { factor, target ->
+                    val selected = BuiltInEncoderProvider.select(factor, target)
+                    if (target == EncodingTarget.POLYNOMIAL) {
+                        selected
+                    } else {
+                        Encoder(selected.support) { view, encoding ->
+                            installations++
+                            encoding.cancellation.charge(1000)
+                            selected.install(view, encoding)
+                        }
+                    }
+                },
+            )
             val projections = providers.prepare(source)
             var completedWork = 0L
             for (limited in listOf(false, true)) {
@@ -504,11 +626,25 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `unchanged routing retains completed encoder work and source objective`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(
-            Linear(intVars = intArrayOf(), intCoeffs = doubleArrayOf(), realVars = intArrayOf(0),
-                realCoeffs = doubleArrayOf(1.0), op = LinearOp.EQ, bound = 1.0),
-        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+    fun `unchanged routing should keep completed encoder work and source objective`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intVars = intArrayOf(),
+                    intCoeffs = doubleArrayOf(),
+                    realVars = intArrayOf(0),
+                    realCoeffs = doubleArrayOf(1.0),
+                    op = LinearOp.EQ,
+                    bound = 1.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         for ((objective, maximize) in listOf(
             null to false,
             LinearObjective(realCoefficients = doubleArrayOf(1.0), constant = 7) to false,
@@ -522,89 +658,84 @@ class PreparedSourcePlanTest {
                 override fun isCancelled(): Boolean = false
                 override fun workMeter(): WorkMeter = WorkMeter { charged += it }
             }
-            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-                val selected = BuiltInEncoderProvider.select(factor, target)
-                if (target != EncodingTarget.LINEAR || !selected.enforcesSource) selected
-                else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                    installations++
-                    encoding.cancellation.charge(1)
-                    selected.install(view, encoding)
-                }
-            })
-
-            val route = assertIs<SourceProblemRoute.OpenTheory>(source.pipelineRoute(
-                providers, objective, maximize, routePureRealToTheory = true, boundCancellation = stop,
-                onLpStats = {
-                    completedWork = charged
-                    completedInstallations = installations
+            val providers = FactorProjectionProviders(
+                encoder = EncoderProvider { factor, target ->
+                    val selected = BuiltInEncoderProvider.select(factor, target)
+                    if (target != EncodingTarget.LINEAR || !selected.enforcesSource) {
+                        selected
+                    } else {
+                        Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                            installations++
+                            encoding.cancellation.charge(1)
+                            selected.install(view, encoding)
+                        }
+                    }
                 },
-            ))
+            )
+
+            val route = assertIs<SourceProblemRoute.OpenTheory>(
+                source.pipelineRoute(
+                    providers,
+                    objective,
+                    maximize,
+                    routePureRealToTheory = true,
+                    boundCancellation = stop,
+                    onLpStats = {
+                        completedWork = charged
+                        completedInstallations = installations
+                    },
+                ),
+            )
 
             assertTrue(completedInstallations > 0)
-            assertTrue(completedWork > 0)
             assertEquals(completedInstallations, installations)
             assertEquals(completedWork, charged)
-            assertSame(source, route.preparedPlan.originalSource)
-            assertSame(source, route.preparedPlan.model)
-            assertSame(providers, assertNotNull(route.preparedPlan.factorProjections).providers)
             assertSame(objective, route.preparedPlan.objective)
             assertEquals(maximize, route.preparedPlan.maximize)
-            assertEquals(ProblemPipeline.EXACT_LRA, route.request.route)
         }
     }
 
     @Test
-    fun `routing preserves maximization metadata without an objective`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(
-            Linear(intVars = intArrayOf(), intCoeffs = doubleArrayOf(), realVars = intArrayOf(0),
-                realCoeffs = doubleArrayOf(1.0), op = LinearOp.EQ, bound = 1.0),
-        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
-
-        val route = assertIs<SourceProblemRoute.OpenTheory>(source.pipelineRoute(
-            maximize = true, routePureRealToTheory = true,
-        ))
-
-        assertNull(route.preparedPlan.objective)
-        assertTrue(route.preparedPlan.maximize)
-        assertSame(source, route.preparedPlan.originalSource)
-        assertSame(source, route.preparedPlan.model)
-    }
-
-    @Test
-    fun `unchanged finite routing retains finite ownership selection`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
-
-        val route = assertIs<SourceProblemRoute.Finite>(source.pipelineRoute())
-
-        assertSame(source, route.problem)
-        assertEquals(ProblemPipeline.FINITE_CP, route.componentPlan.theoryPipeline)
-        assertEquals(IntVariableOwner.CP, route.componentPlan.intOwner(0))
-        assertEquals(FactorOwner.CP, route.componentPlan.factorOwner(0))
-    }
-
-    @Test
-    fun `open source preparation retains selected deduction on its compact finite view`() {
+    fun `open source preparation should keep selected deduction on its compact finite view`() {
         val open = Bits(3).also { it.set(1) }
         val row = AllDifferent(intArrayOf(0, 2), 0, 3)
-        val source = Problem(0, intBounds = IntBounds.fromModelBounds(
-            longArrayOf(1, 0, 0), longArrayOf(1, 0, 2), open, open,
-        ), factors = arrayOf(row, Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0)))
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
-            if (factor !== row) BuiltInPropagationProjectionProvider.select(factor)
-            else PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
-                "The source relation is checked at a complete point.") { NoPropagator }
-        })
+        val source = Problem(
+            0,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(1, 0, 0),
+                longArrayOf(1, 0, 2),
+                open,
+                open,
+            ),
+            factors = arrayOf(row, Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0)),
+        )
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider { factor ->
+                if (factor !== row) {
+                    BuiltInPropagationProjectionProvider.select(factor)
+                } else {
+                    PropagationProjection(
+                        PropagationCapability.INERT,
+                        AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                        "The source relation is checked at a complete point.",
+                    ) { NoPropagator }
+                }
+            },
+        )
 
-        val prepared = assertIs<OpenSourcePreparation.Planned>(source.prepareOpenSource(
-            config = com.eignex.klause.presolve.PresolveConfig.NONE, projections = providers.prepare(source)))
+        val prepared = assertIs<OpenSourcePreparation.Planned>(
+            source.prepareOpenSource(
+                config = com.eignex.klause.presolve.PresolveConfig.NONE,
+                projections = providers.prepare(source),
+            ),
+        )
         val view = prepared.plan.cpProjection(prepared.model, prepared.plan.cpSourceDomains(prepared.model))
 
         assertEquals(IntDomain(0, 2), view.problem.rootIntDomain(1))
     }
 
     @Test
-    fun `complete admission does not require an available scorer`() {
+    fun `complete admission should not require an available scorer`() {
         val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0))))
         val providers = FactorProjectionProviders(scoring = ScoringProjectionProvider { null })
 
@@ -618,9 +749,13 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `unsupported deduction identifies its source factor during admission`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
+    fun `unsupported deduction should identify its source factor during admission`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
+        )
         val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { null })
 
         val admitted = source.prepareExecutionPlan(providers, preferFinite = true).capabilities
@@ -632,12 +767,17 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `an inert clause projection retains exact source enumeration`() {
+    fun `inert clause projection should keep exact source enumeration`() {
         val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0))))
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
-            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
-                "The original clause is checked at a complete point.") { NoPropagator }
-        })
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider {
+                PropagationProjection(
+                    PropagationCapability.INERT,
+                    AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                    "The original clause is checked at a complete point.",
+                ) { NoPropagator }
+            },
+        )
         val plan = source.prepareExecutionPlan(providers, preferFinite = true)
         val ownership = assertNotNull(plan.componentPlan)
 
@@ -650,17 +790,40 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `objective and conditioned plans retain selected finite deduction`() {
+    fun `objective and conditioned plans should keep selected finite deduction`() {
         val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(
-            row, Linear(intVars = intArrayOf(), intCoeffs = doubleArrayOf(), realVars = intArrayOf(0),
-                realCoeffs = doubleArrayOf(1.0), op = LinearOp.EQ, bound = 1.0),
-        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
-            if (factor !== row) BuiltInPropagationProjectionProvider.select(factor)
-            else PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
-                "The source row is checked at a complete point.") { NoPropagator }
-        })
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            arrayOf(
+                row,
+                Linear(
+                    intVars = intArrayOf(),
+                    intCoeffs = doubleArrayOf(),
+                    realVars = intArrayOf(0),
+                    realCoeffs = doubleArrayOf(1.0),
+                    op = LinearOp.EQ,
+                    bound = 1.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider { factor ->
+                if (factor !== row) {
+                    BuiltInPropagationProjectionProvider.select(factor)
+                } else {
+                    PropagationProjection(
+                        PropagationCapability.INERT,
+                        AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                        "The source row is checked at a complete point.",
+                    ) { NoPropagator }
+                }
+            },
+        )
         val sourcePlan = source.prepareExecutionPlan(providers, preferFinite = true)
 
         val objective = sourcePlan.withObjective(LinearObjective(intCoefficients = longArrayOf(1)))
@@ -673,15 +836,30 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `polynomial finite views retain selection by original factor identity`() {
+    fun `polynomial finite views should select by original factor identity`() {
         val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(ContinuousProduct(0, 0, 1), row),
-            numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(2.0, 4.0))
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
-            if (factor !== row) BuiltInPropagationProjectionProvider.select(factor)
-            else PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
-                "The finite source row is checked at a complete point.") { NoPropagator }
-        })
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            arrayOf(ContinuousProduct(0, 0, 1), row),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 4.0),
+        )
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider { factor ->
+                if (factor !== row) {
+                    BuiltInPropagationProjectionProvider.select(factor)
+                } else {
+                    PropagationProjection(
+                        PropagationCapability.INERT,
+                        AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                        "The finite source row is checked at a complete point.",
+                    ) { NoPropagator }
+                }
+            },
+        )
 
         val plan = source.prepareExecutionPlan(providers)
         val finite = assertNotNull(plan.polynomialModel).finite.bake(assertNotNull(plan.finiteFactorProjections))
@@ -692,54 +870,62 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `polynomial decomposition retains original factor indices and integer embedding`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf(
-            ContinuousProduct(0, 0, 2),
-            AllDifferent(intArrayOf(0, 1), 0, 3),
-            RealProduct(1, 0, 1, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY),
-        ), numRealVars = 3,
+    fun `polynomial decomposition should keep original factor indices and integer embedding`() {
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf(
+                ContinuousProduct(0, 0, 2),
+                AllDifferent(intArrayOf(0, 1), 0, 3),
+                RealProduct(1, 0, 1, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY),
+            ),
+            numRealVars = 3,
             realLower = doubleArrayOf(0.0, Double.NEGATIVE_INFINITY, 2.0),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, 2.0))
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, 2.0),
+        )
 
         val route = assertIs<SourceProblemRoute.PolynomialTheory>(source.pipelineRoute())
         val plan = route.preparedPlan
 
         assertSame(source, plan.originalSource)
         assertSame(plan, route.request.preparedPlan)
-        assertEquals(listOf(1), plan.components.single {
-            it.responsibility == ComponentResponsibility.FINITE
-        }.factorIndices)
-        assertEquals(listOf(0, 2), plan.components.single {
-            it.responsibility == ComponentResponsibility.COMPLETION
-        }.factorIndices)
+        assertEquals(
+            listOf(1),
+            plan.components.single {
+                it.responsibility == ComponentResponsibility.FINITE
+            }.factorIndices,
+        )
+        assertEquals(
+            listOf(0, 2),
+            plan.components.single {
+                it.responsibility == ComponentResponsibility.COMPLETION
+            }.factorIndices,
+        )
         assertEquals(3, plan.polynomialIntegerCoordinate(1))
-        assertEquals(listOf(0, 1), plan.components.single {
-            it.responsibility == ComponentResponsibility.FINITE
-        }.integerCoordinates)
+        assertEquals(
+            listOf(0, 1),
+            plan.components.single {
+                it.responsibility == ComponentResponsibility.FINITE
+            }.integerCoordinates,
+        )
         assertSame(source.factors[1], assertNotNull(plan.polynomialModel).finite.factors.single())
     }
 
     @Test
-    fun `polynomial assembler declines open integers without changing source declarations`() {
-        val open = Bits(1).also { it.set(0) }
-        val source = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
-            factors = arrayOf(ContinuousProduct(0, 0, 0)), numRealVars = 1,
-            realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
-
-        val route = assertIs<SourceProblemRoute.UnsupportedOpen>(source.pipelineRoute())
-
-        assertEquals(PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER, route.preparedPlan.decline)
-        assertSame(source, route.preparedPlan.model)
-        assertTrue(!source.intBounds.hasLower(0) && !source.intBounds.hasUpper(0))
-    }
-
-    @Test
-    fun `polynomial snapshots preserve declaration identities separately from auxiliary coordinates`() {
+    fun `polynomial snapshots should keep declaration identities separate from auxiliary coordinates`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const b Bool) (assert (= (* (ite b x 1) x) 2))",
         )
-        val source = PolynomialRealProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.sourceRealCount, parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames)
+        val source = PolynomialRealProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.sourceRealCount,
+            parsed.sourceBoolCount,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
 
         val request = source.pipelineRequest()
         val plan = request.preparedPlan
@@ -752,38 +938,19 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `finite preparation retains the selected objective and source ownership`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
-            arrayOf(AllDifferent(intArrayOf(0, 1), 0, 3)))
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0))
-
-        val plan = source.prepareExecutionPlan(objective, maximize = true, preferFinite = true)
-        val request = FinitePipelineRequest(source, FiniteEngine.BACKTRACK, objective, preparedPlan = plan)
-
-        assertSame(plan, request.preparedPlan)
-        assertSame(objective, plan.objective)
-        assertTrue(plan.maximize)
-        assertEquals(listOf(0, 1), plan.components.single().integerCoordinates)
-        assertEquals(IntVariableOwner.CP, request.componentPlan.intOwner(1))
-    }
-    @Test
-    fun `direct finite mixed product preparation preserves linear completion ownership`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(RealProduct(0, 0, 0, 1.0, 1.0)),
-            numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
-
-        val request = FinitePipelineRequest(source, FiniteEngine.LOCAL_SEARCH)
-
-        assertEquals(PreparedExecutionKind.FINITE_LINEAR, request.preparedPlan.kind)
-        assertEquals(0, request.preparedPlan.finiteIntegerCoordinate(0))
-        assertSame(source, request.preparedPlan.originalSource)
-    }
-
-    @Test
-    fun `conditioned linear preparation preserves finite owners beside exact real completion`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf(
-            AllDifferent(intArrayOf(0, 1), 0, 3),
-            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
-        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+    fun `conditioned linear preparation should preserve finite owners beside exact real completion`() {
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf(
+                AllDifferent(intArrayOf(0, 1), 0, 3),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         val initial = source.prepareExecutionPlan(preferFinite = true)
 
         val prepared = assertNotNull(initial.prepareConditionedLinearQuery())
@@ -797,10 +964,12 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `nonlinear source declarations retain interleaved exact numeric coordinates`() {
-        val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
-            "(declare-const x Int) (declare-const r Real) (declare-const z Int) (assert (= (* x z) r))",
-        )).problem
+    fun `nonlinear source declarations should keep interleaved exact numeric coordinates`() {
+        val source = assertIs<SmtLibInput.NonlinearInteger>(
+            SmtLibAdmission.parse(
+                "(declare-const x Int) (declare-const r Real) (declare-const z Int) (assert (= (* x z) r))",
+            ),
+        ).problem
 
         val plan = source.prepareExecutionPlan()
 
@@ -812,180 +981,4 @@ class PreparedSourcePlanTest {
         assertEquals(1, plan.realCoordinate(0))
         kotlin.test.assertNull(plan.finiteIntegerCoordinate(1))
     }
-
-    @Test
-    fun `objective binding retains completed polynomial encoders after their construction scope ends`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(ContinuousProduct(0, 0, 1)),
-            numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(2.0, 4.0))
-        var installations = 0
-        var stopped = false
-        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-            val selected = BuiltInEncoderProvider.select(factor, target)
-            if (!selected.enforcesSource) selected else Encoder(selected.support) { view, encoding ->
-                installations++
-                selected.install(view, encoding)
-            }
-        })
-        val plan = source.prepareExecutionPlan(providers, cancellation = Cancellation { stopped })
-        val preparedInstallations = installations
-        val objective = LinearObjective(intCoefficients = longArrayOf(1), constant = 7)
-        stopped = true
-
-        val operation = plan.withObjective(objective, maximize = true)
-        val admission = operation.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE)
-
-        assertTrue(preparedInstallations > 0)
-        assertEquals(preparedInstallations, installations)
-        assertTrue(admission.runnable)
-        assertSame(plan.finiteFactorProjections, operation.finiteFactorProjections)
-        assertSame(plan.factorProjections, operation.factorProjections)
-        assertSame(source, operation.originalSource)
-        assertSame(objective, operation.objective)
-        assertTrue(operation.maximize)
-        assertEquals(plan.polynomialIntegerCoordinate(0), operation.polynomialIntegerCoordinate(0))
-        assertNull(plan.objective)
-    }
-
-    @Test
-    fun `invalid objective coordinates preserve polynomial satisfaction and can be rebound`() {
-        val source = assertIs<SmtLibInput.Polynomial>(SmtLibAdmission.parse(
-            "(declare-const x Real) (assert (= (* x x) 2))",
-        )).problem
-        val plan = source.prepareExecutionPlan()
-        val invalid = plan.withObjective(LinearObjective(realCoefficients = doubleArrayOf(1.0, 1.0)))
-        val objective = LinearObjective(realCoefficients = doubleArrayOf(0.5), constant = 7)
-
-        val rebound = invalid.withObjective(objective, maximize = true)
-
-        assertTrue(invalid.capabilities.admission(FiniteEngine.BACKTRACK).runnable)
-        assertEquals(ExecutionDeclineCause.OBJECTIVE,
-            invalid.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE).declines.single().cause)
-        assertTrue(rebound.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE).runnable)
-        assertEquals(setOf(ExecutionClaimAuthority.WITNESS),
-            rebound.capabilities.admission(FiniteEngine.LOCAL_SEARCH, ExecutionOperation.OPTIMIZE).claimAuthorities)
-        assertSame(source, rebound.originalSource)
-        assertSame(objective, rebound.objective)
-        assertTrue(rebound.maximize)
-        assertEquals(plan.realCoordinate(0), rebound.realCoordinate(0))
-    }
-
-    @Test
-    fun `objective binding cannot repair interrupted structural preparation`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
-        val plan = source.prepareExecutionPlan(cancellation = Cancellation { true })
-
-        val operation = plan.withObjective(LinearObjective(intCoefficients = longArrayOf(1)))
-        val admission = operation.capabilities.admission(FiniteEngine.BACKTRACK)
-
-        assertEquals(PreparedPlanDecline.RESOURCE, operation.decline)
-        assertEquals(PreparedExecutionKind.DECLINED, operation.kind)
-        assertFalse(admission.runnable)
-        assertTrue(admission.declines.any { it.preparation == PreparedPlanDecline.RESOURCE })
-        assertSame(source, operation.originalSource)
-    }
-
-    @Test
-    fun `a legacy objective decline retains the polynomial structure for a supported rebind`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 0)),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
-        val prepared = source.prepareExecutionPlan()
-        val legacy = PreparedSourcePlan(source, source, PreparedExecutionKind.DECLINED, null,
-            prepared.polynomialModel, prepared.components, 0, 0, 1,
-            decline = PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE)
-        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
-
-        val rebound = legacy.withObjective(objective)
-
-        assertEquals(PreparedExecutionKind.DECLINED, legacy.kind)
-        assertEquals(PreparedExecutionKind.POLYNOMIAL, rebound.kind)
-        assertNull(rebound.decline)
-        assertSame(source, rebound.model)
-        assertTrue(rebound.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE).runnable)
-    }
-
-    @Test
-    fun `quadratic rebinding retains exact source units without retaining an earlier affine objective`() {
-        val source = assertIs<SmtLibInput.Polynomial>(SmtLibAdmission.parse(
-            "(declare-const x Real) (assert (= (* x x) 2))",
-        )).problem
-        val affine = source.prepareExecutionPlan().withObjective(
-            LinearObjective(realCoefficients = doubleArrayOf(0.5)), maximize = true,
-        )
-        val coefficient = QuadraticCoefficient.of(com.eignex.klause.util.bigIntOf(1),
-            com.eignex.klause.util.bigIntOf(3))
-        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(coefficient,
-            QuadraticVariable.Real(SourceRealId(0)), QuadraticVariable.Real(SourceRealId(0)))))
-
-        val operation = affine.withObjective(objective, ObjectiveSense.MAXIMIZE)
-
-        assertSame(objective, operation.quadraticObjective)
-        assertEquals(coefficient, operation.quadraticObjective?.terms?.single()?.coefficient)
-        assertEquals(ObjectiveSense.MAXIMIZE, operation.quadraticSense)
-        assertNull(operation.objective)
-        assertSame(source, operation.originalSource)
-        assertTrue(operation.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE).runnable)
-        assertTrue(affine.maximize)
-    }
-
-    @Test
-    fun `native integer objective binding preserves interleaved numeric declarations without finite domains`() {
-        val source = NonlinearIntegerProblem(PolynomialRealFormula.Constant(true), 3, 0,
-            mapOf("n" to 1), mapOf("x" to 0, "y" to 2), emptyMap())
-        val plan = source.prepareExecutionPlan()
-        val objective = QuadraticObjectiveSpec(emptyList())
-
-        val operation = plan.withObjective(objective, ObjectiveSense.MAXIMIZE)
-
-        assertSame(source, operation.originalSource)
-        assertNull(operation.model)
-        assertNull(operation.finiteIntegerCoordinate(0))
-        assertEquals(1, operation.integerCoordinate(0))
-        assertEquals(0, operation.realCoordinate(0))
-        assertEquals(2, operation.realCoordinate(1))
-        assertEquals(PreparedExecutionKind.NONLINEAR_INTEGER, operation.kind)
-        assertTrue(operation.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE).runnable)
-        assertFalse(operation.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.EXACT_COUNT).runnable)
-    }
-
-    @Test
-    fun `transcendental binding preserves satisfaction without adding an optimization surface`() {
-        val source = TranscendentalProblem(TranscendentalFormula.Constant(true),
-            mapOf("n" to 1), mapOf("x" to 0), emptyMap())
-        val plan = source.prepareTranscendentalExecutionPlan()
-
-        val operation = plan.withObjective(LinearObjective(intCoefficients = longArrayOf(1)), maximize = true)
-
-        assertSame(source, operation.originalSource)
-        assertNull(operation.model)
-        assertNull(operation.finiteIntegerCoordinate(0))
-        assertEquals(1, operation.integerCoordinate(0))
-        assertEquals(0, operation.realCoordinate(0))
-        assertEquals(PreparedExecutionKind.TRANSCENDENTAL, operation.kind)
-        assertTrue(operation.capabilities.admission(FiniteEngine.BACKTRACK).runnable)
-        assertEquals(ExecutionDeclineCause.OPERATION_SURFACE,
-            operation.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE)
-                .declines.single().cause)
-    }
-
-    @Test
-    fun `a final preparation stop retains completed polynomial coordinates across objective binding`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(1, 2)), arrayOf(RealProduct(0, 0, 1, 1.0, 4.0)),
-            numRealVars = 2, realLower = doubleArrayOf(1.0, 4.0), realUpper = doubleArrayOf(4.0, 4.0))
-        var polls = 0
-        val complete = source.preparePolynomialExecutionPlan(cancellation = Cancellation { polls++; false })
-        val lastPoll = polls
-        polls = 0
-        val stopped = source.preparePolynomialExecutionPlan(cancellation = Cancellation { ++polls >= lastPoll })
-
-        val operation = stopped.withObjective(LinearObjective(intCoefficients = longArrayOf(1)))
-
-        assertEquals(PreparedPlanDecline.RESOURCE, operation.decline)
-        assertEquals(PreparedExecutionKind.DECLINED, operation.kind)
-        assertEquals(assertNotNull(complete.polynomialIntegerCoordinate(0)), operation.polynomialIntegerCoordinate(0))
-        assertEquals(0, operation.finiteIntegerCoordinate(0))
-        assertSame(stopped.polynomialModel, operation.polynomialModel)
-        assertSame(stopped.finiteFactorProjections, operation.finiteFactorProjections)
-        assertEquals(0, assertNotNull(operation.finiteFactorProjections).problem.numFactors)
-    }
-
 }

@@ -20,19 +20,24 @@ import kotlin.test.assertNull
 
 class PowerTest {
     @Test
-    fun `signed endpoint powers distinguish overflow from exact minimum`() {
+    fun `signed endpoint powers should distinguish overflow from exact minimum`() {
         for ((base, exponent, expected) in listOf(
-            Triple(0L, 0, 1L), Triple(Long.MIN_VALUE, 1, Long.MIN_VALUE),
-            Triple(-2L, 63, Long.MIN_VALUE), Triple(-1L, Int.MAX_VALUE, -1L),
-            Triple(1L, Int.MAX_VALUE, 1L), Triple(-3L, 3, -27L),
-        )) assertEquals(expected, integerPowerOrNull(base, exponent))
+            Triple(0L, 0, 1L),
+            Triple(Long.MIN_VALUE, 1, Long.MIN_VALUE),
+            Triple(-2L, 63, Long.MIN_VALUE),
+            Triple(-1L, Int.MAX_VALUE, -1L),
+            Triple(1L, Int.MAX_VALUE, 1L),
+            Triple(-3L, 3, -27L),
+        )) {
+            assertEquals(expected, integerPowerOrNull(base, exponent))
+        }
         for ((base, exponent) in listOf(2L to 63, Long.MIN_VALUE to 2, Long.MAX_VALUE to 2)) {
             assertNull(integerPowerOrNull(base, exponent))
         }
     }
 
     @Test
-    fun `integer remapping preserves an aliased power relation`() {
+    fun `integer remapping should preserve an aliased power relation`() {
         val mapped = Power(1, 3, 2).remap(VarRemap(intArrayOf(), intArrayOf(9, 4, 4)))
 
         assertEquals(Power(4, 3, 4).structuralKey(), mapped.structuralKey())
@@ -40,7 +45,7 @@ class PowerTest {
     }
 
     @Test
-    fun `real coordinates have distinct structural identity`() {
+    fun `real coordinates should have distinct structural identity`() {
         val real = Power(Power.Coordinate.Real(SourceRealId(0)), 2, Power.Coordinate.Real(SourceRealId(1)))
 
         assertNotEquals(Power(0, 2, 1).structuralKey(), real.structuralKey())
@@ -48,9 +53,13 @@ class PowerTest {
     }
 
     @Test
-    fun `even inverse filtering preserves both roots and domain holes`() {
-        val problem = Problem(0, 2, arrayOf(IntDomain(-5, 5).excludeValue(-2), IntDomain(4, 4)),
-            arrayOf<Factor>(Power(0, 2, 1)))
+    fun `even inverse filtering should preserve both roots and domain holes`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(-5, 5).excludeValue(-2), IntDomain(4, 4)),
+            arrayOf<Factor>(Power(0, 2, 1)),
+        )
         val session = PropagationSession(problem)
 
         assertIs<PropagationResult.Implied>(session.seed(Assumptions.None))
@@ -59,9 +68,13 @@ class PowerTest {
     }
 
     @Test
-    fun `nonpowers are rejected without enumerating a wide operand domain`() {
-        val problem = Problem(0, 2, arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE), IntDomain(5, 5)),
-            arrayOf<Factor>(Power(0, 2, 1)))
+    fun `nonpowers should be rejected without enumerating a wide operand domain`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE), IntDomain(5, 5)),
+            arrayOf<Factor>(Power(0, 2, 1)),
+        )
 
         val result = PropagationSession(problem).seed(Assumptions.None)
 
@@ -69,9 +82,13 @@ class PowerTest {
     }
 
     @Test
-    fun `power aliases retain exactly the integer fixed points`() {
-        for ((exponent, expected) in listOf(0 to setOf(1L), 1 to (-2L..2L).toSet(),
-            2 to setOf(0L, 1L), 3 to setOf(-1L, 0L, 1L))) {
+    fun `power aliases should retain exactly the integer fixed points`() {
+        for ((exponent, expected) in listOf(
+            0 to setOf(1L),
+            1 to (-2L..2L).toSet(),
+            2 to setOf(0L, 1L),
+            3 to setOf(-1L, 0L, 1L),
+        )) {
             val problem = Problem(0, 1, arrayOf(IntDomain(-2, 2)), arrayOf<Factor>(Power(0, exponent, 0)))
 
             val values = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(maxDecisions = 50))
@@ -82,7 +99,7 @@ class PowerTest {
     }
 
     @Test
-    fun `retracted inverse bounds admit the opposite sign sibling`() {
+    fun `retracted inverse bounds should admit the opposite sign sibling`() {
         val problem = Problem(0, 2, arrayOf(IntDomain(-3, 3), IntDomain(0, 9)), arrayOf<Factor>(Power(0, 2, 1)))
         val session = PropagationSession(problem)
         session.seed(Assumptions.None)
@@ -98,9 +115,16 @@ class PowerTest {
     }
 
     @Test
-    fun `overflowing powers cannot satisfy a saturated endpoint`() {
-        val problem = Problem(0, 2, arrayOf(IntDomain(3037000500L, 3037000500L),
-            IntDomain(Long.MAX_VALUE, Long.MAX_VALUE)), arrayOf<Factor>(Power(0, 2, 1)))
+    fun `overflowing powers should not satisfy a saturated endpoint`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(
+                IntDomain(3037000500L, 3037000500L),
+                IntDomain(Long.MAX_VALUE, Long.MAX_VALUE),
+            ),
+            arrayOf<Factor>(Power(0, 2, 1)),
+        )
 
         val result = BacktrackSolver(problem.bake()).solve(BacktrackParams(maxDecisions = 0))
 

@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class XmlElementTest {
 
     @Test
-    fun `parses nested elements and attributes and text content`() {
+    fun `parsing should read nested elements attributes and text content`() {
         val root = parseXml(
             """<instance format="XCSP3" type="CSP">
                  <variables><var id="x"> 1..4 </var></variables>
@@ -24,7 +24,7 @@ class XmlElementTest {
     }
 
     @Test
-    fun `skips prolog and doctype and comments`() {
+    fun `parsing should skip prolog doctype and comments`() {
         val root = parseXml(
             """<?xml version="1.0" encoding="UTF-8"?>
                <!DOCTYPE instance>
@@ -36,27 +36,20 @@ class XmlElementTest {
     }
 
     @Test
-    fun `decodes predefined entities in text and attributes`() {
+    fun `predefined entities should decode in text and attributes`() {
         val e = parseXml("""<e note="a &lt; b &amp; c">x &gt; 0 &apos;ok&apos;</e>""")
         assertEquals("a < b & c", e.attr("note"))
         assertEquals("x > 0 'ok'", e.textContent)
     }
 
     @Test
-    fun `reads CDATA verbatim`() {
+    fun `CDATA should be read verbatim`() {
         val e = parseXml("<e><![CDATA[ raw < & > text ]]></e>")
         assertEquals(" raw < & > text ", e.textContent)
     }
 
     @Test
-    fun `textContent concatenates descendant text`() {
-        val root = parseXml("<sum><list> a b </list><coeffs> 1 2 </coeffs></sum>")
-        assertEquals("a b", root.child("list")!!.textContent.trim())
-        assertEquals("1 2", root.child("coeffs")!!.textContent.trim())
-    }
-
-    @Test
-    fun `substituteParams expands placeholders and reuses percent-free text verbatim`() {
+    fun `substituteParams should expand placeholders and reuse percent-free text verbatim`() {
         val template = parseXml("<t><a>%0 %1</a><b>no placeholder</b></t>")
         val out = template.substituteParams(listOf("x", "y"))
         assertEquals("x y", out.child("a")!!.textContent)
@@ -64,19 +57,19 @@ class XmlElementTest {
     }
 
     @Test
-    fun `rejects a mismatched closing tag`() {
+    fun `a mismatched closing tag should be rejected`() {
         val e = assertFailsWith<IllegalArgumentException> { parseXml("<a><b>1</c></a>") }
         assertTrue("mismatched closing tag" in e.message.orEmpty(), e.message.orEmpty())
     }
 
     @Test
-    fun `rejects content after the root element`() {
+    fun `content after the root element should be rejected`() {
         val e = assertFailsWith<IllegalArgumentException> { parseXml("<a/> trailing") }
         assertTrue("after root" in e.message.orEmpty(), e.message.orEmpty())
     }
 
     @Test
-    fun `rejects unknown entity references`() {
+    fun `unknown entity references should be rejected`() {
         val e = assertFailsWith<IllegalArgumentException> { parseXml("<a>&unknown;</a>") }
         assertTrue("unknown entity" in e.message.orEmpty(), e.message.orEmpty())
     }

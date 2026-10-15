@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.cut
 
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -33,7 +34,7 @@ class AssignmentObjectiveCutTest {
     }
 
     @Test
-    fun `cut rhs equals the weighted assignment minimum`() {
+    fun `cut rhs should equal the weighted assignment minimum`() {
         // min 1·x0 + 2·x1 + 3·x2 over AllDifferent[0,4]: assign 2→x0, 1→x1, 0→x2 = 2+2+0 = 4.
         val coef = longArrayOf(1, 2, 3)
         val (p, r, sol) = setup(coef, 4)
@@ -43,4 +44,23 @@ class AssignmentObjectiveCutTest {
         assertEquals(4L, cuts[0].rhs)
     }
 
+    @Test
+    fun `cut should reach an inverse side`() {
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 6,
+            intDomains = Array(6) { IntDomain(0, 4) },
+            factors = arrayOf<Factor>(Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))),
+        )
+        val coef = longArrayOf(3L, 1L, 2L, 0L, 0L, 0L)
+        val relaxation = CpToLpRelaxation(p, LinearObjective(intCoefficients = coef)).build(PropagationSession(p))
+        val solution = requireNotNull(RevisedSimplex(relaxation.model).solve())
+
+        val cut = AssignmentObjectiveCut(coef)
+            .separate(CutContext(p, relaxation, solution.primal, PropagationSession(p)))
+            .first { it.rel == Relation.GE }
+
+        assertEquals(4L, cut.rhs)
+        assertEquals(3, cut.cols.size)
+    }
 }

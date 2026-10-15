@@ -14,7 +14,7 @@ class IndomainMedianTest {
     private val rng = Random(1)
 
     @Test
-    fun `indomain_median is the middle by position - distinct from indomain_middle mean of bounds`() {
+    fun `indomain median should pick the middle value by position`() {
         // Domain {0,1,2,3,10}: median by position is valueAt(2) = 2; the mean of bounds is 5,
         // whose nearest present value is 3. So the two heuristics start on different values.
         var d = IntDomain(0, 10)
@@ -26,7 +26,7 @@ class IndomainMedianTest {
     }
 
     @Test
-    fun `indomain median falls back to the bounds midpoint on a saturated size`() {
+    fun `indomain median should fall back to the bounds midpoint on a saturated size`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)), arrayOf<Factor>())
         val session = PropagationSession(problem)
         assertEquals(-1L, IndomainMedian.values(session, VarRef.IntVar(0), rng).first())

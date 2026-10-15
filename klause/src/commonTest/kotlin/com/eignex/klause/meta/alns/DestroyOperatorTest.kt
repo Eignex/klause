@@ -13,10 +13,12 @@ import kotlin.test.assertContentEquals
 
 class DestroyOperatorTest {
     @Test
-    fun `overlapping wide factors preserve the seeded connected neighborhood`() {
+    fun `overlapping wide factors should preserve the seeded connected neighborhood`() {
         val count = 1024
         val problem = Problem(
-            count, 0, emptyArray(),
+            count,
+            0,
+            emptyArray(),
             List(32) { Clause(IntArray(count) { Lit.make(it, true) }) },
         ).bake()
         val incumbent = Sample(BooleanArray(count) { true }, LongArray(0))
@@ -24,7 +26,11 @@ class DestroyOperatorTest {
 
         for (fraction in listOf(0.25, 0.5, 1.0)) {
             val freed = DestroyOperator.AdjacencyRelated.destroy(
-                Random(17), problem, incumbent, LinearObjective(), fraction,
+                Random(17),
+                problem,
+                incumbent,
+                LinearObjective(),
+                fraction,
             )
 
             val expected = (listOf(seed) + (0 until count).filter { it != seed })
@@ -35,12 +41,16 @@ class DestroyOperatorTest {
     }
 
     @Test
-    fun `disconnected neighborhoods retain both finite coordinate spaces`() {
+    fun `disconnected neighborhoods should retain both finite coordinate spaces`() {
         val problem = Problem(3, 2, Array(2) { IntDomain(0, 1) }, emptyList()).bake()
         val incumbent = Sample(BooleanArray(3), LongArray(2))
 
         val freed = DestroyOperator.AdjacencyRelated.destroy(
-            Random(17), problem, incumbent, LinearObjective(), 1.0,
+            Random(17),
+            problem,
+            incumbent,
+            LinearObjective(),
+            1.0,
         )
 
         assertContentEquals(intArrayOf(0, 1, 2), freed.bools)

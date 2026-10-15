@@ -19,12 +19,12 @@ class DiscountedThompsonTest {
     }
 
     @Test
-    fun `an arm that earns nothing is almost never chosen`() {
+    fun `an arm that earns nothing should almost never be chosen`() {
         assertTrue(choicesOf(trained(), arm = 0, rounds = 1_000) < 10)
     }
 
     @Test
-    fun `fading all evidence makes the arms equally likely again`() {
+    fun `fading all evidence should make the arms equally likely again`() {
         val bandit = trained()
 
         bandit.fade(0.0)
@@ -33,7 +33,7 @@ class DiscountedThompsonTest {
     }
 
     @Test
-    fun `a short half-life lets a written-off arm win once its rival stops paying`() {
+    fun `a short half-life should let a written-off arm win once its rival stops paying`() {
         val bandit = trained(halfLife = 5.0)
 
         repeat(50) { bandit.update(1, 0.0, 1.0) }
@@ -43,7 +43,7 @@ class DiscountedThompsonTest {
     }
 
     @Test
-    fun `choosing among arms picks the best of them and none outside`() {
+    fun `choosing among arms should pick the best of them and none outside`() {
         val bandit = DiscountedThompson(3, Random(7), 1_000.0)
         repeat(200) {
             bandit.update(0, 0.0, 1.0)

@@ -14,10 +14,16 @@ import kotlin.test.assertTrue
 
 class AbsResultRepairTest {
     @Test
-    fun `independent inequalities repair a maintained absolute value through either input sign`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(-3, 3), IntDomain(0, 3)), arrayOf(
-            Abs(0, 1), Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 1),
-        ))
+    fun `independent inequalities should repair a maintained absolute value through either input sign`() {
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(-3, 3), IntDomain(0, 3)),
+            arrayOf(
+                Abs(0, 1),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 1),
+            ),
+        )
         val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
         state.invariants = assertNotNull(DefinitionalSweep.infer(source)).network(2, 0)
         state.assignment.setInt(0, 3)
@@ -37,9 +43,13 @@ class AbsResultRepairTest {
     }
 
     @Test
-    fun `nested absolute value repair reaches searched inputs without negative intermediate magnitudes`() {
-        val source = Problem(0, 3, arrayOf(IntDomain(-3, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            arrayOf(Abs(0, 1), Abs(1, 2)))
+    fun `nested absolute value repair should reach searched inputs without negative intermediate magnitudes`() {
+        val source = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(-3, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            arrayOf(Abs(0, 1), Abs(1, 2)),
+        )
         val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
         state.invariants = assertNotNull(DefinitionalSweep.infer(source)).network(3, 0)
         for (id in 0..2) state.assignment.setInt(id, 3)
@@ -52,9 +62,13 @@ class AbsResultRepairTest {
     }
 
     @Test
-    fun `absolute value repairs preserve holes frozen inputs and implicit owners`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(-3, 3).excludeValue(2), IntDomain(0, 3)),
-            arrayOf(Abs(0, 1)))
+    fun `absolute value repairs should preserve holes frozen inputs and implicit owners`() {
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(-3, 3).excludeValue(2), IntDomain(0, 3)),
+            arrayOf(Abs(0, 1)),
+        )
         val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
         state.invariants = assertNotNull(DefinitionalSweep.infer(source)).network(2, 0)
         state.assignment.setInt(0, 3)
@@ -74,7 +88,7 @@ class AbsResultRepairTest {
     }
 
     @Test
-    fun `negative absolute value targets do not propose repairs`() {
+    fun `negative absolute value targets should not propose repairs`() {
         val source = Problem(0, 2, arrayOf(IntDomain(-3, 3), IntDomain(-3, 3)), arrayOf(Abs(0, 1)))
         val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
         state.invariants = assertNotNull(DefinitionalSweep.infer(source)).network(2, 0)

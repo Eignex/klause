@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 
 class RevisedSimplexScratchTest {
     @Test
-    fun `exact adoption retires an old ray before the next solve`() {
+    fun `exact adoption should retire an old ray before the next solve`() {
         val model = LpBuilder().apply {
             addVar(0L, 1L, cost = 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
@@ -38,7 +38,7 @@ class RevisedSimplexScratchTest {
     }
 
     @Test
-    fun `arbitrary solve failure preserves primary cleanup order and clears result artifacts`() {
+    fun `an arbitrary solve failure should preserve cleanup order and clear result artifacts`() {
         val model = LpBuilder().apply {
             addVar(0L, 3L, cost = 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
@@ -76,7 +76,7 @@ class RevisedSimplexScratchTest {
     }
 
     @Test
-    fun `retained truncated duals do not alias later solve output`() {
+    fun `retained truncated duals should not alias later solve output`() {
         val builder = LpBuilder()
         val x = IntArray(4) { builder.addVar(0L, 10L, cost = 1L) }
         builder.addRow(intArrayOf(x[0], x[1]), longArrayOf(1L, 1L), Relation.GE, 3L)

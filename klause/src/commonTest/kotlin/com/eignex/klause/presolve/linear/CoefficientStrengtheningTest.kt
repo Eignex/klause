@@ -28,9 +28,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class CoefficientStrengtheningTest {
-
     @Test
-    fun `a declared Boolean row is strengthened without changing its solutions`() {
+    fun `a declared Boolean row should be strengthened without changing its solutions`() {
         val source = PseudoBoolean(longArrayOf(2, 4), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 5)
         val model = Problem(2, 0, emptyArray(), listOf(object : Factor by source {}))
 
@@ -45,7 +44,7 @@ class CoefficientStrengtheningTest {
     }
 
     @Test
-    fun `declared integer rows are strengthened with finite and open source bounds`() {
+    fun `declared integer rows should be strengthened with finite and open source bounds`() {
         val source = Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.LE, 5)
         val factor = object : Factor by source {}
         for (open in listOf(false, true)) {
@@ -66,7 +65,7 @@ class CoefficientStrengtheningTest {
     }
 
     @Test
-    fun `strengthening an implied row does not replace its enclosing factor`() {
+    fun `strengthening an implied row should not replace its enclosing factor`() {
         val source = Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.LE, 5)
         for (form in listOf(LinearForm.Relaxation(source.linearRows), LinearForm.Disjunction(source.linearRows))) {
             val factor = object : Factor by source {
@@ -81,7 +80,7 @@ class CoefficientStrengtheningTest {
     }
 
     @Test
-    fun `an indivisible implied equality refutes its enclosing factor`() {
+    fun `an indivisible implied equality should refute its enclosing factor`() {
         val source = Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.EQ, 3)
         val factor = object : Factor by source {
             override val linearForm: LinearForm = LinearForm.Relaxation(source.linearRows)
@@ -122,12 +121,6 @@ class CoefficientStrengtheningTest {
     private fun assertLinearEquivalent(numVars: Int, domain: Int, original: Linear) =
         assertLinearEquivalent(Array(numVars) { 0..domain }, original)
 
-    /**
-     * Feasible-set equivalence over arbitrary per-variable integer domains [domains]. Enumeration
-     * runs over the *root-propagated* domains: the lift reads what the bake left, folding the
-     * constraint's own bound deductions in, so that — not the declared range — is the feasible region
-     * presolve must preserve.
-     */
     private fun assertLinearEquivalent(domains: Array<IntRange>, original: Linear) {
         val numVars = domains.size
         val problem =
@@ -137,9 +130,6 @@ class CoefficientStrengtheningTest {
                 Array(numVars) { IntDomain(domains[it].first.toLong(), domains[it].last.toLong()) },
                 listOf(original),
             ).bake()
-        // The rewrite may produce one factor (lifted / gcd-reduced), none (dropped ⇒ always-true), or
-        // a multi-factor contradiction (an indivisible equality ⇒ infeasible); the feasible set is the
-        // conjunction of whatever rewritten factors remain.
         val rewritten = strengthened(problem).factors.filterIsInstance<Linear>()
         val values = Array(numVars) { v ->
             val d = problem.rootIntDomain(v)
@@ -154,7 +144,6 @@ class CoefficientStrengtheningTest {
         }
     }
 
-    /** Enumerate the cartesian product of index ranges `0 until values[i].size`. */
     private fun enumerateMixed(values: Array<IntArray>, body: (IntArray) -> Unit) {
         val idx = IntArray(values.size)
         while (true) {
@@ -173,12 +162,11 @@ class CoefficientStrengtheningTest {
     }
 
     @Test
-    fun `gcd reduction preserves each linear operator`() {
-        // coeffs 2,4 share gcd 2.
+    fun `gcd reduction should preserve each linear operator`() {
         assertLinearEquivalent(2, 4, Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.LE, 5))
         assertLinearEquivalent(2, 4, Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.GE, 5))
-        assertLinearEquivalent(2, 4, Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.EQ, 6)) // divisible
-        assertLinearEquivalent(2, 4, Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.NE, 5)) // dropped
+        assertLinearEquivalent(2, 4, Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.EQ, 6))
+        assertLinearEquivalent(2, 4, Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.NE, 5))
         assertLinearEquivalent(2, 4, Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.NE, 6))
     }
 
@@ -191,8 +179,7 @@ class CoefficientStrengtheningTest {
     }
 
     @Test
-    fun `an indivisible linear equality is rewritten to an infeasible problem`() {
-        // 2*x0 + 4*x1 = 5: the left-hand side is always even, so it can never equal 5.
+    fun `an indivisible linear equality should be rewritten to an infeasible problem`() {
         assertInfeasibleAfterStrengthen(
             Problem(
                 0,
@@ -204,16 +191,14 @@ class CoefficientStrengtheningTest {
     }
 
     @Test
-    fun `bounded integer eq and ne are not lifted`() {
-        // EQ / NE pass through coefficient lifting unchanged (feasible set must still match).
+    fun `bounded integer eq and ne rows should keep their feasible set`() {
         assertLinearEquivalent(arrayOf(0..3), Linear(intArrayOf(5), intArrayOf(0), LinearOp.EQ, 10))
         assertLinearEquivalent(arrayOf(0..3, 0..2), Linear(intArrayOf(5, 2), intArrayOf(0, 1), LinearOp.NE, 6))
     }
 
     @Test
-    fun `a row the source bounds on both sides is lifted without a finite projection`() {
-        // 7x + 3y <= 8 over two binaries: Amax 10, d 2, so both coefficients clamp to 2 and the bound
-        // becomes 2. Coprime coefficients, so nothing here is the GCD half.
+    fun `a row the source bounds on both sides should be lifted without a finite projection`() {
+        // Amax 10 and d 2 clamp both coefficients and the bound to 2.
         val problem = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
@@ -228,9 +213,7 @@ class CoefficientStrengtheningTest {
     }
 
     @Test
-    fun `a row mentioning a column the source leaves open is not lifted`() {
-        // The same row with nothing bounding y above. Its width is what the lift charges, so an invented
-        // endpoint is the only thing that could justify the clamp.
+    fun `a row mentioning an open column should not be lifted`() {
         val openHi = Bits(2).also { it.set(1) }
         val problem = Problem(
             numBoolVars = 0,
@@ -238,18 +221,12 @@ class CoefficientStrengtheningTest {
             factors = arrayOf(Linear(intArrayOf(7, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
         )
 
-        assertTrue(
-            Presolve.strengthenSourceCoefficients(problem, Cancellation.Never).isEmpty,
-            "an open column has no width for the lift to charge",
-        )
+        assertTrue(Presolve.strengthenSourceCoefficients(problem, Cancellation.Never).isEmpty)
     }
 
     @Test
-    fun `a row over open-domain columns is kept when its lift arithmetic would overflow`() {
-        // Each column carries the unbounded-search clamp, so a capacity is 2^62 and the maximal
-        // activity over three of them leaves Long. Unguarded, the wrapped activity yields either a row
-        // dropped as always-satisfied or a lifted row whose bound is unrelated to the original — both
-        // change the feasible set.
+    fun `a row should be kept when its lift arithmetic would overflow`() {
+        // The maximal activity over three 2^62 columns leaves Long.
         val open = IntDomain(0, 1L shl 62)
         val problem = Problem(
             numBoolVars = 0,
@@ -257,9 +234,6 @@ class CoefficientStrengtheningTest {
             intDomains = arrayOf(open, open, open),
             factors = listOf(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 10)),
         )
-        assertTrue(
-            Presolve.strengthenCoefficients(problem.bake()).isEmpty,
-            "an unliftable row must pass through unchanged, neither dropped nor rewritten",
-        )
+        assertTrue(Presolve.strengthenCoefficients(problem.bake()).isEmpty)
     }
 }

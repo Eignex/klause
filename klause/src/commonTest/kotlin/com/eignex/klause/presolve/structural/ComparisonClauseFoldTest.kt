@@ -23,9 +23,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ComparisonClauseFoldTest {
-
     @Test
-    fun `declared reified comparisons fold without changing integer solutions`() {
+    fun `declared reified comparisons should fold without changing integer solutions`() {
         val first = reif(0, 0, LinearOp.LE, 1)
         val second = reif(1, 1, LinearOp.LE, 1)
         val model = problemOf(
@@ -55,7 +54,6 @@ class ComparisonClauseFoldTest {
         openHi: BooleanArray? = null,
     ) = Problem(numBool, domains.size, domains, factors.toTypedArray(), openIntHi = openHi)
 
-    /** `b0 ⇔ (x0 − x2 ≤ 0)`, `b1 ⇔ (x1 − x3 ≤ 0)` and `b0 ∨ b1`, with x2 and x3 declared `{1}` unless open above. */
     private fun constantShifted(openConstants: Boolean) = problemOf(
         numBool = 2,
         domains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(1, 1), IntDomain(1, 1)),
@@ -68,7 +66,7 @@ class ComparisonClauseFoldTest {
     )
 
     @Test
-    fun `the source form folds comparisons over open columns`() {
+    fun `source folding should fold comparisons over open columns`() {
         val problem = problemOf(
             numBool = 2,
             domains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
@@ -90,14 +88,14 @@ class ComparisonClauseFoldTest {
     }
 
     @Test
-    fun `the source form keeps a term over an open column out of the bound`() {
+    fun `source folding should keep a term over an open column out of the bound`() {
         val delta = ComparisonClauseFold.foldSource(constantShifted(openConstants = true))
 
         assertTrue(delta.isEmpty)
     }
 
     @Test
-    fun `an indicator the objective weighs keeps its reified definition`() {
+    fun `an indicator the objective weighs should keep its reified definition`() {
         val problem = constantShifted(openConstants = false)
 
         val delta = ComparisonClauseFold.foldSource(problem, objectiveBoolVars = setOf(1))
@@ -105,13 +103,11 @@ class ComparisonClauseFoldTest {
         assertTrue(delta.isEmpty)
     }
 
-    /** Enumerate a problem's solutions projected onto its integer variables. */
     private fun intSolutions(problem: Problem): HashSet<List<Long>> = BacktrackSolver(problem.bake())
         .enumerate(BacktrackParams(randomSeed = 1L)).take(10_000).map { it.ints.toList() }.toHashSet()
 
     @Test
-    fun `folds a negated indicator as the complement comparison`() {
-        // Clause(not b0, b1) with b0 <-> (x0 <= 1) is (x0 >= 2) v (x1 <= 1).
+    fun `a negated indicator should fold as the complement comparison`() {
         val domains = arrayOf(IntDomain(0, 3), IntDomain(0, 3))
         val problem = problemOf(
             numBool = 2,
@@ -132,8 +128,7 @@ class ComparisonClauseFoldTest {
     }
 
     @Test
-    fun `does not fold when an indicator is shared by another factor`() {
-        // b0 is used by a second clause too, so it cannot be dropped; neither clause folds through it.
+    fun `an indicator shared by another factor should not fold`() {
         val domains = arrayOf(IntDomain(0, 3), IntDomain(0, 3))
         val problem = problemOf(
             numBool = 2,
@@ -142,28 +137,28 @@ class ComparisonClauseFoldTest {
                 reif(0, 0, LinearOp.LE, 1),
                 reif(1, 1, LinearOp.LE, 1),
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(0, true))), // extra consumer of b0
+                Clause(intArrayOf(Lit.make(0, true))),
             ),
         )
         val baked = problem.bake()
         val delta = Presolve.foldComparisonClauses(baked)
-        assertTrue(delta.isEmpty, "a shared indicator must keep the reified encoding")
+        assertTrue(delta.isEmpty)
     }
 
     @Test
-    fun `does not fold a multi-variable reified comparison`() {
+    fun `a multi-variable reified comparison should not fold`() {
         val domains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3))
         val problem = problemOf(
             numBool = 2,
             domains = domains,
             factors = listOf(
-                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2), // two-variable body
+                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2),
                 reif(1, 2, LinearOp.LE, 1),
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             ),
         )
         val baked = problem.bake()
         val delta = Presolve.foldComparisonClauses(baked)
-        assertTrue(delta.isEmpty, "a multi-variable comparison is not a single-variable literal")
+        assertTrue(delta.isEmpty)
     }
 }

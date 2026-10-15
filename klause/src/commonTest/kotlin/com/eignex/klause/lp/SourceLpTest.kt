@@ -19,7 +19,7 @@ import kotlin.time.TimeSource
 
 class SourceLpTest {
     @Test
-    fun `an operation token states the caller's deadline unless a requested active cap ends sooner`() {
+    fun `operation token should use the caller deadline unless an active cap ends sooner`() {
         val rows = listOf(exactColumnUpper(0, BigFraction.ONE))
         val caller = TimeSource.Monotonic.markNow() + 1.hours
         val cases = listOf(SourceLpBudget() to true, SourceLpBudget(maxActiveNanos = 1_000_000_000L) to false)
@@ -32,7 +32,7 @@ class SourceLpTest {
     }
 
     @Test
-    fun `equality subset retains both source rows and omits unequal and unpaired bounds`() {
+    fun `equality subset should keep paired rows and omit unequal and unpaired bounds`() {
         for (strict in listOf(false, true)) {
             val rows = listOf(
                 ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ofLong(2L)), BigFraction.ofLong(2L), strict),
@@ -50,7 +50,7 @@ class SourceLpTest {
     }
 
     @Test
-    fun `a subset witness does not satisfy an omitted source constraint`() {
+    fun `subset witness should not satisfy an omitted source constraint`() {
         val rows = listOf(
             exactColumnUpper(0, BigFraction.ZERO),
             exactColumnLower(0, BigFraction.ZERO),
@@ -65,14 +65,14 @@ class SourceLpTest {
     }
 
     @Test
-    fun `unequal opposing rows cannot become an equality subset`() {
+    fun `unequal opposing rows should not become an equality subset`() {
         val rows = listOf(exactColumnUpper(0, BigFraction.ONE), exactColumnLower(0, BigFraction.ZERO))
 
         assertTrue(assertNotNull(sourceEqualityRows(rows, 1, SourceLpBudget(), Cancellation.Never)).isEmpty())
     }
 
     @Test
-    fun `equality matching spending survives heavy admission exhaustion and cancellation`() {
+    fun `equality matching spending should survive admission exhaustion and cancellation`() {
         for (cancel in listOf(false, true)) {
             var cancelled = false
             val rows = listOf(exactColumnUpper(0, BigFraction.ONE), exactColumnLower(0, BigFraction.ONE))
@@ -93,7 +93,7 @@ class SourceLpTest {
     }
 
     @Test
-    fun `crossed opposite bounds do not publish an unexplained contradiction`() {
+    fun `crossed opposite bounds should not publish an unexplained contradiction`() {
         val rows = listOf(exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(0, BigFraction.ONE))
 
         assertIs<ExactDoubleBoundedSplit.Unknown>(
@@ -102,7 +102,7 @@ class SourceLpTest {
     }
 
     @Test
-    fun `constant source rows retain strictness and exact zero activity`() {
+    fun `constant source rows should retain strictness and exact zero activity`() {
         for (strict in listOf(false, true)) {
             val row = ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ZERO), BigFraction.ZERO, strict)
 
@@ -116,7 +116,7 @@ class SourceLpTest {
     }
 
     @Test
-    fun `failed and cancelled source operations report spending once`() {
+    fun `failed and cancelled source operations should report spending once`() {
         for (throws in listOf(false, true)) {
             val sink = SmtStatsSink()
             val budget = SourceLpBudget(onWork = sink::observeSourceLp)
@@ -145,7 +145,7 @@ class SourceLpTest {
     }
 
     @Test
-    fun `source row mutation cannot alter an admitted owner`() {
+    fun `source row mutation should not alter an admitted owner`() {
         val coefficients = mutableListOf(BigFraction.ONE)
         val row = ExactRationalInequality(intArrayOf(0), coefficients, BigFraction.ONE)
         SourceLp(listOf(row), 1, SourceLpBudget()).use { owner ->
@@ -161,7 +161,7 @@ class SourceLpTest {
     }
 
     @Test
-    fun `repeated branch forms reuse definitions without retaining their thresholds`() {
+    fun `repeated branch forms should reuse definitions without retaining thresholds`() {
         val rows = listOf(exactColumnLower(0, BigFraction.ZERO), exactColumnLower(1, BigFraction.ZERO))
         val branch = ExactRationalInequality(
             intArrayOf(0, 1),
@@ -180,7 +180,7 @@ class SourceLpTest {
     }
 
     @Test
-    fun `source family reservations survive replacement owners`() {
+    fun `source family reservations should survive replacement owners`() {
         val budget = SourceLpBudget(maxOperations = 1)
         SourceLp(emptyList(), 1, budget).use { assertNotNull(it.solve(Cancellation.Never)) }
 
@@ -192,7 +192,7 @@ class SourceLpTest {
     }
 
     @Test
-    fun `closing every owner preserves primary and suppressed failures`() {
+    fun `closing every owner should preserve primary and suppressed failures`() {
         val first = IllegalStateException("first")
         val second = IllegalStateException("second")
         var closed = 0

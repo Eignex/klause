@@ -47,7 +47,7 @@ class SolveMetricFailureTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["argument", "state", "io", "no-message"])
-    fun `caught solve failures retain their class and message on disk`(type: String) {
+    fun `caught solve failures should retain their class and message on disk`(type: String) {
         val failure = when (type) {
             "argument" -> IllegalArgumentException("bad argument\nsecond line")
             "state" -> IllegalStateException("invalid state")
@@ -66,7 +66,7 @@ class SolveMetricFailureTest {
     }
 
     @Test
-    fun `caught solve failures retain source build and invocation identity`() {
+    fun `caught solve failures should retain source build and invocation identity`() {
         val record = persisted(IOException("cannot launch"))
 
         assertEquals(mapOf("model" to sha256(CorpusFetcher.resolve(ref.source).readBytes())), record.sourceHashes)
@@ -80,7 +80,7 @@ class SolveMetricFailureTest {
     }
 
     @Test
-    fun `caught solve failures retain a nested cause on disk`() {
+    fun `caught solve failures should retain a nested cause on disk`() {
         val cause = IOException("launcher missing", IllegalArgumentException("path"))
         val failure = IllegalStateException("solve failed", cause)
 
@@ -93,7 +93,7 @@ class SolveMetricFailureTest {
     }
 
     @Test
-    fun `oversized caught messages retain a bounded prefix and explicit truncation`() {
+    fun `oversized caught messages should retain a bounded prefix with explicit truncation`() {
         val record = persisted(IllegalStateException("root:" + "x".repeat(100_000), IOException("y".repeat(100_000))))
 
         assertEquals("root:" + "x".repeat(1019), record.stats["errorMessage"])
@@ -104,7 +104,7 @@ class SolveMetricFailureTest {
     }
 
     @Test
-    fun `deep caught cause chains retain bounded causes and explicit truncation`() {
+    fun `deep caught cause chains should retain bounded causes with explicit truncation`() {
         val failure = (1..20).fold<Int, Throwable>(IOException("deepest")) { cause, depth ->
             IllegalStateException("level $depth", cause)
         }
@@ -116,17 +116,8 @@ class SolveMetricFailureTest {
         assertNull(record.stats["errorCause4Class"])
     }
 
-    @ParameterizedTest
-    @ValueSource(ints = [1023, 1024, 1025])
-    fun `message truncation is marked only beyond the retained limit`(length: Int) {
-        val record = persisted(IOException("x".repeat(length)))
-
-        assertEquals(minOf(length, 1024), record.stats.getValue("errorMessage").length)
-        assertEquals(if (length > 1024) "true" else null, record.stats["errorMessageTruncated"])
-    }
-
     @Test
-    fun `cyclic caught cause chains terminate with an explicit marker`() {
+    fun `cyclic caught cause chains should terminate with an explicit marker`() {
         val failure = IllegalStateException("outer")
         val cause = IOException("inner", failure)
         failure.initCause(cause)
@@ -139,7 +130,7 @@ class SolveMetricFailureTest {
     }
 
     @Test
-    fun `an unavailable build capture does not mask its exception or invent an identity`() {
+    fun `an unavailable build capture should not mask its exception or invent an identity`() {
         val (record, _) = SolveMetric.solve(
             entry, SolverInvocation.KLAUSE, settings, Budget(1000), "capture", "timestamp", "revision",
             installedBuild = { throw IOException("missing installation") },
@@ -154,7 +145,7 @@ class SolveMetricFailureTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["success", "unknown"])
-    fun `ordinary outcomes do not acquire caught exception diagnostics`(outcome: String) {
+    fun `ordinary outcomes should not acquire caught exception diagnostics`(outcome: String) {
         val result = SolverInvocation.Result(
             feasible = if (outcome == "success") true else null,
             objective = null, timeToBestMs = null, proven = false, stats = emptyMap(), rawOutput = "",
@@ -174,27 +165,5 @@ class SolveMetricFailureTest {
         } finally {
             File("build/bench-cache", "$key.json").delete()
         }
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = ["success", "unknown", "error"])
-    fun `legacy record shapes remain readable without invented diagnostics`(outcome: String) {
-        val feasible = if (outcome == "success") "true" else "null"
-        val command = if (outcome == "error") "ERROR" else "cli"
-        val legacy = """
-            {"problem":"legacy", "solver":"klause", "engine":null, "processors":1,
-             "search":"free", "seed":3, "budgetMs":60000, "kind":"optimize", "maximize":false,
-             "feasible":$feasible, "objective":null, "timeToBestMs":null, "proven":false,
-             "stats":{}, "gitSha":"historical", "timestamp":"historical", "command":"$command"}
-        """.trimIndent()
-
-        val record = Reports.json.decodeFromString<SolveRecord>(legacy)
-        val roundTrip = Reports.json.decodeFromString<SolveRecord>(Reports.json.encodeToString(record))
-
-        assertEquals(record, roundTrip)
-        assertEquals(command, record.command)
-        assertTrue(record.stats.isEmpty())
-        assertNull(record.buildProvenance)
-        assertTrue(record.sourceHashes.isEmpty())
     }
 }

@@ -7,7 +7,7 @@ import kotlin.test.assertNull
 
 class SearchTrailTest {
     @Test
-    fun `rebuilding the root discards facts from the previous seed`() {
+    fun `rebuilding the root should discard facts from the previous seed`() {
         val session = SearchSession(emptyList())
         session.publish(SearchDecision.Bool(0))
         session.publish(SearchDecision.IntAtLeast(0, 4L))
@@ -27,7 +27,7 @@ class SearchTrailTest {
     }
 
     @Test
-    fun `rebuilding root facts retains and wakes learned units`() {
+    fun `rebuilding root facts should retain and wake learned units`() {
         val session = SearchSession(emptyList())
         session.learn(SearchExplanation(intArrayOf(0)))
         assertIs<ComponentResult.Consistent>(session.propagate())

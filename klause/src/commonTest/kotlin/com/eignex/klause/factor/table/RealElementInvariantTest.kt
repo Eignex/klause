@@ -12,11 +12,17 @@ import kotlin.test.assertEquals
 
 class RealElementInvariantTest {
     @Test
-    fun `real move deltas account for an entry aliasing the result`() {
+    fun `real move deltas should account for an entry aliasing the result`() {
         for ((index, proposed) in listOf(1L to 1.0, 2L to 3.0)) {
-            val source = Problem(0, 1, arrayOf(IntDomain(1, 2)),
+            val source = Problem(
+                0,
+                1,
+                arrayOf(IntDomain(1, 2)),
                 arrayOf<Factor>(RealElement(0, 1, intArrayOf(0, 1))),
-                numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(4.0, 4.0))
+                numRealVars = 2,
+                realLower = doubleArrayOf(0.0, 0.0),
+                realUpper = doubleArrayOf(4.0, 4.0),
+            )
             val state = LocalSearchState(source.bake(), Random(0))
             state.assignment.setInt(0, index)
             state.assignment.setReal(0, 1.0)
@@ -34,10 +40,16 @@ class RealElementInvariantTest {
     }
 
     @Test
-    fun `index move deltas select the corresponding real entry`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(1, 2)),
+    fun `index move deltas should select the corresponding real entry`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(1, 2)),
             arrayOf<Factor>(RealElement(0, 0, doubleArrayOf(1.0, 2.0))),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(3.0))
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(3.0),
+        )
         val state = LocalSearchState(source.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setReal(0, 2.0)

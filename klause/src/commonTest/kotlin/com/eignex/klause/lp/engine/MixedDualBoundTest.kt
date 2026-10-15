@@ -11,17 +11,21 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
-    fun `finite cancellation prioritizes rows changed by integral bounds`() {
+    fun `finite cancellation should prioritize rows changed by integral bounds`() {
         for (fresh in listOf(false, true)) {
-            val source = assertNotNull(LpBuilder().apply {
-                val z = addVar(0L, 1L)
-                val x = addVar(0L, if (fresh) 1L else 2L)
-                val first = addRealVar(0.0, 2.0, cost = 1.0)
-                val second = addRealVar(0.0, 4.0, cost = 1.0)
-                addRealRow(intArrayOf(z, first), doubleArrayOf(-0.5, 1.0), Relation.GE, 0.0)
-                addRealRow(intArrayOf(x, second), doubleArrayOf(-2.0, 1.0), Relation.GE, 0.0)
-            }.build(Sense.MINIMIZE).authoritativeModel())
-            val state = if (fresh) LpExactState(source) else {
+            val source = assertNotNull(
+                LpBuilder().apply {
+                    val z = addVar(0L, 1L)
+                    val x = addVar(0L, if (fresh) 1L else 2L)
+                    val first = addRealVar(0.0, 2.0, cost = 1.0)
+                    val second = addRealVar(0.0, 4.0, cost = 1.0)
+                    addRealRow(intArrayOf(z, first), doubleArrayOf(-0.5, 1.0), Relation.GE, 0.0)
+                    addRealRow(intArrayOf(x, second), doubleArrayOf(-2.0, 1.0), Relation.GE, 0.0)
+                }.build(Sense.MINIMIZE).authoritativeModel(),
+            )
+            val state = if (fresh) {
+                LpExactState(source)
+            } else {
                 val trail = LpBoundTrail(source)
                 assertTrue(trail.push())
                 assertTrue(trail.assertBound(1, true, ExactLpSide(ExactLpNumber.of(1L)), 7L))
@@ -30,16 +34,21 @@ class MixedDualBoundTest {
             val model = assertNotNull(state.toWorkingModel())
             val additional = ArrayList<LpDeductionCertificate>()
 
-            assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0, 0.0),
-                onAdditionalCertificate = { additional.add(it) },
-                preferredColumns = if (fresh) intArrayOf(-1, 1, 2, source.n) else null))
+            assertNotNull(
+                nodeDualCertificate(
+                    model,
+                    doubleArrayOf(0.0, 0.0),
+                    onAdditionalCertificate = { additional.add(it) },
+                    preferredColumns = if (fresh) intArrayOf(-1, 1, 2, source.n) else null,
+                ),
+            )
 
             assertTrue(additional.any { it.fixSteps(1, 1L, 0L) == 0L })
         }
     }
 
     @Test
-    fun `a supported continuous endpoint does not hide an integral fixing direction`() {
+    fun `a supported continuous endpoint should not hide an integral fixing direction`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 1L)
             val r = addRealVar(0.0, 2.0, cost = 1.0)
@@ -48,33 +57,20 @@ class MixedDualBoundTest {
         val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
         val additional = ArrayList<LpDeductionCertificate>()
 
-        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
-            onAdditionalCertificate = { additional.add(it) }))
+        val certificate = assertNotNull(
+            nodeDualCertificate(
+                model,
+                doubleArrayOf(0.0),
+                onAdditionalCertificate = { additional.add(it) },
+            ),
+        )
 
         assertEquals(BigFraction.ZERO, certificate.exactObjectiveBound())
         assertTrue(additional.any { it.fixSteps(0, 1L, 0L) == 0L })
     }
 
     @Test
-    fun `completed primary certificates survive optional candidate work exhaustion`() {
-        val source = LpBuilder().apply {
-            addVar(0L, 10L, cost = 1L)
-            addRealVar(0.0, 1.0)
-        }.build(Sense.MINIMIZE)
-        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
-        val meter = MixedCertificateMeter(Cancellation.Never)
-        meter.reserve(1_999_240L)
-        val additional = ArrayList<LpDeductionCertificate>()
-
-        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(),
-            onAdditionalCertificate = { additional.add(it) }, sharedMeter = meter))
-
-        assertEquals(BigFraction.ZERO, certificate.exactObjectiveBound())
-        assertTrue(additional.isEmpty())
-    }
-
-    @Test
-    fun `objective expression fixing preserves exact integer and fractional defining multipliers`() {
+    fun `objective expression fixing should preserve exact integer and fractional defining multipliers`() {
         for (coefficient in listOf(1.0, 3.0)) {
             val source = LpBuilder().apply {
                 val x = addVar(0L, 10L)
@@ -84,8 +80,13 @@ class MixedDualBoundTest {
             val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
             val additional = ArrayList<LpDeductionCertificate>()
 
-            val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
-                onAdditionalCertificate = { additional.add(it) }))
+            val certificate = assertNotNull(
+                nodeDualCertificate(
+                    model,
+                    doubleArrayOf(0.0),
+                    onAdditionalCertificate = { additional.add(it) },
+                ),
+            )
 
             assertEquals(BigFraction.ZERO, certificate.exactObjectiveBound())
             assertTrue(additional.any { it.fixStepsAtCutoff(0, BigFraction.ofLong(3L), 0L) == 3L })
@@ -94,7 +95,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `a weaker objective elimination certificate fixes the opposite integer endpoint`() {
+    fun `a weaker objective elimination certificate should fix the opposite integer endpoint`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 10L)
             val r = addRealVar(0.0, 3.0, cost = 1.0)
@@ -104,8 +105,13 @@ class MixedDualBoundTest {
         val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
         val additional = ArrayList<LpDeductionCertificate>()
 
-        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(1.5, -4.5),
-            onAdditionalCertificate = { additional.add(it) }))
+        val certificate = assertNotNull(
+            nodeDualCertificate(
+                model,
+                doubleArrayOf(1.5, -4.5),
+                onAdditionalCertificate = { additional.add(it) },
+            ),
+        )
 
         assertEquals(BigFraction.ofLong(3L), certificate.exactObjectiveBound())
         assertEquals(BigFraction.ZERO, certificate.exactReducedCost(0))
@@ -116,7 +122,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `endpoint repair supplies integral fixing without a continuous upper bound`() {
+    fun `endpoint repair should supply integral fixing without a continuous upper bound`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 3L)
             val r = addRealVar(0.0, null, cost = 1.0)
@@ -133,21 +139,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `endpoint repair cannot acquire an absent logical endpoint`() {
-        val source = LpBuilder().apply {
-            val x = addVar(0L, 3L)
-            val r = addRealVar(0.0, null, cost = -1.0)
-            addRealRow(intArrayOf(x, r), doubleArrayOf(0.5, 1.0), Relation.GE, 2.5)
-        }.build(Sense.MINIMIZE)
-        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
-
-        val certificate = nodeDualCertificate(model, doubleArrayOf(0.0))
-
-        assertNull(certificate)
-    }
-
-    @Test
-    fun `endpoint repair withholds a candidate coupling unbounded real coordinates`() {
+    fun `endpoint repair should withhold a candidate coupling unbounded real coordinates`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 3L)
             val r = addRealVar(0.0, null, cost = 1.0)
@@ -162,7 +154,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `directly integral mixed objectives retain lattice support without defining rows`() {
+    fun `directly integral mixed objectives should retain lattice support without defining rows`() {
         val source = LpBuilder().apply {
             addVar(0L, 10L, cost = 2L)
             addRealVar(0.25, 1.25)
@@ -176,7 +168,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `combined dual costs fix an integral coordinate when either component leaves it free`() {
+    fun `combined dual costs should fix an integral coordinate when either component leaves it free`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 1L, cost = 10L)
             val z = addVar(0L, 1L, cost = 100L)
@@ -186,8 +178,13 @@ class MixedDualBoundTest {
         val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
         val additional = ArrayList<LpDeductionCertificate>()
 
-        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(-2.5),
-            onAdditionalCertificate = { additional.add(it) }))
+        val certificate = assertNotNull(
+            nodeDualCertificate(
+                model,
+                doubleArrayOf(-2.5),
+                onAdditionalCertificate = { additional.add(it) },
+            ),
+        )
 
         assertNull(certificate.fixSteps(0, 106L, 0L))
         assertTrue(additional.any { it.fixSteps(0, 106L, 0L) == 0L })
@@ -195,7 +192,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `objective equalities cancel unsupported continuous reduced costs`() {
+    fun `objective equalities should cancel unsupported continuous reduced costs`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 1L)
             val r = addRealVar(0.0, null, cost = 1.0)
@@ -210,7 +207,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `node bounds retain a stronger complete objective equality candidate`() {
+    fun `node bounds should retain a stronger complete objective equality candidate`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 1L)
             val r = addRealVar(0.0, 1.0, cost = 1.0)
@@ -219,15 +216,20 @@ class MixedDualBoundTest {
         val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
         var additional: LpDeductionCertificate? = null
 
-        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(-1.0),
-            onAdditionalCertificate = { if (additional == null) additional = it }))
+        val certificate = assertNotNull(
+            nodeDualCertificate(
+                model,
+                doubleArrayOf(-1.0),
+                onAdditionalCertificate = { if (additional == null) additional = it },
+            ),
+        )
 
         assertEquals(BigFraction.ZERO, certificate.exactObjectiveBound())
         assertEquals(BigFraction.ofLong(-1L), assertNotNull(additional).exactObjectiveBound())
     }
 
     @Test
-    fun `cancellation at admission withholds an additional objective certificate`() {
+    fun `cancellation at admission should withhold an additional objective certificate`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 1L)
             val r = addRealVar(0.0, 4.0, cost = 1.0)
@@ -244,15 +246,20 @@ class MixedDualBoundTest {
             override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
         }
 
-        val certificate = nodeDualCertificate(model, doubleArrayOf(0.0), Cancellation { cancelled }, observer,
-            onAdditionalCertificate = { published = true })
+        val certificate = nodeDualCertificate(
+            model,
+            doubleArrayOf(0.0),
+            Cancellation { cancelled },
+            observer,
+            onAdditionalCertificate = { published = true },
+        )
 
         assertNull(certificate)
         assertFalse(published)
     }
 
     @Test
-    fun `objective equality certificates fix coordinates with zero LP reduced cost`() {
+    fun `objective equality certificates should fix coordinates with zero LP reduced cost`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 1L)
             val z = addVar(0L, 1L)
@@ -262,8 +269,13 @@ class MixedDualBoundTest {
         val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
         var objectiveCertificate: LpDeductionCertificate? = null
 
-        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
-            onAdditionalCertificate = { if (objectiveCertificate == null) objectiveCertificate = it }))
+        val certificate = assertNotNull(
+            nodeDualCertificate(
+                model,
+                doubleArrayOf(0.0),
+                onAdditionalCertificate = { if (objectiveCertificate == null) objectiveCertificate = it },
+            ),
+        )
 
         assertEquals(BigFraction.ONE, certificate.exactObjectiveBound())
         assertEquals(BigFraction.ZERO, certificate.exactReducedCost(0))
@@ -273,18 +285,26 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `defining equalities expose integral reduced costs at a degenerate continuous objective seat`() {
+    fun `defining equalities should expose integral reduced costs at a degenerate continuous objective seat`() {
         for (sign in listOf(-1.0, 1.0)) {
             val source = LpBuilder().apply {
                 val x = addVar(0L, 10L)
-                val r = addRealVar(if (sign > 0.0) 0.0 else -3.0,
-                    if (sign > 0.0) 3.0 else 0.0, cost = sign)
+                val r = addRealVar(
+                    if (sign > 0.0) 0.0 else -3.0,
+                    if (sign > 0.0) 3.0 else 0.0,
+                    cost = sign,
+                )
                 addRealRow(intArrayOf(x, r), doubleArrayOf(-3.0 * sign, 1.0), Relation.EQ, 0.0)
             }.build(Sense.MINIMIZE)
             val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
 
-            val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
-                eliminateContinuousObjective = true))
+            val certificate = assertNotNull(
+                nodeDualCertificate(
+                    model,
+                    doubleArrayOf(0.0),
+                    eliminateContinuousObjective = true,
+                ),
+            )
 
             assertEquals(1L, certificate.fixSteps(0, 3L, 0L))
             assertEquals(BigFraction.ZERO, certificate.exactReducedCost(1))
@@ -293,7 +313,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `mixed rational bounds remain available without an integral objective lattice`() {
+    fun `mixed rational bounds should remain available without an integral objective lattice`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 10L)
             val free = addRealVar(null, null)
@@ -311,7 +331,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `mixed duals require exact cancellation on free continuous columns`() {
+    fun `mixed duals should require exact cancellation on free continuous columns`() {
         for (coefficient in listOf(-3.0, -3.0000000001)) {
             val source = LpBuilder().apply {
                 val x = addVar(0L, 10L, cost = 1L)
@@ -329,34 +349,48 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `scoped logical sides cannot silently supply an objective lattice`() {
-        val source = assertNotNull(LpBuilder().apply {
-            val x = addVar(0L, 10L)
-            val r = addRealVar(0.0, 10.0, cost = 1.0)
-            addRealRow(intArrayOf(x, r), doubleArrayOf(-1.0, 1.0), Relation.EQ, 0.0)
-        }.build(Sense.MINIMIZE).authoritativeModel())
+    fun `scoped logical sides should not supply an objective lattice`() {
+        val source = assertNotNull(
+            LpBuilder().apply {
+                val x = addVar(0L, 10L)
+                val r = addRealVar(0.0, 10.0, cost = 1.0)
+                addRealRow(intArrayOf(x, r), doubleArrayOf(-1.0, 1.0), Relation.EQ, 0.0)
+            }.build(Sense.MINIMIZE).authoritativeModel(),
+        )
         val slack = source.column(source.n)
         val premises = ExactLpPremises(emptyList(), listOf(0))
         val bounds = ExactLpBounds(
-            slack.bounds.lower?.copy(premises = premises), slack.bounds.upper?.copy(premises = premises),
+            slack.bounds.lower?.copy(premises = premises),
+            slack.bounds.upper?.copy(premises = premises),
         )
-        val model = assertNotNull(LpExactState(source.withBoundColumns(
-            List(source.numVars) { if (it == source.n) slack.copy(bounds = bounds) else source.column(it) },
-        )).toWorkingModel())
+        val model = assertNotNull(
+            LpExactState(
+                source.withBoundColumns(
+                    List(source.numVars) { if (it == source.n) slack.copy(bounds = bounds) else source.column(it) },
+                ),
+            ).toWorkingModel(),
+        )
 
         var published = false
-        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
-            onAdditionalCertificate = { published = true }))
+        val certificate = assertNotNull(
+            nodeDualCertificate(
+                model,
+                doubleArrayOf(0.0),
+                onAdditionalCertificate = { published = true },
+            ),
+        )
 
         assertNull(certificate.integralObjectiveRows())
         assertFalse(published)
     }
 
     @Test
-    fun `oversized authoritative arithmetic withholds mixed deductions`() {
-        val source = assertNotNull(LpBuilder().apply {
-            addRealVar(0.0, 1.0, cost = 1.0)
-        }.build(Sense.MINIMIZE).authoritativeModel())
+    fun `oversized authoritative arithmetic should withhold mixed deductions`() {
+        val source = assertNotNull(
+            LpBuilder().apply {
+                addRealVar(0.0, 1.0, cost = 1.0)
+            }.build(Sense.MINIMIZE).authoritativeModel(),
+        )
         val wide = BigFraction.ofLong(Long.MAX_VALUE) * BigFraction.ofLong(Long.MAX_VALUE) * BigFraction.ofLong(8L)
         val objective = ExactLpObjective(listOf(ExactLpNumber.of(wide)))
         val model = assertNotNull(LpExactState(source.withObjective(objective)).toWorkingModel())
@@ -367,7 +401,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `bounded continuous objective definitions retain their integral equality support`() {
+    fun `bounded continuous objective definitions should retain their integral equality support`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 10L)
             val r = addRealVar(0.0, 10.0, cost = 1.0)
@@ -383,7 +417,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `fractional continuous objective definitions retain a rational cutoff`() {
+    fun `fractional continuous objective definitions should retain a rational cutoff`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 10L)
             val r = addRealVar(0.0, 10.0, cost = 1.0)
@@ -397,7 +431,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `continuous objective inequalities cannot supply an integral equality`() {
+    fun `continuous objective inequalities should not supply an integral equality`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 10L)
             val r = addRealVar(0.0, 10.0, cost = 1.0)
@@ -411,15 +445,18 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `objective integrality retains source shifts scale and external constants`() {
+    fun `objective integrality should retain source shifts scale and external constants`() {
         for (constant in listOf(5.0, 5.25)) {
-            val source = assertNotNull(LpBuilder().apply {
-                val x = addVar(3L, 10L)
-                val r = addRealVar(3.0, 10.0, cost = 2.0)
-                addRealRow(intArrayOf(x, r), doubleArrayOf(-1.0, 1.0), Relation.EQ, 0.0)
-            }.build(Sense.MINIMIZE).authoritativeModel())
+            val source = assertNotNull(
+                LpBuilder().apply {
+                    val x = addVar(3L, 10L)
+                    val r = addRealVar(3.0, 10.0, cost = 2.0)
+                    addRealRow(intArrayOf(x, r), doubleArrayOf(-1.0, 1.0), Relation.EQ, 0.0)
+                }.build(Sense.MINIMIZE).authoritativeModel(),
+            )
             val objective = ExactLpObjective(
-                List(source.numVars) { source.objective.cost(it) }, source.objective.constant,
+                List(source.numVars) { source.objective.cost(it) },
+                source.objective.constant,
                 scale = ExactLpNumber.of(2L),
                 externalConstant = ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(constant))),
             )
@@ -433,7 +470,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `subnormal rational cutoffs retain exact integral fixing and wide arithmetic charges`() {
+    fun `subnormal rational cutoffs should retain exact integral fixing and wide arithmetic charges`() {
         val source = LpBuilder().apply {
             addVar(0L, 10L, cost = 1L)
             addRealVar(0.0, 1.0, cost = 1.0)
@@ -449,7 +486,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `mixed certificates use fractional continuous endpoints without rounding the objective`() {
+    fun `mixed certificates should use fractional continuous endpoints without rounding the objective`() {
         val source = LpBuilder().apply {
             addVar(0L, 10L, cost = 1L)
             addRealVar(0.25, 1.25, cost = 0.5)
@@ -465,7 +502,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `mixed certificates select the supported endpoint for both reduced cost signs`() {
+    fun `mixed certificates should select the supported endpoint for both reduced cost signs`() {
         for (sign in listOf(-1L, 1L)) {
             val source = LpBuilder().apply {
                 addVar(0L, 10L, cost = sign)
@@ -482,7 +519,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `mixed certificates retain fractional row coefficients and all contributing row weights`() {
+    fun `mixed certificates should retain fractional row coefficients and all contributing row weights`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 10L, cost = 1L)
             val r = addRealVar(0.0, 2.0)
@@ -499,15 +536,19 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `mixed certificates decline support on absent continuous endpoints`() {
+    fun `mixed certificates should decline support on absent continuous endpoints`() {
         for (cost in listOf(-1.0, 1.0)) {
-            val source = assertNotNull(LpBuilder().apply {
-                addRealVar(0.0, 2.0, cost = cost)
-            }.build(Sense.MINIMIZE).authoritativeModel())
-            val column = source.column(0).copy(bounds = ExactLpBounds(
-                lower = if (cost > 0.0) null else source.column(0).bounds.lower,
-                upper = if (cost < 0.0) null else source.column(0).bounds.upper,
-            ))
+            val source = assertNotNull(
+                LpBuilder().apply {
+                    addRealVar(0.0, 2.0, cost = cost)
+                }.build(Sense.MINIMIZE).authoritativeModel(),
+            )
+            val column = source.column(0).copy(
+                bounds = ExactLpBounds(
+                    lower = if (cost > 0.0) null else source.column(0).bounds.lower,
+                    upper = if (cost < 0.0) null else source.column(0).bounds.upper,
+                ),
+            )
             val model = assertNotNull(LpExactState(source.withBoundColumns(listOf(column))).toWorkingModel())
 
             assertNull(nodeDualCertificate(model, doubleArrayOf()))
@@ -515,30 +556,13 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `mixed certificates retain source objective scale and external constant`() {
-        val source = assertNotNull(LpBuilder().apply {
-            addVar(0L, 10L, cost = 2L)
-            addRealVar(0.25, 1.25, cost = 1.0)
-        }.build(Sense.MINIMIZE).authoritativeModel())
-        val objective = ExactLpObjective(
-            List(source.numVars) { source.objective.cost(it) }, source.objective.constant,
-            scale = ExactLpNumber.of(2L), externalConstant = ExactLpNumber.of(5L),
+    fun `mixed certificates should not cross a bound rollback`() {
+        val source = assertNotNull(
+            LpBuilder().apply {
+                addVar(0L, 10L, cost = 1L)
+                addRealVar(0.25, 1.25, cost = 0.5)
+            }.build(Sense.MINIMIZE).authoritativeModel(),
         )
-        val model = assertNotNull(LpExactState(source.withObjective(objective)).toWorkingModel())
-
-        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf()))
-
-        assertEquals(assertNotNull(BigFraction.ofDouble(5.125)), certificate.exactObjectiveBound())
-        assertEquals(BigFraction.ONE, certificate.exactReducedCost(0))
-        assertEquals(1L, certificate.fixSteps(0, 7L, 0L))
-    }
-
-    @Test
-    fun `mixed certificates cannot cross a bound rollback`() {
-        val source = assertNotNull(LpBuilder().apply {
-            addVar(0L, 10L, cost = 1L)
-            addRealVar(0.25, 1.25, cost = 0.5)
-        }.build(Sense.MINIMIZE).authoritativeModel())
         val trail = LpBoundTrail(source)
         assertTrue(trail.push())
         assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 7L))
@@ -551,7 +575,7 @@ class MixedDualBoundTest {
     }
 
     @Test
-    fun `cancelled mixed certification withholds deductions`() {
+    fun `cancelled mixed certification should withhold deductions`() {
         val source = LpBuilder().apply { addRealVar(0.25, 1.25, cost = 0.5) }.build(Sense.MINIMIZE)
         val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
 

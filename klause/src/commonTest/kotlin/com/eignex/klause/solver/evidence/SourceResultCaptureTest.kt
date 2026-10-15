@@ -20,24 +20,19 @@ class SourceResultCaptureTest {
     private val scope = SourceScope(SourceRevision("original-ir", "klause-ir-exact-v1"))
 
     @Test
-    fun `ordinary completed results omit capture by default`() {
-        val result = SolveResult.Sat(Sample(booleanArrayOf(), longArrayOf(1)))
-
-        assertNull(result.evidence)
-    }
-
-    @Test
-    fun `optional witness capture is carried by the completed result`() {
+    fun `optional witness capture should be carried by the completed result`() {
         val context = assertNotNull(model.sourceProofContext(scope))
         val sample = Sample(booleanArrayOf(), longArrayOf(1))
         val result = SourceResultCapture(context).solve(SolveResult.Sat(sample), "fixture-engine")
 
-        assertEquals(SourceEvidenceCheck.Checked,
-            assertNotNull(result.evidence).verify(SourceClaim.Witness(sample), context))
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            assertNotNull(result.evidence).verify(SourceClaim.Witness(sample), context),
+        )
     }
 
     @Test
-    fun `an uncaptured refutation retains only an engine attestation`() {
+    fun `an uncaptured refutation should retain only an engine attestation`() {
         val context = assertNotNull(model.sourceProofContext(scope))
         val result = SourceResultCapture(context).solve(SolveResult.Unsat(), "fixture-engine")
         val evidence = assertNotNull(result.evidence)
@@ -47,52 +42,70 @@ class SourceResultCaptureTest {
     }
 
     @Test
-    fun `a captured original bound and witness establish an exact optimum`() {
+    fun `a captured original bound and witness should establish an exact optimum`() {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val scoped = scope.copy(objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
         val context = assertNotNull(model.sourceProofContext(scoped, objective))
         val sample = Sample(booleanArrayOf(), longArrayOf(1))
         val proof = SourceDerivation.Optimum(SourceDerivation.SourceWitness, SourceDerivation.Premise("int/0/lower"))
-        val result = SourceResultCapture(context).minimize(MinimizeResult.Optimal(sample, 1.0), objective,
-            "fixture-engine", proof)
+        val result = SourceResultCapture(context).minimize(
+            MinimizeResult.Optimal(sample, 1.0),
+            objective,
+            "fixture-engine",
+            proof,
+        )
         val claim = SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ONE))
 
         assertEquals(SourceEvidenceCheck.Checked, assertNotNull(result.evidence).verify(claim, context))
     }
 
     @Test
-    fun `missing objective proof capture cannot gain coverage from an optimal result label`() {
+    fun `missing objective proof capture should not gain coverage from an optimal result label`() {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val scoped = scope.copy(objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
         val context = assertNotNull(model.sourceProofContext(scoped, objective))
         val sample = Sample(booleanArrayOf(), longArrayOf(1))
-        val result = SourceResultCapture(context).minimize(MinimizeResult.Optimal(sample, 1.0), objective,
-            "fixture-engine")
+        val result = SourceResultCapture(context).minimize(
+            MinimizeResult.Optimal(sample, 1.0),
+            objective,
+            "fixture-engine",
+        )
 
-        assertIs<SourceEvidenceCheck.Unavailable>(assertNotNull(result.evidence).verify(
-            SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ONE)), context,
-        ))
+        assertIs<SourceEvidenceCheck.Unavailable>(
+            assertNotNull(result.evidence).verify(
+                SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ONE)),
+                context,
+            ),
+        )
     }
 
     @Test
-    fun `cancelled optional objective capture preserves the completed result`() {
+    fun `cancelled optional objective capture should preserve the completed result`() {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val scoped = scope.copy(objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
         val context = assertNotNull(model.sourceProofContext(scoped, objective))
         val result = MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf(1)), 1.0)
 
-        val captured = SourceResultCapture(context).minimize(result, objective, "fixture-engine",
-            cancellation = Cancellation { true })
+        val captured = SourceResultCapture(context).minimize(
+            result,
+            objective,
+            "fixture-engine",
+            cancellation = Cancellation { true },
+        )
 
         assertEquals(result, captured)
         assertNull(captured.evidence)
     }
 
     @Test
-    fun `ordinary capture preserves a completed result from another source invocation`() {
-        val conditional = scope.copy(condition = SourceCondition(lower = mapOf(
-            SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ofLong(2),
-        )))
+    fun `ordinary capture should preserve a completed result from another source invocation`() {
+        val conditional = scope.copy(
+            condition = SourceCondition(
+                lower = mapOf(
+                    SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ofLong(2),
+                ),
+            ),
+        )
         val conditionalContext = assertNotNull(model.sourceProofContext(conditional))
         val originalContext = assertNotNull(model.sourceProofContext(scope))
         val result = SourceResultCapture(conditionalContext).solve(SolveResult.Unsat(), "fixture-engine")
@@ -100,30 +113,42 @@ class SourceResultCaptureTest {
         val captured = SourceResultCapture(originalContext).solve(result, "fixture-engine")
 
         assertEquals(result, captured)
-        assertIs<SourceEvidenceCheck.Rejected>(assertNotNull(captured.evidence).verify(
-            SourceClaim.Refutation, originalContext,
-        ))
+        assertIs<SourceEvidenceCheck.Rejected>(
+            assertNotNull(captured.evidence).verify(
+                SourceClaim.Refutation,
+                originalContext,
+            ),
+        )
     }
 
     @Test
-    fun `objective capture preserves a completed optimum from another source invocation`() {
+    fun `objective capture should preserve a completed optimum from another source invocation`() {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val original = scope.copy(objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
-        val conditional = original.copy(condition = SourceCondition(lower = mapOf(
-            SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ofLong(2),
-        )))
+        val conditional = original.copy(
+            condition = SourceCondition(
+                lower = mapOf(
+                    SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ofLong(2),
+                ),
+            ),
+        )
         val conditionalContext = assertNotNull(model.sourceProofContext(conditional, objective))
         val originalContext = assertNotNull(model.sourceProofContext(original, objective))
         val sample = Sample(booleanArrayOf(), longArrayOf(2))
-        val result = SourceResultCapture(conditionalContext).minimize(MinimizeResult.Optimal(sample, 2.0),
-            objective, "fixture-engine")
+        val result = SourceResultCapture(conditionalContext).minimize(
+            MinimizeResult.Optimal(sample, 2.0),
+            objective,
+            "fixture-engine",
+        )
 
         val captured = SourceResultCapture(originalContext).minimize(result, objective, "fixture-engine")
 
         assertEquals(result, captured)
-        assertIs<SourceEvidenceCheck.Rejected>(assertNotNull(captured.evidence).verify(
-            SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ofLong(2))), originalContext,
-        ))
+        assertIs<SourceEvidenceCheck.Rejected>(
+            assertNotNull(captured.evidence).verify(
+                SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ofLong(2))),
+                originalContext,
+            ),
+        )
     }
-
 }

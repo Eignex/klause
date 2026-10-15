@@ -22,8 +22,8 @@ class ImpliedBoundSeparatorTest {
     }
 
     @Test
-    fun `cut holds exactly when the implication holds over all polarities and assignments`() {
-        val boolColOf = intArrayOf(0, 1) // var 0 → col 0, var 1 → col 1
+    fun `implied bound cut should hold exactly when the implication holds`() {
+        val boolColOf = intArrayOf(0, 1)
         for (fromPos in booleanArrayOf(true, false)) {
             for (toPos in booleanArrayOf(true, false)) {
                 val cut = ImpliedBoundSeparator.impliedBoundCut(
@@ -32,7 +32,7 @@ class ImpliedBoundSeparatorTest {
                     boolColOf,
                 ) ?: error("expected a cut for distinct mapped variables")
                 assertEquals(Relation.LE, cut.rel)
-                assertTrue(cut.global, "implication cuts are problem-wide valid")
+                assertTrue(cut.global)
                 for (xu in 0..1) {
                     for (xv in 0..1) {
                         val x = doubleArrayOf(xu.toDouble(), xv.toDouble())
@@ -51,8 +51,8 @@ class ImpliedBoundSeparatorTest {
     }
 
     @Test
-    fun `same variable or unmapped column yields no cut`() {
-        val boolColOf = intArrayOf(0, -1) // var 1 has no LP column
+    fun `implied bound cut should be null for the same variable or an unmapped column`() {
+        val boolColOf = intArrayOf(0, -1)
         assertNull(ImpliedBoundSeparator.impliedBoundCut(Lit.make(0, true), Lit.make(0, false), boolColOf), "same var")
         assertNull(ImpliedBoundSeparator.impliedBoundCut(Lit.make(0, true), Lit.make(1, true), boolColOf), "unmapped")
     }

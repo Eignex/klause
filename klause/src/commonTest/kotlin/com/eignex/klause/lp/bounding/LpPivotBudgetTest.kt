@@ -6,46 +6,46 @@ import kotlin.test.assertEquals
 class LpPivotBudgetTest {
 
     @Test
-    fun `an LP that reaches its warmup without pruning is capped`() {
+    fun `budget should cap an LP that reaches its warmup without pruning`() {
         val budget = LpPivotBudget(cap = 500, warmupSolves = 4)
 
         repeat(4) { budget.observe(pruned = false, couldPrune = true) }
 
-        assertEquals(500, budget.pivots(), "an LP that prunes nothing over its window is the one to cap")
+        assertEquals(500, budget.pivots())
     }
 
     @Test
-    fun `a prune lifts the budget`() {
+    fun `prune should lift the budget`() {
         val budget = LpPivotBudget(cap = 500, warmupSolves = 4)
         repeat(4) { budget.observe(pruned = false, couldPrune = true) }
         assertEquals(500, budget.pivots())
 
         budget.observe(pruned = true, couldPrune = true)
 
-        assertEquals(0, budget.pivots(), "a prune says the cap was the wrong judgement")
+        assertEquals(0, budget.pivots())
     }
 
     @Test
-    fun `a prune restarts the window rather than ending it`() {
+    fun `prune should restart the window rather than end it`() {
         val budget = LpPivotBudget(cap = 500, warmupSolves = 4)
         budget.observe(pruned = true, couldPrune = true)
 
         repeat(4) { budget.observe(pruned = false, couldPrune = true) }
 
-        assertEquals(500, budget.pivots(), "the cap is earned again on the solves since the prune")
+        assertEquals(500, budget.pivots())
     }
 
     @Test
-    fun `solves with no incumbent to prune against do not spend the warmup`() {
+    fun `solves without an incumbent should not spend the warmup`() {
         val budget = LpPivotBudget(cap = 500, warmupSolves = 4)
 
         repeat(50) { budget.observe(pruned = false, couldPrune = false) }
 
-        assertEquals(0, budget.pivots(), "a search that has not found its first solution is not a bad LP")
+        assertEquals(0, budget.pivots())
     }
 
     @Test
-    fun `a cap of zero never bites`() {
+    fun `cap of zero should never bite`() {
         val budget = LpPivotBudget(cap = 0, warmupSolves = 1)
 
         repeat(20) { budget.observe(pruned = false, couldPrune = true) }

@@ -24,8 +24,7 @@ class SubcircuitInvariantTest {
     }
 
     @Test
-    fun `single included node yields positive cost`() {
-        // One included node (succ[0]=1) cannot form a cycle on its own; rest are self-loops.
+    fun `single included node should yield positive cost`() {
         val problem = problem(4)
         val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
@@ -33,14 +32,12 @@ class SubcircuitInvariantTest {
         state.assignment.setInt(2, 2)
         state.assignment.setInt(3, 3)
         state.recompute()
-        assertTrue(state.intPayload[0] > 0, "one included non-cyclic node must have positive cost")
+        assertTrue(state.intPayload[0] > 0)
         assertTrue(state.factors[0].isViolated(state, 0))
     }
 
     @Test
-    fun `deltaIfIntSet predicts cost change accurately`() {
-        // Start with a valid 2-cycle {0,1} and two excluded nodes. Then check delta for
-        // including node 2 (succ[2]=3) — this breaks the valid subcircuit.
+    fun `deltaIfIntSet should predict the cost change`() {
         val n = 4
         val problem = problem(n)
         val state = LocalSearchState(problem.bake(), Random(0))
@@ -49,14 +46,12 @@ class SubcircuitInvariantTest {
         state.assignment.setInt(2, 2)
         state.assignment.setInt(3, 3)
         state.recompute()
-        assertEquals(0, state.intPayload[0], "valid 2-cycle should start at zero cost")
+        assertEquals(0, state.intPayload[0])
 
-        // Predict delta for setting succ[2]=3 (including node 2, pointing at excluded 3).
         val predicted = state.factors[0].deltaIfIntSet(state, 0, intVar = 2, newValue = 3)
         state.apply(IntSet(2, 3))
         val actual = state.intPayload[0]
-        assertEquals(actual, predicted, "predicted delta must equal actual cost change")
-        assertTrue(actual > 0, "including a node pointing to an excluded node should raise cost")
+        assertEquals(actual, predicted)
+        assertTrue(actual > 0)
     }
-
 }

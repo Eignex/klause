@@ -5,7 +5,7 @@ import kotlin.test.assertSame
 
 class FactorProjectionProvidersTest {
     @Test
-    fun `no argument JVM construction selects the built in providers`() {
+    fun `no-argument constructor should select the built-in providers`() {
         val providers = FactorProjectionProviders::class.java.getConstructor().newInstance()
 
         assertSame(FactorProjectionProviders.Default.propagation, providers.propagation)

@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class MpsReferenceTest {
-    /** Flow `f` through a link that only a switched-on binary `b` opens (`f <= 1e6 b`), with a demand of 0.5. */
+    // Flow f through a link only a switched-on binary b opens (f <= 1e6 b), demand 0.5.
     private val link = Mps.parse(
         """
         NAME link
@@ -40,7 +40,7 @@ class MpsReferenceTest {
     }
 
     @Test
-    fun `a retry that finds a checked solution refutes the first run's infeasibility`() {
+    fun `a retry that finds a checked solution should refute the first run infeasibility`() {
         val infeasible = attempt("default", MpsWitness.Status.INFEASIBLE, null, null)
         val found = attempt("presolve off", MpsWitness.Status.LIMIT, 0.5, mapOf("b" to 1.0, "f" to 0.5))
 
@@ -54,7 +54,7 @@ class MpsReferenceTest {
     }
 
     @Test
-    fun `an infeasibility claim the same solver contradicts with a solution, even a rejected one, is not a proof`() {
+    fun `an infeasibility claim contradicted by any solution from the same solver should not be a proof`() {
         val infeasible = attempt("default", MpsWitness.Status.INFEASIBLE, null, null)
         val rejected = attempt("presolve off", MpsWitness.Status.OPTIMAL, -0.8, mapOf("b" to 8e-7, "f" to 0.8))
 

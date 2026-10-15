@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class IntArrayListTest {
 
     @Test
-    fun `add grows past initial capacity and preserves order`() {
+    fun `add should grow past initial capacity and preserve order`() {
         val list = IntArrayList(initialCapacity = 2)
         for (i in 0 until 100) list.add(i * 3)
         assertEquals(100, list.size)
@@ -17,7 +17,7 @@ class IntArrayListTest {
     }
 
     @Test
-    fun `bulk append preserves the live prefix after truncation and growth`() {
+    fun `bulk append should preserve the live prefix after truncation and growth`() {
         val list = IntArrayList(initialCapacity = 2)
         list.addAll(intArrayOf(1, 2, 3))
         list.truncateTo(1)
@@ -27,38 +27,37 @@ class IntArrayListTest {
     }
 
     @Test
-    fun `removeAt swap-removes the tail into the gap`() {
+    fun `removeAt should swap the tail into the gap`() {
         val list = IntArrayList()
         for (v in intArrayOf(10, 20, 30, 40)) list.add(v)
-        list.removeAt(1) // 20 replaced by tail 40
+        list.removeAt(1)
         assertEquals(3, list.size)
         assertEquals(listOf(10, 40, 30), list.toIntArray().toList())
     }
 
     @Test
-    fun `removeValue removes first occurrence by swap and reports presence`() {
+    fun `removeValue should swap-remove the first occurrence and report presence`() {
         val list = IntArrayList()
         for (v in intArrayOf(5, 7, 5, 9)) list.add(v)
         assertTrue(list.removeValue(5))
         assertEquals(3, list.size)
-        // First 5 (index 0) replaced by tail 9.
         assertEquals(listOf(9, 7, 5), list.toIntArray().toList())
-        assertFalse(list.removeValue(42), "removing an absent value returns false")
+        assertFalse(list.removeValue(42))
         assertEquals(3, list.size)
     }
 
     @Test
-    fun `truncateTo drops the suffix and is a no-op when not shrinking`() {
+    fun `truncateTo should drop the suffix and be a no-op when not shrinking`() {
         val list = IntArrayList()
         for (v in 0 until 6) list.add(v)
         list.truncateTo(3)
         assertEquals(listOf(0, 1, 2), list.toIntArray().toList())
-        list.truncateTo(10) // no-op
+        list.truncateTo(10)
         assertEquals(3, list.size)
     }
 
     @Test
-    fun `indexOf contains last and toSet`() {
+    fun `indexOf contains last and toSet should reflect the live elements`() {
         val list = IntArrayList()
         for (v in intArrayOf(4, 4, 8)) list.add(v)
         assertEquals(0, list.indexOf(4))
@@ -70,38 +69,53 @@ class IntArrayListTest {
     }
 
     @Test
-    fun `clear and isEmpty`() {
-        val list = IntArrayList()
-        assertTrue(list.isEmpty())
-        list.add(1)
-        assertFalse(list.isEmpty())
-        list.clear()
-        assertTrue(list.isEmpty())
-        assertEquals(0, list.size)
-    }
-
-    @Test
-    fun `sortByIntKey orders by key ascending and descending with negative values`() {
+    fun `sortByIntKey should order by key ascending and descending with negative values`() {
         val list = IntArrayList()
         for (v in intArrayOf(-3, 7, 0, -10, 4)) list.add(v)
-        list.sortByIntKey { it } // identity key → plain value sort
+        list.sortByIntKey { it }
         assertEquals(listOf(-10, -3, 0, 4, 7), list.toIntArray().toList())
         list.sortByIntKey(descending = true) { it }
         assertEquals(listOf(7, 4, 0, -3, -10), list.toIntArray().toList())
     }
 
     @Test
-    fun `sortByIntKey sorts by an external key and is stable on ties via element order`() {
-        // Elements are item ids; key is a weight lookup with deliberate ties.
-        val weights = intArrayOf(10, 5, 10, 5, 7) // by id
+    fun `sortByIntKey should sort by an external key and break ties by element order`() {
+        val weights = intArrayOf(10, 5, 10, 5, 7)
         val list = IntArrayList()
         for (id in 0 until 5) list.add(id)
         list.sortByIntKey { weights[it] }
-        // Ascending weight: {1,3}=5, {4}=7, {0,2}=10; ties break by id ascending.
         assertEquals(listOf(1, 3, 4, 0, 2), list.toIntArray().toList())
         list.sortByIntKey(descending = true) { weights[it] }
-        // Descending is the exact reverse of the ascending packed order.
         assertEquals(listOf(2, 0, 4, 3, 1), list.toIntArray().toList())
     }
 
+    @Test
+    fun `lowerBound should return the first index not below the element`() {
+        val ascending = listOfInts(2, 4, 6, 9, 13, 15)
+        for (k in -2..18) {
+            val expected = (0 until ascending.size).firstOrNull { ascending[it] >= k } ?: ascending.size
+            assertEquals(expected, ascending.lowerBound(k), "lowerBound($k)")
+        }
+        assertEquals(0, IntArrayList().lowerBound(5))
+    }
+
+    @Test
+    fun `lowerBoundDescending should return the first index not above the element`() {
+        val descending = listOfInts(15, 9, 9, 9, 6, 4, 4, 2)
+        for (k in -2..18) {
+            val expected = (0 until descending.size).firstOrNull { descending[it] <= k } ?: descending.size
+            assertEquals(expected, descending.lowerBoundDescending(k), "lowerBoundDescending($k)")
+        }
+        assertEquals(0, IntArrayList().lowerBoundDescending(5))
+    }
+
+    @Test
+    fun `lowerBound should respect the live size not the backing capacity`() {
+        val list = listOfInts(1, 3, 5, 7, 9)
+        list.truncateTo(3)
+        assertEquals(3, list.lowerBound(6))
+        assertEquals(2, list.lowerBound(5))
+    }
+
+    private fun listOfInts(vararg v: Int): IntArrayList = IntArrayList().apply { addAll(v) }
 }

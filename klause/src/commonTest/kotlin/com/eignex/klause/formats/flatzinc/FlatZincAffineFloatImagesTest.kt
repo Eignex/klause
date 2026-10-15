@@ -8,7 +8,7 @@ import kotlin.test.assertIs
 
 class FlatZincAffineFloatImagesTest {
     @Test
-    fun `fixed integer images propagate binary predicates in both directions`() {
+    fun `fixed integer images should propagate binary predicates in both directions`() {
         val predicates = mapOf("eq" to false, "ne" to true, "le" to true, "lt" to true)
         val variants = predicates.flatMap { (predicate, expected) ->
             listOf(false, true).map { reverse ->
@@ -40,7 +40,7 @@ class FlatZincAffineFloatImagesTest {
     }
 
     @Test
-    fun `affine sums propagate strict linear predicates through aliases and forward definitions`() {
+    fun `affine sums should propagate strict linear predicates through aliases and forward definitions`() {
         for (predicate in listOf("eq", "ne", "le", "lt")) {
             val program = parseFlatZinc(
                 """
@@ -70,7 +70,7 @@ class FlatZincAffineFloatImagesTest {
     }
 
     @Test
-    fun `integer substitution retains exact binary64 coefficients`() {
+    fun `integer substitution should retain exact binary64 coefficients`() {
         val program = parseFlatZinc(
             """
             var 0..4: n;
@@ -92,7 +92,7 @@ class FlatZincAffineFloatImagesTest {
     }
 
     @Test
-    fun `an inconsistent hard float predicate rejects fixed integer images`() {
+    fun `an inconsistent hard float predicate should reject fixed integer images`() {
         val program = parseFlatZinc(
             """
             var -2..2: n;
@@ -108,7 +108,7 @@ class FlatZincAffineFloatImagesTest {
     }
 
     @Test
-    fun `chained finite products propagate reified comparisons from fixed integers`() {
+    fun `chained finite products should propagate reified comparisons from fixed integers`() {
         val program = parseFlatZinc(
             """
             var -3..3: n;
@@ -134,7 +134,7 @@ class FlatZincAffineFloatImagesTest {
     }
 
     @Test
-    fun `constant products and float equalities preserve integer images`() {
+    fun `constant products and float equalities should preserve integer images`() {
         val program = parseFlatZinc(
             """
             var 1..3: n;

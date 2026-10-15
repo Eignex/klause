@@ -16,25 +16,42 @@ import kotlin.test.assertNull
 
 class QuadraticObjectiveLoweringTest {
     @Test
-    fun `distributed mixed products preserve their literal source objective`() {
+    fun `distributed mixed products should preserve their literal source objective`() {
         val x = PolynomialExpression.Variable(SourceRealId(0))
         val i = PolynomialExpression.Variable(SourceRealId(1))
-        val expression = PolynomialExpression.Product(listOf(
-            PolynomialExpression.Sum(listOf(
-                PolynomialExpression.Product(listOf(PolynomialExpression.Constant.of(bigIntOf(3)), x)),
-                PolynomialExpression.Product(listOf(PolynomialExpression.Constant.of(bigIntOf(2)), i)),
-                PolynomialExpression.Constant.of(bigIntOf(-1)),
-            )),
-            PolynomialExpression.Sum(listOf(x, PolynomialExpression.Product(listOf(
-                PolynomialExpression.Constant.of(bigIntOf(-1)), i,
-            )))),
-        ))
+        val expression = PolynomialExpression.Product(
+            listOf(
+                PolynomialExpression.Sum(
+                    listOf(
+                        PolynomialExpression.Product(listOf(PolynomialExpression.Constant.of(bigIntOf(3)), x)),
+                        PolynomialExpression.Product(listOf(PolynomialExpression.Constant.of(bigIntOf(2)), i)),
+                        PolynomialExpression.Constant.of(bigIntOf(-1)),
+                    ),
+                ),
+                PolynomialExpression.Sum(
+                    listOf(
+                        x,
+                        PolynomialExpression.Product(
+                            listOf(
+                                PolynomialExpression.Constant.of(bigIntOf(-1)),
+                                i,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
         val variables = mapOf(
-            0 to QuadraticVariable.Real(SourceRealId(0)), 1 to QuadraticVariable.Int(SourceIntId(0)),
+            0 to QuadraticVariable.Real(SourceRealId(0)),
+            1 to QuadraticVariable.Int(SourceIntId(0)),
         )
         val arithmetic = AlgebraicArithmetic()
-        val sample = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(3.0),
-            algebraicReals = listOf(arithmetic.rational(BigFraction.ofLong(3))))
+        val sample = Sample(
+            booleanArrayOf(),
+            longArrayOf(2),
+            doubleArrayOf(3.0),
+            algebraicReals = listOf(arithmetic.rational(BigFraction.ofLong(3))),
+        )
 
         val objective = assertNotNull(lowerQuadraticObjective(expression, variables))
 
@@ -42,19 +59,28 @@ class QuadraticObjectiveLoweringTest {
     }
 
     @Test
-    fun `quadratic coefficient lowering keeps numerator precision beyond binary64`() {
+    fun `quadratic coefficient lowering should keep numerator precision beyond binary64`() {
         val x = PolynomialExpression.Variable(SourceRealId(0))
-        val expression = PolynomialExpression.Product(listOf(
-            PolynomialExpression.Constant.of(bigIntOf(9007199254740993L), bigIntOf(7)),
-            PolynomialExpression.Power(x, 2),
-        ))
+        val expression = PolynomialExpression.Product(
+            listOf(
+                PolynomialExpression.Constant.of(bigIntOf(9007199254740993L), bigIntOf(7)),
+                PolynomialExpression.Power(x, 2),
+            ),
+        )
         val arithmetic = AlgebraicArithmetic()
-        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0),
-            algebraicReals = listOf(arithmetic.rational(BigFraction.ONE)))
+        val sample = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(1.0),
+            algebraicReals = listOf(arithmetic.rational(BigFraction.ONE)),
+        )
 
-        val objective = assertNotNull(lowerQuadraticObjective(
-            expression, mapOf(0 to QuadraticVariable.Real(SourceRealId(0))),
-        ))
+        val objective = assertNotNull(
+            lowerQuadraticObjective(
+                expression,
+                mapOf(0 to QuadraticVariable.Real(SourceRealId(0))),
+            ),
+        )
 
         assertEquals(
             BigFraction.of(bigIntOf(9007199254740993L), bigIntOf(7)),
@@ -63,7 +89,7 @@ class QuadraticObjectiveLoweringTest {
     }
 
     @Test
-    fun `a cubic objective declines quadratic lowering`() {
+    fun `a cubic objective should decline quadratic lowering`() {
         val expression = PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 3)
 
         val objective = lowerQuadraticObjective(expression, mapOf(0 to QuadraticVariable.Real(SourceRealId(0))))
@@ -72,7 +98,7 @@ class QuadraticObjectiveLoweringTest {
     }
 
     @Test
-    fun `an unmapped auxiliary cannot become a source objective coordinate`() {
+    fun `an unmapped auxiliary should not become a source objective coordinate`() {
         val expression = PolynomialExpression.Variable(SourceRealId(1))
 
         val objective = lowerQuadraticObjective(expression, mapOf(0 to QuadraticVariable.Real(SourceRealId(0))))

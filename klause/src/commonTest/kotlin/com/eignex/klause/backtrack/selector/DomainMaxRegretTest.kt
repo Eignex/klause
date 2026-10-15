@@ -14,7 +14,7 @@ class DomainMaxRegretTest {
     private val rng = Random(1)
 
     @Test
-    fun `max regret prefers the int with the largest gap between its two smallest values`() {
+    fun `max regret should prefer the int with the largest gap between its two smallest values`() {
         // var 0: {0,1,2,3} regret 1; var 1: {0,2,3} (1 excluded) regret 2 — var 1 wins.
         val problem = Problem(
             numBoolVars = 0,

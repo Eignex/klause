@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class MutableIntLongMapTest {
 
     @Test
-    fun `addTo increments from zero default and returns new value`() {
+    fun `addTo should increment from zero and return the new value`() {
         val m = MutableIntLongMap()
         assertEquals(1L, m.addTo(7, 1L))
         assertEquals(3L, m.addTo(7, 2L))
@@ -17,7 +17,7 @@ class MutableIntLongMapTest {
     }
 
     @Test
-    fun `extreme keys and zero coexist`() {
+    fun `extreme keys and zero should coexist`() {
         val m = MutableIntLongMap()
         m.put(Int.MIN_VALUE, 1L)
         m.put(Int.MAX_VALUE, 2L)
@@ -29,7 +29,7 @@ class MutableIntLongMapTest {
     }
 
     @Test
-    fun `remove deletes and leaves other entries findable across collisions`() {
+    fun `remove should keep other entries findable across collisions`() {
         val m = MutableIntLongMap(4)
         for (k in 0 until 50) m.put(k, k.toLong())
         for (k in 0 until 50 step 3) assertTrue(m.remove(k))
@@ -44,7 +44,7 @@ class MutableIntLongMapTest {
     }
 
     @Test
-    fun `clear empties and the map is reusable`() {
+    fun `clear should empty the map and keep it reusable`() {
         val m = MutableIntLongMap()
         for (k in 0 until 30) m.put(k, k.toLong())
         m.clear()
@@ -55,11 +55,10 @@ class MutableIntLongMapTest {
     }
 
     @Test
-    fun `growth preserves all entries`() {
+    fun `growth should preserve all entries`() {
         val m = MutableIntLongMap(8)
         for (k in 0 until 1000) m.put(k * 7, k.toLong())
         assertEquals(1000, m.size)
         for (k in 0 until 1000) assertEquals(k.toLong(), m.getOrDefault(k * 7, -1L))
     }
-
 }

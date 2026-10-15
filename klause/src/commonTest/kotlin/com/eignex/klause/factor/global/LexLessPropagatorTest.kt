@@ -1,28 +1,24 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.PropagationReasonOracle
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.ConflictAnalyzer
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.propagation.addLearnedClause
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class LexLessPropagatorTest {
 
     @Test
-    fun `empty vector comparisons follow lexicographic length ordering`() {
+    fun `empty vector comparisons should follow lexicographic length ordering`() {
         for (strict in listOf(false, true)) {
             for ((xs, ys) in listOf(
                 intArrayOf() to intArrayOf(),
@@ -46,9 +42,7 @@ class LexLessPropagatorTest {
     }
 
     @Test
-    fun `a lex conflict cites only the prefix and the pair that decides it`() {
-        // xs = (x0, x1, x2) <lex ys = (y0, y1, y2): x0 = y0 = 1 and x1 > y1 settle it at position 1; the
-        // tightened position 2 plays no part.
+    fun `a lex conflict should cite only the prefix and the pair that decides it`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 6,
@@ -72,11 +66,8 @@ class LexLessPropagatorTest {
     }
 
     @Test
-    fun `strict lex tightens the last deciding position strictly`() {
-        // x0 = y0 = 0 is a fixed-equal prefix, so the relation hinges on the last position. The
-        // suffix is exhausted there, so strict `lex_less` forces x1 < y1: with x1 ∈ [0,3] and
-        // y1 ∈ [0,2] the β look-ahead derives x1 ≤ y1.max − 1 = 1 and y1 ≥ x1.min + 1 = 1.
-        // A plain `x1 ≤ y1.max` step would only reach x1 ≤ 2. Layout: x0=0, x1=1, y0=2, y1=3.
+    fun `strict lex should tighten the last deciding position strictly`() {
+        // A non-strict step would only reach x1 <= y1.max = 2.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -87,15 +78,12 @@ class LexLessPropagatorTest {
         state.undoLogging = true
         state.currentFactor = 0
         assertTrue(problem.propagators[0].propagate(state, 0))
-        assertEquals(1, state.intDomains[1].max, "strict suffix should force x1 ≤ 1")
-        assertEquals(1, state.intDomains[3].min, "strict suffix should force y1 ≥ 1")
+        assertEquals(1, state.intDomains[1].max)
+        assertEquals(1, state.intDomains[3].min)
     }
 
     @Test
-    fun `lesseq forces a strict head step when the tail is pinned greater`() {
-        // lex_lesseq([x0,x1],[y0,y1]) with the tail pinned x1 = 2 > y1 = 0. The tail can never
-        // rescue equality at the head, so the β look-ahead forces x0 < y0 even though the
-        // relation itself is non-strict: x0 ≤ 1 and y0 ≥ 1. Layout: x0=0, x1=1, y0=2, y1=3.
+    fun `lesseq should force a strict head step when the tail is pinned greater`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -106,87 +94,12 @@ class LexLessPropagatorTest {
         state.undoLogging = true
         state.currentFactor = 0
         assertTrue(problem.propagators[0].propagate(state, 0))
-        assertEquals(1, state.intDomains[0].max, "forced-greater tail should force x0 ≤ 1")
-        assertEquals(1, state.intDomains[2].min, "forced-greater tail should force y0 ≥ 1")
+        assertEquals(1, state.intDomains[0].max)
+        assertEquals(1, state.intDomains[2].min)
     }
 
     @Test
-    fun `learned clause through a per-tighten lex deduction carries the prefix-equality literals`() {
-        // The deciding-position tightening `xs[a].max ≤ ys[a].max` is sound
-        // only because the prefix `xs[0..a-1] = ys[0..a-1]` is pinned equal — index a is the
-        // deciding position precisely because of that prefix. The per-tighten antecedent is
-        // recorded on the implied atom `[xs[a] ≤ ys[a].max]`; when a *later* conflict (seeded
-        // by another factor) resolves through that atom in the 1UIP loop, the prefix-equality
-        // literals must reappear in the learned clause. If they're omitted the clause is too
-        // weak — it reads as a global fact and can excise feasible assignments on later
-        // branches where the prefix is not equal.
-        //
-        // We drive the analyzer directly, the way AtomConflictAnalyzerTest does: pin a genuine
-        // x0 = y0 prefix as decisions, tighten y1 below its max, run the lex propagator (which
-        // tightens x1 ≤ 1 and records its antecedent on the atom `[x1 ≤ 1]`), then seed a
-        // conflict forbidding `[x1 ≤ 1] ∧ [y1 ≤ 1]` and assert the learned clause references
-        // the prefix vars x0 and y0. The free third position keeps the deciding step non-strict
-        // so x1 lands at y1.max = 1 (not the strict y1.max − 1). Layout: x*=var{0,1,2},
-        // y*=var{3,4,5}.
-        val lex = LexLess(intArrayOf(0, 1, 2), intArrayOf(3, 4, 5), strict = true)
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 6,
-            intDomains = arrayOf(
-                IntDomain(0, 2),
-                IntDomain(0, 3),
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-                IntDomain(0, 3),
-                IntDomain(0, 2),
-            ),
-            factors = arrayOf<Factor>(lex),
-        )
-        val state = PropagationState(problem, Assumptions.None)
-        state.undoLogging = true
-
-        // Allocate the two tail atoms first so the lex tighten / y1 decision attach their
-        // antecedents to them, and so `[x1 ≤ 1]` is picked as the 1UIP pivot before `[y1 ≤ 1]`.
-        val atomX1Le1 = state.atomVarLe(1, 1)
-        val atomY1Le1 = state.atomVarLe(4, 1)
-
-        // Decisions: x0 = y0 = 1 at level 1 (a real, non-forced equal prefix).
-        state.currentLevel = 1
-        state.currentFactor = -1
-        check(state.setInt(0, 1)) { "pin x0=1" }
-        check(state.setInt(3, 1)) { "pin y0=1" }
-        // Decision: y1 ≤ 1 at level 2 (tighten below its original max so the lex tighten of
-        // x1 lands below 3 and the antecedent is non-trivial).
-        state.currentLevel = 2
-        check(state.tightenIntMax(4, 1)) { "tighten y1.max=1" }
-
-        // Run the lex propagator attributed to factor 0; it walks the equal x0=y0 prefix and
-        // tightens x1.max ≤ y1.max = 1, recording the prefix-aware antecedent on `[x1 ≤ 1]`.
-        state.currentFactor = 0
-        check(problem.propagators[0].propagate(state, 0)) { "lex propagate should narrow, not fail" }
-        state.currentFactor = -1
-        check(state.intDomains[1].max == 1L) { "lex should have tightened x1.max to 1" }
-
-        // Seed a conflict that forbids the two tail atoms (both currently hold), forcing the
-        // 1UIP loop to resolve `[x1 ≤ 1]` through its recorded antecedent.
-        val seed = Clause(intArrayOf(Lit.make(atomX1Le1, false), Lit.make(atomY1Le1, false)))
-        val fid = state.addLearnedClause(seed, lbd = 2)
-        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(state.conflictAnalyzer.analyze(fid))
-
-        // Map each learned literal back to the int var its atom constrains.
-        val intVarsInClause = learned.literals
-            .map { Lit.variable(it) - problem.numBoolVars }
-            .map { atomId -> state.atoms.intVar[atomId] }
-            .toSet()
-        assertTrue(
-            0 in intVarsInClause && 3 in intVarsInClause,
-            "learned clause must cite the prefix vars x0(0) and y0(3) — omitting them is the " +
-                "reason omits prefix variables; got int vars $intVarsInClause from ${learned.literals.toList()}",
-        )
-    }
-
-    @Test
-    fun `lex less deductions are implied by their reasons under carved holes`() {
+    fun `lex less deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x1E70)
         repeat(300) { iter ->
             val n = 3

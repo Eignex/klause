@@ -3,9 +3,11 @@ package com.eignex.klause.factor
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.GaussianXor
@@ -14,14 +16,19 @@ import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
+import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.factor.global.LexLess
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.global.Sort
 import com.eignex.klause.factor.global.SymmetricAllDifferent
+import com.eignex.klause.factor.global.ValuePrecede
+import com.eignex.klause.factor.objective.MutableObjectiveBound
+import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
@@ -29,12 +36,13 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class FactorRemapTest {
 
-    // Injective shifts so the var-set image is unambiguous; ids used below stay < 64.
     private val intMap = IntArray(64) { it + 100 }
     private val boolMap = IntArray(64) { it + 50 }
     private val mapping = VarRemap(boolMap, intMap)
@@ -49,7 +57,7 @@ class FactorRemapTest {
     }
 
     @Test
-    fun `every factor remaps all of its variables`() {
+    fun `every factor should remap all of its variables`() {
         val factors: List<Pair<String, Factor>> = listOf(
             "Linear" to Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 5),
             "Clause" to Clause(intArrayOf(pos(0), neg(1))),
@@ -100,11 +108,8 @@ class FactorRemapTest {
                 countLow = intArrayOf(0, 0),
                 countHigh = intArrayOf(3, 3),
             ),
-            "GlobalCardinality(counts)" to GlobalCardinality(
-                intArrayOf(0, 1, 2),
-                longArrayOf(0, 1),
-                countVars = intArrayOf(3, 4),
-            ),
+            "GlobalCardinality(counts)" to
+                GlobalCardinality(intArrayOf(0, 1, 2), longArrayOf(0, 1), countVars = intArrayOf(3, 4)),
             "Regular" to Regular(intArrayOf(0, 1), 2, 2, longArrayOf(1, 2, 2, 1), 1, intArrayOf(2)),
             "GaussianXor" to GaussianXor(
                 listOf(Xor(intArrayOf(pos(0), pos(1)), 1), Xor(intArrayOf(pos(1), pos(2)), 0)),
@@ -114,7 +119,7 @@ class FactorRemapTest {
     }
 
     @Test
-    fun `cumulative capacityVar sentinel survives and a real one remaps`() {
+    fun `cumulative capacityVar sentinel should survive while a real one remaps`() {
         val constCap =
             Cumulative(intArrayOf(0), longArrayOf(2), longArrayOf(1), 3L).remap(mapping) as Cumulative
         assertEquals(-1, constCap.capacityVar)
@@ -124,7 +129,7 @@ class FactorRemapTest {
     }
 
     @Test
-    fun `real columns are renumbered by the same remap`() {
+    fun `real columns should be renumbered by the same remap`() {
         val realMap = IntArray(64) { it + 20 }
         val withReals = VarRemap(boolMap, intMap, realMap)
         val row = Linear(
@@ -143,7 +148,7 @@ class FactorRemapTest {
     }
 
     @Test
-    fun `a remap without a real map leaves real columns where they are`() {
+    fun `a remap without a real map should leave real columns where they are`() {
         val row = Linear(
             intVars = intArrayOf(0),
             intCoeffs = doubleArrayOf(1.0),
@@ -158,4 +163,125 @@ class FactorRemapTest {
         assertEquals(listOf(3), out.realVars.toList())
     }
 
+    private val permutation = IntArray(64) { (it * 45) % 64 }.let { VarRemap(it, it, it) }
+
+    private val keyedFactors: List<Pair<String, Factor>> = listOf(
+        "Increasing" to Increasing(intArrayOf(3, 1, 5), strict = true),
+        "Sort" to Sort(intArrayOf(4, 0, 2), intArrayOf(6, 1, 7)),
+        "Inverse" to Inverse(intArrayOf(5, 0, 3), intArrayOf(2, 7, 4), fOffset = 1, gOffset = 0),
+        "AllDifferent" to AllDifferent(intArrayOf(6, 2, 9), 0, 10),
+        "AllDifferent(opt)" to AllDifferent(intArrayOf(6, 2), 0, 10, intArrayOf(pos(4), neg(1))),
+        "ArrayMinMax" to ArrayMinMax(0, intArrayOf(7, 2, 5), max = true),
+        "Product" to Product(8, 1, 4),
+        "ReifiedLinear" to ReifiedLinear(2, intArrayOf(3, -1, 2), intArrayOf(5, 0, 7), LinearOp.LE, 3),
+        "Linear" to Linear(intArrayOf(3, -1, 2), intArrayOf(5, 0, 7), LinearOp.LE, 3),
+        "Linear(wide)" to Linear(
+            intArrayOf(5, 0, 7),
+            arrayOf(
+                parseBigInt("170141183460469231731687303715884105727"),
+                bigIntOf(-3),
+                bigIntOf(2),
+            ),
+            LinearOp.LE,
+            parseBigInt("340282366920938463463374607431768211455"),
+        ),
+        "Linear(real)" to Linear(
+            intVars = intArrayOf(5, 0),
+            intCoeffs = doubleArrayOf(1.5, -2.0),
+            realVars = intArrayOf(3, 6),
+            realCoeffs = doubleArrayOf(0.25, 4.0),
+            op = LinearOp.LE,
+            bound = 7.5,
+        ),
+        "ReifiedRealLinear" to ReifiedRealLinear(
+            aux = 1,
+            vars = intArrayOf(5, 0),
+            intCoeffs = doubleArrayOf(1.5, -2.0),
+            realVars = intArrayOf(3, 6),
+            realCoeffs = doubleArrayOf(0.25, 4.0),
+            op = LinearOp.LE,
+            bound = 7.5,
+        ),
+        "RealProduct" to RealProduct(
+            intOperand = 2,
+            realOperand = 4,
+            result = 9,
+            realOperandLo = 0.0,
+            realOperandHi = 8.0,
+        ),
+        "Cardinality" to Cardinality(intArrayOf(pos(4), neg(1), pos(6)), 1, 2),
+        "Clause" to Clause(intArrayOf(pos(4), neg(1), pos(6))),
+        "Xor" to Xor(intArrayOf(pos(3), neg(5), pos(0)), 1),
+        "PseudoBoolean" to PseudoBoolean(longArrayOf(2, 1, 3), intArrayOf(pos(4), neg(2), pos(7)), PbOp.LE, 2),
+        "Regular" to Regular(
+            intArrayOf(6, 2),
+            numStates = 2,
+            alphabetSize = 2,
+            transitions = longArrayOf(1, 2, 2, 1),
+            q0 = 1,
+            accepting = intArrayOf(1),
+        ),
+        "Table" to Table(intArrayOf(3, 7), longArrayOf(0, 0, 1, 4, 2, 2)),
+        "Circuit" to Circuit(intArrayOf(3, 1, 5)),
+        "Subcircuit" to Circuit(intArrayOf(4, 2, 6), subcircuit = true),
+        "LexLess" to LexLess(intArrayOf(1, 3), intArrayOf(5, 0), strict = true),
+        "SymmetricAllDifferent" to SymmetricAllDifferent(intArrayOf(2, 4, 6), indexOffset = 0),
+        "ValuePrecede" to ValuePrecede(2L, 5L, intArrayOf(1, 3, 0)),
+        "ReifiedCardinality" to ReifiedCardinality(0, intArrayOf(pos(4), neg(1), pos(6)), 1, 2),
+        "ReifiedPseudoBoolean" to
+            ReifiedPseudoBoolean(0, longArrayOf(2, 1, 3), intArrayOf(pos(4), neg(2), pos(7)), PbOp.LE, 2),
+        "Cumulative" to Cumulative(
+            intArrayOf(1, 2),
+            longArrayOf(3, 4),
+            longArrayOf(1, 1),
+            5,
+            intArrayOf(pos(0), neg(6)),
+            intArrayOf(7, 8),
+            intArrayOf(9, 10),
+            11,
+        ),
+        "Diffn" to Diffn(
+            intArrayOf(1, 2),
+            intArrayOf(3, 4),
+            longArrayOf(5, 5),
+            longArrayOf(6, 6),
+            intArrayOf(7, 8),
+            intArrayOf(9, 10),
+            false,
+        ),
+        "Disjunctive" to Cumulative.unary(
+            intArrayOf(1, 2),
+            longArrayOf(3, 4),
+            intArrayOf(pos(0), neg(5)),
+            intArrayOf(6, 7),
+        ),
+        "Mdd" to Mdd(
+            intArrayOf(1, 2),
+            intArrayOf(1, 1, 1),
+            intArrayOf(0, 4, 8),
+            longArrayOf(0, 0, 0, 1, 0, 1, 0, 2),
+            0,
+            intArrayOf(0),
+            4,
+            11,
+        ),
+        "ObjectiveBound" to ObjectiveBoundFactor(
+            intArrayOf(0, 3),
+            longArrayOf(1, 1),
+            intArrayOf(2, 4),
+            longArrayOf(1, 1),
+            MutableObjectiveBound(0L),
+        ),
+    )
+
+    @Test
+    fun `remapStructuralHash should equal the remapped key hash for every factor`() {
+        for ((name, f) in keyedFactors) {
+            assertEquals(
+                f.remap(permutation).structuralKey().hashCode(),
+                f.remapStructuralHash(permutation),
+                name,
+            )
+        }
+    }
 }

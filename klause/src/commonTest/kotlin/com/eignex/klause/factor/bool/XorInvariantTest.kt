@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class XorInvariantTest {
 
     @Test
-    fun `repair proposes all parity-contributing vars when violated`() {
+    fun `repair should propose all parity-contributing vars when violated`() {
         val factor = Xor(IntArray(3) { Lit.make(it, true) }, targetParity = 1)
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem.bake(), Random(0))
@@ -28,8 +28,7 @@ class XorInvariantTest {
     }
 
     @Test
-    fun `var with even occurrence count has zero delta and no repair proposal`() {
-        // v0 appears twice -> contribution = 0; v1 appears once -> contribution = 1
+    fun `var with even occurrence count should have zero delta and no repair proposal`() {
         val factor = Xor(
             intArrayOf(Lit.make(0, true), Lit.make(0, true), Lit.make(1, true)),
             targetParity = 1,
@@ -42,7 +41,7 @@ class XorInvariantTest {
         val sink = MoveSink()
         state.factors[0].proposeRepairMoves(state, 0, sink)
         val proposed = sink.list.filterIsInstance<Move.BoolFlip>().map { it.varId }.toSet()
-        assertFalse(0 in proposed, "v0 has zero parity contribution and should not be proposed")
+        assertFalse(0 in proposed, "$proposed")
         assertTrue(1 in proposed)
     }
 }

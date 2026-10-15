@@ -8,9 +8,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class BitsetDomainTest {
-
     @Test
-    fun `bitset rep excludeValue updates max when removing the current max`() {
+    fun `excludeValue should update max when removing the current max`() {
         var d = ContiguousDomain(10, 30).excludeValue(15)
         d = d.excludeValue(30)
         assertEquals(29, d.max)
@@ -19,7 +18,7 @@ class BitsetDomainTest {
     }
 
     @Test
-    fun `bitset rep excludeValue advances past a chain of removed endpoints`() {
+    fun `excludeValue should advance past a chain of removed endpoints`() {
         var d = ContiguousDomain(0, 30).excludeValue(20)
         for (v in 0..5) d = d.excludeValue(v.toLong())
         assertEquals(6, d.min)
@@ -54,7 +53,7 @@ class BitsetDomainTest {
     }
 
     @Test
-    fun `bitset rep withMinAtLeast clears bits below and updates min`() {
+    fun `withMinAtLeast should clear bits below and update min`() {
         var d = ContiguousDomain(0, 100).excludeValue(50)
         d = d.withMinAtLeast(40)
         assertEquals(40, d.min)
@@ -65,7 +64,7 @@ class BitsetDomainTest {
     }
 
     @Test
-    fun `bitset rep withMaxAtMost clears bits above and updates max`() {
+    fun `withMaxAtMost should clear bits above and update max`() {
         var d = ContiguousDomain(0, 100).excludeValue(50)
         d = d.withMaxAtMost(60)
         assertEquals(0, d.min)
@@ -76,7 +75,7 @@ class BitsetDomainTest {
     }
 
     @Test
-    fun `bitset rep valueAt walks set bits in order`() {
+    fun `valueAt should walk set bits in order`() {
         val d = ContiguousDomain(5, 20).excludeValue(10).excludeValue(15)
         val expected = (5..20).filter { it != 10 && it != 15 }
         for ((i, v) in expected.withIndex()) {
@@ -85,7 +84,7 @@ class BitsetDomainTest {
     }
 
     @Test
-    fun `bitset rep forEach matches expected sequence`() {
+    fun `forEach should visit the expected sequence`() {
         val d = ContiguousDomain(0, 80).excludeValue(40)
         val seen = mutableListOf<Long>()
         d.values.forEach { seen.add(it) }
@@ -94,7 +93,7 @@ class BitsetDomainTest {
     }
 
     @Test
-    fun `bitset rep refuses excludeValue that would empty the domain`() {
+    fun `excludeValue should refuse to empty the domain`() {
         var d = ContiguousDomain(0, 4).excludeValue(2)
         d = d.excludeValue(0)
         d = d.excludeValue(4)

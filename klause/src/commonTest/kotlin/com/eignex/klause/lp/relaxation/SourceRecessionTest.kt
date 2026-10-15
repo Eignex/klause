@@ -28,7 +28,6 @@ class SourceRecessionTest {
         val aux: Boolean = true,
     )
 
-    // x in [0,3] fixed at 2; r0 >= 0 and r1 free; minimizing -r0 by default.
     private fun proves(case: Case): Boolean {
         val problem = Problem(
             numBoolVars = 1,
@@ -64,11 +63,17 @@ class SourceRecessionTest {
         ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 5.0)
 
     @Test
-    fun `finite real product rays retain the chosen operand and exact product`() {
+    fun `provesUnbounded should accept a product ray only when it keeps the chosen operand and exact product`() {
         val factor = ContinuousProduct(0, 2, 1, 2, doubleArrayOf(0.5), intArrayOf(Lit.make(0, true)))
-        val problem = Problem(1, 0, emptyArray(), arrayOf<Factor>(factor), numRealVars = 3,
+        val problem = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(factor),
+            numRealVars = 3,
             realLower = doubleArrayOf(0.0, 0.0, 0.0),
-            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+        )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0, 0.0, 0.0))
         val exact = listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.ofLong(2).reciprocal())
         val point = Sample(booleanArrayOf(true), longArrayOf(), doubleArrayOf(2.0, 1.0, 0.5), exact)
@@ -85,12 +90,16 @@ class SourceRecessionTest {
     }
 
     @Test
-    fun `a ray every factor keeps and the objective descends along proves unboundedness`() {
+    fun `provesUnbounded should accept a ray every factor keeps and the objective descends along`() {
         val cases = listOf(
             Case("open row", listOf(open), listOf(1L, 0L), listOf(1L, 0L)),
             Case("equality moving both reals", listOf(sum), listOf(0L, 0L), listOf(1L, -1L)),
-            Case("maximum retaining its selected operand",
-                listOf(RealArrayMinMax(0, intArrayOf(0, 1), max = true)), listOf(0L, 0L), listOf(1L, 0L)),
+            Case(
+                "maximum retaining its selected operand",
+                listOf(RealArrayMinMax(0, intArrayOf(0, 1), max = true)),
+                listOf(0L, 0L),
+                listOf(1L, 0L),
+            ),
             Case("product at the fixed integer", listOf(product), listOf(1L, 2L), listOf(1L, 2L)),
             Case("complement of a false atom", listOf(atom), listOf(6L, 0L), listOf(1L, 0L), aux = false),
         )
@@ -98,7 +107,7 @@ class SourceRecessionTest {
     }
 
     @Test
-    fun `a ray that leaves the model or fails to descend is declined`() {
+    fun `provesUnbounded should decline a ray that leaves the model or fails to descend`() {
         val ascending = doubleArrayOf(1.0, 0.0)
         val cases = listOf(
             Case("crosses a finite bound", listOf(open), listOf(1L, 0L), listOf(-1L, 0L), costs = ascending),
@@ -106,8 +115,12 @@ class SourceRecessionTest {
             Case("objective does not descend", listOf(open), listOf(1L, 0L), listOf(1L, 0L), costs = ascending),
             Case("zero ray", listOf(open), listOf(1L, 0L), listOf(0L, 0L)),
             Case("point violates a row", listOf(open), listOf(0L, 0L), listOf(1L, 0L)),
-            Case("minimum crosses its other operand",
-                listOf(RealArrayMinMax(0, intArrayOf(0, 1), max = false)), listOf(0L, 0L), listOf(1L, 0L)),
+            Case(
+                "minimum crosses its other operand",
+                listOf(RealArrayMinMax(0, intArrayOf(0, 1), max = false)),
+                listOf(0L, 0L),
+                listOf(1L, 0L),
+            ),
             Case("product off the fixed integer", listOf(product), listOf(1L, 2L), listOf(1L, 1L)),
             Case("true atom bounds the ray", listOf(atom), listOf(1L, 0L), listOf(1L, 0L)),
         )

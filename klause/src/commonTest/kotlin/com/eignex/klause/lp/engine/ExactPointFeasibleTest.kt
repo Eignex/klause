@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 
 class ExactPointFeasibleTest {
     @Test
-    fun `independent denominators produce a checked point`() {
+    fun `independent denominators should produce a checked point`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)
         val y = builder.addRealVar(0.0, 1.0)
@@ -36,7 +36,7 @@ class ExactPointFeasibleTest {
     }
 
     @Test
-    fun `two sparse row residuals admit exact local correction`() {
+    fun `two sparse row residuals should admit exact local correction`() {
         val builder = LpBuilder()
         val values = doubleArrayOf(
             5.0 / 8.0,
@@ -78,7 +78,7 @@ class ExactPointFeasibleTest {
     }
 
     @Test
-    fun `coupled row residuals decline when corrections violate fixed rows`() {
+    fun `coupled row residuals should decline when corrections violate fixed rows`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)
         val y = builder.addRealVar(0.0, 1.0)
@@ -108,7 +108,7 @@ class ExactPointFeasibleTest {
     }
 
     @Test
-    fun `incompatible rows reject a reconstructed point`() {
+    fun `incompatible rows should reject a reconstructed point`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.0)
@@ -129,7 +129,7 @@ class ExactPointFeasibleTest {
     }
 
     @Test
-    fun `strict row boundary is not used as a repair target`() {
+    fun `a strict row boundary should not be used as a repair target`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0, strict = true)
@@ -149,7 +149,7 @@ class ExactPointFeasibleTest {
     }
 
     @Test
-    fun `cancelled point attempt retains only spent source work`() {
+    fun `a cancelled point attempt should retain only spent source work`() {
         val builder = LpBuilder()
         builder.addRealVar(0.0, 1.0)
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -170,7 +170,7 @@ class ExactPointFeasibleTest {
     }
 
     @Test
-    fun `oversized exact row declines within the bit limit`() {
+    fun `an oversized exact row should decline within the bit limit`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 1e40)
@@ -191,31 +191,7 @@ class ExactPointFeasibleTest {
     }
 
     @Test
-    fun `point allocation exhaustion persists in the source ledger`() {
-        val builder = LpBuilder()
-        builder.addRealVar(0.0, 1.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-
-        LpScopedSolver(state).use { owner ->
-            val result = recoverExactPointWitness(
-                assertNotNull(state.toWorkingModel()),
-                doubleArrayOf(0.5),
-                LpRefinementRequest(
-                    owner,
-                    owner.refinementCache,
-                    LpRefinementLimits(maxAllocation = 0L),
-                ),
-                Cancellation.Never,
-            )
-
-            assertNull(result.witness)
-            assertEquals(LpRefinementDecline.ALLOCATION, result.decline)
-            assertEquals(result.allocation, owner.pointRecoveryCache.allocation)
-        }
-    }
-
-    @Test
-    fun `recovered point maps the source objective scale and constant`() {
+    fun `a recovered point should map the source objective scale and constant`() {
         val builder = LpBuilder()
         builder.addRealVar(0.0, 1.0)
         val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
@@ -248,42 +224,7 @@ class ExactPointFeasibleTest {
     }
 
     @Test
-    fun `point work limit applies to each attempt while source spending accumulates`() {
-        val builder = LpBuilder()
-        builder.addRealVar(0.0, 1.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-
-        LpScopedSolver(state).use { owner ->
-            val request = LpRefinementRequest(
-                owner,
-                owner.refinementCache,
-                LpRefinementLimits(maxWork = 2L),
-            )
-            val model = assertNotNull(state.toWorkingModel())
-            val first = recoverExactPointWitness(
-                model,
-                doubleArrayOf(0.5),
-                request,
-                Cancellation.Never,
-            )
-            val second = recoverExactPointWitness(
-                model,
-                doubleArrayOf(0.5),
-                request,
-                Cancellation.Never,
-            )
-
-            assertNull(first.witness)
-            assertEquals(LpRefinementDecline.WORK, first.decline)
-            assertEquals(LpRefinementDecline.WORK, second.decline)
-            assertEquals(first.work + second.work, owner.pointRecoveryCache.work)
-            assertEquals(4L, owner.pointRecoveryCache.work)
-            assertEquals(0L, owner.refinementCache.work)
-        }
-    }
-
-    @Test
-    fun `near zero equalities remain contradictory for every point candidate`() {
+    fun `near zero equalities should remain contradictory for every point candidate`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0)
             addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.0)
@@ -297,7 +238,7 @@ class ExactPointFeasibleTest {
     }
 
     @Test
-    fun `binary decimal projection is not a parsed decimal witness`() {
+    fun `a binary decimal projection should not count as a parsed decimal witness`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0)
             addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.1)

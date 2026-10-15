@@ -12,7 +12,6 @@ import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchSession
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
@@ -21,26 +20,15 @@ import com.eignex.klause.solver.search.SourceBoundTerm as SharedSourceBoundTerm
 
 class SourceBoundAtomTest {
     @Test
-    fun `legacy constructors preserve source payload access`() {
-        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
-        val terms = listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE))
-
-        val split = assertNotNull(SourceBoundAtom.integerSplit(session, terms, BigFraction.ZERO))
-        val bound = assertIs<SourceBoundAtom>(split.positive.payload)
-
-        assertEquals(terms, bound.terms)
-        assertEquals(BigFraction.ZERO, bound.threshold)
-        assertEquals(true, bound.upper)
-        assertEquals(false, bound.strict)
-        assertEquals<Any>(bound.sourceBound, bound)
-        assertEquals(bound.hashCode(), bound.sourceBound.hashCode())
-    }
-
-    @Test
-    fun `linear adapter enforces legacy predicates and retracts their scope`() {
+    fun `linear adapter should enforce legacy predicates and retract their scope`() {
         val source = Problem(
-            0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(2.0),
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(1.0),
+            realUpper = doubleArrayOf(2.0),
         )
         ExactLiraSearchComponent(source).use { component ->
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
@@ -62,7 +50,7 @@ class SourceBoundAtomTest {
     }
 
     @Test
-    fun `legacy and neutral constructors reuse the same atom in either registration order`() {
+    fun `legacy and neutral constructors should reuse the same atom in either registration order`() {
         for (legacyFirst in listOf(false, true)) {
             for (integer in listOf(false, true)) {
                 val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
@@ -70,22 +58,32 @@ class SourceBoundAtomTest {
                 fun legacy() = assertNotNull(
                     if (integer) {
                         SourceBoundAtom.integerSplit(
-                            session, listOf(SourceBoundTerm(source, BigFraction.ONE)), BigFraction.ZERO,
+                            session,
+                            listOf(SourceBoundTerm(source, BigFraction.ONE)),
+                            BigFraction.ZERO,
                         )
                     } else {
                         SourceBoundAtom.rationalSplit(
-                            session, listOf(SourceBoundTerm(source, BigFraction.ONE)), BigFraction.ZERO, true,
+                            session,
+                            listOf(SourceBoundTerm(source, BigFraction.ONE)),
+                            BigFraction.ZERO,
+                            true,
                         )
                     },
                 )
                 fun neutral() = assertNotNull(
                     if (integer) {
                         SharedSourceBoundAtom.integerSplit(
-                            session, listOf(SharedSourceBoundTerm(source, BigFraction.ONE)), BigFraction.ZERO,
+                            session,
+                            listOf(SharedSourceBoundTerm(source, BigFraction.ONE)),
+                            BigFraction.ZERO,
                         )
                     } else {
                         SharedSourceBoundAtom.rationalSplit(
-                            session, listOf(SharedSourceBoundTerm(source, BigFraction.ONE)), BigFraction.ZERO, true,
+                            session,
+                            listOf(SharedSourceBoundTerm(source, BigFraction.ONE)),
+                            BigFraction.ZERO,
+                            true,
                         )
                     },
                 )

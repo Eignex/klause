@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 
 class SparseSlicesTest {
     @Test
-    fun `scatter preserves first touch order and cancellation until compacted clear`() {
+    fun `scatter should preserve first touch order and cancellation until compacted clear`() {
         val values = doubleArrayOf(99.0, 99.0, 99.0)
         val marks = IntArray(3)
         val touched = IntArray(5) { -1 }
@@ -33,7 +33,7 @@ class SparseSlicesTest {
     }
 
     @Test
-    fun `invalid scatter and overlapping gather leave all state intact`() {
+    fun `invalid scatter and overlapping gather should leave all state intact`() {
         val values = doubleArrayOf(5.0, 6.0)
         val marks = intArrayOf(1, 0)
         val touched = intArrayOf(0, -1)
@@ -53,7 +53,7 @@ class SparseSlicesTest {
     }
 
     @Test
-    fun `checked scatter evaluates zero alpha and latches underflow across calls`() {
+    fun `checked scatter should evaluate zero alpha and latch underflow across calls`() {
         val values = DoubleArray(2)
         val marks = IntArray(2)
         val touched = IntArray(2)
@@ -78,7 +78,7 @@ class SparseSlicesTest {
     }
 
     @Test
-    fun `checked reduction preserves input order and repeated contributions`() {
+    fun `checked reduction should preserve input order and repeated contributions`() {
         val status = intArrayOf(8)
 
         val result = SparseSlices.reduceDotChecked(
@@ -91,7 +91,7 @@ class SparseSlicesTest {
     }
 
     @Test
-    fun `checked reduction does not fuse multiplication with subtraction`() {
+    fun `checked reduction should not fuse multiplication with subtraction`() {
         val status = IntArray(1)
         val operand = 1.0 + 2.220446049250313e-16
         val roundedProduct = operand * operand
@@ -106,7 +106,7 @@ class SparseSlicesTest {
     }
 
     @Test
-    fun `checked reduction reports underflow and empty nonfinite initial values`() {
+    fun `checked reduction should report underflow and empty nonfinite initial values`() {
         val status = intArrayOf(8)
         SparseSlices.reduceDotChecked(
             0.0, false, intArrayOf(0), 0, doubleArrayOf(Double.MIN_VALUE), 0, 1,
@@ -123,7 +123,7 @@ class SparseSlicesTest {
     }
 
     @Test
-    fun `clear validates before mutation and resets signed zeros for reuse`() {
+    fun `clear should validate before mutation and reset signed zeros for reuse`() {
         val values = doubleArrayOf(-0.0, 3.0)
         val marks = intArrayOf(1, 1)
         assertFailsWith<IndexOutOfBoundsException> {
@@ -141,7 +141,7 @@ class SparseSlicesTest {
     }
 
     @Test
-    fun `pivot candidates retain relative positions and ignore inactive nonfinite values`() {
+    fun `pivot candidates should retain relative positions and ignore inactive nonfinite values`() {
         val rows = intArrayOf(-1, 2, 0, 1)
         val values = doubleArrayOf(9.0, 9.0, 4.0, Double.NaN, -2.0)
         val active = booleanArrayOf(false, true, true)

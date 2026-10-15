@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 class OpbDecoderTest {
 
     @Test
-    fun `rejects unrepresentable normalized objective coefficients`() {
+    fun `unrepresentable normalized objective coefficients should be rejected`() {
         val objectives = listOf(
             "${Long.MAX_VALUE} x1 ${Long.MAX_VALUE} x1",
             "${Long.MIN_VALUE} x1 -1 x1",
@@ -34,7 +34,7 @@ class OpbDecoderTest {
     }
 
     @Test
-    fun `preserves supported coefficient and offset boundaries`() {
+    fun `supported coefficient and offset boundaries should be preserved`() {
         val objectives = listOf(
             Triple("${Long.MAX_VALUE} x1", Long.MAX_VALUE, 0L),
             Triple("${Long.MIN_VALUE} x1", Long.MIN_VALUE, 0L),
@@ -55,7 +55,7 @@ class OpbDecoderTest {
     }
 
     @Test
-    fun `normalizes cancelling repeated terms before checking range`() {
+    fun `cancelling repeated terms should normalize before range checking`() {
         val objectives = listOf(
             Triple("${Long.MAX_VALUE} x1 1 x1 -1 x1", Long.MAX_VALUE, 0L),
             Triple("${Long.MIN_VALUE} x1 -1 x1 1 x1", Long.MIN_VALUE, 0L),
@@ -80,7 +80,7 @@ class OpbDecoderTest {
     }
 
     @Test
-    fun `rejects unrepresentable normalized objective offsets`() {
+    fun `unrepresentable normalized objective offsets should be rejected`() {
         val objectives = listOf(
             "min: ${Long.MAX_VALUE} ~x1 1 ~x2 ;",
             "min: ${Long.MIN_VALUE} ~x1 -1 x1 -1 ~x2 ;",
@@ -98,7 +98,7 @@ class OpbDecoderTest {
     }
 
     @Test
-    fun `combines objective statements before checking range`() {
+    fun `objective statements should combine before range checking`() {
         val document = Opb.parse("min: 9223372036854775808 ~x1 ; min: -1 ~x1 ;")
 
         val objective = assertNotNull(document.toProblem().objective)
@@ -108,7 +108,7 @@ class OpbDecoderTest {
     }
 
     @Test
-    fun `preserves soft cost boundaries`() {
+    fun `soft cost boundaries should be preserved`() {
         for (cost in listOf(0L, Long.MAX_VALUE)) {
             val document = Opb.parse("[$cost] 1 x1 >= 1 ;")
 
@@ -122,7 +122,7 @@ class OpbDecoderTest {
     }
 
     @Test
-    fun `shares exact product costs and agrees with source objectives for every assignment`() {
+    fun `exact product costs should be shared and agree with source objectives for every assignment`() {
         val document = Opb.parse(
             "min: ${Long.MAX_VALUE} x1 ~x2 1 ~x2 x1 -${Long.MAX_VALUE} x1 ~x2 " +
                 "${Long.MIN_VALUE} ~x1 -1 x1 ;",
@@ -155,7 +155,7 @@ class OpbDecoderTest {
     }
 
     @Test
-    fun `preserves soft penalty values after exact offset cancellation`() {
+    fun `soft penalty values should be preserved after exact offset cancellation`() {
         val document = Opb.parse(
             "[${Long.MAX_VALUE}] 1 x1 >= 1 ; [1] 1 x2 >= 1 ; " +
                 "min: -1 ~x1 ;",

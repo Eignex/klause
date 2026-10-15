@@ -52,7 +52,6 @@ internal data class BasisRebuildComparisonReport(
     val valid: Boolean get() = captured.errors.isEmpty() && deferred.errors.isEmpty() && pairedErrors.isEmpty()
 }
 
-/** A bounded operation replay. It cannot establish source LP feasibility or exact certification. */
 internal object BasisRebuildComparison {
     const val MAX_OPERATIONS = 256
     const val MAX_UPDATES_SINCE_BUILD = 16

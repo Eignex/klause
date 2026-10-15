@@ -11,16 +11,18 @@ import kotlin.test.assertNull
 
 class SearchModelKeyTest {
     @Test
-    fun `extension-defined typed keys infer their contributed value`() {
+    fun `extension-defined typed keys should infer their contributed value`() {
         data class FunctionValue(val symbol: String) : TypedSearchValueKey<String> {
             override val valueType: KClass<String> get() = String::class
         }
         val key = FunctionValue("f")
-        val session = SearchSession(listOf(object : SearchComponent {
-            override fun contributeModel(model: SearchModel, context: SearchContext) {
-                model.contribute(key, "store")
-            }
-        }))
+        val session = SearchSession(
+            listOf(object : SearchComponent {
+                override fun contributeModel(model: SearchModel, context: SearchContext) {
+                    model.contribute(key, "store")
+                }
+            }),
+        )
 
         val value: String? = session.model().valueOf(key)
 
@@ -28,15 +30,17 @@ class SearchModelKeyTest {
     }
 
     @Test
-    fun `assembly captures borrowed extension state once`() {
+    fun `assembly should capture borrowed extension state once`() {
         data class ArrayValue(val entries: List<Long>)
         val key = SearchModelKey(ArrayValue::class) { ArrayValue(snapshotValues(it.entries)) }
         val entries = mutableListOf(3L)
-        val session = SearchSession(listOf(object : SearchComponent {
-            override fun contributeModel(model: SearchModel, context: SearchContext) {
-                model.contribute(key, ArrayValue(entries))
-            }
-        }))
+        val session = SearchSession(
+            listOf(object : SearchComponent {
+                override fun contributeModel(model: SearchModel, context: SearchContext) {
+                    model.contribute(key, ArrayValue(entries))
+                }
+            }),
+        )
         val model = session.model()
 
         entries[0] = 7
@@ -46,19 +50,21 @@ class SearchModelKeyTest {
 
     @Test
     @Suppress("DEPRECATION")
-    fun `legacy writes cannot put an incompatible value under a typed key`() {
+    fun `untyped writes should not put an incompatible value under a typed key`() {
         val key = SearchModelKey(String::class)
-        val session = SearchSession(listOf(object : SearchComponent {
-            override fun contributeModel(model: SearchModel, context: SearchContext) {
-                model.put(key, 1)
-            }
-        }))
+        val session = SearchSession(
+            listOf(object : SearchComponent {
+                override fun contributeModel(model: SearchModel, context: SearchContext) {
+                    model.put(key, 1)
+                }
+            }),
+        )
 
         assertFailsWith<IllegalArgumentException> { session.model() }
     }
 
     @Test
-    fun `typed contributions still have one owning component`() {
+    fun `typed contributions should still have one owning component`() {
         val key = SearchModelKey(String::class)
         val components = List(2) {
             object : SearchComponent {
@@ -72,14 +78,16 @@ class SearchModelKeyTest {
     }
 
     @Test
-    fun `a retained assembler cannot add values to a published model`() {
+    fun `a retained assembler should not add values to a published model`() {
         val key = SearchModelKey(String::class)
         var retained: SearchModel? = null
-        val session = SearchSession(listOf(object : SearchComponent {
-            override fun contributeModel(model: SearchModel, context: SearchContext) {
-                retained = model
-            }
-        }))
+        val session = SearchSession(
+            listOf(object : SearchComponent {
+                override fun contributeModel(model: SearchModel, context: SearchContext) {
+                    retained = model
+                }
+            }),
+        )
         val published = session.model()
 
         checkNotNull(retained).contribute(key, "late")
@@ -88,14 +96,16 @@ class SearchModelKeyTest {
     }
 
     @Test
-    fun `typed integer values preserve coordinates outside Long`() {
+    fun `typed integer values should preserve coordinates outside Long`() {
         val key = SearchExactIntValue(SourceIntId(0))
         val wide = parseBigInt("9223372036854775808")
-        val session = SearchSession(listOf(object : SearchComponent {
-            override fun contributeModel(model: SearchModel, context: SearchContext) {
-                model.contribute(key, wide)
-            }
-        }))
+        val session = SearchSession(
+            listOf(object : SearchComponent {
+                override fun contributeModel(model: SearchModel, context: SearchContext) {
+                    model.contribute(key, wide)
+                }
+            }),
+        )
 
         assertEquals(wide, session.model().valueOf(key))
     }

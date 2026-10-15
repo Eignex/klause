@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class MutableLongIntMapTest {
 
     @Test
-    fun `put overwrites existing key without growing size`() {
+    fun `put should overwrite an existing key without growing size`() {
         val m = MutableLongIntMap()
         m.put(5L, 1)
         m.put(5L, 2)
@@ -18,7 +18,7 @@ class MutableLongIntMapTest {
     }
 
     @Test
-    fun `addTo increments from zero default and returns new value`() {
+    fun `addTo should increment from zero and return the new value`() {
         val m = MutableLongIntMap()
         assertEquals(1, m.addTo(7_000_000_000L, 1))
         assertEquals(3, m.addTo(7_000_000_000L, 2))
@@ -28,7 +28,7 @@ class MutableLongIntMapTest {
     }
 
     @Test
-    fun `extreme keys and zero coexist`() {
+    fun `extreme keys and zero should coexist`() {
         val m = MutableLongIntMap()
         m.put(Long.MIN_VALUE, 1)
         m.put(Long.MAX_VALUE, 2)
@@ -40,7 +40,7 @@ class MutableLongIntMapTest {
     }
 
     @Test
-    fun `value equal to default is still reported present`() {
+    fun `value equal to default should still be reported present`() {
         val m = MutableLongIntMap()
         m.put(5L, 0)
         assertEquals(0, m.getOrDefault(5L, 0))
@@ -48,7 +48,7 @@ class MutableLongIntMapTest {
     }
 
     @Test
-    fun `remove deletes and leaves other entries findable across collisions`() {
+    fun `remove should keep other entries findable across collisions`() {
         val m = MutableLongIntMap(4)
         for (k in 0L until 50L) m.put(k, (k * k).toInt())
         for (k in 0L until 50L step 3) assertTrue(m.remove(k))
@@ -60,11 +60,11 @@ class MutableLongIntMapTest {
                 assertEquals((k * k).toInt(), m.getOrDefault(k, -1), "survivor key $k")
             }
         }
-        assertFalse(m.remove(0L), "already-removed key returns false")
+        assertFalse(m.remove(0L))
     }
 
     @Test
-    fun `clear empties and the map is reusable`() {
+    fun `clear should empty the map and keep it reusable`() {
         val m = MutableLongIntMap()
         for (k in 0L until 30L) m.put(k, k.toInt())
         m.clear()
@@ -76,7 +76,7 @@ class MutableLongIntMapTest {
     }
 
     @Test
-    fun `forEach visits every entry exactly once`() {
+    fun `forEach should visit every entry exactly once`() {
         val m = MutableLongIntMap()
         val expected = HashMap<Long, Int>()
         for (k in -10L..10L) {
@@ -92,11 +92,10 @@ class MutableLongIntMapTest {
     }
 
     @Test
-    fun `growth preserves all entries`() {
+    fun `growth should preserve all entries`() {
         val m = MutableLongIntMap(8)
         for (k in 0L until 1000L) m.put(k * 7L, k.toInt())
         assertEquals(1000, m.size)
         for (k in 0L until 1000L) assertEquals(k.toInt(), m.getOrDefault(k * 7L, -1))
     }
-
 }

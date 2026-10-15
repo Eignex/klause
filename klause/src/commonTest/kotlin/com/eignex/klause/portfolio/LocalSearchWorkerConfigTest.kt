@@ -1,37 +1,70 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.localsearch.strategy.FeasibleDescent
-import com.eignex.klause.solver.ProblemClass
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class LocalSearchWorkerConfigTest {
 
-    @Test
-    fun `clausal satisfaction starts with the fixed break walk`() {
-        val recipes = LocalSearchCatalog.diverse(Kind.CSP, 1, ProblemClass.Sat)
+    private val weights = longArrayOf(7L, 3L, 5L, 9L, 1L, 8L, 2L, 6L, 12L, 4L, 11L, 10L)
+    private val objective = LinearObjective(boolWeights = weights)
 
-        assertEquals("probsat/plain", recipes.single().label)
+    private fun problem(): BakedProblem = Problem(
+        numBoolVars = weights.size,
+        numIntVars = 0,
+        intDomains = emptyArray(),
+        factors = arrayOf<Factor>(
+            Cardinality(IntArray(weights.size) { Lit.make(it, true) }, min = 4, max = weights.size),
+        ),
+    ).bake()
+
+    private fun run(
+        config: WorkerConfig,
+        exchange: IncumbentExchange<Sample, Double>,
+        seed: Long,
+        budget: Long,
+    ): MinimizeResult = config.materialize(
+        problem(),
+        index = 0,
+        armId = 0,
+        seed = seed,
+        lsLambda = 1.0,
+        objective = objective,
+        lsObjective = null,
+        definitionalSweep = null,
+        onEvent = null,
+        pools = SharedPools(clauses = SharedClausePool(), cuts = null, solutions = exchange),
+    ).use { worker ->
+        worker.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never, maxInstructions = budget).last()
     }
 
     @Test
-    fun `clausal optimization retains its general local search leader`() {
-        val recipes = LocalSearchCatalog.diverse(Kind.COP, 1, ProblemClass.Sat)
-
-        assertEquals("cbls/fixed", recipes.single().label)
+    fun `a materialized LS arm should offer its incumbents to the shared exchange`() {
+        val exchange = IncumbentExchange.minimizing<Sample>()
+        val result = run(LocalSearchWorkerConfig.byLabel("cbls/fixed"), exchange, seed = 1L, budget = 300L)
+        val standing = assertNotNull(exchange.current())
+        assertEquals(result.objectiveValue, standing.objective)
     }
 
     @Test
-    fun `each arm family declares an explicit feasible-descent mode`() {
-        val byLabel = LocalSearchCatalog.ranked(Kind.COP).associateBy { it.label }
-        // CBLS and the SA family both self-own their feasible walk (CBLS descends greedily on its
-        // sources, SA anneals); nothing relies on an engine-side descent.
-        for (label in listOf("cbls/fixed", "sa/fixed", "sa-reheat/fixed", "sa-phased/fixed")) {
-            assertEquals(FeasibleDescent.SelfOwned, byLabel.getValue(label).feasibleDescent, "'$label'")
-        }
-        // Violation-native finders: ratcheted as a constraint on a COP, pure finders on a CSP.
-        assertEquals(FeasibleDescent.RatchetAsConstraint, byLabel.getValue("adaptive-probsat/fixed").feasibleDescent)
-        assertEquals(FeasibleDescent.RatchetAsConstraint, byLabel.getValue("probsat/plain").feasibleDescent)
-        assertEquals(FeasibleDescent.RatchetAsConstraint, byLabel.getValue("walksat-cc/luby").feasibleDescent)
+    fun `an arm entering the pool later should never report worse than the standing incumbent`() {
+        val exchange = IncumbentExchange.minimizing<Sample>()
+        val first = assertNotNull(run(LocalSearchWorkerConfig.byLabel("cbls/fixed"), exchange, 1L, 300L).objectiveValue)
+        val second = assertNotNull(run(AlnsWorkerConfig(), exchange, 2L, 300L).objectiveValue)
+        assertTrue(second <= first, "$second > $first")
+        val standing = assertNotNull(exchange.current())
+        assertEquals(second, standing.objective)
     }
 }

@@ -16,13 +16,17 @@ import kotlin.test.assertTrue
 
 class SmtLibPowersTest {
     @Test
-    fun `lexical and bounded powers agree with original signed roots`() {
-        val bounded = SmtLib.parse("(declare-const x Int) " +
-            "(assert (and (<= (- 3) x 3) (= (^ x 4) 16)))")
-        val lexical = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
-            "(declare-const x Int) (define-fun fourth ((y Int)) Int (^ y 4)) " +
-                "(assert (and (<= (- 3) x 3) (= (fourth x) 16)))",
-        )).problem
+    fun `lexical and bounded powers should agree with original signed roots`() {
+        val bounded = SmtLib.parse(
+            "(declare-const x Int) " +
+                "(assert (and (<= (- 3) x 3) (= (^ x 4) 16)))",
+        )
+        val lexical = assertIs<SmtLibInput.NonlinearInteger>(
+            SmtLibAdmission.parse(
+                "(declare-const x Int) (define-fun fourth ((y Int)) Int (^ y 4)) " +
+                    "(assert (and (<= (- 3) x 3) (= (fourth x) 16)))",
+            ),
+        ).problem
         assertEquals(4, bounded.model.factors.filterIsInstance<Power>().single().exponent)
         val finite = BacktrackSolver(bounded.model.bake()).enumerate(BacktrackParams(maxDecisions = 50))
             .map { it.intValue(0).toString() }.toSet()
@@ -35,11 +39,13 @@ class SmtLibPowersTest {
     }
 
     @Test
-    fun `wide fixed integer powers preserve arbitrary precision source values`() {
-        val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
-            "(declare-const x Int) (assert (= x 100000000000000000000)) " +
-                "(assert (= (^ x 2) 10000000000000000000000000000000000000000))",
-        )).problem
+    fun `wide fixed integer powers should preserve arbitrary precision source values`() {
+        val source = assertIs<SmtLibInput.NonlinearInteger>(
+            SmtLibAdmission.parse(
+                "(declare-const x Int) (assert (= x 100000000000000000000)) " +
+                    "(assert (= (^ x 2) 10000000000000000000000000000000000000000))",
+            ),
+        ).problem
 
         val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
 
@@ -47,7 +53,7 @@ class SmtLibPowersTest {
     }
 
     @Test
-    fun `constant and identity powers retain their linear admission`() {
+    fun `constant and identity powers should retain their linear admission`() {
         for (expression in listOf("(^ x 0)", "(^ 2 3)", "(^ (^ 2 3) 1)")) {
             val source = "(declare-const x Int) (assert (= $expression $expression))"
 

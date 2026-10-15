@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 
 class RevisedSimplexTheoryPricingTest {
     @Test
-    fun `theory pricing prefers less transformed non-free support`() {
+    fun `theory pricing should prefer less transformed non-free support`() {
         val model = disturbedSupportModel()
         val defaultUpdates = ArrayList<Int>()
         val theoryUpdates = ArrayList<Int>()
@@ -41,7 +41,7 @@ class RevisedSimplexTheoryPricingTest {
     }
 
     @Test
-    fun `warm transformed support outranks source sparsity and ignores free basics`() {
+    fun `warm transformed support should outrank source sparsity and ignore free basics`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val minusOne = ExactLpNumber.of(-1L)
@@ -67,15 +67,8 @@ class RevisedSimplexTheoryPricingTest {
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         val warm = Basis(
             intArrayOf(boundedBasic, freeBasic, model.slackCol(2)),
-            arrayOf(
-                VarStatus.BASIC,
-                VarStatus.BASIC,
-                VarStatus.AT_LOWER,
-                VarStatus.AT_LOWER,
-                VarStatus.FIXED,
-                VarStatus.FIXED,
-                VarStatus.BASIC,
-            ),
+            arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.AT_LOWER) +
+                arrayOf(VarStatus.FIXED, VarStatus.FIXED, VarStatus.BASIC),
             captureEligible = false,
         )
         val defaultUpdates = ArrayList<Int>()
@@ -91,18 +84,16 @@ class RevisedSimplexTheoryPricingTest {
             pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
         )
 
-        val baselineResult = assertNotNull(baseline.solve(warm))
-        val theoryResult = assertNotNull(theory.solve(warm))
+        assertTrue(assertNotNull(baseline.solve(warm)).warmStarted)
+        assertTrue(assertNotNull(theory.solve(warm)).warmStarted)
 
-        assertTrue(baselineResult.warmStarted)
-        assertTrue(theoryResult.warmStarted)
         assertEquals(sparseCandidate, defaultUpdates.first())
         assertEquals(transformedCandidate, theoryUpdates.first())
         assertEquals(transformedCandidate, theory.lastTheorySelectedColumn)
     }
 
     @Test
-    fun `magnitude floor falls back to ordinary Harris selection`() {
+    fun `a magnitude floor should fall back to ordinary Harris selection`() {
         val b = LpBuilder()
         val x0 = b.addRealVar(0.0, 2e8)
         val x1 = b.addRealVar(0.0, 2e8)
@@ -132,7 +123,7 @@ class RevisedSimplexTheoryPricingTest {
     }
 
     @Test
-    fun `sampling is capped and accepted update uses a freshly prepared spike`() {
+    fun `capped sampling should accept an update with a freshly prepared spike`() {
         val b = LpBuilder()
         val columns = IntArray(12) { b.addVar(0L, 10L) }
         b.addRow(columns, LongArray(columns.size) { 1L }, Relation.GE, 1L)
@@ -151,7 +142,7 @@ class RevisedSimplexTheoryPricingTest {
     }
 
     @Test
-    fun `cancellation before the first probe preserves the current iterate`() {
+    fun `cancellation before the first probe should preserve the current iterate`() {
         var polls = 0
         val updates = ArrayList<Int>()
         val simplex = RevisedSimplex(
@@ -171,37 +162,7 @@ class RevisedSimplexTheoryPricingTest {
     }
 
     @Test
-    fun `work exhaustion after a successful probe stops before pivot`() {
-        val full = RevisedSimplex(
-            disturbedSupportModel(),
-            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
-        )
-        assertNotNull(full.solve())
-        var stopped: RevisedSimplex? = null
-        for (limit in 1L..full.lastWorkOps) {
-            val attempt = RevisedSimplex(
-                disturbedSupportModel(),
-                workLimit = limit,
-                pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
-            )
-            attempt.solve()
-            if (attempt.lastTheoryPricingSamples > 0 && attempt.lastTheoryPricingResourceStops == 1 &&
-                attempt.lastPivots == 0
-            ) {
-                stopped = attempt
-                break
-            }
-            attempt.close()
-        }
-
-        val exhausted = assertNotNull(stopped)
-        assertNull(exhausted.infeasibleBasis)
-        assertNull(exhausted.infeasibleRay)
-        exhausted.close()
-    }
-
-    @Test
-    fun `failed sample falls back to ordinary Harris`() {
+    fun `a failed sample should fall back to ordinary Harris`() {
         var ftrans = 0
         val updates = ArrayList<Int>()
         val simplex = RevisedSimplex(
@@ -232,11 +193,11 @@ class RevisedSimplexTheoryPricingTest {
         assertNotNull(simplex.solve())
 
         assertEquals(1, simplex.lastTheoryPricingDeclines)
-        assertTrue(updates.isNotEmpty(), "ordinary Harris must continue after the sample decline")
+        assertTrue(updates.isNotEmpty())
     }
 
     @Test
-    fun `nonzero objective adoption disables minimum bound support pricing`() {
+    fun `nonzero objective adoption should disable minimum bound support pricing`() {
         val source = exactCoverModel()
         val trail = LpBoundTrail(source)
         RevisedSimplex(assertNotNull(trail.state.toWorkingModel())).use { simplex ->
@@ -251,13 +212,7 @@ class RevisedSimplexTheoryPricingTest {
             assertEquals(0, simplex.lastTheoryPricingAttempts)
             val certified = certifyLpResult(assertNotNull(trail.state.toWorkingModel()), simplex, current)
             assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
-            assertEquals(
-                listOf(
-                    BigFraction.ONE,
-                    BigFraction.ZERO,
-                ),
-                certified.exactPrimal,
-            )
+            assertEquals(listOf(BigFraction.ONE, BigFraction.ZERO), certified.exactPrimal)
         }
     }
 

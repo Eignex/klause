@@ -17,9 +17,7 @@ import kotlin.test.assertTrue
 class LagrangianBoundTest {
 
     @Test
-    fun `bound is a valid lower bound on a weighted all-different`() {
-        // min 1·x0 + 2·x1 + 3·x2, AllDifferent over [0,4]. Cheapest distinct assignment by the
-        // assignment problem: the largest weight takes value 0, etc. -> exact via Hungarian.
+    fun `bound should be a valid lower bound on a weighted all different`() {
         val p = Problem(
             0,
             3,
@@ -32,13 +30,11 @@ class LagrangianBoundTest {
         val r = assertNotNull(
             lb.computeBound(PropagationSession(p), Double.POSITIVE_INFINITY, LongArray(lb.multiplierCount), 1),
         )
-        // True optimum: x2=0,x1=1,x0=2 -> 2 + 2 + 0 = 4. The bound must not exceed it.
         assertTrue(ceil(r.boundNumerator, r.denominator) <= 4L, "bound ${r.boundNumerator}/${r.denominator} > 4")
     }
 
     @Test
-    fun `infeasible all-different is pruned`() {
-        // 3 distinct variables but only 2 values -> no assignment.
+    fun `bound should prune an infeasible all different`() {
         val p = Problem(
             0,
             3,
@@ -54,7 +50,7 @@ class LagrangianBoundTest {
     }
 
     @Test
-    fun `large assignment costs do not prune a feasible all-different`() {
+    fun `large assignment costs should not prune a feasible all different`() {
         val problem = Problem(
             0,
             2,
@@ -78,9 +74,7 @@ class LagrangianBoundTest {
     }
 
     @Test
-    fun `two coupled all-different blocks give a valid bound`() {
-        // Two disjoint AllDifferents (x0..x2 and x3..x5) over [0,4], coupled by x0 + x3 >= 6.
-        // Each block is solved as its own assignment; the coupling is priced via a multiplier.
+    fun `bound should stay valid over two coupled all different blocks`() {
         val p = Problem(
             0,
             6,
@@ -96,10 +90,35 @@ class LagrangianBoundTest {
         assertTrue(lb.applicable)
         assertEquals(1, lb.multiplierCount)
         val r = assertNotNull(lb.computeBound(PropagationSession(p), 100.0, LongArray(lb.multiplierCount), 20))
-        // True optimum: unconstrained each block is 0+1+2 = 3, but x0+x3>=6 forces one anchor up — the
-        // cheapest is {2,0,1} and {4,0,1} (2+4=6), total 8. The bound is a lower bound, so ≤ 8.
+        // The coupling x0 + x3 >= 6 raises the true optimum to 8.
         assertFalse(r.prune)
         assertTrue(ceil(r.boundNumerator, r.denominator) <= 8L, "bound ${r.boundNumerator}/${r.denominator} > 8")
+    }
+
+    @Test
+    fun `deflected ascent should lift the bound above the undualized base and stay valid`() {
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 5) },
+            arrayOf<Factor>(
+                AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6),
+                Linear(intArrayOf(2, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 10),
+            ),
+        )
+        val lb = LagrangianBound(problem, LinearObjective(intCoefficients = longArrayOf(1, 1, 1)))
+        assertTrue(lb.applicable && lb.multiplierCount == 1)
+        // Polyak steps need a target near the optimum 6.
+        val incumbent = 7.0
+
+        val oneStep = assertNotNull(lb.computeBound(PropagationSession(problem), incumbent, LongArray(1), 1))
+        val converged = assertNotNull(lb.computeBound(PropagationSession(problem), incumbent, LongArray(1), 30))
+
+        val base = ceil(oneStep.boundNumerator, oneStep.denominator)
+        val tightened = ceil(converged.boundNumerator, converged.denominator)
+        assertTrue(base <= 3L)
+        assertTrue(tightened > base)
+        assertTrue(tightened <= 6L)
     }
 
     private fun ceil(a: Long, b: Long): Long {

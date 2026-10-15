@@ -16,19 +16,26 @@ import kotlin.test.assertTrue
 
 class MonotoneClausePrimalTest {
     @Test
-    fun `a completed model is polished after its search slice ends`() {
+    fun `a completed model should be polished after its search slice ends`() {
         val problem = Problem(
-            3, 0, emptyArray(), arrayOf(
+            3,
+            0,
+            emptyArray(),
+            arrayOf(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
             ),
         ).bake()
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 2L))
         lateinit var primal: MonotoneClausePrimal
-        primal = assertNotNull(MonotoneClausePrimal.create(
-            BacktrackSolver(problem), objective,
-            BacktrackParams(cancellation = Cancellation { primal.models > 1L }), Cancellation.Never,
-        ))
+        primal = assertNotNull(
+            MonotoneClausePrimal.create(
+                BacktrackSolver(problem),
+                objective,
+                BacktrackParams(cancellation = Cancellation { primal.models > 1L }),
+                Cancellation.Never,
+            ),
+        )
 
         primal.use {
             val sample = assertNotNull(it.advance())
@@ -40,43 +47,62 @@ class MonotoneClausePrimalTest {
     }
 
     @Test
-    fun `greedy feasible assumptions preserve hard clauses and improve cost`() {
+    fun `greedy feasible assumptions should preserve hard clauses and improve cost`() {
         val problem = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             arrayOf(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
             ),
         ).bake()
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 2L, 0L))
-        val primal = assertNotNull(MonotoneClausePrimal.create(
-            BacktrackSolver(problem), objective, BacktrackParams(), Cancellation.Never,
-        ))
+        val primal = assertNotNull(
+            MonotoneClausePrimal.create(
+                BacktrackSolver(problem),
+                objective,
+                BacktrackParams(),
+                Cancellation.Never,
+            ),
+        )
         primal.use {
             val sample = assertNotNull(it.advance())
             assertEquals(1L, objective.evaluateLong(sample))
-            assertTrue(problem.factors.all { factor ->
-                (factor as Clause).literals.any { literal ->
-                    Lit.evaluate(literal, sample.bools[Lit.variable(literal)])
-                }
-            })
+            assertTrue(
+                problem.factors.all { factor ->
+                    (factor as Clause).literals.any { literal ->
+                        Lit.evaluate(literal, sample.bools[Lit.variable(literal)])
+                    }
+                },
+            )
             while (!it.isDone) it.advance()
         }
     }
 
     @Test
-    fun `relaxation channels retain the necessary source cost`() {
-        val solver = BacktrackSolver(Problem(
-            4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(3, true))),
-            ),
-        ).bake())
+    fun `relaxation channels should retain the necessary source cost`() {
+        val solver = BacktrackSolver(
+            Problem(
+                4,
+                0,
+                emptyArray(),
+                arrayOf(
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+                    Clause(intArrayOf(Lit.make(1, false), Lit.make(3, true))),
+                ),
+            ).bake(),
+        )
         val objective = LinearObjective(boolWeights = longArrayOf(0L, 0L, 1L, 2L))
-        val primal = assertNotNull(MonotoneClausePrimal.create(
-            solver, objective, BacktrackParams(), Cancellation.Never,
-        ))
+        val primal = assertNotNull(
+            MonotoneClausePrimal.create(
+                solver,
+                objective,
+                BacktrackParams(),
+                Cancellation.Never,
+            ),
+        )
         primal.use {
             val sample = assertNotNull(it.advance())
             assertEquals(1L, objective.evaluateLong(sample))
@@ -85,17 +111,27 @@ class MonotoneClausePrimalTest {
     }
 
     @Test
-    fun `polishing preserves caller pins on free variables`() {
-        val solver = BacktrackSolver(Problem(
-            3, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
-            ),
-        ).bake())
+    fun `polishing should preserve caller pins on free variables`() {
+        val solver = BacktrackSolver(
+            Problem(
+                3,
+                0,
+                emptyArray(),
+                arrayOf(
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+                    Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
+                ),
+            ).bake(),
+        )
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 2L, 0L))
-        val primal = assertNotNull(MonotoneClausePrimal.create(
-            solver, objective, BacktrackParams(assumptions = Assumptions(bools = mapOf(2 to true))), Cancellation.Never,
-        ))
+        val primal = assertNotNull(
+            MonotoneClausePrimal.create(
+                solver,
+                objective,
+                BacktrackParams(assumptions = Assumptions(bools = mapOf(2 to true))),
+                Cancellation.Never,
+            ),
+        )
         primal.use {
             val sample = assertNotNull(it.advance())
             assertEquals(2L, objective.evaluateLong(sample))
@@ -104,14 +140,24 @@ class MonotoneClausePrimalTest {
     }
 
     @Test
-    fun `a feasibility trial resumes across small work slices`() {
-        val solver = BacktrackSolver(Problem(
-            12, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
-        ).bake())
+    fun `a feasibility trial should resume across small work slices`() {
+        val solver = BacktrackSolver(
+            Problem(
+                12,
+                0,
+                emptyArray(),
+                arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+            ).bake(),
+        )
         val objective = LinearObjective(boolWeights = longArrayOf(1L))
-        val primal = assertNotNull(MonotoneClausePrimal.create(
-            solver, objective, BacktrackParams(), Cancellation.Never,
-        ))
+        val primal = assertNotNull(
+            MonotoneClausePrimal.create(
+                solver,
+                objective,
+                BacktrackParams(),
+                Cancellation.Never,
+            ),
+        )
         primal.use { probe ->
             var sample = probe.advance(sliceNodes = 1L)
             repeat(30) { if (sample == null && !probe.isDone) sample = probe.advance(sliceNodes = 1L) }
@@ -120,18 +166,28 @@ class MonotoneClausePrimalTest {
     }
 
     @Test
-    fun `a feasible decision model supplies an incumbent`() {
-        val solver = BacktrackSolver(Problem(
-            3, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
-            ),
-        ).bake())
+    fun `a feasible decision model should supply an incumbent`() {
+        val solver = BacktrackSolver(
+            Problem(
+                3,
+                0,
+                emptyArray(),
+                arrayOf(
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))),
+                    Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+                    Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+                ),
+            ).bake(),
+        )
         val objective = LinearObjective(boolWeights = longArrayOf(1L))
-        val primal = assertNotNull(MonotoneClausePrimal.create(
-            solver, objective, BacktrackParams(), Cancellation.Never,
-        ))
+        val primal = assertNotNull(
+            MonotoneClausePrimal.create(
+                solver,
+                objective,
+                BacktrackParams(),
+                Cancellation.Never,
+            ),
+        )
         primal.use {
             val sample = assertNotNull(it.advance())
             assertEquals(0L, objective.evaluateLong(sample))
@@ -140,21 +196,32 @@ class MonotoneClausePrimalTest {
     }
 
     @Test
-    fun `clausal trials retain original coordinates and caller pins`() {
-        val solver = BacktrackSolver(Problem(
-            33, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(Lit.make(28, true), Lit.make(31, true))),
-                Clause(intArrayOf(Lit.make(29, true), Lit.make(31, false))),
+    fun `clausal trials should retain original coordinates and caller pins`() {
+        val solver = BacktrackSolver(
+            Problem(
+                33,
+                0,
+                emptyArray(),
+                arrayOf(
+                    Clause(intArrayOf(Lit.make(28, true), Lit.make(31, true))),
+                    Clause(intArrayOf(Lit.make(29, true), Lit.make(31, false))),
+                ),
+            ).bake(),
+        )
+        val objective = LinearObjective(
+            boolWeights = LongArray(33).apply {
+                this[28] = 1L
+                this[29] = 2L
+            },
+        )
+        val primal = assertNotNull(
+            MonotoneClausePrimal.create(
+                solver,
+                objective,
+                BacktrackParams(assumptions = Assumptions(bools = mapOf(32 to true))),
+                Cancellation.Never,
             ),
-        ).bake())
-        val objective = LinearObjective(boolWeights = LongArray(33).apply {
-            this[28] = 1L
-            this[29] = 2L
-        })
-        val primal = assertNotNull(MonotoneClausePrimal.create(
-            solver, objective, BacktrackParams(assumptions = Assumptions(bools = mapOf(32 to true))),
-            Cancellation.Never,
-        ))
+        )
 
         primal.use {
             val sample = assertNotNull(it.advance())
@@ -167,17 +234,25 @@ class MonotoneClausePrimalTest {
     }
 
     @Test
-    fun `baked root pins survive clausal trials`() {
+    fun `baked root pins should survive clausal trials`() {
         val problem = Problem(
-            4, 0, emptyArray(), arrayOf(
+            4,
+            0,
+            emptyArray(),
+            arrayOf(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
             ),
         ).bake().conditionedRoot(Assumptions(bools = mapOf(3 to true)), Cancellation.Never)
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 2L))
-        val primal = assertNotNull(MonotoneClausePrimal.create(
-            BacktrackSolver(problem), objective, BacktrackParams(), Cancellation.Never,
-        ))
+        val primal = assertNotNull(
+            MonotoneClausePrimal.create(
+                BacktrackSolver(problem),
+                objective,
+                BacktrackParams(),
+                Cancellation.Never,
+            ),
+        )
 
         primal.use {
             val sample = assertNotNull(it.advance())
@@ -188,30 +263,49 @@ class MonotoneClausePrimalTest {
     }
 
     @Test
-    fun `negative occurrence of a costly variable disables the probe`() {
-        val solver = BacktrackSolver(Problem(
-            1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false)))),
-        ).bake())
-        assertNull(MonotoneClausePrimal.create(
-            solver, LinearObjective(boolWeights = longArrayOf(1L)), BacktrackParams(), Cancellation.Never,
-        ))
+    fun `a negative occurrence of a costly variable should disable the probe`() {
+        val solver = BacktrackSolver(
+            Problem(
+                1,
+                0,
+                emptyArray(),
+                arrayOf(Clause(intArrayOf(Lit.make(0, false)))),
+            ).bake(),
+        )
+        assertNull(
+            MonotoneClausePrimal.create(
+                solver,
+                LinearObjective(boolWeights = longArrayOf(1L)),
+                BacktrackParams(),
+                Cancellation.Never,
+            ),
+        )
     }
 
     @Test
-    fun `pinned costly variables disable the probe`() {
+    fun `pinned costly variables should disable the probe`() {
         val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
-        assertNull(MonotoneClausePrimal.create(
-            solver, LinearObjective(boolWeights = longArrayOf(1L)),
-            BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to true))), Cancellation.Never,
-        ))
+        assertNull(
+            MonotoneClausePrimal.create(
+                solver,
+                LinearObjective(boolWeights = longArrayOf(1L)),
+                BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to true))),
+                Cancellation.Never,
+            ),
+        )
     }
 
     @Test
-    fun `cancelled probe publishes no candidate`() {
+    fun `a cancelled probe should publish no candidate`() {
         val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
-        val primal = assertNotNull(MonotoneClausePrimal.create(
-            solver, LinearObjective(boolWeights = longArrayOf(1L)), BacktrackParams(), Cancellation { true },
-        ))
+        val primal = assertNotNull(
+            MonotoneClausePrimal.create(
+                solver,
+                LinearObjective(boolWeights = longArrayOf(1L)),
+                BacktrackParams(),
+                Cancellation { true },
+            ),
+        )
         primal.use { assertNull(it.advance()) }
     }
 }

@@ -24,7 +24,7 @@ class ClauseInvariantTest {
     }
 
     @Test
-    fun `flip deltas match clause truth for dense and sparse variable ids`() {
+    fun `flip deltas should match clause truth for dense and sparse variable ids`() {
         for (arity in listOf(4, 5)) {
             for (spacing in listOf(1, 17)) {
                 val literals = IntArray(arity) { Lit.make(it * spacing, it % 2 == 0) }
@@ -51,7 +51,7 @@ class ClauseInvariantTest {
     }
 
     @Test
-    fun `duplicate literals are folded before local search`() {
+    fun `duplicate literals should be folded before local search`() {
         val input = intArrayOf(Lit.make(0, true), Lit.make(0, true), Lit.make(1, false))
         val clause = Clause(input)
         input[0] = Lit.make(2, true)
@@ -69,7 +69,7 @@ class ClauseInvariantTest {
     }
 
     @Test
-    fun `tautological clause is never violated after flips`() {
+    fun `tautological clause should never be violated after flips`() {
         val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, true)))
         val state = stateFor(2, clause)
         state.assignment.setBool(0, false)
@@ -83,7 +83,7 @@ class ClauseInvariantTest {
     }
 
     @Test
-    fun `remapping folds duplicate clause literals`() {
+    fun `remapping should fold duplicate clause literals`() {
         val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
 
         val remapped = clause.remap(VarRemap(intArrayOf(0, 0), intArrayOf())) as Clause

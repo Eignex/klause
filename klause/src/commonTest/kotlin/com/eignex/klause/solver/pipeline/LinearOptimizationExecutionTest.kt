@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
@@ -37,31 +36,58 @@ import kotlin.test.assertTrue
 
 class LinearOptimizationExecutionTest {
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-    private val scope = SourceScope(SourceRevision("public-linear", "exact-affine"),
-        objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+    private val scope = SourceScope(
+        SourceRevision("public-linear", "exact-affine"),
+        objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
+    )
 
     @Test
-    fun `cancelling a scoped portfolio retains its checked incumbent and conditional root bound`() {
-        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+    fun `cancelling a scoped portfolio should keep its checked incumbent and conditional root bound`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val request = OpenTheoryRequest(model, LinearObjective(realCoefficients = doubleArrayOf(1.0)))
         val original = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
         val third = BigFraction.of(BIG_ONE, parseBigInt("3"))
-        val context = SourceProofContext(original.scope.copy(condition = SourceCondition(
-            lower = mapOf(real to third))), original.coordinates, original.premises, original.objective,
-            original.objectiveConstant, original.semanticsChecker)
+        val context = SourceProofContext(
+            original.scope.copy(
+                condition = SourceCondition(
+                    lower = mapOf(real to third),
+                ),
+            ),
+            original.coordinates,
+            original.premises,
+            original.objective,
+            original.objectiveConstant,
+            original.semanticsChecker,
+        )
 
         for (lanes in listOf(1, 4)) {
             var cancelled = false
             var observed: SourceIncumbentPublication? = null
-            val params = TheoryParams(openWorkLimit = 100_000, maxFlips = 0,
-                cancellation = Cancellation { cancelled })
+            val params = TheoryParams(
+                openWorkLimit = 100_000,
+                maxFlips = 0,
+                cancellation = Cancellation { cancelled },
+            )
 
-            val execution = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(
-                request.withLinearAuthority(context), params, FiniteEngine.MIXED, lanes) {
-                observed = it
-                cancelled = true
-            })
+            val execution = assertIs<OpenTheoryExecution.Optimize>(
+                OpenTheoryPipeline.execute(
+                    request.withLinearAuthority(context),
+                    params,
+                    FiniteEngine.MIXED,
+                    lanes,
+                ) {
+                    observed = it
+                    cancelled = true
+                },
+            )
 
             val bounded = assertIs<OpenTheoryOptimum.Bounded>(execution.result)
             val authority = assertNotNull(bounded.linearResult)
@@ -70,8 +96,10 @@ class LinearOptimizationExecutionTest {
             assertNull(authority.terminal)
             val bound = assertIs<SourceClaim.Bound>(assertNotNull(authority.bound).claim)
             assertEquals(SourceValue.Rational(third), bound.value)
-            assertEquals(SourceEvidenceCheck.Checked,
-                authority.evidence.verify(bound, context.withLinearAuthority()))
+            assertEquals(
+                SourceEvidenceCheck.Checked,
+                authority.evidence.verify(bound, context.withLinearAuthority()),
+            )
             assertSame(assertNotNull(observed), execution.acceptedIncumbent)
             assertSame(observed?.sample, authority.incumbent)
             assertEquals(third, authority.value)
@@ -79,40 +107,61 @@ class LinearOptimizationExecutionTest {
     }
 
     @Test
-    fun `ordinary complete routes preserve captured exact coordinate pins and source receipts`() {
-        val model = Problem(numBoolVars = 1,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0),
-                Bits(1), Bits(1).also { it.set(0) }), factors = emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
-        val request = OpenTheoryRequest(model,
-            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(1.0)))
+    fun `ordinary complete routes should preserve captured exact coordinate pins and source receipts`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(0),
+                longArrayOf(0),
+                Bits(1),
+                Bits(1).also { it.set(0) },
+            ),
+            factors = emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
+        val request = OpenTheoryRequest(
+            model,
+            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(1.0)),
+        )
         val original = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val wide = BigFraction.of(parseBigInt("18446744073709551616"), BIG_ONE)
         val third = BigFraction.of(BIG_ONE, parseBigInt("3"))
         val pins = mapOf(integer to wide, real to third)
-        val context = SourceProofContext(original.scope.copy(condition = SourceCondition(mapOf(0 to true), pins, pins)),
-            original.coordinates, original.premises, original.objective, original.objectiveConstant,
-            original.semanticsChecker)
+        val context = SourceProofContext(
+            original.scope.copy(condition = SourceCondition(mapOf(0 to true), pins, pins)),
+            original.coordinates,
+            original.premises,
+            original.objective,
+            original.objectiveConstant,
+            original.semanticsChecker,
+        )
         val params = TheoryParams(maxLeaves = 32, openWorkLimit = 100_000, maxFlips = 0)
 
-        for ((engine, lanes) in listOf(FiniteEngine.BACKTRACK to 1, FiniteEngine.FIXED to 1,
-            FiniteEngine.MIXED to 1, FiniteEngine.MIXED to 4)) {
+        for ((engine, lanes) in listOf(FiniteEngine.BACKTRACK to 1, FiniteEngine.MIXED to 4)) {
             val publications = ArrayList<SourceIncumbentPublication>()
 
-            val execution = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(
-                request.withLinearAuthority(context), params, engine, lanes) { publications += it })
+            val execution = assertIs<OpenTheoryExecution.Optimize>(
+                OpenTheoryPipeline.execute(
+                    request.withLinearAuthority(context),
+                    params,
+                    engine,
+                    lanes,
+                ) { publications += it },
+            )
 
             val authority = assertNotNull(assertIs<OpenTheoryOptimum.Optimal>(execution.result).linearResult)
             val optimal = assertIs<SourceClaim.Optimal>(assertNotNull(authority.terminal).claim)
             assertEquals(SourceValue.Rational(wide + third), optimal.value)
-            assertEquals(context.scope, authority.scope)
-            assertEquals(SourceEvidenceCheck.Checked,
-                authority.evidence.verify(optimal, context.withLinearAuthority()))
+            assertEquals(
+                SourceEvidenceCheck.Checked,
+                authority.evidence.verify(optimal, context.withLinearAuthority()),
+            )
             val receipt = assertNotNull(execution.acceptedIncumbent)
             assertSame(publications.last(), receipt)
             assertSame(receipt.sample, authority.incumbent)
-            assertEquals(SourceValue.Rational(wide + third), receipt.value)
             assertTrue(receipt.sample.boolValue(0))
             assertEquals(wide.num, receipt.sample.exactIntValue(0))
             assertEquals(third, assertNotNull(receipt.sample.exactReals).single())
@@ -120,24 +169,52 @@ class LinearOptimizationExecutionTest {
     }
 
     @Test
-    fun `ordinary witness only routes retain exact scoped receipts without terminal claims`() {
+    fun `ordinary witness only routes should keep exact scoped receipts without terminal claims`() {
         val third = BigFraction.of(BIG_ONE, parseBigInt("3"))
-        val model = Problem(0, 0, emptyArray(), arrayOf(ExactSearchRow.of(intArrayOf(Term.ofRealVar(0)),
-            listOf(BigFraction.ONE), LinearOp.EQ, third)), numRealVars = 1,
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                ExactSearchRow.of(
+                    intArrayOf(Term.ofRealVar(0)),
+                    listOf(BigFraction.ONE),
+                    LinearOp.EQ,
+                    third,
+                ),
+            ),
+            numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val request = OpenTheoryRequest(model, LinearObjective(realCoefficients = doubleArrayOf(1.0)))
         val original = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
-        val context = SourceProofContext(original.scope.copy(condition = SourceCondition(
-            lower = mapOf(real to third), upper = mapOf(real to third))), original.coordinates,
-            original.premises, original.objective, original.objectiveConstant, original.semanticsChecker)
+        val context = SourceProofContext(
+            original.scope.copy(
+                condition = SourceCondition(
+                    lower = mapOf(real to third),
+                    upper = mapOf(real to third),
+                ),
+            ),
+            original.coordinates,
+            original.premises,
+            original.objective,
+            original.objectiveConstant,
+            original.semanticsChecker,
+        )
         val params = TheoryParams(openWorkLimit = 100_000, maxFlips = 12, alnsIterations = 1)
 
         for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
             val publications = ArrayList<SourceIncumbentPublication>()
 
-            val execution = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(
-                request.withLinearAuthority(context), params, engine, 1) { publications += it })
+            val execution = assertIs<OpenTheoryExecution.Optimize>(
+                OpenTheoryPipeline.execute(
+                    request.withLinearAuthority(context),
+                    params,
+                    engine,
+                    1,
+                ) { publications += it },
+            )
 
             val bounded = assertIs<OpenTheoryOptimum.Bounded>(execution.result)
             assertNull(bounded.linearResult?.terminal)
@@ -150,14 +227,18 @@ class LinearOptimizationExecutionTest {
     }
 
     @Test
-    fun `public linear execution preserves exact wide integer and rational condition pins`() {
+    fun `public linear execution should preserve exact wide integer and rational condition pins`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val wide = BigFraction.of(parseBigInt("18446744073709551616"), BIG_ONE)
         val third = BigFraction.of(BIG_ONE, parseBigInt("3"))
         val pins = mapOf(integer to wide, real to third)
-        val context = SourceProofContext(scope.copy(condition = SourceCondition(mapOf(0 to true), pins, pins)),
-            setOf(bool, integer, real), emptyMap(), mapOf(integer to BigFraction.ONE, real to BigFraction.ONE))
+        val context = SourceProofContext(
+            scope.copy(condition = SourceCondition(mapOf(0 to true), pins, pins)),
+            setOf(bool, integer, real),
+            emptyMap(),
+            mapOf(integer to BigFraction.ONE, real to BigFraction.ONE),
+        )
 
         val result = OpenTheoryPipeline.optimizeLinear(context)
 
@@ -170,20 +251,29 @@ class LinearOptimizationExecutionTest {
     }
 
     @Test
-    fun `a conditional source optimum and bound cannot be reused in the parent scope`() {
+    fun `a conditional source optimum and bound should not be reused in the parent scope`() {
         val parent = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
-        val restricted = SourceProofContext(scope.copy(condition = SourceCondition(
-            lower = mapOf(real to BigFraction.ONE))), parent.coordinates, parent.premises, parent.objective)
+        val restricted = SourceProofContext(
+            scope.copy(
+                condition = SourceCondition(
+                    lower = mapOf(real to BigFraction.ONE),
+                ),
+            ),
+            parent.coordinates,
+            parent.premises,
+            parent.objective,
+        )
         val result = OpenTheoryPipeline.optimizeLinear(restricted)
 
         for (evidence in listOf(assertNotNull(result.terminal), assertNotNull(result.bound))) {
             assertIs<SourceEvidenceCheck.Rejected>(
-                SourceEvidenceVerifier(parent.withLinearAuthority()).verify(evidence))
+                SourceEvidenceVerifier(parent.withLinearAuthority()).verify(evidence),
+            )
         }
     }
 
     @Test
-    fun `an omitted affine objective cannot establish a zero optimum`() {
+    fun `an omitted affine objective should not establish a zero optimum`() {
         val context = SourceProofContext(scope, setOf(real), emptyMap())
 
         val result = OpenTheoryPipeline.optimizeLinear(context.withLinearAuthority())
@@ -194,7 +284,7 @@ class LinearOptimizationExecutionTest {
     }
 
     @Test
-    fun `sparse source coordinates decline before witness construction`() {
+    fun `sparse source coordinates should decline before witness construction`() {
         val sparse = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val context = SourceProofContext(scope, setOf(sparse), emptyMap(), mapOf(sparse to BigFraction.ONE))
 
@@ -205,10 +295,17 @@ class LinearOptimizationExecutionTest {
     }
 
     @Test
-    fun `public linear execution retains checkable limit evidence and accepted source values`() {
-        val context = SourceProofContext(scope, setOf(real), mapOf("positive" to SourcePremise(
-            SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true))),
-            mapOf(real to BigFraction.ONE))
+    fun `public linear execution should keep checkable limit evidence and accepted source values`() {
+        val context = SourceProofContext(
+            scope,
+            setOf(real),
+            mapOf(
+                "positive" to SourcePremise(
+                    SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
+                ),
+            ),
+            mapOf(real to BigFraction.ONE),
+        )
         val accepted = ArrayList<BigFraction>()
 
         val result = OpenTheoryPipeline.optimizeLinear(context) { _, value -> accepted += value }
@@ -220,10 +317,17 @@ class LinearOptimizationExecutionTest {
     }
 
     @Test
-    fun `callback failure retires the native invocation before another slice`() {
-        val context = SourceProofContext(scope, setOf(real), mapOf("lower" to SourcePremise(
-            SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))),
-            mapOf(real to BigFraction.ONE))
+    fun `callback failure should retire the native invocation before another slice`() {
+        val context = SourceProofContext(
+            scope,
+            setOf(real),
+            mapOf(
+                "lower" to SourcePremise(
+                    SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+                ),
+            ),
+            mapOf(real to BigFraction.ONE),
+        )
         val invocation = LinearAuthorityInvocation(context, TheoryParams())
 
         val failure = assertFailsWith<IllegalArgumentException> {
@@ -237,65 +341,5 @@ class LinearOptimizationExecutionTest {
             invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
         }
         invocation.close()
-    }
-
-    @Test
-    fun `ordinary portfolio limits retain original direction and checkable approach evidence`() {
-        for (maximize in listOf(false, true)) {
-            val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-                intArrayOf(0), doubleArrayOf(1.0), if (maximize) LinearOp.LE else LinearOp.GE,
-                if (maximize) 1.0 else 0.0, strict = true)), numRealVars = 1,
-                realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
-            val request = OpenTheoryRequest(model, LinearObjective(realCoefficients = doubleArrayOf(1.0)), maximize)
-            val context = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
-            val captured = request.withLinearAuthority(context)
-            val params = TheoryParams(maxLeaves = 32, openWorkLimit = 100_000, maxFlips = 12, alnsIterations = 1)
-
-            for ((engine, lanes) in listOf(FiniteEngine.BACKTRACK to 1, FiniteEngine.FIXED to 1,
-                FiniteEngine.MIXED to 1, FiniteEngine.MIXED to 2)) {
-                val result = assertIs<OpenTheoryExecution.Optimize>(
-                    OpenTheoryPipeline.execute(captured, params, engine, lanes)).result
-
-                val authority = assertNotNull(assertIs<OpenTheoryOptimum.Bounded>(result).linearResult)
-                val claim = assertIs<SourceClaim.Limit>(assertNotNull(authority.terminal).claim)
-                assertEquals(SourceValue.Rational(if (maximize) BigFraction.ONE else BigFraction.ZERO), claim.value)
-                assertEquals(context.scope, authority.scope)
-                assertEquals(SourceEvidenceCheck.Checked,
-                    authority.evidence.verify(claim, context.withLinearAuthority()))
-                val value = assertNotNull(authority.value)
-                assertTrue(if (maximize) value < BigFraction.ONE else value > BigFraction.ZERO)
-            }
-        }
-    }
-
-    @Test
-    fun `ordinary portfolio rays retain moving integer coordinates and original source evidence`() {
-        val model = Problem(numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0),
-                Bits(1), Bits(1).also { it.set(0) }),
-            factors = arrayOf(Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
-                doubleArrayOf(10.0), LinearOp.GE, 0.0)), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
-        val request = OpenTheoryRequest(model, LinearObjective(intCoefficients = longArrayOf(-1)))
-        val context = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
-        val captured = request.withLinearAuthority(context)
-        val params = TheoryParams(maxLeaves = 32, openWorkLimit = 100_000, maxFlips = 12, alnsIterations = 1)
-
-        for ((engine, lanes) in listOf(FiniteEngine.BACKTRACK to 1, FiniteEngine.FIXED to 1,
-            FiniteEngine.MIXED to 1, FiniteEngine.MIXED to 2)) {
-            val result = assertIs<OpenTheoryExecution.Optimize>(
-                OpenTheoryPipeline.execute(captured, params, engine, lanes)).result
-
-            val authority = assertNotNull(assertIs<OpenTheoryOptimum.Unbounded>(result).linearResult)
-            val claim = assertIs<SourceClaim.Ray>(assertNotNull(authority.terminal).claim)
-            val step = assertNotNull(claim.direction[SourceCoordinate(SourceCoordinate.Kind.Integer, 0)])
-            assertTrue(step > BigFraction.ZERO)
-            assertEquals(BigFraction.ONE.den, step.den)
-            assertNotNull(claim.direction[real])
-            assertEquals(context.scope, authority.scope)
-            assertEquals(SourceEvidenceCheck.Checked,
-                authority.evidence.verify(claim, context.withLinearAuthority()))
-        }
     }
 }

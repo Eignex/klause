@@ -10,14 +10,14 @@ import kotlin.test.assertNull
 
 class ElementTest {
     @Test
-    fun `affine substitution declines an unrepresentable index offset`() {
+    fun `affine substitution should decline an unrepresentable index offset`() {
         val factor = Element(0, 1, longArrayOf(4, 9), false, Int.MAX_VALUE)
 
         assertNull(factor.substituteAffine(0, 1, -1, 2))
     }
 
     @Test
-    fun `constant reduction retains a range beyond integer rewrite bounds`() {
+    fun `constant reduction should retain a range beyond integer rewrite bounds`() {
         val factor = Element(0, 1, longArrayOf(4, 4), false, Int.MAX_VALUE)
         val domains = arrayOf(IntDomain(Int.MAX_VALUE.toLong(), Int.MAX_VALUE.toLong() + 1), IntDomain(0, 9))
 
@@ -25,7 +25,7 @@ class ElementTest {
     }
 
     @Test
-    fun `remapping preserves ordered repeated and aliased roles`() {
+    fun `remapping should preserve ordered repeated and aliased roles`() {
         val factor = Element(0, 1, longArrayOf(2, 1, 0, 2), true, -2)
 
         val remapped = assertIs<Element>(factor.remap(VarRemap(intArrayOf(), intArrayOf(1, 0, 0))))

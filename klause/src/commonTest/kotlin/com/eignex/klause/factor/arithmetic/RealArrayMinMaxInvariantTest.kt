@@ -11,11 +11,17 @@ import kotlin.test.assertEquals
 
 class RealArrayMinMaxInvariantTest {
     @Test
-    fun `real move deltas preserve repeated operand and result aliases`() {
+    fun `real move deltas should preserve repeated operand and result aliases`() {
         for (max in listOf(false, true)) {
-            val source = Problem(0, 0, emptyArray(),
+            val source = Problem(
+                0,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(RealArrayMinMax(0, intArrayOf(0, 1, 0), max)),
-                numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(4.0, 4.0))
+                numRealVars = 2,
+                realLower = doubleArrayOf(0.0, 0.0),
+                realUpper = doubleArrayOf(4.0, 4.0),
+            )
             val state = LocalSearchState(LocalSearchModel.open(source), Random(0))
             state.assignment.setReal(0, if (max) 1.0 else 3.0)
             state.assignment.setReal(1, 2.0)

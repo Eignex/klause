@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 
 class ExactLraAssignmentTest {
     @Test
-    fun `exact real witnesses own their constructor and exported coordinates`() {
+    fun `exact real witnesses should own their constructor and exported coordinates`() {
         val third = BigFraction.ofLong(3).reciprocal()
         val bools = booleanArrayOf(true)
         val reals = mutableListOf(third)

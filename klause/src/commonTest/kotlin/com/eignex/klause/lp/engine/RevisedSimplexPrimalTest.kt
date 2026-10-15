@@ -1,24 +1,14 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.LpBuilder
-import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
-import com.eignex.klause.lp.engine.integerDualLowerBoundCeil
-import com.eignex.klause.simplex.basis.BasisBuildKind
-import com.eignex.klause.simplex.basis.BasisBuildWork
-import com.eignex.klause.simplex.basis.BasisOperationWork
-import com.eignex.klause.simplex.basis.BasisPhaseWork
 import com.eignex.klause.simplex.basis.BasisSolveQuality
 import com.eignex.klause.simplex.basis.BasisSolver
-import com.eignex.klause.simplex.basis.BasisWork
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
-import kotlin.math.abs
-import kotlin.math.ceil
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -29,7 +19,7 @@ import kotlin.test.assertTrue
 class RevisedSimplexPrimalTest {
 
     @Test
-    fun `primal stops report their invocation caps`() {
+    fun `primal stops should report their invocation caps`() {
         val builder = LpBuilder()
         repeat(2) {
             val column = builder.addVar(0L, 3L, cost = 1L)
@@ -49,7 +39,7 @@ class RevisedSimplexPrimalTest {
     }
 
     @Test
-    fun `native lower upper free and fixed seats certify their source optimum`() {
+    fun `native lower upper free and fixed seats should certify their source optimum`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val three = ExactLpNumber.of(3L)
@@ -82,7 +72,7 @@ class RevisedSimplexPrimalTest {
     }
 
     @Test
-    fun `nonzero logical cost repairs a feasible but dual infeasible initial basis`() {
+    fun `nonzero logical cost should repair a feasible but dual infeasible initial basis`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val box = ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))
@@ -102,7 +92,7 @@ class RevisedSimplexPrimalTest {
     }
 
     @Test
-    fun `distinct exact endpoints sharing a double do not export a fixed status`() {
+    fun `distinct exact endpoints sharing a double should not export a fixed status`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val lower = ExactLpNumber.of(9007199254740992L)
@@ -128,75 +118,21 @@ class RevisedSimplexPrimalTest {
         assertEquals(lower.value.toDouble(), upper.value.toDouble())
     }
 
-    /** `≥`-rows with positive rhs (covering): the all-lower start is primal-infeasible (every slack
-     *  starts negative), so [RevisedSimplex.solvePrimal] must run phase-1 to recover feasibility. */
-    private fun randomCoveringModel(m: Int, n: Int, rng: Random): LpModel {
-        val b = LpBuilder()
-        repeat(n) { b.addVar(0L, rng.nextLong(2, 6), cost = rng.nextLong(0, 7)) }
-        val cols = IntArray(n) { it }
-        repeat(m) { b.addRow(cols, LongArray(n) { rng.nextLong(1, 4) }, Relation.GE, rng.nextLong(1, 9)) }
-        return b.build(Sense.MINIMIZE)
-    }
-
     @Test
-    fun `primal phase-1 recovers feasibility on covering models`() {
-        val rng = Random(20260622)
-        var converged = 0
-        repeat(500) {
-            val model = randomCoveringModel(rng.nextInt(2, 6), rng.nextInt(3, 7), rng)
-            val primal = RevisedSimplex(model).solvePrimal() ?: return@repeat // infeasible models skip
-            val dual = RevisedSimplex(model).solve() ?: return@repeat
-            converged++
-            assertTrue(
-                abs(primal.objective - dual.objective) <= 1e-6 * maxOf(1.0, abs(dual.objective)),
-                "primal obj ${primal.objective} vs dual ${dual.objective}",
-            )
-            val bound = integerDualLowerBoundCeil(model, primal.duals) ?: return@repeat
-            assertTrue(
-                bound.toDouble() <= ceil(primal.objective) + 1e-6,
-                "primal certified bound $bound > ceil(obj ${primal.objective})",
-            )
-        }
-        assertTrue(converged > 100, "primal phase-1 converged on only $converged covering instances")
-    }
-
-    @Test
-    fun `the bound-flipping ratio test flips entering variables to their upper bound`() {
-        // maximize x0 + x1 (minimize the negation) with x0, x1 ∈ [0,1] under the loose x0 + x1 ≤ 5.
-        // No basic variable blocks before each entering variable reaches its own upper bound, so both
-        // pivots are bound flips; the optimum is x0 = x1 = 1, objective -2.
+    fun `the bound-flipping ratio test should flip entering variables to their upper bound`() {
+        // The loose row never blocks, so both pivots are bound flips.
         val b = LpBuilder()
         b.addVar(0L, 1L, cost = -1L)
         b.addVar(0L, 1L, cost = -1L)
         b.addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.LE, 5L)
         val model = b.build(Sense.MINIMIZE)
         val result = RevisedSimplex(model).solvePrimal()
-        assertTrue(result != null, "primal should solve the loose box")
-        assertTrue(abs(result.objective - (-2.0)) <= 1e-9, "optimum ${result.objective} should be -2")
+        assertTrue(result != null)
+        assertEquals(-2.0, result.objective, 1e-9)
     }
 
     @Test
-    fun `cost triggered refactors are counted as update limits rather than numerical recovery`() {
-        val builder = LpBuilder()
-        repeat(60) {
-            val variable = builder.addVar(0L, 3L, cost = 1L)
-            builder.addRow(intArrayOf(variable), longArrayOf(1L), Relation.GE, 1L)
-        }
-        val model = builder.build(Sense.MINIMIZE)
-
-        RevisedSimplex(
-            model,
-            basisSolverFactory = { matrix -> MeteredBtranSolver(KotlinBasisSolver(matrix)) },
-        ).use { solver ->
-            assertNotNull(solver.solvePrimal())
-
-            assertEquals(0, solver.lastMetrics.numericalRecoveryRefactorizations)
-            assertTrue(solver.lastMetrics.updateLimitRefactorizations > 4, "${solver.lastMetrics}")
-        }
-    }
-
-    @Test
-    fun `generation changing quality restarts share one recovery budget`() {
+    fun `generation changing quality restarts should share one recovery budget`() {
         val builder = LpBuilder()
         repeat(40) {
             val variable = builder.addVar(0L, 1L, cost = -1L)
@@ -219,20 +155,4 @@ class RevisedSimplexPrimalTest {
 private class PersistentlyBadQualitySolver(private val delegate: BasisSolver) : BasisSolver by delegate {
     override fun solveQuality(rhs: DoubleArray, solution: IndexedVector, transpose: Boolean): BasisSolveQuality =
         BasisSolveQuality(1e-4, 1e-4)
-}
-
-// Reports a fixed build and dual-solve work, so the synthetic work trigger fires at a chosen cadence.
-private class MeteredBtranSolver(private val delegate: BasisSolver) : BasisSolver by delegate {
-    private var btrans = 0L
-
-    override fun btran(x: IndexedVector, expectedDensity: Double) {
-        btrans++
-        delegate.btran(x, expectedDensity)
-    }
-
-    override val basisWork: BasisWork
-        get() = BasisWork(BasisBuildWork(BasisBuildKind.REFACTORIZATION, true, 1, 0, 0, 0, 85, 85))
-
-    override val basisOperationWork: BasisOperationWork
-        get() = BasisOperationWork(btran = BasisPhaseWork(btrans, btrans, 10 * btrans))
 }

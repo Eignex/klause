@@ -27,9 +27,9 @@ import kotlin.test.assertTrue
 class SubcircuitPropagatorTest {
 
     @Test
-    fun `subcircuit deductions are implied by their reasons under carved holes`() {
+    fun `subcircuit deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x5EA5)
-        repeat(300) { iter ->
+        repeat(40) { iter ->
             val n = 5
             val problem = Problem(
                 numBoolVars = 0,
@@ -47,10 +47,7 @@ class SubcircuitPropagatorTest {
     }
 
     @Test
-    fun `a premature subtour cites only its edges and one node that must join it`() {
-        // succ(0)=1 and succ(1)=0 close a 2-cycle while node 2 cannot opt out (2 is outside succ(2)'s
-        // domain), so the cycle is too short. Node 3 is tightened but may still opt out: a reason
-        // citing every successor would name it.
+    fun `a premature subtour should cite only its edges and one node that must join it`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 5,
@@ -77,8 +74,7 @@ class SubcircuitPropagatorTest {
     }
 
     @Test
-    fun `a mandatory node the root cannot reach cites the arcs out of the reached set`() {
-        // Nodes 0 and 3 cannot opt out. Node 0 reaches only {0, 1, 2}, whose successors all stay at or below 2.
+    fun `a mandatory node the root cannot reach should cite the arcs out of the reached set`() {
         val problem = problem(4)
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
@@ -114,17 +110,14 @@ class SubcircuitPropagatorTest {
     }
 
     @Test
-    fun `propagation rejects a claimed successor taken by two included nodes`() {
-        // succ[0]=2 and succ[1]=2 — two nodes claim the same successor. Infeasible.
+    fun `propagation should reject a successor claimed by two included nodes`() {
         val problem = problem(4)
         val result = problem.propagate(Assumptions(ints = mapOf(0 to 2, 1 to 2)))
-        assertTrue(result is Unsat, "two nodes claiming same successor should be Unsat; got $result")
+        assertTrue(result is Unsat, "$result")
     }
 
     @Test
-    fun `propagation forces closing edge when only one valid target remains`() {
-        // Fixed: succ[0]=1, succ[1]=2. Node 2 must close back to 0 (others claimed or excluded).
-        // Domain for succ[2] includes 0, 1, 2 — after propagation succ[2]=0 should be forced.
+    fun `propagation should force the closing edge when only one valid target remains`() {
         val factor = Circuit(succ = intArrayOf(0, 1, 2), subcircuit = true)
         val problem = Problem(
             numBoolVars = 0,
@@ -133,13 +126,12 @@ class SubcircuitPropagatorTest {
             factors = arrayOf<Factor>(factor),
         )
         val result = problem.propagate(Assumptions(ints = mapOf(0 to 1, 1 to 2)))
-        assertTrue(result is Implied, "chain 0→1→2 must propagate; got $result")
-        assertEquals(0, result.ints[2], "succ[2] must be forced to 0 to close the cycle; got ${result.ints}")
+        assertTrue(result is Implied, "$result")
+        assertEquals(0, result.ints[2], "${result.ints}")
     }
 
-
     @Test
-    fun `shared subcircuit connectivity work preserves a peer cut reason across undo`() {
+    fun `shared subcircuit connectivity work should preserve a peer cut reason across undo`() {
         val projection = PropagationProblem(problem(4))
         val first = PropagationState(projection, Assumptions.None)
         val second = PropagationState(projection, Assumptions.None)

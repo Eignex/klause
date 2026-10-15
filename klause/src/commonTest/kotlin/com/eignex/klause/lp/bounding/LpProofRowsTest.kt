@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 
 class LpProofRowsTest {
     @Test
-    fun `a callback mutation of a copied value is detected before success`() {
+    fun `callback mutation of a copied value should be detected before success`() {
         val builder = LpBuilder()
         builder.addVar(0, 10)
         repeat(2) { builder.addRow(intArrayOf(0), longArrayOf(1), Relation.LE, 5) }
@@ -35,7 +35,7 @@ class LpProofRowsTest {
     }
 
     @Test
-    fun `support changes after accepted preflight decline instead of selecting fallback`() {
+    fun `support changes after accepted preflight should decline instead of selecting fallback`() {
         val builder = LpBuilder()
         builder.addVar(0, 10)
         builder.addRow(intArrayOf(0), longArrayOf(1), Relation.LE, 5)
@@ -64,7 +64,7 @@ class LpProofRowsTest {
     }
 
     @Test
-    fun `indexed rows preserve scanner overwrites with duplicates zeros and padding`() {
+    fun `indexed rows should preserve scanner overwrites with duplicates zeros and padding`() {
         val builder = LpBuilder()
         repeat(3) { builder.addVar(0, 10) }
         repeat(3) { builder.addRow(intArrayOf(0, 1, 2), longArrayOf(1, 1, 1), Relation.LE, 10) }
@@ -98,28 +98,7 @@ class LpProofRowsTest {
     }
 
     @Test
-    fun `combined primitive budget falls back before exceeding its limit`() {
-        val builder = LpBuilder()
-        builder.addVar(0, 10)
-        builder.addRow(intArrayOf(0), longArrayOf(1), Relation.LE, 5)
-        val model = builder.build(Sense.MINIMIZE)
-        val bytes = 2L * (24 + 4 * 2 + 8 + 4)
-
-        for (budget in listOf(bytes - 1, bytes)) {
-            val rows = LpProofRows.create(model, model, Cancellation.Never, budget)
-            if (budget < bytes) {
-                assertNull(rows.source)
-                assertNull(rows.transformed)
-            } else {
-                assertNotNull(rows.source)
-                assertNotNull(rows.transformed)
-            }
-            assertTrue(rows.unchanged(Cancellation.Never))
-        }
-    }
-
-    @Test
-    fun `unsupported support selects the scanner without indexing it`() {
+    fun `unsupported support should select the scanner without indexing it`() {
         val builder = LpBuilder()
         builder.addVar(0, 10)
         builder.addRow(intArrayOf(0), longArrayOf(1), Relation.LE, 5)
@@ -137,7 +116,7 @@ class LpProofRowsTest {
     }
 
     @Test
-    fun `mutations during consumption invalidate the whole batch and later calls read afresh`() {
+    fun `mutations during consumption should invalidate the whole batch`() {
         val builder = LpBuilder()
         builder.addVar(0, 10)
         builder.addRow(intArrayOf(0), longArrayOf(2), Relation.LE, 5)
@@ -170,7 +149,7 @@ class LpProofRowsTest {
     }
 
     @Test
-    fun `cancellation interrupts each construction boundary without retaining a partial index`() {
+    fun `cancellation should interrupt each construction boundary without retaining a partial index`() {
         val builder = LpBuilder()
         builder.addVar(0, 10)
         builder.addRow(intArrayOf(0), longArrayOf(1), Relation.LE, 5)

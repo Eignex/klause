@@ -21,15 +21,23 @@ class LinearSourceSemanticsCheckerTest {
     private val checker = LinearSourceSemanticsChecker(setOf(x), listOf(lower), mapOf(x to BigFraction.MINUS_ONE))
 
     @Test
-    fun `integer indicator rows constrain exactly the enabled original points`() {
+    fun `integer indicator rows should constrain exactly the enabled original points`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         for (trigger in listOf(0L, 1L)) {
             val row = SourcePremise(lower.inequality, emptyMap(), mapOf(integer to BigFraction.ofLong(trigger)))
             val checker = LinearSourceSemanticsChecker(setOf(x, integer), listOf(row))
-            val enabled = Sample(booleanArrayOf(), longArrayOf(trigger), doubleArrayOf(0.0),
-                exactReals = listOf(BigFraction.ZERO))
-            val disabled = Sample(booleanArrayOf(), longArrayOf(1L - trigger), doubleArrayOf(0.0),
-                exactReals = listOf(BigFraction.ZERO))
+            val enabled = Sample(
+                booleanArrayOf(),
+                longArrayOf(trigger),
+                doubleArrayOf(0.0),
+                exactReals = listOf(BigFraction.ZERO),
+            )
+            val disabled = Sample(
+                booleanArrayOf(),
+                longArrayOf(1L - trigger),
+                doubleArrayOf(0.0),
+                exactReals = listOf(BigFraction.ZERO),
+            )
 
             assertIs<SourceEvidenceCheck.Rejected>(checker.witness(enabled, scope, Cancellation.Never))
             assertEquals(SourceEvidenceCheck.Checked, checker.witness(disabled, scope, Cancellation.Never))
@@ -37,7 +45,7 @@ class LinearSourceSemanticsCheckerTest {
     }
 
     @Test
-    fun `integer guard recession requires the original trigger coordinate to remain fixed`() {
+    fun `integer guard recession should require the original trigger coordinate to remain fixed`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val row = SourcePremise(lower.inequality, emptyMap(), mapOf(integer to BigFraction.ONE))
         val checker = LinearSourceSemanticsChecker(setOf(x, integer), listOf(row), mapOf(x to BigFraction.MINUS_ONE))
@@ -50,16 +58,20 @@ class LinearSourceSemanticsCheckerTest {
     }
 
     @Test
-    fun `an exact rational point satisfies original source rows`() {
+    fun `an exact rational point should satisfy original source rows`() {
         val value = BigFraction.of(bigIntOf(3), bigIntOf(2))
-        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(value.toDouble()),
-            exactReals = listOf(value))
+        val sample = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(value.toDouble()),
+            exactReals = listOf(value),
+        )
 
         assertEquals(SourceEvidenceCheck.Checked, checker.witness(sample, scope, Cancellation.Never))
     }
 
     @Test
-    fun `an algebraic point is checked without rounded coordinate authority`() {
+    fun `an algebraic point should be checked without rounded coordinate authority`() {
         val value = AlgebraicArithmetic().roots(RationalPolynomial.of(-2, 0, 1)).last()
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), algebraicReals = listOf(value))
 
@@ -67,21 +79,21 @@ class LinearSourceSemanticsCheckerTest {
     }
 
     @Test
-    fun `a rounded feasible value cannot replace missing exact coordinates`() {
+    fun `a rounded feasible value should not replace missing exact coordinates`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0))
 
         assertIs<SourceEvidenceCheck.Unavailable>(checker.witness(sample, scope, Cancellation.Never))
     }
 
     @Test
-    fun `a wrong point fails the original source check`() {
+    fun `a wrong point should fail the original source check`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))
 
         assertIs<SourceEvidenceCheck.Rejected>(checker.witness(sample, scope, Cancellation.Never))
     }
 
     @Test
-    fun `a source point must satisfy the actual invocation restrictions`() {
+    fun `a source point should satisfy the actual invocation restrictions`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
         val conditioned = scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ofLong(2))))
 
@@ -89,7 +101,7 @@ class LinearSourceSemanticsCheckerTest {
     }
 
     @Test
-    fun `a valid feasible base and improving ray establish unboundedness`() {
+    fun `a valid feasible base and improving ray should establish unboundedness`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
         val claim = SourceClaim.Ray(sample, mapOf(x to BigFraction.ONE))
 
@@ -97,7 +109,7 @@ class LinearSourceSemanticsCheckerTest {
     }
 
     @Test
-    fun `a point alone does not prove unboundedness`() {
+    fun `a point alone should not prove unboundedness`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
         val claim = SourceClaim.Ray(sample, emptyMap())
 
@@ -105,7 +117,7 @@ class LinearSourceSemanticsCheckerTest {
     }
 
     @Test
-    fun `a ray cannot leave an invocation upper bound`() {
+    fun `a ray should not leave an invocation upper bound`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
         val claim = SourceClaim.Ray(sample, mapOf(x to BigFraction.ONE))
         val conditioned = scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ofLong(2))))
@@ -114,19 +126,32 @@ class LinearSourceSemanticsCheckerTest {
     }
 
     @Test
-    fun `an improving direction must preserve every original source row`() {
+    fun `an improving direction should preserve every original source row`() {
         val upper = SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(2)))
         val checker = LinearSourceSemanticsChecker(setOf(x), listOf(lower, upper), mapOf(x to BigFraction.MINUS_ONE))
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
 
-        assertIs<SourceEvidenceCheck.Rejected>(checker.ray(SourceClaim.Ray(sample,
-            mapOf(x to BigFraction.ONE)), scope, Cancellation.Never))
+        assertIs<SourceEvidenceCheck.Rejected>(
+            checker.ray(
+                SourceClaim.Ray(
+                    sample,
+                    mapOf(x to BigFraction.ONE),
+                ),
+                scope,
+                Cancellation.Never,
+            ),
+        )
     }
 
     @Test
-    fun `strict source rows reject their boundary`() {
-        val row = SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE,
-            strict = true))
+    fun `strict source rows should reject their boundary`() {
+        val row = SourcePremise(
+            SourceInequality(
+                mapOf(x to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE,
+                strict = true,
+            ),
+        )
         val checker = LinearSourceSemanticsChecker(setOf(x), listOf(row))
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
 

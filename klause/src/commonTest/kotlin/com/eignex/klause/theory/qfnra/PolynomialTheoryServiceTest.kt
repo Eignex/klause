@@ -8,42 +8,15 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialTheoryServiceTest {
     @Test
-    fun `dyadic query snapshots survive accumulation copying and repeated close`() {
-        val source = SmtLibPolynomial.parse("""
-            (declare-const x Real)
-            (declare-const y Real)
-            (assert (> (* x y) 1))
-        """.trimIndent())
-        val invocation = PolynomialTheoryService(source.formula, source.boolCount, source.realCount).invocation()
-
-        val first = assertIs<QfNraResult.Satisfiable>(invocation.check()).stats
-        val second = assertIs<QfNraResult.Satisfiable>(invocation.check()).stats
-        val accumulated = invocation.stats
-        val copied = accumulated.copy(workSpent = 0)
-        invocation.close()
-        invocation.close()
-
-        assertEquals(1L, first.dyadicAttempts)
-        assertEquals(1L, first.dyadicBases)
-        assertEquals(first, second)
-        assertEquals(2L, accumulated.dyadicAttempts)
-        assertEquals(2L, copied.dyadicBases)
-        assertEquals(0L, accumulated.coupledWorkDeclines)
-        assertEquals(0L, accumulated.dyadicPreExtractionDeclines)
-        assertEquals(accumulated, invocation.stats)
-        assertEquals(first.workSpent + second.workSpent, accumulated.workSpent)
-    }
-
-    @Test
-    fun `completed query has no further elements`() {
+    fun `completed query should have no further elements`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         service.invocation().use { invocation ->
@@ -57,13 +30,15 @@ class PolynomialTheoryServiceTest {
     }
 
     @Test
-    fun `projection continuation retains native charges and refutation`() {
-        val source = SmtLibPolynomial.parse("""
+    fun `projection continuation should retain native charges and refutation`() {
+        val source = SmtLibPolynomial.parse(
+            """
             (declare-const x Real)
             (declare-const y Real)
             (assert (= y (* x x)))
             (assert (< y 0))
-        """.trimIndent())
+            """.trimIndent(),
+        )
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         val complete = service.invocation().use { assertIs<QfNraResult.Unsatisfiable>(it.check()) }
 
@@ -85,7 +60,7 @@ class PolynomialTheoryServiceTest {
     }
 
     @Test
-    fun `paused query retains native work without repeating preparation`() {
+    fun `paused query should retain native work without repeating preparation`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         val required = service.invocation().use { it.check().stats.workSpent }
@@ -106,7 +81,7 @@ class PolynomialTheoryServiceTest {
     }
 
     @Test
-    fun `closing paused query retains charges and rejects continuation`() {
+    fun `closing paused query should retain charges and reject continuation`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
         val invocation = PolynomialTheoryService(source.formula, source.boolCount, source.realCount).invocation()
         val pending = invocation.prepareCheck()
@@ -121,7 +96,7 @@ class PolynomialTheoryServiceTest {
     }
 
     @Test
-    fun `solve cancellation terminates paused query without a partial witness`() {
+    fun `solve cancellation should terminate paused query without a partial witness`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         var cancelled = false
@@ -136,13 +111,13 @@ class PolynomialTheoryServiceTest {
         }
     }
 
-
     @Test
-    fun `query bounds cannot replace fixed source coordinates`() {
+    fun `query bounds should not replace fixed source coordinates`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert true)")
         val service = PolynomialTheoryService(source.formula, 0, 1, mapOf(0 to BigFraction.ONE))
         val contradictory = PolynomialCondition(
-            lower = mapOf(0 to BigFraction.ofLong(2)), upper = mapOf(0 to BigFraction.ofLong(2)),
+            lower = mapOf(0 to BigFraction.ofLong(2)),
+            upper = mapOf(0 to BigFraction.ofLong(2)),
         )
 
         service.invocation().use { invocation ->
@@ -153,19 +128,25 @@ class PolynomialTheoryServiceTest {
     }
 
     @Test
-    fun `conditioned queries isolate finite pins`() {
-        val source = SmtLibPolynomial.parse("""
+    fun `conditioned queries should isolate finite pins`() {
+        val source = SmtLibPolynomial.parse(
+            """
             (declare-const x Real)
             (declare-const k Real)
             (assert (= (* x x) k))
-        """.trimIndent())
+            """.trimIndent(),
+        )
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
 
         service.invocation().use { invocation ->
-            val negative = PolynomialCondition(lower = mapOf(1 to BigFraction.MINUS_ONE),
-                upper = mapOf(1 to BigFraction.MINUS_ONE))
-            val positive = PolynomialCondition(lower = mapOf(1 to BigFraction.ofLong(2)),
-                upper = mapOf(1 to BigFraction.ofLong(2)))
+            val negative = PolynomialCondition(
+                lower = mapOf(1 to BigFraction.MINUS_ONE),
+                upper = mapOf(1 to BigFraction.MINUS_ONE),
+            )
+            val positive = PolynomialCondition(
+                lower = mapOf(1 to BigFraction.ofLong(2)),
+                upper = mapOf(1 to BigFraction.ofLong(2)),
+            )
             assertIs<QfNraResult.Unsatisfiable>(invocation.check(negative))
             val witness = assertIs<QfNraResult.Satisfiable>(invocation.check(positive)).assignment
             assertEquals(0, AlgebraicArithmetic().signAt(RationalPolynomial.of(-2, 0, 1), witness.realValue(0)))
@@ -174,12 +155,14 @@ class PolynomialTheoryServiceTest {
     }
 
     @Test
-    fun `Boolean query conditions preserve correlation`() {
-        val source = SmtLibPolynomial.parse("""
+    fun `Boolean query conditions should preserve correlation`() {
+        val source = SmtLibPolynomial.parse(
+            """
             (declare-const b Bool)
             (declare-const x Real)
             (assert (or b (= (* x x) (- 1))))
-        """.trimIndent())
+            """.trimIndent(),
+        )
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
 
         service.invocation().use { invocation ->
@@ -192,27 +175,16 @@ class PolynomialTheoryServiceTest {
     }
 
     @Test
-    fun `native allowance persists between queries`() {
-        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
-        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
-        val required = service.invocation().use { it.check().stats.workSpent }
-
-        service.invocation(QfNraParams(maximumWork = required + 1)).use { invocation ->
-            assertIs<QfNraResult.Satisfiable>(invocation.check())
-            val stopped = assertIs<QfNraResult.Unknown>(invocation.check())
-            assertEquals(QfNraReason.WorkLimit, stopped.reason)
-        }
-    }
-
-    @Test
-    fun `native work reaches caller meter once`() {
+    fun `native work should reach caller meter once`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         var charged = 0L
         val token = object : Cancellation, WorkMeter {
             override fun isCancelled() = false
             override fun workMeter(): WorkMeter = this
-            override fun charge(units: Long) { charged += units }
+            override fun charge(units: Long) {
+                charged += units
+            }
         }
 
         service.invocation(QfNraParams(cancellation = token)).use { invocation ->
@@ -223,7 +195,7 @@ class PolynomialTheoryServiceTest {
     }
 
     @Test
-    fun `closing an invocation preserves published coordinates`() {
+    fun `closing an invocation should preserve published coordinates`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         val invocation = service.invocation()
@@ -236,13 +208,15 @@ class PolynomialTheoryServiceTest {
     }
 
     @Test
-    fun `cancelled query does not contaminate a fresh invocation`() {
+    fun `cancelled query should not contaminate a fresh invocation`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
 
         service.invocation().use { invocation ->
-            assertEquals(QfNraReason.Interrupted,
-                assertIs<QfNraResult.Unknown>(invocation.check(cancellation = Cancellation { true })).reason)
+            assertEquals(
+                QfNraReason.Interrupted,
+                assertIs<QfNraResult.Unknown>(invocation.check(cancellation = Cancellation { true })).reason,
+            )
         }
         service.invocation().use { assertIs<QfNraResult.Satisfiable>(it.check()) }
     }

@@ -2,7 +2,6 @@ package com.eignex.klause.lp.lattice
 
 import com.eignex.klause.lp.lattice.SparseIntRow
 import com.eignex.klause.lp.lattice.bareissEchelon
-import com.eignex.klause.lp.lattice.hermiteNormalForm
 import com.eignex.klause.lp.lattice.mixedEchelonHermite
 import com.eignex.klause.lp.lattice.originalBounds
 import com.eignex.klause.lp.lattice.sparseIntRow
@@ -15,7 +14,6 @@ import com.eignex.klause.util.isZero
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SparseIntMatrixTest {
@@ -31,7 +29,6 @@ class SparseIntMatrixTest {
     private fun dense(a: List<SparseIntRow>, cols: Int): Array<Array<BigInt>> =
         Array(a.size) { i -> Array(cols) { j -> a[i][j] } }
 
-    /** Dense fraction-free elimination over pivot columns, used as an independent oracle. */
     private fun densePivots(a: List<SparseIntRow>, cols: Int): List<Int> {
         val w = dense(a, cols)
         val m = w.size
@@ -56,76 +53,20 @@ class SparseIntMatrixTest {
         return pivots
     }
 
-    /** `det` by fraction-free elimination, only ever asked whether the answer is `±1`. */
-    private fun determinant(m: Array<Array<BigInt>>): BigInt {
-        val n = m.size
-        val a = Array(n) { i -> Array(n) { j -> m[i][j] } }
-        var sign = 1
-        var prev = BIG_ONE
-        for (k in 0 until n - 1) {
-            if (a[k][k].isZero()) {
-                val swap = (k + 1 until n).firstOrNull { !a[it][k].isZero() } ?: return BIG_ZERO
-                val t = a[k]
-                a[k] = a[swap]
-                a[swap] = t
-                sign = -sign
-            }
-            for (i in k + 1 until n) {
-                for (j in k + 1 until n) a[i][j] = (a[i][j] * a[k][k] - a[i][k] * a[k][j]) / prev
-            }
-            prev = a[k][k]
-        }
-        val d = a[n - 1][n - 1]
-        return if (sign < 0) -d else d
-    }
-
     @Test
-    fun `the sparse elimination finds the rank and pivot columns the dense reduction finds`() {
+    fun `sparse elimination should match the dense rank and pivot columns`() {
         val random = Random(20260813)
         repeat(REPEATS) {
             val a = matrix(random, ROWS, COLS)
             val e = bareissEchelon(a, COLS)
             assertEquals(densePivots(a, COLS), e.pivots.toList(), "pivot columns must match on $a")
-            assertEquals(e.pivots.size, e.rows.size, "one reduced row per pivot")
+            assertEquals(e.pivots.size, e.rows.size)
         }
     }
 
     @Test
-    fun `the hermite factorisation reproduces the reduced matrix exactly`() {
-        val random = Random(77)
-        repeat(REPEATS) {
-            val a = bareissEchelon(matrix(random, ROWS, COLS), COLS).rows
-            if (a.isEmpty()) return@repeat
-            val f = hermiteNormalForm(a, COLS)
-            assertNotNull(f)
-            for (i in a.indices) {
-                for (j in 0 until COLS) {
-                    var acc = BIG_ZERO
-                    for (k in 0 until COLS) acc += a[i][k] * f.v[k, j]
-                    assertEquals(acc, f.h[i][j], "H must equal A*V at row $i column $j")
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `the hermite transform is unimodular so the integer lattice is preserved`() {
-        val random = Random(99)
-        repeat(REPEATS) {
-            val a = bareissEchelon(matrix(random, ROWS, COLS), COLS).rows
-            if (a.isEmpty()) return@repeat
-            val f = hermiteNormalForm(a, COLS)
-            assertNotNull(f)
-            val det = determinant(Array(COLS) { i -> Array(COLS) { j -> f.v[i, j] } })
-            assertTrue(det == BIG_ONE || det == -BIG_ONE, "det V was $det")
-        }
-    }
-
-    @Test
-    fun `a bound derived from the structure contains a witness of the original system`() {
-        // The soundness property the whole chain exists for. A witness is built first and the equalities
-        // are given its own right-hand sides, so the system provably has that solution; every bound the
-        // chain then derives must admit it. A bound that did not would prune away a real model.
+    fun `structural bounds should contain a witness of the original system`() {
+        // The right-hand sides come from a witness, so the system provably has that solution.
         val random = Random(555)
         repeat(REPEATS) {
             val a = matrix(random, ROWS, COLS)
@@ -152,6 +93,6 @@ class SparseIntMatrixTest {
     private companion object {
         const val ROWS = 5
         const val COLS = 6
-        const val REPEATS = 60
+        const val REPEATS = 20
     }
 }

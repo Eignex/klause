@@ -23,17 +23,25 @@ import kotlin.test.assertTrue
 
 class BooleanRepairClosureTest {
     @Test
-    fun `closed pools retain primitive lane order`() {
-        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
-        ))
+    fun `closed pools should retain primitive lane order`() {
+        val problem = Problem(
+            4,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+            ),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setBool(2, true)
-        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
-            BoolFoldDefinition(2, intArrayOf(Lit.make(0, false)), true),
-        ))?.network(0, 4)
+        state.invariants = DefinitionalSweep.infer(
+            problem,
+            boolFolds = listOf(
+                BoolFoldDefinition(2, intArrayOf(Lit.make(0, false)), true),
+            ),
+        )?.network(0, 4)
         state.recompute()
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
 
@@ -45,19 +53,27 @@ class BooleanRepairClosureTest {
     }
 
     @Test
-    fun `mandatory consequences settle before replacement support choices`() {
-        val problem = Problem(5, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true), Lit.make(3, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(4, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(4, false))),
-        ))
+    fun `mandatory consequences should settle before replacement support choices`() {
+        val problem = Problem(
+            5,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(4, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(4, false))),
+            ),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setBool(4, true)
-        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
-            BoolFoldDefinition(4, intArrayOf(Lit.make(0, false)), true),
-        ))?.network(0, 5)
+        state.invariants = DefinitionalSweep.infer(
+            problem,
+            boolFolds = listOf(
+                BoolFoldDefinition(4, intArrayOf(Lit.make(0, false)), true),
+            ),
+        )?.network(0, 5)
         state.recompute()
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
 
@@ -69,17 +85,25 @@ class BooleanRepairClosureTest {
     }
 
     @Test
-    fun `replacement support prices follow the current source batch`() {
-        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
-        ))
+    fun `replacement support prices should follow the current source batch`() {
+        val problem = Problem(
+            4,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
+            ),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setBool(3, true)
-        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
-            BoolFoldDefinition(3, intArrayOf(Lit.make(0, false)), true),
-        ))?.network(0, 4)
+        state.invariants = DefinitionalSweep.infer(
+            problem,
+            boolFolds = listOf(
+                BoolFoldDefinition(3, intArrayOf(Lit.make(0, false)), true),
+            ),
+        )?.network(0, 4)
         state.shaping.objective = LinearObjective(boolWeights = longArrayOf(0, 5, 1, 100))
         state.recompute()
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
@@ -96,18 +120,26 @@ class BooleanRepairClosureTest {
     }
 
     @Test
-    fun `objective seeds follow forced ternary consequences before ranking`() {
-        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
-        ))
+    fun `objective seeds should follow forced ternary consequences before ranking`() {
+        val problem = Problem(
+            4,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
+            ),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setBool(3, true)
-        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
-            BoolFoldDefinition(3, intArrayOf(Lit.make(0, false)), true),
-        ))?.network(0, 4)
+        state.invariants = DefinitionalSweep.infer(
+            problem,
+            boolFolds = listOf(
+                BoolFoldDefinition(3, intArrayOf(Lit.make(0, false)), true),
+            ),
+        )?.network(0, 4)
         state.shaping.objective = LinearObjective(boolWeights = longArrayOf(0, 0, 0, 1))
         state.recompute()
         state.booleanRepairs = BooleanRepairClosure.preparation(state).filterNotNull().first().closure
@@ -125,18 +157,26 @@ class BooleanRepairClosureTest {
     }
 
     @Test
-    fun `a pinned consequence rejects a Boolean repair`() {
-        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
-        ))
+    fun `a pinned consequence should reject a Boolean repair`() {
+        val problem = Problem(
+            4,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
+            ),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0), Assumptions.None.withBool(2, false))
         state.assignment.setBool(3, true)
-        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
-            BoolFoldDefinition(3, intArrayOf(Lit.make(0, false)), true),
-        ))?.network(0, 4)
+        state.invariants = DefinitionalSweep.infer(
+            problem,
+            boolFolds = listOf(
+                BoolFoldDefinition(3, intArrayOf(Lit.make(0, false)), true),
+            ),
+        )?.network(0, 4)
         state.recompute()
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
 
@@ -149,7 +189,7 @@ class BooleanRepairClosureTest {
     }
 
     @Test
-    fun `canceled closure preserves assignment and write activity`() {
+    fun `canceled closure should preserve assignment and write activity`() {
         val count = 270
         val factors = Array<Factor>(count + 1) { index ->
             when {
@@ -161,9 +201,12 @@ class BooleanRepairClosureTest {
         val problem = Problem(count + 1, 0, emptyArray(), factors)
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setBool(count, true)
-        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
-            BoolFoldDefinition(count, intArrayOf(Lit.make(0, false)), true),
-        ))?.network(0, count + 1)
+        state.invariants = DefinitionalSweep.infer(
+            problem,
+            boolFolds = listOf(
+                BoolFoldDefinition(count, intArrayOf(Lit.make(0, false)), true),
+            ),
+        )?.network(0, count + 1)
         state.recompute()
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
 
@@ -178,18 +221,26 @@ class BooleanRepairClosureTest {
     }
 
     @Test
-    fun `duplicate flips cancel before closure`() {
-        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
-        ))
+    fun `duplicate flips should cancel before closure`() {
+        val problem = Problem(
+            4,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
+            ),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setBool(3, true)
-        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
-            BoolFoldDefinition(3, intArrayOf(Lit.make(0, false)), true),
-        ))?.network(0, 4)
+        state.invariants = DefinitionalSweep.infer(
+            problem,
+            boolFolds = listOf(
+                BoolFoldDefinition(3, intArrayOf(Lit.make(0, false)), true),
+            ),
+        )?.network(0, 4)
         state.recompute()
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
         val proposed = Move.Compound(listOf(Move.BoolFlip(0), Move.BoolFlip(0), Move.BoolFlip(1)))
@@ -204,15 +255,22 @@ class BooleanRepairClosureTest {
     }
 
     @Test
-    fun `models without unit definitions retain primitive neighborhoods`() {
-        val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-        ))
+    fun `models without unit definitions should retain primitive neighborhoods`() {
+        val problem = Problem(
+            2,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+            ),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.recompute()
         state.booleanRepairs = BooleanRepairClosure.preparation(state).filterNotNull().first().closure
         val strategy = SourceDrivenStrategy(
-            sources = emptyList(), perturbation = { Move.BoolFlip(0) }, feasibleDescent = FeasibleDescent.SelfOwned,
+            sources = emptyList(),
+            perturbation = { Move.BoolFlip(0) },
+            feasibleDescent = FeasibleDescent.SelfOwned,
         )
 
         val move = strategy.pickMove(state)
@@ -221,7 +279,7 @@ class BooleanRepairClosureTest {
     }
 
     @Test
-    fun `suspended preparation retains all clause consequences`() {
+    fun `suspended preparation should retain all clause consequences`() {
         val count = 270
         val factors = Array<Factor>(count + 1) { index ->
             when {
@@ -233,9 +291,12 @@ class BooleanRepairClosureTest {
         val problem = Problem(count + 1, 0, emptyArray(), factors)
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setBool(count, true)
-        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
-            BoolFoldDefinition(count, intArrayOf(Lit.make(0, false)), true),
-        ))?.network(0, count + 1)
+        state.invariants = DefinitionalSweep.infer(
+            problem,
+            boolFolds = listOf(
+                BoolFoldDefinition(count, intArrayOf(Lit.make(0, false)), true),
+            ),
+        )?.network(0, count + 1)
         state.recompute()
         val preparation = BooleanRepairClosure.preparation(state).iterator()
         assertNull(preparation.next())

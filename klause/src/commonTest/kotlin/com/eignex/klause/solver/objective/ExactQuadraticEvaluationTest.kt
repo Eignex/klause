@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
 
 class ExactQuadraticEvaluationTest {
     @Test
-    fun `source squares retain exact algebraic cancellation`() {
+    fun `evaluateExact should square an algebraic root exactly`() {
         val arithmetic = AlgebraicArithmetic()
         val x = QuadraticVariable.Real(SourceRealId(0))
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
@@ -25,7 +25,7 @@ class ExactQuadraticEvaluationTest {
     }
 
     @Test
-    fun `source cross terms retain irrational objective values`() {
+    fun `evaluateExact should keep irrational cross term values`() {
         val arithmetic = AlgebraicArithmetic()
         val x = QuadraticVariable.Real(SourceRealId(0))
         val y = QuadraticVariable.Real(SourceRealId(1))

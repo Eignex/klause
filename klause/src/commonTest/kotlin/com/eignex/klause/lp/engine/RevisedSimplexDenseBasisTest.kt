@@ -12,21 +12,26 @@ import kotlin.test.assertTrue
 
 class RevisedSimplexDenseBasisTest {
     @Test
-    fun `dense and sparse warm bases certify the same attained optimum`() {
+    fun `dense and sparse warm bases should certify the same attained optimum`() {
         for (dimension in listOf(6, 7)) {
             for (denseLimit in listOf(0, 6)) {
                 val builder = LpBuilder()
                 repeat(dimension) { builder.addVar(0L, 2L, cost = 1L) }
                 repeat(dimension) { row ->
                     builder.addRow(
-                        IntArray(dimension) { it }, LongArray(dimension) { if (it == row) 2L else 1L },
-                        Relation.EQ, (dimension + 1).toLong(),
+                        IntArray(dimension) { it },
+                        LongArray(dimension) { if (it == row) 2L else 1L },
+                        Relation.EQ,
+                        (dimension + 1).toLong(),
                     )
                 }
                 val model = builder.build(Sense.MINIMIZE)
-                val warm = Basis(IntArray(dimension) { it }, Array(model.numVars) {
-                    if (it < dimension) VarStatus.BASIC else VarStatus.FIXED
-                })
+                val warm = Basis(
+                    IntArray(dimension) { it },
+                    Array(model.numVars) {
+                        if (it < dimension) VarStatus.BASIC else VarStatus.FIXED
+                    },
+                )
                 lateinit var factors: KotlinBasisSolver
                 RevisedSimplex(model, basisSolverFactory = { matrix ->
                     KotlinBasisSolver(matrix, denseDimensionLimit = denseLimit).also { factors = it }
@@ -38,15 +43,17 @@ class RevisedSimplexDenseBasisTest {
                     assertEquals(BigFraction.ofLong(dimension.toLong()), certified.lowerBound)
                     assertNotNull(certified.witness)
                     assertTrue(factors.basisOperationWork.complete)
-                    assertEquals(if (dimension <= denseLimit) 1L else 0L,
-                        assertNotNull(factors.basisWork.build).denseAttempts)
+                    assertEquals(
+                        if (dimension <= denseLimit) 1L else 0L,
+                        assertNotNull(factors.basisWork.build).denseAttempts,
+                    )
                 }
             }
         }
     }
 
     @Test
-    fun `cancellation after dense factorization withholds numerical and exact publication`() {
+    fun `cancellation after dense factorization should withhold numerical and exact publication`() {
         val builder = LpBuilder()
         repeat(2) { builder.addVar(0L, 2L, cost = 1L) }
         builder.addRow(intArrayOf(0, 1), longArrayOf(2, 1), Relation.EQ, 3L)
@@ -67,7 +74,8 @@ class RevisedSimplexDenseBasisTest {
             }
         }).use { solver ->
             val warm = Basis(
-                intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED),
+                intArrayOf(0, 1),
+                arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED),
             )
             val result = solver.solve(warm)
             val certified = certifyLpResult(model, solver, result, cancellation = token)

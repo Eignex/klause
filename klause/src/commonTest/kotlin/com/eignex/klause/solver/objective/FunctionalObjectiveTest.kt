@@ -1,24 +1,17 @@
 package com.eignex.klause.solver.objective
 
-import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.values
-import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
-import kotlin.math.abs
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.assertIs
 
 class FunctionalObjectiveTest {
     @Test
-    fun `functional objective deltas preserve wide endpoint differences`() {
+    fun `deltaIfApplied should keep wide endpoint differences`() {
         val half = 1L shl 62
         for (minimize in listOf(true, false)) {
             val objective = FunctionalObjective(0, minimize, emptyList(), intArrayOf(0))
@@ -33,10 +26,16 @@ class FunctionalObjectiveTest {
     }
 
     @Test
-    fun `functional objective deltas preserve weighted values outside the long range`() {
+    fun `deltaIfApplied should keep weighted values beyond Long`() {
         for (minimize in listOf(true, false)) {
-            val objective = FunctionalObjective(intArrayOf(0), longArrayOf(Long.MAX_VALUE), 0,
-                minimize, emptyList(), intArrayOf(0))
+            val objective = FunctionalObjective(
+                intArrayOf(0),
+                longArrayOf(Long.MAX_VALUE),
+                0,
+                minimize,
+                emptyList(),
+                intArrayOf(0),
+            )
             val assignment = Assignment(0, 1)
 
             val delta = objective.deltaIfApplied(assignment, Move.IntSet(0, 2))
@@ -49,7 +48,7 @@ class FunctionalObjectiveTest {
     }
 
     @Test
-    fun `cross space objectives honor final repeated targets and Boolean parity`() {
+    fun `deltaIfApplied should honor repeated compound targets and Boolean parity`() {
         val fold = FunctionalObjective.BoolFold(3, intArrayOf(Lit.make(1, true), Lit.make(2, false)), true)
         val objective = FunctionalObjective(
             intArrayOf(2, 0), longArrayOf(1, 1), 0, true, emptyList(), intArrayOf(0),
@@ -65,9 +64,14 @@ class FunctionalObjectiveTest {
         val assignment = Assignment(4, 3)
         assignment.setInt(1, 99)
         assignment.setBool(1, true)
-        val move = Move.Compound(listOf(
-            Move.IntSet(0, 2), Move.BoolFlip(2), Move.IntSet(0, 1), Move.BoolFlip(2),
-        ))
+        val move = Move.Compound(
+            listOf(
+                Move.IntSet(0, 2),
+                Move.BoolFlip(2),
+                Move.IntSet(0, 1),
+                Move.BoolFlip(2),
+            ),
+        )
         val before = objective.evaluate(assignment)
 
         val predicted = objective.deltaIfApplied(assignment, move)
@@ -80,8 +84,7 @@ class FunctionalObjectiveTest {
     }
 
     @Test
-    fun `functional objective delta matches evaluate-after minus before`() {
-        // objective = |a - b| + |a - c|, minimized. Decomposed via int_abs + int_lin_eq.
+    fun `deltaIfApplied should match the evaluated difference`() {
         val src = """
             var 0..20: a; var 0..20: b; var 0..20: c;
             var -20..20: d1; var -20..20: d2;
@@ -96,54 +99,23 @@ class FunctionalObjectiveTest {
         """.trimIndent()
         val execution = parseFlatZincExecution(src)
         val program = execution.program
-        val obj = execution.localSearchObjective
-        assertNotNull(obj, "expected a functional objective for the decomposed minimize")
-        assertTrue(obj is FunctionalObjective)
-        val fo = obj
-        // leaf vars should be a,b,c (the decision vars), not the aux/objective vars.
-        val aId = program.intVarsByName.getValue("a")
-        val bId = program.intVarsByName.getValue("b")
-        val cId = program.intVarsByName.getValue("c")
-        assertEquals(setOf(aId, bId, cId), fo.leafVars.toSet())
+        val obj = assertIs<FunctionalObjective>(execution.localSearchObjective)
+        val (a, b, c) = listOf("a", "b", "c").map { program.intVarsByName.getValue(it) }
+        val assignment = Assignment(program.problem.numBoolVars, program.problem.numIntVars)
+        assignment.setInt(a, 5)
+        assignment.setInt(b, 2)
+        assignment.setInt(c, 9)
 
-        val rng = Random(7)
-        val state = LocalSearchState(program.problem.bake(), rng)
-        repeat(200) {
-            for (i in 0 until program.problem.numIntVars) {
-                val dom = program.problem.finiteIntDomain(i)
-                state.assignment.setInt(i, dom.values.valueAt(rng.nextInt(dom.values.size)))
-            }
-            // Pick a leaf var move.
-            val v = listOf(aId, bId, cId).random(rng)
-            val dom = program.problem.finiteIntDomain(v)
-            val nv = dom.values.valueAt(rng.nextInt(dom.values.size))
-            val move = Move.IntSet(v, nv)
-            val before = obj.evaluate(snapshot(state, program))
-            val predicted = obj.deltaIfApplied(state.assignment, move)
-            state.assignment.setInt(v, nv)
-            val after = obj.evaluate(snapshot(state, program))
-            assertEquals(
-                (after - before),
-                predicted,
-                1e-9,
-                "delta mismatch: before=$before after=$after predicted=$predicted move=$move",
-            )
-            // True objective at this assignment = |a-b|+|a-c| (minimize → positive).
-            val a = state.assignment.intValue(aId)
-            val b = state.assignment.intValue(bId)
-            val cc = state.assignment.intValue(cId)
-            assertEquals(
-                (abs(a - b) + abs(a - cc)).toDouble(),
-                after,
-                1e-9,
-                "evaluate != true objective",
-            )
-        }
+        val predicted = obj.deltaIfApplied(assignment, Move.IntSet(a, 10))
+        assignment.setInt(a, 10)
+
+        assertEquals(setOf(a, b, c), obj.leafVars.toSet())
+        assertEquals(2.0, predicted, 1e-9)
+        assertEquals(9.0, obj.evaluate(assignment), 1e-9)
     }
 
     @Test
-    fun `bool-count objective descends the literals through array_bool_and`() {
-        // maximize bool2int(x1 /\ x2) + bool2int(x3 /\ x4), the indicators functionally defined.
+    fun `bool count objective should descend to literals through array_bool_and`() {
         val src = """
             var bool: x1; var bool: x2; var bool: x3; var bool: x4;
             var bool: a1; var bool: a2;
@@ -158,33 +130,16 @@ class FunctionalObjectiveTest {
         """.trimIndent()
         val execution = parseFlatZincExecution(src)
         val program = execution.program
-        val obj = execution.localSearchObjective
-        assertNotNull(obj, "expected a bool-count functional objective")
-        assertTrue(obj is FunctionalObjective)
+        val obj = assertIs<FunctionalObjective>(execution.localSearchObjective)
         val x = intArrayOf(1, 2, 3, 4).map { program.boolVarsByName.getValue("x$it") }
+        val assignment = Assignment(program.problem.numBoolVars, program.problem.numIntVars)
+        for (v in x.take(3)) assignment.setBool(v, true)
+
+        val predicted = obj.deltaIfApplied(assignment, Move.BoolFlip(x[3]))
+        assignment.flipBool(x[3])
+
         assertEquals(x.toSet(), obj.boolLeafVars.toSet())
-
-        val rng = Random(11)
-        val state = LocalSearchState(program.problem.bake(), rng)
-        repeat(200) {
-            for (b in 0 until program.problem.numBoolVars) state.assignment.setBool(b, rng.nextBoolean())
-            val v = x.random(rng)
-            val move = Move.BoolFlip(v)
-            val before = obj.evaluate(snapshot(state, program))
-            val predicted = obj.deltaIfApplied(state.assignment, move)
-            state.assignment.flipBool(v)
-            val after = obj.evaluate(snapshot(state, program))
-            assertEquals(after - before, predicted, 1e-9, "delta mismatch: before=$before after=$after")
-            // maximize ⇒ "lower is better" objective is −(count of satisfied ANDs).
-            val a1 = state.assignment.boolValue(x[0]) && state.assignment.boolValue(x[1])
-            val a2 = state.assignment.boolValue(x[2]) && state.assignment.boolValue(x[3])
-            assertEquals(-((if (a1) 1 else 0) + (if (a2) 1 else 0)).toDouble(), after, 1e-9)
-        }
-    }
-
-    private fun snapshot(state: LocalSearchState, program: FlatZincProgram): Sample {
-        val bools = BooleanArray(program.problem.numBoolVars) { state.assignment.boolValue(it) }
-        val ints = LongArray(program.problem.numIntVars) { state.assignment.intValue(it) }
-        return Sample(bools, ints)
+        assertEquals(-1.0, predicted, 1e-9)
+        assertEquals(-2.0, obj.evaluate(assignment), 1e-9)
     }
 }

@@ -15,9 +15,6 @@ class CumulativeTimeIndexedTest {
 
     private val eps = 1e-6
 
-    /** Sum-of-starts LP bound (`min Σ startᵢ`) with the time-indexed rows on/off. The time-indexed
-     *  formulation is exact (integral) for single-machine completion-time objectives, where the
-     *  expected-start channel cannot be gamed — unlike loose-domain makespan. */
     private fun sumStartBound(problem: Problem, taskStarts: IntArray, timeIndexed: Boolean): Double {
         val obj = LinearObjective(
             intCoefficients = LongArray(problem.numIntVars) { if (it in taskStarts) 1L else 0L },
@@ -30,10 +27,8 @@ class CumulativeTimeIndexedTest {
     }
 
     @Test
-    fun `time-indexed is exact for single-machine total completion time`() {
-        // 3 unit tasks of length 3 on capacity 1, min Σ startᵢ. Serial starts 0,3,6 ⇒ Σ = 9; the
-        // resource rows forbid the all-at-zero point the plain LP allows (Σ = 0). The single-machine
-        // time-indexed LP is integral, so it attains exactly 9.
+    fun `time indexed relaxation should be exact for single-machine total completion time`() {
+        // Serial starts 0, 3, 6 sum to 9; the plain LP admits all at zero.
         val p = Problem(
             0,
             3,
@@ -45,17 +40,14 @@ class CumulativeTimeIndexedTest {
     }
 
     @Test
-    fun `disjunctive factor is reformulated too`() {
-        // Same single-machine completion-time bound through the Disjunctive surface (cap 1).
+    fun `time indexed relaxation should reformulate a disjunctive factor`() {
         val p = Problem(
             0,
             3,
             Array(3) { IntDomain(0, 20) },
             arrayOf<Factor>(Cumulative.unary(intArrayOf(0, 1, 2), longArrayOf(2, 3, 4))),
         )
-        // Serial by SPT: starts 0, 2, 5 ⇒ Σ = 7 (the plain LP gives 0).
         assertEquals(0.0, sumStartBound(p, intArrayOf(0, 1, 2), timeIndexed = false), eps)
         assertEquals(7.0, sumStartBound(p, intArrayOf(0, 1, 2), timeIndexed = true), eps)
     }
-
 }

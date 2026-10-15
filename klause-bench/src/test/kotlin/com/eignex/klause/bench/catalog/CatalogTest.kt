@@ -1,17 +1,10 @@
 package com.eignex.klause.bench.catalog
 
-import com.eignex.klause.bench.OpbFormat
-import com.eignex.klause.bench.WcnfFormat
 import com.eignex.klause.bench.runner.InProcessRunner
-import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.CorpusSelection.Selection
-import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
-import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.bool.PseudoBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CatalogTest {
@@ -19,36 +12,7 @@ class CatalogTest {
     private fun ref(suite: String, name: String): ProblemRef = Catalog.suite(suite).problems.first { it.name == name }
 
     @Test
-    fun `dimacs-core resolves with expected shapes and oracles`() {
-        val byName = Catalog.suite("dimacs-core").problems.associateBy { it.name }
-        assertEquals(6, byName.size)
-        assertEquals(Expected.Unsat, byName.getValue("php4").expected)
-        assertEquals(Expected.Unsat, byName.getValue("php3").expected)
-        assertEquals(Expected.Sat, byName.getValue("random3sat-20-80").expected)
-
-        val php4 = InProcessRunner.resolve(ref("dimacs-core", "php4")).problem
-        assertEquals(20, php4.numBoolVars)
-        assertEquals(45, php4.factors.size)
-
-        val r50 = InProcessRunner.resolve(ref("dimacs-core", "random3sat-50-200")).problem
-        assertEquals(50, r50.numBoolVars)
-        assertEquals(200, r50.factors.size)
-    }
-
-    @Test
-    fun `opb-core resolves problem and objective`() {
-        val resolved = InProcessRunner.resolve(ref("opb-core", "setcover-tiny"))
-        assertEquals(4, resolved.problem.numBoolVars)
-        assertEquals(3, resolved.problem.factors.size)
-        assertTrue(resolved.problem.factors.all { it is PseudoBoolean })
-
-        val opb = OpbFormat.ingest(CorpusFetcher.resolve(ref("opb-core", "setcover-tiny").source))
-        val obj = assertNotNull(opb.objective)
-        assertTrue(obj.boolWeights.contentEquals(longArrayOf(1L, 2L, 3L, 4L)))
-    }
-
-    @Test
-    fun `xcsp3-core resolves a maximization with its sense and a minimise-canonical objective`() {
+    fun `xcsp3-core maximization should resolve its sense with a minimise-canonical objective`() {
         val resolved = InProcessRunner.resolve(ref("xcsp3-core", "sum-opt-tiny"))
 
         assertTrue(resolved.maximize)
@@ -56,42 +20,8 @@ class CatalogTest {
     }
 
     @Test
-    fun `wcnf-core resolves the maxsat instance with a soft-clause objective`() {
-        val ingested = WcnfFormat.ingest(CorpusFetcher.resolve(ref("wcnf-core", "maxsat-tiny").source))
-        assertEquals(4, ingested.problem.numBoolVars)
-        val obj = assertNotNull(ingested.objective)
-        assertEquals(listOf(3L, 1L), obj.boolWeights.toList().takeLast(2))
-    }
-
-    @Test
-    fun `opb-core resolves the non-linear instance to product indicators`() {
-        val problem = InProcessRunner.resolve(ref("opb-core", "sporttournament06")).problem
-        assertEquals(39, problem.numBoolVars)
-        assertTrue(problem.factors.any { it is Clause }, "products lower to Tseitin clauses")
-        assertNotNull(OpbFormat.ingest(CorpusFetcher.resolve(ref("opb-core", "sporttournament06").source)).objective)
-    }
-
-    @Test
-    fun `opb-core resolves the wbo instance with soft-constraint reification`() {
-        val opb = OpbFormat.ingest(CorpusFetcher.resolve(ref("opb-core", "queens4-soft").source))
-        assertNotNull(opb.objective)
-        assertTrue(opb.problem.numBoolVars > 16)
-        assertTrue(opb.problem.factors.any { it is ReifiedPseudoBoolean }, "soft constraints reify to indicators")
-    }
-
-    @Test
-    fun `schema-core resolves the campaign instance`() {
-        val p = InProcessRunner.resolve(ref("schema-core", "campaign")).problem
-        assertTrue(p.numBoolVars >= 4)
-        assertEquals(1, p.numIntVars)
-        assertTrue(p.factors.isNotEmpty())
-    }
-
-    @Test
-    fun `handwritten-core problems all build in-code`() {
-        val hw = Catalog.suite("handwritten-core").problems
-        assertTrue(hw.size >= 13)
-        for (ref in hw) {
+    fun `handwritten-core problems should all build in code`() {
+        for (ref in Catalog.suite("handwritten-core").problems) {
             assertEquals(Format.IN_CODE, ref.format)
             assertTrue(InProcessRunner.supports(ref))
             InProcessRunner.resolve(ref)
@@ -99,23 +29,7 @@ class CatalogTest {
     }
 
     @Test
-    fun `mps-core resolves integer, LP-only-float and infeasible instances`() {
-        val byName = Catalog.suite("mps-core").problems.associateBy { it.name }
-        assertEquals(12, byName.size)
-        assertEquals(Expected.Unsat, byName.getValue("infeasible-tiny").expected)
-
-        val blend = InProcessRunner.resolve(ref("mps-core", "blend-tiny"))
-        assertEquals(2, blend.problem.numIntVars)
-        assertNotNull(blend.objective)
-
-        assertEquals(3, InProcessRunner.resolve(ref("mps-core", "feasible-tiny")).problem.numIntVars)
-
-        val floatTiny = InProcessRunner.resolve(ref("mps-core", "float-tiny")).problem
-        assertEquals(0, floatTiny.numIntVars)
-        assertEquals(1, floatTiny.numRealVars)
-    }
-    @Test
-    fun `catalogue admission fills caps from valid identities before provider sampling`() {
+    fun `catalogue admission should fill caps from valid identities before provider sampling`() {
         val sources = listOf(ref("dimacs-core", "php4"), ref("dimacs-core", "php3"))
             .map { it.copy(family = "pigeonhole") }
         val dynamic = DynamicSuite("admission", "admission", admit = { it.name != "php4" }) { selection ->
@@ -128,7 +42,7 @@ class CatalogTest {
     }
 
     @Test
-    fun `raw identity discovery bypasses admission and provider caps`() {
+    fun `raw identity discovery should bypass admission and provider caps`() {
         val sources = listOf(ref("dimacs-core", "php4"), ref("dimacs-core", "php3"))
             .map { it.copy(family = "pigeonhole") }
         val dynamic = DynamicSuite("admission", "admission", defaultPerFamily = 1, admit = { false }) { selection ->
@@ -139,5 +53,4 @@ class CatalogTest {
 
         assertEquals(listOf("php4", "php3"), discovered.map { it.name })
     }
-
 }

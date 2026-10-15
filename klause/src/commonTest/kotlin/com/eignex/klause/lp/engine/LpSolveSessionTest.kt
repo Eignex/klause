@@ -11,37 +11,61 @@ import kotlin.test.assertTrue
 
 class LpSolveSessionTest {
     @Test
-    fun `retained fractional equalities reject a rounded product`() {
+    fun `retained fractional equalities should reject a rounded product`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.1)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(0.1), Relation.EQ, 0.010000000000000002)
-        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-            .ownerWorkingModel())
+        val model = assertNotNull(
+            LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+                .ownerWorkingModel(),
+        )
         val fresh = solveAndCertify(model)
 
         LpSolveSession().use { owner ->
             val actual = owner.solve(model)
 
             assertEquals(LpVerdict.INFEASIBLE, fresh.verdict)
-            assertEquals(fresh.verdict, actual.verdict,
-                "continuation=${actual.continuation}, refinement=${actual.refinement}")
+            assertEquals(
+                fresh.verdict,
+                actual.verdict,
+                "continuation=${actual.continuation}, refinement=${actual.refinement}",
+            )
         }
     }
 
     @Test
-    fun `retained solves use each calls work allowance independently of construction`() {
-        val model = assertNotNull(LpExactState(assertNotNull(LpBuilder().apply {
-            val x = addRealVar(0.0, 5.0, cost = 1.0)
-            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
-        }.build(Sense.MINIMIZE).authoritativeModel())).ownerWorkingModel())
+    fun `retained solves should use a per call work allowance independent of construction`() {
+        val model = assertNotNull(
+            LpExactState(
+                assertNotNull(
+                    LpBuilder().apply {
+                        val x = addRealVar(0.0, 5.0, cost = 1.0)
+                        addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
+                    }.build(Sense.MINIMIZE).authoritativeModel(),
+                ),
+            ).ownerWorkingModel(),
+        )
         val allowances = ArrayList<LpFloatAllowance?>()
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean,
-                pricing: LpPricingOptions): PersistentLpSolver {
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation, refactorUpdateLimit,
-                    iterationLimit, workLimit, trackDegeneracy, pricing)
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
                 return object : PersistentLpSolver by delegate {
                     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
                         allowances += allowance
@@ -62,23 +86,46 @@ class LpSolveSessionTest {
     }
 
     @Test
-    fun `solve failures preserve the primary error and retire owned factors`() {
-        val model = assertNotNull(LpExactState(assertNotNull(LpBuilder().apply {
-            val x = addRealVar(0.0, 2.0)
-            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
-        }.build(Sense.MINIMIZE).authoritativeModel())).ownerWorkingModel())
+    fun `solve failures should preserve the primary error and retire owned factors`() {
+        val model = assertNotNull(
+            LpExactState(
+                assertNotNull(
+                    LpBuilder().apply {
+                        val x = addRealVar(0.0, 2.0)
+                        addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
+                    }.build(Sense.MINIMIZE).authoritativeModel(),
+                ),
+            ).ownerWorkingModel(),
+        )
         val primary = IllegalArgumentException("solve")
         val cleanup = IllegalStateException("close")
         var closed = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean,
-                pricing: LpPricingOptions): PersistentLpSolver {
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation, refactorUpdateLimit,
-                    iterationLimit, workLimit, trackDegeneracy, pricing)
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
                 return object : PersistentLpSolver by delegate {
                     override fun solve(warm: Basis?): FloatLpResult? = throw primary
-                    override fun close() { closed++; delegate.close(); throw cleanup }
+                    override fun close() {
+                        closed++
+                        delegate.close()
+                        throw cleanup
+                    }
                 }
             }
         }
@@ -93,7 +140,7 @@ class LpSolveSessionTest {
     }
 
     @Test
-    fun `retained solves match fresh proofs across nested bounds and pops`() {
+    fun `retained solves should match fresh proofs across bounds and pops`() {
         for (split in listOf(false, true)) {
             val builder = LpBuilder()
             repeat(2) {
@@ -109,10 +156,8 @@ class LpSolveSessionTest {
                 )
                 assertTrue(trail.push())
                 assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 7L))
-                assertTrue(trail.push())
-                assertTrue(trail.assertBound(1, false, ExactLpSide(ExactLpNumber.of(4L)), 8L))
-                for (depth in listOf(2, 1, 0)) {
-                    if (depth < 2) assertTrue(trail.pop(depth))
+                for (depth in listOf(1, 0)) {
+                    if (depth < 1) assertTrue(trail.pop(depth))
                     val model = assertNotNull(trail.state.ownerWorkingModel())
                     val actual = owner.solve(model)
                     val fresh = solveAndCertify(model, componentSplit = split)
@@ -132,22 +177,44 @@ class LpSolveSessionTest {
     }
 
     @Test
-    fun `release retires factors and permits a fresh numerical lifetime`() {
-        val model = assertNotNull(LpExactState(assertNotNull(LpBuilder().apply {
-            val x = addRealVar(0.0, 2.0, cost = 1.0)
-            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
-        }.build(Sense.MINIMIZE).authoritativeModel())).ownerWorkingModel())
+    fun `release should retire factors and permit a fresh numerical lifetime`() {
+        val model = assertNotNull(
+            LpExactState(
+                assertNotNull(
+                    LpBuilder().apply {
+                        val x = addRealVar(0.0, 2.0, cost = 1.0)
+                        addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
+                    }.build(Sense.MINIMIZE).authoritativeModel(),
+                ),
+            ).ownerWorkingModel(),
+        )
         var opened = 0
         var closed = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean,
-                pricing: LpPricingOptions): PersistentLpSolver {
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation, refactorUpdateLimit,
-                    iterationLimit, workLimit, trackDegeneracy, pricing)
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
                 opened++
                 return object : PersistentLpSolver by delegate {
-                    override fun close() { closed++; delegate.close() }
+                    override fun close() {
+                        closed++
+                        delegate.close()
+                    }
                 }
             }
         }

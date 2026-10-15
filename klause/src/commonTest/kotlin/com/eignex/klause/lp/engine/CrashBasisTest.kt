@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class CrashBasisTest {
     @Test
-    fun `triangular columns replace logicals in source row order`() {
+    fun `triangular columns should replace logicals in source row order`() {
         val builder = LpBuilder()
         val first = builder.addVar(0L, 10L)
         val second = builder.addVar(0L, 10L)
@@ -28,7 +28,7 @@ class CrashBasisTest {
     }
 
     @Test
-    fun `nonbasic seats follow exact reduced cost signs`() {
+    fun `nonbasic seats should follow exact reduced cost signs`() {
         val builder = LpBuilder()
         val basic = builder.addVar(0L, 10L)
         val lower = builder.addVar(0L, 10L, cost = 2L)
@@ -43,7 +43,7 @@ class CrashBasisTest {
     }
 
     @Test
-    fun `free and upper only columns retain native nonbasic seats`() {
+    fun `free and upper only columns should retain native nonbasic seats`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val model = ExactLpModel(
@@ -66,7 +66,7 @@ class CrashBasisTest {
     }
 
     @Test
-    fun `a missing reduced cost side declines the whole proposal`() {
+    fun `a missing reduced cost side should decline the whole proposal`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val model = ExactLpModel(
@@ -88,7 +88,7 @@ class CrashBasisTest {
     }
 
     @Test
-    fun `nonzero retained logical cost declines the proposal`() {
+    fun `nonzero retained logical cost should decline the proposal`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val model = ExactLpModel(
@@ -110,7 +110,7 @@ class CrashBasisTest {
     }
 
     @Test
-    fun `cancellation and work ceilings decline without a partial basis`() {
+    fun `cancellation and work ceilings should decline without a partial basis`() {
         val builder = LpBuilder()
         val column = builder.addVar(0L, 10L)
         builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)

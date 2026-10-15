@@ -2,9 +2,9 @@ package com.eignex.klause.lp.cut
 
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutExpression
-import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
+import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.Relation
@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
 class CutPoolTest {
 
     @Test
-    fun `conditional deduplication ignores premise order and preserves distinct guards`() {
+    fun `conditional deduplication should ignore premise order and preserve distinct guards`() {
         val root = Any()
         val x = CutSource(CutSourceKind.INTEGER, 0)
         val y = CutSource(CutSourceKind.INTEGER, 1)
@@ -33,12 +33,24 @@ class CutPoolTest {
             listOf(CutColumnSource(x), CutColumnSource(y)),
             activePremises = setOf(lower, upper),
         )
-        val first = SourceCut(expression, Relation.LE, BigFraction.ofLong(5L),
-            CutProvenance(root, 0L, listOf(CutProofFact(lower, false), CutProofFact(upper, false))))
-        val reversed = SourceCut(expression, Relation.LE, BigFraction.ofLong(5L),
-            CutProvenance(root, 0L, listOf(CutProofFact(upper, false), CutProofFact(lower, false))))
-        val different = SourceCut(expression, Relation.LE, BigFraction.ofLong(5L),
-            CutProvenance(root, 0L, listOf(CutProofFact(weaker, false), CutProofFact(upper, false))))
+        val first = SourceCut(
+            expression,
+            Relation.LE,
+            BigFraction.ofLong(5L),
+            CutProvenance(root, 0L, listOf(CutProofFact(lower, false), CutProofFact(upper, false))),
+        )
+        val reversed = SourceCut(
+            expression,
+            Relation.LE,
+            BigFraction.ofLong(5L),
+            CutProvenance(root, 0L, listOf(CutProofFact(upper, false), CutProofFact(lower, false))),
+        )
+        val different = SourceCut(
+            expression,
+            Relation.LE,
+            BigFraction.ofLong(5L),
+            CutProvenance(root, 0L, listOf(CutProofFact(weaker, false), CutProofFact(upper, false))),
+        )
         val pool = CutPool()
 
         assertTrue(pool.add(first, map))
@@ -52,41 +64,36 @@ class CutPoolTest {
         Cut(intArrayOf(col), longArrayOf(coeff), Relation.LE, rhs, global = true)
 
     @Test
-    fun `deduplicates by key`() {
+    fun `pool should deduplicate cuts by key`() {
         val pool = CutPool()
         assertTrue(pool.add(cut(0, 1, 5)))
-        assertFalse(pool.add(cut(0, 1, 5)), "an equal cut must not be added twice")
+        assertFalse(pool.add(cut(0, 1, 5)))
         assertEquals(1, pool.size)
     }
 
     @Test
-    fun `evicts the least active cuts when over the cap`() {
-        // Three cuts x_c ≤ rhs against the LP point (x0,x1,x2) = (5, 1, 0):
-        //   cut 0: slack |5 − 5| = 0   (tight — most active)
-        //   cut 1: slack |6 − 1| = 5
-        //   cut 2: slack |7 − 0| = 7   (loosest — least active)
+    fun `pool should evict the least active cuts when over the cap`() {
         val pool = CutPool(maxCuts = 2)
         pool.addAll(listOf(cut(0, 1, 5), cut(1, 1, 6), cut(2, 1, 7)))
         pool.observe(doubleArrayOf(5.0, 1.0, 0.0))
         pool.retainMostActive()
         assertEquals(2, pool.size)
         val kept = pool.cuts().map { it.rhs }.toSet()
-        assertEquals(setOf(5L, 6L), kept, "the two tightest cuts survive; the loosest is evicted")
+        assertEquals(setOf(5L, 6L), kept)
     }
 
     @Test
-    fun `a re-added evicted cut is accepted again`() {
-        // Eviction rebuilds the dedup set, so a cut dropped for inactivity can re-enter a later harvest.
+    fun `pool should accept a re-added evicted cut`() {
         val pool = CutPool(maxCuts = 1)
         pool.addAll(listOf(cut(0, 1, 5), cut(1, 1, 6)))
-        pool.observe(doubleArrayOf(5.0, 0.0)) // keeps cut 0 (tight), evicts cut 1
+        pool.observe(doubleArrayOf(5.0, 0.0))
         pool.retainMostActive()
         assertEquals(setOf(5L), pool.cuts().map { it.rhs }.toSet())
-        assertTrue(pool.add(cut(1, 1, 6)), "the evicted cut is no longer marked seen")
+        assertTrue(pool.add(cut(1, 1, 6)))
     }
 
     @Test
-    fun `decayed activity retains cuts active across observations`() {
+    fun `decayed activity should retain cuts active across observations`() {
         val pool = CutPool(maxCuts = 1)
         pool.addAll(listOf(cut(0, 1, 5), cut(1, 1, 5)))
 
@@ -98,7 +105,7 @@ class CutPoolTest {
     }
 
     @Test
-    fun `evicts a cut at the consecutive inactivity threshold`() {
+    fun `pool should evict a cut at the consecutive inactivity threshold`() {
         val pool = CutPool(maxConsecutiveInactive = 2)
         val stale = cut(0, 1, 5)
         pool.add(stale)
@@ -108,11 +115,11 @@ class CutPoolTest {
         pool.observe(doubleArrayOf(0.0))
 
         assertEquals(0, pool.size)
-        assertTrue(pool.add(stale), "an inactive eviction clears the dedup key")
+        assertTrue(pool.add(stale))
     }
 
     @Test
-    fun `raw and portable global duplicates retain one portable entry in either order`() {
+    fun `raw and portable global duplicates should retain one portable entry in either order`() {
         val source = CutSource(CutSourceKind.INTEGER, 0)
         val token = Any()
         val map = CutSourceMap(token, 0, listOf(CutColumnSource(source)))
@@ -137,7 +144,7 @@ class CutPoolTest {
     }
 
     @Test
-    fun `root seeding preserves portable payload for export and permuted remapping`() {
+    fun `root seeding should preserve portable payload for export and permuted remapping`() {
         val source = CutSource(CutSourceKind.INTEGER, 0)
         val token = Any()
         val map = CutSourceMap(token, 0, listOf(CutColumnSource(source)))
@@ -159,4 +166,103 @@ class CutPoolTest {
         assertEquals(1, search.cuts().single().cols.single())
     }
 
+    @Test
+    fun `select should put constant contradictions before ordinary violated cuts`() {
+        val pool = CutPool()
+        pool.add(cut(Relation.GE, 100, 0 to 1L))
+        val contradiction = cut(Relation.GE, 1)
+        pool.add(contradiction)
+
+        val selected = pool.select(doubleArrayOf(0.0), doubleArrayOf(1.0), max = 1)
+
+        assertTrue(selected.single() === contradiction)
+    }
+
+    @Test
+    fun `select should exclude constant tautologies`() {
+        val pool = CutPool()
+        pool.add(cut(Relation.GE, 0))
+
+        val selected = pool.select(doubleArrayOf(), doubleArrayOf(), max = 1)
+
+        assertTrue(selected.isEmpty())
+    }
+
+    private fun cut(rel: Relation, rhs: Long, vararg terms: Pair<Int, Long>): Cut =
+        Cut(terms.map { it.first }.toIntArray(), terms.map { it.second }.toLongArray(), rel, rhs, global = true)
+
+    @Test
+    fun `select should drop satisfied cuts and keep the violated one`() {
+        val pool = CutPool()
+        pool.add(cut(Relation.GE, 1, 0 to 1L))
+        pool.add(cut(Relation.LE, 1, 0 to 1L))
+        val sel = pool.select(doubleArrayOf(0.5), doubleArrayOf(0.0), max = 10)
+        assertEquals(1, sel.size)
+        assertEquals(Relation.GE, sel[0].rel)
+    }
+
+    @Test
+    fun `select should order by efficacy and skip near-parallel cuts`() {
+        val pool = CutPool()
+        val strong = cut(Relation.GE, 10, 0 to 1L)
+        val weak = cut(Relation.GE, 2, 1 to 1L)
+        val parallelToStrong = cut(Relation.GE, 8, 0 to 1L)
+        pool.add(weak)
+        pool.add(strong)
+        pool.add(parallelToStrong)
+        val sel = pool.select(doubleArrayOf(0.0, 0.0), doubleArrayOf(0.0, 0.0), max = 10)
+        assertEquals(2, sel.size)
+        assertTrue(sel[0] === strong)
+        assertTrue(sel.contains(weak))
+        assertTrue(sel.none { it === parallelToStrong })
+    }
+
+    @Test
+    fun `select should prefer a cut parallel to the objective when efficacy ties`() {
+        val pool = CutPool()
+        val orthogonal = cut(Relation.GE, 2, 0 to 1L)
+        val parallel = cut(Relation.GE, 2, 1 to 1L)
+        pool.add(orthogonal)
+        pool.add(parallel)
+
+        val selected = pool.select(DoubleArray(2), doubleArrayOf(0.0, 1.0), max = 1)
+
+        assertTrue(selected.single() === parallel)
+    }
+
+    @Test
+    fun `select should honour the max cap and never invent cuts`() {
+        val pool = CutPool()
+        val all = (0 until 6).map { cut(Relation.GE, 5, it to 1L) }
+        all.forEach { pool.add(it) }
+        val sel = pool.select(DoubleArray(6), DoubleArray(6), max = 3)
+        assertEquals(3, sel.size)
+        assertTrue(sel.all { s -> all.any { it === s } })
+    }
+
+    @Test
+    fun `select should treat antiparallel normals as the same direction`() {
+        val pool = CutPool()
+        val positive = cut(Relation.GE, 2, 0 to 1L)
+        val negative = cut(Relation.GE, 2, 0 to -1L)
+        pool.add(positive)
+        pool.add(negative)
+
+        val selected = pool.select(doubleArrayOf(0.0), doubleArrayOf(0.0), max = 2)
+
+        assertEquals(1, selected.size)
+        assertTrue(selected.single() === positive)
+    }
+
+    @Test
+    fun `select should fall back to efficacy ordering when the objective norm overflows`() {
+        val pool = CutPool()
+        val first = cut(Relation.GE, 2, 0 to 1L)
+        pool.add(first)
+        pool.add(cut(Relation.GE, 1, 1 to 1L))
+
+        val selected = pool.select(DoubleArray(2), doubleArrayOf(Double.MAX_VALUE, Double.MAX_VALUE), max = 1)
+
+        assertTrue(selected.single() === first)
+    }
 }

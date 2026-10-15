@@ -11,11 +11,9 @@ import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.solver.Sample
 import kotlin.test.assertTrue
 
-/**
- * Exhaustively checks that every satisfying assignment of a factor satisfies its conflict clause.
- * [state] must already hold a conflict on [factorId]; its atom registry interprets the clause literals.
- */
 object ConflictReasonOracle {
+
+    // state must already hold a conflict on factorId; its atom registry interprets the clause literals.
 
     fun assertEntailed(problem: Problem, state: PropagationState, factorId: Int, label: String = "reason") {
         val reason = state.factorAt(factorId).conflictReason(state, factorId) ?: return

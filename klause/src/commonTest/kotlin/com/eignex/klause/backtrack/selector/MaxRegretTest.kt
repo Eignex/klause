@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
 class MaxRegretTest {
 
     @Test
-    fun `MaxRegret regret saturates instead of wrapping on a full long span`() {
+    fun `MaxRegret should saturate instead of wrapping on a full long span`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -25,14 +25,13 @@ class MaxRegretTest {
     }
 
     @Test
-    fun `MaxRegret falls through to base when all regrets are zero`() {
+    fun `MaxRegret should fall through to base when all regrets are zero`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4)),
             factors = emptyArray(),
         )
-        // Zero coefficients → all regrets 0; base = InputOrder returns v0.
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L))
         val session = PropagationSession(problem)
         val picked = MaxRegret(obj, base = InputOrder).pick(session, Random(0L))

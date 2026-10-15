@@ -23,10 +23,25 @@ class SolveCoreOpenLocalSearchTest(private val maximize: Boolean) {
     }
 
     @Test
-    fun `open local search publishes its original exact cost before incomplete terminal reporting`() {
-        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+    fun `open local search should publish its exact cost before incomplete terminal reporting`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val original = LinearObjective(realCoefficients = doubleArrayOf(1.0), constant = 7)
         val solvable = openLocalSearchSolvable(model, {
             renderOpenTheoryModel(emptyMap(), emptyMap(), mapOf("x" to 0), it)
@@ -50,7 +65,9 @@ class SolveCoreOpenLocalSearchTest(private val maximize: Boolean) {
                 assertFalse(context.completePool)
                 terminal = true
             }
-            override fun onComplete(verdict: Verdict) { completed = verdict }
+            override fun onComplete(verdict: Verdict) {
+                completed = verdict
+            }
         }
 
         SolveCore.solve(solvable, common, output)

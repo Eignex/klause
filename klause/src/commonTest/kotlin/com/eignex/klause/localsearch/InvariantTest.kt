@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
 class InvariantTest {
 
     @Test
-    fun `default repair steps to the present neighbours across a hole`() {
+    fun `default repair should step to the present neighbours across a hole`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,

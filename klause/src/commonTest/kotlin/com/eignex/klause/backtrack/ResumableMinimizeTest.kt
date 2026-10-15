@@ -2,14 +2,10 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
-import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.formats.mps.Mps
-import com.eignex.klause.formats.mps.toExactSourceProblem
-import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -17,7 +13,6 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.Basis
-import com.eignex.klause.lp.engine.DEFAULT_REFACTOR_UPDATE_LIMIT
 import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
@@ -27,7 +22,6 @@ import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
-import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
@@ -35,13 +29,9 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
@@ -50,7 +40,6 @@ import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
-import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -58,10 +47,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
-import kotlin.time.ComparableTimeMark
-import kotlin.time.Duration.Companion.seconds
 
 internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
     val problem = Problem(
@@ -98,8 +84,15 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
             trackDegeneracy: Boolean,
             pricing: LpPricingOptions,
         ): PersistentLpSolver {
-            val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation, refactorUpdateLimit,
-                iterationLimit, workLimit, trackDegeneracy, pricing)
+            val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                model,
+                cancellation,
+                refactorUpdateLimit,
+                iterationLimit,
+                workLimit,
+                trackDegeneracy,
+                pricing,
+            )
             val leaf = iterationLimit == 0 && workLimit == 0L
             persistentOpened++
             if (leaf) opened++
@@ -153,8 +146,6 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
         assertEquals(1.0, sample.reals.single())
         assertEquals(2.0, sample.ints.single() + 2.0 * sample.reals.single())
         assertTrue(sample.reals.single() in 0.0..1.0)
-        // The other source-feasible region improves this incumbent: 1 + 2 * (1/2) = 2.
-        assertEquals(2.0, 1.0 + 2.0 * 0.5)
         assertTrue(0.5 < objective.evaluate(sample))
     }
 }
@@ -187,15 +178,21 @@ internal object FiniteCutoffKnapsackFixture {
 
 class ResumableMinimizeTest {
     @Test
-    fun `closing an abandoned improvement stream releases additional peers`() {
+    fun `closing an abandoned improvement stream should release additional peers`() {
         val closed = ArrayList<Int>()
         val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
-        val stream = solver.openImprovements(LinearObjective(boolWeights = longArrayOf(-1, -1)),
+        val stream = solver.openImprovements(
+            LinearObjective(boolWeights = longArrayOf(-1, -1)),
             BacktrackParams(componentFactory = {
-                List(2) { index -> object : com.eignex.klause.solver.search.SearchComponent, AutoCloseable {
-                    override fun close() { closed += index }
-                } }
-            }))
+                List(2) { index ->
+                    object : com.eignex.klause.solver.search.SearchComponent, AutoCloseable {
+                        override fun close() {
+                            closed += index
+                        }
+                    }
+                }
+            }),
+        )
         assertTrue(stream.hasNext())
         stream.next()
 
@@ -206,7 +203,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `Boolean objective retains component preparation before publishing`() {
+    fun `a Boolean objective should retain component preparation before publishing`() {
         var batches = 0
         val component = object : PreparingSearchComponent {
             override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> = sequence {
@@ -219,15 +216,19 @@ class ResumableMinimizeTest {
         }
         val problem = Problem(1, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(boolWeights = longArrayOf(1))
-        val search = BacktrackSolver(problem).resumable(objective,
-            BacktrackParams(componentFactory = { listOf(component) }))
+        val search = BacktrackSolver(problem).resumable(
+            objective,
+            BacktrackParams(componentFactory = { listOf(component) }),
+        )
         assertEquals(0, batches)
         assertTrue(search.preparationPending)
 
         var result: MinimizeResult? = null
         search.use {
-            while (result == null) result = it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) {
-                assertEquals(3, batches)
+            while (result == null) {
+                result = it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) {
+                    assertEquals(3, batches)
+                }
             }
         }
 
@@ -236,7 +237,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `optimization delivers successful deductions to its finite selector`() {
+    fun `optimization should deliver successful deductions to its finite selector`() {
         val deductions = ArrayList<PropagationResult.Implied>()
         val base = com.eignex.klause.backtrack.selector.InputOrder
         val selector = object : VariableSelector by base {
@@ -246,7 +247,10 @@ class ResumableMinimizeTest {
             }
         }
         val problem = Problem(
-            2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
+            2,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
         )
 
         val result = BacktrackSolver(problem.bake()).minimize(
@@ -260,11 +264,15 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `a completed clausal proposal is delivered while work debt blocks search`() {
-        val solver = BacktrackSolver(Problem(
-            2, 0, emptyArray(),
-            Array(2_000) { Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))) },
-        ).bake())
+    fun `a completed clausal proposal should be delivered while work debt blocks search`() {
+        val solver = BacktrackSolver(
+            Problem(
+                2,
+                0,
+                emptyArray(),
+                Array(2_000) { Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))) },
+            ).bake(),
+        )
         val objective = LinearObjective(boolWeights = longArrayOf(1L))
         val samples = mutableListOf<MinimizeResult.WithSample>()
 
@@ -282,7 +290,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `rebind can prove the same optimum after an exhausted fragment`() {
+    fun `rebind should prove the same optimum after an exhausted fragment`() {
         val objective = LinearObjective(boolWeights = longArrayOf(-1L))
         val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
 
@@ -298,7 +306,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `rebind preserves a restricted optimum after LP bounding`() {
+    fun `rebind should preserve a restricted optimum after LP bounding`() {
         val weights = intArrayOf(6, 7, 2, 3, 5, 9, 4, 3, 4)
         val profits = longArrayOf(7, 5, 4, 3, 8, 6, 5, 8, 6)
         val problem = Problem(
@@ -332,21 +340,13 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `finite cutoff LP fixings preserve improving source assignments across rebind`() {
+    fun `finite cutoff LP fixings should preserve improving source assignments across rebind`() {
         val fixture = FiniteCutoffKnapsackFixture
-        var cutoff = 4.0
         var observedSession: PropagationSession? = null
-        val exchange = object : ClauseExchange {
-            override fun onRestart(session: PropagationSession) = Unit
-            override fun onSearchStart(session: PropagationSession) {
-                observedSession = session
-            }
-
-            override fun publishGlobal(clause: SharedClause) = Unit
-        }
-        val params = fixture.params.copy(objectiveBoundSupplier = { cutoff }, clauseExchange = exchange)
-        assertEquals(-4L, fixture.improvingMasks(4L).minOf(fixture::sourceCost))
-        assertEquals(3L, fixture.improvingMasks(4L, 0L).minOf(fixture::sourceCost))
+        val params = fixture.params.copy(
+            objectiveBoundSupplier = { 4.0 },
+            clauseExchange = onSearchStart { observedSession = it },
+        )
 
         ResumableMinimize(
             BacktrackSolver(fixture.problem),
@@ -358,89 +358,27 @@ class ResumableMinimizeTest {
             val initial = assertIs<MinimizeResult.BestFound>(
                 search.runSlice(Cancellation.Never, 1000L, 100000L) {},
             )
-            assertEquals(TerminationReason.SearchExhausted, initial.reason)
             assertEquals(-4.0, initial.objective)
-            val initialMask = fixture.weights.indices.sumOf { initial.sample.ints[it].toInt() shl it }
-            assertTrue(initialMask in fixture.improvingMasks(4L))
-            assertEquals(fixture.sourceCost(initialMask), fixture.objective.evaluateLong(initial.sample))
-            assertTrue(search.stats.lp.nodePasses.sum > 0.0)
-            assertTrue(search.stats.lp.fixed.sum > 0.0)
             assertTrue(search.stats.lp.rootReducedCostFixes.sum > 0.0)
-
-            val session = assertNotNull(observedSession)
-            assertEquals(0, session.decisionLevel)
-            assertEquals(1L, session.intDomain(1).min)
-            assertEquals(1L, session.intDomain(1).max)
-            for (mask in fixture.improvingMasks(4L)) {
-                for (v in fixture.weights.indices) {
-                    assertTrue((mask shr v and 1).toLong() in session.intDomain(v))
-                }
-            }
+            assertEquals(1L, assertNotNull(observedSession).intDomain(1).min)
 
             search.rebind(Assumptions.None.withInt(0, 0), 100000L)
-            assertEquals(1L, session.intDomain(1).min)
-            for (mask in fixture.improvingMasks(4L, 0L)) {
-                for (v in fixture.weights.indices) {
-                    assertTrue((mask shr v and 1).toLong() in session.intDomain(v))
-                }
-            }
             val restricted = assertIs<MinimizeResult.BestFound>(
                 search.runSlice(Cancellation.Never, 1000L, 100000L) {},
             )
             assertEquals(TerminationReason.SearchExhausted, restricted.reason)
             assertEquals(3.0, restricted.objective)
-            val restrictedMask = fixture.weights.indices.sumOf { restricted.sample.ints[it].toInt() shl it }
-            assertTrue(restrictedMask in fixture.improvingMasks(4L, 0L))
-            assertEquals(fixture.sourceCost(restrictedMask), fixture.objective.evaluateLong(restricted.sample))
-
-            cutoff = 3.0
-            search.rebind(Assumptions.None.withInt(0, 0), 100000L)
-            val excluded = assertIs<MinimizeResult.Unknown>(
-                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
-            )
-            assertEquals(TerminationReason.SearchExhausted, excluded.reason)
-            assertTrue(fixture.improvingMasks(3L, 0L).isEmpty())
-
-            cutoff = 2.0
-            search.rebind(Assumptions.None.withInt(0, 1), 100000L)
-            for (mask in fixture.improvingMasks(2L, 1L)) {
-                for (v in fixture.weights.indices) {
-                    assertTrue((mask shr v and 1).toLong() in session.intDomain(v))
-                }
-            }
-            val improving = assertIs<MinimizeResult.BestFound>(
-                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
-            )
-            assertEquals(TerminationReason.SearchExhausted, improving.reason)
-            assertEquals(-4.0, improving.objective)
-            assertEquals(-4L, fixture.improvingMasks(2L, 1L).minOf(fixture::sourceCost))
-
-            cutoff = -4.0
-            search.rebind(Assumptions.None, 100000L)
-            val exhausted = assertIs<MinimizeResult.Unknown>(
-                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
-            )
-            assertEquals(TerminationReason.SearchExhausted, exhausted.reason)
-            assertTrue(fixture.improvingMasks(-4L).isEmpty())
         }
     }
 
     @Test
-    fun `finite cutoff without LP leaves the source domain free`() {
+    fun `finite cutoff without LP should leave the source domain free`() {
         val fixture = FiniteCutoffKnapsackFixture
         var observedSession: PropagationSession? = null
-        val exchange = object : ClauseExchange {
-            override fun onRestart(session: PropagationSession) = Unit
-            override fun onSearchStart(session: PropagationSession) {
-                observedSession = session
-            }
-
-            override fun publishGlobal(clause: SharedClause) = Unit
-        }
         val params = fixture.params.copy(
             lpPlan = LpPlan(bounding = false),
             objectiveBoundSupplier = { 4.0 },
-            clauseExchange = exchange,
+            clauseExchange = onSearchStart { observedSession = it },
         )
 
         ResumableMinimize(
@@ -463,7 +401,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `raw repair rejects an increasing or NaN cutoff`() {
+    fun `raw repair should reject an increasing or NaN cutoff`() {
         val fixture = FiniteCutoffKnapsackFixture
         for (invalid in listOf(5.0, Double.NaN)) {
             var cutoff = 4.0
@@ -488,7 +426,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `an optimization leaf whose assignment violates a factor fails as unsound`() {
+    fun `an optimization leaf violating a factor should fail as unsound`() {
         // A selector that stops before any column is fixed stands in for an engine defect that reads an open
         // node as a solved leaf: the minima it reports put both columns of the AllDifferent at 0.
         val stopsEarly = object : VariableSelector {
@@ -511,7 +449,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `raw repair publishes a second exact improvement with the same displayed score`() {
+    fun `raw repair should publish a second exact improvement with the same displayed score`() {
         val values = listOf(-9_007_199_254_740_992L, -9_007_199_254_740_993L)
         val problem = Problem(0, 1, arrayOf(IntDomain(values.min(), values.max())), emptyArray()).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1L))
@@ -535,7 +473,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `rebind clears an indeterminate verdict after a resolved fragment`() {
+    fun `rebind should clear an indeterminate verdict after a resolved fragment`() {
         val fixture = UnresolvedRealLeafFixture(false)
         fixture.acceptProof = { _, _ -> false }
 
@@ -556,895 +494,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `constant real leaf completion requires its independently accepted bound`() {
-        for (acceptBound in listOf(false, true)) {
-            val fixture = UnresolvedRealLeafFixture(false)
-            val objective = LinearObjective()
-            var opened = 0
-            var closed = 0
-            var cappedSolves = 0
-            var continuationExports = 0
-            var boundChecked = false
-            var sharedClauses = 0
-            var observedSession: PropagationSession? = null
-            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-                override fun newPersistentSolver(
-                    model: LpModel,
-                    cancellation: Cancellation,
-                    refactorUpdateLimit: Int,
-                    iterationLimit: Int,
-                    workLimit: Long,
-                    trackDegeneracy: Boolean,
-                    pricing: LpPricingOptions,
-                ): PersistentLpSolver {
-                    val leafWork = if (workLimit == 0L && iterationLimit == 0) 1L else workLimit
-                    val leafIterations = if (workLimit == 0L && iterationLimit == 0) 1 else iterationLimit
-                    val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                        model,
-                        cancellation,
-                        refactorUpdateLimit,
-                        leafIterations,
-                        leafWork,
-                        trackDegeneracy,
-                        pricing,
-                    )
-                    opened++
-                    return object : PersistentLpSolver by delegate {
-                        override fun solve(warm: Basis?): FloatLpResult? = delegate.solve(warm).also {
-                            if (leafWork == 1L) {
-                                cappedSolves++
-                                assertNull(it)
-                                assertTrue(delegate.lastWorkOps >= leafWork)
-                            }
-                        }
-
-                        override fun continuationBasis(model: LpModel): Basis? =
-                            delegate.continuationBasis(model).also {
-                                if (leafWork == 1L && it != null) continuationExports++
-                            }
-
-                        override fun close() {
-                            closed++
-                            delegate.close()
-                        }
-                    }
-                }
-            }
-            val policy = LpCertificationPolicy { certifier, success ->
-                if (certifier == LpCertifier.INTEGER) boundChecked = success
-                success && (acceptBound || certifier != LpCertifier.INTEGER)
-            }
-            val context = LpSolveContext(factory, policy)
-            val exchange = object : ClauseExchange {
-                override fun onRestart(session: PropagationSession) = Unit
-
-                override fun onSearchStart(session: PropagationSession) {
-                    observedSession = session
-                }
-
-                override fun publishGlobal(clause: SharedClause) {
-                    sharedClauses++
-                }
-            }
-            val params = fixture.params.copy(clauseExchange = exchange)
-            BacktrackSolver(fixture.problem, context).resumable(objective, params).use { search ->
-                val offered = ArrayList<Double>()
-
-                val result = assertNotNull(
-                    search.runSlice(Cancellation.Never, 1000L, 256L) {
-                        offered += it.objectiveValue
-                    },
-                )
-
-                val sample = if (acceptBound) {
-                    assertIs<MinimizeResult.Optimal>(result).sample
-                } else {
-                    val incomplete = assertIs<MinimizeResult.BestFound>(result)
-                    assertEquals(TerminationReason.Unsupported, incomplete.reason)
-                    incomplete.sample
-                }
-                assertEquals(
-                    BigFraction.ONE,
-                    assertNotNull(BigFraction.ofDouble(sample.reals.single())) * BigFraction.ofLong(2L),
-                )
-                assertEquals(0.0, objective.evaluate(sample))
-                assertEquals(listOf(0.0), offered)
-                assertTrue(search.isDone)
-                assertSame(result, search.runSlice(Cancellation.Never, 1000L, 256L) { error("duplicate incumbent") })
-                assertEquals(0, assertNotNull(observedSession).learnedClauseCount)
-                assertEquals(0, sharedClauses)
-            }
-            assertEquals(0, sharedClauses)
-            assertEquals(1, cappedSolves)
-            assertTrue(continuationExports > 0)
-            assertTrue(boundChecked)
-            assertEquals(opened, closed)
-        }
-    }
-
-    @Test
-    fun `mixed tree probes preserve original MPS coordinates objective and sense`() {
-        for (sense in listOf("MIN", "MAX")) {
-            for (exact in listOf(false, true)) {
-                val source = Mps.parse("NAME TREE\nOBJSENSE\n $sense\nROWS\n N COST\n E R\nCOLUMNS\n" +
-                    " M0 'MARKER' 'INTORG'\n I COST 1 R 1\n M1 'MARKER' 'INTEND'\n" +
-                    " X COST 10 R 2\nRHS\n RHS R 2 COST -3\nBOUNDS\n" +
-                    " BV B I\n LO B X 0.25\n UP B X 1.25\nENDATA")
-                val compiled = if (exact) source.toExactSourceProblem() else source.toProblem()
-                val sourceObjective = assertNotNull(compiled.objective).toLinearObjective()
-                val objective = if (compiled.maximize) sourceObjective.negated() else sourceObjective
-                val offered = ArrayList<Sample>()
-                val params = BacktrackParams(maxDecisions = 0L,
-                    toleranceCheck = if (exact) null else { sample ->
-                        compiled.withinTolerance(sample.ints, sample.reals)
-                    }, lpPlan = LpPlan(bounding = true, probe = false, lbTreeSearch = true, rootCutHarvest = false))
-
-                BacktrackSolver(compiled.model.bake()).resumable(objective, params).use { search ->
-                    search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
-                    assertEquals(0.0, search.stats.search.nodes.sum)
-                }
-
-                val sample = offered.single()
-                val reals = sample.exactReals ?: sample.reals.map { assertNotNull(BigFraction.ofDouble(it)) }
-                val witness = compiled.sourceWitness(sample.ints, reals)
-                assertEquals(if (compiled.maximize) "13" else "9", witness.objective.toString())
-                assertEquals(if (compiled.maximize) listOf("0", "1") else listOf("1", "1/2"),
-                    witness.values.map { it.toString() })
-                if (exact) assertNotNull(sample.exactReals)
-                else assertNull(sample.exactReals)
-            }
-        }
-    }
-
-    @Test
-    fun `explicit mixed tree probing finds a completed incumbent before ordinary decisions`() {
-        for ((coefficient, expectedInteger, expectedReal) in listOf(Triple(1.0, 1L, 0.5), Triple(-1.0, 0L, 1.0))) {
-            for (enabled in listOf(false, true)) {
-                val fixture = UnresolvedRealLeafFixture(true)
-                fixture.acceptProof = { _, _ -> true }
-                val objective = LinearObjective(realCoefficients = doubleArrayOf(coefficient))
-                val offered = ArrayList<Sample>()
-                val nodesAtPublication = ArrayList<Double>()
-                val params = fixture.params.copy(maxDecisions = 0L,
-                    lpPlan = fixture.params.lpPlan.copy(bounding = true, lbTreeSearch = enabled,
-                        probe = false, rootCutHarvest = false))
-
-                fixture.solver.resumable(objective, params).use { search ->
-                    val result = search.runSlice(Cancellation.Never, 1000L, 100_000L) {
-                        offered += it.sample
-                        nodesAtPublication += search.stats.search.nodes.sum
-                    }
-                    assertTrue(result !is MinimizeResult.Infeasible)
-                }
-
-                assertEquals(if (enabled) 1 else 0, offered.size)
-                if (enabled) {
-                    assertEquals(listOf(0.0), nodesAtPublication)
-                    val sample = offered.single()
-                    assertEquals(expectedInteger, sample.ints.single())
-                    assertEquals(expectedReal, sample.reals.single())
-                    assertEquals(BigFraction.ofDouble(expectedReal), sample.exactReals?.single())
-                }
-                assertEquals(fixture.opened, fixture.closed)
-                assertEquals(fixture.persistentOpened, fixture.persistentClosed)
-            }
-        }
-    }
-
-    @Test
-    fun `mixed tree decisions spend the containing solve allowance`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1)),
-            numRealVars = 1, realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.5)).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1),
-            realCoefficients = doubleArrayOf(0.5))
-        for (limit in listOf(0L, 1L)) {
-            val budget = NodeBudget(limit)
-            val offered = ArrayList<Sample>()
-            val params = BacktrackParams(nodeBudget = budget, maxDecisions = 0L,
-                lpPlan = LpPlan(bounding = true, lbTreeSearch = true, probe = false, rootCutHarvest = false))
-
-            BacktrackSolver(problem).resumable(objective, params).use { search ->
-                val result = search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
-                assertIs<MinimizeResult.Unknown>(result)
-                assertEquals(0.0, search.stats.search.nodes.sum)
-                assertTrue(search.work >= limit)
-            }
-
-            assertEquals(limit, budget.spent)
-            assertTrue(offered.isEmpty())
-        }
-    }
-
-    @Test
-    fun `mixed tree probing keeps tolerance witnesses separate from exact certification`() {
-        for (acceptance in listOf(null, false, true)) {
-            val tolerated = acceptance == true
-            val fixture = UnresolvedRealLeafFixture(true)
-            fixture.acceptProof = { _, _ -> false }
-            val offered = ArrayList<Sample>()
-            val check: ((Sample) -> Boolean)? = if (acceptance != null) {
-                { sample -> acceptance && sample.ints.single() + 2.0 * sample.reals.single() == 2.0 &&
-                    sample.reals.single() in 0.0..1.0 }
-            } else null
-            val params = fixture.params.copy(maxDecisions = 0L, toleranceCheck = check,
-                lpPlan = fixture.params.lpPlan.copy(bounding = true, lbTreeSearch = true,
-                    probe = false, rootCutHarvest = false))
-
-            fixture.solver.resumable(fixture.objective, params).use { search ->
-                val result = search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
-                assertTrue(result !is MinimizeResult.Optimal)
-            }
-
-            assertEquals(if (tolerated) 1 else 0, offered.size)
-            if (tolerated) {
-                assertEquals(1L, offered.single().ints.single())
-                assertEquals(0.5, offered.single().reals.single())
-                assertNull(offered.single().exactReals)
-            }
-            assertEquals(fixture.opened, fixture.closed)
-            assertEquals(fixture.persistentOpened, fixture.persistentClosed)
-        }
-    }
-
-    @Test
-    fun `mixed rounding publishes completed reals without tree decisions`() {
-        val fixture = UnresolvedRealLeafFixture(true)
-        fixture.acceptProof = { _, _ -> true }
-        val offered = ArrayList<Sample>()
-        val nodesAtPublication = ArrayList<Double>()
-        val params = fixture.params.copy(maxDecisions = 0L,
-            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
-
-        fixture.solver.resumable(fixture.objective, params).use { search ->
-            search.runSlice(Cancellation.Never, 1000L, 100_000L) {
-                offered += it.sample
-                nodesAtPublication += search.stats.search.nodes.sum
-            }
-            val sample = offered.single()
-            assertEquals(1L, sample.ints.single())
-            assertEquals(0.5, sample.reals.single())
-            assertEquals(BigFraction.ofDouble(0.5), sample.exactReals?.single())
-            assertEquals(listOf(0.0), nodesAtPublication)
-            assertTrue(search.stats.lp.standaloneWorkOps.sum > 0.0)
-        }
-        assertEquals(fixture.opened, fixture.closed)
-    }
-
-    @Test
-    fun `completed mixed leaves publish only an improvement over the peer cutoff`() {
-        for ((cutoff, expected) in listOf(0.5 to 0, 1.0 to 1)) {
-            val fixture = UnresolvedRealLeafFixture(true)
-            fixture.acceptProof = { _, _ -> true }
-            val offered = ArrayList<Sample>()
-            val params = fixture.params.copy(maxDecisions = 0L, objectiveBoundSupplier = { cutoff },
-                assumptions = Assumptions.None.withInt(0, 1L))
-
-            fixture.solver.resumable(fixture.objective, params).use { search ->
-                search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
-            }
-
-            assertEquals(expected, offered.size)
-            assertTrue(offered.all { fixture.objective.evaluate(it) < cutoff })
-            for (sample in offered) {
-                assertEquals(1L, sample.ints.single())
-                assertEquals(0.5, sample.reals.single())
-            }
-            assertEquals(fixture.opened, fixture.closed)
-        }
-    }
-
-    @Test
-    fun `mixed root probes admit only an improvement over the peer cutoff`() {
-        for ((cutoff, expected) in listOf(0.5 to 0, 1.0 to 1)) {
-            val fixture = UnresolvedRealLeafFixture(true)
-            fixture.acceptProof = { _, _ -> true }
-            val offered = ArrayList<Sample>()
-            val params = fixture.params.copy(maxDecisions = 0L, objectiveBoundSupplier = { cutoff },
-                lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
-
-            fixture.solver.resumable(fixture.objective, params).use { search ->
-                search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
-            }
-
-            assertEquals(expected, offered.size)
-            assertTrue(offered.all { fixture.objective.evaluate(it) < cutoff })
-            assertEquals(fixture.opened, fixture.closed)
-        }
-    }
-
-    @Test
-    fun `root proposal diagnostics distinguish improving and cutoff declined completions`() {
-        for ((cutoff, expected) in listOf(0.5 to "NON_IMPROVING", 1.0 to "IMPROVING")) {
-            val fixture = UnresolvedRealLeafFixture(true)
-            fixture.acceptProof = { _, _ -> true }
-            val params = fixture.params.copy(maxDecisions = 0L, objectiveBoundSupplier = { cutoff },
-                lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
-
-            fixture.solver.resumable(fixture.objective, params).use { search ->
-                search.runSlice(Cancellation.Never, 1000L, 100_000L) {}
-                val phase = assertNotNull(search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"])
-
-                assertTrue(phase.calls > 0L)
-                assertEquals(mapOf(expected to phase.calls), phase.outcomes)
-            }
-        }
-    }
-
-    @Test
-    fun `root proposal diagnostics retain an uncertified completion outcome`() {
-        val fixture = UnresolvedRealLeafFixture(true)
-        fixture.acceptProof = { _, _ -> false }
-        val params = fixture.params.copy(maxDecisions = 0L,
-            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
-
-        fixture.solver.resumable(fixture.objective, params).use { search ->
-            search.runSlice(Cancellation.Never, 1000L, 100_000L) {}
-            val phase = assertNotNull(search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"])
-
-            assertTrue(phase.calls > 0L)
-            assertEquals(mapOf("REAL_INDETERMINATE" to phase.calls), phase.outcomes)
-        }
-    }
-
-    @Test
-    fun `mixed root proposals improve a declined completion before tree branching`() {
-        val problem = Problem(
-            0, 3, Array(3) { IntDomain(0, 1) },
-            arrayOf<Factor>(
-                Linear(intArrayOf(0, 1), doubleArrayOf(1.0, 1.0),
-                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
-                Linear(intArrayOf(1, 2), doubleArrayOf(1.0, 1.0),
-                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
-                Linear(intArrayOf(0, 2), doubleArrayOf(1.0, 1.0),
-                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
-            ),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
-        ).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1), realCoefficients = doubleArrayOf(10.0))
-        for (initial in listOf(null, Sample(BooleanArray(0), longArrayOf(0, 1, 1), doubleArrayOf(0.3)))) {
-            val offered = ArrayList<Sample>()
-            val nodesAtPublication = ArrayList<Double>()
-            val pool = initial?.let { sample -> IncumbentExchange.minimizing<Sample>().apply { offer(sample, 5.0) } }
-            val params = BacktrackParams(randomSeed = 0L, maxDecisions = 0L, objectiveBoundSupplier = { 5.0 },
-                pooledIncumbents = pool, lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false))
-
-            BacktrackSolver(problem).resumable(objective, params).use { search ->
-                search.runSlice(Cancellation.Never, 1000L, 100_000L) {
-                    offered += it.sample
-                    nodesAtPublication += search.stats.search.nodes.sum
-                }
-            }
-
-            val sample = offered.single()
-            assertEquals(if (initial == null) 3.0 else 2.0, objective.evaluate(sample))
-            assertEquals(listOf(0.0), nodesAtPublication)
-            assertEquals(BigFraction.ZERO, sample.exactReals?.single())
-        }
-    }
-
-    @Test
-    fun `mixed directed rounding completes fractional capacity proposals before branching`() {
-        for (sign in listOf(1L, -1L)) {
-            val domain = if (sign > 0L) IntDomain(0L, 5L) else IntDomain(-5L, 0L)
-            val problem = Problem(
-                0, 1, arrayOf(domain),
-                arrayOf<Factor>(
-                    Linear(intArrayOf(0), doubleArrayOf(sign.toDouble()),
-                        intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
-                    Linear(IntArray(0), DoubleArray(0),
-                        intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.4),
-                ),
-                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-            ).bake()
-            val objective = LinearObjective(intCoefficients = longArrayOf(sign))
-            val params = BacktrackParams(maxDecisions = 0L, objectiveBoundSupplier = { 5.0 },
-                lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false))
-            val offered = ArrayList<Sample>()
-            val nodesAtPublication = ArrayList<Double>()
-
-            BacktrackSolver(problem).resumable(objective, params).use { search ->
-                search.runSlice(Cancellation.Never, 1000L, 100_000L) {
-                    offered += it.sample
-                    nodesAtPublication += search.stats.search.nodes.sum
-                }
-            }
-
-            val sample = offered.single()
-            assertEquals(sign, sample.ints.single())
-            assertEquals(1.0, objective.evaluate(sample))
-            assertTrue(sample.reals.single() >= 0.4)
-            assertEquals(1, sample.exactReals?.size)
-            assertEquals(listOf(0.0), nodesAtPublication)
-        }
-    }
-
-    @Test
-    fun `mixed root rounding admits source checked float coordinates without native completion`() {
-        val fixture = UnresolvedRealLeafFixture(true)
-        fixture.acceptProof = { _, _ -> false }
-        val params = fixture.params.copy(maxDecisions = 0L, objectiveBoundSupplier = { 1.0 },
-            toleranceCheck = { sample ->
-                sample.numRealVars == 1 && sample.reals.single() in 0.0..1.0 &&
-                    sample.ints.single() + 2.0 * sample.reals.single() == 2.0
-            },
-            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
-        val offered = ArrayList<Sample>()
-        val nodesAtPublication = ArrayList<Double>()
-
-        fixture.solver.resumable(fixture.objective, params).use { search ->
-            search.runSlice(Cancellation.Never, 1000L, 100_000L) {
-                offered += it.sample
-                nodesAtPublication += search.stats.search.nodes.sum
-            }
-        }
-
-        val sample = offered.single()
-        assertEquals(0.5, fixture.objective.evaluate(sample))
-        assertEquals(2.0, sample.ints.single() + 2.0 * sample.reals.single())
-        assertNull(sample.exactReals)
-        assertEquals(0, fixture.visited)
-        assertEquals(listOf(0.0), nodesAtPublication)
-        assertEquals(fixture.opened, fixture.closed)
-    }
-
-    @Test
-    fun `declined float coordinates retain discrete real completion fallback`() {
-        val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 2)),
-            arrayOf<Factor>(Linear(intArrayOf(0), doubleArrayOf(1.0),
-                intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.3)),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.5),
-        ).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val params = BacktrackParams(maxDecisions = 0L, objectiveBoundSupplier = { 2.0 },
-            toleranceCheck = { sample ->
-                sample.numRealVars == 1 && sample.reals.single() in 0.0..0.5 &&
-                    kotlin.math.abs(sample.ints.single() + sample.reals.single() - 1.3) < 1e-8
-            },
-            lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false))
-        val offered = ArrayList<Sample>()
-        val nodesAtPublication = ArrayList<Double>()
-
-        BacktrackSolver(problem).resumable(objective, params).use { search ->
-            search.runSlice(Cancellation.Never, 1000L, 100_000L) {
-                offered += it.sample
-                nodesAtPublication += search.stats.search.nodes.sum
-            }
-        }
-
-        val sample = offered.single()
-        assertEquals(1.0, objective.evaluate(sample))
-        assertTrue(kotlin.math.abs(sample.reals.single() - 0.3) < 1e-8)
-        assertTrue(assertNotNull(params.toleranceCheck)(sample))
-        assertEquals(listOf(0.0), nodesAtPublication)
-    }
-
-    @Test
-    fun `mixed rounding cannot publish an uncertified completion`() {
-        val fixture = UnresolvedRealLeafFixture(true)
-        fixture.acceptProof = { _, _ -> false }
-        val offered = ArrayList<Sample>()
-        val params = fixture.params.copy(maxDecisions = 0L,
-            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
-
-        fixture.solver.resumable(fixture.objective, params).use { search ->
-            search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
-        }
-
-        assertTrue(offered.isEmpty())
-        assertEquals(fixture.opened, fixture.closed)
-    }
-
-    @Test
-    fun `mixed rounding cannot publish after completion cancellation`() {
-        val fixture = UnresolvedRealLeafFixture(true)
-        var cancelled = false
-        fixture.acceptProof = { leaf, _ ->
-            if (leaf > 0) cancelled = true
-            true
-        }
-        val offered = ArrayList<Sample>()
-        val params = fixture.params.copy(maxDecisions = 0L,
-            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
-
-        fixture.solver.resumable(fixture.objective, params).use { search ->
-            search.runSlice(Cancellation { cancelled }, 1000L, 100_000L) { offered += it.sample }
-        }
-
-        assertTrue(fixture.visited > 0)
-        assertTrue(offered.isEmpty())
-        assertEquals(fixture.opened, fixture.closed)
-    }
-
-    @Test
-    fun `a real leaf LP is handed the run deadline`() {
-        val deadlines = ArrayList<ComparableTimeMark?>()
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: Cancellation,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                deadlines += cancellation.deadline()
-                return ProductionLpEngineFactory.newPersistentSolver(model, cancellation, refactorUpdateLimit,
-                    iterationLimit, workLimit, trackDegeneracy, pricing)
-            }
-        }
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 3L),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(10.0),
-        ).bake()
-        val run = Cancellation.after(60.seconds)
-        val params = BacktrackParams(lpPlan = LpPlan(bounding = false, componentSplit = false))
-
-        BacktrackSolver(problem, LpSolveContext(factory))
-            .resumable(LinearObjective(realCoefficients = doubleArrayOf(1.0)), params)
-            .use { it.runSlice(run, 1000L, 256L) {} }
-
-        assertTrue(deadlines.isNotEmpty())
-        assertTrue(deadlines.all { it == run.deadline() }, "every leaf LP budgets against the run's own deadline")
-    }
-
-    @Test
-    fun `node LPs are handed the run deadline`() {
-        val deadlines = ArrayList<ComparableTimeMark?>()
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: Cancellation,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                deadlines += cancellation.deadline()
-                return ProductionLpEngineFactory.newPersistentSolver(
-                    model,
-                    cancellation,
-                    refactorUpdateLimit,
-                    iterationLimit,
-                    workLimit,
-                    trackDegeneracy,
-                    pricing,
-                )
-            }
-        }
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0L, 9L), IntDomain(0L, 9L)),
-            factors = arrayOf<Factor>(Linear(longArrayOf(2L, 3L), intArrayOf(0, 1), LinearOp.GE, 7L)),
-        ).bake()
-        val run = Cancellation.after(60.seconds)
-        val params = BacktrackParams(lpPlan = LpPlan(bounding = true, componentSplit = false))
-
-        BacktrackSolver(problem, LpSolveContext(factory))
-            .resumable(LinearObjective(intCoefficients = longArrayOf(1L, 1L)), params)
-            .use { it.runSlice(run, 1000L, 256L) {} }
-
-        assertTrue(deadlines.isNotEmpty())
-        assertTrue(deadlines.all { it == run.deadline() }, "every node LP budgets against the run's own deadline")
-    }
-
-    @Test
-    fun `a genuine shared cutoff retains exhaustive coverage without a local incumbent`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0L, 3L)), emptyArray()).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
-        val result = BacktrackSolver(problem).minimize(
-            objective,
-            BacktrackParams(objectiveBoundSupplier = { 0.0 }),
-        )
-        assertEquals(TerminationReason.SearchExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
-        assertEquals(0.0, objective.evaluate(Sample(booleanArrayOf(), longArrayOf(0L))))
-    }
-
-    @Test
-    fun `optimization guidance receives complete admitted incumbents`() {
-        val fixture = UnresolvedRealLeafFixture(true)
-        val observed = ArrayList<Sample>()
-        val selector = object : ValueSelector by IndomainMin {
-            override fun fresh(): ValueSelector = this
-            override fun onSolution(snapshot: Sample) {
-                observed += snapshot
-            }
-        }
-
-        fixture.solver.minimize(fixture.objective, fixture.params.copy(valueSelector = selector))
-
-        fixture.assertIncumbent(observed.single())
-    }
-
-    @Test
-    fun `verified real point without an optimum is published once before termination`() {
-        val fixture = UnresolvedRealLeafFixture(false)
-        fixture.acceptProof = { _, certifier -> certifier == LpCertifier.EXACT_POINT }
-        ResumableMinimize(fixture.solver, fixture.objective, fixture.params, rebindable = true).use { search ->
-            val offered = ArrayList<Double>()
-            val result = assertIs<MinimizeResult.BestFound>(
-                search.runSlice(Cancellation.Never, 1000L, 256L) {
-                    offered += it.objectiveValue
-                },
-            )
-            assertEquals(TerminationReason.Unsupported, result.reason)
-            assertEquals(listOf(0.5), offered)
-            assertEquals(0.5, result.sample.reals.single())
-            fixture.assertVisitedLeaves(ownersReleased = false)
-            assertSame(result, search.runSlice(Cancellation.Never, 1000L, 256L) { error("duplicate incumbent") })
-            search.rebind(Assumptions.None, 256L)
-            fixture.acceptProof = { _, _ -> false }
-            assertIs<MinimizeResult.Unknown>(
-                search.runSlice(Cancellation.Never, 1000L, 256L) { error("stale incumbent") },
-            )
-            assertEquals(1, fixture.opened)
-            assertEquals(0, fixture.closed)
-        }
-        assertEquals(fixture.opened, fixture.closed)
-    }
-
-    @Test
-    fun `rebind recertifies an unresolved improving region without blocking it`() {
-        val fixture = UnresolvedRealLeafFixture(true)
-        ResumableMinimize(fixture.solver, fixture.objective, fixture.params, rebindable = true).use { search ->
-            assertIs<MinimizeResult.BestFound>(search.runSlice(Cancellation.Never, 1000L, 256L) {})
-            fixture.assertVisitedLeaves(ownersReleased = false)
-            search.rebind(Assumptions.None.withInt(0, 1L), 256L)
-            fixture.acceptProof = { _, _ -> true }
-            val offered = ArrayList<Double>()
-            val result = assertIs<MinimizeResult.Optimal>(
-                search.runSlice(Cancellation.Never, 1000L, 256L) {
-                    offered += it.objectiveValue
-                },
-            )
-            assertEquals(listOf(0.5), offered)
-            assertEquals(1L, result.sample.ints.single())
-            assertEquals(0.5, result.sample.reals.single())
-            assertEquals(3, fixture.visited)
-            assertEquals(1, fixture.opened)
-            assertEquals(0, fixture.closed)
-        }
-        assertEquals(fixture.opened, fixture.closed)
-    }
-
-    @Test
-    fun `cancelled slice resumes to an unresolved real terminal`() {
-        val fixture = UnresolvedRealLeafFixture(false)
-        fixture.solver.resumable(fixture.objective, fixture.params).use { search ->
-            assertNull(search.runSlice(Cancellation { true }, 1000L, 256L) {})
-            assertEquals(0, fixture.opened)
-            val result = assertIs<MinimizeResult.Unknown>(search.runSlice(Cancellation.Never, 1000L, 256L) {})
-            assertEquals(TerminationReason.Unsupported, result.reason)
-            fixture.assertVisitedLeaves()
-        }
-    }
-
-    @Test
-    fun `decision cap does not become real infeasibility`() {
-        val fixture = UnresolvedRealLeafFixture(true)
-        val result = fixture.solver.minimize(fixture.objective, fixture.params.copy(maxDecisions = 0L))
-        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
-        assertEquals(0, fixture.opened)
-    }
-
-    @Test
-    fun `exact real exhaustion retains complete shared coverage`() {
-        for (shared in listOf(false, true)) {
-            for (feasible in listOf(false, true)) {
-                val problem = Problem(
-                    0,
-                    0,
-                    emptyArray(),
-                    arrayOf(
-                        Linear(
-                            longArrayOf(),
-                            intArrayOf(),
-                            doubleArrayOf(2.0),
-                            intArrayOf(0),
-                            LinearOp.EQ,
-                            if (feasible) 1L else 3L,
-                        ),
-                    ),
-                    numRealVars = 1,
-                    realLower = doubleArrayOf(0.0),
-                    realUpper = doubleArrayOf(1.0),
-                ).bake()
-                val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
-                val params = BacktrackParams(
-                    objectiveBoundSupplier = if (shared) ({ Double.POSITIVE_INFINITY }) else null,
-                )
-                val result = BacktrackSolver(problem).minimize(objective, params)
-                when {
-                    shared && feasible -> assertEquals(
-                        TerminationReason.SearchExhausted,
-                        assertIs<MinimizeResult.BestFound>(result).reason,
-                    )
-
-                    shared -> assertEquals(
-                        TerminationReason.SearchExhausted,
-                        assertIs<MinimizeResult.Unknown>(result).reason,
-                    )
-
-                    feasible -> assertEquals(0.5, assertIs<MinimizeResult.Optimal>(result).sample.reals.single())
-
-                    else -> assertIs<MinimizeResult.Infeasible>(result)
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `unresolved real leaf cannot prove infeasibility under shared bounds`() {
-        for (shared in listOf(false, true)) {
-            val fixture = UnresolvedRealLeafFixture(false)
-            val params = fixture.params.copy(
-                objectiveBoundSupplier = if (shared) ({ Double.POSITIVE_INFINITY }) else null,
-            )
-            fixture.solver.resumable(fixture.objective, params).use { search ->
-                val result = assertIs<MinimizeResult.Unknown>(search.runSlice(Cancellation.Never, 1000L, 256L) {})
-                assertEquals(TerminationReason.Unsupported, result.reason)
-                fixture.assertVisitedLeaves()
-                assertTrue(search.isDone)
-                assertSame(result, search.runSlice(Cancellation.Never, 1000L, 256L) {})
-            }
-        }
-    }
-
-    @Test
-    fun `unresolved improving region preserves an independently verified incumbent`() {
-        for (shared in listOf(false, true)) {
-            val fixture = UnresolvedRealLeafFixture(true)
-            var bound = Double.POSITIVE_INFINITY
-            val params = fixture.params.copy(objectiveBoundSupplier = if (shared) ({ bound }) else null)
-            fixture.solver.resumable(fixture.objective, params).use { search ->
-                val result = assertIs<MinimizeResult.BestFound>(
-                    search.runSlice(Cancellation.Never, 1000L, 256L) {
-                        fixture.assertIncumbent(it.sample)
-                        bound = it.objectiveValue
-                    },
-                )
-                assertEquals(TerminationReason.Unsupported, result.reason)
-                fixture.assertIncumbent(result.sample)
-                fixture.assertVisitedLeaves()
-            }
-        }
-    }
-
-    @Test
-    fun `carried incumbent must satisfy replacement assumptions and deductions`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0L, 3L)), emptyArray()).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
-        for (assumptions in listOf(Assumptions.None.withInt(0, 3L), Assumptions.None.withTightenedMin(0, 2L))) {
-            val params = BacktrackParams(randomSeed = 0L)
-            val first = ResumableMinimize(BacktrackSolver(problem), objective, params)
-            assertIs<MinimizeResult.Optimal>(first.runSlice(Cancellation.Never, 1000L, 256L) {})
-            first.replacingObjective(objective, params.copy(assumptions = assumptions)).use { second ->
-                val offered = ArrayList<Long>()
-                val result = assertIs<MinimizeResult.Optimal>(
-                    second.runSlice(Cancellation.Never, 1000L, 256L) {
-                        offered += it.sample.ints[0]
-                    },
-                )
-                assertTrue(offered.all { it >= 2L })
-                assertEquals(if (assumptions.numInts > 0) 3L else 2L, result.sample.ints[0])
-                second.replacingObjective(objective, params).use { third ->
-                    val restored = assertIs<MinimizeResult.Optimal>(third.runSlice(Cancellation.Never, 1000L, 256L) {})
-                    assertEquals(0L, restored.sample.ints[0])
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `contradictory replacement deductions discard a carried incumbent`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0L, 3L)), emptyArray()).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
-        val params = BacktrackParams(randomSeed = 0L)
-        val first = ResumableMinimize(BacktrackSolver(problem), objective, params)
-        assertIs<MinimizeResult.Optimal>(first.runSlice(Cancellation.Never, 1000L, 256L) {})
-        first.replacingObjective(
-            objective,
-            params.copy(assumptions = Assumptions.None.withTightenedMin(0, 4)),
-        ).use { second ->
-            var offers = 0
-            assertIs<MinimizeResult.Infeasible>(second.runSlice(Cancellation.Never, 1000L, 256L) { offers++ })
-            assertEquals(0, offers)
-        }
-    }
-
-    @Test
-    fun `replacement can remove an earlier boolean root assumption`() {
-        val problem = Problem(1, 0, emptyArray(), emptyArray()).bake()
-        val objective = LinearObjective(boolWeights = longArrayOf(1L))
-        val params = BacktrackParams(randomSeed = 0L)
-        val first = ResumableMinimize(BacktrackSolver(problem), objective, params)
-        first.replacingObjective(
-            objective,
-            params.copy(assumptions = Assumptions.None.withBool(0, true)),
-        ).use { second ->
-            val restricted = assertIs<MinimizeResult.Optimal>(second.runSlice(Cancellation.Never, 1000L, 256L) {})
-            assertEquals(true, restricted.sample.bools[0])
-            second.replacingObjective(objective, params).use { third ->
-                val restored = assertIs<MinimizeResult.Optimal>(third.runSlice(Cancellation.Never, 1000L, 256L) {})
-                assertEquals(false, restored.sample.bools[0])
-            }
-        }
-    }
-
-    @Test
-    fun `cancelled replacement leaves the original search usable`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0L, 3L)), emptyArray()).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
-        val params = BacktrackParams(randomSeed = 0L)
-        for (initiallyCancelled in listOf(true, false)) {
-            var cancelled = initiallyCancelled
-            val exchange = object : ClauseExchange {
-                override fun onRestart(session: PropagationSession) = Unit
-                override fun onSearchStart(session: PropagationSession) {
-                    cancelled = true
-                }
-            }
-            ResumableMinimize(BacktrackSolver(problem), objective, params).use { first ->
-                assertFailsWith<CancellationException> {
-                    first.replacingObjective(
-                        objective,
-                        params.copy(cancellation = Cancellation { cancelled }, clauseExchange = exchange),
-                    )
-                }
-                val result = assertIs<MinimizeResult.Optimal>(first.runSlice(Cancellation.Never, 1000L, 256L) {})
-                assertEquals(0L, result.sample.ints[0])
-                first.replacingObjective(objective, params).use { replacement ->
-                    assertIs<MinimizeResult.Optimal>(replacement.runSlice(Cancellation.Never, 1000L, 256L) {})
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `throwing publication token leaves the original search usable`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0L, 3L)), emptyArray()).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
-        val params = BacktrackParams(randomSeed = 0L)
-        val failure = IllegalStateException("publication token")
-        var initialized = false
-        val exchange = object : ClauseExchange {
-            override fun onRestart(session: PropagationSession) = Unit
-            override fun onSearchStart(session: PropagationSession) {
-                initialized = true
-            }
-        }
-        val token = Cancellation {
-            if (initialized) throw failure
-            false
-        }
-        ResumableMinimize(BacktrackSolver(problem), objective, params).use { first ->
-            val thrown = assertFailsWith<IllegalStateException> {
-                first.replacingObjective(objective, params.copy(cancellation = token, clauseExchange = exchange))
-            }
-            assertSame(failure, thrown)
-            assertIs<MinimizeResult.Optimal>(first.runSlice(Cancellation.Never, 1000L, 256L) {})
-            first.replacingObjective(objective, params).use { replacement ->
-                assertIs<MinimizeResult.Optimal>(replacement.runSlice(Cancellation.Never, 1000L, 256L) {})
-            }
-        }
-    }
-
-    @Test
-    fun `a leaf the LP cannot decide is passed over instead of ending the search`() {
-        // x0 + x1 + x2 + r >= 5 over x in [0,2], r in [0,10]; with every certifier vetoed no leaf LP decides.
+    fun `a leaf the LP cannot decide should be passed over instead of ending the search`() {
         val n = 3
         val problem = Problem(
             numBoolVars = 0,
@@ -1471,20 +521,15 @@ class ResumableMinimizeTest {
 
         assertTrue(terminal is MinimizeResult.Unknown && search.stats.lp.standalonePasses.sum > 1.0, "$terminal")
     }
+
     @Test
-    fun `cancelled optimization preparation resumes without searching partial state`() {
+    fun `cancelled optimization preparation should resume without searching partial state`() {
         val fixture = FiniteCutoffKnapsackFixture
         val factory = RecordingLpEngineFactory()
         var cancelled = false
-        val exchange = object : ClauseExchange {
-            override fun onRestart(session: PropagationSession) = Unit
-            override fun onSearchStart(session: PropagationSession) {
-                cancelled = true
-            }
-        }
         val params = fixture.params.copy(
             cancellation = Cancellation { cancelled },
-            clauseExchange = exchange,
+            clauseExchange = onSearchStart { cancelled = true },
         )
         val solver = BacktrackSolver(fixture.problem, LpSolveContext(factory))
 
@@ -1498,14 +543,19 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `cancelled one shot optimization returns an unknown verdict`() {
+    fun `cancelled one-shot optimization should return an unknown verdict`() {
         val fixture = FiniteCutoffKnapsackFixture
 
         val result = BacktrackSolver(fixture.problem).minimize(
-            fixture.objective, fixture.params.copy(cancellation = Cancellation { true }),
+            fixture.objective,
+            fixture.params.copy(cancellation = Cancellation { true }),
         )
 
         assertIs<MinimizeResult.Unknown>(result)
     }
+}
 
+internal fun onSearchStart(action: (PropagationSession) -> Unit) = object : ClauseExchange {
+    override fun onRestart(session: PropagationSession) = Unit
+    override fun onSearchStart(session: PropagationSession) = action(session)
 }

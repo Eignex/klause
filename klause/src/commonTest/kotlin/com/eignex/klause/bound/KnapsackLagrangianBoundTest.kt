@@ -22,9 +22,7 @@ class KnapsackLagrangianBoundTest {
     )
 
     @Test
-    fun `exact knapsack bound on a forced cover-style instance`() {
-        // 4 bools, minimize -(3 x0 + 2 x1 + 2 x2 + x3) (i.e. maximize a profit) under capacity
-        // 4 x0 + 3 x1 + 3 x2 + 2 x3 <= 6, plus a second capacity 2 x0 + 2 x1 + x2 + x3 <= 3.
+    fun `knapsack bound should not exceed the optimum of a two-capacity instance`() {
         val p = Problem(
             numBoolVars = 4,
             numIntVars = 0,
@@ -39,10 +37,8 @@ class KnapsackLagrangianBoundTest {
         assertTrue(lb.applicable)
         val r = lb.computeBound(PropagationSession(p), 100.0, LongArray(lb.multiplierCount), 30)
         requireNotNull(r)
-        // Brute-force optimum over both capacities: best feasible profit is x0,x3 -> 4+2=6 cap, 2+1=3
-        // cap, profit 3+1=4 -> objective -4. The bound is a lower bound, so <= -4.
+        // The brute-force optimum picks x0 and x3 for objective -4.
         assertTrue(!r.prune)
         assertTrue(ceil(r.boundNumerator, r.denominator) <= -4L, "bound ${r.boundNumerator}/${r.denominator} > -4")
     }
-
 }

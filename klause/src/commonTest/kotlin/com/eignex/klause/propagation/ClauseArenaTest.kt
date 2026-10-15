@@ -21,7 +21,7 @@ class ClauseArenaTest {
     )
 
     @Test
-    fun `each clause is recoverable from the arena in original order`() {
+    fun `each clause should be recoverable from the arena in original order`() {
         val c0 = intArrayOf(Lit.make(0, true), Lit.make(1, false))
         val c1 = intArrayOf(Lit.make(2, true))
         val c2 = intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(2, false))
@@ -33,7 +33,7 @@ class ClauseArenaTest {
     }
 
     @Test
-    fun `building an arena from an ineligible problem fails`() {
+    fun `building an arena from an ineligible problem should fail`() {
         val problem = Problem(
             numBoolVars = 1,
             numIntVars = 1,

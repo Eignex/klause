@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 
 class LpModelTest {
     @Test
-    fun `builder source bounds preserve open sides and exact mixed endpoints`() {
+    fun `builder source bounds should preserve open sides and exact mixed endpoints`() {
         val builder = LpBuilder().apply {
             addVar(2L, 5L)
             addFreeVar(null, 7L)
@@ -50,7 +50,7 @@ class LpModelTest {
     }
 
     @Test
-    fun `objective helpers clear every previous structural and logical cost`() {
+    fun `objective helpers should clear every previous structural and logical cost`() {
         val source = LpBuilder().apply {
             addVar(0L, 2L, cost = 7L)
             addVar(0L, 2L, cost = 11L)
@@ -67,7 +67,7 @@ class LpModelTest {
     }
 
     @Test
-    fun `mixed rows preserve coalescing shifts and maximizing costs`() {
+    fun `mixed rows should preserve coalescing shifts and maximizing costs`() {
         val model = LpBuilder().apply {
             val x = addVar(2L, 7L, cost = 3L)
             val y = addRealVar(-1.0, 2.5, cost = -0.5)
@@ -88,7 +88,7 @@ class LpModelTest {
     }
 
     @Test
-    fun `IEEE recenter cannot erase source authority by deriving integral values`() {
+    fun `IEEE recenter should not erase source authority by deriving integral values`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val model = ExactLpModel(
@@ -115,7 +115,7 @@ class LpModelTest {
     }
 
     @Test
-    fun `nonintegral values in each numeric slot decline the legacy bridge`() {
+    fun `nonintegral values in any numeric slot should decline the legacy bridge`() {
         val zero = ExactLpNumber.of(0L)
         val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
         val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 80, BIG_ONE))
@@ -146,7 +146,7 @@ class LpModelTest {
     }
 
     @Test
-    fun `source metadata and objective units participate in exact authority`() {
+    fun `source metadata and objective units should participate in exact authority`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
             listOf(emptyList()),
@@ -176,7 +176,7 @@ class LpModelTest {
     }
 
     @Test
-    fun `exact authority retains rationals and large integers across copies`() {
+    fun `exact authority should retain rationals and large integers across copies`() {
         val values = listOf(
             BigFraction.of(BIG_ONE, bigIntOf(3)),
             BigFraction.ofLong(9007199254740992L),
@@ -205,7 +205,7 @@ class LpModelTest {
     }
 
     @Test
-    fun `binary input retains its raw bits and differs from decimal authority`() {
+    fun `binary input should retain its raw bits and differ from decimal authority`() {
         val binary = ExactLpNumber.ofIeee(0.1)
         val decimal = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(10)))
         val negativeZero = ExactLpNumber.ofIeee(-0.0)
@@ -221,7 +221,7 @@ class LpModelTest {
     }
 
     @Test
-    fun `bounds sharing a double are not exactly fixed`() {
+    fun `bounds sharing a double should not be exactly fixed`() {
         val one = ExactLpNumber.of(1L)
         val next = ExactLpNumber.of(BigFraction.ONE + BigFraction.of(BIG_ONE, BIG_ONE shl 54))
         val bounds = ExactLpBounds(ExactLpSide(one), ExactLpSide(next))
@@ -232,7 +232,7 @@ class LpModelTest {
     }
 
     @Test
-    fun `recenter preserves source equations and both objective constants`() {
+    fun `recenter should preserve source equations and both objective constants`() {
         val zero = ExactLpNumber.of(0L)
         val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
         val model = ExactLpModel(
@@ -267,7 +267,7 @@ class LpModelTest {
     }
 
     @Test
-    fun `snapshots own lists and bridge arrays`() {
+    fun `snapshots should own their lists and bridge arrays`() {
         val zero = ExactLpNumber.of(0L)
         val entries = mutableListOf(ExactLpEntry(0, ExactLpNumber.of(2L)))
         val rhs = mutableListOf(ExactLpNumber.of(8L))
@@ -302,7 +302,7 @@ class LpModelTest {
     }
 
     @Test
-    fun `a Farkas ray is checked against the exact shift where binary64 rounds it`() {
+    fun `a Farkas ray should be checked against the exact shift where binary64 rounds it`() {
         // A + U + B + V >= 0 over B in [-4.2e18, -4e18]: shifting by B's lower bound puts 4.2e18 + 300 on the
         // right-hand side, which binary64 rounds up by 212 — enough to make the feasible model look infeasible.
         for ((vUpper, infeasible) in listOf(-100.0 to false, -250.0 to true)) {
@@ -316,9 +316,5 @@ class LpModelTest {
 
             assertEquals(infeasible, sourceFarkasValid(model, longArrayOf(-1L)), "V <= $vUpper")
         }
-    }
-
-    private companion object {
-        const val PAST_BINARY64: Long = (1L shl 53) + 1L
     }
 }

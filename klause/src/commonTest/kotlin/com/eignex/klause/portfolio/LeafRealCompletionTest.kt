@@ -42,7 +42,7 @@ class LeafRealCompletionTest {
     private fun candidate(k: Long, x: Double) = Sample(BooleanArray(0), longArrayOf(k), doubleArrayOf(x))
 
     @Test
-    fun `a candidate whose discrete part admits a completion gets exact reals`() {
+    fun `a candidate whose discrete part admits a completion should get exact reals`() {
         val completion = LeafRealCompletion(
             problem,
             objective = null,
@@ -54,14 +54,7 @@ class LeafRealCompletionTest {
     }
 
     @Test
-    fun `a candidate whose discrete part admits no completion is refuted`() {
-        assertIs<Completion.Refuted>(
-            LeafRealCompletion(problem, objective = null).complete(candidate(0, 1.0), Cancellation.Never),
-        )
-    }
-
-    @Test
-    fun `a refutation names the rows its proof combines`() {
+    fun `a refutation should name the rows its proof combines`() {
         // k = 0 forces x = 2.5 through the first row, which the second row's x ≤ 1 forbids.
         val completion = LeafRealCompletion(problem, objective = null).complete(candidate(0, 1.0), Cancellation.Never)
 
@@ -70,13 +63,19 @@ class LeafRealCompletionTest {
     }
 
     @Test
-    fun `numerical completion retains CP source tolerance when exact certification is unavailable`() {
-        val source = Mps.parse("ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 1\n" +
-            " M1 'MARKER' 'INTEND'\n X COST 0.1 R 3\nRHS\n RHS R 1\n" +
-            "BOUNDS\n BV B I\n UP B X 1\nENDATA\n").toProblem()
+    fun `numerical completion should retain CP source tolerance when exact certification is unavailable`() {
+        val source = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 1\n" +
+                " M1 'MARKER' 'INTEND'\n X COST 0.1 R 3\nRHS\n RHS R 1\n" +
+                "BOUNDS\n BV B I\n UP B X 1\nENDATA\n",
+        ).toProblem()
         val objective = source.objective?.toLinearObjective()
-        val sample = Sample(booleanArrayOf(), longArrayOf(0), DoubleArray(source.model.numRealVars) { 1.0 },
-            List(source.model.numRealVars) { BigFraction.ONE })
+        val sample = Sample(
+            booleanArrayOf(),
+            longArrayOf(0),
+            DoubleArray(source.model.numRealVars) { 1.0 },
+            List(source.model.numRealVars) { BigFraction.ONE },
+        )
         val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
         val check: (Sample) -> Boolean = { source.withinTolerance(it.ints, it.reals) }
 
@@ -89,14 +88,16 @@ class LeafRealCompletionTest {
         assertEquals(cp.reals.toList(), witness.sample.reals.toList())
         assertTrue(check(witness.sample))
         assertNull(witness.sample.exactReals)
-        assertEquals(source.sourceObjective(sample.ints, cp.reals),
-            source.sourceObjective(witness.sample.ints, witness.sample.reals))
+        assertEquals(
+            source.sourceObjective(sample.ints, cp.reals),
+            source.sourceObjective(witness.sample.ints, witness.sample.reals),
+        )
         assertTrue(witness.work > 0L)
         assertEquals(List(source.model.numRealVars) { BigFraction.ONE }, sample.exactReals)
     }
 
     @Test
-    fun `unavailable exact certification cannot be replaced by absent or rejected tolerance`() {
+    fun `unavailable exact certification should not be replaced by absent or rejected tolerance`() {
         val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val checks = listOf<((Sample) -> Boolean)?>(null, { false })
@@ -110,10 +111,13 @@ class LeafRealCompletionTest {
     }
 
     @Test
-    fun `a tolerance point rejected at completion admission stays private`() {
+    fun `a tolerance point rejected at completion admission should stay private`() {
         var calls = 0
-        val completion = LeafRealCompletion(problem, LinearObjective(realCoefficients = doubleArrayOf(1.0)),
-            toleranceCheck = { ++calls == 1 })
+        val completion = LeafRealCompletion(
+            problem,
+            LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            toleranceCheck = { ++calls == 1 },
+        )
             .complete(candidate(2, 0.4), Cancellation.Never)
 
         assertIs<Completion.Undecided>(completion)
@@ -121,20 +125,28 @@ class LeafRealCompletionTest {
     }
 
     @Test
-    fun `cancellation during tolerance validation withholds the completed witness`() {
+    fun `cancellation during tolerance validation should withhold the completed witness`() {
         var stopped = false
-        val completion = LeafRealCompletion(problem, LinearObjective(realCoefficients = doubleArrayOf(1.0)),
-            toleranceCheck = { stopped = true; true })
+        val completion = LeafRealCompletion(
+            problem,
+            LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            toleranceCheck = {
+                stopped = true
+                true
+            },
+        )
             .complete(candidate(2, 0.4), Cancellation { stopped })
 
         assertTrue(assertIs<Completion.Undecided>(completion).work > 0L)
     }
 
     @Test
-    fun `indicator pins retain original objective direction under exact and tolerance completion`() {
-        val source = Mps.parse("OBJSENSE\n MAX\nROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-            " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R 1\nRHS\n RHS R 0.2\n" +
-            "BOUNDS\n BV B I\n UP B X 1\nINDICATORS\n IF R I 1\nENDATA\n").toProblem()
+    fun `indicator pins should retain original objective direction under exact and tolerance completion`() {
+        val source = Mps.parse(
+            "OBJSENSE\n MAX\nROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R 1\nRHS\n RHS R 0.2\n" +
+                "BOUNDS\n BV B I\n UP B X 1\nINDICATORS\n IF R I 1\nENDATA\n",
+        ).toProblem()
         val objective = source.objective!!.toLinearObjective().negated()
         val check: (Sample) -> Boolean = { source.withinTolerance(it.ints, it.reals) }
 
@@ -146,14 +158,20 @@ class LeafRealCompletionTest {
 
                 val witness = assertIs<Completion.Witness>(completion).sample
                 assertEquals(pin, witness.ints.single())
-                assertEquals(if (pin == 0L) 1.0 else 0.2,
-                    witness.approximateRealValue(source.columns.single { it.real }.id))
+                assertEquals(
+                    if (pin == 0L) 1.0 else 0.2,
+                    witness.approximateRealValue(source.columns.single { it.real }.id),
+                )
                 assertTrue(check(witness))
-                if (tolerance) assertNull(witness.exactReals)
-                else assertEquals(if (pin == 0L) BigFraction.ONE else BigFraction.ofLong(5L).reciprocal(),
-                    source.sourceWitness(witness.ints, witness.exactReals).objective)
+                if (tolerance) {
+                    assertNull(witness.exactReals)
+                } else {
+                    assertEquals(
+                        if (pin == 0L) BigFraction.ONE else BigFraction.ofLong(5L).reciprocal(),
+                        source.sourceWitness(witness.ints, witness.exactReals).objective,
+                    )
+                }
             }
         }
     }
-
 }

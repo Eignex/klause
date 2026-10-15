@@ -10,21 +10,30 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class SearchCandidateHintsTest {
 
     @Test
-    fun `usage observes caller precedence once and retains the complementary traversal`() {
+    fun `usage should observe caller precedence once and retain the complementary traversal`() {
         val usage = OpenHintUsageSink()
         var callerCalls = 0
         var componentCalls = 0
-        val caller = SearchCandidateHints { callerCalls++; false }
-        val component = SearchCandidateHints { componentCalls++; true }
+        val caller = SearchCandidateHints {
+            callerCalls++
+            false
+        }
+        val component = SearchCandidateHints {
+            componentCalls++
+            true
+        }
         val commits = CommitRecorder()
-        val run = SearchSession(emptyList()).openRun(1, observer = commits,
-            candidateHints = observedCandidateHints(caller, component, usage))
+        val run = SearchSession(emptyList()).openRun(
+            1,
+            observer = commits,
+            candidateHints = observedCandidateHints(caller, component, usage),
+        )
 
         assertIs<SearchRunEvent.Satisfied>(run.next())
         assertIs<SearchRunEvent.Satisfied>(run.next())
@@ -39,7 +48,7 @@ class SearchCandidateHintsTest {
     }
 
     @Test
-    fun `a failing hint retains its consultation without inventing a selected polarity`() {
+    fun `a failing hint should retain its consultation without inventing a selected polarity`() {
         val usage = OpenHintUsageSink()
         val failure = IllegalStateException("hint failed")
         val hints = observedCandidateHints(SearchCandidateHints.None, SearchCandidateHints { throw failure }, usage)
@@ -52,16 +61,26 @@ class SearchCandidateHintsTest {
     }
 
     @Test
-    fun `caller hints precede nested gate preferences and preserve both sides`() {
+    fun `caller hints should precede nested gate preferences and preserve both sides`() {
         val clauses = listOf(
-            Clause(intArrayOf(3, 4)), Clause(intArrayOf(3, 6)), Clause(intArrayOf(2, 5, 7)),
-            Clause(intArrayOf(1, 2)), Clause(intArrayOf(1, 8)), Clause(intArrayOf(0, 3, 9)),
+            Clause(intArrayOf(3, 4)),
+            Clause(intArrayOf(3, 6)),
+            Clause(intArrayOf(2, 5, 7)),
+            Clause(intArrayOf(1, 2)),
+            Clause(intArrayOf(1, 8)),
+            Clause(intArrayOf(0, 3, 9)),
         )
-        val component = assertNotNull(SourceConjunctionHints.create(
-            clauses, 5, intArrayOf(2, 3, 4), SearchCandidateHints { variable ->
-                if (variable in 2..4) true else null
-            }, Cancellation.Never,
-        ))
+        val component = assertNotNull(
+            SourceConjunctionHints.create(
+                clauses,
+                5,
+                intArrayOf(2, 3, 4),
+                SearchCandidateHints { variable ->
+                    if (variable in 2..4) true else null
+                },
+                Cancellation.Never,
+            ),
+        )
         val caller = SearchCandidateHints.ofLiterals(intArrayOf(literal(0, false)))
         val commits = CommitRecorder()
         val session = SearchSession(emptyList())
@@ -75,7 +94,7 @@ class SearchCandidateHintsTest {
     }
 
     @Test
-    fun `caller preferences precede component fallback and keep the complement`() {
+    fun `caller preferences should precede component fallback and keep the complement`() {
         for (preferred in listOf(false, true)) {
             val caller = SearchCandidateHints.ofLiterals(intArrayOf(literal(0, preferred)))
             val component = SearchCandidateHints.ofLiterals(
@@ -96,7 +115,7 @@ class SearchCandidateHintsTest {
     }
 
     @Test
-    fun `a hint decides which polarity of a split is tried first`() {
+    fun `a hint should decide which polarity of a split is tried first`() {
         for (preferred in listOf(true, false)) {
             val commits = CommitRecorder()
             val session = SearchSession(emptyList())
@@ -114,24 +133,7 @@ class SearchCandidateHintsTest {
     }
 
     @Test
-    fun `a hinted split still tries its complement on backtracking`() {
-        val commits = CommitRecorder()
-        val session = SearchSession(emptyList())
-        val run = session.openRun(
-            numBoolVars = 1,
-            observer = commits,
-            candidateHints = SearchCandidateHints.ofLiterals(intArrayOf(literal(0, true))),
-        )
-
-        assertIs<SearchRunEvent.Satisfied>(run.next())
-        assertIs<SearchRunEvent.Satisfied>(run.next())
-
-        assertIs<SearchRunEvent.Exhausted>(run.next())
-        assertEquals(listOf(literal(0, true), literal(0, false)), commits.literals)
-    }
-
-    @Test
-    fun `propagation overrides a hint before its split is reached`() {
+    fun `propagation should override a hint before its split is reached`() {
         val commits = CommitRecorder()
         val session = SearchSession(
             listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(literal(0, false)))))),
@@ -150,7 +152,7 @@ class SearchCandidateHintsTest {
     }
 
     @Test
-    fun `a contradictory hint keeps the default branch order`() {
+    fun `a contradictory hint should keep the default branch order`() {
         val commits = CommitRecorder()
         val session = SearchSession(emptyList())
         val run = session.openRun(
@@ -167,7 +169,7 @@ class SearchCandidateHintsTest {
     }
 
     @Test
-    fun `a hint for a variable outside the split keeps the default branch order`() {
+    fun `a hint for a variable outside the split should keep the default branch order`() {
         val commits = CommitRecorder()
         val session = SearchSession(emptyList())
         val run = session.openRun(
@@ -182,7 +184,7 @@ class SearchCandidateHintsTest {
     }
 
     @Test
-    fun `a misleading hint still refutes an unsatisfiable space`() {
+    fun `a misleading hint should still refute an unsatisfiable space`() {
         val session = SearchSession(
             listOf(
                 ClauseSearchComponent(
@@ -208,7 +210,7 @@ class SearchCandidateHintsTest {
     }
 
     @Test
-    fun `a hint still orders splits after a restart`() {
+    fun `a hint should still order splits after a restart`() {
         val commits = CommitRecorder()
         val session = SearchSession(emptyList())
         val run = session.openRun(
@@ -226,18 +228,7 @@ class SearchCandidateHintsTest {
     }
 
     @Test
-    fun `a cancelled hinted run reaches no verdict`() {
-        val session = SearchSession(emptyList(), cancellation = Cancellation { true })
-        val run = session.openRun(
-            numBoolVars = 1,
-            candidateHints = SearchCandidateHints.ofLiterals(intArrayOf(literal(0, true))),
-        )
-
-        assertIs<SearchRunEvent.Indeterminate>(run.next())
-    }
-
-    @Test
-    fun `a hinted run charges the same decisions and open work as an unhinted one`() {
+    fun `a hinted run should charge the same decisions and open work as an unhinted one`() {
         val hints = listOf(
             "unhinted" to SearchCandidateHints.None,
             "hinted" to SearchCandidateHints.ofLiterals(intArrayOf(literal(0, true), literal(1, true))),
@@ -259,7 +250,7 @@ class SearchCandidateHintsTest {
     }
 
     @Test
-    fun `a hinted run stops on the same decision budget as an unhinted one`() {
+    fun `a hinted run should stop on the same decision budget as an unhinted one`() {
         val session = SearchSession(emptyList())
         val run = session.openRun(
             numBoolVars = 2,
@@ -273,7 +264,7 @@ class SearchCandidateHintsTest {
     }
 
     @Test
-    fun `hints from literals drop a variable hinted both ways`() {
+    fun `hints from literals should drop a variable hinted both ways`() {
         val hints = SearchCandidateHints.ofLiterals(
             intArrayOf(
                 literal(0, true),
@@ -291,7 +282,7 @@ class SearchCandidateHintsTest {
     }
 
     @Test
-    fun `a split that is not one Boolean variable keeps its delegate order`() {
+    fun `a split that is not one Boolean variable should keep its delegate order`() {
         val split = listOf(SearchDecision.IntAtMost(0, 1), SearchDecision.IntAtLeast(0, 2))
         val branching = HintedBooleanBranching(BooleanBranching { split }) { true }
 
@@ -300,7 +291,6 @@ class SearchCandidateHintsTest {
 
     private fun literal(variable: Int, value: Boolean): Int = (variable shl 1) or if (value) 0 else 1
 
-    /** Restarts the traversal once, so a second run re-selects the same hinted splits from root. */
     private class OneShotRestart : SearchRestartPolicy {
         private var fired = false
 

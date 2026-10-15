@@ -27,46 +27,62 @@ import kotlin.test.assertTrue
 
 class GridArithmeticEncoderTest {
     @Test
-    fun `selected polynomial encodings preserve every rounded square pair`() {
+    fun `selected polynomial encodings should preserve every rounded square pair`() {
         val input = GridCoordinate(0, -2.0, 2.0, 5)
         val output = GridCoordinate(1, 0.0, 4.0, 5)
         for (relation in listOf<Factor>(GridProduct(input, input, output), GridPower(input, 2, output))) {
-            val source = Problem(0, 2, Array(2) { IntDomain(0, 4) }, arrayOf<Factor>(
-                relation, RealProduct(0, 0, 1, 0.0, 0.0),
-            ), numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(0.0, 0.0))
+            val source = Problem(
+                0,
+                2,
+                Array(2) { IntDomain(0, 4) },
+                arrayOf<Factor>(
+                    relation,
+                    RealProduct(0, 0, 1, 0.0, 0.0),
+                ),
+                numRealVars = 2,
+                realLower = doubleArrayOf(0.0, 0.0),
+                realUpper = doubleArrayOf(0.0, 0.0),
+            )
             val model = assertNotNull(source.prepareExecutionPlan().polynomialModel)
             assertEquals(0, model.encodingAttributions.first().sourceFactorIndex)
-            for (index in 0L..4L) for (result in 0L..4L) {
-                val arithmetic = PolynomialArithmetic()
-                val values = longArrayOf(index, result)
-                val fixed = mutableMapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO)
-                for ((id, column) in model.integerColumns) fixed[column] = BigFraction.ofLong(values[id])
-                val normalized = PolynomialFormula.normalize(model.service.formula, arithmetic, fixed)
-                val signs = normalized.atoms.map { atom ->
-                    assertTrue(atom.polynomial.variables.isEmpty())
-                    val sign = (atom.polynomial.terms.singleOrNull()?.coefficient ?: BigFraction.ZERO)
-                        .compareTo(BigFraction.ZERO)
-                    if (atom.holds(sign)) PolynomialFormula.TRUE else PolynomialFormula.FALSE
-                }.toIntArray()
+            for (index in 0L..4L) {
+                for (result in 0L..4L) {
+                    val arithmetic = PolynomialArithmetic()
+                    val values = longArrayOf(index, result)
+                    val fixed = mutableMapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO)
+                    for ((id, column) in model.integerColumns) fixed[column] = BigFraction.ofLong(values[id])
+                    val normalized = PolynomialFormula.normalize(model.service.formula, arithmetic, fixed)
+                    val signs = normalized.atoms.map { atom ->
+                        assertTrue(atom.polynomial.variables.isEmpty())
+                        val sign = (atom.polynomial.terms.singleOrNull()?.coefficient ?: BigFraction.ZERO)
+                            .compareTo(BigFraction.ZERO)
+                        if (atom.holds(sign)) PolynomialFormula.TRUE else PolynomialFormula.FALSE
+                    }.toIntArray()
 
-                val truth = normalized.truth(intArrayOf(), signs, arithmetic)
+                    val truth = normalized.truth(intArrayOf(), signs, arithmetic)
 
-                val expected = (index - 2L) * (index - 2L)
-                assertEquals(if (result == expected) PolynomialFormula.TRUE else PolynomialFormula.FALSE, truth)
+                    val expected = (index - 2L) * (index - 2L)
+                    assertEquals(if (result == expected) PolynomialFormula.TRUE else PolynomialFormula.FALSE, truth)
+                }
             }
         }
     }
 
     @Test
-    fun `private linear grid relations retain conditioning and retraction`() {
+    fun `private linear grid relations should retain conditioning and retraction`() {
         val input = GridCoordinate(0, -2.0, 2.0, 5)
         val output = GridCoordinate(1, 0.0, 4.0, 5)
         for (relation in listOf<Factor>(GridProduct(input, input, output), GridPower(input, 2, output))) {
             val source = Problem(0, 2, Array(2) { IntDomain(0, 4) }, arrayOf(relation))
-            val encoded = assertNotNull(FactorProjectionProviders.Default.prepare(source)
-                .linearTheoryModel(EncodingTarget.LINEAR))
-            val queries = OpenExactNeighborhood(encoded, TheoryParams(),
-                preparedSource = encoded.prepareExecutionPlan())
+            val encoded = assertNotNull(
+                FactorProjectionProviders.Default.prepare(source)
+                    .linearTheoryModel(EncodingTarget.LINEAR),
+            )
+            val queries = OpenExactNeighborhood(
+                encoded,
+                TheoryParams(),
+                preparedSource = encoded.prepareExecutionPlan(),
+            )
             queries.use {
                 val conflictPins = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO)
                 val negativePins = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ofLong(4))
@@ -86,29 +102,50 @@ class GridArithmeticEncoderTest {
     }
 
     @Test
-    fun `binary private linear grids enforce the rounded product`() {
-        val relation = GridProduct(GridCoordinate(0, 0.0, 1.0, 2), GridCoordinate(1, 0.0, 1.0, 2),
-            GridCoordinate(2, 0.0, 1.0, 2))
+    fun `binary private linear grids should enforce the rounded product`() {
+        val relation = GridProduct(
+            GridCoordinate(0, 0.0, 1.0, 2),
+            GridCoordinate(1, 0.0, 1.0, 2),
+            GridCoordinate(2, 0.0, 1.0, 2),
+        )
         val source = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf<Factor>(relation))
-        val encoded = assertNotNull(FactorProjectionProviders.Default.prepare(source)
-            .linearTheoryModel(EncodingTarget.LINEAR))
+        val encoded = assertNotNull(
+            FactorProjectionProviders.Default.prepare(source)
+                .linearTheoryModel(EncodingTarget.LINEAR),
+        )
         OpenExactNeighborhood(encoded, TheoryParams(), preparedSource = encoded.prepareExecutionPlan()).use { owner ->
-            for (a in 0L..1L) for (b in 0L..1L) for (result in 0L..1L) {
-                val fixed = mapOf(0 to BigFraction.ofLong(a), 1 to BigFraction.ofLong(b),
-                    2 to BigFraction.ofLong(result))
+            for (a in 0L..1L) {
+                for (b in 0L..1L) {
+                    for (result in 0L..1L) {
+                        val fixed = mapOf(
+                            0 to BigFraction.ofLong(a),
+                            1 to BigFraction.ofLong(b),
+                            2 to BigFraction.ofLong(result),
+                        )
 
-                val checked = owner.check(ExactNeighborhoodCondition(emptyMap(), fixed, fixed), Cancellation.Never)
+                        val checked = owner.check(
+                            ExactNeighborhoodCondition(emptyMap(), fixed, fixed),
+                            Cancellation.Never,
+                        )
 
-                if (a * b == result) assertIs<ExactNeighborhoodResult.Witness>(checked)
-                else assertIs<ExactNeighborhoodResult.Refuted>(checked)
+                        if (a * b == result) {
+                            assertIs<ExactNeighborhoodResult.Witness>(checked)
+                        } else {
+                            assertIs<ExactNeighborhoodResult.Refuted>(checked)
+                        }
+                    }
+                }
             }
         }
     }
 
     @Test
-    fun `binary grid installation keeps a compact complete relation`() {
-        val relation = GridProduct(GridCoordinate(0, 0.0, 1.0, 16), GridCoordinate(1, 0.0, 1.0, 16),
-            GridCoordinate(2, 0.0, 1.0, 16))
+    fun `binary grid installation should keep a compact complete relation`() {
+        val relation = GridProduct(
+            GridCoordinate(0, 0.0, 1.0, 16),
+            GridCoordinate(1, 0.0, 1.0, 16),
+            GridCoordinate(2, 0.0, 1.0, 16),
+        )
         val source = Problem(0, 3, Array(3) { IntDomain(0, 15) }, arrayOf<Factor>(relation))
 
         val encoded = FactorProjectionProviders.Default.prepare(source).linearTheoryModel(EncodingTarget.LINEAR)
@@ -117,9 +154,12 @@ class GridArithmeticEncoderTest {
     }
 
     @Test
-    fun `oversized private encodings decline without dropping native finite support`() {
-        val relation = GridPower(GridCoordinate(0, -1.0, 1.0, 10000), 2,
-            GridCoordinate(1, 0.0, 1.0, 10000))
+    fun `oversized private encodings should decline without dropping native finite support`() {
+        val relation = GridPower(
+            GridCoordinate(0, -1.0, 1.0, 10000),
+            2,
+            GridCoordinate(1, 0.0, 1.0, 10000),
+        )
         val source = Problem(0, 2, Array(2) { IntDomain(0, 9999) }, arrayOf<Factor>(relation))
         val prepared = FactorProjectionProviders.Default.prepare(source)
 
@@ -130,7 +170,7 @@ class GridArithmeticEncoderTest {
     }
 
     @Test
-    fun `cancelled grid installation does not retain partial encoding state`() {
+    fun `cancelled grid installation should not retain partial encoding state`() {
         val relation = GridPower(GridCoordinate(0, -2.0, 2.0, 5), 2, GridCoordinate(1, 0.0, 4.0, 5))
         val source = Problem(0, 2, Array(2) { IntDomain(0, 4) }, arrayOf<Factor>(relation))
         val prepared = FactorProjectionProviders.Default.prepare(source)

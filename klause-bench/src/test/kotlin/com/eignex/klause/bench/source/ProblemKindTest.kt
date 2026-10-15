@@ -7,14 +7,12 @@ import kotlin.test.assertTrue
 class ProblemKindTest {
 
     @Test
-    fun `single-line solve minimize is COP`() {
+    fun `single-line solve minimize should be COP`() {
         assertTrue(ProblemKind.hasSolveObjective("solve minimize objective;"))
     }
 
     @Test
-    fun `multi-line solve item with search annotation is COP`() {
-        // The shape of most annotated MiniZinc Challenge models (routing, scheduling): the
-        // objective sits several lines below `solve`, past the search annotation.
+    fun `multi-line solve item with search annotation should be COP`() {
         val model = """
             constraint forall(i in 1..n)(x[i] >= 0);
             solve
@@ -26,17 +24,17 @@ class ProblemKindTest {
     }
 
     @Test
-    fun `solve satisfy is not COP`() {
+    fun `solve satisfy should not be COP`() {
         assertFalse(ProblemKind.hasSolveObjective("solve satisfy;"))
     }
 
     @Test
-    fun `commented-out objective is not COP`() {
+    fun `commented-out objective should not be COP`() {
         assertFalse(ProblemKind.hasSolveObjective("% solve minimize objective;\nsolve satisfy;"))
     }
 
     @Test
-    fun `solve-prefixed identifier does not falsely match`() {
+    fun `solve-prefixed identifier should not match as a solve item`() {
         assertFalse(ProblemKind.hasSolveObjective("constraint solve_count = maximize_calls;\nsolve satisfy;"))
     }
 }

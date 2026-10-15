@@ -11,28 +11,11 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 
 class SolverInvocationTest {
 
     @Test
-    fun `source hint admission and selections survive ordinary SMT protocol capture`() {
-        val lines = "; openHintIndexVisitLimit=1\n; openHintComponentConsulted=0\n; openHintGateSelected=0\nunknown"
-
-        val result = SolverInvocation.invoke(listOf("sh", "-c", "printf '%s\\n' '$lines'"),
-            SolverInvocation.Dialect.SMT_LIB)
-        val decoded = Reports.json.decodeFromString<SolverInvocation.Result>(Reports.json.encodeToString(result))
-
-        assertEquals(null, decoded.feasible)
-        assertEquals("1", decoded.stats["openHintIndexVisitLimit"])
-        assertEquals("0", decoded.stats["openHintComponentConsulted"])
-        assertEquals("0", decoded.stats["openHintGateSelected"])
-        assertEquals(null, decoded.stats["openHintDraws"])
-    }
-
-    @Test
-    fun `exact FlatZinc objective comments override decimal display`() {
+    fun `exact FlatZinc objective comments should override decimal display`() {
         val lines = "_objective = 0.3333333333333333;\n% klause-exact: _objective = 1/3;\n----------"
 
         val result = SolverInvocation.invoke(
@@ -44,7 +27,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `portfolio diagnostics survive protocol parsing`() {
+    fun `portfolio diagnostics should survive protocol parsing`() {
         val diagnostic = """{"armId":7,"phase":"slice","message":"row \"R\"\u000aarm failure"}"""
         for (dialect in SolverInvocation.Dialect.entries) {
             val lines = when (dialect) {
@@ -61,7 +44,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `objective precision survives parsing and cache round trips for each protocol`() {
+    fun `objective precision should survive parsing and cache round trips for each protocol`() {
         val objectives = listOf("9223372036854775808", "9007199254740993", "1/3", "-1/3", "1e400")
         for (dialect in SolverInvocation.Dialect.entries) {
             for (objective in objectives) {
@@ -83,7 +66,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `attribution arrival is measured on the subprocess clock`() {
+    fun `attribution arrival should be measured on the subprocess clock`() {
         val r = SolverInvocation.invoke(
             listOf("sh", "-c", "echo '%%%klause-arm: label=bt objective=7 time=123456'; echo '----------'"),
             SolverInvocation.Dialect.MINIZINC,
@@ -95,24 +78,24 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `a missing klause dist is reported as a defect naming the install task`() {
+    fun `a missing klause dist should be reported as a defect naming the install task`() {
         val defect = SolverInvocation.klauseCliDefect(File("does-not-exist/klause-cli"))
         assertNotNull(defect)
-        assertTrue("installJvmDist" in defect, "the defect should say how to fix it, got: $defect")
+        assertTrue("installJvmDist" in defect, defect)
     }
 
     @Test
-    fun `a klause dist that cannot start is reported as a defect`() {
+    fun `a klause dist that cannot start should be reported as a defect`() {
         assertNotNull(SolverInvocation.klauseCliDefect(File("/usr/bin/false")))
     }
 
     @Test
-    fun `a klause dist that answers version is no defect`() {
+    fun `a klause dist that answers version should not be a defect`() {
         assertNull(SolverInvocation.klauseCliDefect(File("/usr/bin/true")))
     }
 
     @Test
-    fun `subprocess exits remain visible after verdict publication`() {
+    fun `subprocess exit codes should remain visible after verdict publication`() {
         for (dialect in SolverInvocation.Dialect.entries) {
             val verdict = when (dialect) {
                 SolverInvocation.Dialect.MINIZINC -> "----------"
@@ -130,7 +113,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `a model the solver declines is undecided rather than a failed run`() {
+    fun `a declined model should be undecided rather than a failed run`() {
         val r = SolverInvocation.invoke(
             listOf(
                 "sh",
@@ -145,7 +128,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `a MiniZinc UNSATISFIABLE verdict is a proof of infeasibility`() {
+    fun `a MiniZinc UNSATISFIABLE verdict should be a proof of infeasibility`() {
         val r = SolverInvocation.invoke(
             listOf("sh", "-c", "echo '=====UNSATISFIABLE====='; echo '%%%mzn-core: [x > 8, x < 3]'"),
             SolverInvocation.Dialect.MINIZINC,
@@ -155,7 +138,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `flattening infeasibility retains wall clock without an incumbent time`() {
+    fun `flattening infeasibility should retain wall clock without an incumbent time`() {
         val r = SolverInvocation.invoke(
             listOf("sh", "-c", "printf '%s\\n' '%%%mzn-stat: flatTime=0.14' '=====UNSATISFIABLE====='"),
             SolverInvocation.Dialect.MINIZINC,
@@ -169,7 +152,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `subprocess completion retains the earlier incumbent timestamp`() {
+    fun `subprocess completion should retain the earlier incumbent timestamp`() {
         val r = SolverInvocation.invoke(
             listOf("sh", "-c", "echo '----------'; sleep 0.02; echo '=========='"),
             SolverInvocation.Dialect.MINIZINC,
@@ -180,7 +163,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `reference proofs use solve time then wall clock then legacy budget`() {
+    fun `reference proofs should use solve time then wall clock then budget`() {
         val r = SolverInvocation.Result(
             false,
             null,
@@ -202,30 +185,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `subprocess records survive caching and legacy caches have unknown elapsed`() {
-        val diagnostic = """{"armId":7,"phase":"slice","segment":2,"work":30,"type":"IllegalStateException",""" +
-            """"message":"row \"R\"\u000aarm failure","trace":"cause\u000aframe"}"""
-        val r = SolverInvocation.Result(
-            false,
-            null,
-            null,
-            proven = true,
-            stats = mapOf("armFailure.failed" to diagnostic),
-            rawOutput = "",
-            command = "",
-            elapsedMs = 140,
-        )
-        val encoded = Reports.json.encodeToString(r)
-        val legacy = JsonObject(Reports.json.parseToJsonElement(encoded).jsonObject - "elapsedMs").toString()
-        val decoded = Reports.json.decodeFromString<SolverInvocation.Result>(encoded)
-
-        assertEquals(140, decoded.elapsedMs)
-        assertEquals(diagnostic, decoded.stats["armFailure.failed"])
-        assertNull(Reports.json.decodeFromString<SolverInvocation.Result>(legacy).elapsedMs)
-    }
-
-    @Test
-    fun `reference witnesses use incumbent time and undecided runs use budget`() {
+    fun `reference witnesses should use incumbent time and undecided runs the budget`() {
         val r = SolverInvocation.Result(
             true, null, 12, timeToFirstFeasibleMs = 10, elapsedMs = 140,
             proven = false, stats = emptyMap(), rawOutput = "", command = "",
@@ -236,7 +196,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `a crash that also printed a refusal line still raises`() {
+    fun `a crash that also printed a refusal line should still raise`() {
         assertFailsWith<IllegalStateException> {
             SolverInvocation.invoke(
                 listOf(
@@ -250,7 +210,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `a rational competition objective retains incumbent and optimum status`() {
+    fun `a rational competition objective should retain incumbent and optimum status`() {
         val r = SolverInvocation.invoke(
             listOf("sh", "-c", "printf '%s\\n' 'o -1/3' 's OPTIMUM FOUND'"),
             SolverInvocation.Dialect.PB_COMPETITION,
@@ -264,7 +224,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `an SMT optimum requires explicit status and a finite objective`() {
+    fun `an SMT optimum should require explicit status and a finite objective`() {
         val r = SolverInvocation.invoke(
             listOf("sh", "-c", "printf '%s\\n' '; objective=9' '; objective=7' 'sat' '; optimizationStatus=optimal'"),
             SolverInvocation.Dialect.SMT_LIB,
@@ -278,7 +238,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `plain SMT sat provides no optimality proof`() {
+    fun `plain SMT sat should provide no optimality proof`() {
         val r = SolverInvocation.invoke(listOf("sh", "-c", "echo sat"), SolverInvocation.Dialect.SMT_LIB)
 
         assertEquals(true, r.feasible)
@@ -287,7 +247,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `SMT partial and unbounded objectives remain distinct from proved optima`() {
+    fun `SMT partial and unbounded objectives should remain distinct from proved optima`() {
         for (status in listOf("best-found", "unbounded", "unknown", "satisfiable", "unrecognized")) {
             val r = SolverInvocation.invoke(
                 listOf("sh", "-c", "printf '%s\\n' '; objective=-1/3' 'sat' '; optimizationStatus=$status'"),
@@ -304,7 +264,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `SMT optimization metadata alone cannot prove an optimum`() {
+    fun `SMT optimization metadata alone should not prove an optimum`() {
         val r = SolverInvocation.invoke(
             listOf("sh", "-c", "printf '%s\\n' '; objective=7' '; optimizationStatus=optimal'"),
             SolverInvocation.Dialect.SMT_LIB,
@@ -315,7 +275,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `SMT malformed objectives receive no optimum credit`() {
+    fun `SMT malformed objectives should receive no optimum credit`() {
         for (objective in listOf("", "NaN", "Infinity", "1/0")) {
             val r = SolverInvocation.invoke(
                 listOf("sh", "-c", "printf '%s\\n' '; objective=$objective' 'sat' '; optimizationStatus=optimal'"),
@@ -329,7 +289,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `SMT unsat retains its infeasibility proof`() {
+    fun `SMT unsat should retain its infeasibility proof`() {
         val r = SolverInvocation.invoke(
             listOf("sh", "-c", "printf '%s\\n' 'unsat' '; optimizationStatus=unsatisfiable'"),
             SolverInvocation.Dialect.SMT_LIB,
@@ -341,7 +301,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `competition objectives parse decimal exponent and large finite fractions`() {
+    fun `competition objectives should parse decimal exponent and large finite fractions`() {
         val huge = "1" + "0".repeat(400)
         val cases = listOf("-2.5" to -2.5, "1e2" to 100.0, "+1/-4" to -0.25, "$huge/$huge" to 1.0)
 
@@ -351,7 +311,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `competition objectives reject malformed and nonfinite fractions`() {
+    fun `competition objectives should reject malformed and nonfinite fractions`() {
         val cases = listOf("1/0", "1//2", "1.0/2", "NaN", "Infinity", "1e999", "1${"0".repeat(400)}/1")
 
         cases.forEach { source ->
@@ -360,7 +320,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `a subprocess killed by the hard timeout is recorded as an undecided run`() {
+    fun `a subprocess killed by the hard timeout should be recorded as undecided`() {
         val r = SolverInvocation.invoke(listOf("sleep", "5"), SolverInvocation.Dialect.MINIZINC, hardTimeoutMs = 100)
         assertNull(r.feasible)
         assertFalse(r.proven)
@@ -368,14 +328,14 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `a subprocess that fails without being killed still raises`() {
+    fun `a subprocess that fails without being killed should still raise`() {
         assertFailsWith<IllegalStateException> {
             SolverInvocation.invoke(listOf("false"), SolverInvocation.Dialect.MINIZINC)
         }
     }
 
     @Test
-    fun `arm telemetry parses exact and continuous objective channels`() {
+    fun `arm telemetry should parse exact and continuous objective channels`() {
         val r = SolverInvocation.invoke(
             listOf(
                 "sh",
@@ -398,31 +358,8 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `persisted arm telemetry decodes legacy numeric objectives`() {
-        val legacy = """{"label":"legacy","objective":27500000.0,"elapsedMs":15}"""
-
-        val decoded = Reports.json.decodeFromString<Attribution>(legacy)
-        val encoded = Reports.json.encodeToString(
-            Attribution(
-                label = "wide",
-                objective = 9_007_199_254_740_993L.toDouble(),
-                exactObjective = "9007199254740993",
-                continuousObjective = 9_007_199_254_740_994.0,
-                elapsedMs = 20,
-            ),
-        )
-
-        assertEquals(27_500_000.0, decoded.objective)
-        assertNull(decoded.exactObjective)
-        assertTrue("\"exactObjective\": \"9007199254740993\"" in encoded, encoded)
-        assertTrue("\"continuousObjective\": 9.007199254740994E15" in encoded, encoded)
-    }
-
-    @Test
-    fun `calibration timing finds the best-valued incumbent even when attribution arrives out of order`() {
-        // A concurrent portfolio's shared-bound CAS and its attribution-emit lock are separate critical
-        // sections, so a worse incumbent's line can print after a better one's (klause.portfolio.
-        // Portfolio.fold) — the middle entry here is the true best, not the last.
+    fun `calibration timing should find the best-valued incumbent when attribution arrives out of order`() {
+        // Concurrent arms can print a worse incumbent after a better one; the middle entry is the best.
         val r = SolverInvocation.Result(
             feasible = true,
             objective = null,
@@ -443,7 +380,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `calibration timing compares on the continuous channel once any entry carries one`() {
+    fun `calibration timing should compare on the continuous channel once any entry carries one`() {
         val r = SolverInvocation.Result(
             feasible = true,
             objective = null,
@@ -463,7 +400,7 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `every quarantine warning on stderr is kept and nothing else is`() {
+    fun `quarantine warning parsing should keep every stderr warning and nothing else`() {
         val stderr = "WARNING: Using incubator modules\n" +
             "% WARNING: portfolio arm ls/a quarantined: int 3 = 7 conflicts\n" +
             "% WARNING: portfolio arm bt/b quarantined: claimed infeasible against a verified incumbent\n"

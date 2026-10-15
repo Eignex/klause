@@ -20,7 +20,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class BlockedClauseEliminationTest {
-
     private fun pos(v: Int) = Lit.make(v, true)
     private fun neg(v: Int) = Lit.make(v, false)
     private fun clause(vararg lits: Int) = Clause(lits)
@@ -28,7 +27,6 @@ class BlockedClauseEliminationTest {
     private fun sat(factors: Array<Factor>, a: BooleanArray): Boolean =
         factors.filterIsInstance<Clause>().all { c -> c.literals.any { Lit.evaluate(it, a[Lit.variable(it)]) } }
 
-    /** Run BCE and assert soundness over the whole `2^numBool` assignment space; returns the reduced problem. */
     private fun checkBce(numBool: Int, clauses: List<Clause>, objectiveBoolVars: Set<Int> = emptySet()): Problem {
         val problem = Problem(numBool, 0, emptyArray(), clauses).bake()
         val delta = Presolve.eliminateBlockedClauses(problem, objectiveBoolVars)
@@ -59,20 +57,17 @@ class BlockedClauseEliminationTest {
     private fun clauseCount(problem: Problem) = problem.factors.filterIsInstance<Clause>().size
 
     @Test
-    fun `keeps clauses whose only blocking variables are ineligible`() {
-        // With both variables protected, neither may serve as a blocking literal, so nothing is removed.
+    fun `clauses whose only blocking variables are ineligible should be kept`() {
         val reduced = checkBce(
             2,
             listOf(clause(pos(0), pos(1)), clause(neg(0), neg(1))),
             objectiveBoolVars = setOf(0, 1),
         )
-        assertEquals(2, clauseCount(reduced), "no clause is removed")
+        assertEquals(2, clauseCount(reduced))
     }
 
     @Test
-    fun `a blocked clause is repaired on a model with an open column`() {
-        // The blocked check reads only the clause database, so an open integer column beside it is
-        // untouched — the reduction the finite lane cannot reach on this model.
+    fun `a blocked clause should be repaired on a model with an open column`() {
         val open = Bits(1).also { it.set(0) }
         val problem = Problem(
             numBoolVars = 3,
@@ -86,8 +81,8 @@ class BlockedClauseEliminationTest {
 
         val delta = Presolve.eliminateSourceBlockedClauses(problem, emptySet(), Cancellation.Never)
 
-        val reduced = assertNotNull(problem.withSourcePassDelta(delta), "the elimination must not refute")
-        assertTrue(clauseCount(reduced) < clauseCount(problem), "a blocked clause is removed")
+        val reduced = assertNotNull(problem.withSourcePassDelta(delta))
+        assertTrue(clauseCount(reduced) < clauseCount(problem))
         for (mask in 0 until (1 shl problem.numBoolVars)) {
             val solved = BooleanArray(problem.numBoolVars) { ((mask shr it) and 1) == 1 }
             if (!sat(reduced.factors, solved)) continue
@@ -97,9 +92,7 @@ class BlockedClauseEliminationTest {
     }
 
     @Test
-    fun `a boolean an integer row reads never blocks a clause`() {
-        // (b0 ∨ b1) is blocked on either literal over the clauses alone, but a reified row reads both, so
-        // a repair flipping one would change what the row sees.
+    fun `a boolean read by an integer row should never block a clause`() {
         val open = Bits(1).also { it.set(0) }
         val problem = Problem(
             numBoolVars = 2,
@@ -113,6 +106,6 @@ class BlockedClauseEliminationTest {
 
         val delta = Presolve.eliminateSourceBlockedClauses(problem, emptySet(), Cancellation.Never)
 
-        assertTrue(delta.isEmpty, "no clause over row-read booleans is removed")
+        assertTrue(delta.isEmpty)
     }
 }

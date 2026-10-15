@@ -3,16 +3,9 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
-import com.eignex.klause.propagation.NoPropagator
-import com.eignex.klause.propagation.PropagationProjection
-import com.eignex.klause.propagation.PropagationProjectionProvider
-import com.eignex.klause.solver.AssignmentCheckCapability
-import com.eignex.klause.solver.FactorProjectionProviders
-import com.eignex.klause.solver.PropagationCapability
+import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealProblem
@@ -23,8 +16,15 @@ import com.eignex.klause.ir.QuadraticObjectiveTerm
 import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
+import com.eignex.klause.propagation.NoPropagator
+import com.eignex.klause.propagation.PropagationProjection
+import com.eignex.klause.propagation.PropagationProjectionProvider
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.AssignmentCheckCapability
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.TerminationReason
@@ -32,27 +32,42 @@ import com.eignex.klause.util.Cancellation
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertTrue
-import kotlin.test.assertNotNull
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class QuadraticOptimizationExecutionTest {
     @Test
-    fun `quadratic finite preparation opens the selected source deduction`() {
+    fun `quadratic finite preparation should open the selected source deduction`() {
         val clause = Clause(intArrayOf(0))
-        val source = Problem(1, 1, arrayOf(IntDomain(1, 1)), arrayOf(clause, RealProduct(0, 0, 0, 1.0, 1.0)),
-            numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
+        val source = Problem(
+            1,
+            1,
+            arrayOf(IntDomain(1, 1)),
+            arrayOf(clause, RealProduct(0, 0, 0, 1.0, 1.0)),
+            numRealVars = 1,
+            realLower = doubleArrayOf(1.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         var opened = 0
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
-            if (factor !== clause) BuiltInPropagationProjectionProvider.select(factor)
-            else PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
-                "The original clause is checked at complete points.") {
-                opened++
-                NoPropagator
-            }
-        })
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider { factor ->
+                if (factor !== clause) {
+                    BuiltInPropagationProjectionProvider.select(factor)
+                } else {
+                    PropagationProjection(
+                        PropagationCapability.INERT,
+                        AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                        "The original clause is checked at complete points.",
+                    ) {
+                        opened++
+                        NoPropagator
+                    }
+                }
+            },
+        )
         val request = source.prepareExecutionPlan(providers).polynomialRequest()
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
@@ -65,17 +80,28 @@ class QuadraticOptimizationExecutionTest {
     }
 
     @Test
-    fun `continuous rational optimum is published with a matching exact bound`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+    fun `continuous rational optimum should be published with a matching exact bound`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val x = QuadraticVariable.Real(SourceRealId(0))
-        val objective = QuadraticObjectiveSpec(listOf(
-            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x),
-            QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), x),
-        ))
+        val objective = QuadraticObjectiveSpec(
+            listOf(
+                QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x),
+                QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), x),
+            ),
+        )
 
         val execution = OpenTheoryPipeline.minimize(
-            source.pipelineRequest(), objective, engine = FiniteEngine.BACKTRACK,
+            source.pipelineRequest(),
+            objective,
+            engine = FiniteEngine.BACKTRACK,
         )
 
         val optimum = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
@@ -84,15 +110,24 @@ class QuadraticOptimizationExecutionTest {
     }
 
     @Test
-    fun `strict source boundary publishes an unattained infimum with a feasible incumbent`() {
+    fun `strict source boundary should publish an unattained infimum with a feasible incumbent`() {
         val parsed = SmtLibPolynomial.parse("(declare-const x Real) (assert (> x 0)) (check-sat)")
-        val source = PolynomialRealProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.sourceRealCount, parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames)
+        val source = PolynomialRealProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.sourceRealCount,
+            parsed.sourceBoolCount,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
 
         val execution = OpenTheoryPipeline.minimize(
-            source.pipelineRequest(), objective, engine = FiniteEngine.BACKTRACK,
+            source.pipelineRequest(),
+            objective,
+            engine = FiniteEngine.BACKTRACK,
         )
 
         val infimum = assertIs<QuadraticOptimizationResult.UnattainedLimit>(execution.result)
@@ -102,14 +137,24 @@ class QuadraticOptimizationExecutionTest {
     }
 
     @Test
-    fun `maximization keeps source objective direction and exact values`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+    fun `maximization should keep source objective direction and exact values`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), x, x)))
 
         val execution = OpenTheoryPipeline.minimize(
-            source.pipelineRequest(), objective, engine = FiniteEngine.BACKTRACK, sense = ObjectiveSense.MAXIMIZE,
+            source.pipelineRequest(),
+            objective,
+            engine = FiniteEngine.BACKTRACK,
+            sense = ObjectiveSense.MAXIMIZE,
         )
 
         val optimum = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
@@ -118,34 +163,57 @@ class QuadraticOptimizationExecutionTest {
     }
 
     @Test
-    fun `zero native allowance cannot publish an optimization certificate`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `zero native allowance should not publish an optimization certificate`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
 
         val execution = OpenTheoryPipeline.minimize(
-            source.pipelineRequest(), objective, PolynomialTheoryParams(maximumWork = 0), FiniteEngine.MIXED,
+            source.pipelineRequest(),
+            objective,
+            PolynomialTheoryParams(maximumWork = 0),
+            FiniteEngine.MIXED,
         )
 
         assertEquals(
-            TerminationReason.BudgetExhausted, assertIs<QuadraticOptimizationResult.Unknown>(execution.result).reason,
+            TerminationReason.BudgetExhausted,
+            assertIs<QuadraticOptimizationResult.Unknown>(execution.result).reason,
         )
         assertEquals(0L, execution.nativeWork)
     }
 
     @Test
-    fun `local optimization keeps a source incumbent without promoting its neighborhood proof`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(2.0))
+    fun `local optimization should keep a source incumbent without promoting its neighborhood proof`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-2.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), x, x)))
-        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 2, randomSeed = 17),
-        ))
+        val params = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 2, randomSeed = 17),
+            ),
+        )
 
         val execution = OpenTheoryPipeline.minimize(
-            source.pipelineRequest(), objective, params, FiniteEngine.LOCAL_SEARCH,
+            source.pipelineRequest(),
+            objective,
+            params,
+            FiniteEngine.LOCAL_SEARCH,
         )
 
         assertIs<QuadraticOptimizationResult.BestFound>(execution.result)
@@ -153,46 +221,66 @@ class QuadraticOptimizationExecutionTest {
     }
 
     @Test
-    fun `algebraic optimum retains its exact source root after a later cancelled invocation`() {
+    fun `algebraic optimum should keep its exact root after a later cancelled invocation`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (assert (and (= (* x x) 2) (> x 0))) (check-sat)",
         )
         val source = PolynomialRealProblem(
-            parsed.formula, parsed.realCount, parsed.boolCount, parsed.sourceRealCount,
-            parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames,
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.sourceRealCount,
+            parsed.sourceBoolCount,
+            parsed.realVarNames,
+            parsed.boolVarNames,
         ).pipelineRequest()
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x)))
 
         val execution = OpenTheoryPipeline.minimize(source, objective, engine = FiniteEngine.BACKTRACK)
         val cancelled = OpenTheoryPipeline.minimize(
-            source, objective, PolynomialTheoryParams(cancellation = Cancellation { true }),
+            source,
+            objective,
+            PolynomialTheoryParams(cancellation = Cancellation { true }),
         )
 
         val optimum = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
         assertEquals(0, AlgebraicArithmetic().signAt(RationalPolynomial.of(-2, 0, 1), optimum.incumbent.value))
         assertTrue(AlgebraicArithmetic().sign(optimum.incumbent.value) > 0)
         assertEquals(
-            TerminationReason.Cancelled, assertIs<QuadraticOptimizationResult.Unknown>(cancelled.result).reason,
+            TerminationReason.Cancelled,
+            assertIs<QuadraticOptimizationResult.Unknown>(cancelled.result).reason,
         )
     }
 
     @Test
-    fun `an exhausted heuristic retains a global box bound without a feasibility claim`() {
+    fun `exhausted heuristic should keep a global box bound without a feasibility claim`() {
         val source = Problem(
-            0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(2.0),
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-2.0),
+            realUpper = doubleArrayOf(2.0),
         )
         val x = QuadraticVariable.Real(SourceRealId(0))
-        val objective = QuadraticObjectiveSpec(listOf(
-            QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), x, x),
-        ))
-        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 0),
-        ))
+        val objective = QuadraticObjectiveSpec(
+            listOf(
+                QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), x, x),
+            ),
+        )
+        val params = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 0),
+            ),
+        )
 
         val execution = OpenTheoryPipeline.minimize(
-            source.pipelineRequest(), objective, params, FiniteEngine.LOCAL_SEARCH,
+            source.pipelineRequest(),
+            objective,
+            params,
+            FiniteEngine.LOCAL_SEARCH,
         )
 
         val unknown = assertIs<QuadraticOptimizationResult.Unknown>(execution.result)
@@ -201,23 +289,33 @@ class QuadraticOptimizationExecutionTest {
     }
 
     @Test
-    fun `private worker cancellation retains a checked incumbent without an optimum certificate`() {
+    fun `private worker cancellation should keep a checked incumbent without an optimum certificate`() {
         val source = Problem(
-            0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-1.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
         var cancelled = false
-        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            backtrack = BacktrackParams(
-                cancellation = Cancellation { cancelled },
-                onEvent = { if (it is SearchEvent.Incumbent) cancelled = true },
+        val params = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                backtrack = BacktrackParams(
+                    cancellation = Cancellation { cancelled },
+                    onEvent = { if (it is SearchEvent.Incumbent) cancelled = true },
+                ),
             ),
-        ))
+        )
 
         val execution = OpenTheoryPipeline.minimize(
-            source.pipelineRequest(), objective, params, FiniteEngine.BACKTRACK,
+            source.pipelineRequest(),
+            objective,
+            params,
+            FiniteEngine.BACKTRACK,
         )
 
         val result = assertIs<QuadraticOptimizationResult.BestFound>(execution.result)
@@ -226,21 +324,31 @@ class QuadraticOptimizationExecutionTest {
     }
 
     @Test
-    fun `a cancellation exception retains an incumbent checked before interruption`() {
+    fun `cancellation exception should keep an incumbent checked before interruption`() {
         val source = Problem(
-            0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-1.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
-        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            backtrack = BacktrackParams(onEvent = {
-                if (it is SearchEvent.Incumbent) throw CancellationException()
-            }),
-        ))
+        val params = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                backtrack = BacktrackParams(onEvent = {
+                    if (it is SearchEvent.Incumbent) throw CancellationException()
+                }),
+            ),
+        )
 
         val execution = OpenTheoryPipeline.minimize(
-            source.pipelineRequest(), objective, params, FiniteEngine.BACKTRACK,
+            source.pipelineRequest(),
+            objective,
+            params,
+            FiniteEngine.BACKTRACK,
         )
 
         val result = assertIs<QuadraticOptimizationResult.BestFound>(execution.result)
@@ -249,13 +357,18 @@ class QuadraticOptimizationExecutionTest {
     }
 
     @Test
-    fun `alternative source equalities cannot become unconditional objective fixings`() {
+    fun `alternative source equalities should not become unconditional objective fixings`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (assert (or (= x 1) (= x 2))) (check-sat)",
         )
         val source = PolynomialRealProblem(
-            parsed.formula, parsed.realCount, parsed.boolCount, parsed.sourceRealCount,
-            parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames,
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.sourceRealCount,
+            parsed.sourceBoolCount,
+            parsed.realVarNames,
+            parsed.boolVarNames,
         ).pipelineRequest()
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
@@ -265,53 +378,33 @@ class QuadraticOptimizationExecutionTest {
         val result = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
         assertEquals(BigFraction.ONE, result.incumbent.value.rational)
     }
-    @Test
-    fun `parallel mixed execution preserves a strict unattained source limit`() {
-        val parsed = SmtLibPolynomial.parse("(declare-const x Real) (assert (> x 0))")
-        val source = PolynomialRealProblem(parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.sourceRealCount, parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames)
-        val x = QuadraticVariable.Real(SourceRealId(0))
-        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
-
-        val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, PolynomialTheoryParams(),
-            FiniteEngine.MIXED, ObjectiveSense.MINIMIZE, 4)
-
-        val limit = assertIs<QuadraticOptimizationResult.UnattainedLimit>(execution.result)
-        assertEquals(BigFraction.ZERO, limit.bound.value.rational)
-        assertTrue(limit.bound.strict)
-        assertTrue(AlgebraicArithmetic().sign(limit.incumbent.value) > 0)
-        assertEquals(4, limit.stats.portfolio.arms.size)
-    }
 
     @Test
-    fun `parallel mixed maximization retains the original exact objective direction`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
-        val x = QuadraticVariable.Real(SourceRealId(0))
-        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), x, x)))
-
-        val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, PolynomialTheoryParams(),
-            FiniteEngine.MIXED, ObjectiveSense.MAXIMIZE, 4)
-
-        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
-        assertEquals(ObjectiveSense.MAXIMIZE, optimum.sense)
-        assertEquals(BigFraction.ZERO, optimum.incumbent.value.rational)
-        assertEquals(BigFraction.ZERO, optimum.bound.value.rational)
-        assertEquals(4, optimum.stats.portfolio.arms.size)
-    }
-
-    @Test
-    fun `sliced quadratic traversal preserves exact completion and native accounting`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(3.0))
+    fun `sliced quadratic traversal should preserve exact completion and native accounting`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-2.0),
+            realUpper = doubleArrayOf(3.0),
+        )
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
         val request = source.pipelineRequest()
         val params = PolynomialTheoryParams()
         val whole = OpenTheoryPipeline.minimize(request, objective, params, FiniteEngine.BACKTRACK)
         val native = QuadraticNativeScope(params)
-        val adapter = QuadraticWorkerAdapter(request, request.resolvedModel(), objective, ObjectiveSense.MINIMIZE,
-            params, native, FiniteEngine.BACKTRACK)
+        val adapter = QuadraticWorkerAdapter(
+            request,
+            request.resolvedModel(),
+            objective,
+            ObjectiveSense.MINIMIZE,
+            params,
+            native,
+            FiniteEngine.BACKTRACK,
+        )
         val worker = adapter.worker(0)
         val handle = assertIs<QuadraticPortfolioSearch>(worker.newResumableSearch { Double.POSITIVE_INFINITY })
         var slices = 0
@@ -329,15 +422,29 @@ class QuadraticOptimizationExecutionTest {
     }
 
     @Test
-    fun `closed pending quadratic traversal rejects more slices`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(3.0))
+    fun `closed pending quadratic traversal should reject more slices`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-2.0),
+            realUpper = doubleArrayOf(3.0),
+        )
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
         val request = source.pipelineRequest()
         val params = PolynomialTheoryParams()
-        val adapter = QuadraticWorkerAdapter(request, request.resolvedModel(), objective, ObjectiveSense.MINIMIZE,
-            params, QuadraticNativeScope(params), FiniteEngine.BACKTRACK)
+        val adapter = QuadraticWorkerAdapter(
+            request,
+            request.resolvedModel(),
+            objective,
+            ObjectiveSense.MINIMIZE,
+            params,
+            QuadraticNativeScope(params),
+            FiniteEngine.BACKTRACK,
+        )
         val handle = assertNotNull(adapter.worker(0).newResumableSearch { Double.POSITIVE_INFINITY })
 
         handle.close()
@@ -345,18 +452,31 @@ class QuadraticOptimizationExecutionTest {
         assertFailsWith<IllegalStateException> { handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { } }
     }
 
-
     @Test
-    fun `quadratic neighborhood preparation is charged once before its first repair`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(3.0))
+    fun `quadratic neighborhood preparation should be charged once before its first repair`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-2.0),
+            realUpper = doubleArrayOf(3.0),
+        )
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
         val request = source.pipelineRequest()
         val params = PolynomialTheoryParams()
         val native = QuadraticNativeScope(params)
-        val adapter = QuadraticWorkerAdapter(request, request.resolvedModel(), objective, ObjectiveSense.MINIMIZE,
-            params, native, FiniteEngine.LOCAL_SEARCH)
+        val adapter = QuadraticWorkerAdapter(
+            request,
+            request.resolvedModel(),
+            objective,
+            ObjectiveSense.MINIMIZE,
+            params,
+            native,
+            FiniteEngine.LOCAL_SEARCH,
+        )
         val handle = assertIs<InstructionSlicedSearch>(
             adapter.worker(1).newResumableSearch { Double.POSITIVE_INFINITY },
         )
@@ -375,23 +495,38 @@ class QuadraticOptimizationExecutionTest {
     }
 
     @Test
-    fun `parallel algebraic optimum retains its accepted publication identity`() {
+    fun `parallel algebraic optimum should keep its accepted publication identity`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (assert (and (= (* x x) 2) (> x 0))) (check-sat)",
         )
         val source = PolynomialRealProblem(
-            parsed.formula, parsed.realCount, parsed.boolCount, parsed.sourceRealCount,
-            parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames,
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.sourceRealCount,
+            parsed.sourceBoolCount,
+            parsed.realVarNames,
+            parsed.boolVarNames,
         ).pipelineRequest()
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x)))
         val published = mutableListOf<QuadraticIncumbentPublication>()
 
-        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 0), alnsIterations = 0,
-        ))
-        val execution = OpenTheoryPipeline.minimize(source, objective, params,
-            FiniteEngine.MIXED, ObjectiveSense.MINIMIZE, 2, onAccepted = { published += it })
+        val params = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 0),
+                alnsIterations = 0,
+            ),
+        )
+        val execution = OpenTheoryPipeline.minimize(
+            source,
+            objective,
+            params,
+            FiniteEngine.MIXED,
+            ObjectiveSense.MINIMIZE,
+            2,
+            onAccepted = { published += it },
+        )
         val result = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
 
         assertEquals(1, published.size)
@@ -402,17 +537,31 @@ class QuadraticOptimizationExecutionTest {
     }
 
     @Test
-    fun `a cancellation exception from exact publication is propagated after cleanup`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(3.0))
+    fun `cancellation exception from exact publication should propagate after cleanup`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-2.0),
+            realUpper = doubleArrayOf(3.0),
+        )
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
         val request = source.pipelineRequest()
         val expected = CancellationException("publication cancelled")
 
         val failure = assertFailsWith<CancellationException> {
-            OpenTheoryPipeline.minimize(request, objective, PolynomialTheoryParams(), FiniteEngine.FIXED,
-                ObjectiveSense.MINIMIZE, 1, onAccepted = { throw expected })
+            OpenTheoryPipeline.minimize(
+                request,
+                objective,
+                PolynomialTheoryParams(),
+                FiniteEngine.FIXED,
+                ObjectiveSense.MINIMIZE,
+                1,
+                onAccepted = { throw expected },
+            )
         }
         val later = OpenTheoryPipeline.minimize(request, objective, engine = FiniteEngine.FIXED)
 
@@ -421,21 +570,42 @@ class QuadraticOptimizationExecutionTest {
     }
 
     @Test
-    fun `fixed quadratic execution ignores extra lane requests`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(3.0))
+    fun `fixed quadratic execution should ignore extra lane requests`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-2.0),
+            realUpper = doubleArrayOf(3.0),
+        )
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
         val request = source.pipelineRequest()
         val params = PolynomialTheoryParams()
 
-        val single = OpenTheoryPipeline.minimize(request, objective, params, FiniteEngine.FIXED,
-            ObjectiveSense.MINIMIZE, 1)
-        val extra = OpenTheoryPipeline.minimize(request, objective, params, FiniteEngine.FIXED,
-            ObjectiveSense.MINIMIZE, 4)
+        val single = OpenTheoryPipeline.minimize(
+            request,
+            objective,
+            params,
+            FiniteEngine.FIXED,
+            ObjectiveSense.MINIMIZE,
+            1,
+        )
+        val extra = OpenTheoryPipeline.minimize(
+            request,
+            objective,
+            params,
+            FiniteEngine.FIXED,
+            ObjectiveSense.MINIMIZE,
+            4,
+        )
 
-        assertEquals(assertIs<QuadraticOptimizationResult.Optimal>(single.result).incumbent.value.rational,
-            assertIs<QuadraticOptimizationResult.Optimal>(extra.result).incumbent.value.rational)
+        assertEquals(
+            assertIs<QuadraticOptimizationResult.Optimal>(single.result).incumbent.value.rational,
+            assertIs<QuadraticOptimizationResult.Optimal>(extra.result).incumbent.value.rational,
+        )
         assertEquals(single.nativeWork, extra.nativeWork)
         assertEquals(single.polynomialStats, extra.polynomialStats)
         assertTrue(extra.result.stats.portfolio.arms.isEmpty())

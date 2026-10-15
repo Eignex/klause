@@ -18,7 +18,7 @@ import kotlin.test.assertEquals
 class ValuePrecedePropagatorTest {
 
     @Test
-    fun `value precede deductions are implied by their reasons under carved holes`() {
+    fun `value precede deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x7A1E)
         repeat(300) { iter ->
             val n = 5
@@ -42,8 +42,7 @@ class ValuePrecedePropagatorTest {
     }
 
     @Test
-    fun `a t pruned before any s cites only the positions that lost s`() {
-        // 1 must precede 2: x0 lost 1, so x1 cannot hold 2; x3's hole at 0 plays no part.
+    fun `a t pruned before any s should cite only the positions that lost s`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,

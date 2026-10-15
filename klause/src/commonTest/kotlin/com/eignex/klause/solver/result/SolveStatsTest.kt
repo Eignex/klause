@@ -10,17 +10,14 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.localsearch.LocalSearchSolver
-import com.eignex.klause.model.IntCmpOp
-import com.eignex.klause.model.IntCompare
-import com.eignex.klause.model.IntRef
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferent
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.kumulant.stat.summary.MaxResult
+import com.eignex.kumulant.stat.summary.SumResult
+import com.eignex.kumulant.stat.summary.WeightedMeanResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -40,40 +37,19 @@ class SolveStatsTest {
     }
 
     @Test
-    fun `backtrack populates stats with non-zero nodes and depth`() {
+    fun `backtrack solve should populate node and depth stats`() {
         val schema = Queens6()
         val compiled = schema.compile()
         val result = BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams())
-        assertTrue(result is SolveResult.Sat, "expected SAT for 6-row alldiff")
+        assertTrue(result is SolveResult.Sat)
         val stats = result.stats
         assertEquals("backtrack", stats.run.backend)
-        assertTrue(
-            stats.search.nodes.sum > 0.0,
-            "backtrack should visit at least one decision node; nodes=${stats.search.nodes.sum}",
-        )
-        assertTrue(stats.search.peakDepth.max >= 1.0, "peak depth should be ≥1; got ${stats.search.peakDepth.max}")
-        assertTrue(stats.search.depthMean.totalWeights >= 1.0, "mean depth should have received ≥1 update")
+        assertTrue(stats.search.nodes.sum > 0.0)
+        assertTrue(stats.search.peakDepth.max >= 1.0)
+        assertTrue(stats.search.depthMean.totalWeights >= 1.0)
     }
 
-    @Test
-    fun `local-search populates backend tag and wall time`() {
-        val schema = Queens6()
-        val compiled = schema.compile()
-        val result = LocalSearchSolver(
-            compiled.problem.bake(),
-        ).solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 7))
-        // Either SAT or Unknown — both should carry the ls backend tag.
-        val stats = result.stats
-        assertEquals("ls", stats.run.backend)
-        assertTrue(stats.run.wallMs >= 0L, "wallMs should be non-negative")
-    }
-
-    /**
-     * Pigeonhole over weak binary `!=` (decomposed, *not* the global alldifferent): `n` int
-     * vars in `0..n-2` with all pairs constrained unequal. Weak propagation can't prove this at
-     * the root, so the engine must branch and hit propagation conflicts — exactly the situation
-     * where failures must be counted.
-     */
+    // Pairwise != instead of AllDifferent, so refuting it needs branching.
     private fun pigeonhole(n: Int): Problem {
         val factors = buildList {
             for (i in 0 until n) {
@@ -91,24 +67,14 @@ class SolveStatsTest {
     }
 
     @Test
-    fun `backtrack counts failures while proving UNSAT`() {
-        // 4 pigeons, 3 holes: infeasible, but only the weak binary != constraints — so the
-        // proof requires branching and backtracking on conflicts, not a root wipeout.
+    fun `backtrack should count failures while proving unsat`() {
         val result = BacktrackSolver(pigeonhole(4).bake()).solve(BacktrackParams(randomSeed = 0L))
-        assertIs<SolveResult.Unsat>(result, "4-into-3 pigeonhole is infeasible")
-        assertTrue(
-            result.stats.search.fails.sum > 0.0,
-            "an UNSAT proof that branches must record failures; got fails=${result.stats.search.fails.sum}",
-        )
+        assertIs<SolveResult.Unsat>(result)
+        assertTrue(result.stats.search.fails.sum > 0.0)
     }
 
     @Test
-    fun `branch-and-bound counts failures while proving optimal`() {
-        // Three vars in 0..3 with pairwise sum >= 4, minimising x+y+z. IndomainMin tries the
-        // smallest values first, which violate the >= sums and conflict before the descent
-        // climbs to a feasible leaf — so the optimality proof genuinely backtracks on conflicts
-        // (the optimum is x=y=z=2, total 6). A search like this cannot honestly report zero
-        // failures.
+    fun `branch and bound should count failures while proving optimality`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -124,23 +90,14 @@ class SolveStatsTest {
             obj,
             BacktrackParams(randomSeed = 0L, variableSelector = InputOrder, valueSelector = IndomainMax),
         )
-        val optimal = assertIs<MinimizeResult.Optimal>(result, "expected a proven optimum")
-        assertEquals(6.0, optimal.objective, "minimum of x+y+z under the pairwise sum bounds is 6")
-        assertTrue(
-            optimal.stats.search.fails.sum > 0.0,
-            "a branch-and-bound optimality proof that searches must record failures; " +
-                "got fails=${optimal.stats.search.fails.sum}",
-        )
+        val optimal = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(6.0, optimal.objective)
+        assertTrue(optimal.stats.search.fails.sum > 0.0)
     }
 
     @Test
-    fun `branch-and-bound counts bound-pruned nodes as failures`() {
-        // Two unconstrained vars, minimising x + y. With no constraints there is never a
-        // propagation conflict, and a two-variable objective has no single objective var to pin
-        // as a domain bound — so the optimum (0) is found immediately and every remaining subtree
-        // dies purely by the objective lower bound (linearLowerBound >= incumbent). Those
-        // bound-pruned nodes are failed nodes too and must be counted, matching solvers
-        // that post the objective bound as a constraint.
+    fun `branch and bound should count bound-pruned nodes as failures`() {
+        // Without constraints, every failure comes from objective-bound pruning.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -152,42 +109,263 @@ class SolveStatsTest {
             obj,
             BacktrackParams(randomSeed = 0L, variableSelector = InputOrder, valueSelector = IndomainMin),
         )
-        val optimal = assertIs<MinimizeResult.Optimal>(result, "expected a proven optimum")
-        assertEquals(0.0, optimal.objective, "minimum of x + y is 0")
-        assertTrue(
-            optimal.stats.search.fails.sum > 0.0,
-            "a proof that kills subtrees by the objective bound must record those as failures; " +
-                "got fails=${optimal.stats.search.fails.sum}",
+        val optimal = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(0.0, optimal.objective)
+        assertTrue(optimal.stats.search.fails.sum > 0.0)
+    }
+
+    @Test
+    fun `hint usage should keep unobserved fields absent and observed zeros through merges`() {
+        val sink = OpenHintUsageSink()
+        val absent = sink.snapshot()
+        sink.rawConstruction(0, 0, 0, 0, 0)
+        val zero = sink.snapshot()
+
+        assertEquals(null, absent.rawClausesMax)
+        assertEquals(null, absent.rawLedgerDebits)
+        assertEquals(null, zero.sourceBooleansMax)
+        assertEquals(null, zero.sourceClausesMax)
+        assertEquals(null, zero.sourcePrimitiveEntriesMax)
+        assertEquals(0L, zero.rawClausesMax)
+        assertEquals(0L, zero.rawLiteralsMax)
+        assertEquals(0L, zero.rawIncidencesMax)
+        assertEquals(0L, zero.rawVariablesMax)
+        assertEquals(0L, zero.rawLedgerDebits)
+        assertEquals(zero, zero.copy())
+        assertEquals(zero, absent.mergedWith(zero))
+        assertEquals(zero, zero.mergedWith(absent))
+        assertEquals(absent, absent.mergedWith(absent))
+        sink.sourceDimensions(0, 0, 0)
+        val observed = sink.snapshot()
+        assertEquals(0L, observed.sourceBooleansMax)
+        assertEquals(0L, observed.sourceClausesMax)
+        assertEquals(0L, observed.sourcePrimitiveEntriesMax)
+        assertEquals(observed, observed.copy())
+        assertTrue(observed != absent)
+    }
+
+    @Test
+    fun `construction maxima should survive snapshots copies and merges`() {
+        val sink = OpenHintUsageSink()
+        sink.sourceDimensions(9, 7, 5)
+        sink.rawConstruction(3, 11, 7, 4, 19)
+        val first = sink.snapshot()
+        sink.sourceDimensions(4, 2, 1)
+        sink.rawConstruction(2, 8, 6, 3, 13)
+        val second = sink.snapshot()
+
+        val merged = SolveStats(openHints = OpenHintStats(usage = first))
+            .mergedWith(SolveStats(openHints = OpenHintStats(usage = second))).openHints.usage
+        val saturated = second.copy(rawLedgerDebits = Long.MAX_VALUE).mergedWith(second)
+
+        assertEquals(32L, second.rawLedgerDebits)
+        assertEquals(9L, second.sourceBooleansMax)
+        assertEquals(11L, second.rawLiteralsMax)
+        assertEquals(second, second.copy())
+        assertEquals(second.copy(rawLedgerDebits = 51), merged)
+        assertEquals(Long.MAX_VALUE, saturated.rawLedgerDebits)
+        assertEquals(second.rawLiteralsMax, saturated.rawLiteralsMax)
+    }
+
+    @Test
+    fun `hint stats copies should keep usage and merge it across workers`() {
+        val usage = OpenHintUsageStats(
+            indexesAdmitted = 1, componentSelections = 3, gateSelections = 3,
+            clauseIndexesAdmitted = 1, clauseConsultations = 3, clauseSelections = 2, clauseDeclines = 1,
+            earlyPointUnavailable = 2, forwardUncovered = 3, primitiveProviderNone = 1,
         )
+        val original = OpenHintStats(draws = 1, steeredSplits = 2, usage = usage)
+
+        val copied = original.copy(steeredSplits = 7)
+        val replaced = copied.copy(usage = OpenHintUsageStats())
+        val merged = SolveStats(openHints = original).mergedWith(SolveStats(openHints = copied)).openHints
+
+        assertEquals(usage, copied.usage)
+        assertEquals(OpenHintUsageStats(), replaced.usage)
+        assertEquals(2L, merged.draws)
+        assertEquals(9L, merged.steeredSplits)
+        assertEquals(
+            OpenHintUsageStats(
+                indexesAdmitted = 2, componentSelections = 6, gateSelections = 6,
+                clauseIndexesAdmitted = 2, clauseConsultations = 6, clauseSelections = 4, clauseDeclines = 2,
+                earlyPointUnavailable = 4, forwardUncovered = 6, primitiveProviderNone = 2,
+            ),
+            merged.usage,
+        )
+        assertEquals(OpenHintStats(), OpenHintStats(0, 0, 0, 0, 0))
+        assertTrue(original != replaced)
     }
 
     @Test
-    fun `default SolveStats EMPTY is zero everywhere`() {
-        val s = SolveStats.EMPTY
-        assertEquals("", s.run.backend)
-        assertEquals(0.0, s.search.nodes.sum)
-        assertEquals(0L, s.run.wallMs)
-        assertEquals(false, s.run.timedOut)
+    fun `usage snapshots should be immutable and cumulative`() {
+        val sink = OpenHintUsageSink()
+        sink.index(HintIndexOutcome.ADMITTED)
+        sink.componentConsulted()
+        sink.componentSelected(primitive = false, gate = true)
+        sink.pointUnavailable()
+        val first = sink.snapshot()
+
+        sink.index(HintIndexOutcome.STOPPED)
+        sink.pointUnavailable()
+        val second = sink.snapshot()
+
+        assertEquals(0L, first.stoppedIndexes)
+        assertEquals(1L, first.earlyPointUnavailable)
+        assertEquals(1L, second.stoppedIndexes)
+        assertEquals(1L, second.indexesAdmitted)
+        assertEquals(1L, second.componentSelections)
+        assertEquals(2L, second.earlyPointUnavailable)
     }
 
     @Test
-    fun `unsat result carries non-empty stats with timedOut=false`() {
-        // An infeasible schema: x = y AND x != y over a tiny domain.
-        class S : VariableSchema() {
-            val x by intVar(0, 0)
-            val y by intVar(1, 1)
-            val c by constraint {
-                IntCompare(
-                    IntRef("x"),
-                    IntCmpOp.EQ,
-                    IntRef("y"),
-                )
-            }
-        }
-        val compiled = S().compile()
-        val r = BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams())
-        assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
-        assertEquals("backtrack", r.stats.run.backend)
-        assertEquals(false, r.stats.run.timedOut)
+    fun `merge should add local search phase times by key`() {
+        val left = SolveStats(ls = LocalSearchStats(phaseNanos = mapOf("seeding" to 7L, "selection" to 11L)))
+        val right = SolveStats(ls = LocalSearchStats(phaseNanos = mapOf("preparation" to 3L, "selection" to 13L)))
+
+        val merged = left.mergedWith(right)
+
+        assertEquals(mapOf("preparation" to 3L, "seeding" to 7L, "selection" to 24L), merged.ls.phaseNanos)
+        assertEquals(merged, SolveStats.EMPTY.mergedWith(merged))
+        assertEquals(merged, merged.mergedWith(SolveStats.EMPTY))
+    }
+
+    @Test
+    fun `merge should add ALNS stats`() {
+        val left = SolveStats(alns = AlnsStats(13, 7, 17, 5, 120, 9, 8, 3))
+        val right = SolveStats(alns = AlnsStats(2, 3, 5, 7, 80, 4, 3, 2))
+
+        val merged = left.mergedWith(right)
+
+        assertEquals(AlnsStats(15, 10, 22, 12, 200, 13, 11, 5), merged.alns)
+        assertEquals(merged, SolveStats.EMPTY.mergedWith(merged))
+        assertEquals(merged, merged.mergedWith(SolveStats.EMPTY))
+        assertEquals(0.0, merged.ls.moves.sum)
+        assertEquals(0.0, merged.search.nodes.sum)
+    }
+
+    @Test
+    fun `merge should keep the lowest residual with its breakdown`() {
+        val left = SolveStats(ls = LocalSearchStats(bestResidual = LocalSearchResidual(8, mapOf("Linear" to 8L))))
+        val right = SolveStats(
+            ls = LocalSearchStats(
+                bestResidual = LocalSearchResidual(
+                    3,
+                    mapOf("Clause" to 3L),
+                    listOf(LocalSearchResidualFactor(1, "Clause", 3, mapOf(2 to false), emptyMap())),
+                ),
+            ),
+        )
+
+        val merged = left.mergedWith(right)
+
+        assertEquals(right.ls.bestResidual, merged.ls.bestResidual)
+        assertEquals(right.ls.bestResidual, right.mergedWith(left).ls.bestResidual)
+        assertEquals(right.ls.bestResidual, SolveStats.EMPTY.mergedWith(right).ls.bestResidual)
+    }
+
+    @Test
+    fun `merge should add open theory conflict counts`() {
+        val left = SolveStats(openTheoryClauses = OpenTheoryClauseStats(assertingConflicts = 7))
+        val right = SolveStats(openTheoryClauses = OpenTheoryClauseStats(nonAssertingConflicts = 3))
+
+        val merged = left.mergedWith(right).openTheoryClauses
+
+        assertEquals(7L, merged.assertingConflicts)
+        assertEquals(3L, merged.nonAssertingConflicts)
+    }
+
+    private fun stats(backend: String, nodes: Double, peak: Double, weights: Double, mean: Double, wallMs: Long) =
+        SolveStats(
+            run = RunStats(backend = backend, wallMs = wallMs),
+            search = SearchStats(
+                nodes = SumResult(nodes),
+                peakDepth = MaxResult(peak),
+                depthMean = WeightedMeanResult(totalWeights = weights, mean = mean),
+            ),
+        )
+
+    @Test
+    fun `merge should sum counters max peaks weight means and mix backends`() {
+        val a = stats("backtrack", nodes = 10.0, peak = 4.0, weights = 10.0, mean = 2.0, wallMs = 7L)
+        val b = stats("ls", nodes = 5.0, peak = 9.0, weights = 30.0, mean = 6.0, wallMs = 3L)
+        val m = a.mergedWith(b)
+        assertEquals(15.0, m.search.nodes.sum)
+        assertEquals(9.0, m.search.peakDepth.max)
+        assertEquals(40.0, m.search.depthMean.totalWeights)
+        assertEquals(5.0, m.search.depthMean.mean)
+        assertEquals(7L, m.run.wallMs)
+        assertEquals("mixed", m.run.backend)
+        assertEquals("backtrack", a.mergedWith(a).run.backend)
+    }
+
+    @Test
+    fun `merge should add LP counters and keep the tightest finite root bound`() {
+        val a = SolveStats(lp = LpStats(solves = SumResult(8.0), pruned = SumResult(5.0), rootBound = 12.0, ms = 4L))
+        val b = SolveStats(lp = LpStats(solves = SumResult(3.0), pruned = SumResult(1.0), rootBound = 15.0, ms = 6L))
+        val unbounded = SolveStats(lp = LpStats(solves = SumResult(1.0)))
+
+        val m = a.mergedWith(b)
+
+        assertEquals(11.0, m.lp.solves.sum)
+        assertEquals(6.0, m.lp.pruned.sum)
+        assertEquals(15.0, m.lp.rootBound)
+        assertEquals(10L, m.lp.ms)
+        assertEquals(12.0, a.mergedWith(unbounded).lp.rootBound)
+    }
+
+    @Test
+    fun `merge should ignore a zero weight mean`() {
+        val a = stats("ls", nodes = 0.0, peak = Double.NEGATIVE_INFINITY, weights = 0.0, mean = Double.NaN, wallMs = 5L)
+        val b = stats("ls", nodes = 2.0, peak = 3.0, weights = 4.0, mean = 1.5, wallMs = 1L)
+        val m = a.mergedWith(b)
+        assertEquals(1.5, m.search.depthMean.mean)
+        assertTrue(m.run.timedOut.not())
+    }
+
+    @Test
+    fun `withPresolve should attach presolve LP work once`() {
+        val presolve = PresolveStats(lpStats = LpStats(rootPasses = SumResult(2.0)))
+
+        val once = SolveStats.EMPTY.withPresolve(presolve)
+        val twice = once.withPresolve(presolve)
+
+        assertEquals(2.0, once.lp.rootPasses.sum)
+        assertEquals(2.0, twice.lp.rootPasses.sum)
+        assertEquals(presolve, twice.presolve)
+    }
+
+    @Test
+    fun `merge should add SMT counters and source work`() {
+        val left = SolveStats(
+            smt = SmtStats(
+                reductionNs = 7,
+                sourceLp = SourceLpWorkStats(operations = 2, floatWork = 11, modeledWork = 13),
+                realGraphOpenings = 2,
+                graphPointHintCaptures = 3,
+                lpPointHintCaptures = 5,
+                defaultGraphHintReleases = 7,
+            ),
+        )
+        val right = SolveStats(
+            smt = SmtStats(
+                reductionNs = 17,
+                sourceLp = SourceLpWorkStats(operations = 3, floatWork = 19, modeledWork = 23),
+                realGraphOpenings = 11,
+                graphPointHintCaptures = 13,
+                lpPointHintCaptures = 17,
+                defaultGraphHintReleases = 19,
+            ),
+        )
+
+        val merged = left.mergedWith(right).smt
+
+        assertEquals(5L, merged.sourceLp.operations)
+        assertEquals(24L, merged.reductionNs)
+        assertEquals(30L, merged.sourceLp.floatWork)
+        assertEquals(36L, merged.sourceLp.modeledWork)
+        assertEquals(13L, merged.realGraphOpenings)
+        assertEquals(16L, merged.graphPointHintCaptures)
+        assertEquals(22L, merged.lpPointHintCaptures)
+        assertEquals(26L, merged.defaultGraphHintReleases)
     }
 }

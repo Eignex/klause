@@ -17,7 +17,7 @@ import kotlin.test.assertFailsWith
 
 class QuadraticPolynomialObjectiveTest {
     @Test
-    fun `wide integer square objectives retain exact source values`() {
+    fun `evaluateExact should square wide integers exactly`() {
         val value = parseBigInt("18446744073709551617")
         val sample = Sample(booleanArrayOf(), longArrayOf(), exactInts = listOf(value))
         val x = QuadraticVariable.Int(SourceIntId(0))
@@ -26,12 +26,13 @@ class QuadraticPolynomialObjectiveTest {
         val evaluated = objective.evaluateExact(sample, AlgebraicArithmetic())
 
         assertEquals(
-            BigFraction.of(parseBigInt("340282366920938463500268095579187314689"), bigIntOf(1)), evaluated.rational,
+            BigFraction.of(parseBigInt("340282366920938463500268095579187314689"), bigIntOf(1)),
+            evaluated.rational,
         )
     }
 
     @Test
-    fun `approximate continuous coordinates cannot authorize source objective evaluation`() {
+    fun `evaluateExact should reject approximate real coordinates`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.5))
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))

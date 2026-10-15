@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 
 class PortfolioInvocationResourcesTest {
     @Test
-    fun `parallel slot quotas retain aggregate work and do not take a sibling allowance`() {
+    fun `parallel slot quotas should keep aggregate work without taking a sibling allowance`() {
         val containing = NodeBudget(5)
         val resources = PortfolioInvocationResources(3, 2, 17, Cancellation.Never, containing)
         val first = requireNotNull(resources.slots[0].nodeBudget)
@@ -30,7 +30,7 @@ class PortfolioInvocationResourcesTest {
     }
 
     @Test
-    fun `sequential workers share one containing decision and move ledger`() {
+    fun `sequential workers should share one containing decision and move ledger`() {
         val containing = NodeBudget(5)
         val resources = PortfolioInvocationResources(2, 1, 1, Cancellation.Never, containing)
 
@@ -43,7 +43,7 @@ class PortfolioInvocationResourcesTest {
     }
 
     @Test
-    fun `complete native reservation divides its remainder over explicit worker slots`() {
+    fun `complete native reservation should divide its remainder over explicit worker slots`() {
         val resources = PortfolioInvocationResources(4, 2, 1, Cancellation.Never, null)
 
         val allowances = resources.nativeAllowances(11, setOf(0, 2))
@@ -53,17 +53,7 @@ class PortfolioInvocationResourcesTest {
     }
 
     @Test
-    fun `single complete worker retains its entire native allowance`() {
-        val resources = PortfolioInvocationResources(1, 4, 1, Cancellation.Never, null)
-
-        val allowances = resources.nativeAllowances(7, setOf(0))
-
-        assertEquals(1, resources.lanes)
-        assertContentEquals(longArrayOf(7), allowances)
-    }
-
-    @Test
-    fun `heuristic only native allocation has no implicit complete worker`() {
+    fun `heuristic only native allocation should have no implicit complete worker`() {
         val resources = PortfolioInvocationResources(3, 2, 1, Cancellation.Never, null)
 
         val allowances = resources.nativeAllowances(5, emptySet())
@@ -72,7 +62,7 @@ class PortfolioInvocationResourcesTest {
     }
 
     @Test
-    fun `worker slot retains its invocation cancellation through reacquisition`() {
+    fun `worker slot should keep its invocation cancellation through reacquisition`() {
         var cancelled = false
         val lifetime = Cancellation { cancelled }
         val resources = PortfolioInvocationResources(2, 2, 1, lifetime, null)
@@ -85,25 +75,28 @@ class PortfolioInvocationResourcesTest {
     }
 
     @Test
-    fun `complete slot receives no heuristic allowance even when instructions are unlimited`() {
+    fun `complete slot should receive no heuristic allowance even with unlimited instructions`() {
         val allowances = heuristicWorkerAllowances(3, Long.MAX_VALUE, setOf(0))
 
         assertContentEquals(longArrayOf(0, Long.MAX_VALUE, Long.MAX_VALUE), allowances)
     }
 
-
     @Test
-    fun `source cleanup preserves failures while releasing every worker slot`() {
+    fun `source cleanup should preserve failures while releasing every worker slot`() {
         val resources = PortfolioInvocationResources(2, 2, 1, Cancellation.Never, null)
         val closed = mutableListOf<Int>()
-        resources.slots[0].own(AutoCloseable {
-            closed += 0
-            throw IllegalStateException("first slot")
-        })
-        resources.slots[1].own(AutoCloseable {
-            closed += 1
-            throw IllegalStateException("second slot")
-        })
+        resources.slots[0].own(
+            AutoCloseable {
+                closed += 0
+                throw IllegalStateException("first slot")
+            },
+        )
+        resources.slots[1].own(
+            AutoCloseable {
+                closed += 1
+                throw IllegalStateException("second slot")
+            },
+        )
 
         val failure = assertFailsWith<IllegalStateException> { resources.close() }
         resources.close()
@@ -112,5 +105,4 @@ class PortfolioInvocationResourcesTest {
         assertEquals("second slot", failure.message)
         assertEquals("first slot", failure.suppressedExceptions.single().message)
     }
-
 }

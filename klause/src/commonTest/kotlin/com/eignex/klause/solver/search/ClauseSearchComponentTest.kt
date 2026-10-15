@@ -8,7 +8,7 @@ import kotlin.test.assertIs
 class ClauseSearchComponentTest {
 
     @Test
-    fun `widely separated watched identifiers retain their implications`() {
+    fun `widely separated watched identifiers should retain their implications`() {
         for (variable in listOf(1, 257, 65_537, (1 shl 30) - 1)) {
             val literal = variable shl 1
             val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(0, literal))))))
@@ -21,7 +21,7 @@ class ClauseSearchComponentTest {
     }
 
     @Test
-    fun `widely separated watches propagate after a reversed sibling assignment`() {
+    fun `widely separated watches should propagate after a reversed sibling assignment`() {
         for (variable in listOf(1, 257, 65_537, (1 shl 30) - 1)) {
             val literal = variable shl 1
             val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(0, literal))))))
@@ -36,7 +36,7 @@ class ClauseSearchComponentTest {
     }
 
     @Test
-    fun `unit clause implies its literal at the root`() {
+    fun `unit clause should imply its literal at the root`() {
         val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(0))))))
 
         assertIs<ComponentResult.Consistent>(session.initialize())
@@ -45,7 +45,7 @@ class ClauseSearchComponentTest {
     }
 
     @Test
-    fun `clause implies its last literal once the others are falsified`() {
+    fun `clause should imply its last literal once the others are falsified`() {
         val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(0, 2, 4))))))
         assertIs<ComponentResult.Consistent>(session.initialize())
 
@@ -56,7 +56,7 @@ class ClauseSearchComponentTest {
     }
 
     @Test
-    fun `clause conflicts when propagation falsifies every literal`() {
+    fun `clause should conflict when propagation falsifies every literal`() {
         val session = SearchSession(
             listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3))))),
         )
@@ -68,7 +68,7 @@ class ClauseSearchComponentTest {
     }
 
     @Test
-    fun `clause implies again after its literals are refalsified in another order`() {
+    fun `clause should imply again after its literals are refalsified in another order`() {
         val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(0, 2, 4))))))
         assertIs<ComponentResult.Consistent>(session.initialize())
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
@@ -81,7 +81,7 @@ class ClauseSearchComponentTest {
     }
 
     @Test
-    fun `implied literal propagates the clauses it falsifies in turn`() {
+    fun `implied literal should propagate the clauses it falsifies in turn`() {
         val session = SearchSession(
             listOf(
                 ClauseSearchComponent(
@@ -99,7 +99,7 @@ class ClauseSearchComponentTest {
     }
 
     @Test
-    fun `solver refutes a clause set with no model`() {
+    fun `solver should refute a clause set with no model`() {
         val session = SearchSession(
             listOf(
                 ClauseSearchComponent(

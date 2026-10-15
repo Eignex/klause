@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class IndomainRandomTest {
 
     @Test
-    fun `random head on a non-enumerable domain is drawn from the full bounds`() {
+    fun `random head on a non-enumerable domain should be drawn from the full bounds`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,

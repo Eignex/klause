@@ -12,7 +12,7 @@ class FznStreamCheckerTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["-1/3", "0", "1/3"])
-    fun `satisfaction publications check exact absolute value without a cost`(input: String) {
+    fun `satisfaction publications should check exact absolute value without a cost`(input: String) {
         val source = "var float: x; var float: y; constraint float_abs(x,y); solve satisfy;"
         val magnitude = if (input == "0") "0" else "1/3"
         val output = "x = $input;\ny = $magnitude;\n----------\n"
@@ -23,7 +23,7 @@ class FznStreamCheckerTest {
     }
 
     @Test
-    fun `satisfaction publications reject a point allowed only by the absolute value relaxation`() {
+    fun `satisfaction publications should reject a point allowed only by the absolute value relaxation`() {
         val source = "var float: x; var float: y; constraint float_abs(x,y); solve satisfy;"
         val output = "x = 0;\ny = 1/3;\n----------\n"
 
@@ -34,7 +34,7 @@ class FznStreamCheckerTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["% objective=0\n", "_objective = 0;\n"])
-    fun `satisfaction publications cannot supply an optimization cost`(metadata: String) {
+    fun `satisfaction publications should not supply an optimization cost`(metadata: String) {
         val source = "var float: x; var float: y; constraint float_abs(x,y); solve satisfy;"
         val output = metadata + "x = 0;\ny = 0;\n----------\n"
 
@@ -44,7 +44,7 @@ class FznStreamCheckerTest {
     }
 
     @Test
-    fun `finite objective fields are checked against the original source cost`() {
+    fun `finite objective fields should be checked against the original source cost`() {
         val source = "var 0..2: i; solve minimize i;"
         val output = "i = 2;\n_objective = 2;\n----------\ni = 1;\n_objective = 1;\n----------\n"
 
@@ -54,7 +54,7 @@ class FznStreamCheckerTest {
     }
 
     @Test
-    fun `an incorrect finite objective field cannot earn a checked witness`() {
+    fun `an incorrect finite objective field should not earn a checked witness`() {
         val source = "var 0..2: i; solve minimize i;"
         val output = "i = 2;\n_objective = 1;\n----------\n"
 
@@ -65,7 +65,7 @@ class FznStreamCheckerTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["2", "2.0"])
-    fun `equivalent comment and finite objective fields retain source acceptance`(helper: String) {
+    fun `equivalent comment and finite objective fields should retain source acceptance`(helper: String) {
         val source = "var 0..2: i; solve minimize i;"
         val output = "% objective=2/1\ni = 2;\n_objective = $helper;\n----------\n"
 
@@ -75,7 +75,7 @@ class FznStreamCheckerTest {
     }
 
     @Test
-    fun `conflicting comment and finite objective field are rejected`() {
+    fun `conflicting comment and finite objective fields should be rejected`() {
         val source = "var 0..2: i; solve minimize i;"
         val output = "% objective=2\ni = 2;\n_objective = 1;\n----------\n"
 
@@ -86,7 +86,7 @@ class FznStreamCheckerTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["minimize", "maximize"])
-    fun `each improving publication is checked against original rows and objective`(sense: String) {
+    fun `each improving publication should be checked against original rows and objective`(sense: String) {
         val source = declarations + "solve $sense i;"
         val points = if (sense == "minimize") listOf(1, 0) else listOf(0, 1)
         val output = points.joinToString("") { i ->
@@ -100,7 +100,7 @@ class FznStreamCheckerTest {
     }
 
     @Test
-    fun `incorrect original objective remains rejected beside a valid publication`() {
+    fun `an incorrect objective should remain rejected beside a valid publication`() {
         val source = declarations + "solve maximize i;"
         val output = "% objective=0\ni = 0;\nx = 2;\ny = 4;\n----------\n" +
             "% objective=-1\ni = 1;\nx = 2;\ny = 4;\n----------\n"
@@ -111,7 +111,7 @@ class FznStreamCheckerTest {
     }
 
     @Test
-    fun `a source-invalid point cannot earn a checked witness`() {
+    fun `a source-invalid point should not earn a checked witness`() {
         val source = declarations + "solve maximize i;"
         val output = "% objective=1\ni = 1;\nx = 2;\ny = 3;\n----------\n"
 
@@ -121,7 +121,7 @@ class FznStreamCheckerTest {
     }
 
     @Test
-    fun `duplicate final publication is rejected`() {
+    fun `a duplicate final publication should be rejected`() {
         val source = declarations + "solve maximize i;"
         val point = "% objective=1\ni = 1;\nx = 2;\ny = 4;\n----------\n"
 
@@ -133,7 +133,7 @@ class FznStreamCheckerTest {
     @ParameterizedTest
     @ValueSource(strings = ["==========", "=====UNBOUNDED=====", "=====UNSATISFIABLE=====", "=====UNKNOWN=====",
         "% optimizationStatus=unattained-infimum", "% optimizationStatus=unattained-supremum"])
-    fun `an interrupted publication cannot carry a terminal marker`(marker: String) {
+    fun `an interrupted publication should not carry a terminal marker`(marker: String) {
         val source = declarations + "solve maximize i;"
         val output = "% objective=1\ni = 1;\nx = 2;\ny = 4;\n----------\n$marker\n"
 

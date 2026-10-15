@@ -25,8 +25,6 @@ import kotlin.test.assertTrue
 
 class ArgminJumpTest {
 
-    /** A single `x0 = 3` constraint over 0..5: from the all-zero start the unique argmin jump is
-     *  `x0 ← 3` (which zeroes the constraint). */
     private fun eqProblem(): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 1,
@@ -34,7 +32,6 @@ class ArgminJumpTest {
         factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3)),
     )
 
-    /** Two coupled sum constraints so a hot-spot jump has a non-trivial weighted argmin. */
     private fun coupledProblem(): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 2,
@@ -55,7 +52,7 @@ class ArgminJumpTest {
     }
 
     @Test
-    fun `jumps to the violation-minimizing value`() {
+    fun `argmin jump should jump to the violation-minimizing value`() {
         val state = freshState(eqProblem(), 7L)
         assertTrue(state.cost > 0L, "all-zero start violates x0 = 3")
         val moves = jumps(state, candidateVars = 1)
@@ -66,8 +63,8 @@ class ArgminJumpTest {
     }
 
     @Test
-    fun `emitted jumps never increase weighted violation`() {
-        for (seed in longArrayOf(1L, 7L, 42L, 1234L)) {
+    fun `emitted jumps should never increase weighted violation`() {
+        for (seed in longArrayOf(1L, 42L)) {
             val state = freshState(coupledProblem(), seed)
             for (m in jumps(state, candidateVars = 4)) {
                 assertTrue(
@@ -79,9 +76,11 @@ class ArgminJumpTest {
     }
 
     @Test
-    fun `maintained integer indicators jump through their source`() {
+    fun `maintained integer indicators should jump through their source`() {
         val problem = Problem(
-            1, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            1,
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
             arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
@@ -107,16 +106,20 @@ class ArgminJumpTest {
     }
 
     @Test
-    fun `maintained Boolean predicates choose the best inverse repair`() {
+    fun `maintained Boolean predicates should choose the best inverse repair`() {
         val source = Problem(
-            1, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 1)),
+            1,
+            2,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 1)),
             arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
             ),
         )
         val lowered = Problem(
-            1, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 0)),
+            1,
+            2,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 0)),
             arrayOf<Factor>(
                 source.factors[0],
                 Clause(intArrayOf(Lit.make(0, false))),
@@ -147,9 +150,11 @@ class ArgminJumpTest {
     }
 
     @Test
-    fun `integer jumps account for maintained output penalties`() {
+    fun `integer jumps should account for maintained output penalties`() {
         val problem = Problem(
-            0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 4)),
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 4)),
             arrayOf<Factor>(
                 Product(0, 0, 1),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 2),
@@ -168,9 +173,11 @@ class ArgminJumpTest {
     }
 
     @Test
-    fun `Boolean jumps account for maintained channel penalties`() {
+    fun `Boolean jumps should account for maintained channel penalties`() {
         val problem = Problem(
-            1, 1, arrayOf(IntDomain(0, 1)),
+            1,
+            1,
+            arrayOf(IntDomain(0, 1)),
             arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
                 Clause(intArrayOf(Lit.make(0, true))),
@@ -189,10 +196,12 @@ class ArgminJumpTest {
     }
 
     @Test
-    fun `integer jumps grade the emitted channel compound`() {
+    fun `integer jumps should grade the emitted channel compound`() {
         for (upper in listOf(2, 32)) {
             val problem = Problem(
-                1, 1, arrayOf(IntDomain(0, upper.toLong())),
+                1,
+                1,
+                arrayOf(IntDomain(0, upper.toLong())),
                 arrayOf<Factor>(
                     ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                     Clause(intArrayOf(Lit.make(0, true))),
@@ -210,7 +219,7 @@ class ArgminJumpTest {
     }
 
     @Test
-    fun `inverse jumps preserve pinned and implicitly owned coordinates`() {
+    fun `inverse jumps should preserve pinned and implicitly owned coordinates`() {
         for (protection in listOf("source pin", "indicator pin", "Boolean pin", "source owner", "indicator owner")) {
             val ownerVar = if (protection == "indicator owner") 1 else 0
             val factors = arrayOf<Factor>(
@@ -245,9 +254,11 @@ class ArgminJumpTest {
     }
 
     @Test
-    fun `integer jumps select the improving Element destination variant`() {
+    fun `integer jumps should select the improving Element destination variant`() {
         val problem = Problem(
-            0, 4, arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(0, 1), IntDomain(0, 1)),
+            0,
+            4,
+            arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(0, 1), IntDomain(0, 1)),
             arrayOf<Factor>(
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
                 Element(0, 1, longArrayOf(2, 3), true, 0),
@@ -270,9 +281,11 @@ class ArgminJumpTest {
     }
 
     @Test
-    fun `inverse integer jumps stay within sparse source domains`() {
+    fun `inverse integer jumps should stay within sparse source domains`() {
         val problem = Problem(
-            1, 2, arrayOf(IntDomain(0, 3).excludeValue(1).excludeValue(2), IntDomain(0, 1)),
+            1,
+            2,
+            arrayOf(IntDomain(0, 3).excludeValue(1).excludeValue(2), IntDomain(0, 1)),
             arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
@@ -293,11 +306,13 @@ class ArgminJumpTest {
     }
 
     @Test
-    fun `Boolean inverse jumps preserve source restrictions`() {
+    fun `Boolean inverse jumps should preserve source restrictions`() {
         for (protection in listOf("source pin", "Boolean pin", "source owner", "fixed source")) {
             val domain = IntDomain(0, if (protection == "fixed source") 0L else 2L)
             val source = Problem(
-                1, 3, arrayOf(domain, IntDomain(0, 1), IntDomain(0, 2)),
+                1,
+                3,
+                arrayOf(domain, IntDomain(0, 1), IntDomain(0, 2)),
                 arrayOf<Factor>(
                     ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                     ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),

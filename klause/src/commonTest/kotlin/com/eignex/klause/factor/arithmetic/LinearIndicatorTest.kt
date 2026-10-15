@@ -21,10 +21,14 @@ import kotlin.test.assertTrue
 
 class LinearIndicatorTest {
     @Test
-    fun `integer indicators retain both polarities across finite branches`() {
+    fun `integer indicators should retain both polarities across finite branches`() {
         for (whenOne in listOf(false, true)) {
-            val row = ExactLinear.of(intArrayOf(Term.ofIntVar(1)), listOf(BigFraction.ONE),
-                LinearOp.EQ, BigFraction.ONE)
+            val row = ExactLinear.of(
+                intArrayOf(Term.ofIntVar(1)),
+                listOf(BigFraction.ONE),
+                LinearOp.EQ,
+                BigFraction.ONE,
+            )
             val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(LinearIndicator(0, whenOne, row)))
 
             val points = BacktrackSolver(source.bake()).enumerate().map { it.ints.toList() }.toSet()
@@ -35,9 +39,13 @@ class LinearIndicatorTest {
     }
 
     @Test
-    fun `indicator score deltas include a guard aliased with its row operand`() {
-        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE),
-            LinearOp.EQ, BigFraction.ZERO)
+    fun `indicator score deltas should include a guard aliased with its row operand`() {
+        val row = ExactLinear.of(
+            intArrayOf(Term.ofIntVar(0)),
+            listOf(BigFraction.ONE),
+            LinearOp.EQ,
+            BigFraction.ZERO,
+        )
         val factor = LinearIndicator(0, true, row)
         val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(factor))
         val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
@@ -54,13 +62,24 @@ class LinearIndicatorTest {
     }
 
     @Test
-    fun `retracting an indicator pin removes its infeasible numerical row`() {
+    fun `retracting an indicator pin should remove its infeasible numerical row`() {
         val tiny = BigFraction.of(BIG_ONE, parseBigInt("100000000000000000000"))
         for (coefficient in listOf(BigFraction.ONE, tiny)) {
-            val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(coefficient),
-                LinearOp.GE, BigFraction.ONE)
-            val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(LinearIndicator(0, true, row)),
-                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+            val row = ExactLinear.of(
+                intArrayOf(Term.ofRealVar(0)),
+                listOf(coefficient),
+                LinearOp.GE,
+                BigFraction.ONE,
+            )
+            val source = Problem(
+                0,
+                1,
+                arrayOf(IntDomain(0, 1)),
+                arrayOf(LinearIndicator(0, true, row)),
+                numRealVars = 1,
+                realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(0.0),
+            )
             LeafRealSolver(source, null).use { completion ->
                 val enabled = completion.solve(Sample(booleanArrayOf(), longArrayOf(1)))
                 val disabled = completion.solve(Sample(booleanArrayOf(), longArrayOf(0)))

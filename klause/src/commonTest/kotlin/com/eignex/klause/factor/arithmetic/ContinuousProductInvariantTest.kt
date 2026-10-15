@@ -1,7 +1,7 @@
 package com.eignex.klause.factor.arithmetic
 
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -13,11 +13,23 @@ import kotlin.test.assertTrue
 
 class ContinuousProductInvariantTest {
     @Test
-    fun `product move deltas replace every aliased real role`() {
-        for ((a, b, result) in listOf(Triple(0, 1, 2), Triple(0, 0, 1), Triple(0, 1, 0),
-            Triple(1, 0, 0), Triple(0, 0, 0))) {
-            val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(a, b, result)), numRealVars = 3,
-                realLower = DoubleArray(3) { -10.0 }, realUpper = DoubleArray(3) { 10.0 })
+    fun `product move deltas should replace every aliased real role`() {
+        for ((a, b, result) in listOf(
+            Triple(0, 1, 2),
+            Triple(0, 0, 1),
+            Triple(0, 1, 0),
+            Triple(1, 0, 0),
+            Triple(0, 0, 0),
+        )) {
+            val source = Problem(
+                0,
+                0,
+                emptyArray(),
+                arrayOf(ContinuousProduct(a, b, result)),
+                numRealVars = 3,
+                realLower = DoubleArray(3) { -10.0 },
+                realUpper = DoubleArray(3) { 10.0 },
+            )
             val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
             for ((old, target) in listOf(-3.0 to 2.0, 0.0 to 1.0, 1.0 to 0.0)) {
                 state.assignment.setReal(0, old)
@@ -37,11 +49,24 @@ class ContinuousProductInvariantTest {
     }
 
     @Test
-    fun `finite choice guard flips agree with complete numerical regrading`() {
-        val factor = ContinuousProduct(0, 0, 1, 0, doubleArrayOf(0.125, 0.375),
-            intArrayOf(Lit.make(0, true), Lit.make(0, false)))
-        val source = Problem(1, 0, emptyArray(), arrayOf(factor), numRealVars = 2,
-            realLower = DoubleArray(2), realUpper = DoubleArray(2) { 1.0 })
+    fun `finite choice guard flips should agree with complete numerical regrading`() {
+        val factor = ContinuousProduct(
+            0,
+            0,
+            1,
+            0,
+            doubleArrayOf(0.125, 0.375),
+            intArrayOf(Lit.make(0, true), Lit.make(0, false)),
+        )
+        val source = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf(factor),
+            numRealVars = 2,
+            realLower = DoubleArray(2),
+            realUpper = DoubleArray(2) { 1.0 },
+        )
         val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
         for (value in listOf(0.125, 0.375)) {
             state.assignment.setReal(0, value)
@@ -60,12 +85,25 @@ class ContinuousProductInvariantTest {
     }
 
     @Test
-    fun `nearby declared values keep distinct source guard truth`() {
+    fun `nearby declared values should keep distinct source guard truth`() {
         val values = doubleArrayOf(0.125, 0.125 + 1e-12)
-        val factor = ContinuousProduct(0, 0, 1, 0, values,
-            intArrayOf(Lit.make(0, true), Lit.make(0, false)))
-        val source = Problem(1, 0, emptyArray(), arrayOf(factor), numRealVars = 2,
-            realLower = DoubleArray(2), realUpper = DoubleArray(2) { 1.0 })
+        val factor = ContinuousProduct(
+            0,
+            0,
+            1,
+            0,
+            values,
+            intArrayOf(Lit.make(0, true), Lit.make(0, false)),
+        )
+        val source = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf(factor),
+            numRealVars = 2,
+            realLower = DoubleArray(2),
+            realUpper = DoubleArray(2) { 1.0 },
+        )
         val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
         for (index in values.indices) {
             state.assignment.setReal(0, values[index])
@@ -79,9 +117,16 @@ class ContinuousProductInvariantTest {
     }
 
     @Test
-    fun `square inverse repairs retain both signs within declared bounds`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
-            realLower = doubleArrayOf(-3.0, 4.0), realUpper = doubleArrayOf(3.0, 4.0))
+    fun `square inverse repairs should retain both signs within declared bounds`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(ContinuousProduct(0, 0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-3.0, 4.0),
+            realUpper = doubleArrayOf(3.0, 4.0),
+        )
         val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
         state.assignment.setReal(0, 1.0)
         state.assignment.setReal(1, 4.0)
@@ -95,9 +140,16 @@ class ContinuousProductInvariantTest {
     }
 
     @Test
-    fun `overflowing product never receives zero numerical violation`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
-            realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(Double.MAX_VALUE, 1.0))
+    fun `overflowing product should never receive zero numerical violation`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(ContinuousProduct(0, 0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 1.0),
+            realUpper = doubleArrayOf(Double.MAX_VALUE, 1.0),
+        )
         val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
         state.assignment.setReal(0, Double.MAX_VALUE)
         state.assignment.setReal(1, 1.0)

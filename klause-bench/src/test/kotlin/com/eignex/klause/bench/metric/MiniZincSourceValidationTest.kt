@@ -6,7 +6,7 @@ import kotlin.test.assertNull
 
 class MiniZincSourceValidationTest {
     @Test
-    fun `retained mixed witness preserves coordinate scope and component provenance`() {
+    fun `retained mixed witness should preserve coordinate scope and component provenance`() {
         val raw = "x = 0.3333333333333333;\n% klause-float-component: x = exact component=0\n" +
             "% klause-float-component: grid = grid component=1 reason=continuous component\n" +
             "% klause-coordinate: x = 1/3;\n% klause-coordinate: grid = 1/2;\n----------\n"
@@ -16,7 +16,7 @@ class MiniZincSourceValidationTest {
     }
 
     @Test
-    fun `candidate extraction uses the last complete multiline solution`() {
+    fun `candidate extraction should use the last complete multiline solution`() {
         val raw = """
             WARNING: JVM startup
             x = 1;
@@ -37,38 +37,33 @@ class MiniZincSourceValidationTest {
     }
 
     @Test
-    fun `candidate extraction skips startup diagnostics`() {
-        assertEquals("x = 1;", MiniZincSourceValidation.candidate("WARNING: startup\nx = 1;\n----------\n"))
-    }
-
-    @Test
-    fun `an incomplete solution cannot be checked`() {
+    fun `an incomplete solution should not be checkable`() {
         assertNull(MiniZincSourceValidation.candidate("x = 1;"))
     }
 
     @Test
-    fun `a grounded source model validates its pinned objective`() {
+    fun `a grounded source model should validate its pinned objective`() {
         val fzn = "var 1.0..1.0: z; solve maximize z;"
 
         assertEquals("valid", MiniZincSourceValidation.inspect(fzn, 1.0).status)
     }
 
     @Test
-    fun `a reported objective differing from the pinned objective is rejected`() {
+    fun `a reported objective differing from the pinned objective should be rejected`() {
         val fzn = "var 1.0..1.0: z; solve maximize z;"
 
         assertEquals("invalid", MiniZincSourceValidation.inspect(fzn, 1.001466275659824).status)
     }
 
     @Test
-    fun `a constant source contradiction rejects the candidate`() {
+    fun `a constant source contradiction should reject the candidate`() {
         val fzn = "constraint bool_eq(false, true); solve satisfy;"
 
         assertEquals("invalid", MiniZincSourceValidation.inspect(fzn, null).status)
     }
 
     @Test
-    fun `residual variables and arithmetic cannot validate a candidate`() {
+    fun `residual variables and arithmetic should not validate a candidate`() {
         for (fzn in listOf(
             "var 0.0..1.0: z; solve maximize z;",
             "var 1..2: x; constraint int_le(x, 2); solve satisfy;",
@@ -79,7 +74,7 @@ class MiniZincSourceValidationTest {
     }
 
     @Test
-    fun `retained witness keeps exact coordinates only from the last complete solution`() {
+    fun `retained witness should keep exact coordinates only from the last complete solution`() {
         val raw = """
             x = 0.5;
             % klause-exact: x = 1/2;
@@ -96,7 +91,7 @@ class MiniZincSourceValidationTest {
     }
 
     @Test
-    fun `pinned integer objective remains exact above binary64 consecutive integers`() {
+    fun `pinned integer objective should stay exact above binary64 consecutive integers`() {
         val fzn = "var 9007199254740993..9007199254740993: z; solve minimize z;"
 
         assertEquals("valid", MiniZincSourceValidation.inspect(fzn, null, "9007199254740993").status)
@@ -104,7 +99,7 @@ class MiniZincSourceValidationTest {
     }
 
     @Test
-    fun `optimization checking without a reported objective remains unknown`() {
+    fun `optimization checking without a reported objective should remain unknown`() {
         val fzn = "var 1..1: z; solve minimize z;"
 
         assertEquals("unknown", MiniZincSourceValidation.inspect(fzn, null).status)

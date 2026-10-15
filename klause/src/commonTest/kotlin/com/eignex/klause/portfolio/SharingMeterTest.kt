@@ -8,7 +8,7 @@ import kotlin.test.assertEquals
 class SharingMeterTest {
 
     @Test
-    fun `a snapshot reports each channel's traffic and leaves out channels without any`() {
+    fun `a snapshot should report each channel's traffic and omit idle channels`() {
         val meter = SharingMeter()
         meter.exported(SharingChannel.Clauses, 3)
         meter.imported(SharingChannel.Clauses, 2)

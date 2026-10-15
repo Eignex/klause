@@ -9,7 +9,7 @@ import kotlin.test.assertSame
 
 class SearchBranchSelectionTest {
     @Test
-    fun `default selection does not consult components when Boolean alternatives exist`() {
+    fun `default selection should not consult components when Boolean alternatives exist`() {
         val alternatives = listOf(SearchDecision.Bool(0), SearchDecision.Bool(1))
         val sources = object : SearchBranchSources {
             override fun booleanAlternatives(): List<SearchDecision> = alternatives
@@ -23,7 +23,7 @@ class SearchBranchSelectionTest {
     }
 
     @Test
-    fun `explicit priority selects the first available category lazily`() {
+    fun `explicit priority should select the first available category lazily`() {
         for (first in SearchBranchKind.entries) {
             val consulted = ArrayList<SearchBranchKind>()
             val alternatives = listOf(SearchDecision.IntEqual(0, 0), SearchDecision.IntEqual(0, 1))
@@ -47,7 +47,7 @@ class SearchBranchSelectionTest {
     }
 
     @Test
-    fun `priority falls through unavailable categories without dropping alternatives`() {
+    fun `priority should fall through unavailable categories without dropping alternatives`() {
         val consulted = ArrayList<SearchBranchKind>()
         val alternatives = listOf(SearchDecision.IntEqual(0, 0), SearchDecision.IntEqual(0, 1))
         val sources = object : SearchBranchSources {
@@ -58,16 +58,20 @@ class SearchBranchSelectionTest {
             }
         }
 
-        val selected = SearchBranchSelection.Priority(listOf(
-            SearchBranchKind.Finite, SearchBranchKind.Boolean, SearchBranchKind.Arithmetic,
-        )).alternatives(sources)
+        val selected = SearchBranchSelection.Priority(
+            listOf(
+                SearchBranchKind.Finite,
+                SearchBranchKind.Boolean,
+                SearchBranchKind.Arithmetic,
+            ),
+        ).alternatives(sources)
 
         assertSame(alternatives, selected)
         assertEquals(listOf(SearchBranchKind.Finite, SearchBranchKind.Boolean, SearchBranchKind.Arithmetic), consulted)
     }
 
     @Test
-    fun `an empty exhaustive proposal is selected without evaluating another category`() {
+    fun `an empty exhaustive proposal should be selected without evaluating another category`() {
         val sources = object : SearchBranchSources {
             override fun booleanAlternatives(): List<SearchDecision> = emptyList()
             override fun componentAlternatives(kind: SearchBranchKind?): List<SearchDecision>? =
@@ -78,7 +82,7 @@ class SearchBranchSelectionTest {
     }
 
     @Test
-    fun `priority snapshots the supplied order`() {
+    fun `priority should snapshot the supplied order`() {
         val order = mutableListOf(SearchBranchKind.Arithmetic, SearchBranchKind.Finite, SearchBranchKind.Boolean)
         val policy = SearchBranchSelection.Priority(order)
         val consulted = ArrayList<SearchBranchKind>()
@@ -97,14 +101,18 @@ class SearchBranchSelectionTest {
     }
 
     @Test
-    fun `priority rejects missing or duplicate categories`() {
-        for (order in listOf(emptyList(), listOf(SearchBranchKind.Boolean),
-            listOf(SearchBranchKind.Boolean, SearchBranchKind.Boolean, SearchBranchKind.Arithmetic))) {
+    fun `priority should reject missing or duplicate categories`() {
+        for (order in listOf(
+            emptyList(),
+            listOf(SearchBranchKind.Boolean),
+            listOf(SearchBranchKind.Boolean, SearchBranchKind.Boolean, SearchBranchKind.Arithmetic),
+        )) {
             assertFailsWith<IllegalArgumentException> { SearchBranchSelection.Priority(order) }
         }
     }
+
     @Test
-    fun `default selection preserves Boolean installed legacy and independent proposal order`() {
+    fun `default selection should preserve Boolean installed legacy and independent proposal order`() {
         val commits = ArrayList<Int>()
         val installed = object : SearchBrancher, SearchBranchProposal {
             override val branchKind = SearchBranchKind.Arithmetic
@@ -123,11 +131,14 @@ class SearchBranchSelectionTest {
         }
         val session = SearchComponentSet(listOf(installed), listOf(legacy), listOf(independent)).session()
         session.initialize()
-        val run = session.openRun(1, observer = object : SearchRunObserver {
-            override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
-                commits += (decision as SearchDecision.Bool).literal ushr 1
-            }
-        })
+        val run = session.openRun(
+            1,
+            observer = object : SearchRunObserver {
+                override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
+                    commits += (decision as SearchDecision.Bool).literal ushr 1
+                }
+            },
+        )
 
         assertIs<SearchRunEvent.Satisfied>(run.next())
 
@@ -135,7 +146,7 @@ class SearchBranchSelectionTest {
     }
 
     @Test
-    fun `category priority changes selection without changing deductive installation order`() {
+    fun `category priority should change selection without changing deductive installation order`() {
         for (first in SearchBranchKind.entries) {
             val initialized = ArrayList<Int>()
             val commits = ArrayList<Int>()
@@ -158,12 +169,15 @@ class SearchBranchSelectionTest {
             val session = SearchSession(components)
             session.initialize()
             val order = listOf(first) + SearchBranchKind.entries.filter { it != first }
-            val run = session.openRun(1, branchSelection = SearchBranchSelection.Priority(order),
+            val run = session.openRun(
+                1,
+                branchSelection = SearchBranchSelection.Priority(order),
                 observer = object : SearchRunObserver {
                     override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
                         commits += (decision as SearchDecision.Bool).literal ushr 1
                     }
-                })
+                },
+            )
 
             assertIs<SearchRunEvent.Satisfied>(run.next())
 
@@ -173,9 +187,13 @@ class SearchBranchSelectionTest {
     }
 
     @Test
-    fun `independent proposals traverse every alternative through an installed checker`() {
-        for (selection in listOf(SearchBranchSelection.Default, SearchBranchSelection.Priority(
-            listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Finite, SearchBranchKind.Boolean)))) {
+    fun `independent proposals should traverse every alternative through an installed checker`() {
+        for (selection in listOf(
+            SearchBranchSelection.Default,
+            SearchBranchSelection.Priority(
+                listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Finite, SearchBranchKind.Boolean),
+            ),
+        )) {
             val checked = ArrayList<Boolean?>()
             val component = object : SearchComponent {
                 override fun check(context: SearchContext): ComponentCheck {
@@ -201,7 +219,7 @@ class SearchBranchSelectionTest {
     }
 
     @Test
-    fun `an unknown selected leaf prevents exhaustion from becoming a refutation`() {
+    fun `an unknown selected leaf should prevent exhaustion from becoming a refutation`() {
         val component = object : SearchComponent {
             override fun check(context: SearchContext): ComponentCheck = if (context.boolValue(0) == true) {
                 ComponentCheck.Indeterminate
@@ -216,14 +234,18 @@ class SearchBranchSelectionTest {
         }
         val session = SearchSession(listOf(component), proposals = listOf(proposal))
         session.initialize()
-        val run = session.openRun(0, branchSelection = SearchBranchSelection.Priority(
-            listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Boolean, SearchBranchKind.Finite)))
+        val run = session.openRun(
+            0,
+            branchSelection = SearchBranchSelection.Priority(
+                listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Boolean, SearchBranchKind.Finite),
+            ),
+        )
 
         assertEquals(SearchRunEvent.Indeterminate.Component, run.next())
     }
 
     @Test
-    fun `an empty independent proposal exhausts without checking a leaf`() {
+    fun `an empty independent proposal should exhaust without checking a leaf`() {
         val component = object : SearchComponent {
             override fun check(context: SearchContext): ComponentCheck = error("leaf was checked")
         }
@@ -233,21 +255,29 @@ class SearchBranchSelectionTest {
         }
         val session = SearchSession(listOf(component), proposals = listOf(proposal))
         session.initialize()
-        val run = session.openRun(0, branchSelection = SearchBranchSelection.Priority(
-            listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Finite, SearchBranchKind.Boolean)))
+        val run = session.openRun(
+            0,
+            branchSelection = SearchBranchSelection.Priority(
+                listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Finite, SearchBranchKind.Boolean),
+            ),
+        )
 
         assertEquals(SearchRunEvent.Exhausted, run.next())
     }
 
     @Test
-    fun `cancellation prevents consulting independent proposals`() {
+    fun `cancellation should prevent consulting independent proposals`() {
         val proposal = object : SearchBranchProposal {
             override val branchKind = SearchBranchKind.Finite
             override fun nextBranch(context: SearchContext): List<SearchDecision>? = error("proposal was consulted")
         }
         val session = SearchSession(emptyList(), cancellation = Cancellation { true }, proposals = listOf(proposal))
-        val run = session.openRun(0, branchSelection = SearchBranchSelection.Priority(
-            listOf(SearchBranchKind.Finite, SearchBranchKind.Arithmetic, SearchBranchKind.Boolean)))
+        val run = session.openRun(
+            0,
+            branchSelection = SearchBranchSelection.Priority(
+                listOf(SearchBranchKind.Finite, SearchBranchKind.Arithmetic, SearchBranchKind.Boolean),
+            ),
+        )
 
         assertIs<SearchRunEvent.Indeterminate>(run.next())
     }

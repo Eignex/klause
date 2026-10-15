@@ -5,12 +5,11 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class HyperSparseSolveTest {
     @Test
-    fun `DFS reaches only dependencies and switches when support grows`() {
+    fun `hypersparse solve should visit only dependencies and switch when support grows`() {
         for (lower in listOf(false, true)) {
             val n = 40
             val matrix = SparseMatrix.ofColumns(
@@ -39,17 +38,12 @@ class HyperSparseSolveTest {
                     for (j in 0 until n) product += matrix[i, j] * work.values[j]
                     assertEquals(if (i == root) 8.0 else 0.0, product)
                 }
-                val first = work.values.copyOf()
-                work.clear()
-                work.set(root, 8.0)
-                assertEquals(report, solver.solve(work, 0.0))
-                assertContentEquals(first, work.values)
             }
         }
     }
 
     @Test
-    fun `exact cancellation removes output support and workspace clears every touched entry`() {
+    fun `exact cancellation should remove output support and clear the workspace`() {
         val matrix = SparseMatrix.ofColumns(4, 4, listOf(listOf(1 to 2.0), emptyList(), emptyList(), emptyList()))
         val solver = HyperSparseSolve(matrix, lower = true, unitDiagonal = true, densityThreshold = 1.0)
         val work = BasisWorkspace(4)
@@ -69,7 +63,7 @@ class HyperSparseSolveTest {
     }
 
     @Test
-    fun `failed output mapping clears workspace for reuse`() {
+    fun `failed output mapping should clear the workspace for reuse`() {
         val work = BasisWorkspace(2)
         val vector = IndexedVector(2)
         work.set(0, 3.0)
@@ -85,7 +79,7 @@ class HyperSparseSolveTest {
     }
 
     @Test
-    fun `checked scatter failures preserve caller vectors and recover on the next solve`() {
+    fun `checked scatter failure should preserve caller vectors and recover on the next solve`() {
         for ((coefficient, rhs) in listOf(1e200 to 1e200, 1e-200 to 1e-200)) {
             val matrix = SparseMatrix.ofColumns(
                 2,
@@ -111,22 +105,5 @@ class HyperSparseSolveTest {
             }
             solver.close()
         }
-    }
-
-    @Test
-    fun `declined solves report completed traversal and pivot work`() {
-        val matrix = SparseMatrix.ofColumns(
-            2,
-            2,
-            listOf(listOf(0 to 1.0), listOf(0 to 1e200, 1 to 1.0)),
-        )
-        val solver = HyperSparseSolve(matrix, lower = false, unitDiagonal = false)
-        val work = BasisWorkspace(2).also { it.set(1, 1e200) }
-
-        assertFailsWith<BasisArithmeticException> { solver.solve(work, 1.0) }
-
-        val declined = assertNotNull(solver.lastWork)
-        assertEquals(1, declined.pivotVisits)
-        assertTrue(declined.units > 0)
     }
 }

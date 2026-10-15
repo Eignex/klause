@@ -6,7 +6,7 @@ import kotlin.test.assertNull
 
 class VarRemapTest {
     @Test
-    fun `source remapping owns its caller supplied tables`() {
+    fun `source remapping should own its caller supplied tables`() {
         val booleans = intArrayOf(2)
         val integers = intArrayOf(3)
         val reals = intArrayOf(4)
@@ -22,7 +22,7 @@ class VarRemapTest {
     }
 
     @Test
-    fun `absent variables have no typed target identity`() {
+    fun `absent variables should have no typed target identity`() {
         val mapping = VarRemap(intArrayOf(-1), intArrayOf(-1), intArrayOf(-1))
 
         assertNull(mapping.bool(SourceBoolId(0)))

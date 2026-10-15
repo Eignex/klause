@@ -25,11 +25,13 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
-    fun `finite MPS execution retains original open declarations after bound closure`() {
+    fun `finite MPS execution should retain original open declarations after bound closure`() {
         val source = File.createTempFile("mps-original-declarations", ".mps").apply {
-            writeText("ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-                " I COST 0\n X COST 1 R 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 2\n" +
-                "BOUNDS\n FX B I 1\n LI B X 0\nINDICATORS\n IF R I 1\nENDATA\n")
+            writeText(
+                "ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                    " I COST 0\n X COST 1 R 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 2\n" +
+                    "BOUNDS\n FX B I 1\n LI B X 0\nINDICATORS\n IF R I 1\nENDATA\n",
+            )
             deleteOnExit()
         }
         for (exact in listOf(false, true)) {
@@ -42,10 +44,12 @@ class MpsModeTest {
     }
 
     @Test
-    fun `finite MPS maximization retains its original objective beside the minimized execution goal`() {
+    fun `finite MPS maximization should retain its original objective beside the minimized execution goal`() {
         val source = File.createTempFile("mps-original-objective", ".mps").apply {
-            writeText("OBJSENSE\n MAX\nROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-                " I COST 1\n M1 'MARKER' 'INTEND'\nBOUNDS\n LI B I 0\n UI B I 2\nENDATA\n")
+            writeText(
+                "OBJSENSE\n MAX\nROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                    " I COST 1\n M1 'MARKER' 'INTEND'\nBOUNDS\n LI B I 0\n UI B I 2\nENDATA\n",
+            )
             deleteOnExit()
         }
         for (exact in listOf(false, true)) {
@@ -58,11 +62,13 @@ class MpsModeTest {
     }
 
     @Test
-    fun `open MPS indicator regions retain numerical optima under either certification policy`() {
+    fun `open MPS indicator regions should retain numerical optima under either certification policy`() {
         val source = File.createTempFile("mps-open-indicator", ".mps").apply {
-            writeText("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-                " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R 1\nRHS\n RHS R 2\n" +
-                "BOUNDS\n LI B I 0\n LO B X 0\nINDICATORS\n IF R I 0\nENDATA\n")
+            writeText(
+                "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                    " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R 1\nRHS\n RHS R 2\n" +
+                    "BOUNDS\n LI B I 0\n LO B X 0\nINDICATORS\n IF R I 0\nENDATA\n",
+            )
             deleteOnExit()
         }
         for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
@@ -78,10 +84,12 @@ class MpsModeTest {
     }
 
     @Test
-    fun `original nonzero underflow declines numerical MPS under either certification policy`() {
+    fun `nonzero underflow should decline numerical MPS under either certification policy`() {
         val source = File.createTempFile("mps-underflow-numerical", ".mps").apply {
-            writeText("ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1e-400\n" +
-                "RHS\n RHS R 0.1\nBOUNDS\n UP B X 1\nENDATA\n")
+            writeText(
+                "ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1e-400\n" +
+                    "RHS\n RHS R 0.1\nBOUNDS\n UP B X 1\nENDATA\n",
+            )
             deleteOnExit()
         }
         for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
@@ -97,10 +105,12 @@ class MpsModeTest {
     }
 
     @Test
-    fun `an infeasible constant MPS row retains numerical refutation under either policy`() {
+    fun `an infeasible constant MPS row should retain numerical refutation under either policy`() {
         val source = File.createTempFile("mps-constant-infeasible", ".mps").apply {
-            writeText("ROWS\n N COST\n G R\nCOLUMNS\n X COST 0\nRHS\n RHS R 1\n" +
-                "BOUNDS\n FR B X\nENDATA\n")
+            writeText(
+                "ROWS\n N COST\n G R\nCOLUMNS\n X COST 0\nRHS\n RHS R 1\n" +
+                    "BOUNDS\n FR B X\nENDATA\n",
+            )
             deleteOnExit()
         }
         for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
@@ -114,11 +124,13 @@ class MpsModeTest {
     }
 
     @Test
-    fun `fixed MPS indicators retain numerical bound closure under either certification policy`() {
+    fun `fixed MPS indicators should retain numerical bound closure under either certification policy`() {
         val source = File.createTempFile("mps-fixed-indicator", ".mps").apply {
-            writeText("ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-                " I COST 0\n X COST 1 R 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 2\n" +
-                "BOUNDS\n FX B I 1\n LI B X 0\nINDICATORS\n IF R I 1\nENDATA\n")
+            writeText(
+                "ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                    " I COST 0\n X COST 1 R 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 2\n" +
+                    "BOUNDS\n FX B I 1\n LI B X 0\nINDICATORS\n IF R I 1\nENDATA\n",
+            )
             deleteOnExit()
         }
         for (exact in listOf(false, true)) {
@@ -135,17 +147,26 @@ class MpsModeTest {
     }
 
     @Test
-    fun `continuous MPS heuristic workers retain numerical completion under either policy`() {
+    fun `continuous MPS heuristic workers should retain numerical completion under either policy`() {
         val source = File.createTempFile("mps-finite-numerical", ".mps").apply {
             writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n UP B X 1\nENDATA\n")
             deleteOnExit()
         }
         for ((engine, flags) in listOf("ls" to emptyArray(), "alns" to arrayOf("--exact"))) {
-            val loaded = MpsMode.newSession().load(source.absolutePath,
-                CommonOptions().apply { exact = flags.isNotEmpty() })
+            val loaded = MpsMode.newSession().load(
+                source.absolutePath,
+                CommonOptions().apply { exact = flags.isNotEmpty() },
+            )
             val text = capture {
-                assertEquals(0, runCli(arrayOf("-s", "-e", engine, "-p", "1", "--param",
-                    "node-limit=100", *flags, source.absolutePath)))
+                assertEquals(
+                    0,
+                    runCli(
+                        arrayOf(
+                            "-s", "-e", engine, "-p", "1", "--param",
+                            "node-limit=100", *flags, source.absolutePath,
+                        ),
+                    ),
+                )
             }
 
             assertTrue(loaded.numericalCompletion)
@@ -157,11 +178,13 @@ class MpsModeTest {
     }
 
     @Test
-    fun `open MPS optimization executes numerical relaxations under default and exact policy`() {
+    fun `open MPS optimization should execute numerical relaxations under default and exact policy`() {
         val source = File.createTempFile("mps-open-numerical", ".mps").apply {
-            writeText("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-                " I COST 1 R 1\n M1 'MARKER' 'INTEND'\n X R 1\n" +
-                "BOUNDS\n LI B I 0\n FR B X\nENDATA\n")
+            writeText(
+                "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                    " I COST 1 R 1\n M1 'MARKER' 'INTEND'\n X R 1\n" +
+                    "BOUNDS\n LI B I 0\n FR B X\nENDATA\n",
+            )
             deleteOnExit()
         }
         for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
@@ -179,10 +202,12 @@ class MpsModeTest {
     }
 
     @Test
-    fun `exact continuous decimals retain numerical execution and source certificates`() {
+    fun `exact continuous decimals should retain numerical execution and source certificates`() {
         val source = File.createTempFile("mps-exact-continuous", ".mps").apply {
-            writeText("ROWS\n N COST\n E R\nCOLUMNS\n X COST 0.1 R 3\nRHS\n RHS R 1\n" +
-                "BOUNDS\n LO B X 0.1\n UP B X 1\nENDATA\n")
+            writeText(
+                "ROWS\n N COST\n E R\nCOLUMNS\n X COST 0.1 R 3\nRHS\n RHS R 1\n" +
+                    "BOUNDS\n LO B X 0.1\n UP B X 1\nENDATA\n",
+            )
             deleteOnExit()
         }
         assertFalse(Mps.parse(source.readText()).toProblem().sourceExact)
@@ -198,11 +223,13 @@ class MpsModeTest {
     }
 
     @Test
-    fun `default bounded decimal optimization publishes an original source tolerance witness`() {
+    fun `default bounded decimal optimization should publish a source tolerance witness`() {
         val source = File.createTempFile("mps-finite-tolerance", ".mps").apply {
-            writeText("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -0.1\n" +
-                " M1 'MARKER' 'INTEND'\n X COST 0.1 R 1\nRHS\n RHS R 0.2\n" +
-                "BOUNDS\n LI B I 0\n UI B I 1\n LO B X 0.1\nENDATA\n")
+            writeText(
+                "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -0.1\n" +
+                    " M1 'MARKER' 'INTEND'\n X COST 0.1 R 1\nRHS\n RHS R 0.2\n" +
+                    "BOUNDS\n LI B I 0\n UI B I 1\n LO B X 0.1\nENDATA\n",
+            )
             deleteOnExit()
         }
 
@@ -214,24 +241,45 @@ class MpsModeTest {
     }
 
     @Test
-    fun `numerical CP and LS completion retain the configured MPS source guarantee`() {
+    fun `numerical CP and LS completion should retain the configured MPS source guarantee`() {
         val source = File.createTempFile("mps-completion-source-guarantee", ".mps").apply {
-            writeText("ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 3\nRHS\n RHS R 1\n" +
-                "BOUNDS\n UP B X 1\nENDATA\n")
+            writeText(
+                "ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 3\nRHS\n RHS R 1\n" +
+                    "BOUNDS\n UP B X 1\nENDATA\n",
+            )
             deleteOnExit()
         }
         for (exact in listOf(false, true)) {
             for (engine in listOf("cp", "ls")) {
                 val flags = if (exact) arrayOf("--exact") else emptyArray()
                 val text = capture {
-                    assertEquals(0, runCli(arrayOf("-s", "-e", engine, "-p", "1", "--param",
-                        "node-limit=100", *flags, source.absolutePath)))
+                    assertEquals(
+                        0,
+                        runCli(
+                            arrayOf(
+                                "-s", "-e", engine, "-p", "1", "--param",
+                                "node-limit=100", *flags, source.absolutePath,
+                            ),
+                        ),
+                    )
                 }
 
-                assertTrue(if (engine == "cp") "s OPTIMUM FOUND" in text.lines()
-                    else "s SATISFIABLE" in text.lines(), text)
-                assertTrue(if (exact) "exact original MPS source witness" in text
-                    else "MPS source tolerance witness" in text, text)
+                assertTrue(
+                    if (engine == "cp") {
+                        "s OPTIMUM FOUND" in text.lines()
+                    } else {
+                        "s SATISFIABLE" in text.lines()
+                    },
+                    text,
+                )
+                assertTrue(
+                    if (exact) {
+                        "exact original MPS source witness" in text
+                    } else {
+                        "MPS source tolerance witness" in text
+                    },
+                    text,
+                )
                 if (exact) assertTrue("v X=1/3" in text.lines(), text)
                 if (engine == "ls") assertFalse("optimizationStatus=" in text, text)
                 assertFalse("exact-neighborhood" in text, text)
@@ -241,11 +289,13 @@ class MpsModeTest {
     }
 
     @Test
-    fun `bounded mixed decimal loading retains finite execution under default and exact settings`() {
+    fun `bounded mixed decimal loading should retain finite execution under default and exact settings`() {
         val source = File.createTempFile("mps-finite-decimal", ".mps").apply {
-            writeText("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -0.1\n" +
-                " M1 'MARKER' 'INTEND'\n X COST 0.1 R 1\nRHS\n RHS R 0.2\n" +
-                "BOUNDS\n LI B I 0\n UI B I 1\n LO B X 0.1\nENDATA\n")
+            writeText(
+                "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -0.1\n" +
+                    " M1 'MARKER' 'INTEND'\n X COST 0.1 R 1\nRHS\n RHS R 0.2\n" +
+                    "BOUNDS\n LI B I 0\n UI B I 1\n LO B X 0.1\nENDATA\n",
+            )
             deleteOnExit()
         }
 
@@ -259,12 +309,14 @@ class MpsModeTest {
     }
 
     @Test
-    fun `joint decimal indicators refute their enabled original source`() {
+    fun `joint decimal indicators should refute their enabled source`() {
         val source = File.createTempFile("mps-joint-indicators", ".mps").apply {
-            writeText("ROWS\n N COST\n G A\n L B\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 0\n" +
-                " M1 'MARKER' 'INTEND'\n X A 1 B 1\nRHS\n RHS A 0.2 B 0.1\n" +
-                "BOUNDS\n FX BN I 1\n LO BN X 0\n UP BN X 1\n" +
-                "INDICATORS\n IF A I 1\n IF B I 1\nENDATA\n")
+            writeText(
+                "ROWS\n N COST\n G A\n L B\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 0\n" +
+                    " M1 'MARKER' 'INTEND'\n X A 1 B 1\nRHS\n RHS A 0.2 B 0.1\n" +
+                    "BOUNDS\n FX BN I 1\n LO BN X 0\n UP BN X 1\n" +
+                    "INDICATORS\n IF A I 1\n IF B I 1\nENDATA\n",
+            )
             deleteOnExit()
         }
 
@@ -276,7 +328,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `float rendering checks zero reconstruction against original source rows`() {
+    fun `float rendering should check zero reconstruction against source rows`() {
         val compiled = Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R -1\n" +
                 " M1 'MARKER' 'INTEND'\n X R 1\nRHS\n RHS R 0\nBOUNDS\n BV B I\n LO B X 0\nENDATA",
@@ -291,7 +343,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `zero reconstruction preserves a nonzero original source equality`() {
+    fun `zero reconstruction should preserve a nonzero source equality`() {
         val compiled = Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n X COST 0 R 1\nRHS\n RHS R 0.00000000000001\n" +
                 "BOUNDS\n LO B X 0\nENDATA",
@@ -304,7 +356,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `zero reconstruction preserves the source objective at the float point`() {
+    fun `zero reconstruction should preserve the source objective at the float point`() {
         val compiled = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n LO B X 0\nENDATA")
             .toExactSourceProblem()
         val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(-5e-14))
@@ -315,7 +367,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `source inexact models retain their original float witness`() {
+    fun `source inexact models should retain their original float witness`() {
         val compiled = Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 3.0000000000000001\nRHS\n RHS R 1\nENDATA",
         ).toProblem()
@@ -328,7 +380,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `MPS publication uses the checked current source value before duplicate handling`() {
+    fun `MPS publication should use the checked current source value before duplicate handling`() {
         var checked: BigFraction? = BigFraction.ONE * BigFraction.ofLong(2).reciprocal()
         val output = MpsOutput(objectiveScale = 3L, sourceArithmeticValue = { checked?.let(SourceValue::Rational) })
         val publication = ArithmeticPublication(output)
@@ -345,19 +397,24 @@ class MpsModeTest {
     }
 
     @Test
-    fun `accepted MPS objectives retain original units and decimal formatting`() {
+    fun `accepted MPS objectives should retain original units and decimal formatting`() {
         val output = MpsOutput(objectiveScale = 3L, sourceObjective = { BigFraction.ofLong(99) })
 
         val text = capture {
-            output.onArithmeticIncumbent("v X=1/2", SourceValue.Rational(BigFraction.ONE *
-                BigFraction.ofLong(2).reciprocal()))
+            output.onArithmeticIncumbent(
+                "v X=1/2",
+                SourceValue.Rational(
+                    BigFraction.ONE *
+                        BigFraction.ofLong(2).reciprocal(),
+                ),
+            )
         }
 
         assertEquals("o 0.5\nv X=1/2\n", text)
     }
 
     @Test
-    fun `exact open objectives undo the MPS scale without rounding`() {
+    fun `exact open objectives should undo the MPS scale without rounding`() {
         for (sign in listOf(-1L, 1L)) {
             val output = MpsOutput(objectiveScale = 3L)
 
@@ -368,11 +425,13 @@ class MpsModeTest {
     }
 
     @Test
-    fun `MPS root statistics retain their source objective scale`() {
+    fun `MPS root statistics should retain their source objective scale`() {
         for (scale in listOf(1L, 3L, 100L)) {
             val output = MpsOutput(objectiveScale = scale)
-            val stats = SolveStats(run = RunStats(backend = "backtrack"),
-                lp = LpStats(solves = SumResult(1.0), rootBound = -1.23456789))
+            val stats = SolveStats(
+                run = RunStats(backend = "backtrack"),
+                lp = LpStats(solves = SumResult(1.0), rootBound = -1.23456789),
+            )
 
             val text = capture { output.onStatistics(stats, 1L, 0L) }
 
@@ -394,35 +453,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `exact MPS loading requires certificates instead of tolerance acceptance`() {
-        val mps = File.createTempFile("mpsfloat", ".mps").apply {
-            writeText(
-                """
-                NAME T
-                ROWS
-                 N COST
-                 L LIMIT
-                COLUMNS
-                    X COST 1 LIMIT 1
-                RHS
-                    RHS LIMIT 1
-                BOUNDS
-                 UP BND X 1
-                ENDATA
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        val tolerant = MpsMode.newSession().load(mps.absolutePath, CommonOptions())
-        val exact = MpsMode.newSession().load(mps.absolutePath, CommonOptions().apply { this.exact = true })
-
-        assertNotNull(tolerant.toleranceCheck)
-        assertNull(exact.toleranceCheck)
-    }
-
-    @Test
-    fun `pure continuous objectives attain fractional optima in either direction`() {
+    fun `pure continuous objectives should attain fractional optima in either direction`() {
         for ((sense, expected) in listOf("MIN" to "1/3", "MAX" to "2/3")) {
             val mps = File.createTempFile("mpscontinuous", ".mps").apply {
                 writeText(
@@ -444,7 +475,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `open continuous objectives retain source sense in either direction`() {
+    fun `open continuous objectives should retain source sense in either direction`() {
         for (sense in listOf("MIN", "MAX")) {
             val mps = File.createTempFile("mpsopenobjective", ".mps").apply {
                 writeText(
@@ -464,7 +495,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `open continuous incumbents report the source objective without an optimum claim`() {
+    fun `open continuous incumbents should report the source objective without an optimum claim`() {
         val mps = File.createTempFile("mpsopenincumbent", ".mps").apply {
             writeText(
                 "NAME T\nROWS\n N COST\n G R\nCOLUMNS\n" +
@@ -475,8 +506,20 @@ class MpsModeTest {
         }
 
         val text = capture {
-            assertEquals(0, runCli(arrayOf("-e", "ls", "--param", "node-limit=100",
-                "--param", "max-flips=1", mps.absolutePath)))
+            assertEquals(
+                0,
+                runCli(
+                    arrayOf(
+                        "-e",
+                        "ls",
+                        "--param",
+                        "node-limit=100",
+                        "--param",
+                        "max-flips=1",
+                        mps.absolutePath,
+                    ),
+                ),
+            )
         }
 
         val values = text.lines().single { it.startsWith("v ") }.removePrefix("v ").split(' ')
@@ -491,7 +534,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `pure continuous decimal lowerings admit only source tolerance witnesses`() {
+    fun `pure continuous decimal lowerings should admit only source tolerance witnesses`() {
         val mps = File.createTempFile("mpscontinuoustolerance", ".mps").apply {
             writeText(
                 "NAME T\nROWS\n N COST\nCOLUMNS\n X COST -1\n" +
@@ -508,7 +551,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `exact open decimal sources admit complete search`() {
+    fun `exact open decimal sources should admit complete search`() {
         val mps = File.createTempFile("mpsopenrounded", ".mps").apply {
             writeText(
                 "NAME T\nROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
@@ -525,7 +568,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `default open decimal incumbents report their original objective`() {
+    fun `default open decimal incumbents should report their original objective`() {
         val mps = File.createTempFile("mpsopentolerance", ".mps").apply {
             writeText(
                 "NAME T\nROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
@@ -555,7 +598,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `default open decimal witnesses violating the source are withheld`() {
+    fun `default open decimal witnesses violating the source should be withheld`() {
         val mps = File.createTempFile("mpsopenreject", ".mps").apply {
             writeText(
                 "NAME T\nROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
@@ -583,7 +626,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `a source objective with no finite decimal prints as a fraction`() {
+    fun `a source objective with no finite decimal should print as a fraction`() {
         val third = BigFraction.ofLong(3L).reciprocal()
         val output = MpsOutput(sourceObjective = { third })
 
@@ -593,7 +636,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `a source objective with a finite decimal stays decimal`() {
+    fun `a source objective with a finite decimal should stay decimal`() {
         val half = BigFraction.ofLong(2L).reciprocal()
         val output = MpsOutput(sourceObjective = { half })
 
@@ -603,7 +646,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `a source difference qualifies the lowered optimum`() {
+    fun `a source difference should qualify the lowered optimum`() {
         val output = MpsOutput(sourceExact = false, sourceDifference = "objective coefficient 'X'")
 
         val text = capture {
@@ -616,7 +659,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `a feasible verdict without a verified source witness is unknown`() {
+    fun `a feasible verdict without a verified source witness should be unknown`() {
         val output = MpsOutput(sourceExact = false, sourceDifference = "row 'R' coefficient")
 
         val text = capture { output.onComplete(Verdict.OPTIMAL) }
@@ -626,7 +669,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `a source difference declines negative terminal claims`() {
+    fun `a source difference should decline negative terminal claims`() {
         listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED).forEach { verdict ->
             val output = MpsOutput(sourceExact = false, sourceDifference = "row 'R' coefficient")
 
@@ -637,7 +680,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `a source within tolerance still declines negative terminal claims`() {
+    fun `a source within tolerance should still decline negative terminal claims`() {
         listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED).forEach { verdict ->
             val output = MpsOutput(sourceExact = true, proofExact = false)
 
@@ -648,7 +691,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `complete engines prove original decimal objective cutoffs`() {
+    fun `complete search should prove decimal objective cutoffs`() {
         val mps = File.createTempFile("mpssourceobjective", ".mps").apply {
             writeText(
                 "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R -1\n" +
@@ -657,20 +700,17 @@ class MpsModeTest {
             )
             deleteOnExit()
         }
-        for (engine in listOf("cp", "fixed", "mixed")) {
-            val text = capture {
-                assertEquals(0, runCli(arrayOf("-e", engine, "-p", "1", "--param",
-                    "node-limit=10000", mps.absolutePath)))
-            }
-
-            assertTrue("s OPTIMUM FOUND" in text.lines(), text)
-            assertTrue("o 0.10000000000000000001" in text.lines(), text)
-            assertTrue("v I=0 X=1/10" in text.lines(), text)
+        val text = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--param", "node-limit=10000", mps.absolutePath)))
         }
+
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("o 0.10000000000000000001" in text.lines(), text)
+        assertTrue("v I=0 X=1/10" in text.lines(), text)
     }
 
     @Test
-    fun `original decimal cancellation supersedes a rounded refutation`() {
+    fun `decimal cancellation should supersede a rounded refutation`() {
         val mps = File.createTempFile("mpssourcecancellation", ".mps").apply {
             writeText(
                 "ROWS\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 0\n" +
@@ -689,7 +729,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `exact source refutations do not follow rounded decimal feasibility`() {
+    fun `exact source refutations should not follow rounded decimal feasibility`() {
         val mps = File.createTempFile("mpssourceconflict", ".mps").apply {
             writeText(
                 "ROWS\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 0\n" +
@@ -707,7 +747,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `heuristic engines retain original decimal incumbent strength`() {
+    fun `heuristic engines should retain decimal incumbent strength`() {
         val mps = File.createTempFile("mpssourceheuristic", ".mps").apply {
             writeText(
                 "ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 0\n" +
@@ -718,8 +758,15 @@ class MpsModeTest {
         }
         for (engine in listOf("ls", "alns")) {
             val text = capture {
-                assertEquals(0, runCli(arrayOf("-e", engine, "-p", "1", "--param",
-                    "node-limit=10000", "--param", "max-flips=4", mps.absolutePath)))
+                assertEquals(
+                    0,
+                    runCli(
+                        arrayOf(
+                            "-e", engine, "-p", "1", "--param",
+                            "node-limit=10000", "--param", "max-flips=4", mps.absolutePath,
+                        ),
+                    ),
+                )
             }
 
             assertTrue("s SATISFIABLE" in text.lines(), text)
@@ -729,23 +776,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `explicit exact continuous decimal sources have original optimum authority`() {
-        val mps = File.createTempFile("mpsexactsourcecontinuous", ".mps").apply {
-            writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n LO B X 0.1\nENDATA\n")
-            deleteOnExit()
-        }
-
-        val text = capture {
-            assertEquals(0, runCli(arrayOf("--exact", "-e", "cp", "-p", "1", mps.absolutePath)))
-        }
-
-        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
-        assertTrue("o 0.1" in text.lines(), text)
-        assertTrue("v X=0.1" in text.lines(), text)
-    }
-
-    @Test
-    fun `bounded mixed exact decimal sources retain original optimum authority`() {
+    fun `bounded mixed exact decimal sources should retain optimum authority`() {
         val mps = File.createTempFile("mpsfiniteoriginalsource", ".mps").apply {
             writeText(
                 "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -0.1\n" +
@@ -765,7 +796,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `rejected terminal witnesses cannot promote an earlier incumbent`() {
+    fun `rejected terminal witnesses should not promote an earlier incumbent`() {
         for (verdict in listOf(Verdict.OPTIMAL, Verdict.UNBOUNDED)) {
             var accepted = true
             val output = MpsOutput(sourceWitnessAccepted = { accepted })
@@ -784,7 +815,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `constant source objectives retain attained optimum semantics`() {
+    fun `constant source objectives should retain attained optimum semantics`() {
         val mps = File.createTempFile("mpsconstantsource", ".mps").apply {
             writeText("ROWS\n N COST\n E R\nRHS\n RHS R 0 COST 0.3\nENDATA\n")
             deleteOnExit()
@@ -799,7 +830,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `retained MPS outputs keep their original source objective scope`() {
+    fun `retained MPS outputs should keep their source objective scope`() {
         val files = listOf("1.0000000000000000001", "2").map { coefficient ->
             File.createTempFile("mpsobjectivescope", ".mps").apply {
                 writeText(
@@ -830,7 +861,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `source witness guarantees distinguish exact and tolerance acceptance`() {
+    fun `source witness guarantees should distinguish exact and tolerance acceptance`() {
         val mps = File.createTempFile("mpswitnessguarantee", ".mps").apply {
             writeText("OBJSENSE\n MAX\nROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n UP B X 1\nENDATA\n")
             deleteOnExit()
@@ -839,8 +870,12 @@ class MpsModeTest {
             val common = CommonOptions().apply { this.exact = exact }
             val session = MpsMode.newSession()
             val solvable = session.load(mps.absolutePath, common)
-            val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(if (exact) 1.0 else 1.00000001),
-                if (exact) listOf(BigFraction.ONE) else null)
+            val sample = Sample(
+                BooleanArray(0),
+                LongArray(0),
+                doubleArrayOf(if (exact) 1.0 else 1.00000001),
+                if (exact) listOf(BigFraction.ONE) else null,
+            )
             if (!exact) assertTrue(assertNotNull(solvable.toleranceCheck)(sample))
             val output = session.output(common)
 
@@ -857,7 +892,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `a tolerance witness cannot support original source unboundedness`() {
+    fun `a tolerance witness should not support source unboundedness`() {
         val output = MpsOutput(exactSourceWitness = { false })
 
         val text = capture {

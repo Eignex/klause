@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class OznApplierTest {
     @Test
-    fun `finite set bindings widen elements at the output boundary`() {
+    fun `finite set bindings should widen elements at the output boundary`() {
         val program = parseFlatZinc("var set of {-2147483648,2147483647}: s; solve satisfy;")
         val sample = Sample(BooleanArray(program.problem.numBoolVars) { true }, LongArray(0))
         val applier = OznApplier("set of int: s; output [show(s)];")
@@ -20,7 +20,7 @@ class OznApplierTest {
     }
 
     @Test
-    fun `set parameter arrays preserve signed elements in output`() {
+    fun `set parameter arrays should preserve signed elements in output`() {
         val program = parseFlatZinc(
             "array[1..2] of set of int: a = [{-2147483648},{2147483647}]; solve satisfy;",
         )
@@ -33,7 +33,7 @@ class OznApplierTest {
     }
 
     @Test
-    fun `integer bindings outside the rendering range report an evaluation error`() {
+    fun `integer bindings outside the rendering range should report an evaluation error`() {
         val program = parseFlatZinc("var int: x; solve satisfy;")
         val sample = Sample(BooleanArray(0), LongArray(0), exactInts = listOf(parseBigInt("9223372036854775808")))
         val applier = OznApplier("int: x; output [show(x)];")

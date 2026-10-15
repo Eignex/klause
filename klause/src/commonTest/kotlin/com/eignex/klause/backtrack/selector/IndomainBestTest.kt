@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
 class IndomainBestTest {
 
     @Test
-    fun `IndomainBest descending for negative coefficient`() {
+    fun `IndomainBest should order descending for a negative coefficient`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
@@ -26,7 +26,7 @@ class IndomainBestTest {
     }
 
     @Test
-    fun `IndomainBest ascending for positive coefficient`() {
+    fun `IndomainBest should order ascending for a positive coefficient`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
