@@ -17,6 +17,33 @@ import kotlin.test.assertTrue
 
 class LpExactContinuationTest {
     @Test
+    fun `direct continuation dimension declines retain no state and can later admit another model`() {
+        val cache = LpExactContinuationCache()
+        val models = listOf(2, 1).map { rows ->
+            LpBuilder().apply {
+                addVar(0L, 1L)
+                repeat(rows) { addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L) }
+            }.build(Sense.MINIMIZE)
+        }
+        val largeBasis = Basis(intArrayOf(0, 2), arrayOf(VarStatus.BASIC, VarStatus.FIXED, VarStatus.BASIC))
+        val limits = ExactContinuationLimits(maxRows = 1)
+        repeat(2) {
+            val declined = continueExactLp(models[0], largeBasis, cache, limits = limits)
+            assertEquals(ContinuationDecline.DIMENSION, declined.metrics.decline)
+            assertEquals(1L, declined.metrics.work)
+            assertEquals(0, declined.metrics.builds)
+            assertNull(declined.witness)
+        }
+
+        val admitted = continueExactLp(models[1],
+            Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED)), cache, limits = limits)
+
+        assertEquals(listOf(BigFraction.ONE), assertNotNull(admitted.witness).primal)
+        assertNull(admitted.metrics.decline)
+        assertEquals(1, admitted.metrics.builds)
+    }
+
+    @Test
     fun `structural target declines skip basis export and current limits can admit a retry`() {
         val model = LpBuilder().apply {
             addVar(0L, 1L)
