@@ -1015,7 +1015,7 @@ internal class ResumableMinimize(
             lpEngine.lbTreeSearch(objective, rootToken, params.assumptions, params.toleranceCheck,
                 complete = ::completeLeaf,
                 accept = { verifiedLpProposal(it, rootToken)?.assignment })?.let { seed ->
-                if (!rootToken()) recordIfImproving(seed.sample, objective.evaluate(seed.sample))?.let { return it }
+                if (!params.cancellation()) recordIfImproving(seed.sample, objective.evaluate(seed.sample))?.let { return it }
             }
         }
         return null

@@ -7,6 +7,9 @@ import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.toExactSourceProblem
+import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -38,6 +41,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
@@ -651,6 +655,40 @@ class ResumableMinimizeTest {
             assertTrue(continuationExports > 0)
             assertTrue(boundChecked)
             assertEquals(opened, closed)
+        }
+    }
+
+    @Test
+    fun `mixed tree probes preserve original MPS coordinates objective and sense`() {
+        for (sense in listOf("MIN", "MAX")) {
+            for (exact in listOf(false, true)) {
+                val source = Mps.parse("NAME TREE\nOBJSENSE\n $sense\nROWS\n N COST\n E R\nCOLUMNS\n" +
+                    " M0 'MARKER' 'INTORG'\n I COST 1 R 1\n M1 'MARKER' 'INTEND'\n" +
+                    " X COST 10 R 2\nRHS\n RHS R 2 COST -3\nBOUNDS\n" +
+                    " BV B I\n LO B X 0.25\n UP B X 1.25\nENDATA")
+                val compiled = if (exact) source.toExactSourceProblem() else source.toProblem()
+                val sourceObjective = assertNotNull(compiled.objective).toLinearObjective()
+                val objective = if (compiled.maximize) sourceObjective.negated() else sourceObjective
+                val offered = ArrayList<Sample>()
+                val params = BacktrackParams(maxDecisions = 0L,
+                    toleranceCheck = if (exact) null else { sample ->
+                        compiled.withinTolerance(sample.ints, sample.reals)
+                    }, lpPlan = LpPlan(bounding = true, probe = false, lbTreeSearch = true, rootCutHarvest = false))
+
+                BacktrackSolver(compiled.model.bake()).resumable(objective, params).use { search ->
+                    search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
+                    assertEquals(0.0, search.stats.search.nodes.sum)
+                }
+
+                val sample = offered.single()
+                val reals = sample.exactReals ?: sample.reals.map { assertNotNull(BigFraction.ofDouble(it)) }
+                val witness = compiled.sourceWitness(sample.ints, reals)
+                assertEquals(if (compiled.maximize) "13" else "9", witness.objective.toString())
+                assertEquals(if (compiled.maximize) listOf("0", "1") else listOf("1", "1/2"),
+                    witness.values.map { it.toString() })
+                if (exact) assertNotNull(sample.exactReals)
+                else assertNull(sample.exactReals)
+            }
         }
     }
 
