@@ -49,7 +49,7 @@ class ClauseSearchComponent(clauses: Iterable<Clause>) :
         for (literals in sourceClauses) {
             val result = withContext(context) {
                 val index = store.add(literals.copyOf(), lbd = literals.size)
-                if (index < 0) ComponentResult.Consistent else store.attach(index, this)
+                if (index < 0) ComponentResult.Consistent else store.attach(index, this@ClauseSearchComponent)
             }
             if (result !is ComponentResult.Consistent) {
                 yield(result)
