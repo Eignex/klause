@@ -15,6 +15,7 @@ import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -91,6 +92,26 @@ class DivModEncoderTest {
 
         assertEquals(DivisionConvention.EUCLIDEAN, factor.convention)
         assertEquals(2L, sample.intValue(parsed.intVarNames.getValue("a")))
+    }
+
+    @Test
+    fun `interrupted formula expansion discards the complete relation scope`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(-8, 8) },
+            arrayOf<Factor>(DivMod(0, bigIntOf(3), 1, 2)))
+        var work = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = work > 0L
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+        var decline: EncoderDecline? = null
+        val prepared = FactorProjectionProviders.Default.prepare(source)
+
+        val installed = prepared.linearTheoryModel(EncodingTarget.LINEAR, cancellation = stop,
+            onDecline = { decline = it })
+
+        assertTrue(work > 0L)
+        assertNull(installed)
+        assertEquals(EncoderDecline.RESOURCE, decline)
     }
 
     @Test
