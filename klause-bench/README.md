@@ -133,6 +133,16 @@ pinned revisions. Use `SourceRecordCheck` with `captureSources=true` for indepen
 original-decimal validation; this fixture suite requires hash-named source bytes.
 Reference agreement does not verify an exported solver proof certificate.
 
+`bench.profile.LpCertificationAdmissionProfile` measures exact basis verification and
+continuation-target dimension rejection without a floating solve. Submit it as a
+pinned lab profile with `rows=129 attempts=20000 rounds=7 warmup=5000`, one machine
+and one core. It saves settings and alternating per-mechanism elapsed/thread-allocation
+observations and requires a dimension decline with one entry work unit and no modeled
+allocation. Reflection retains the numerical engine's private API. Compare identical
+profile source, settings and runtime identities across revisions; these setup timings
+and allocations do not establish whole-source solve speedups. Use uninstrumented,
+source-checked default/exact experiments separately.
+
 ## Klause-lab
 
 [Klause-lab](https://github.com/Eignex/klause-lab) owns remote experiment execution,
