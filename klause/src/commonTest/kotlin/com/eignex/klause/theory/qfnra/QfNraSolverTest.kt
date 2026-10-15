@@ -29,8 +29,8 @@ class QfNraSolverTest {
             val declarations = if (extended) "(declare-const fixed Real) (declare-const unused Real)" else ""
             val condition = if (extended) "(= fixed 2)" else ""
             val source = SmtLibPolynomial.parse("""
-                (declare-const x Real)
                 (declare-const y Real)
+                (declare-const x Real)
                 $declarations
                 (assert (and (> x 1) (> y x) (> (* x y) 4) $condition))
             """.trimIndent())
@@ -48,8 +48,8 @@ class QfNraSolverTest {
 
             assertEquals(1L, work.snapshot().dyadicBases)
             assertTrue(work.snapshot().workSpent < 32768)
-            assertEquals(1, algebraic.compare(assignment.realValue(0), algebraic.rational(BigFraction.ONE)))
-            assertEquals(1, algebraic.compare(assignment.realValue(1), assignment.realValue(0)))
+            assertEquals(1, algebraic.compare(assignment.realValue(1), algebraic.rational(BigFraction.ONE)))
+            assertEquals(1, algebraic.compare(assignment.realValue(0), assignment.realValue(1)))
             assertEquals(1, algebraic.compare(algebraic.multiply(assignment.realValue(0), assignment.realValue(1)),
                 algebraic.rational(BigFraction.ofLong(4))))
             if (extended) {
@@ -57,6 +57,28 @@ class QfNraSolverTest {
                 assertEquals(BigFraction.ZERO, assignment.realValue(3).rational)
             }
         }
+    }
+
+    @Test
+    fun `stalled dyadic repairs cannot publish a base from stale shared weights`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (and (> x 1) (> y x) (> (* x y) 4)))
+        """.trimIndent())
+        val work = QfNraWork(QfNraParams())
+        val arithmetic = PolynomialArithmetic(work)
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val guides = requireNotNull(formula.conjunctiveAtoms(arithmetic, 128))
+        val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic), work)
+
+        val assignment = work.probe { work.coupled {
+            probe.coupled(guides, List(source.realCount) { BigFraction.ZERO }, emptyMap(),
+                atomTermCounts = guides.map { it.polynomial.terms.size })
+        } }
+
+        assertNull(assignment)
+        assertEquals(0L, work.snapshot().dyadicBases)
     }
 
     @Test
