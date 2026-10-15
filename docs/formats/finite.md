@@ -31,6 +31,18 @@ bounds must fit the signed-word representation. Variable, negative and fractiona
 exponents are unsupported. DIMACS/WCNF have no numeric powers; OPB/WBO monomials
 remain Boolean conjunctions, including repeated literals.
 
+Integer conditional expressions retain a native `Element` over their ordered else
+and then values, with a 0/1 condition channel. Constant matrices retain native
+selections of the row start, row length and flattened cell. Row-dependent column
+bounds prevent an invalid column from selecting another row's cell, including
+ragged constant rows. Variable matrix selection retains its existing axis guards.
+
+Vector selection and indexed extrema read the standard `list@startIndex` attribute.
+The existing parent `startIndex` spelling remains a compatibility alias; conflicting
+explicit offsets decline. Indexed minimum/maximum retains both `ArrayMinMax` and
+`Element`; its numerical condition is optional. Selection with `rank="first"` or
+`rank="last"` declines explicitly. Unindexed vector membership remains unsupported.
+
 XCSP3 variable-matrix selection uses a
 row-major index equality and a native `Element` factor. The compiler marks the
 flattened index, selected result and affine expression outputs as functionally defined. Local search
