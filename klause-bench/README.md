@@ -1775,7 +1775,10 @@ plus alternating plain/observed producer records.
 
 The JVM-only observer reflects the existing root query and native owner. It records
 the stack and cumulative charge at the existing coupled-work stop checkpoint without
-returning cancellation or adding native charges. Both modes use the same source,
+returning cancellation or adding native charges. An observing caller meter also groups
+every existing native charge by its engine stack; the attributed sum must match the
+native snapshot. Stack collection adds diagnostic overhead, not native allowance.
+Both modes use the same source,
 fixings, default representation caps and a 60-second containing deadline. Two query
 checkpoints run normalization and bounded probing; no projection or lifting follows.
 All four native snapshots and outcome classes must agree. A pending producer supplies
