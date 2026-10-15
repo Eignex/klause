@@ -34,14 +34,18 @@ import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import java.io.File
+import java.security.MessageDigest
 import java.util.Base64
 import java.util.zip.GZIPInputStream
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 internal object BooleanObjectiveDescentProbe {
@@ -60,10 +64,10 @@ internal object BooleanObjectiveDescentProbe {
         val timeout = options["timeout"]?.toLong() ?: 5000L
         val prepareMs = options["prepareMs"]?.toLong() ?: 500L
         val conditional = options["conditional"]?.toInt() ?: 0
-        require(options["conditionalClosure"] in listOf(null, "true", "false"))
-        val closedRepairs = options["conditionalClosure"] == "true"
+        val closureMode = options["conditionalClosure"] ?: "false"
+        require(closureMode in listOf("true", "false", "both"))
         require(conditional in 0..32)
-        require(!closedRepairs || conditional > 0)
+        require(closureMode == "false" || conditional > 0)
         require(timeout in 1..60_000 && prepareMs in 1..5000)
         val ref = Catalog.uncapped(suite).problems.single { it.name == name }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(ref.source)).use { it.readNBytes(MAX_SOURCE_BYTES + 1) }
@@ -113,11 +117,26 @@ internal object BooleanObjectiveDescentProbe {
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         if (conditional > 0) {
             val roots = parsed.boolFolds.map { Lit.variable(it.lits.single()) }.distinct()
-            val rows = conditionalRepairs(
-                problem, objective, sweep, initial, roots, conditional, work, timeout,
-                suite, name, digest, parsed.numOriginalBoolVars, sourceObjective, prepared.reconstruct,
-                closedRepairs,
-            )
+            val variants = if (closureMode == "both") listOf(false, true) else listOf(closureMode == "true")
+            val rows = buildJsonArray {
+                var index = 0
+                var identity: String? = null
+                for (closedRepairs in variants) {
+                    val results = conditionalRepairs(
+                        problem, objective, sweep, initial, roots, conditional, work, timeout,
+                        suite, name, digest, parsed.numOriginalBoolVars, sourceObjective, prepared.reconstruct,
+                        closedRepairs,
+                    )
+                    for (result in results) {
+                        val row = result.jsonObject
+                        val signature = row.getValue("record").jsonObject
+                            .getValue("preparedModelSha256").jsonPrimitive.content
+                        check(identity == null || identity == signature)
+                        identity = signature
+                        add(JsonObject(row + ("index" to JsonPrimitive(index++))))
+                    }
+                }
+            }
             out.resolve("cases.json").writeText(rows.toString() + "\n")
             return
         }
@@ -226,6 +245,7 @@ internal object BooleanObjectiveDescentProbe {
         val setupStarted = System.nanoTime()
         val pins = requireNotNull(LocalSearchModel.of(problem.bake()).pinsUnder(Assumptions.None))
         pins.forEachBool { id, value -> require(initial.boolValue(id) == value) }
+        val preparedIdentity = preparedIdentity(problem, objective, pins)
         val model = LocalSearchModel.open(problem)
         val base = LocalSearchState(model, Random(3), pins)
         for (v in 0 until problem.numBoolVars) base.assignment.setBool(v, initial.boolValue(v))
@@ -281,11 +301,13 @@ internal object BooleanObjectiveDescentProbe {
             val incrementalCost = state.cost
             state.recompute()
             check(state.cost == incrementalCost)
+            check(state.step == moves)
             val feasible = !seedRejected && state.cost == 0L
             val sourceSample = if (feasible) reconstruct(state.assignment.snapshot()) else null
             val value = sourceSample?.let(sourceObjective::evaluateExact)
             add(buildJsonObject {
-                put("index", index); put("status", "DONE"); put("arm", "conditional-cbls-$root")
+                put("index", index); put("status", "DONE")
+                put("arm", "conditional-${if (closedRepairs) "closed" else "raw"}-cbls-$root")
                 put("seed", 3)
                 put("problem", buildJsonObject {
                     put("suite", suite); put("problem", name); put("format", "WCNF")
@@ -300,6 +322,7 @@ internal object BooleanObjectiveDescentProbe {
                         })
                     }
                     put("sourceHashes", buildJsonObject { put("model", digest) })
+                    put("preparedModelSha256", preparedIdentity); put("searchFactorCount", problem.numFactors)
                     put("initialObjective", sourceObjective.evaluateExact(initial).toString())
                     put("strictImprovements",
                         if (value != null && value < sourceObjective.evaluateExact(initial)) 1 else 0)
@@ -320,7 +343,8 @@ internal object BooleanObjectiveDescentProbe {
                     put("elapsedNanos", elapsedNanos); put("workLimit", work); put("timeoutMillis", timeout)
                     put("stalled", stalled); put("cancelled", cancellation.isCancelled())
                     put("stats", buildJsonObject {
-                        put("lsMoves", moves); put("lsPrimitiveFlips", state.step); put("lsRestarts", 0)
+                        put("lsMoves", moves); put("lsAcceptedStep", state.step)
+                        put("lsPrimitiveFlips", state.tabu.touchCount.sumOf { it.toLong() }); put("lsRestarts", 0)
                     })
                 })
             })
@@ -330,5 +354,26 @@ internal object BooleanObjectiveDescentProbe {
                 "sourceObjective=$value moves=$moves elapsedNanos=$elapsedNanos")
         }
         println("conditional targets=${targets.size} requested=$count sharedSetupNanos=$sharedSetupNanos")
+    }
+
+    private fun preparedIdentity(problem: Problem, objective: LinearObjective, pins: Assumptions): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        fun append(value: Long) {
+            for (shift in 56 downTo 0 step 8) digest.update((value ushr shift).toByte())
+        }
+        append(problem.numBoolVars.toLong())
+        append(problem.numFactors.toLong())
+        for (factor in problem.factors) {
+            val literals = (factor as Clause).literals
+            append(literals.size.toLong())
+            for (literal in literals) append(literal.toLong())
+        }
+        append(objective.constant)
+        val weights = objective.boolWeights
+        append(weights.size.toLong())
+        for (weight in weights) append(weight)
+        append(pins.numBools.toLong())
+        pins.forEachBool { variable, value -> append(variable.toLong()); append(if (value) 1 else 0) }
+        return digest.digest().joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
     }
 }

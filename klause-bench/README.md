@@ -1483,6 +1483,11 @@ outputs follow their source moves, and cancellation discards incomplete proposal
 Rows distinguish accepted transitions, primitive flips and closure work, verify pins
 and terminal binary feasibility, and reconcile the incremental cost from scratch.
 This allocation-heavy diagnostic is not a production recipe or a performance claim.
+`conditionalClosure=both` runs ordinary and closed repairs over one prepared model.
+Every row records and verifies a matching fingerprint of ordered clauses, native
+objective and effective pins. Primitive flips come from write activity; the accepted
+step clock is checked against committed transitions. Fixed variant order does not
+support comparative timing claims.
 
 ### Objective representation probe
 
