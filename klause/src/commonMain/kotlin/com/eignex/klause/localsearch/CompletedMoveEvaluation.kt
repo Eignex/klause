@@ -88,7 +88,7 @@ internal class CompletedMoveEvaluation(
         return decided.sample
     }
 
-    fun commitMove(move: Move, sample: Sample): Move {
+    fun commitMove(move: Move, sample: Sample): Move? {
         val parts = (if (move is Move.Compound) move.parts else listOf(move)).filter {
             it !is Move.RealSet
         }.toMutableList()
@@ -97,7 +97,7 @@ internal class CompletedMoveEvaluation(
             if (value.toRawBits() != state.assignment.realValue(id).toRawBits()) parts.add(Move.RealSet(id, value))
         }
         return when (parts.size) {
-            0 -> move
+            0 -> null
             1 -> parts.single()
             else -> Move.Compound(parts)
         }
