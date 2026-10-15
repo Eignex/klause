@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.smtlib.SmtLib
@@ -11,19 +12,44 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class OpenTheoryEngineTest {
 
     private fun sourceRoute(model: Problem): ProblemPipeline = model.sourceRoute()
+
+    @Test
+    fun `difference openings retain their component owned model payload`() {
+        val open = Bits.full(2)
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 1),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
+                ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
+        )
+        model.componentPlan().search(model, emptyMap()).use { planned ->
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+
+            val result = assertIs<SearchRunEvent.Satisfied>(planned.session.openRun(model.numBoolVars).next())
+
+            assertNotNull(result.model.valueOf<Sample>(assertNotNull(planned.theory)))
+        }
+    }
 
     @Test
     fun `settled Boolean sources complete relative graphs without arithmetic decisions`() {

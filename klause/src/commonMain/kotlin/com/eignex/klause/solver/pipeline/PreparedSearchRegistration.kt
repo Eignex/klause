@@ -6,6 +6,7 @@ import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.solver.result.HintIndexOutcome
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
@@ -26,6 +27,7 @@ internal class SearchComponentOpening(
     private val resources: SearchInvocationResources,
     val openHintFlips: Long? = null,
 ) {
+    private val proposals = ArrayList<SearchBranchProposal>()
     private var primitiveHints: Pair<IntArray, SearchCandidateHints>? = null
     private var releaseHints: (() -> Unit)? = null
     private var pointAvailable: (() -> Boolean)? = null
@@ -103,6 +105,13 @@ internal class SearchComponentOpening(
     fun <T : AutoCloseable> own(resource: T): T = resources.own(resource)
 
     fun ownComponent(component: SearchComponent) = resources.ownComponent(component)
+
+    fun registerBranchProposal(proposal: SearchBranchProposal) {
+        check(proposal !in proposals) { "branch proposal already registered" }
+        proposals += proposal
+    }
+
+    fun branchProposals(): List<SearchBranchProposal> = proposals.toList()
 }
 
 internal class PreparedSearchRegistration(
@@ -163,7 +172,7 @@ internal class PreparedSearchRegistrations(
                 }
                 components + SourceCoordinateAgreementComponent(participants, { session.model() }, supported)
             } else components
-            session = SearchComponentSet(installed).session(
+            session = SearchComponentSet(installed, proposals = opening.branchProposals()).session(
                 maxChecks, cancellation, learnedDb, SearchAtomRegistry(boolCount),
             )
             if (arithmetic.size > 1) {

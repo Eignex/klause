@@ -154,6 +154,8 @@ They register exact complementary difference predicates in the ordinary shared
 trail; their graph, retraction and source-check obligations belong to
 [difference logic](../theories/difference.md). This changes variable selection,
 without granting a partial potential any polarity or witness authority.
+The opening registers that proposal separately from its arithmetic component,
+retaining component identity, contribution ownership and existing model keys.
 An opt-in live-point provider first completes a sparse incidence index over all
 original source clauses. The opening owns the index and borrows those clauses
 read-only. Every source literal ID is validated, including the suffix;
