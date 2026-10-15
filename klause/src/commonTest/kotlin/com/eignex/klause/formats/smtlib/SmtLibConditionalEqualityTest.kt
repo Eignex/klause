@@ -34,7 +34,8 @@ class SmtLibConditionalEqualityTest {
         for (guard in listOf("b", "(= x 0)")) {
             for (term in terms) {
                 val builder = Compiler.Builder(
-                    Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+                    Long.MIN_VALUE, Long.MAX_VALUE, false,
+                    conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
                 )
                 val reader = SExprReader(StringCharSource(
                     "(declare-const b Bool) (declare-const x Int) (assert (let ((c $guard)) (= $term 3)))",

@@ -451,7 +451,9 @@ private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
         val loU = if (aLo == null || bLo == null) null else minOf(aLo, bLo)
         val hiU = if (aHi == null || bHi == null) null else maxOf(aHi, bHi)
         val self = LinComb(mapOf(newInt(loU, hiU) to 1), 0)
-        val parts = exclusiveIntegerSelection(checkNotNull(self.asSimpleVar()), listOf(cond), listOf(thenTerm), elseTerm)
+        val parts = exclusiveIntegerSelection(
+            checkNotNull(self.asSimpleVar()), listOf(cond), listOf(thenTerm), elseTerm,
+        )
         conditionalEqualities.define(
             checkNotNull(self.asSimpleVar()), listOf(cond), listOf(thenTerm), elseTerm, parts,
             listOf(iteChains.guardEquality(cond)),
