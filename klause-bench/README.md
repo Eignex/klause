@@ -1515,6 +1515,22 @@ suffixes and failures are retained. There is no global installation or target
 library loading. Linear decoding establishes no control-flow or argument proof;
 do not derive private field offsets, task lifetime or compiler savings from it.
 
+`com.eignex.klause.bench.profile.NativeVmEntryTransferReview` accepts
+`entries=<https URL>`, `entries-sha256=<hash>` and `producer-sha256=<hash>`.
+Authenticate the original capture and its exact reader source before supplying
+these hashes; a reader version need not match the current source. The retained
+download is bounded to 32 MiB. The child rechecks symbol-owned bytes against the
+same pinned library and validates every saved linear instruction boundary and
+byte slice, without decoding again or loading the target library.
+
+The review retains every original entry, failure, unrecognized instruction and
+indirect operand. Recognized explicit transfer syntax records direct operands
+and all captured definitions at that address, preserving aliases. Targets inside
+the retained prefix, outside its linear boundaries, in an unretained symbol span
+or outside the symbol remain distinct. This is a syntax inventory: it establishes
+no reachability, alternate decoding, indirect target, callee return, calling
+convention, inlining cause, runtime coverage, full-root census or compiler saving.
+
 ### Captured source and executable entry associations
 
 `com.eignex.klause.bench.profile.NativeVmBoundaryEntryBinding` accepts
