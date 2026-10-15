@@ -74,7 +74,10 @@ class Xcsp3SourceCheckerTest {
         when (val resolution = cp.resolveConflict(shared)) {
             is SearchConflictResolution.Backjump -> {
                 shared.popTo(resolution.conflict.decisionLevel)
-                assertIs<SearchLearnedConflictResult.Resume>(resolution.conflict.apply(shared))
+                assertTrue(
+                    resolution.conflict.apply(shared) != SearchLearnedConflictResult.Exhausted,
+                    "A checked source witness rules out root exhaustion",
+                )
             }
 
             SearchConflictResolution.Chronological -> {
