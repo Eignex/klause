@@ -16,6 +16,8 @@ import com.eignex.klause.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Assignment
+import com.eignex.klause.solver.AssignmentCheckCapability
+import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -1168,10 +1170,19 @@ class LocalSearchState private constructor(
         }
     }
 
-    internal fun snapshotAfter(move: Move): Sample {
+    internal fun completionCandidate(move: Move): Sample? {
         var sample: Sample? = null
-        evaluateMove(move, capture = { sample = assignment.snapshot() })
-        return checkNotNull(sample)
+        evaluateMove(move, capture = {
+            val finiteViolation = (0 until violated.size).any { index ->
+                val id = violated[index]
+                val factor = problem.factors[id]
+                factor.variables.reals.isEmpty() &&
+                    (projection.selection?.capabilities(id) ?: factor.executionCapabilities()).assignmentCheck ==
+                    AssignmentCheckCapability.EXACT
+            }
+            if (!finiteViolation) sample = assignment.snapshot()
+        })
+        return sample
     }
 
     // Use the committed move's single propagation pass and restore saved outputs without replaying definitions.

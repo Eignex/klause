@@ -651,14 +651,20 @@ against those constraints before publication; a rejected or indeterminate candid
 cannot refute the source model. Completed samples retain authoritative coordinates
 and source scope rather than substituting the local-search score for a witness check.
 
-Self-owned optimization with finite and continuous coordinates admits at most two
-completion probes per pick after source generation and configuration filtering. One
+Self-owned optimization with finite and continuous coordinates and a continuous
+objective term admits at most two completion probes per pick after source generation
+and configuration filtering. One
 probe follows the best raw score. If that productive raw direction completes to an
-improvement, selection retains it without another numerical query. Otherwise a second
-probe explores a rotating proposal. A rotating
-finite coordinate touching a continuous factor also offers a channeling-aware flip,
+improvement, strict greedy descent retains its reservoir-selected proposal without
+another numerical query or tie draw. Existing proposal multiplicities are retained;
+exploration does not insert a duplicate into a pool. Otherwise a second probe explores
+a rotating proposal. A rotating finite coordinate touching a continuous factor also offers a channeling-aware flip,
 neighbor or domain endpoint, including directions whose direct objective cost rises.
-Raw feasibility and objective deltas order probes without rejecting that exploration.
+Raw continuous feasibility and objective deltas order probes without rejecting that
+exploration. A violated finite-only row whose selected scoring projection declares
+an exact assignment check declines the pinned proposal before numerical completion;
+continuous changes cannot repair that source violation. Heuristic and unsupported
+finite checks retain their ordinary completion/publication checks.
 The existing instruction, solve-wide move and containing native/query allowances
 bound attempts; every completed attempt is charged once, including failures.
 
@@ -671,8 +677,8 @@ An accepted source completion supplies feasible-phase authority even when floati
 row scores retain a residual; source tolerance does not become an exact proof.
 Reverted probes preserve assignment, definitions, costs, configuration and activity.
 Failed, canceled or undecided attempts cannot replace an incumbent. Finite-only,
-continuous-only and ratchet recipes retain their existing move selection. A completed
-witness remains heuristic incumbent evidence, with the completion adapter's exact or
+continuous-only, discrete-objective and ratchet recipes add no move-completion probes.
+A completed witness remains heuristic incumbent evidence, with the completion adapter's exact or
 configured source-tolerance guarantee; it supplies no optimum proof.
 
 Numerical finite completion uses the same original-source tolerance callback as
@@ -697,8 +703,9 @@ that guide the walk.
 
 Standalone LS checks covered constraints through their invariants. A propagation-only
 custom factor mapped to `NoInvariant` instead receives a private
-[full-coordinate finite check](search.md#custom-factor-publication-checks) on the
-completed sample before publication. Zero score alone cannot publish its candidate. An uncovered
+[full-coordinate finite check](search.md#custom-factor-publication-checks) before
+caller completion. A check that also needs real coordinates instead reads the completed
+sample before publication. Zero score alone cannot publish its candidate. An uncovered
 continuous constraint explicitly declines finite local-search execution.
 
 ## Exact coordinate neighborhoods

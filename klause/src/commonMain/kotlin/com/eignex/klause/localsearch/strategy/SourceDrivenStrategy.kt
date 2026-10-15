@@ -231,20 +231,23 @@ class SourceDrivenStrategy(
         val ccNoise = ccFilter(state, noiseSink.list)
         val ccScore = ccFilter(state, scoreSink.list)
         val ccAlternative = ccFilter(state, alternativeSink.list)
-        evaluation?.prepare(ccNoise + ccScore + ccAlternative) { score(state, it) }
+        if (evaluation != null) {
+            val primary = ccNoise + ccScore
+            val alternatives = if (primary.any { score(state, it) < 0.0 }) emptyList() else ccAlternative
+            evaluation.prepare(primary + alternatives) { score(state, it) }
+        }
         fun admitted(moves: List<Move>): List<Move> =
             if (evaluation == null) moves else moves.filter { evaluation.sample(it) != null }
         fun grade(move: Move): Double = evaluation?.score(move) ?: score(state, move)
         val improving = evaluation?.let { completed -> { move: Move -> (completed.score(move) ?: 0.0) < 0.0 } }
         // The noise/score pool split is preserved across the CC + tabu filters. CC precedes tabu: the
         // configuration filter is the primary focus, tabu the cycle-breaker layered on what survives it.
-        val eligibleNoise = admitted(ccNoise)
-        val noiseFiltered = tabu.filter(state, eligibleNoise, improving)
+        val noiseFiltered = tabu.filter(state, ccNoise, improving)
         // While stalled, never let tabu starve the noise pool into a null pick (a restart that discards
         // plateau progress): fall back to the unfiltered candidates so the search keeps walking the plateau.
-        val noiseMoves = if (noiseFiltered.isEmpty() && stalled) eligibleNoise else noiseFiltered
-        val primaryScoreMoves = tabu.filter(state, admitted(ccScore), improving)
-        val alternatives = tabu.filter(state, admitted(ccAlternative), improving)
+        val noiseMoves = admitted(if (noiseFiltered.isEmpty() && stalled) ccNoise else noiseFiltered)
+        val primaryScoreMoves = admitted(tabu.filter(state, ccScore, improving))
+        val alternatives = admitted(tabu.filter(state, ccAlternative, improving))
         val scoreMoves = if (alternatives.isEmpty()) {
             primaryScoreMoves
         } else {
@@ -275,6 +278,10 @@ class SourceDrivenStrategy(
         // once per pick that sampled the noise pool, so acceptance stays pure. A Metropolis rule with
         // no temperature schedule falls back to a fixed conservative temperature rather than degenerating.
         val temperature = schedule.temperature?.temperature ?: DEFAULT_METROPOLIS_TEMPERATURE
+        val productive = evaluation?.productiveMove
+        if (effectiveAcceptance == AcceptanceRule.GreedyDescent && productive != null &&
+            (productive in noiseMoves || productive in scoreMoves)
+        ) return productive
         val move = effectiveAcceptance.choose(state.rng, noiseMoves, scoreMoves, temperature) { grade(it) }
         if (effectiveAcceptance is AcceptanceRule.Metropolis && noiseMoves.isNotEmpty()) schedule.temperature?.step()
         return move

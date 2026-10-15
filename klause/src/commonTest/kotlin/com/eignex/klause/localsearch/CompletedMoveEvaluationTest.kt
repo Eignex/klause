@@ -37,18 +37,53 @@ class CompletedMoveEvaluationTest {
             }, current = { initial },
         )
         evaluation.begin()
-        evaluation.seed(MoveSink())
+        val sink = MoveSink()
+        val compound = Move.Compound(listOf(Move.IntSet(1, 1), Move.IntSet(2, 1)))
+        sink.addCompound(compound.parts)
+        evaluation.seed(sink)
         val moves = List(3) { Move.IntSet(it, 1) }
 
-        evaluation.prepare(moves) { 3.0 - (it as Move.IntSet).varId }
+        evaluation.prepare(moves + sink.list) { move ->
+            if (move is Move.IntSet) 3.0 - move.varId else 5.0
+        }
 
         assertEquals(2, calls)
         assertNotNull(evaluation.sample(moves[0]))
         assertNull(evaluation.sample(moves[1]))
         assertNotNull(evaluation.sample(moves[2]))
+        assertNull(evaluation.sample(compound))
         assertEquals(-9.0, evaluation.score(moves[0]))
         assertEquals(initial, state.assignment.snapshot())
         assertEquals(0L, state.step)
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `an exact finite violation declines a numerical completion proposal`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setReal(0, 1.0)
+        state.recompute()
+        val initial = state.assignment.snapshot()
+        var calls = 0
+        val evaluation = CompletedMoveEvaluation(
+            state, LinearObjective(intCoefficients = longArrayOf(1)), Cancellation.Never,
+            mayAttempt = { true }, complete = { candidate -> calls++; Completion.Witness(candidate) },
+            current = { initial },
+        )
+
+        val completed = evaluation.attempt(Move.IntSet(0, 1))
+
+        assertNull(completed)
+        assertEquals(0, calls)
+        assertEquals(initial, state.assignment.snapshot())
         assertEquals(0L, state.cost)
     }
 

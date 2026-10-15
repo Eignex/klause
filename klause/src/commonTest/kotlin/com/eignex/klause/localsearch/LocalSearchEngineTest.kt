@@ -1042,11 +1042,11 @@ class LocalSearchEngineTest {
     @Test
     fun `continuous move probing stops at the containing move allowance`() {
         val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
-        val budget = NodeBudget(1)
+        val budget = NodeBudget(5)
         var calls = 0
         val search = engine { candidate, _ ->
             calls++
-            if (candidate.intValue(0) == 2L) Completion.Witness(candidate) else Completion.Undecided(work = 1)
+            if (candidate.intValue(0) == 2L) Completion.Witness(candidate) else Completion.Undecided(work = 4)
         }
 
         val result = search.improvements(

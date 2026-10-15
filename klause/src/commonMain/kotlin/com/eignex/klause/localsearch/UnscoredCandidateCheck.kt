@@ -28,6 +28,7 @@ internal class UnscoredCandidateCheck(
         problem.withFactors(Array(factorIds.size) { problem.factors[factorIds[it]] })
     private val uncheckedSelection = unchecked?.let { selection?.projected(it, factorIds) }
     val required: Boolean get() = unchecked != null
+    val requiresReals: Boolean = factorIds.any { problem.factors[it].variables.reals.isNotEmpty() }
 
     fun check(candidate: Sample, assumptions: Assumptions, cancellation: Cancellation): Completion {
         val source = unchecked ?: return Completion.Witness(candidate)
