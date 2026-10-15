@@ -1503,6 +1503,29 @@ signature supplies no proof of the
 actual argument registers, live task pointer, root association, clock/loss,
 code-size result or compiler saving. Validate those boundaries before probing.
 
+### Native external debug-file identity
+
+`com.eignex.klause.bench.profile.NativeVmDebugImageBinding` accepts no arguments.
+It checks the pinned Linux x86-64 JVM library before downloading the official
+Temurin 25.0.4.1+1 debug image. The archive URL, byte length and SHA-256 are fixed
+in the reader. Its bounds are 512 MiB compressed, 2 GiB of declared member bytes
+and 4096 regular-file/directory records. Unsafe paths, duplicate members and
+ambiguous `libjvm.debuginfo` members fail explicitly.
+
+Only that debug file is extracted, into temporary storage outside the capture.
+Both ELF files retain their exact file hashes, section and symbol metadata and
+raw note/debug-link records. Binding requires one matching GNU build ID on each
+side and the target's debug-link filename and CRC for the complete external file.
+Both file identities are rechecked after inspection. Archive URLs, hashes and
+member metadata support recovery; downloaded archive and native debug bytes are
+removed when the child exits normally, including failures. The parent allows
+300 seconds and archives raw output on failure.
+
+The diagnostic does not interpret DWARF types or locations, load either native
+file, invoke a decoder, run a target or read private fields. A bound external file
+establishes no calling convention, field layout, control-flow/runtime coverage,
+root census, clock agreement, generated-code size or compiler saving.
+
 ### Native executable entry bytes
 
 `com.eignex.klause.bench.profile.NativeVmEntryVerification` retains bytes for the
