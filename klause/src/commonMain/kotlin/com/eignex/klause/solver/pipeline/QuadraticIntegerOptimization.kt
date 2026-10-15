@@ -145,7 +145,7 @@ fun OpenTheoryPipeline.minimize(
                         val worker = slot.own(QuadraticIntegerOptimization(request.problem, objective, local,
                             selected, sense, scope, request.preparedPlan))
                         worker.readIncumbent = read
-                        worker.worker(arm)
+                        worker.worker(arm, operation)
                     }
             }
         }
@@ -255,9 +255,9 @@ internal class QuadraticIntegerOptimization(
         close()
     }
 
-    fun worker(arm: Int): PortfolioWorker {
+    fun worker(arm: Int, prepared: PreparedSourcePlan = plan): PortfolioWorker {
         val model = ModelIdentity.of(source, objective)
-        val binding = SourceWorkerBinding(model, provesResults = arm == 0, preparedPlan = plan,
+        val binding = SourceWorkerBinding(model, provesResults = arm == 0, preparedPlan = prepared,
             quadraticInvocation = plan.quadraticEngineInvocation(objective, sense, quadraticAssumptions(controls, engine)))
         return if (arm == 0) PortfolioWorker.ofMinimize("bt+exact-integer-quadratic", arm,
             resumable = { completeHandle() }) { _, _, _, _ -> error("integer traversal runs by slice") }

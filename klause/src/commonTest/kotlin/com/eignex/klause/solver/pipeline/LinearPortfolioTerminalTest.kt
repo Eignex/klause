@@ -249,12 +249,11 @@ class LinearPortfolioTerminalTest {
                     TheoryParams(cancellation = slot.cancellation), source), foreign)
             }) { _, _, _, _ -> error("linear search is retained") }.bindSource(SourceWorkerBinding(foreign))
         }
-        val terminal = LinearPortfolioTerminal(binding, source, Cancellation.Never) { accepted += it }
-        val invocation = PortfolioInvocation(request.preparedPlan, listOf(factory), PortfolioInvocationControls(),
-            PortfolioEvidence(identity, source.linearWitnessVerifier(Cancellation.Never)).bindInvocation(binding),
+        assertFailsWith<IllegalArgumentException> {
+            PortfolioInvocation(request.preparedPlan, listOf(factory), PortfolioInvocationControls(),
+                PortfolioEvidence(identity, source.linearWitnessVerifier(Cancellation.Never)).bindInvocation(binding),
                 objective)
-
-        invocation.use { it.minimize(Cancellation.Never, null, PortfolioIncumbents.exact(objective), terminal) }
+        }
 
         assertTrue(accepted.isEmpty())
     }

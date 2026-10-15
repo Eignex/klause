@@ -169,4 +169,33 @@ class PortfolioInvocationTest {
         assertFalse(admitted)
     }
 
+    @Test
+    fun `failed replica binding closes workers before reversing private source owners`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val plan = source.prepareExecutionPlan()
+        val runtime = EngineInvocation(plan, ModelIdentity.of(source))
+        val foreign = EngineInvocation(source.prepareExecutionPlan(), runtime.model)
+        val closed = mutableListOf<String>()
+        val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack, binding = {
+            SourceWorkerBinding(if (it.label == "1") foreign else runtime)
+        }) { slot ->
+            slot.own(AutoCloseable { closed += "source${slot.index}" })
+            val delegate = BacktrackSolver(source.bake()).session()
+            val session = object : Session<BacktrackParams> by delegate {
+                override fun close() {
+                    closed += "worker${slot.index}"
+                    delegate.close()
+                }
+            }
+            PortfolioWorker.of(slot.index.toString(), 0, session, BacktrackParams())
+        }
+
+        assertFailsWith<IllegalArgumentException> {
+            PortfolioInvocation(plan, listOf(factory), PortfolioInvocationControls(parallelism = 2),
+                PortfolioEvidence(runtime.model, CandidateVerifier.trusting()))
+        }
+
+        assertEquals(listOf("worker1", "worker0", "source1", "source0"), closed)
+    }
+
 }
