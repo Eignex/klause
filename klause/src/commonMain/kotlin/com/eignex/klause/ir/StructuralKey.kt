@@ -99,6 +99,7 @@ internal enum class FactorKind {
     CONTINUOUS_PRODUCT,
     ABS,
     REAL_ABS,
+    GRID_ABS,
     EXACT_SEARCH_ROW,
     MPS_SOURCE_INDICATOR,
     DIV_MOD,
