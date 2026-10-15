@@ -75,7 +75,7 @@ class LeafRealCompletionTest {
             " M1 'MARKER' 'INTEND'\n X COST 0.1 R 3\nRHS\n RHS R 1\n" +
             "BOUNDS\n BV B I\n UP B X 1\nENDATA\n").toProblem()
         val objective = source.objective?.toLinearObjective()
-        val sample = Sample(booleanArrayOf(), longArrayOf(0), doubleArrayOf(0.9), listOf(BigFraction.ONE))
+        val sample = Sample(booleanArrayOf(), longArrayOf(0), doubleArrayOf(1.0), listOf(BigFraction.ONE))
         val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
         val check: (Sample) -> Boolean = { source.withinTolerance(it.ints, it.reals) }
 

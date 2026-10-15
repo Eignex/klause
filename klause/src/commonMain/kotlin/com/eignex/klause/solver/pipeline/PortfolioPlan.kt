@@ -39,7 +39,7 @@ class PortfolioPlanRequest(
     val nodeBudget: NodeBudget?,
     /** Optional model search-annotation arm. */
     val annotationArm: BacktrackParams?,
-    /** Tolerance semantics for every backtrack arm's continuous leaves; see [BacktrackParams.toleranceCheck]. */
+    /** Source tolerance semantics for every arm's continuous completion; see [BacktrackParams.toleranceCheck]. */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
 ) {
     /** Captured frontend parameters for compatibility; empty for directly typed options. */
