@@ -51,7 +51,7 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
                 var float: y :: output_var;
                 constraint int_lin_eq([${if (maximize) -1 else 1},1],[i,cost],7);
                 constraint int2float(i,r);
-                constraint float_times(r,x,y);
+                constraint float_times(x,x,y);
                 constraint float_le(-2.0,x);
                 constraint float_le(x,2.0);
                 solve $direction cost;
