@@ -1,5 +1,7 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
@@ -30,6 +32,26 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class PortfolioEvidenceTest {
+
+    @Test
+    fun `unrestricted exhaustion retains refutation only for a complete bound worker`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(
+            Linear(intArrayOf(), intArrayOf(), LinearOp.EQ, 1),
+        ))
+        val objective = LinearObjective()
+        val identity = ModelIdentity.of(source, objective)
+        val invocation = EngineInvocation(source.prepareExecutionPlan(objective), identity, objective)
+        for (proofs in listOf(false, true)) {
+            val worker = PortfolioWorker.ofMinimize("exhausted", 0) { bound, _, _, _ ->
+                assertEquals(Double.POSITIVE_INFINITY, bound())
+                sequenceOf(MinimizeResult.Unknown(TerminationReason.SearchExhausted))
+            }.bindEvidence(identity, provesResults = proofs).bindInvocation(invocation)
+
+            val result = Portfolio.thompson(listOf(worker)).use { it.minimize() }
+
+            if (proofs) assertIs<MinimizeResult.Infeasible>(result) else assertIs<MinimizeResult.Unknown>(result)
+        }
+    }
 
     @Test
     fun `a native witness without a publication still satisfies its producer restrictions`() {
