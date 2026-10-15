@@ -3,6 +3,7 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.exclusionLiteral
 
 internal class PowerPropagator(private val base: Int, private val exponent: Int, private val result: Int) : Propagator {
     private val variables = intArrayOf(base, result).distinct().toIntArray()

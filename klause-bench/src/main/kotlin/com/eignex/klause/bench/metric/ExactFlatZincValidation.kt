@@ -212,6 +212,9 @@ internal object ExactFlatZincValidation {
                     }
                 }
 
+                "int_pow", "int_pow_fixed", "klause_int_pow", "float_pow", "klause_float_pow" ->
+                    powerMatches(numeric(args[0]), numeric(args[1]), numeric(args[2]))
+
                 "float_times", "int_times" ->
                     (numeric(args[0]) * numeric(args[1])).compareTo(numeric(args[2])) == 0
 
@@ -227,6 +230,34 @@ internal object ExactFlatZincValidation {
                 name.endsWith("_imp") -> !boolean(args.last()) || relation
                 else -> relation
             }
+        }
+
+        private fun powerMatches(base: ExactObjective, power: ExactObjective, output: ExactObjective): Boolean {
+            require(power.integral) { "nonintegral source power exponent" }
+            val exponent = power.toString().toIntOrNull()
+            require(exponent != null && exponent >= 0) { "source power exponent exceeds checker representation" }
+            fun ratio(value: ExactObjective): Pair<BigInteger, BigInteger> {
+                val parts = value.toString().split('/')
+                return BigInteger(parts[0]) to if (parts.size == 1) BigInteger.ONE else BigInteger(parts[1])
+            }
+            val (numerator, denominator) = ratio(base)
+            val (targetNumerator, targetDenominator) = ratio(output)
+            val sign = if (exponent == 0) 1 else if (numerator.signum() < 0 && exponent and 1 != 0) -1
+                else if (numerator == BigInteger.ZERO) 0 else 1
+            if (sign != targetNumerator.signum()) return false
+            fun matches(coefficient: BigInteger, target: BigInteger): Boolean {
+                val cap = target + BigInteger.ONE
+                var remaining = exponent
+                var value = BigInteger.ONE
+                var factor = coefficient.min(cap)
+                while (remaining > 0) {
+                    if (remaining and 1 != 0) value = (value * factor).min(cap)
+                    remaining = remaining ushr 1
+                    if (remaining > 0) factor = (factor * factor).min(cap)
+                }
+                return value == target
+            }
+            return matches(numerator.abs(), targetNumerator.abs()) && matches(denominator, targetDenominator)
         }
 
         private fun literal(text: String): Value = when (val token = text.trim()) {

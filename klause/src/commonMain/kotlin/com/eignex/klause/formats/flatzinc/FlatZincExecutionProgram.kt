@@ -496,6 +496,7 @@ private fun FunctionalObjective.Node.inputs(): List<Operand> = when (this) {
     is FunctionalObjective.Abs -> listOf(a)
     is FunctionalObjective.Extreme -> ins.toList()
     is FunctionalObjective.Times -> listOf(a, b)
+    is FunctionalObjective.Power -> listOf(base)
     is FunctionalObjective.Plus -> listOf(a, b)
     is FunctionalObjective.Lin -> ins.toList()
 }
@@ -517,6 +518,12 @@ private fun FlatZincCompiler.buildObjNode(c: FznConstraint, definedId: Int): Fun
         "array_int_maximum", "array_int_minimum" -> {
             val xs = arrayOperands(c.args[1]) ?: return null
             FunctionalObjective.Extreme(definedId, xs, max = c.name.endsWith("maximum"))
+        }
+
+        "int_pow", "int_pow_fixed", "klause_int_pow" -> {
+            val exponent = evalIntConstOrNull(c.args[1]) ?: return null
+            if (exponent !in 0L..Int.MAX_VALUE.toLong()) return null
+            FunctionalObjective.Power(definedId, operandOf(c.args[0]) ?: return null, exponent.toInt())
         }
 
         "int_times" -> FunctionalObjective.Times(

@@ -50,6 +50,32 @@ class ExactFlatZincValidationTest {
     """.trimIndent()
 
     @Test
+    fun `fixed power predicates check original exact coordinates and reject corruption`() {
+        for ((predicate, input, exponent, output) in listOf(
+            listOf("int_pow", "-2", "63", "-9223372036854775808"),
+            listOf("klause_int_pow", "0", "0", "1"),
+            listOf("int_pow_fixed", "-1", "2147483647", "-1"),
+            listOf("float_pow", "1/3", "4.0", "1/81"),
+        )) {
+            val source = "var float: x; var float: y; constraint $predicate(x, $exponent, y); solve satisfy;"
+            val valid = ExactFlatZincValidation.inspect(source, "x = $input;\ny = $output;", null)
+            val corrupted = ExactFlatZincValidation.inspect(source, "x = $input;\ny = 0;", null)
+
+            assertEquals("valid", valid.status, valid.reason)
+            assertEquals("invalid", corrupted.status, corrupted.reason)
+        }
+    }
+
+    @Test
+    fun `power checker cannot accept saturation as exact arithmetic`() {
+        val source = "var int: x; var int: y; constraint int_pow(x, 2, y); solve satisfy;"
+
+        val result = ExactFlatZincValidation.inspect(source, "x = 3037000500;\ny = 9223372036854775807;", null)
+
+        assertEquals("invalid", result.status, result.reason)
+    }
+
+    @Test
     fun `absolute value checks exact integer signs and magnitudes`() {
         val source = "var int: x; var int: y; constraint int_abs(x,y); solve satisfy;"
         for ((input, output) in listOf("-3" to "3", "0" to "0", "3" to "3",
