@@ -38,6 +38,28 @@ grid semantics. MPS admits linear arithmetic; DIMACS and WCNF admit Boolean clau
 so neither has an arithmetic product path. OPB/WBO Boolean monomials use conjunction:
 repeated literals are idempotent and complementary literals make the term false.
 
+## Absolute-value source forms
+
+Absolute-value definitions retain their operand and result roles through aliases,
+Boolean scopes and remapping. A surrounding predicate can be reified while the
+numeric function remains a total definition. Optional MiniZinc values retain their
+presence conditions through compilation to FlatZinc. Selected consumers enforce the
+complete relation; the separately declared inequalities remain a relaxation.
+
+| Source | Retained relation and admission |
+|---|---|
+| Schema integer `abs` | `IntAbs` lowers to `Abs`; integer schema handles are total values |
+| FlatZinc/MiniZinc integer `abs` | `int_abs` retains `Abs`, including compiled optional and reified uses |
+| FlatZinc/MiniZinc real `abs` | `float_abs` retains `RealAbs` in exact mode and `GridAbs` under the declared bucket policy |
+| SMT-LIB integer `abs` | Scalar values retain `Abs`; wide affine values retain `AffineAbs` and existing finite digit columns |
+| XCSP3 integer `abs` and `dist` | Retain `Abs` after exact materialization of admitted affine operands |
+| SMT-LIB real `abs` | No real absolute-value syntax is admitted by the linear, polynomial or function source normalizers |
+| MPS, DIMACS/WCNF and OPB/WBO | No arithmetic absolute-value source syntax or recovery; sign/index/range normalization is parser metadata |
+
+See [model ownership](model.md) for finite magnitude boundaries, exact wide source
+checks and private real/grid projections. [FlatZinc semantics](formats/flatzinc.md)
+owns exact and grid result qualifications.
+
 ## Solving coverage
 
 The solver supports finite constraints, linear arithmetic and polynomial real

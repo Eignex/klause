@@ -16,8 +16,10 @@ import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.SchemaEntry
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.IntHandle
+import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.abs
 import com.eignex.klause.schema.eq
+import com.eignex.klause.schema.iff
 import com.eignex.skema.SchemaDef
 import kotlin.random.Random
 import kotlin.test.Test
@@ -25,6 +27,53 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class AbsCompilationTest {
+    @Test
+    fun `schema reification preserves both truth values of an absolute value predicate`() {
+        class S : VariableSchema() {
+            val b by boolVar()
+            val x by intVar(-2, 2)
+            val relation by constraint { b iff (abs(x) eq 2) }
+        }
+        val compiled = S().compile()
+        assertEquals(1, compiled.problem.factors.filterIsInstance<Abs>().size)
+        val x = compiled.intVarIdByName.getValue("x")
+        val b = compiled.boolVarIdByName.getValue("b")
+
+        val values = BacktrackSolver(compiled.problem.bake()).enumerate().map {
+            it.intValue(x) to it.boolValue(b)
+        }.toSet()
+
+        assertEquals(setOf(-2L to true, -1L to false, 0L to false, 1L to false, 2L to true), values)
+    }
+
+    @Test
+    fun `XCSP distance expressions retain the absolute value of their affine operand`() {
+        val parsed = Xcsp3.parse(
+            """<instance><variables><var id="x">-3..3</var><var id="y">1</var></variables>
+                <constraints><intension>eq(dist(x,y),2)</intension></constraints></instance>""",
+        )
+        assertEquals(1, parsed.problem.factors.filterIsInstance<Abs>().size)
+        val operand = parsed.intVarNames.getValue("x")
+
+        val values = BacktrackSolver(parsed.problem.bake()).enumerate().map { it.intValue(operand) }.toSet()
+
+        assertEquals(setOf(-1L, 3L), values)
+    }
+
+    @Test
+    fun `XCSP Boolean scopes preserve the complete absolute value predicate`() {
+        val parsed = Xcsp3.parse(
+            """<instance><variables><var id="x">-3..3</var></variables>
+                <constraints><intension>or(eq(abs(x),2),eq(x,0))</intension></constraints></instance>""",
+        )
+        assertEquals(1, parsed.problem.factors.filterIsInstance<Abs>().size)
+        val operand = parsed.intVarNames.getValue("x")
+
+        val values = BacktrackSolver(parsed.problem.bake()).enumerate().map { it.intValue(operand) }.toSet()
+
+        assertEquals(setOf(-2L, 0L, 2L), values)
+    }
+
     @Test
     fun `schema absolute value expressions solve their retained source relation`() {
         val x = IntHandle("x", -3, 3)
