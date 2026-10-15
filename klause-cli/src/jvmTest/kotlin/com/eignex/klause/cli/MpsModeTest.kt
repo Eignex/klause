@@ -541,11 +541,11 @@ class MpsModeTest {
 
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
         assertTrue("o 0.1" in text.lines(), text)
-        assertTrue("v X=1/10" in text.lines(), text)
+        assertTrue("v X=0.1" in text.lines(), text)
     }
 
     @Test
-    fun `bounded mixed decimal sources retain original optimum authority`() {
+    fun `bounded mixed exact decimal sources retain original optimum authority`() {
         val mps = File.createTempFile("mpsfiniteoriginalsource", ".mps").apply {
             writeText(
                 "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -0.1\n" +
@@ -556,12 +556,12 @@ class MpsModeTest {
         }
 
         val text = capture {
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", mps.absolutePath)))
+            assertEquals(0, runCli(arrayOf("--exact", "-e", "cp", "-p", "1", mps.absolutePath)))
         }
 
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
         assertTrue("o 0.02" in text.lines(), text)
-        assertTrue("v I=0 X=1/5" in text.lines(), text)
+        assertTrue("v I=0 X=0.2" in text.lines(), text)
     }
 
     @Test
