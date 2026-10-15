@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -13,14 +14,20 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.abs
 
 internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification<Sample, Unit> {
     for ((id, factor) in model.factors.withIndex()) {
-        if (factor !is AffineAbs) continue
+        if (factor !is Abs && factor !is AffineAbs) continue
         if (sample.numIntVars != model.numIntVars) {
             return Verification.Rejected("assignment does not cover the integer variables")
         }
-        if (!factor.isSatisfied(sample::exactIntValue)) {
+        val valid = when (factor) {
+            is Abs -> sample.exactIntValue(factor.operand).abs() == sample.exactIntValue(factor.result)
+            is AffineAbs -> factor.isSatisfied(sample::exactIntValue)
+            else -> false
+        }
+        if (!valid) {
             return Verification.Rejected("integer factor $id refutes the assignment")
         }
     }

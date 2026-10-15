@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.evidence
 
+import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
@@ -19,6 +20,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.verifyOpenWitness
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.abs
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
 
@@ -121,18 +123,23 @@ fun Problem.sourceProofContext(
         if (factor !is Linear || factor.op == LinearOp.NE) return@all false
         (0 until factor.size).none { Term.isBool(factor.ref(it)) }
     }
-    val completeAffineAbs = source.factors.any { it is AffineAbs } && source.factors.all { factor ->
-        factor is AffineAbs || (factor is Linear && factor.op != LinearOp.NE &&
+    val completeAbsSource = source.factors.any { it is Abs || it is AffineAbs } && source.factors.all { factor ->
+        factor is Abs || factor is AffineAbs || (factor is Linear && factor.op != LinearOp.NE &&
             (0 until factor.size).none { Term.isBool(factor.ref(it)) })
     }
     val checker = object : SourceSemanticsChecker {
         override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
             val pins = restrictionChecker.witness(sample, scope, cancellation)
             if (pins != SourceEvidenceCheck.Checked) return pins
-            if (completeAffine || completeAffineAbs) {
+            if (completeAffine || completeAbsSource) {
                 for ((index, factor) in source.factors.withIndex()) {
                     if (cancellation()) return SourceEvidenceCheck.Unavailable("original-source check cancelled")
-                    if (factor is AffineAbs && !factor.isSatisfied(sample::exactIntValue)) {
+                    val valid = when (factor) {
+                        is Abs -> sample.exactIntValue(factor.operand).abs() == sample.exactIntValue(factor.result)
+                        is AffineAbs -> factor.isSatisfied(sample::exactIntValue)
+                        else -> true
+                    }
+                    if (!valid) {
                         return SourceEvidenceCheck.Rejected("original absolute value $index refutes the assignment")
                     }
                 }
