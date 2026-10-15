@@ -21,7 +21,7 @@ internal val selectionEncoder = Encoder(EncoderSupport.EQUIVALENT) { factor, enc
                 is ArrayMinMax -> minMaxEncoding(factor, encoding.cancellation, row,
                     { PolynomialRealFormula.And(it) }, { PolynomialRealFormula.Or(it) })
                 is Element -> elementEncoding(factor, encoding.cancellation, row,
-                    { PolynomialRealFormula.And(it) }, { PolynomialRealFormula.Or(it) })
+                    { PolynomialRealFormula.And(it) }, { PolynomialRealFormula.Or(it) }, affineBinary = true)
                 else -> error("selection encoder requires a selection factor")
             }
             encoding.polynomial(formula)
@@ -31,7 +31,8 @@ internal val selectionEncoder = Encoder(EncoderSupport.EQUIVALENT) { factor, enc
                 is ArrayMinMax -> minMaxEncoding<LinearEncodingFormula>(factor, encoding.cancellation, row,
                     { LinearEncodingFormula.And(it) }, { LinearEncodingFormula.Or(it) })
                 is Element -> elementEncoding<LinearEncodingFormula>(factor, encoding.cancellation, row,
-                    { LinearEncodingFormula.And(it) }, { LinearEncodingFormula.Or(it) })
+                    { LinearEncodingFormula.And(it) }, { LinearEncodingFormula.Or(it) },
+                    affineBinary = encoding.target != EncodingTarget.DIFFERENCE)
                 else -> error("selection encoder requires a selection factor")
             }
             encoding.linearFormula(formula)

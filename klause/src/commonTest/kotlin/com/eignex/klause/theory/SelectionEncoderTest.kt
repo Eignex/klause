@@ -1,5 +1,7 @@
 package com.eignex.klause.theory
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -20,6 +22,7 @@ import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
 import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.search
@@ -40,6 +43,35 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class SelectionEncoderTest {
+    @Test
+    fun `binary constant selection preserves full width endpoint values`() {
+        for ((position, expected) in listOf(0 to Long.MIN_VALUE, 1 to Long.MAX_VALUE)) {
+            val open = Bits(2).also { it.set(0); it.set(1) }
+            val source = Problem(0, IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+                arrayOf<Factor>(Element(0, 1, longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE),
+                    arrIsVars = false, indexOffset = Int.MIN_VALUE),
+                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, Int.MIN_VALUE.toLong() + position)))
+
+            val result = BacktrackSolver.source(source).solve(BacktrackParams(maxDecisions = 100))
+
+            assertEquals(expected.toString(), assertIs<OpenTheoryResult.Sat>(result, result.toString())
+                .assignment.intValue(1))
+        }
+    }
+
+    @Test
+    fun `binary constant selection rejects a value between its endpoints`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val source = Problem(0, IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            arrayOf<Factor>(Element(0, 1, longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE), arrIsVars = false),
+                Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, 2),
+                Linear(longArrayOf(1), intArrayOf(1), LinearOp.EQ, 0)))
+
+        val result = BacktrackSolver.source(source).solve(BacktrackParams(maxDecisions = 100))
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
     @Test
     fun `native and encoded extrema agree when the result aliases an operand`() {
         val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(2, 2)),
