@@ -123,6 +123,8 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
 
     is PseudoBoolean -> PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
 
+    is RealAbs -> RealAbsInvariant(operand, result)
+
     is RealProduct -> RealProductInvariant(intOperand, realOperand, result)
 
     is ReifiedRealLinear -> RealRowInvariant(vars, intCoeffs, realVars, realCoeffs, op, bound, strict, aux)

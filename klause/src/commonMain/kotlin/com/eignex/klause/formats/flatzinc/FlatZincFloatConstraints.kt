@@ -423,17 +423,7 @@ internal fun FlatZincCompiler.emitFloatAbs(c: FznConstraint) {
         is FloatRef.Const -> resolveFloatElement(c.args[1], "__float_abs_${floatVars.size}", x.lpOnly)
     }
     if (x.lpOnly) {
-        val variables = intArrayOf(x.varId, y.varId)
-        postExactFloatLinear(doubleArrayOf(1.0, -1.0), variables, LinearOp.LE, 0.0)
-        postExactFloatLinear(doubleArrayOf(-1.0, -1.0), variables, LinearOp.LE, 0.0)
-        factors.add(
-            Clause(
-                intArrayOf(
-                    reifyRealLinear(doubleArrayOf(1.0, -1.0), variables, LinearOp.EQ, 0.0),
-                    reifyRealLinear(doubleArrayOf(-1.0, -1.0), variables, LinearOp.EQ, 0.0),
-                ),
-            ),
-        )
+        factors.add(com.eignex.klause.factor.arithmetic.RealAbs(x.varId, y.varId))
         return
     }
     val stepX = if (x.buckets > 1) (x.hi - x.lo) / (x.buckets - 1) else 0.0

@@ -53,10 +53,12 @@ exponents and variable real exponents decline.
 ## FlatZinc floats
 
 FlatZinc first preserves finite float choices from constant-array selection and
-singleton domains. Supported connected operations lower to exact linear rows with
+singleton domains. Supported connected operations retain exact relations with
 Boolean structure. This includes comparisons, strict/reified comparisons, absolute
 values, minimum/maximum, constant-array selection, multiplication/division by
-constants, and products with a finite selected operand.
+constants, and products with a finite selected operand. Exact absolute values retain
+`RealAbs` in the source model; the selected consumer installs its complete equality
+alternatives privately. Implied inequalities alone do not enforce this relation.
 
 Finite integer float images retain affine maps to source integer values. Fixed
 integer selections and products can be eliminated while preserving source values

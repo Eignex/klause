@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.DivMod
 import com.eignex.klause.factor.arithmetic.Power
+import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.WideDivMod
 import com.eignex.klause.factor.table.Element
@@ -67,6 +68,8 @@ object BuiltInEncoderProvider : EncoderProvider {
 
         factor is WideDivMod -> wideDivModEncoder(target)
         factor is DivMod -> divModEncoder(factor, target)
+        factor is RealAbs && target == EncodingTarget.LINEAR -> AbsEncoding.realLinear
+        factor is RealAbs && target == EncodingTarget.POLYNOMIAL -> AbsEncoding.realPolynomial
         target == EncodingTarget.POLYNOMIAL && factor is ContinuousProduct -> continuousProduct
         target == EncodingTarget.POLYNOMIAL && factor is RealProduct -> mixedProduct
         target == EncodingTarget.LINEAR && factor is RealProduct -> conditionedProduct(factor)

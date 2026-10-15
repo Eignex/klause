@@ -13,3 +13,14 @@ internal fun absoluteValueRows(operand: Int, result: Int): List<LinearForm> = li
     )
     ),
 )
+
+internal fun realAbsoluteValueRows(operand: Int, result: Int): List<LinearForm> = listOf(
+    LinearForm.Conjunction(listOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(result),
+        doubleArrayOf(1.0), LinearOp.GE, 0.0))),
+    LinearForm.Disjunction(listOf(
+        Linear(intArrayOf(), doubleArrayOf(), intArrayOf(result, operand),
+            doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0),
+        Linear(intArrayOf(), doubleArrayOf(), intArrayOf(result, operand),
+            doubleArrayOf(1.0, 1.0), LinearOp.EQ, 0.0),
+    )),
+)
