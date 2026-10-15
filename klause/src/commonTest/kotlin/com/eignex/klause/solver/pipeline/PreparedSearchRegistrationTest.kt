@@ -4,7 +4,6 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -277,12 +276,20 @@ class PreparedSearchRegistrationTest {
             val source = Problem(
                 numBoolVars = 1,
                 intBounds = IntBounds.fromModelBounds(LongArray(integerCount), LongArray(integerCount), null, null),
-                numRealVars = 1,
-                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
-                factors = arrayOf<Factor>(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.LE, 0.0)) + if (integerCount == 0) emptyArray() else arrayOf(
+                numRealVars = if (integerCount == 0) 2 else 1,
+                realLower = DoubleArray(if (integerCount == 0) 2 else 1),
+                realUpper = DoubleArray(if (integerCount == 0) 2 else 1),
+                factors = if (integerCount == 0) arrayOf(
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                        doubleArrayOf(1.0, 2.0), LinearOp.EQ, 0.0),
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                        doubleArrayOf(1.0, 2.0), LinearOp.LE, 0.0),
+                ) else arrayOf(
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
                     Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0),
-                        doubleArrayOf(1.0), LinearOp.EQ, 0.0)),
+                        doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                ),
             )
             for (callerWins in listOf(false, true)) {
                 val stats = SmtStatsSink()
@@ -302,12 +309,53 @@ class PreparedSearchRegistrationTest {
                     assertEquals(BigFraction.ZERO, result.model.valueOf(SearchExactRealValue(SourceRealId(0))))
                     if (integerCount > 0) {
                         assertEquals(BIG_ZERO, result.model.valueOf(SearchExactIntValue(SourceIntId(0))))
+                    } else {
+                        assertEquals(BigFraction.ZERO, result.model.valueOf(SearchExactRealValue(SourceRealId(1))))
                     }
                 }
                 val usage = stats.hintUsage.snapshot()
                 assertEquals(if (callerWins) 0L else 1L, usage.componentSelections)
                 assertEquals(if (callerWins) 1L else 0L, usage.callerSelections)
                 assertEquals(0L, usage.clauseConsultations)
+                assertEquals(0L, usage.indexesAdmitted)
+                assertNull(usage.rawLedgerDebits)
+            }
+        }
+    }
+
+    @Test
+    fun `real difference openings retain default polarity and explicit point guidance`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.LE, 0.0)),
+        )
+        for (allowance in listOf(null, 0L, 1L)) for (callerWins in listOf(false, true)) {
+            val stats = SmtStatsSink()
+            source.componentPlan().search(source, emptyMap(), Long.MAX_VALUE, Cancellation.Never,
+                SearchLearnedDbParams(), stats, openHintFlips = allowance).use { planned ->
+                assertNull(planned.candidateHints.preferredBool(0))
+                assertIs<ComponentResult.Consistent>(planned.session.initialize())
+                assertNull(planned.session.boolValue(0))
+                assertEquals(if (allowance == 1L) true else null, planned.candidateHints.preferredBool(0))
+                if (allowance == 0L) assertSame(SearchCandidateHints.None, planned.candidateHints)
+                val caller = if (callerWins) SearchCandidateHints { false } else SearchCandidateHints.None
+
+                val result = assertIs<SearchResult.Satisfied>(planned.session.solve(1,
+                    SearchSolveParams(maxDecisions = 2), candidateHints = observedCandidateHints(
+                        caller, planned.candidateHints, stats.hintUsage)))
+
+                assertEquals(true, result.model.valueOf(SearchBoolValue(0)))
+                assertEquals(BigFraction.ZERO, result.model.valueOf(SearchExactRealValue(SourceRealId(0))))
+            }
+            val usage = stats.hintUsage.snapshot()
+            assertEquals(if (callerWins) 1L else 0L, usage.callerSelections)
+            assertEquals(if (!callerWins && allowance == 1L) 1L else 0L, usage.componentSelections)
+            if (allowance == null) {
+                assertTrue(usage.componentConsultations > 0L || callerWins)
                 assertEquals(0L, usage.indexesAdmitted)
                 assertNull(usage.rawLedgerDebits)
             }
@@ -446,12 +494,20 @@ class PreparedSearchRegistrationTest {
             val source = Problem(
                 numBoolVars = 2,
                 intBounds = IntBounds.fromModelBounds(LongArray(integerCount), LongArray(integerCount), null, null),
-                numRealVars = 1,
-                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
-                factors = arrayOf<Factor>(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.LE, 0.0)) + if (integerCount == 0) emptyArray() else arrayOf(
+                numRealVars = if (integerCount == 0) 2 else 1,
+                realLower = DoubleArray(if (integerCount == 0) 2 else 1),
+                realUpper = DoubleArray(if (integerCount == 0) 2 else 1),
+                factors = if (integerCount == 0) arrayOf(
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                        doubleArrayOf(1.0, 2.0), LinearOp.EQ, 0.0),
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                        doubleArrayOf(1.0, 2.0), LinearOp.LE, 0.0),
+                ) else arrayOf(
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
                     Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0),
-                        doubleArrayOf(1.0), LinearOp.EQ, 0.0)),
+                        doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                ),
             )
             val planned = source.componentPlan().search(source, emptyMap(), Long.MAX_VALUE, Cancellation.Never,
                 SearchLearnedDbParams())
@@ -561,12 +617,20 @@ class PreparedSearchRegistrationTest {
             val source = Problem(
                 numBoolVars = 1,
                 intBounds = IntBounds.fromModelBounds(LongArray(integerCount), LongArray(integerCount), null, null),
-                numRealVars = 1,
-                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
-                factors = arrayOf<Factor>(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.LE, 0.0)) + if (integerCount == 0) emptyArray() else arrayOf(
+                numRealVars = if (integerCount == 0) 2 else 1,
+                realLower = DoubleArray(if (integerCount == 0) 2 else 1),
+                realUpper = DoubleArray(if (integerCount == 0) 2 else 1),
+                factors = if (integerCount == 0) arrayOf(
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                        doubleArrayOf(1.0, 2.0), LinearOp.EQ, 0.0),
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                        doubleArrayOf(1.0, 2.0), LinearOp.LE, 0.0),
+                ) else arrayOf(
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
                     Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0),
-                        doubleArrayOf(1.0), LinearOp.EQ, 0.0)),
+                        doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                ),
             )
             var stopped = false
             var charged = 0L

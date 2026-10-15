@@ -222,6 +222,12 @@ columns use the same entry and scalar limits; their fractional point values rema
 branch-order guesses. Evaluation of its existing completed point charges that
 check's existing operation token. This direct primitive path creates no source-clause
 index or Boolean draw.
+For a default opening with an established complete pure-real difference graph,
+the first live primitive consultation releases only optional hint rows and values.
+The opening registration and all capture work already spent remain charged without refund; subsequent
+checks skip released hint capture. No live consultation means this release has not
+occurred, including when caller preferences bypass the component. Required source,
+graph, LP and witness work retains its existing token and limits.
 Other built-in linear guidance and compound indexed preferences remain opt-in.
 Their existing real-coordinate producer admission is unchanged.
 Explicit zero can retain construction observations but withholds component

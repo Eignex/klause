@@ -83,6 +83,48 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
+    fun `default real difference consultation releases hints across retraction and fresh checks`() {
+        val model = Problem(
+            numBoolVars = 2, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.LE, 0.0)),
+        )
+        for (defaultOpening in listOf(false, true)) {
+            var charged = 0L
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            }
+            ExactLiraSearchComponent(model).use { component ->
+                val hints = assertNotNull(component.partialPointHints(stop, defaultOpening)).second
+                val registrationWork = charged
+                assertTrue(registrationWork > 0L)
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+                assertNull(hints.preferredBool(0))
+
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertTrue(component.partialPointHintAvailable())
+                assertEquals(if (defaultOpening) null else true, hints.preferredBool(0))
+                assertEquals(!defaultOpening, component.partialPointHintAvailable())
+                assertEquals(registrationWork, charged)
+                assertNull(session.boolValue(0))
+                assertIs<ComponentCheck.Indeterminate>(component.check(session))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+                session.popTo(0)
+
+                assertNull(hints.preferredBool(0))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+                assertEquals(if (defaultOpening) null else true, hints.preferredBool(0))
+                assertEquals(!defaultOpening, component.partialPointHintAvailable())
+                assertEquals(registrationWork, charged)
+            }
+        }
+    }
+
+    @Test
     fun `interrupted integer point preparation retains its registration debit`() {
         var stopped = false
         var charged = 0L
@@ -91,7 +133,7 @@ class ExactLiraSearchComponentTest {
             override fun workMeter(): WorkMeter = WorkMeter { charged += it; stopped = true }
         }
         ExactLiraSearchComponent(partialModel()).use { component ->
-            assertNull(component.partialPointHints(stop, allowIntegerOnly = true))
+            assertNull(component.partialPointHints(stop, defaultOpening = true))
 
             assertTrue(charged > 0L)
             assertTrue(stopped)
@@ -164,7 +206,7 @@ class ExactLiraSearchComponentTest {
             )
             ExactLiraSearchComponent(model).use { component ->
                 val hints = assertNotNull(component.partialPointHints(Cancellation.Never,
-                    allowIntegerOnly = integerOnly)).second
+                    defaultOpening = integerOnly)).second
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 assertEquals(false, hints.preferredBool(0))
@@ -208,7 +250,7 @@ class ExactLiraSearchComponentTest {
             )
             val component = ExactLiraSearchComponent(model)
             val hints = assertNotNull(component.partialPointHints(Cancellation.Never,
-                allowIntegerOnly = integerOnly)).second
+                defaultOpening = integerOnly)).second
             try {
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
                 assertIs<ComponentResult.Consistent>(session.initialize())
@@ -361,7 +403,7 @@ class ExactLiraSearchComponentTest {
             )
             ExactLiraSearchComponent(model).use { component ->
                 val hints = assertNotNull(component.partialPointHints(Cancellation.Never,
-                    allowIntegerOnly = integerOnly)).second
+                    defaultOpening = integerOnly)).second
                 component.useSolveStop(Cancellation.Never)
                 val session = SearchSession(listOf(component), cancellation = Cancellation { cancelled },
                     atoms = SearchAtomRegistry(model.numBoolVars))

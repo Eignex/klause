@@ -163,8 +163,15 @@ retain that route.
 Admitted pure-real difference components under the production certification policy
 defer LP construction and check the active graph at partial and complete Boolean states,
 including the root. A feasible partial graph supplies consistency without a numerical
-guide or a model contribution. Complete graph points still pass the complete source-row
-check before publication. Missing cycle evidence, declined source validation and private
+guide or a model contribution. With default primitive guidance, the first live
+consultation after this admission supplies no preference and releases optional hint
+rows and values. Registration and all capture work already spent remain charged; later checks
+skip released capture in the same opening. An unavailable point or a caller preference
+that bypasses the component does not trigger release. Explicit hint allowances retain
+their existing graph-point preferences. This policy changes neither graph admission
+nor the source candidate, graph state or private-branch LP fallback. Complete graph
+points still pass the complete source-row check before publication. Missing cycle
+evidence, declined source validation and private
 source-bound branches retain the shared LP route. Late LP installation reaches the
 current decision scope before asserting resolved source rows, so retraction removes their
 guards and original witness premises together. Unconditional source rows can be reasserted

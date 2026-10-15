@@ -119,6 +119,12 @@ initialization; evaluation uses a point from an existing numerical check. It
 constructs no source-clause index and draws no Boolean proposal. Custom registered
 providers retain precedence, and primitive preferences retain their dirty,
 retraction, containing-stop and close lifetime.
+If initialization has already admitted the complete pure-real difference graph under
+the production certification policy, a live default consultation releases the optional
+primitive hint state and supplies no preference. Registration and all completed
+capture work retain their spent debit; later checks do not recapture released hints in that
+opening. An unavailable point or a caller preference that bypasses the component does
+not trigger this release. Source checks and graph or LP fallback retain their owners.
 Other built-in exact-linear point guidance and compound source-clause preferences
 use the existing `openHintFlips` opt-in, retaining their real-coordinate producer
 admission. Explicit zero permits bounded construction observations but supplies no

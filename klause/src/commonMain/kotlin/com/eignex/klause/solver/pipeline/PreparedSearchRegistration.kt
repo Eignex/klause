@@ -60,7 +60,7 @@ internal class SearchComponentOpening(
             if (registered == null) {
                 val direct = if (openHintFlips == null) {
                     (defaultComponent as? ExactLiraSearchComponent)
-                        ?.partialPointHints(cancellation, allowIntegerOnly = true)?.second
+                        ?.partialPointHints(cancellation, defaultOpening = true)?.second
                 } else null
                 if (direct == null) outcome(HintIndexOutcome.NO_PROVIDER) else accounted = true
                 return direct ?: SearchCandidateHints.None
