@@ -147,6 +147,12 @@ observations, without pretending that a source index was admitted.
 Custom registered providers retain their own existing admission and lifetime.
 The default integer difference opening installs no point hint provider; its ordinary
 Boolean polarity selection is independent of optional internal adapter composition.
+For an entirely theory-owned integer difference graph, source-proved relative
+interval proposals precede Boolean choices through arithmetic category priority.
+They register exact complementary difference predicates in the ordinary shared
+trail; their graph, retraction and source-check obligations belong to
+[difference logic](../theories/difference.md). This changes variable selection,
+without granting a partial potential any polarity or witness authority.
 An opt-in live-point provider first completes a sparse incidence index over all
 original source clauses. The opening owns the index and borrows those clauses
 read-only. Every source literal ID is validated, including the suffix;
