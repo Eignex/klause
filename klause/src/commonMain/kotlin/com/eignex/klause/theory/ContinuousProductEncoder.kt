@@ -1,7 +1,9 @@
 package com.eignex.klause.theory
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
@@ -52,29 +54,27 @@ private val finiteLinearProduct = Encoder(EncoderSupport.EQUIVALENT) { view, enc
     view as ContinuousProduct
     val choices = checkNotNull(view.finiteChoices)
     val other = if (choices.operand == view.a) view.b else view.a
-    val alternatives = ArrayList<LinearEncodingFormula>()
+    val cover = ArrayList<LinearRow>()
     for (index in 0 until choices.size) {
         if (encoding.cancellation()) return@Encoder EncoderDecline.RESOURCE
         encoding.cancellation.charge(2)
         val value = requireNotNull(BigFraction.ofDouble(choices.valueAt(index)))
         val selected = ExactSearchRow.of(intArrayOf(Term.ofRealVar(choices.operand)), listOf(BigFraction.ONE),
             LinearOp.EQ, value)
+        val absent = ExactSearchRow.of(intArrayOf(Term.ofRealVar(choices.operand)), listOf(BigFraction.ONE),
+            LinearOp.NE, value)
         val product = ExactSearchRow.of(intArrayOf(Term.ofRealVar(view.result), Term.ofRealVar(other)),
             listOf(BigFraction.ONE, value.negated()), LinearOp.EQ, BigFraction.ZERO)
-        alternatives += LinearEncodingFormula.And(listOf(LinearEncodingFormula.Relation(selected.linearForm),
-            LinearEncodingFormula.Relation(product.linearForm)))
+        cover += selected
+        encoding.linear(LinearForm.Disjunction(listOf(absent, product)))
         if (choices.hasGuards) {
-            fun guard(truth: Boolean): LinearEncodingFormula = LinearEncodingFormula.Relation(ExactSearchRow.of(
+            fun guard(truth: Boolean): LinearRow = ExactSearchRow.of(
                 intArrayOf(Term.ofLit(choices.literalAt(index))), listOf(BigFraction.ONE), LinearOp.EQ,
-                if (truth) BigFraction.ONE else BigFraction.ZERO).linearForm)
-            val absent = ExactSearchRow.of(intArrayOf(Term.ofRealVar(choices.operand)), listOf(BigFraction.ONE),
-                LinearOp.NE, value)
-            encoding.linearFormula(LinearEncodingFormula.And(listOf(
-                LinearEncodingFormula.Or(listOf(guard(false), LinearEncodingFormula.Relation(selected.linearForm))),
-                LinearEncodingFormula.Or(listOf(guard(true), LinearEncodingFormula.Relation(absent.linearForm))),
-            )))
+                if (truth) BigFraction.ONE else BigFraction.ZERO)
+            encoding.linear(LinearForm.Disjunction(listOf(guard(false), selected)))
+            encoding.linear(LinearForm.Disjunction(listOf(guard(true), absent)))
         }
     }
-    encoding.linearFormula(LinearEncodingFormula.Or(alternatives))
+    encoding.linear(LinearForm.Disjunction(cover))
     null
 }

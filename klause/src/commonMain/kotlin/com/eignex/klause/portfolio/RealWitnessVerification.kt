@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -55,6 +56,13 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
     }
     for ((id, factor) in model.factors.withIndex()) {
         if (factor.variables.reals.isEmpty()) continue
+        if (factor is Power && factor.base is Power.Coordinate.Real && factor.exponent <= 1) {
+            val expected = if (factor.exponent == 0) BigFraction.ONE else reals[factor.base.id.index]
+            if (expected != reals[(factor.result as Power.Coordinate.Real).id.index]) {
+                return Verification.Rejected("real factor $id refutes the assignment")
+            }
+            continue
+        }
         if (factor is ContinuousProduct) {
             if (reals[factor.a] * reals[factor.b] != reals[factor.result]) {
                 return Verification.Rejected("real factor $id refutes the assignment")

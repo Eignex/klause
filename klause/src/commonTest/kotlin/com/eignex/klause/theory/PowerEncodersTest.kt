@@ -2,6 +2,7 @@ package com.eignex.klause.theory
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -42,6 +43,19 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class PowerEncodersTest {
+    @Test
+    fun `affine real powers retain original source witness checks`() {
+        for (exponent in listOf(0, 1)) {
+            val source = parseFlatZinc("var 2.0..2.0: x; var 0.0..3.0: y; " +
+                "constraint float_pow(x, $exponent.0, y); solve satisfy;", exactFloats = true).problem
+
+            val result = BacktrackSolver.source(source).solve()
+
+            val point = assertIs<OpenTheoryResult.Sat>(result).assignment
+            assertEquals(if (exponent == 0) "1" else "2", point.realValue(1))
+        }
+    }
+
     @Test
     fun `linear powers require captured representable operand fixings`() {
         val source = Problem(0, 2, Array(2) { IntDomain(-10, 100) }, arrayOf<Factor>(Power(0, 3, 1)))

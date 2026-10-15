@@ -2,6 +2,7 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -75,6 +76,16 @@ private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): 
                 factor.vars, RealConsts(factor.intCoeffs), factor.realVars, RealConsts(factor.realCoeffs),
                 op, factor.bound, if (holds) factor.strict else !factor.strict, point, direction,
             )
+        }
+
+        is Power -> {
+            val base = factor.base as? Power.Coordinate.Real ?: return false
+            val result = factor.result as Power.Coordinate.Real
+            when (factor.exponent) {
+                0 -> reals[result.id.index] == BigFraction.ONE && direction[result.id.index].isZero
+                1 -> reals[result.id.index] == reals[base.id.index] && direction[result.id.index] == direction[base.id.index]
+                else -> false
+            }
         }
 
         is ContinuousProduct -> {

@@ -3,6 +3,7 @@ package com.eignex.klause.factor
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -12,6 +13,36 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class ContinuousProductTest {
+    @Test
+    fun `finite choices capture values and retain typed guard remapping`() {
+        val values = doubleArrayOf(0.125, 0.375)
+        val guards = intArrayOf(Lit.make(0, true), Lit.make(1, false))
+        val source = ContinuousProduct(0, 1, 2, 0, values, guards)
+        values[0] = 3.0
+        guards[0] = Lit.make(1, true)
+        val remapped = source.remap(VarRemap(intArrayOf(2, 3), intArrayOf(), intArrayOf(4, 5, 6)))
+            as ContinuousProduct
+        val choices = requireNotNull(remapped.finiteChoices)
+
+        assertContentEquals(intArrayOf(2, 3), remapped.boolVars)
+        assertContentEquals(intArrayOf(4, 5, 6), remapped.variables.reals)
+        assertEquals(4, choices.operand)
+        assertEquals(0.125, choices.valueAt(0))
+        assertEquals(Lit.make(2, true), choices.literalAt(0))
+        assertEquals(Lit.make(3, false), choices.literalAt(1))
+    }
+
+    @Test
+    fun `declared operand choices participate in source structural identity`() {
+        val first = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375), intArrayOf(0, 2))
+        val reordered = ContinuousProduct(1, 0, 2, 0, doubleArrayOf(0.375, 0.125), intArrayOf(2, 0))
+        val different = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.5), intArrayOf(0, 2))
+
+        assertEquals(first.structuralKey(), reordered.structuralKey())
+        assertNotEquals(first.structuralKey(), ContinuousProduct(0, 1, 2).structuralKey())
+        assertNotEquals(first.structuralKey(), different.structuralKey())
+    }
+
     @Test
     fun `squares and result aliases have unique real membership`() {
         for ((factor, expected) in listOf(
