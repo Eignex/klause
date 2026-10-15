@@ -4,7 +4,13 @@ import com.eignex.klause.solver.objective.FunctionalObjective
 
 internal class AbsResultRepair(private val state: LocalSearchState, private val sink: MoveSink) {
     fun propose(variable: Int, value: Long) {
-        propose(variable, value, 0)
+        if (sink.absRepairDepth >= MAX_DEPTH) return
+        sink.absRepairDepth++
+        try {
+            propose(variable, value, 0)
+        } finally {
+            sink.absRepairDepth--
+        }
     }
 
     private fun propose(variable: Int, value: Long, depth: Int) {

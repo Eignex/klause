@@ -33,6 +33,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     private var cachedList: List<Move>? = null
     private var elementPreservingProbes: Int = 0
     internal var alternativeRepairs: MoveSink? = null
+    internal var absRepairDepth: Int = 0
 
     /** Materialized [Move] view. Stable across reads until the sink is mutated.
      *  Compound moves follow primitives in the iteration order. */
