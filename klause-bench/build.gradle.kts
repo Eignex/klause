@@ -88,6 +88,14 @@ val checkNativeVmSymbolQueries = tasks.register<Exec>("checkNativeVmSymbolQuerie
         "tools/native_vm_loaded_module.py", "tools/read_native_vm_metadata.py")
 }
 
+val checkNativeVmDwarfRecordReview = tasks.register<Exec>("checkNativeVmDwarfRecordReview") {
+    group = "verification"
+    description = "Test saved DWARF member/type candidate review and unresolved locations."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_native_vm_dwarf_records.py")
+    inputs.files("tools/review_native_vm_dwarf_records.py", "tools/test_review_native_vm_dwarf_records.py")
+}
+
 val checkNativeVmDwarfProvider = tasks.register<Exec>("checkNativeVmDwarfProvider") {
     group = "verification"
     description = "Test private hash-bound DWARF provider extraction and imports."
@@ -248,7 +256,8 @@ tasks.named("check") {
         checkNativeVmLiveArgumentReview, checkNativeVmEventLoss, checkNativeVmEventLossReview,
         checkNativeVmBoundaryEntries, checkNativeVmBoundaryLifecycle, checkNativeVmBoundaryLifecycleReview,
         checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkNativeVmEntryTransfers,
-        checkNativeVmDebugImage, checkNativeVmDwarfProvider, checkNativeVmDwarfRecords)
+        checkNativeVmDebugImage, checkNativeVmDwarfProvider, checkNativeVmDwarfRecords,
+        checkNativeVmDwarfRecordReview)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
