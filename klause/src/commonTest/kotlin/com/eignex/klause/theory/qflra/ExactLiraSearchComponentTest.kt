@@ -257,40 +257,46 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `partial point choices defer disjunctions with Boolean coefficients`() {
-        val declaration = object : Factor by ComparisonClause(
-            intArrayOf(1, 1), arrayOf(LinearOp.GE, LinearOp.LE), longArrayOf(1, -1),
-        ) {
-            override val linearForm: LinearForm = LinearForm.Disjunction(listOf(
-                TaggedLinearRow(intArrayOf(Term.ofIntVar(1), Term.ofLit(Lit.make(0, true))),
-                    IntegerConstants(constsOf(longArrayOf(1, 1)), 1L), LinearOp.GE),
-                TaggedLinearRow(intArrayOf(Term.ofIntVar(1)),
-                    IntegerConstants(constsOf(longArrayOf(1)), -1L), LinearOp.LE),
-            ))
-        }
-        val source = Problem(
-            numBoolVars = 2, numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 0)),
-            openIntLo = booleanArrayOf(false, true), openIntHi = booleanArrayOf(false, true),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
-            factors = arrayOf(
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
-                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
-                declaration,
-                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
-            ),
-        )
-        source.componentPlan().search(source, emptyMap()).use { planned ->
-            val theory = assertIs<ExactLiraSearchComponent>(planned.theory)
-            assertIs<ComponentResult.Consistent>(planned.session.initialize())
-            assertEquals(true, planned.candidateHints.preferredBool(1))
+    fun `partial point choices defer disjunctions with Boolean dependencies`() {
+        for (coefficient in listOf(true, false)) {
+            val declaration = object : Factor by ComparisonClause(
+                intArrayOf(1, 1), arrayOf(LinearOp.GE, LinearOp.LE), longArrayOf(1, -1),
+            ) {
+                override val linearForm: LinearForm = LinearForm.Disjunction(listOf(
+                    TaggedLinearRow(
+                        if (coefficient) intArrayOf(Term.ofIntVar(1), Term.ofLit(Lit.make(0, true)))
+                        else intArrayOf(Term.ofIntVar(1)),
+                        IntegerConstants(constsOf(if (coefficient) longArrayOf(1, 1) else longArrayOf(1)), 1L),
+                        LinearOp.GE, activator = if (coefficient) LinearRow.ALWAYS else 0,
+                    ),
+                    TaggedLinearRow(intArrayOf(Term.ofIntVar(1)),
+                        IntegerConstants(constsOf(longArrayOf(1)), -1L), LinearOp.LE),
+                ))
+            }
+            val source = Problem(
+                numBoolVars = 2, numIntVars = 2,
+                intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 0)),
+                openIntLo = booleanArrayOf(false, true), openIntHi = booleanArrayOf(false, true),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+                factors = arrayOf(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                    Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+                    declaration,
+                    ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ),
+            )
+            source.componentPlan().search(source, emptyMap()).use { planned ->
+                val theory = assertIs<ExactLiraSearchComponent>(planned.theory)
+                assertIs<ComponentResult.Consistent>(planned.session.initialize())
+                assertEquals(true, planned.candidateHints.preferredBool(1))
 
-            assertNull(theory.nextBranch(planned.session))
-            assertNull(planned.session.boolValue(0))
-            assertIs<ComponentResult.Consistent>(planned.session.push(SearchDecision.Bool(Lit.make(0, true))))
-            assertIs<ComponentResult.Consistent>(planned.session.push(SearchDecision.Bool(Lit.make(1, true))))
-            assertNotNull(theory.nextBranch(planned.session))
+                assertNull(theory.nextBranch(planned.session))
+                assertNull(planned.session.boolValue(0))
+                assertIs<ComponentResult.Consistent>(planned.session.push(SearchDecision.Bool(Lit.make(0, true))))
+                assertIs<ComponentResult.Consistent>(planned.session.push(SearchDecision.Bool(Lit.make(1, true))))
+                assertNotNull(theory.nextBranch(planned.session))
+            }
         }
     }
 

@@ -942,10 +942,15 @@ class ExactLiraSearchComponent private constructor(
                             rowAssertions = node.rowAssertions + (disjunct.address to payload),
                             retainedReduction = null,
                         )
-                        if (canForwardArithmeticPoint(priorPoint, priorHints, wasDirty, wasForwardPending)) {
+                        if (canForwardArithmeticPoint(priorPoint, priorHints, wasDirty, wasForwardPending) &&
+                            model.factors[disjunct.address.factor].linearRows[disjunct.address.row].activator ==
+                            LinearRow.ALWAYS
+                        ) {
                             val comparison = exactForms[disjunct.address.factor][disjunct.address.row]
                                 .hintComparison({ null }, ::hintScalar, ::hintPreflight)
-                            if (comparison != null && hintTruth(comparison, checkNotNull(priorPoint)) == disjunct.holds) {
+                            if (comparison != null &&
+                                hintTruth(comparison, checkNotNull(priorPoint)) == disjunct.holds
+                            ) {
                                 candidate = priorPoint
                                 pointHintValues = priorHints
                                 pendingPointForward = true
