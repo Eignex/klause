@@ -1,6 +1,8 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
@@ -32,6 +34,19 @@ class GridArrayMinMaxTest {
         val assignments = BacktrackSolver(source.bake()).enumerate().map { it.ints.toList() }.toSet()
 
         assertEquals(setOf(listOf(0L, 0L, 0L), listOf(1L, 0L, 0L), listOf(2L, 0L, 0L)), assignments)
+    }
+
+    @Test
+    fun `grid extrema share propagated bounds with distinctness conflicts`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf<Factor>(
+            GridArrayMinMax(intArrayOf(0, 1, 2), DoubleArray(3) { 1.0 }, DoubleArray(3),
+                BooleanArray(3), 1000L, max = false),
+            AllDifferent(intArrayOf(0, 1, 2)),
+        ))
+
+        val result = BacktrackSolver(source.bake()).solve()
+
+        assertIs<SolveResult.Unsat>(result)
     }
 
     @Test
