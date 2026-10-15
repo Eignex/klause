@@ -99,16 +99,20 @@ The pipeline can compose theory-owned columns with a finite projection where the
 ownership plan admits that decomposition. Source variables keep their identities;
 extracting a graph never authorizes dropping factors outside its fragment.
 
-An entirely theory-owned integer graph can branch on directly proved relative
+An entirely theory-owned integer graph can branch on small directly proved relative
 intervals before its ordinary Boolean choices. Opposite unconditional source edges
 bound `x-y` without bounding either source coordinate absolutely. Narrower intervals
-precede wider ones, with source identities breaking ties. Each split registers
+precede wider ones, with source identities breaking ties. First relative values
+rotate using the interval ordinal's digit sum modulo interval cardinality; this
+ordering preference creates no numerical fact. Each split registers
 `x-y <= c` and `y-x <= -c-1` as exclusive, exhaustive integer alternatives through
 the shared atom registry. No finite CP domain or fixed anchor is introduced.
 Retraction restores the active interval from the shared Boolean trail; immutable
 predicate names survive siblings and restarts. Source comparison guards can receive
 explained consequences from these named edges. Unused names impose neither side at
 a complete graph check. Final original-source checks retain witness authority.
+Once the original Boolean skeleton is settled, graph feasibility supplies its
+arithmetic completion without further relative decisions.
 
 ## Results and proof authority
 
@@ -145,7 +149,8 @@ result, rather than an invented bounded model.
 
 Relative-interval preparation and each registered-graph extension charge and poll
 the containing opening token. Registered edges share the 65,536-edge private
-representation envelope; reaching it or atom capacity retains ordinary Boolean
+representation envelope. Intervals wider than 255 retain ordinary graph search.
+Reaching the edge envelope or atom capacity retains ordinary Boolean
 search over the current valid scope. Index rebuilding retains spent work and the
 live deadline. Closing discards interval splits and private graph extensions.
 
