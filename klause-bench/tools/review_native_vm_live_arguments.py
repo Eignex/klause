@@ -1,6 +1,7 @@
 """Review saved live argument records against independent JVM identities."""
 import hashlib
 import json
+from collections import Counter
 from pathlib import Path
 import re
 import sys
@@ -310,6 +311,7 @@ def correlate(native, layout, jfr, logs, diagnostics):
             issues.append({'group': frame['entry'], 'reason': 'unfinished native invocation'})
     for frame in invocations:
         frame['recordedArgumentBindingCorroborated'] = False
+        frame['independentIdentityMatched'] = False
         try:
             if not frame['completed'] or len(frame['usdtBegin']) != 1 or len(frame['usdtEnd']) != 1:
                 raise ValueError('Broker lifetime or USDT pair is incomplete')
@@ -321,8 +323,13 @@ def correlate(native, layout, jfr, logs, diagnostics):
             task = decode_candidate(frame['entry'], 'task', 'CompileTask', layout)
             key = task_key(task)
             wanted = method_name(begin)
-            matches = [row for row in jfr if row['compileId'] == key[0] and row['level'] == key[1] and
-                       row['isOsr'] == (key[2] != ordinary) and row['tid'] == frame['entry']['tid'] and row['method'] == wanted]
+            by_id = [row for row in jfr if row['compileId'] == key[0]]
+            by_method = [row for row in by_id if row['level'] == key[1] and
+                         row['isOsr'] == (key[2] != ordinary) and row['method'] == wanted]
+            matches = [row for row in by_method if row['tid'] == frame['entry']['tid']]
+            frame.update(taskCandidate=task, usdtIdentity=begin, jfrCompileIdCandidates=by_id,
+                         independentMatchStages={'compileId': len(by_id), 'methodLevelOsr': len(by_method),
+                                                 'nativeThread': len(matches)})
             if len(matches) != 1:
                 raise ValueError('Independent JFR identity is absent or ambiguous')
             log_matches = [row for row in logs if row['compileId'] == key[0] and row['method'] == wanted and
@@ -347,10 +354,23 @@ def correlate(native, layout, jfr, logs, diagnostics):
                 posts.append({'task': post_task, 'nmethod': nmethod, 'returned': 'return' in post})
             frame.update(task=task, usdtIdentity=begin, jfrMatches=matches, logMatches=log_matches,
                          postCandidateMatches=posts,
+                         independentIdentityMatched=True,
                          recordedArgumentBindingCorroborated=diagnostics['readWarningGuardPassed'] and not native['errors'] and not issues)
         except (ValueError, KeyError, IndexError) as error:
             frame['unprovenReason'] = str(error)
-    return {'brokerInvocations': invocations, 'nativeLifetimeIssues': issues}
+    matched = {id(row) for frame in invocations for row in frame.get('jfrMatches', [])}
+    unmatched = [row for row in jfr if id(row) not in matched]
+    summary = {'brokerInvocations': len(invocations),
+               'completedBrokerInvocations': sum(frame['completed'] for frame in invocations),
+               'independentIdentityMatches': sum(frame['independentIdentityMatched'] for frame in invocations),
+               'recordedArgumentBindingsCorroborated': sum(frame['recordedArgumentBindingCorroborated'] for frame in invocations),
+               'brokerUnprovenReasons': dict(Counter(frame['unprovenReason'] for frame in invocations if 'unprovenReason' in frame)),
+               'nativeLifetimeIssueReasons': dict(Counter(issue['reason'] for issue in issues)),
+               'nativeParseErrors': len(native['errors']), 'independentJfrRecords': len(jfr),
+               'independentLogRecords': len(logs), 'unmatchedIndependentJfrRecords': len(unmatched),
+               'scope': 'Saved-record counts only. Independent identity matches remain distinct from capture-wide binding guards; unfinished/missing records are not zero-cost roots or compiler savings.'}
+    return {'brokerInvocations': invocations, 'nativeLifetimeIssues': issues,
+            'unmatchedIndependentJfrRecords': unmatched, 'summary': summary}
 
 
 def inspect(directory, report):
