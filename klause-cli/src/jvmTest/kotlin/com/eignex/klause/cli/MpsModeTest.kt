@@ -20,6 +20,22 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `default bounded decimal optimization publishes an original source tolerance witness`() {
+        val source = File.createTempFile("mps-finite-tolerance", ".mps").apply {
+            writeText("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -0.1\n" +
+                " M1 'MARKER' 'INTEND'\n X COST 0.1 R 1\nRHS\n RHS R 0.2\n" +
+                "BOUNDS\n LI B I 0\n UI B I 1\n LO B X 0.1\nENDATA\n")
+            deleteOnExit()
+        }
+
+        val text = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", source.absolutePath))) }
+
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("optimizationStatus=tolerance-optimum" in text, text)
+        assertTrue("MPS source tolerance witness" in text, text)
+    }
+
+    @Test
     fun `bounded mixed decimal loading retains finite execution under default and exact settings`() {
         val source = File.createTempFile("mps-finite-decimal", ".mps").apply {
             writeText("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -0.1\n" +
