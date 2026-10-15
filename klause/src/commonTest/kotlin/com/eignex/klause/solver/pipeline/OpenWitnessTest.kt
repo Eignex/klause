@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.IntBounds
@@ -36,6 +37,20 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class OpenWitnessTest {
+    @Test
+    fun `real absolute value checks the exact source magnitude before publication`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(RealAbs(0, 1)), numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, 0.0), realUpper = doubleArrayOf(2.0, 2.0))
+        val third = BigFraction.ofLong(3).reciprocal()
+        val valid = Sample(BooleanArray(0), LongArray(0), reals = doubleArrayOf(-third.toDouble(), third.toDouble()),
+            exactReals = listOf(-third, third))
+        val relaxed = Sample(BooleanArray(0), LongArray(0), reals = doubleArrayOf(0.0, 1.0),
+            exactReals = listOf(BigFraction.ZERO, BigFraction.ONE))
+
+        assertIs<Verification.Accepted<*, *>>(verifyOpenWitness(source, valid))
+        assertIs<Verification.Rejected>(verifyOpenWitness(source, relaxed))
+    }
+
     @Test
     fun `native publication metadata cannot rescue an invalid exact row witness`() {
         val source = Problem(0, 0, emptyArray(), arrayOf(ExactSearchRow.of(intArrayOf(Term.ofRealVar(0)),

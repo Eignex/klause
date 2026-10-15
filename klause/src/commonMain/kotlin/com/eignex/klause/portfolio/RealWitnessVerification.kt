@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearRow
@@ -31,6 +32,14 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
     }
     for ((id, factor) in model.factors.withIndex()) {
         if (factor.variables.reals.isEmpty()) continue
+        if (factor is RealAbs) {
+            val operand = reals[factor.operand]
+            val magnitude = if (operand < BigFraction.ZERO) -operand else operand
+            if (magnitude != reals[factor.result]) {
+                return Verification.Rejected("real factor $id refutes the assignment")
+            }
+            continue
+        }
         if (factor is RealProduct) {
             val integer = BigFraction.of(sample.exactIntValue(factor.intOperand), BIG_ONE)
             if (integer * reals[factor.realOperand] != reals[factor.result]) {

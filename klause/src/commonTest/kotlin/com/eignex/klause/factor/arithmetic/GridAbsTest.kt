@@ -17,6 +17,9 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
+import com.eignex.klause.lowering.gridAbsoluteValueRows
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
@@ -27,9 +30,26 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class GridAbsTest {
+    @Test
+    fun `grid encoding preparation stops on the containing work allowance`() {
+        val relation = GridAbs(0, 1, -2.0, 2.0, 101, 0.0, 2.0, 101)
+        var work = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = work >= 7
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+
+        val rows = gridAbsoluteValueRows(relation, cancellation)
+
+        assertNull(rows)
+        assertEquals(7L, work)
+        assertNotNull(gridAbsoluteValueRows(relation, Cancellation.Never))
+    }
+
     @Test
     fun `FlatZinc grid absolute value retains its source relation`() {
         val parsed = parseFlatZinc(

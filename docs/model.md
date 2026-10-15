@@ -364,6 +364,7 @@ repairs either role and maintains acyclic outputs through the definition network
 install the complete nonnegative equality alternatives. Its implied inequalities
 remain a relaxation. Finite propagation is inert for real coordinates, and floating
 local scores and repairs require exact source completion before publication.
+Rational source witness verification compares the operand magnitude and result exactly.
 Default bucketed `float_abs` retains `GridAbs` with its immutable bucket metadata
 and scalar image. Selected finite and LP consumers build private tuple projections;
 selected arithmetic consumers install a valid-input cover and guarded image

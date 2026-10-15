@@ -93,7 +93,9 @@ class RealAbsEncodingTest {
         val result = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source).solve())
 
         assertEquals(IntVariableOwner.CP, assertNotNull(plan.componentPlan).intOwner(integer))
-        assertTrue(result.assignment.intValue(integer) in setOf("-1", "1"))
+        assertTrue(result.assignment.intValue(integer) in setOf("-1", "1"),
+            "n=${result.assignment.intValue(integer)}, x=${result.assignment.realValue(relation.operand)}, " +
+                "y=${result.assignment.realValue(relation.result)}")
         assertEquals("1", result.assignment.realValue(relation.result))
     }
 
