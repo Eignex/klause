@@ -654,7 +654,11 @@ and source scope rather than substituting the local-search score for a witness c
 
 Self-owned optimization from a completion-checked incumbent with finite and continuous
 coordinates and a continuous objective term admits at most two completion probes per pick after source generation
-and configuration filtering. Uncompleted restart states retain ordinary traversal.
+and configuration filtering. A compatible supplied start gets one charged completion
+check before heuristic repair when only real-dependent residuals prevent zero score.
+Finite domain and exact finite-row checks precede that attempt; rejection retains ordinary
+repair. Interrupted checks remain resumable under the containing allowance.
+Uncompleted restart states retain ordinary traversal.
 Strict greedy descent first offers its ordinary finite selection for completion.
 At a zero-score point the completed objective must improve; a residual-repair choice
 retains the recipe's repair/noise acceptance after source completion. Real-only

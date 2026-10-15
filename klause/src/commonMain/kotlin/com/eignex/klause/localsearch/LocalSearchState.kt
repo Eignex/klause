@@ -1172,17 +1172,19 @@ class LocalSearchState private constructor(
 
     internal fun completionCandidate(move: Move): Sample? {
         var sample: Sample? = null
-        evaluateMove(move, capture = {
-            val finiteViolation = (0 until violated.size).any { index ->
-                val id = violated[index]
-                val factor = problem.factors[id]
-                factor.variables.reals.isEmpty() &&
-                    (projection.selection?.capabilities(id) ?: factor.executionCapabilities()).assignmentCheck ==
-                    AssignmentCheckCapability.EXACT
-            }
-            if (!finiteViolation) sample = assignment.snapshot()
-        })
+        evaluateMove(move, capture = { sample = completionCandidate() })
         return sample
+    }
+
+    internal fun completionCandidate(): Sample? {
+        val finiteViolation = (0 until violated.size).any { index ->
+            val id = violated[index]
+            val factor = problem.factors[id]
+            factor.variables.reals.isEmpty() &&
+                (projection.selection?.capabilities(id) ?: factor.executionCapabilities()).assignmentCheck ==
+                AssignmentCheckCapability.EXACT
+        }
+        return if (finiteViolation) null else assignment.snapshot()
     }
 
     // Use the committed move's single propagation pass and restore saved outputs without replaying definitions.
