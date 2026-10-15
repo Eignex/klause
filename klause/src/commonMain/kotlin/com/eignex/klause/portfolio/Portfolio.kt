@@ -40,8 +40,8 @@ import kotlin.time.TimeSource
 /**
  * Bandit-scheduled portfolio of [PortfolioWorker] arms built by [PortfolioBuilder], mixing local
  * search, backtrack and ALNS. Each lane claims an arm selected by [UnivariateBandit], runs one
- * segment and settles its reward. An arm runs on at most one lane at a time. Single-lane
- * scheduling balances complete-search work until a witness is accepted, then favors progress.
+ * segment and settles its reward. An arm runs on at most one lane at a time. Scheduled
+ * lanes protect complete-search elapsed opportunity until a witness is accepted, then favor progress.
  * With a lane per arm, each arm runs for the whole solve.
  *
  * The shared incumbent cutoff prunes backtrack arms and its assignment warm-starts local-search
