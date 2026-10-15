@@ -96,6 +96,16 @@ paths preserve coefficient-first multiplication order and exact scalar metadata.
 The point owner exposes its captured coordinates separately from arithmetic work,
 so callers can publish the same immutable values they evaluated.
 
+An affine-line evaluation captures rational offsets and directions by original
+coordinate ID. It retains only completed rational univariate images and coordinate
+powers for that line. A point binds one exact algebraic parameter to the captured
+line; polynomial signs use the image at that same parameter, and coordinate access
+constructs the corresponding exact scalar. Another line starts with separate state.
+Capture, cache consultations, image arithmetic, sign checking and coordinate
+construction debit the same token and retain its dense and checked-degree limits.
+Interrupted images install no entry. The kernel supplies arithmetic signs and values;
+callers retain full source-formula and publication obligations.
+
 Specialization evaluates coefficients at exact earlier coordinates and trims
 vanished leading coefficients by exact sign. `AlgebraicPolynomial.isZero` retains
 nullification as a separate state. Lifting forms a rational annihilator by

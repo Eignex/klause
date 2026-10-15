@@ -409,6 +409,16 @@ Nonlinear and multi-coordinate affine guides precede coordinate bounds. Exact
 duplicate specialized polynomials share one root guide within a line; constant
 guides consume no root query. A degree or representation decline skips that guide
 only, retaining every source assertion in the complete point check.
+Each coupled line owns its rational affine coordinate map. Complete point checks
+use exact univariate images of every original normalized source polynomial at the
+same algebraic line parameter, retaining coordinate correlation. Images and powers
+are completed privately under the existing token and reused only within that line.
+Guide eligibility does not omit high-degree or Boolean source constraints from this
+check. The full Boolean formula still decides acceptance; final assignment capture
+and rejected-point guidance reconstruct coordinates from the same owned line point.
+Interrupted checking or capture publishes no witness and refunds no work. Ordinary
+CAD point evaluation and the existing query, proposal and phase limits remain intact.
+
 Equalities under negation or disjunction are proposal guides, never asserted facts.
 For a nonlinear conjunction of numeric inequalities and disequalities, an optional guide view
 complements directly negated atoms without changing the source formula. It excludes
