@@ -3,9 +3,9 @@ package com.eignex.klause.formats.mps
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.solver.pipeline.IntVariableOwner
+import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
-import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.sourceRoute
 import kotlin.test.Test
 import kotlin.test.assertEquals

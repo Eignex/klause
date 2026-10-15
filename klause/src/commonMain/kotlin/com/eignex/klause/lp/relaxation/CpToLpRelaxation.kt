@@ -24,12 +24,12 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
-import com.eignex.klause.lp.ExactRelaxationBuilder
-import com.eignex.klause.lp.NumericalLinearRow
 import com.eignex.klause.lp.Contribution
+import com.eignex.klause.lp.ExactRelaxationBuilder
 import com.eignex.klause.lp.HullFlags
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.LpAuxiliaryColumn
+import com.eignex.klause.lp.NumericalLinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.cut.CircuitArcModel
 import com.eignex.klause.lp.cut.CircuitSeparator
