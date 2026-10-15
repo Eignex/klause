@@ -23,7 +23,7 @@ class RationalTheoryDescentAdmissionTest {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 1_000_000)), arrayOf(ExactSearchRow.of(
             intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
             listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ofLong(999_999) +
-                BigFraction.ofLong(1) / BigFraction.ofLong(2))), numRealVars = 43,
+                BigFraction.ofLong(2).reciprocal())), numRealVars = 43,
             realLower = DoubleArray(43), realUpper = DoubleArray(43) { 1.0 })
         val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
         var published: MinimizeResult.WithSample? = null
