@@ -109,6 +109,9 @@ class NativeVmLiveArgumentReviewTest(unittest.TestCase):
 
         self.assertTrue(good['brokerInvocations'][0]['recordedArgumentBindingCorroborated'])
         self.assertFalse(bad['brokerInvocations'][0]['recordedArgumentBindingCorroborated'])
+        self.assertTrue(bad['brokerInvocations'][0]['independentIdentityMatched'])
+        self.assertEqual(1, bad['summary']['independentIdentityMatches'])
+        self.assertEqual(0, bad['summary']['recordedArgumentBindingsCorroborated'])
         self.assertEqual(jfr, bad['brokerInvocations'][0]['jfrMatches'])
 
     def test_primary_clock_order_cannot_contradict_per_thread_sequence(self):
