@@ -6,6 +6,21 @@ import kotlin.test.assertTrue
 
 class ExactFlatZincValidationTest {
     @Test
+    fun `absolute value source checking preserves holes in an integer value set`() {
+        val source = "var {-2,-1,1,2}: n; var float: x; var float: y; " +
+            "constraint int2float(n,x); constraint float_abs(x,y); solve minimize y;"
+        for ((value, status) in listOf(-2 to "valid", -1 to "valid", 0 to "invalid", 1 to "valid", 2 to "valid")) {
+            val magnitude = kotlin.math.abs(value)
+
+            val result = ExactFlatZincValidation.inspect(source, "n = $value;\nx = $value;\ny = $magnitude;",
+                magnitude.toString())
+
+            assertEquals(status, result.status, result.reason)
+        }
+    }
+
+
+    @Test
     fun `original set selection checks the selected row and full result universe`() {
         val source = "array[1..2] of set of int: choices = [{1,3}, {2}]; " +
             "var 0..3: i; var set of 1..3: r; constraint array_set_element(i, choices, r); solve satisfy;"

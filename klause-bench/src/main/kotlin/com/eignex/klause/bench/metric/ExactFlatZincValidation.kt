@@ -115,6 +115,16 @@ internal object ExactFlatZincValidation {
                         "int" -> require(element is Value.Number && element.value.integral) { "non-integer $name" }
 
                         else -> {
+                            if (scalarType.startsWith('{') && scalarType.endsWith('}')) {
+                                val members = split(scalarType.substring(1, scalarType.length - 1)).map(::sourceNumber)
+                                require(members.all { it.integral }) { "non-integer source domain" }
+                                val x = numeric(element)
+                                if (!x.integral || members.none { it.compareTo(x) == 0 }) {
+                                    return SourceValidation("invalid", "source value set rejects $name")
+                                }
+                                bounds++
+                                continue
+                            }
                             val range = scalarType.split("..")
                             require(range.size == 2) { "unsupported domain $scalarType" }
                             val lo = sourceNumber(range[0])
