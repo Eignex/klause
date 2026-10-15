@@ -24,6 +24,141 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `sparse dyadic weights preserve distant original ids within the coupled prefix`() {
+        val declarations = (0 until 32).joinToString("\n") { "(declare-const x$it Real)" }
+        val terms = (1..7).flatMap { x -> (1..8 - x).map { y -> x to y } }.take(19)
+            .joinToString(" ") { (x, y) -> "(* (^ x3 $x) (^ x29 $y))" }
+        val source = SmtLibPolynomial.parse("""
+            $declarations
+            (assert (> (+ $terms) x31))
+        """.trimIndent())
+        val fixed = mapOf(31 to BigFraction.ofLong(2))
+        val work = QfNraWork(QfNraParams())
+        val arithmetic = PolynomialArithmetic(work)
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic(), fixed)
+        val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic), work)
+
+        val assignment = assertIs<QfNraAssignment>(work.probe {
+            probe.probeWitness(source.realCount, fixed) { phase ->
+                assertTrue(work.snapshot().workSpent <= 29000)
+                work.charge(29000 - work.snapshot().workSpent)
+                work.coupled(phase)
+            }
+        })
+
+        assertTrue(work.snapshot().workSpent in 29001L until 32768L)
+        assertEquals(1L, work.snapshot().dyadicBases)
+        assertEquals(0L, work.snapshot().coupledWorkDeclines)
+        assertEquals(1, algebraic.sign(assignment.realValue(3)))
+        assertEquals(1, algebraic.sign(assignment.realValue(29)))
+        assertEquals(BigFraction.ofLong(2), assignment.realValue(31).rational)
+        for (id in 0 until source.realCount) {
+            if (id != 3 && id != 29 && id != 31) assertEquals(BigFraction.ZERO, assignment.realValue(id).rational)
+        }
+        repeat(32) { assertEquals(emptyList(), probe.roots(Polynomial.ONE, 0, emptyMap())) }
+        assertNull(probe.roots(Polynomial.ONE, 0, emptyMap()))
+    }
+
+    @Test
+    fun `sparse signed weights retain strict rational bounds and unused source coordinates`() {
+        for (negated in listOf(false, true)) {
+            val declarations = (0 until 32).joinToString("\n") { "(declare-const x$it Real)" }
+            val comparisons = if (negated) "(not (>= (* 3 x0) 1)) (not (<= x31 x0))"
+                else "(< (* 3 x0) 1) (> x31 x0)"
+            val source = SmtLibPolynomial.parse("""
+                $declarations
+                (assert (and (> x0 0) (> x31 0) (> (* x0 x31) 0) $comparisons))
+            """.trimIndent())
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+            val guides = requireNotNull(formula.conjunctiveAtoms(arithmetic, 128))
+            val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic))
+
+            val assignment = assertIs<QfNraAssignment>(probe.coupled(guides,
+                List(source.realCount) { BigFraction.ZERO }, emptyMap(),
+                atomTermCounts = guides.map { it.polynomial.terms.size }))
+
+            assertEquals(1, algebraic.sign(assignment.realValue(0)))
+            assertEquals(1, algebraic.compare(assignment.realValue(31), assignment.realValue(0)))
+            assertEquals(-1, algebraic.compare(algebraic.multiply(assignment.realValue(0),
+                algebraic.rational(BigFraction.ofLong(3))), algebraic.rational(BigFraction.ONE)))
+            for (id in 1 until 31) assertEquals(BigFraction.ZERO, assignment.realValue(id).rational)
+        }
+    }
+
+    @Test
+    fun `coupled source ids outside the seed decline before excluding fixed coordinates`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (declare-const outside Real)
+            (assert (> (* x y outside) 1))
+        """.trimIndent())
+        for (fixed in listOf(emptyMap(), mapOf(2 to BigFraction.ONE))) {
+            val work = QfNraWork(QfNraParams())
+            val arithmetic = PolynomialArithmetic(work)
+            val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            val guides = requireNotNull(formula.conjunctiveAtoms(PolynomialArithmetic(), 128))
+            val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic), work)
+
+            assertNull(work.probe { work.coupled {
+                probe.coupled(guides, List(2) { BigFraction.ZERO }, fixed,
+                    atomTermCounts = guides.map { it.polynomial.terms.size })
+            } })
+
+            assertEquals(0L, work.snapshot().dyadicAttempts)
+            assertTrue(work.snapshot().workSpent > 0)
+        }
+    }
+
+    @Test
+    fun `sparse and constant weights latch containing stops before publication`() {
+        for ((comparison, stops) in listOf(
+            ">" to listOf(5L, 6L, 8L, 14L), "<" to listOf(4L, 5L),
+        )) for (stopAt in stops) {
+            val source = SmtLibPolynomial.parse("""
+                (declare-const x Real)
+                (declare-const y Real)
+                (assert ($comparison (* x y) 1))
+            """.trimIndent())
+            var stopped = false
+            var triggered = false
+            var afterExtraction = 0L
+            var spent = 0L
+            lateinit var work: QfNraWork
+            val cancellation = object : Cancellation {
+                override fun isCancelled(): Boolean = stopped.also { stopped = false }
+                override fun workMeter(): WorkMeter = WorkMeter { units ->
+                    spent += units
+                    if (work.dyadicAttempts == 1L && !work.dyadicPreExtraction) {
+                        afterExtraction += units
+                        if (!triggered && afterExtraction >= stopAt) {
+                            triggered = true
+                            stopped = true
+                        }
+                    }
+                }
+            }
+            work = QfNraWork(QfNraParams(cancellation))
+            val arithmetic = PolynomialArithmetic(work)
+            val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            val guides = requireNotNull(formula.conjunctiveAtoms(PolynomialArithmetic(), 128))
+            val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic), work)
+
+            assertFailsWith<PolynomialInterrupted> { work.probe { work.coupled {
+                probe.coupled(guides, List(source.realCount) { BigFraction.ZERO }, emptyMap(),
+                    atomTermCounts = guides.map { it.polynomial.terms.size })
+            } } }
+
+            assertTrue(triggered)
+            assertTrue(spent > 0)
+            assertEquals(spent, work.snapshot().workSpent)
+            assertEquals(0L, work.snapshot().dyadicBases)
+            assertEquals(0L, work.snapshot().coupledWorkDeclines)
+        }
+    }
+
+    @Test
     fun `completed admission reuses terms without refunding native debt`() {
         val terms = (1..7).flatMap { x -> (1..8 - x).map { y -> x to y } }.take(19)
             .joinToString(" ") { (x, y) -> "(* (^ x $x) (^ y $y))" }
