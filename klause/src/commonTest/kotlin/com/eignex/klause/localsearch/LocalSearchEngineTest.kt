@@ -1191,6 +1191,38 @@ class LocalSearchEngineTest {
     }
 
     @Test
+    fun `unavailable objective sources do not add completion exploration`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(Linear(
+                intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0,
+            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))
+        for (source in listOf(ConfiguredSource(ObjectiveSeed(), cap = 0),
+            ConfiguredSource(ObjectiveSeed(), enabled = false))) {
+            var calls = 0
+            val search = LocalSearchEngine(
+                LocalSearchModel.open(problem), greedyRepairOnRestart = false,
+                strategy = SourceDrivenStrategy(
+                    sources = listOf(source), feasibleDescent = FeasibleDescent.SelfOwned,
+                    feasibleAcceptance = AcceptanceRule.GreedyDescent,
+                ), completion = { candidate, _ ->
+                    calls++
+                    Completion.Witness(candidate.copy(reals = doubleArrayOf(1.0 - candidate.intValue(0))))
+                },
+            )
+
+            val result = search.improvements(
+                LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+                LocalSearchParams(maxInstructions = 1, initialAssignment = initial), null,
+            ).last()
+
+            assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
+            assertEquals(1, calls)
+        }
+    }
+
+    @Test
     fun `continuous move exploration preserves finite invocation pins`() {
         val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
         val candidates = mutableListOf<Long>()

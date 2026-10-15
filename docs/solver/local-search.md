@@ -667,7 +667,7 @@ only accepted completed candidates enter the fallback acceptance pools. Explorat
 does not insert a duplicate into a pool. An enabled `ObjectiveSeed` also offers a rotating finite
 coordinate touching a continuous factor: a channeling-aware flip, neighbor or domain
 endpoint, including directions whose direct objective cost rises. Its proposals retain
-that source's configured phase and pool.
+that source's configured phase and pool and use only its remaining proposal cap.
 Real-only guesses do not enter numerical move probing: completion already optimizes
 the real coordinates for the current finite pins. Raw continuous feasibility and
 objective deltas order probes without rejecting that exploration. A violated finite-only row whose selected scoring projection declares

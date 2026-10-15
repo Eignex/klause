@@ -131,6 +131,8 @@ class SourceDrivenStrategy(
 
     internal var prioritizePrimaryRepairs: Boolean = false
 
+    private data class CompletionSeed(val sink: MoveSink, val remaining: Int)
+
     private val noiseSink = MoveSink()
     private val scoreSink = MoveSink()
     private val alternativeSink = MoveSink()
@@ -176,8 +178,8 @@ class SourceDrivenStrategy(
         }
 
         val greedyFallback = evaluation != null && feasibleAcceptance == AcceptanceRule.GreedyDescent
-        var explorationSink = collectMoves(state, cancellation, stalled,
-            if (evaluation == null || greedyFallback) state.cost else 0L)
+        var completionSeed = collectMoves(state, cancellation, stalled,
+            if (evaluation == null || greedyFallback) state.cost else 0L, completionSeeds = evaluation != null)
         var ordinary: Move? = null
         if (evaluation != null) {
             if (greedyFallback) {
@@ -186,17 +188,19 @@ class SourceDrivenStrategy(
                     evaluation.retainOrdinary(ordinary)
                     return ordinary
                 }
-                if (explorationSink == null) {
+                if (completionSeed == null) {
                     val seed = sources.firstOrNull {
-                        it.source is ObjectiveSeed && it.enabled && (!it.stallGated || stalled) &&
-                            it.effectivePhase.appliesAt(0L)
+                        it.source is ObjectiveSeed && it.enabled && it.cap > 0 && (!it.stallGated || stalled) &&
+                            it.effectivePhase.appliesAt(0L) && !it.effectivePhase.appliesAt(state.cost)
                     }
                     if (seed != null) {
-                        explorationSink = if (seed.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
+                        completionSeed = CompletionSeed(
+                            if (seed.source.pool == Pool.NoiseEligible) noiseSink else scoreSink, seed.cap,
+                        )
                     }
                 }
             }
-            explorationSink?.let(evaluation::seed)
+            completionSeed?.let { evaluation.seed(it.sink, it.remaining) }
         }
         val completed = selectMove(state, stall, stalled, evaluation)
         if (completed != null) return completed
@@ -209,7 +213,8 @@ class SourceDrivenStrategy(
         cancellation: Cancellation,
         stalled: Boolean,
         phaseCost: Long,
-    ): MoveSink? {
+        completionSeeds: Boolean,
+    ): CompletionSeed? {
         noiseSink.clear()
         scoreSink.clear()
         alternativeSink.clear()
@@ -226,12 +231,14 @@ class SourceDrivenStrategy(
             noiseSink.alternativeRepairs = alternativeSink
             scoreSink.alternativeRepairs = alternativeSink
         }
-        var explorationSink: MoveSink? = null
+        var completionSeed: CompletionSeed? = null
         for (cs in sources) {
             if (!cs.enabled) continue
             if (cs.stallGated && !stalled) continue
             if (!cs.effectivePhase.appliesAt(phaseCost)) continue
             val sink = if (cs.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
+            val objectiveSeed = completionSeeds && cs.source is ObjectiveSeed
+            val before = if (objectiveSeed) sink.list.size else 0
             val closure = state.booleanRepairs
             if (closure == null) {
                 cs.source.generate(state, sink)
@@ -254,9 +261,12 @@ class SourceDrivenStrategy(
                 closure.closeInto(state, raw.list, sink, cancellation)
                 if (alternatives != null) closure.closeInto(state, alternatives.list, alternativeSink, cancellation)
             }
-            if (cs.source is ObjectiveSeed) explorationSink = sink
+            if (objectiveSeed) {
+                val remaining = cs.cap - (sink.list.size - before)
+                if (remaining > 0) completionSeed = CompletionSeed(sink, remaining)
+            }
         }
-        return explorationSink
+        return completionSeed
     }
 
     private fun selectMove(
