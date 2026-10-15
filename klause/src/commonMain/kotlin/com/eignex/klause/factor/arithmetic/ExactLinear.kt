@@ -88,7 +88,9 @@ class ExactLinear private constructor(
             require(refs.size == coefficients.size)
             require(refs.all { it >= 0 && (Term.isInt(it) || Term.isReal(it)) })
             val terms = LinkedHashMap<Int, BigFraction>()
-            for (index in refs.indices) terms[refs[index]] = (terms[refs[index]] ?: BigFraction.ZERO) + coefficients[index]
+            for (index in refs.indices) {
+                terms[refs[index]] = (terms[refs[index]] ?: BigFraction.ZERO) + coefficients[index]
+            }
             val kept = terms.filterValues { !it.isZero }
             val denominator = kept.values.fold(rhs.den) { scale, value -> scale / scale.gcd(value.den) * value.den }
             val multiplier = BigFraction.of(if (relation == LinearOp.GE) -denominator else denominator, BIG_ONE)

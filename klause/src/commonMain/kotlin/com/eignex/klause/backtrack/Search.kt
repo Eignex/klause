@@ -822,7 +822,8 @@ private class ResidualRealComponent(
                     result.reals,
                     result.exactReals,
                 )
-                if ((problem as? BakedProblem)?.factorProjections?.requiresRealSourceCheck == true &&
+                val tolerated = result.verdict == LpVerdict.TOLERANCE_OPTIMUM && toleranceCheck?.invoke(sample) == true
+                if ((problem as? BakedProblem)?.factorProjections?.requiresRealSourceCheck == true && !tolerated &&
                     verifyRealCoordinates(problem, sample) !is Verification.Accepted
                 ) ComponentCheck.Indeterminate
                 else ComponentCheck.Feasible.also { completed = sample }
