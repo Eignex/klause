@@ -10912,6 +10912,91 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOperation : java/l
 	public static fun values ()[Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
 }
 
+public final class com/eignex/klause/solver/pipeline/ExecutionOption {
+	public static final field Companion Lcom/eignex/klause/solver/pipeline/ExecutionOption$Companion;
+	public final fun invoke (Ljava/lang/Object;)Lcom/eignex/klause/solver/pipeline/ExecutionSetting;
+}
+
+public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
+	public final fun getAcceptance ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getAdaptiveRestart ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getArms ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getBacktrackArms ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getBacktrackArmsByLabel ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getCb ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getClauseShareLbd ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getClauseShareLen ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getCoolingRate ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getDryRunSolver ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getEmaRestart ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getInitialTemp ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getInprocessingCadence ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLambda ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLbdGlue ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLocalSearchArm ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLocalSearchArms ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLpAdaptiveWork ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLpAutoOffReprobe ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLpBoundMaxPivots ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLpBranching ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLpComponentSplit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLpKnapsackLagrangian ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLpObjectiveCone ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLpPruneHulls ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLpRootCuts ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLpVariableShaving ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLsPhaseTimes ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLsResiduals ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLuby ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getMaxDecisions ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getMaxLearned ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getMidLbd ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getMinTemp ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getModeSwitchingRestart ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getNoise ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getObjectiveGuidedValues ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getPbLearning ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getPbObjectiveCutoff ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getPhaseRetention ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getPhaseSaving ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getRephaseInterval ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getReseedStaleThreshold ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getRestart ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getScoring ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSeed ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSkewAlpha ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSliceGrowth ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSliceMaxWork ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSliceWork ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSmoothFactor ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSmoothProb ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSolutionPhasing ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSources ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getStrategy ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSubsumeBatch ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSubsumption ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getTabuTenure ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getTargetPhasing ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getTieredDb ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getValueSelector ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getVariableSelector ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getVivification ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getVivifyBatch ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+}
+
+public final class com/eignex/klause/solver/pipeline/ExecutionOptions {
+	public static final field Companion Lcom/eignex/klause/solver/pipeline/ExecutionOptions$Companion;
+	public fun <init> ([Lcom/eignex/klause/solver/pipeline/ExecutionSetting;)V
+	public final fun getExplicitArms ()Z
+}
+
+public final class com/eignex/klause/solver/pipeline/ExecutionOptions$Companion {
+	public final fun parse (Ljava/util/List;)Lcom/eignex/klause/solver/pipeline/ExecutionOptions;
+}
+
+public final class com/eignex/klause/solver/pipeline/ExecutionSetting {
+}
+
 public final class com/eignex/klause/solver/pipeline/ExecutionStrategy : java/lang/Enum {
 	public static final field ALNS Lcom/eignex/klause/solver/pipeline/ExecutionStrategy;
 	public static final field COMPLETE Lcom/eignex/klause/solver/pipeline/ExecutionStrategy;
@@ -11035,6 +11120,8 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveOutcome$Prepared
 }
 
 public final class com/eignex/klause/solver/pipeline/FiniteSolveRequest {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteSolveShape;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILcom/eignex/klause/solver/pipeline/ExecutionOptions;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;ZLjava/lang/Long;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ZLkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteSolveShape;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILcom/eignex/klause/solver/pipeline/ExecutionOptions;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;ZLjava/lang/Long;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ZLkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteSolveShape;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILjava/util/List;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;ZLjava/lang/Long;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ZLkotlin/jvm/functions/Function1;)V
 	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteSolveShape;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILjava/util/List;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;ZLjava/lang/Long;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ZLkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getAllSolutions ()Z
@@ -11044,6 +11131,7 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveRequest {
 	public final fun getDefaultArms ()I
 	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
 	public final fun getEngineParams ()Ljava/util/List;
+	public final fun getExecutionOptions ()Lcom/eignex/klause/solver/pipeline/ExecutionOptions;
 	public final fun getExplicitPresolveConfig ()Z
 	public final fun getLpConfig ()Lcom/eignex/klause/lp/bounding/LpConfig;
 	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
@@ -11105,10 +11193,12 @@ public final class com/eignex/klause/solver/pipeline/FixedBacktrackPlan {
 }
 
 public final class com/eignex/klause/solver/pipeline/FixedBacktrackPlanRequest {
+	public fun <init> (Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/pipeline/ExecutionOptions;Ljava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;)V
 	public fun <init> (Lcom/eignex/klause/backtrack/BacktrackParams;Ljava/util/List;Ljava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;)V
 	public final fun getAnnotatedParams ()Lcom/eignex/klause/backtrack/BacktrackParams;
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getEngineParams ()Ljava/util/List;
+	public final fun getExecutionOptions ()Lcom/eignex/klause/solver/pipeline/ExecutionOptions;
 	public final fun getLpConfig ()Lcom/eignex/klause/lp/bounding/LpConfig;
 	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
 	public final fun getOnEvent ()Lkotlin/jvm/functions/Function1;
@@ -11642,6 +11732,8 @@ public final class com/eignex/klause/solver/pipeline/PortfolioPlanKt {
 }
 
 public final class com/eignex/klause/solver/pipeline/PortfolioPlanRequest {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteEngine;ZILcom/eignex/klause/solver/pipeline/ExecutionOptions;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lcom/eignex/klause/backtrack/NodeBudget;Lcom/eignex/klause/backtrack/BacktrackParams;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteEngine;ZILcom/eignex/klause/solver/pipeline/ExecutionOptions;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lcom/eignex/klause/backtrack/NodeBudget;Lcom/eignex/klause/backtrack/BacktrackParams;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteEngine;ZILjava/util/List;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lcom/eignex/klause/backtrack/NodeBudget;Lcom/eignex/klause/backtrack/BacktrackParams;Lkotlin/jvm/functions/Function1;)V
 	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteEngine;ZILjava/util/List;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lcom/eignex/klause/backtrack/NodeBudget;Lcom/eignex/klause/backtrack/BacktrackParams;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getAnnotationArm ()Lcom/eignex/klause/backtrack/BacktrackParams;
@@ -11649,6 +11741,7 @@ public final class com/eignex/klause/solver/pipeline/PortfolioPlanRequest {
 	public final fun getDefaultArms ()I
 	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
 	public final fun getEngineParams ()Ljava/util/List;
+	public final fun getExecutionOptions ()Lcom/eignex/klause/solver/pipeline/ExecutionOptions;
 	public final fun getLpCeiling ()Lcom/eignex/klause/lp/bounding/LpConfig;
 	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
 	public final fun getOptimize ()Z

@@ -51,7 +51,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val emaRestart: ExecutionOption<Boolean> = ExecutionOption("ema-restart", ValueKind.BOOLEAN)
 
         /** The `mode-switching-restart` execution setting. */
-        val modeSwitchingRestart: ExecutionOption<Boolean> = ExecutionOption("mode-switching-restart", ValueKind.BOOLEAN)
+        val modeSwitchingRestart: ExecutionOption<Boolean> =
+            ExecutionOption("mode-switching-restart", ValueKind.BOOLEAN)
 
         /** The `phase-saving` execution setting. */
         val phaseSaving: ExecutionOption<Boolean> = ExecutionOption("phase-saving", ValueKind.BOOLEAN)
@@ -99,7 +100,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val lpAutoOffReprobe: ExecutionOption<Boolean> = ExecutionOption("lp-auto-off-reprobe", ValueKind.BOOLEAN)
 
         /** The `lp-knapsack-lagrangian` execution setting. */
-        val lpKnapsackLagrangian: ExecutionOption<Boolean> = ExecutionOption("lp-knapsack-lagrangian", ValueKind.BOOLEAN)
+        val lpKnapsackLagrangian: ExecutionOption<Boolean> =
+            ExecutionOption("lp-knapsack-lagrangian", ValueKind.BOOLEAN)
 
         /** The `lp-component-split` execution setting. */
         val lpComponentSplit: ExecutionOption<Boolean> = ExecutionOption("lp-component-split", ValueKind.BOOLEAN)
@@ -129,10 +131,12 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val pbObjectiveCutoff: ExecutionOption<Boolean> = ExecutionOption("pb-objective-cutoff", ValueKind.BOOLEAN)
 
         /** The `objective-guided-values` execution setting. */
-        val objectiveGuidedValues: ExecutionOption<Boolean> = ExecutionOption("objective-guided-values", ValueKind.BOOLEAN)
+        val objectiveGuidedValues: ExecutionOption<Boolean> =
+            ExecutionOption("objective-guided-values", ValueKind.BOOLEAN)
 
         /** The `var-selector` execution setting. */
-        val variableSelector: ExecutionOption<VarSelectorKind> = ExecutionOption("var-selector", ValueKind.VARIABLE_SELECTOR)
+        val variableSelector: ExecutionOption<VarSelectorKind> =
+            ExecutionOption("var-selector", ValueKind.VARIABLE_SELECTOR)
 
         /** The `val-selector` execution setting. */
         val valueSelector: ExecutionOption<ValSelectorKind> = ExecutionOption("val-selector", ValueKind.VALUE_SELECTOR)
@@ -279,6 +283,7 @@ class ExecutionOptions private constructor(
         return CapturedExecutionOptionReader(values.toMutableMap())
     }
 
+    /** Frontend syntax capture for immutable execution settings. */
     companion object {
         /**
          * Capture repeatable frontend `key=value` parameters once. Invalid values retain their
