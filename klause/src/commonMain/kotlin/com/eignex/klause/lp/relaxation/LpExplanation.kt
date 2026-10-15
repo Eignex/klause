@@ -178,7 +178,7 @@ internal object LpExplanation {
         if (!integralSupport) return null
         val lits = IntArrayList()
         val seen = IntHashSet()
-        if (!addRowPremiseLits(lits, seen, relaxation, intArrayOf(cert.row), session)) return null
+        if (!addRowPremiseLits(lits, seen, relaxation, cert.premiseRows(), session)) return null
         var supported = true
         cert.forEachSupport { column, lower ->
             if (column >= relaxation.model.n) {
