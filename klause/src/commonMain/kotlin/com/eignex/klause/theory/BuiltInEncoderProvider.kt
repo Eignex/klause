@@ -1,5 +1,6 @@
 package com.eignex.klause.theory
 
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
@@ -77,6 +78,7 @@ object BuiltInEncoderProvider : EncoderProvider {
         factor is GridAbs && target == EncodingTarget.LINEAR -> AbsEncoding.gridLinear
         factor is GridAbs && target == EncodingTarget.POLYNOMIAL -> AbsEncoding.gridPolynomial
         factor is RealElement && target != EncodingTarget.DIFFERENCE -> selectionEncoder
+        factor is RealArrayMinMax && target != EncodingTarget.DIFFERENCE -> selectionEncoder
         target == EncodingTarget.POLYNOMIAL && factor is ContinuousProduct -> continuousProduct
         target == EncodingTarget.POLYNOMIAL && factor is RealProduct -> mixedProduct
         target == EncodingTarget.LINEAR && factor is RealProduct -> conditionedProduct(factor)

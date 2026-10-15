@@ -1361,6 +1361,19 @@ public final class com/eignex/klause/factor/arithmetic/RealAbs : com/eignex/klau
 	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
+public final class com/eignex/klause/factor/arithmetic/RealArrayMinMax : com/eignex/klause/ir/Factor {
+	public fun <init> (I[IZ)V
+	public final fun getLinearForm ()Lcom/eignex/klause/ir/LinearForm;
+	public final fun getMax ()Z
+	public final fun getResult ()I
+	public final fun getStructuralKeyWeight ()I
+	public final fun getVariables ()Lcom/eignex/klause/ir/VarList;
+	public final fun getXs ()[I
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
+	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
+	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
+}
+
 public final class com/eignex/klause/factor/arithmetic/RealProduct : com/eignex/klause/ir/Factor {
 	public fun <init> (IIIDD)V
 	public fun canSubstituteAffine (IIII)Z

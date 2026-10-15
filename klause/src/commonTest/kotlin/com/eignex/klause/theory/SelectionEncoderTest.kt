@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.table.Element
@@ -45,6 +46,18 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class SelectionEncoderTest {
+    @Test
+    fun `real extrema and a polynomial product require one shared continuous point`() {
+        val source = Problem(0, 0, emptyArray(),
+            arrayOf<Factor>(ContinuousProduct(0, 0, 1), RealArrayMinMax(2, intArrayOf(0, 1), max = false)),
+            numRealVars = 3, realLower = doubleArrayOf(1.0, 2.0, 2.0), realUpper = doubleArrayOf(2.0, 2.0, 2.0))
+        val shared = assertNotNull(source.prepareExecutionPlan().polynomialModel)
+
+        val result = shared.service.invocation().use { it.check() }
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
     @Test
     fun `real selection and a polynomial product share one continuous point`() {
         val source = Problem(0, 1, arrayOf(IntDomain(1, 1)),

@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
@@ -863,7 +864,7 @@ internal class CpToLpRelaxation(
     private fun touchesReals(factor: Factor): Boolean = when (factor) {
         is Linear -> factor.realConstants != null
         is ReifiedRealLinear -> true
-        is RealAbs, is RealProduct, is RealElement -> true
+        is RealAbs, is RealProduct, is RealElement, is RealArrayMinMax -> true
         is Power -> factor.base is Power.Coordinate.Real
         else -> false
     }
