@@ -16,6 +16,10 @@ import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.PolynomialRealProblem
+import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.NonlinearIntegerProblem
+import com.eignex.klause.ir.TranscendentalFormula
+import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.QuadraticCoefficient
 import com.eignex.klause.ir.QuadraticObjectiveSpec
@@ -921,6 +925,45 @@ class PreparedSourcePlanTest {
         assertSame(source, operation.originalSource)
         assertTrue(operation.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE).runnable)
         assertTrue(affine.maximize)
+    }
+
+    @Test
+    fun `native integer objective binding preserves interleaved numeric declarations without finite domains`() {
+        val source = NonlinearIntegerProblem(PolynomialRealFormula.Constant(true), 3, 0,
+            mapOf("n" to 1), mapOf("x" to 0, "y" to 2), emptyMap())
+        val plan = source.prepareExecutionPlan()
+        val objective = QuadraticObjectiveSpec(emptyList())
+
+        val operation = plan.withObjective(objective, ObjectiveSense.MAXIMIZE)
+
+        assertSame(source, operation.originalSource)
+        assertNull(operation.model)
+        assertNull(operation.finiteIntegerCoordinate(0))
+        assertEquals(1, operation.integerCoordinate(0))
+        assertEquals(0, operation.realCoordinate(0))
+        assertEquals(2, operation.realCoordinate(1))
+        assertEquals(PreparedExecutionKind.NONLINEAR_INTEGER, operation.kind)
+        assertTrue(operation.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE).runnable)
+        assertFalse(operation.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.EXACT_COUNT).runnable)
+    }
+
+    @Test
+    fun `transcendental binding preserves satisfaction without adding an optimization surface`() {
+        val source = TranscendentalProblem(TranscendentalFormula.Constant(true),
+            mapOf("n" to 1), mapOf("x" to 0), emptyMap())
+        val plan = source.prepareTranscendentalExecutionPlan()
+
+        val operation = plan.withObjective(LinearObjective(intCoefficients = longArrayOf(1)), maximize = true)
+
+        assertSame(source, operation.originalSource)
+        assertNull(operation.model)
+        assertNull(operation.finiteIntegerCoordinate(0))
+        assertEquals(1, operation.integerCoordinate(0))
+        assertEquals(0, operation.realCoordinate(0))
+        assertEquals(PreparedExecutionKind.TRANSCENDENTAL, operation.kind)
+        assertTrue(operation.capabilities.admission(FiniteEngine.BACKTRACK).runnable)
+        assertEquals(ExecutionDeclineCause.OPERATION_SURFACE,
+            operation.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE).declines.single().cause)
     }
 
 }
