@@ -272,13 +272,13 @@ arm with the least charged work. Shared clauses, root fixings and objective floo
 remain credited, but cannot exclude a silent search from its family's coverage. Before a
 witness, observable violation reductions can earn a family more turns. A positive-work
 heuristic search segment without progress supplies plateau feedback even without an
-accepted incumbent; private preparation and zero-work pauses supply no such feasibility
-failure. An internal violation score does not install an incumbent or change the
+accepted incumbent; private preparation, cancelled initialization and zero-work pauses
+supply no such feasibility failure. An internal violation score does not install an incumbent or change the
 objective phase. Complete-search
 root fixings and glue clauses do not favor its family, because deduction throughput does
 not predict the first witness. Those counters remain recorded. After the first witness,
-arm selection also follows that policy. Initial admission, preparation revisits and
-explicit minimum time shares retain precedence. A segment reporting no charged work uses
+arm selection also follows that policy. Initial admission and explicit minimum time
+shares retain precedence. A segment reporting no charged work uses
 its slice allowance for coverage accounting.
 
 Before the first accepted witness or completed refutation, ordinary complete workers
@@ -293,7 +293,8 @@ Initial admission and explicit minimum shares retain precedence. Coverage can in
 preparation revisits without closing or restarting their retained cursors.
 Retired, deferred and auxiliary proof workers supply no coverage debt; paused handles
 retain their elapsed credit. An accepted incumbent ends this floor at installation;
-the ordinary reward phase settles with its producing segment. Dedicated lanes, segment deadlines and containing work/native allowances retain their controls.
+the ordinary reward phase settles with its producing segment. Dedicated lanes, segment
+deadlines and containing work/native allowances retain their controls.
 The lag and cooperative segment overspend bound the opportunity guarantee; no fixed
 number of milliseconds or result is promised to an individual worker. Work bounds keep
 each segment's stopping point stable for the same incoming state. Elapsed coverage can
