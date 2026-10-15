@@ -338,7 +338,8 @@ from a hash-pinned original catalog SMT source. Pass `suite=<suite>`, `problem=<
 and `sha256=<original source digest>` through a committed remote lab profile. It retains
 the original source, build/runtime identity, declared and prepared dimensions,
 registered point rows and primitives, completed dependency admission, finite owners,
-disjunction groups and the first point primitive/finite coordinate status. A child JVM uses Serial GC,
+disjunction groups, fractional-coordinate counts by finite/open ownership, and the
+first point primitive/finite coordinate status. A child JVM uses Serial GC,
 `-Xmx3g` and one active processor, retaining its command and runtime identity. The
 opening uses seed3 and a 60-second deadline; it makes no traversal decision or
 source verdict claim. CLI routing equivalence is not established by this capture.

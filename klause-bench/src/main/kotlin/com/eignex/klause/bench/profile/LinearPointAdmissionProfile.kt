@@ -92,6 +92,16 @@ internal object LinearPointAdmissionProfile {
                         val first = variables?.getOrNull(cursor)
                         val finite = field(component, "finiteIntVars") as IntArray
                         val point = field(component, "candidate") as? List<*>
+                        val finiteSet = finite.toSet()
+                        val fractional = point?.let { values ->
+                            (0 until model.numIntVars).filter { integer ->
+                                (values.getOrNull(model.numRealVars + integer) as? BigFraction)
+                                    ?.let { it.den != BIG_ONE } == true
+                            }
+                        }
+                        val fractionalFinite = fractional?.filter { it in finiteSet }
+                        val fractionalOpen = fractional?.filter { it !in finiteSet }
+                        val firstFractionalOpen = fractionalOpen?.firstOrNull()
                         val firstFinite = finite.firstOrNull { variable ->
                             planned.session.intLowerBound(variable) == null ||
                                 planned.session.intLowerBound(variable) != planned.session.intUpperBound(variable)
@@ -121,6 +131,13 @@ internal object LinearPointAdmissionProfile {
                         put("firstUnfixedFiniteVariable", firstFinite)
                         put("firstUnfixedFinitePoint", finiteValue?.toString())
                         put("firstUnfixedFinitePointIntegral", finiteValue?.let { it.den == BIG_ONE })
+                        put("fractionalFiniteIntegerCoordinates", fractionalFinite?.size)
+                        put("fractionalOpenIntegerCoordinates", fractionalOpen?.size)
+                        put("firstFractionalFiniteInteger", fractionalFinite?.firstOrNull())
+                        put("firstFractionalOpenInteger", firstFractionalOpen)
+                        put("firstFractionalOpenPoint", firstFractionalOpen?.let {
+                            point?.getOrNull(model.numRealVars + it)?.toString()
+                        })
                         put("dirty", field(component, "dirty") as Boolean)
                         put("pendingPointForward", field(component, "pendingPointForward") as Boolean)
                         put("decisionLevel", planned.session.decisionLevel)
