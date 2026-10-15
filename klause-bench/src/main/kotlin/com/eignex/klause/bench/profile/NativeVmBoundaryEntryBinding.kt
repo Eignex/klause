@@ -24,14 +24,26 @@ internal object NativeVmBoundaryEntryBinding {
         }
         ProfileCaptureArchive.run {
             val out = File(requireNotNull(System.getenv("OUT"))).canonicalFile.apply { mkdirs() }
-            val entries = download(requireNotNull(options["entries"]), requireNotNull(options["entries-sha256"]),
-                File(out, "captured-vm-entries.json"))
-            val signatures = download(requireNotNull(options["signatures"]), requireNotNull(options["signatures-sha256"]),
-                File(out, "captured-vm-signatures.json"))
+            val entries = download(
+                requireNotNull(options["entries"]),
+                requireNotNull(options["entries-sha256"]),
+                File(out, "captured-vm-entries.json"),
+            )
+            val signatures = download(
+                requireNotNull(options["signatures"]),
+                requireNotNull(options["signatures-sha256"]),
+                File(out, "captured-vm-signatures.json"),
+            )
             val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
-            val names = listOf("bind_native_vm_boundary_entries.py", "read_native_vm_entries.py",
-                "read_native_vm_symbols.py", "read_native_vm_signatures.py", "native_vm_demangler.py",
-                "native_vm_loaded_module.py", "read_native_vm_metadata.py")
+            val names = listOf(
+                "bind_native_vm_boundary_entries.py",
+                "read_native_vm_entries.py",
+                "read_native_vm_symbols.py",
+                "read_native_vm_signatures.py",
+                "native_vm_demangler.py",
+                "native_vm_loaded_module.py",
+                "read_native_vm_metadata.py",
+            )
             for (name in names) File(root, "klause-bench/tools/$name").copyTo(File(out, name))
             val runtime = File(System.getProperty("java.home")).canonicalFile
             val command = listOf(
