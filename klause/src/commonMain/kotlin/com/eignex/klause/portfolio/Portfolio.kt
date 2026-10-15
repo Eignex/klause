@@ -92,8 +92,9 @@ class Portfolio(
      * pauses somewhere different on every run, and since the search resumes from wherever it stopped, every counter
      * a solve reports inherits that. A work-bound segment pauses at the same point for the same incoming state;
      * elapsed coverage can still change later arm choices on one lane. Work binds first wherever
-     * [lsInstructionsPerWork] prices an arm's steps about right; the time slice is there for the models where it does not, on which one segment of a few thousand
-     * units can otherwise run for seconds and hold the core past every later choice the policy would make.
+     * [lsInstructionsPerWork] prices an arm's steps about right; the time slice is there for models where it does
+     * not, on which one segment of a few thousand units can otherwise run for seconds and hold the core past every
+     * later choice the policy would make.
      */
     private val baseSliceWork: Long = 5_000,
     /** Cap on a single counted segment's work. */
