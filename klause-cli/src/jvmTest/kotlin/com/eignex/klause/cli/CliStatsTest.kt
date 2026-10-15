@@ -47,7 +47,8 @@ class CliStatsTest {
         for (observed in listOf(false, true)) {
             val stats = if (observed) SmtStats(completeSearchBooleanVariables = 0,
                 completeSearchMinUnassignedBooleans = 0, completeSearchLinearChecks = 0,
-                completeSearchLinearPoints = 0) else SmtStats()
+                completeSearchLinearPoints = 0,
+                completeSearchLinearOutcomes = mapOf("NO_RESULT" to 2L)) else SmtStats()
 
             val pairs = openTheoryStatPairs(SolveStats(smt = stats), 1L).toMap()
 
@@ -55,6 +56,7 @@ class CliStatsTest {
             assertEquals(if (observed) "0" else null, pairs["smtCompleteSearchMinUnassignedBooleans"])
             assertEquals(if (observed) "0" else null, pairs["smtCompleteSearchLinearChecks"])
             assertEquals(if (observed) "0" else null, pairs["smtCompleteSearchLinearPoints"])
+            assertEquals(if (observed) "2" else null, pairs["smtCompleteSearchLinearOutcome_NO_RESULT"])
         }
     }
 
