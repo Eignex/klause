@@ -11,7 +11,6 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.PbOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
@@ -19,6 +18,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LocalSearchCatalog
