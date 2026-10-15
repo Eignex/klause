@@ -12,7 +12,6 @@ import com.eignex.klause.model.IntSpec
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.SchemaEntry
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.schema.IntHandle
 import com.eignex.klause.schema.div
 import com.eignex.klause.schema.eq
@@ -22,7 +21,6 @@ import com.eignex.skema.SchemaDef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
 
 class DivModCompilationTest {
     @Test
@@ -87,15 +85,15 @@ class DivModCompilationTest {
     @Test
     fun `SMT minimum word division retains its exact over-word quotient`() {
         val parsed = SmtLib.parse("""
-            (declare-const a Int) (assert (= a (- 9223372036854775808)))
+            (declare-const a Int)
+            (assert (<= (- 9223372036854775808) a (- 9223372036854775808)))
             (assert (= (div a (- 1)) 9223372036854775808))
             (assert (= (mod a (- 1)) 0))
         """.trimIndent())
 
-        val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(maxDecisions = 100))
+        val sample = BacktrackSolver(parsed.model.bake()).enumerate(BacktrackParams(maxDecisions = 100)).single()
 
-        assertEquals("-9223372036854775808", assertIs<OpenTheoryResult.Sat>(result).assignment
-            .intValue(parsed.intVarNames.getValue("a")))
+        assertEquals(Long.MIN_VALUE, sample.intValue(parsed.intVarNames.getValue("a")))
     }
 
     @Test
