@@ -1110,13 +1110,14 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun finitePointBranch(variable: Int, context: SearchContext): List<SearchDecision>? {
-        if (dirty || bools.any { it == UNASSIGNED } || disjunctionAtoms.isNotEmpty() ||
-            node.nextDisequality(model, disjunctionAtoms, bools) != null ||
+        if (dirty || disjunctionAtoms.isNotEmpty() ||
             (outcome != null && outcome != ComponentCheck.Feasible)
         ) return null
         val point = candidate ?: return null
-        lpStop.charge(model.numIntVars.toLong() + 1L)
-        if (operationStop() || !context.consumeCheck()) return null
+        lpStop.charge(model.numIntVars.toLong() + model.numBoolVars + preparedRows.size + 1L)
+        if (operationStop() || bools.any { it == UNASSIGNED } ||
+            node.nextDisequality(model, disjunctionAtoms, bools) != null || !context.consumeCheck()
+        ) return null
         sourceIntegerSplit(point, context)?.let { return it }
         val value = point[model.numRealVars + variable]
         if (!value.isInteger() || !value.num.fitsLong()) return null
