@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.cut.CutContext
 import com.eignex.klause.lp.cut.CutPool
 import com.eignex.klause.lp.cut.CutSeparator
@@ -839,6 +840,15 @@ private fun LpEngine.applyRowBounds(
         if (result is PropagationResult.Unsat) {
             sink.lp.observePrune()
             return true
+        }
+        if (learn) lpNogoods?.let { pool ->
+            val conclusion = when {
+                bool -> Lit.make(variable, !certificate.upper)
+                certificate.upper -> session.boundLeLit(variable, threshold, positive = true)
+                else -> session.boundGeLit(variable, threshold, positive = true)
+            }
+            noteNodeOverhead(support.size.toLong() + 1L)
+            pool.add(intArrayOf(conclusion) + support)
         }
         sink.lp.observeFix()
         onFix()

@@ -1074,7 +1074,7 @@ internal class ResumableMinimize(
         return params.solveBudgetMillis?.let { it - startMark.elapsedNow().inWholeMilliseconds }
     }
 
-    /** Drains the LP-learned Farkas nogoods at a restart, registering them permanently and sharing each
+    /** Drains LP source-feasibility clauses at a restart, registering them permanently and sharing each
      *  globally (its LBD = length would never clear the glue export filter). Returns true iff a
      *  root contradiction proves the whole space empty. */
     private fun drainLpNogoods(): Boolean {
@@ -1082,8 +1082,7 @@ internal class ResumableMinimize(
         for (nogood in lpNogoods.drain()) {
             val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
             if (res is PropagationResult.Unsat) return true
-            // An LP Farkas nogood is globally valid (the relaxation is infeasible regardless of the
-            // incumbent), so share it with peer arms directly.
+            // Complete source premises make these feasibility clauses independent of the incumbent.
             params.clauseExchange?.publishGlobal(session.asSharedClause(nogood, nogood.size))
         }
         return false
