@@ -348,7 +348,7 @@ sealed class ExecutionOption<T> private constructor(internal val id: String) {
     }
 
     internal companion object {
-        val all: List<ExecutionOption<*>> = listOf(
+        val all: List<ExecutionOption<*>> get() = listOf(
             MaxDecisions, Luby, AdaptiveRestart, EmaRestart, ModeSwitchingRestart,
             PhaseSaving, TargetPhasing, SolutionPhasing, RephaseInterval, MaxLearned,
             LbdGlue, TieredDb, MidLbd, Vivification, VivifyBatch,
@@ -363,7 +363,7 @@ sealed class ExecutionOption<T> private constructor(internal val id: String) {
             ClauseShareLen, SliceWork, SliceMaxWork, SliceGrowth, PhaseRetention,
             ReseedStaleThreshold, LsResiduals, LsPhaseTimes, BacktrackArmsByLabel, DryRunPresolve,
         )
-        val byId = all.associateBy { it.id }
+        val byId by lazy { all.associateBy { it.id } }
     }
 }
 
