@@ -55,7 +55,9 @@ class LocalSearchEngineTest {
                 } else Move.BoolFlip(0)
             },
         )
-        val search = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false)
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
+        )
         val params = LocalSearchParams(
             maxFlips = 2L, randomSeed = 0L, initialAssignment = Sample(booleanArrayOf(false), longArrayOf()),
         )
@@ -67,7 +69,7 @@ class LocalSearchEngineTest {
 
             val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
 
-            assertTrue(assertIs<SolveResult.Sat>(result).sample.boolValue(0))
+            assertTrue(assertIs<SolveResult.Sat>(result).assignment.boolValue(0))
         }
     }
 
@@ -85,7 +87,9 @@ class LocalSearchEngineTest {
                 } else Move.BoolFlip(0)
             },
         )
-        val search = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false)
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
+        )
         val params = LocalSearchParams(
             maxFlips = 2L, randomSeed = 0L, initialAssignment = Sample(booleanArrayOf(false), longArrayOf()),
         )
@@ -116,7 +120,9 @@ class LocalSearchEngineTest {
                 } else Move.BoolFlip(0)
             },
         )
-        val search = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false)
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
+        )
         val params = LocalSearchParams(
             maxFlips = 2L, randomSeed = 0L, initialAssignment = Sample(booleanArrayOf(true), longArrayOf()),
         )
