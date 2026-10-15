@@ -24,11 +24,22 @@ class NumericalLinearRequestTest {
             "BOUNDS\n FX B I 1\n LI B X 0\nINDICATORS\n IF R I 1\nENDATA\n").toExactSourceProblem()
         val request = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective())
 
-        val route = assertNotNull(request.finiteRoute())
+        val route = assertIs<SourceProblemRoute.Finite>(request.finiteRoute())
 
         assertSame(compiled.model, route.preparedPlan.originalSource)
         assertTrue(!compiled.model.intBounds.hasUpper(1))
         assertEquals(2L, route.problem.intBounds.upper(1))
+    }
+
+    @Test
+    fun `a source fixed indicator can retain a numerical routing refutation`() {
+        val compiled = Mps.parse("ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+            " I COST 0\n X COST 1 R 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS R -1\n" +
+            "BOUNDS\n FX B I 1\n LI B X 0\nINDICATORS\n IF R I 1\nENDATA\n").toExactSourceProblem()
+
+        val route = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).finiteRoute()
+
+        assertEquals(SourceProblemRoute.Refuted, route)
     }
 
     @Test

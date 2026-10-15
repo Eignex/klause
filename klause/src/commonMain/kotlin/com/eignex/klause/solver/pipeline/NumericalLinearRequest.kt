@@ -29,15 +29,19 @@ class NumericalLinearRequest(
     val maximize: Boolean = false,
     private val cancellation: Cancellation = Cancellation.Never,
 ) {
-    /** Finite numerical execution over declared or numerically proved integer bounds. */
-    fun finiteRoute(onLpStats: (LpStats) -> Unit = {}): SourceProblemRoute.Finite? {
+    /**
+     * Finite numerical execution or a source refutation from numerical bound closure.
+     * Null retains numerical traversal over the original open sides.
+     */
+    fun finiteRoute(onLpStats: (LpStats) -> Unit = {}): SourceProblemRoute? {
         if (cancellation()) return null
         var routed = model
         if (!routed.hasFiniteIntegerRanges()) {
             val sink = LpStatsSink(LpRoute.STANDALONE)
             val closed = routed.closeOpenBounds(cancellation, sink)
             onLpStats(sink.snapshot())
-            routed = (closed as? OpenPresolveResult.Tightened)?.spec ?: return null
+            if (closed == OpenPresolveResult.Refuted) return SourceProblemRoute.Refuted
+            routed = (closed as OpenPresolveResult.Tightened).spec
             if (!routed.hasFiniteIntegerRanges()) return null
             routed = routed.withIntDomains(routed.finiteIntDomains())
         }

@@ -12,6 +12,7 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.NumericalLinearRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
@@ -50,11 +51,12 @@ internal object MpsMode : CliMode {
             val routingStart = TimeSource.Monotonic.markNow()
             var numerical = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective(),
                 compiled.maximize, common.routingCancellation())
-            val route = numerical.finiteRoute { routingLpStats = it }
-            if (route == null && !compiled.sourceExact) {
+            var route = numerical.finiteRoute { routingLpStats = it }
+            if ((route == null || route == SourceProblemRoute.Refuted) && !compiled.sourceExact) {
                 compiled = source.toExactSourceProblem(settings)
                 numerical = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective(),
                     compiled.maximize, common.routingCancellation())
+                route = numerical.finiteRoute { routingLpStats = it }
             }
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
             if (route != null) common.logRoute(route, routingElapsedMs)
@@ -100,9 +102,12 @@ internal object MpsMode : CliMode {
                 renderMpsOpenModel(compiled, assignment)
             }
             val objective = compiled.objective?.toLinearObjective()
-            return if (route != null) {
+            val finite = route as? SourceProblemRoute.Finite
+            return if (route == SourceProblemRoute.Refuted) {
+                refutedSolvable(routingLpStats, routingElapsedMs)
+            } else if (finite != null) {
                 mpsLinearSolvable(compiled, common.exact, linearSolvable(
-                    route.problem,
+                    finite.problem,
                     if (compiled.maximize) objective?.negated() else objective,
                     compiled.maximize,
                     render,
