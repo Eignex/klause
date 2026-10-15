@@ -94,10 +94,16 @@ the gate and its inputs.
 Source declarations and arithmetic leaves remain authoritative, including open
 defaults and sparse decision-list selectors. Shared search has no unconstrained
 predicate columns from these omitted definitions.
-Decision lists whose selector tests have this Boolean expansion keep their shared
-guarded encoding. They do not become numeric tables that require the symbolic
-selector's auxiliary value; direct numeric selector tests remain eligible for
-finite-domain table lowering.
+Integer conditionals retain native `Element` relations over materialized branch
+values. Short and sparse decision lists use one finite choice index whose guards
+retain the original equality meanings and default. Choices, affine branch columns
+and result definitions participate in the same dependency closure, so Boolean
+normalization can remove their unused private state. A Boolean-expanded selector
+uses those guarded choices without requiring its removed numeric placeholder;
+dense direct numeric selector tests remain eligible for table recovery over the
+selector's whole declared domain. Wide finite conditionals use the existing
+canonical digit columns with one shared choice index across every digit. Open
+values retain arithmetic ownership and exact equality links.
 
 The exact real component can certify supported difference fragments with a graph,
 retaining the LP route for other states and conflict explanations. Its admission,
