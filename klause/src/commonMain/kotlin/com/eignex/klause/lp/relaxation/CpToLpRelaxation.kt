@@ -3,6 +3,7 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -862,6 +863,7 @@ internal class CpToLpRelaxation(
         is Linear -> factor.realConstants != null
         is ReifiedRealLinear -> true
         is RealAbs, is RealProduct -> true
+        is Power -> factor.base is Power.Coordinate.Real
         else -> false
     }
 

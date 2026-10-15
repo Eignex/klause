@@ -826,3 +826,14 @@ private pinned-point checks retain the selected descriptors after factor selecti
 Scheduling windows and dense-timeline admission restrictions apply to built-in
 scorers. A selected alternate scorer receives the actual move domains and owns its
 own numeric and resource limits.
+
+## Continuous arithmetic scores
+
+`ContinuousProduct`, real `Power`, `RealProduct` and `RealAbs` retain their source
+relations while selected native invariants grade floating assignments. Scores and
+move deltas substitute every aliased role together. Product and power repairs
+respect declared real bounds and retain both inverse signs where appropriate.
+Nonfinite arithmetic cannot receive zero violation. These scores and repairs are
+heuristic: zero violation requires the selected exact encoder and original-source
+completion, and supplies no feasibility or proof authority on its own. Each search
+opening owns its assignment and invariant state; the source factors remain immutable.

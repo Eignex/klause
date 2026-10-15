@@ -2,11 +2,13 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
@@ -25,6 +27,42 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LeafRealSolverTest {
+    @Test
+    fun `linear leaf completion enforces affine powers before accepting tolerance`() {
+        for (exponent in listOf(0, 1)) {
+            val factor = Power(Power.Coordinate.Real(SourceRealId(0)), exponent,
+                Power.Coordinate.Real(SourceRealId(1)))
+            val problem = Problem(0, 0, emptyArray(), arrayOf(factor), numRealVars = 2,
+                realLower = doubleArrayOf(2.0, 3.0), realUpper = doubleArrayOf(2.0, 3.0))
+            val sample = Sample(booleanArrayOf(), longArrayOf())
+
+            val fresh = leafRealFeasibility(problem, null, sample, toleranceCheck = { true })
+            LeafRealSolver(problem, null).use { owner ->
+                val retained = owner.solve(sample, toleranceCheck = { true })
+
+                assertEquals(LpVerdict.INFEASIBLE, fresh.verdict)
+                assertEquals(LpVerdict.INFEASIBLE, retained.verdict)
+            }
+        }
+    }
+
+    @Test
+    fun `linear leaf completion cannot certify a nonlinear real power`() {
+        val factor = Power(Power.Coordinate.Real(SourceRealId(0)), 2,
+            Power.Coordinate.Real(SourceRealId(1)))
+        val problem = Problem(0, 0, emptyArray(), arrayOf(factor), numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 2.0), realUpper = doubleArrayOf(1.0, 2.0))
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+
+        val fresh = leafRealFeasibility(problem, null, sample, toleranceCheck = { true })
+        LeafRealSolver(problem, null).use { owner ->
+            val retained = owner.solve(sample, toleranceCheck = { true })
+
+            assertEquals(LpVerdict.INDETERMINATE, fresh.verdict)
+            assertEquals(LpVerdict.INDETERMINATE, retained.verdict)
+        }
+    }
+
     @Test
     fun `linear leaf feasibility cannot certify a continuous square`() {
         val problem = Problem(

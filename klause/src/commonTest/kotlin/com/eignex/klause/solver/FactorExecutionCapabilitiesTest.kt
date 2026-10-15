@@ -75,6 +75,9 @@ class FactorExecutionCapabilitiesTest {
             LexLess(intArrayOf(0), intArrayOf(1), true),
             Sort(intArrayOf(0, 1), intArrayOf(2, 3)),
             RealProduct(0, 0, 1, 0.0, 1.0),
+            ContinuousProduct(0, 0, 1),
+            Power(Power.Coordinate.Real(com.eignex.klause.ir.SourceRealId(0)), 2,
+                Power.Coordinate.Real(com.eignex.klause.ir.SourceRealId(1))),
             ReifiedRealLinear(
                 0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0,
             ),
@@ -146,16 +149,15 @@ class FactorExecutionCapabilitiesTest {
     }
 
     @Test
-    fun `continuous products explicitly decline finite execution and linear certification`() {
+    fun `continuous product scores require source certification without linear relaxation`() {
         val factor = ContinuousProduct(0, 0, 1)
         val capabilities = factor.executionCapabilities()
 
-        assertEquals(PropagationCapability.UNSUPPORTED, capabilities.propagation)
-        assertEquals(AssignmentCheckCapability.UNSUPPORTED, capabilities.assignmentCheck)
-        assertEquals(ScoringCapability.UNSUPPORTED, capabilities.scoring)
+        assertEquals(PropagationCapability.INERT, capabilities.propagation)
+        assertEquals(AssignmentCheckCapability.SOURCE_CERTIFICATION, capabilities.assignmentCheck)
+        assertEquals(ScoringCapability.HEURISTIC, capabilities.scoring)
         assertEquals(RelaxationCapability.NONE, capabilities.relaxation)
-        assertFailsWith<IllegalStateException> { factor.propagatorProjection() }
-        assertFailsWith<IllegalStateException> { factor.invariantProjection() }
+        assertSame(NoPropagator, factor.propagatorProjection())
     }
 
     @Test

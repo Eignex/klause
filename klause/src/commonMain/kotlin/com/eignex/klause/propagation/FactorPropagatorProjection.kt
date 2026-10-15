@@ -120,14 +120,17 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is Product -> ProductPropagator(a, b, result, boolVars, intVars)
 
-    is Power -> PowerPropagator((base as Power.Coordinate.Integer).id.index, exponent,
-        (result as Power.Coordinate.Integer).id.index)
+    is Power -> when (val coordinate = base) {
+        is Power.Coordinate.Integer -> PowerPropagator(coordinate.id.index, exponent,
+            (result as Power.Coordinate.Integer).id.index)
+        is Power.Coordinate.Real -> NoPropagator
+    }
 
     is PseudoBoolean -> PseudoBooleanPropagator(boolVars, intVars, weights, literals, op, bound)
 
     is RealAbs -> NoPropagator
 
-    is RealProduct -> NoPropagator
+    is RealProduct, is ContinuousProduct -> NoPropagator
 
     is ReifiedCardinality -> ReifiedCardinalityPropagator(auxBoolVar, literals, min, max, boolVars, intVars)
 

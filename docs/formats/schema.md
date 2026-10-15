@@ -73,9 +73,9 @@ semantics; multiplying a continuous expression by a constant retains a product n
 [Source lowering](schema.md#schema-continuous-products) defines exact constants,
 auxiliary columns and refused contexts.
 
-Continuous products have no finite propagator, local-search score or finite
-assignment checker. Direct finite execution projections reject them, and an LP
-completion cannot certify their nonlinear equalities. Shared pipeline entry points
+Continuous products have inert finite deduction and native floating local-search
+scores and repairs. Their zero score requires source certification; an LP completion
+cannot certify their nonlinear equalities. Shared pipeline entry points
 route them through [shared polynomial completion](../theories/polynomial-real.md#shared-model-composition)
 beside finite factors across backtracking, local search, ALNS and mixed portfolios.
 Exact rational/algebraic witnesses retain their source coordinates. This route
@@ -110,8 +110,8 @@ Products connect all participating float variables before representation selecti
 A product connected to a grid-selected strict, disequal or optional float component
 is rejected rather than approximated. Continuous equalities requiring Boolean
 reification are rejected; top-level constraints and conjunctions are supported.
-Continuous products declare unsupported finite execution capabilities and no LP
-relaxation. LP leaf publication declines feasible or tolerance-accepted completions
+Continuous products declare inert finite deduction, heuristic scoring requiring
+source certification and no LP relaxation. LP leaf publication declines feasible or tolerance-accepted completions
 when a continuous product remains; exact linear refutations remain sound. The
 [polynomial theory](../theories/polynomial-real.md) owns nonlinear witness authority, and its
 polynomial-source admission is separate from this schema representation.
