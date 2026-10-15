@@ -985,6 +985,10 @@ internal class LocalSearchEngine(
                             cancelCountdown = 0
                             continue
                         }
+                        if (completedMoves != null && state.cost != 0L) {
+                            liveCompletion = null
+                            continue
+                        }
                         // No move this draw. For a sampled strategy that is usually an unlucky draw rather
                         // than a true local optimum, so re-sample (and let the stall machinery engage) up to
                         // feasibleResampleCap times before diversifying — a restart here discards the current
