@@ -1488,6 +1488,10 @@ Every row records and verifies a matching fingerprint of ordered clauses, native
 objective and effective pins. Primitive flips come from write activity; the accepted
 step clock is checked against committed transitions. Fixed variant order does not
 support comparative timing claims.
+`conditionalRecipe=sa/adaptive-perturb` selects the existing default SA strategy;
+the default remains `cbls/fixed`. Recipe parameters are retained, and this kernel
+still performs no engine restarts. A seed-only witness is distinguished from a
+point reached after accepted native search moves.
 
 ### Objective representation probe
 

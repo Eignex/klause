@@ -56,7 +56,9 @@ internal object BooleanObjectiveDescentProbe {
             require(parts.size == 2)
             parts[0] to parts[1]
         }
-        require(options.keys - setOf("prepareMs", "timeout", "conditional", "conditionalClosure") ==
+        require(options.keys - setOf(
+            "prepareMs", "timeout", "conditional", "conditionalClosure", "conditionalRecipe",
+        ) ==
             setOf("suite", "problem", "sha256", "witness64", "work"))
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -68,6 +70,9 @@ internal object BooleanObjectiveDescentProbe {
         require(closureMode in listOf("true", "false", "both"))
         require(conditional in 0..32)
         require(closureMode == "false" || conditional > 0)
+        val recipeLabel = options["conditionalRecipe"] ?: "cbls/fixed"
+        require(recipeLabel in listOf("cbls/fixed", "sa/adaptive-perturb"))
+        require(options["conditionalRecipe"] == null || conditional > 0)
         require(timeout in 1..60_000 && prepareMs in 1..5000)
         val ref = Catalog.uncapped(suite).problems.single { it.name == name }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(ref.source)).use { it.readNBytes(MAX_SOURCE_BYTES + 1) }
@@ -125,7 +130,7 @@ internal object BooleanObjectiveDescentProbe {
                     val results = conditionalRepairs(
                         problem, objective, sweep, initial, roots, conditional, work, timeout,
                         suite, name, digest, parsed.numOriginalBoolVars, sourceObjective, prepared.reconstruct,
-                        closedRepairs,
+                        closedRepairs, recipeLabel,
                     )
                     for (result in results) {
                         val row = result.jsonObject
@@ -241,6 +246,7 @@ internal object BooleanObjectiveDescentProbe {
         sourceObjective: LinearObjective,
         reconstruct: (Sample) -> Sample,
         closedRepairs: Boolean,
+        recipeLabel: String,
     ) = buildJsonArray {
         val setupStarted = System.nanoTime()
         val pins = requireNotNull(LocalSearchModel.of(problem.bake()).pinsUnder(Assumptions.None))
@@ -277,7 +283,7 @@ internal object BooleanObjectiveDescentProbe {
             if (!seedRejected && graph != null) check(graph.violations(state) == 0L)
             val initialCost = state.cost
             val cancellation = Cancellation.after(timeout.milliseconds)
-            val recipe = LocalSearchCatalog.byLabel("cbls/fixed").strategy
+            val recipe = LocalSearchCatalog.byLabel(recipeLabel).strategy
             val strategy = closure?.wrap(recipe, cancellation) ?: recipe
             val materializeNanos = System.nanoTime() - materializeStarted
             val started = System.nanoTime()
@@ -307,7 +313,7 @@ internal object BooleanObjectiveDescentProbe {
             val value = sourceSample?.let(sourceObjective::evaluateExact)
             add(buildJsonObject {
                 put("index", index); put("status", "DONE")
-                put("arm", "conditional-${if (closedRepairs) "closed" else "raw"}-cbls-$root")
+                put("arm", "conditional-${if (closedRepairs) "closed" else "raw"}-$recipeLabel-$root")
                 put("seed", 3)
                 put("problem", buildJsonObject {
                     put("suite", suite); put("problem", name); put("format", "WCNF")
@@ -339,6 +345,7 @@ internal object BooleanObjectiveDescentProbe {
                     put("closureFacts", closure?.factVisits ?: 0); put("closureEdges", closure?.edgeVisits ?: 0)
                     put("closureLargestMove", closure?.largestMove ?: 0)
                     put("nativeWitnesses", if (feasible) 1 else 0)
+                    put("recipe", recipeLabel); put("seedOnlyWitness", feasible && moves == 0L)
                     put("sharedSetupNanos", sharedSetupNanos); put("materializeNanos", materializeNanos)
                     put("elapsedNanos", elapsedNanos); put("workLimit", work); put("timeoutMillis", timeout)
                     put("stalled", stalled); put("cancelled", cancellation.isCancelled())
