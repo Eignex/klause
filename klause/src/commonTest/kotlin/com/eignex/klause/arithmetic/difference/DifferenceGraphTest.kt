@@ -177,6 +177,22 @@ class DifferenceGraphTest {
     }
 
     @Test
+    fun `a containing work stop withholds a potential and its conflict`() {
+        val graph = DifferenceGraph(3)
+        graph.addEdge(0, 1, -1L)
+        graph.addEdge(1, 2, -1L)
+        var charged = 0L
+        var cycle: IntArray? = null
+
+        val result = graph.potentials(cancelled = { charged > 0L },
+            onNegativeCycle = { cycle = it }, onWork = { charged += it })
+
+        assertEquals(Potentials.Abandoned, result)
+        assertNull(cycle)
+        assertTrue(charged > 0L)
+    }
+
+    @Test
     fun `an interrupted predecessor walk exports no cycle`() {
         for (transient in listOf(false, true)) {
             val graph = DifferenceGraph(9_000)
