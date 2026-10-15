@@ -365,6 +365,9 @@ The memo holds at most 4,096 literal entries and each export retains its 4,096-f
 guard. Inherited shared integer proofs remain uncached because they can contain unavailable
 evidence. No memo survives a callback, iterator suspension or retraction; published premise
 conjunctions own their lists and outlive the scratch state.
+Each callback reuses traversal storage between exports and clears its proof references,
+visiting set and pending frames on every exit, including unavailable evidence. Traversal
+contents do not carry between exports; only the bounded positive-subproof memo does.
 
 Prepared capability summaries read the selected projection descriptors. Built-in
 providers declare their existing execution routes; replacements supply their own

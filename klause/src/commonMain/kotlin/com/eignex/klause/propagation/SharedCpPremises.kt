@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
 
@@ -16,6 +17,7 @@ internal class CpPublicationPremises(
     private val rootLevel: Int,
 ) {
     private val memo = MutableIntObjectMap<SearchAtomPremise>()
+    private val scratch = NativePremiseScratch()
     private var nativePosition = session.explanationState.undo.size
     private var sharedLevel = context.decisionLevel
 
@@ -27,7 +29,7 @@ internal class CpPublicationPremises(
         nativePosition = position
         sharedLevel = level
         return state.sharedBoundPremise(variable, upper, context, sourceIntId, rootLevel,
-            if (state.undoLogging) memo else null)
+            if (state.undoLogging) memo else null, scratch)
     }
 }
 
@@ -60,11 +62,12 @@ private fun PropagationState.sharedBoundPremise(
     sourceIntId: (Int) -> Int,
     rootLevel: Int,
     memo: MutableIntObjectMap<SearchAtomPremise>? = null,
+    scratch: NativePremiseScratch? = null,
 ): SearchAtomPremise {
     if (endpointLevel(variable, upper) <= rootLevel) return SearchAtomPremise.All(emptyList())
     endpointReason(variable, upper)?.let { antecedents ->
         return sharedPremise(IntArray(antecedents.size) { antecedents[it] xor 1 }, context, sourceIntId, rootLevel,
-            memo)
+            memo, scratch)
     }
     val domain = intDomains[variable]
     val source = sourceIntId(variable)
@@ -83,61 +86,67 @@ private fun PropagationState.sharedPremise(
     sourceIntId: (Int) -> Int,
     rootLevel: Int,
     memo: MutableIntObjectMap<SearchAtomPremise>? = null,
+    scratch: NativePremiseScratch? = null,
 ): SearchAtomPremise {
-    val proofs = MutableIntObjectMap<SearchAtomPremise>()
-    val visiting = IntHashSet()
-    val pending = ArrayDeque<NativePremiseFrame>()
-    for (literal in asserted) pending.addLast(NativePremiseFrame(literal))
-    var remaining = SHARED_PREMISE_VISIT_LIMIT
-    while (pending.isNotEmpty()) {
-        if (remaining-- <= 0) return SearchAtomPremise.Unavailable
-        val frame = pending.removeLast()
-        val literal = frame.literal
-        if (proofs.containsKey(literal)) continue
-        val children = frame.children
-        if (children != null) {
-            val leaves = children.map { proofs[it] ?: return SearchAtomPremise.Unavailable }
-            val premise = SearchAtomPremise.All(leaves)
-            proofs.put(literal, premise)
-            if (memo != null && children.all { memo.containsKey(it) }) memo.retain(literal, premise)
-            visiting.remove(literal)
-            continue
+    val workspace = scratch ?: NativePremiseScratch()
+    val proofs = workspace.proofs
+    val visiting = workspace.visiting
+    val pending = workspace.pending
+    try {
+        for (literal in asserted) pending.addLast(NativePremiseFrame(literal))
+        var remaining = SHARED_PREMISE_VISIT_LIMIT
+        while (pending.isNotEmpty()) {
+            if (remaining-- <= 0) return SearchAtomPremise.Unavailable
+            val frame = pending.removeLast()
+            val literal = frame.literal
+            if (proofs.containsKey(literal)) continue
+            val children = frame.children
+            if (children != null) {
+                val leaves = children.map { proofs[it] ?: return SearchAtomPremise.Unavailable }
+                val premise = SearchAtomPremise.All(leaves)
+                workspace.store(literal, premise)
+                if (memo != null && children.all { memo.containsKey(it) }) memo.retain(literal, premise)
+                visiting.remove(literal)
+                continue
+            }
+            if (litTruth(literal) != true) return SearchAtomPremise.Unavailable
+            val retained = memo?.get(literal)
+            if (retained != null) {
+                workspace.store(literal, retained)
+                continue
+            }
+            val variable = Lit.variable(literal)
+            if (variable < problem.numBoolVars) {
+                if (context.boolValue(variable) != Lit.isPositive(literal)) return SearchAtomPremise.Unavailable
+                val premise = SearchAtomPremise.Asserted(SearchDecision.Bool(literal))
+                workspace.store(literal, premise)
+                memo?.retain(literal, premise)
+                continue
+            }
+            val atom = atomIdOf(variable)
+            if (atomLevelForConflict(atom) <= rootLevel) {
+                val premise = SearchAtomPremise.All(emptyList())
+                workspace.store(literal, premise)
+                memo?.retain(literal, premise)
+                continue
+            }
+            val antecedents = atomAntecedentsDerived(atom)
+            if (antecedents == null) {
+                // Inherited integer proofs can contain Unavailable below a conjunction.
+                val premise = sharedIntegerLeaf(atom, Lit.isPositive(literal), context, sourceIntId)
+                if (premise === SearchAtomPremise.Unavailable) return premise
+                workspace.store(literal, premise)
+                continue
+            }
+            if (!visiting.add(literal)) return SearchAtomPremise.Unavailable
+            val next = IntArray(antecedents.size) { antecedents[it] xor 1 }
+            pending.addLast(NativePremiseFrame(literal, next))
+            for (child in next) pending.addLast(NativePremiseFrame(child))
         }
-        if (litTruth(literal) != true) return SearchAtomPremise.Unavailable
-        val retained = memo?.get(literal)
-        if (retained != null) {
-            proofs.put(literal, retained)
-            continue
-        }
-        val variable = Lit.variable(literal)
-        if (variable < problem.numBoolVars) {
-            if (context.boolValue(variable) != Lit.isPositive(literal)) return SearchAtomPremise.Unavailable
-            val premise = SearchAtomPremise.Asserted(SearchDecision.Bool(literal))
-            proofs.put(literal, premise)
-            memo?.retain(literal, premise)
-            continue
-        }
-        val atom = atomIdOf(variable)
-        if (atomLevelForConflict(atom) <= rootLevel) {
-            val premise = SearchAtomPremise.All(emptyList())
-            proofs.put(literal, premise)
-            memo?.retain(literal, premise)
-            continue
-        }
-        val antecedents = atomAntecedentsDerived(atom)
-        if (antecedents == null) {
-            // Inherited integer proofs can contain Unavailable below a conjunction.
-            val premise = sharedIntegerLeaf(atom, Lit.isPositive(literal), context, sourceIntId)
-            if (premise === SearchAtomPremise.Unavailable) return premise
-            proofs.put(literal, premise)
-            continue
-        }
-        if (!visiting.add(literal)) return SearchAtomPremise.Unavailable
-        val next = IntArray(antecedents.size) { antecedents[it] xor 1 }
-        pending.addLast(NativePremiseFrame(literal, next))
-        for (child in next) pending.addLast(NativePremiseFrame(child))
+        return SearchAtomPremise.All(asserted.map { proofs[it] ?: return SearchAtomPremise.Unavailable })
+    } finally {
+        workspace.clear()
     }
-    return SearchAtomPremise.All(asserted.map { proofs[it] ?: return SearchAtomPremise.Unavailable })
 }
 
 private fun MutableIntObjectMap<SearchAtomPremise>.retain(literal: Int, premise: SearchAtomPremise) {
@@ -210,3 +219,23 @@ private fun SearchContext.sharedIntegerPremise(decision: SearchDecision): Search
 }
 
 private class NativePremiseFrame(val literal: Int, val children: IntArray? = null)
+
+private class NativePremiseScratch {
+    val proofs = MutableIntObjectMap<SearchAtomPremise>()
+    val visiting = IntHashSet()
+    val pending = ArrayDeque<NativePremiseFrame>()
+    private val written = IntArrayList()
+
+    fun store(literal: Int, premise: SearchAtomPremise) {
+        proofs.put(literal, premise)
+        written.add(literal)
+    }
+
+    fun clear() {
+        // Short exports must not clear every slot retained from a larger traversal.
+        for (index in 0 until written.size) proofs.remove(written[index])
+        written.clear()
+        if (!visiting.isEmpty()) visiting.clear()
+        pending.clear()
+    }
+}
