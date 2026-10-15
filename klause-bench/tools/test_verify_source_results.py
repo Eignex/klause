@@ -23,6 +23,52 @@ class ProofCheckTest(unittest.TestCase):
         with mock.patch.object(proof_check, 'source', return_value=source or self.source):
             return proof_check.check([case])[0]['check']
 
+    def test_original_mps_root_bounds_use_minimized_source_units_in_either_sense(self):
+        for sense, bound in [('MIN', 3.125), ('MAX', -4.625)]:
+            with self.subTest(sense=sense):
+                source = ('NAME root\nOBJSENSE\n ' + sense + '\nROWS\n N cost\nCOLUMNS\n'
+                          " M0 'MARKER' 'INTORG'\n i cost 1\n M1 'MARKER' 'INTEND'\n x cost 0.5\n"
+                          'RHS\n r cost -3\nBOUNDS\n LO b i 0\n UP b i 1\n'
+                          ' LO b x 0.25\n UP b x 1.25\nENDATA\n')
+
+                result = proof_check.check_mps_root_bound(source, bound, sense == 'MAX', 'root')
+
+                self.assertEqual(result['check'], 'strictly better source objective unsat')
+                self.assertEqual(result['scope'], 'original MPS constraints')
+                self.assertFalse(result['nativeCertificateChecked'])
+                with self.assertRaisesRegex(AssertionError, 'source root bound exclusion expected unsat'):
+                    proof_check.check_mps_root_bound(source, bound + 0.125, sense == 'MAX', 'root')
+
+    def test_root_bound_check_preserves_exact_binary_value_without_tolerance(self):
+        source = 'ROWS\n N cost\nCOLUMNS\n x cost 1\nBOUNDS\n LO b x 0.1\nENDATA\n'
+        with self.assertRaisesRegex(AssertionError, 'source root bound exclusion expected unsat'):
+            proof_check.check_mps_root_bound(source, '0.1', False, 'root')
+
+        result = proof_check.check_mps_root_bound(source, '0.09999999999999999', False, 'root')
+
+        self.assertEqual(result['check'], 'strictly better source objective unsat')
+
+    def test_nonfinite_saved_root_bounds_are_rejected(self):
+        for bound in ['NaN', 'Infinity', '-Infinity']:
+            with self.subTest(bound=bound), self.assertRaisesRegex(AssertionError, 'nonfinite MPS root bound'):
+                proof_check.check_mps_root_bound(self.mps_source, bound, False, 'root')
+
+    def test_saved_root_bounds_are_checked_even_when_no_witness_is_claimed(self):
+        cases = [self.case(suite='mps-core', feasible=None, objective=None, proven=False, finalWitness=None,
+                           stats={'lpRootBound': '-0.10000000000000002'})]
+        with mock.patch.object(proof_check, 'source', return_value=self.mps_source):
+            results = proof_check.check(cases, root_bounds=True)
+
+        self.assertEqual(results[0]['check']['verdictCheck'], 'no claimed verdict')
+        self.assertEqual(results[0]['check']['rootBoundCheck']['check'], 'strictly better source objective unsat')
+
+    def test_cached_source_checks_do_not_hide_a_different_root_bound(self):
+        cases = [self.case(suite='mps-core', feasible=None, objective=None, proven=False, finalWitness=None,
+                           stats={'lpRootBound': bound}) for bound in ['-1', '0']]
+        with mock.patch.object(proof_check, 'source', return_value=self.mps_source):
+            with self.assertRaisesRegex(AssertionError, 'source root bound exclusion expected unsat'):
+                proof_check.check(cases, root_bounds=True)
+
     def test_exact_rational_witness_and_optimum(self):
         result = self.check(self.case())
         self.assertEqual(result['witness'], 'exact source feasible')

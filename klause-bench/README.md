@@ -1196,6 +1196,15 @@ the encoded input is capped at 96 KiB and the compressed `sha256` remains requir
 Each `sources` value is base64 original bytes or an object with `gzip64` holding
 base64 gzip bytes. Decompression preserves the original source hash and caps the
 combined uncompressed sources at 64 MiB.
+`rootBounds=true` additionally checks each recorded `lpRootBound` against the
+unchanged original MPS constraints and objective, in minimized source units.
+The checker reads the exact binary64 value from its round-trip decimal, retains
+integrality, and requires the strict better-objective query to be unsatisfiable.
+Missing bounds stay unavailable; nonfinite bounds, counterexamples and unknown
+queries fail. This independent source query verifies no native bound certificate
+and establishes no witness or attainment. Use records with unrounded root-bound
+statistics; older four-decimal output can overstate the bound. The standalone
+verifier exposes the same opt-in check as `--root-bounds`.
 With `catalog=true`, missing sources are resolved through the maintained corpus
 catalog on the analysis host and must match each record's original model hash.
 This permits record-only bundles for fetched collections without redistributing

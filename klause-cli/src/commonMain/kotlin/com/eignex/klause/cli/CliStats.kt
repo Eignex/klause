@@ -189,7 +189,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "lpLagrangianPruned" to "${lagrangian.toLong()}"
     out += "lpEnergeticPruned" to "${energetic.toLong()}"
     out += "lpMs" to "${stats.lp.ms}"
-    if (stats.lp.rootBound.isFinite()) out += "lpRootBound" to round4(stats.lp.rootBound)
+    if (stats.lp.rootBound.isFinite()) out += "lpRootBound" to "${stats.lp.rootBound}"
     return out
 }
 
@@ -516,7 +516,7 @@ internal fun printStatPairs(prefix: String, pairs: List<Pair<String, String>>) {
     for ((k, v) in pairs) println("$prefix $k=$v")
 }
 
-/** Round to four decimals for the rate / bound lines; integral values render without a fraction. */
+/** Round to four decimals for the rate lines; integral values render without a fraction. */
 private fun round4(x: Double): String {
     val r = round(x * 10000.0) / 10000.0
     return if (r == r.toLong().toDouble()) "${r.toLong()}" else "$r"
