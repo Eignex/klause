@@ -214,10 +214,7 @@ internal fun FlatZincCompiler.emitIntMaxMin(c: FznConstraint, max: Boolean) {
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
     val r = resolveIntVar(c.args[2])
-    var i = 0
-    factors.addAll(
-        IntFunctionLowering.minMaxFactors(r, intArrayOf(a, b), isMax = max) { allocBool("__mm_${a}_${b}_${r}_${i++}") },
-    )
+    factors.add(ArrayMinMax(r, intArrayOf(a, b), max))
 }
 
 /** FlatZinc `int_div` uses truncated-toward-zero semantics. */
