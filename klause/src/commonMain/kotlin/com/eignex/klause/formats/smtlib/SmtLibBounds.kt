@@ -62,6 +62,27 @@ internal fun Compiler.Builder.inferBounds() {
     }
 }
 
+internal fun Compiler.Builder.hasOpenProductOperand(): Boolean {
+    if (intDomains.none { it is PresolveDomain.Open }) return false
+    val pending = ArrayDeque<Pair<SExpr, Boolean>>()
+    for (assertion in asserts) pending.addLast(assertion to false)
+    while (pending.isNotEmpty()) {
+        if (sourceCancellation()) throw PolynomialSourceInterrupted()
+        val (node, product) = pending.removeLast()
+        when (node) {
+            is SExpr.Atom -> if (product && intNames[node.text]?.let { intDomains[it] is PresolveDomain.Open } == true) {
+                return true
+            }
+            is SExpr.SList -> {
+                val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
+                val operand = product || head == "*" || head == "^"
+                for (child in node.items.drop(1)) pending.addLast(child to operand)
+            }
+        }
+    }
+    return false
+}
+
 internal fun Compiler.Builder.closeProductBounds() {
     if (productBoundsClosed || intDomains.none { it is PresolveDomain.Open }) return
     productBoundsClosed = true
