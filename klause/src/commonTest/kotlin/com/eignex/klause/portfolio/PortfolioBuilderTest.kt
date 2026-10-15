@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -20,6 +21,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
@@ -40,6 +42,47 @@ class PortfolioBuilderTest {
                 assertFalse("exact-neighborhood" in worker.label)
                 assertNotNull(assertIs<SolveResult.Sat>(result).assignment.exactReals)
             }
+        }
+    }
+
+    @Test
+    fun `numerical heuristic worker copies retain the configured source tolerance guarantee`() {
+        val problem = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        for (engine in listOf(EngineMix.LOCAL_SEARCH, EngineMix.ALNS)) {
+            val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.CSP, engine = engine,
+                reportLsResiduals = true, reportLsPhaseTimes = true,
+                toleranceCheck = { it.reals.size == 1 && it.reals[0] in 0.0..1.0 })
+            val factory = PortfolioBuilder.factories(problem, scenario, null, null, null, null,
+                ProblemProfile.of(problem, false), numericalCompletion = true).single()
+            val worker = factory.materialize(0, 3L, NodeBudget(10_000))
+
+            worker.use {
+                val result = worker.solve(Cancellation.Never, maxInstructions = 10_000)
+
+                val sample = assertIs<SolveResult.Sat>(result).assignment
+                assertNull(sample.exactReals)
+                assertTrue(sample.reals.single() in 0.0..1.0)
+            }
+        }
+    }
+
+    @Test
+    fun `an exhausted containing allowance cannot admit a tolerance completion`() {
+        val problem = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        var checks = 0
+        val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH,
+            toleranceCheck = { checks++; true })
+        val factory = PortfolioBuilder.factories(problem, scenario, null, null, null, null,
+            ProblemProfile.of(problem, false), numericalCompletion = true).single()
+        val worker = factory.materialize(0, 3L, NodeBudget(0))
+
+        worker.use {
+            val result = worker.solve(Cancellation.Never, maxInstructions = 10_000)
+
+            assertIs<SolveResult.Unknown>(result)
+            assertEquals(0, checks)
         }
     }
 
