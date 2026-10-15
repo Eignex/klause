@@ -1691,6 +1691,24 @@ authorization remains false. Register numbering follows the
 and canonical source symbol encoding follows the
 [C++ ABI](https://itanium-cxx-abi.github.io/cxx-abi/abi.html#mangling).
 
+`com.eignex.klause.bench.profile.NativeVmTaskCallReview` accepts four saved input
+URL/hash pairs: `context=`, `abi=`, `entries=` and `transfers=`, each with its
+`-sha256` option. Inputs are bounded at 16 MiB each and 32 MiB combined; output
+is bounded at 32 MiB and child execution at 60 seconds. All original inputs,
+aliases, transfer records and unresolved cases are retained. No library or decoder
+is loaded by the saved-data review.
+
+The fixed caller plan binds `CompileBroker::compiler_thread_loop` to its pinned
+source declaration and complete physical span. Broker and post entries must match
+the original entry ABI proof. Required task-wrapper destructor and task-free
+definitions remain explicit. A direct near call must encode the bound broker
+target and return to a retained caller instruction boundary. Tail, indirect,
+prefixed and unresolved transfers supply no normal-call proof. This establishes
+the specific call/continuation binding only. The caller's source wrapper lifetime
+contract remains separate from transitive callee effects, kernel return probes,
+task generation and live-read validation. Private reads, complete control flow,
+root census, clocks, code size and compiler savings remain unproved.
+
 ### Native executable entry bytes
 
 `com.eignex.klause.bench.profile.NativeVmEntryVerification` retains bytes for the
