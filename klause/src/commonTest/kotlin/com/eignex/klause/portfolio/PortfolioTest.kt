@@ -1832,6 +1832,31 @@ class PortfolioTest {
     }
 
     @Test
+    fun `an accepted incumbent ends feasibility elapsed coverage`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(2)
+        val workers = listOf(
+            trackingWorker("complete", 0, ScriptedSearch({ false }) {
+                elapsed[0] += 10L
+                clock += 10.milliseconds
+            }),
+            trackingWorker("improver", 1, ScriptedSearch({ true }) {
+                elapsed[1] += 500L
+                clock += 500.milliseconds
+            }).also { it.family = ArmFamily.LocalSearch },
+        )
+        var checks = 0
+        val portfolio = Portfolio.thompson(workers, seed = 3L, witnessCheck = { _, _ -> checks++; null })
+            .also { it.runTimeSource = clock }
+
+        val result = portfolio.use { it.minimize(Cancellation { elapsed.sum() >= 6_000L }) }
+
+        assertIs<MinimizeResult.BestFound>(result)
+        assertTrue(checks > 0)
+        assertTrue(elapsed[0] < 500L)
+    }
+
+    @Test
     fun `the arm that found the first solution loses its lead to the arm improving it`() {
         val slices = IntArray(2)
         val finder = ScriptedSearch({ it == 0 }, start = 1_000.0) { slices[0]++ }
