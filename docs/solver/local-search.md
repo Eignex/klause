@@ -845,3 +845,9 @@ Nonfinite arithmetic cannot receive zero violation. These scores and repairs are
 heuristic: zero violation requires the selected exact encoder and original-source
 completion, and supplies no feasibility or proof authority on its own. Each search
 opening owns its assignment and invariant state; the source factors remain immutable.
+
+`GridProduct` and `GridPower` instead grade their declared rounded index relation
+with integer move deltas, respecting aliases, domain holes and channel ownership.
+They retain operation/range metadata rather than a frontend table. Their exact grid
+membership check supplies no original continuous-source witness or proof authority;
+source approximation metadata and whole-source validation remain required.

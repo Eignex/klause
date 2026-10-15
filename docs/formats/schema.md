@@ -107,8 +107,15 @@ tree and named affine operands. Source AST maps are borrowed read-only during
 compilation, like other model payloads.
 
 Products connect all participating float variables before representation selection.
-A product connected to a grid-selected strict, disequal or optional float component
-is rejected rather than approximated. Continuous equalities requiring Boolean
+A product or fixed power connected to a grid-selected strict, disequal or optional
+float component retains `GridProduct` or `GridPower` with the declared source index
+ranges and rounding metadata. Expression auxiliaries use finite ranges derived from
+those declarations; nonfinite ranges and affine coefficient overflow decline.
+Native finite filtering and scoring consume the retained relation. Private enforcing
+encodings admit at most 4096 operand combinations and preserve the rounded grid
+relation; larger encodings decline without disabling native finite execution.
+Grid exhaustion supplies no original-source refutation, and every decoded witness
+still requires an original-source check. Continuous equalities requiring Boolean
 reification are rejected; top-level constraints and conjunctions are supported.
 Continuous products declare inert finite deduction, heuristic scoring requiring
 source certification and no LP relaxation. LP leaf publication declines feasible or tolerance-accepted completions

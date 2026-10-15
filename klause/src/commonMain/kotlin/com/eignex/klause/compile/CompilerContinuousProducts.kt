@@ -8,6 +8,16 @@ import com.eignex.klause.model.ContinuousRealEquality
 import com.eignex.klause.model.ContinuousRealExpr
 
 internal fun Lowering.assertContinuousEquality(equality: ContinuousRealEquality) {
+    fun grid(expression: ContinuousRealExpr): Boolean = when (expression) {
+        is ContinuousRealExpr.Affine -> expression.coefficients.filterValues { it != 0.0 }.keys
+            .any { floatRepresentations.getValue(it).approximate }
+        is ContinuousRealExpr.Power -> grid(expression.base)
+        is ContinuousRealExpr.Multiply -> grid(expression.left) || grid(expression.right)
+    }
+    if (grid(equality.left) || grid(equality.right)) {
+        assertGridContinuousEquality(equality)
+        return
+    }
     val columns = HashMap<ContinuousRealExpr, Int>()
     fun lift(expression: ContinuousRealExpr): Int = columns.getOrPut(expression) {
         when (expression) {

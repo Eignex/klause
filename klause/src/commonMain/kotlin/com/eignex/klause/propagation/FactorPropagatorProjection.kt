@@ -51,6 +51,8 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is GridAbs -> gridAbsoluteValueTable(this).buildPropagatorProjection(preparation)
 
+    is GridArithmetic -> GridArithmeticPropagator(this)
+
     is ArrayMinMax -> ArrayMinMaxPropagator(result, xs, max, boolVars, intVars)
 
     is GridArrayMinMax -> GridArrayMinMaxPropagator(this)
