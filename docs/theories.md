@@ -57,7 +57,9 @@ keeps finite globals and domain holes with their CP owner. The captured encoder
 remains conditioned. This consumer caps the Cartesian cover at 4096 cases and
 declines open conditions, Boolean-only conditions and oversized covers. A failed
 or interrupted case discards the entire receiving relation. Explicit leaf pins
-continue to install only their scoped relation.
+continue to install only their scoped relation. The numerical mixed-product
+completion requires every possible integer operand to be exactly representable
+in binary64; wider source integers retain exact arithmetic completion.
 
 Linear and difference participation uses selected complete relations and retains
 existing exact coefficient, strictness and combined graph safety gates. Finite
