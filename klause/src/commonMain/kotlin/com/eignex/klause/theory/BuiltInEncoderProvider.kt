@@ -48,14 +48,6 @@ object BuiltInEncoderProvider : EncoderProvider {
             else PolynomialRealFormula.And(rows))
         null
     }
-    private val continuousProduct = Encoder(EncoderSupport.DIRECT) { view, encoding ->
-        view as ContinuousProduct
-        encoding.polynomial(PolynomialRealFormula.Atom(
-            PolynomialExpression.Product(listOf(encoding.real(SourceRealId(view.a)),
-                encoding.real(SourceRealId(view.b)))), PolynomialRelation.EQ,
-            encoding.real(SourceRealId(view.result))))
-        null
-    }
     private val mixedProduct = Encoder(EncoderSupport.DIRECT) { view, encoding ->
         view as RealProduct
         encoding.polynomial(PolynomialRealFormula.Atom(
@@ -83,7 +75,7 @@ object BuiltInEncoderProvider : EncoderProvider {
         factor is GridArrayMinMax && target != EncodingTarget.DIFFERENCE -> selectionEncoder
         factor is RealElement && target != EncodingTarget.DIFFERENCE -> selectionEncoder
         factor is RealArrayMinMax && target != EncodingTarget.DIFFERENCE -> selectionEncoder
-        target == EncodingTarget.POLYNOMIAL && factor is ContinuousProduct -> continuousProduct
+        factor is ContinuousProduct -> continuousProductEncoder(factor, target)
         target == EncodingTarget.POLYNOMIAL && factor is RealProduct -> mixedProduct
         target == EncodingTarget.LINEAR && factor is RealProduct -> conditionedProduct(factor)
         factor.exactTheoryOwnable && (target != EncodingTarget.DIFFERENCE ||

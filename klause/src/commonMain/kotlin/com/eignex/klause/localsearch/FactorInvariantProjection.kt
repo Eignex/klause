@@ -141,7 +141,7 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
 
     is RealProduct -> RealProductInvariant(intOperand, realOperand, result)
 
-    is ContinuousProduct -> ContinuousProductInvariant(a, b, result)
+    is ContinuousProduct -> ContinuousProductInvariant(this)
 
     is RealElement -> RealElementInvariant(this)
 

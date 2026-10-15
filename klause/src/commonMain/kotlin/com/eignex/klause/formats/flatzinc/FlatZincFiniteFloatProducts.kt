@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -53,28 +54,13 @@ internal fun FlatZincCompiler.emitFiniteFloatProduct(a: FloatRef, b: FloatRef, r
     }
     val selected = (if (selectA) a else b) as FloatRef.Var
     val other = (if (selectA) b else a) as FloatRef.Var
-    val guards = IntArray(values.size)
-    for ((i, value) in values.withIndex()) {
-        val guard = exactFloatValueLiteral(selected.bk.varId, value)
-        guards[i] = guard
-        val product = when (result) {
-            is FloatRef.Const -> reifyRealLinear(
-                doubleArrayOf(value),
-                intArrayOf(other.bk.varId),
-                LinearOp.EQ,
-                result.value,
-            )
-
-            is FloatRef.Var -> reifyRealLinear(
-                doubleArrayOf(value, -1.0),
-                intArrayOf(other.bk.varId, result.bk.varId),
-                LinearOp.EQ,
-                0.0,
-            )
-        }
-        factors.add(Clause(intArrayOf(Lit.negate(guard), product)))
+    val output = when (result) {
+        is FloatRef.Var -> result.bk.varId
+        is FloatRef.Const -> resolveFloatElement(FznExpr.FloatLit(result.value),
+            "__finite_product_${floatVars.size}", lpOnly = true).varId
     }
-    factors.add(Clause(guards))
+    val guards = IntArray(values.size) { exactFloatValueLiteral(selected.bk.varId, values[it]) }
+    factors.add(ContinuousProduct(selected.bk.varId, other.bk.varId, output, selected.bk.varId, values, guards))
 }
 
 internal fun FlatZincCompiler.exactFloatValueLiteral(variable: Int, value: Double): Int {
