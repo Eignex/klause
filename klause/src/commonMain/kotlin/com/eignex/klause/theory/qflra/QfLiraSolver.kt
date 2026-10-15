@@ -1115,6 +1115,7 @@ class ExactLiraSearchComponent private constructor(
             (outcome != null && outcome != ComponentCheck.Feasible)
         ) return null
         val point = candidate ?: return null
+        lpStop.charge(model.numIntVars.toLong() + 1L)
         if (operationStop() || !context.consumeCheck()) return null
         sourceIntegerSplit(point, context)?.let { return it }
         val value = point[model.numRealVars + variable]
