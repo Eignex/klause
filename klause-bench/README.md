@@ -1825,16 +1825,22 @@ Saved task entries retain their source names, signed compile identities, raw
 pointer arguments, process/thread sequences and payload errors. Selected terminal
 delivery and the complete owned loss-counter proof remain separate from global
 kernel coverage. Initialization candidate edges retain every equal-pointer
-initialization compatible with known per-thread sequence. Cross-thread timestamp
-relations are recorded without imposing an order or proving the absence of hidden
-reuse. Null tasks and orphan frees remain unresolved.
+initialization compatible with known per-thread sequence. Schema-2 graphs retain
+each task entry once, with its native group event and primary-record index. Shared
+pointer tables list every initialization entry; a candidate set excludes only
+same-thread initializations at or after the task entry. Node timestamps preserve
+all cross-thread relations without imposing an order or excluding hidden reuse.
+Null tasks and orphan frees remain unresolved.
 
 Observed wrapper nesting retains unfinished and orphan callbacks. Public identity
 candidates preserve the independent JFR compilation records, all recorded phase
-and inlining events, and the original XML states. A unique candidate does not
+and inlining events, and the original XML states. Wrapper and JFR identity tables
+refer to the retained native groups, task entries and recording-event positions
+instead of copying those records. A unique candidate does not
 establish wrapper identity, broker return, task generation or compiled lifetime.
 Raw inputs remain retained on malformed data, resource failure or proof decline;
-oversized derived inventories are withheld with an explicit failure. The review
+compact JSON output retains the same 64 MiB cap; oversized derived inventories
+are withheld with an explicit failure. The review
 does not authorize private reads, complete roots, elapsed clocks, code size or
 compiler savings.
 
