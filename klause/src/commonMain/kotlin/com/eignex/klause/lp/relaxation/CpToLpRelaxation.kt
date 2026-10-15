@@ -422,10 +422,14 @@ internal fun LpRelaxation.leafResult(
     sink: LpStatsSink?,
 ): LeafRealResult {
     certified.float?.let { sink?.observeComponentSplit(it.blocks) }
-    if (problem.factors.any { it is ContinuousProduct } && certified.verdict != LpVerdict.INFEASIBLE) {
+    if (problem.factors.any { it is ContinuousProduct && it.finiteChoices?.hasGuards != true } &&
+        certified.verdict != LpVerdict.INFEASIBLE) {
         return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
     }
     certified.floatOptimum?.let { float ->
+        if (problem.factors.any { it is ContinuousProduct }) {
+            return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        }
         return LeafRealResult(LpVerdict.TOLERANCE_OPTIMUM, floatReals(float.primal, problem))
     }
     if (certified.verdict == LpVerdict.INFEASIBLE) {
@@ -459,7 +463,7 @@ internal fun LpRelaxation.exactLeafResult(
     objective: LinearObjective?,
     sample: Sample,
 ): LeafRealResult {
-    if (problem.factors.any { it is ContinuousProduct }) {
+    if (problem.factors.any { it is ContinuousProduct && it.finiteChoices?.hasGuards != true }) {
         return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
     }
     val unboundedness = certified.unboundedness
@@ -851,7 +855,7 @@ internal class CpToLpRelaxation(
      * certificates keep running on the per-node pin-consulting [build], whose magnitudes rationalize.
      */
     fun buildGatedResidual(cancellation: Cancellation = Cancellation.Never): LpRelaxation? {
-        if (!realResidual || problem.numIntVars > 0) return null
+        if (!realResidual || problem.numIntVars > 0 || problem.factors.any { it is ContinuousProduct }) return null
         return Assembler(RootDomains(problem), gated = true, cancellation = cancellation).assemble(emptyList())
     }
 
@@ -864,7 +868,7 @@ internal class CpToLpRelaxation(
     private fun touchesReals(factor: Factor): Boolean = when (factor) {
         is Linear -> factor.realConstants != null
         is ReifiedRealLinear -> true
-        is RealAbs, is RealProduct, is RealElement, is RealArrayMinMax -> true
+        is RealAbs, is RealProduct, is RealElement, is RealArrayMinMax, is ContinuousProduct -> true
         is Power -> factor.base is Power.Coordinate.Real
         else -> false
     }

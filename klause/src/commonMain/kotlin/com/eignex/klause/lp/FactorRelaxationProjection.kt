@@ -2,6 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.GridAbs
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -38,6 +39,7 @@ internal fun Factor.buildLpRelaxation(builder: RelaxationBuilder, linearProjecti
     }
     when (this) {
         is ArrayMinMax -> emitLpRelaxation(builder)
+        is ContinuousProduct -> emitLpRelaxation(builder)
         is Element -> emitLpRelaxation(builder)
         is RealElement -> emitLpRelaxation(builder)
         is GlobalCardinality -> emitLpRelaxation(builder)
