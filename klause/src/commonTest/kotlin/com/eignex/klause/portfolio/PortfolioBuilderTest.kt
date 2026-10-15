@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -20,9 +21,31 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
+
+    @Test
+    fun `annotated first fail worker has initial admission and complete source authority`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray()).bake()
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = BacktrackParams())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+
+        val workers = PortfolioBuilder.build(problem, scenario, objective)
+
+        try {
+            val generic = workers.single { it.label == "bt/first-fail" }
+            assertFalse(generic.improvementOnly)
+            assertEquals(ArmFamily.Backtrack, generic.family)
+            assertTrue(generic.permitsSourceProofs)
+            assertTrue(generic.controlsObjectiveCutoff)
+            assertNotNull(generic.sourceBinding)
+            assertSame(workers.first().sharingInvocation, generic.sharingInvocation)
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
 
     @Test
     fun `numerical completion materializes finite heuristic workers without theory neighborhoods`() {
