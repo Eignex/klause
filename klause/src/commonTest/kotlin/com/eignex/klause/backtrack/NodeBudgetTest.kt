@@ -17,6 +17,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -238,6 +240,42 @@ class NodeBudgetTest {
 
         assertEquals(3.0, result.stats.search.nodes.sum)
         assertEquals(3L, budget.spent)
+    }
+
+    @Test
+    fun `resource quotas and compatibility facades share fractional accounting`() {
+        val budget = NodeBudget(10)
+        val facades = budget.quotas(2)
+        val resources = budget.allowance.quotas(2)
+
+        facades[0].spendMoves(1)
+        resources[0].spendMoves(3)
+        resources[1].spend()
+
+        assertSame(resources[0], facades[0].allowance)
+        assertEquals(5L, facades[0].spent)
+        assertEquals(6L, budget.spent)
+    }
+
+    @Test
+    fun `resource partitioning before facade access retains child identity`() {
+        val budget = NodeBudget(10)
+        val resources = budget.allowance.quotas(2)
+        resources[0].spend()
+
+        val facades = budget.quotas(2)
+
+        assertSame(resources[0], facades[0].allowance)
+        assertSame(facades, budget.quotas(2))
+        assertEquals(1L, facades[0].spent)
+    }
+
+    @Test
+    fun `facade and resource views cannot repartition an existing allowance`() {
+        val budget = NodeBudget(10)
+        budget.quotas(2)
+
+        assertFailsWith<IllegalArgumentException> { budget.allowance.quotas(3) }
     }
 
 }

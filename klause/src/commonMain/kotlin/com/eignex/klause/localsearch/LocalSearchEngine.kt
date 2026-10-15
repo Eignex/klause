@@ -530,7 +530,7 @@ internal class LocalSearchEngine(
     private fun moveCap(params: LocalSearchParams): Long = minOf(
         params.maxFlips,
         params.maxInstructions ?: Long.MAX_VALUE,
-        params.nodeBudget?.movesLeft() ?: Long.MAX_VALUE,
+        params.nodeBudget?.allowance?.movesLeft() ?: Long.MAX_VALUE,
     )
 
     private fun streamImpl(
@@ -788,7 +788,7 @@ internal class LocalSearchEngine(
                 yield(null)
                 cancelCountdown = 0
             }
-            if (params.nodeBudget?.movesLeft() == 0L) break
+            if (params.nodeBudget?.allowance?.movesLeft() == 0L) break
             if (cancelCountdown-- <= 0) {
                 while (params.cancellation()) {
                     if (checkpoint != null) {

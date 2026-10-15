@@ -221,7 +221,7 @@ internal class CoreGuidedSearch(
             }
             val decisionLimit = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
             val decisions = addWork(completedStats.search.nodes.sum.toLong(), handle.stats.search.nodes.sum.toLong())
-            val quotaExhausted = params.nodeBudget?.exhausted() == true || decisions >= decisionLimit
+            val quotaExhausted = params.nodeBudget?.allowance?.exhausted() == true || decisions >= decisionLimit
             val paused = result is SolveResult.Unknown &&
                 (result.reason == TerminationReason.Cancelled || result.reason == TerminationReason.BudgetExhausted) &&
                 segment() && !token() && !quotaExhausted

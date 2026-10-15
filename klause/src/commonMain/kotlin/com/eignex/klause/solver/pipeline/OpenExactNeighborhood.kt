@@ -141,7 +141,7 @@ internal class OpenExactNeighborhood(
     ): ExactNeighborhood =
         ExactNeighborhood(model.numBoolVars, centers(), completion, objective,
             coordinateValues = { sample -> coordinates(sample) }, adaptive = adaptive, seed = seed,
-            nodeBudget = params.nodeBudget, maximumMoves = minOf(maximumMoves, params.maxFlips),
+            nodeBudget = params.nodeBudget?.allowance, maximumMoves = minOf(maximumMoves, params.maxFlips),
             maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
             maximumImprovementMoves = maximumImprovementMoves, nativeWork = nativeWork,
             completionStats = completionStats, onClose = onClose,

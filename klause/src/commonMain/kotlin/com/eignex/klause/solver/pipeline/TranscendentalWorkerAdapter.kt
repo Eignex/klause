@@ -62,7 +62,7 @@ internal class TranscendentalWorkerAdapter(
     }
     private var closedWork = 0L
     private var closedDecline = false
-    private val stop = external or Cancellation { service.exhausted || nodeBudget?.exhausted() == true }
+    private val stop = external or Cancellation { service.exhausted || nodeBudget?.allowance?.exhausted() == true }
     private val root = assumptions()
     private var strategyStats = SolveStats.EMPTY
     private var decisions = 0L
@@ -131,7 +131,7 @@ internal class TranscendentalWorkerAdapter(
         } else exactNeighborhoodWorker(
             if (arm == 2) "alns+exact-transcendental" else "ls+exact-transcendental", arm,
             objective = null, lifetime = external or params.strategy.localSearch.cancellation,
-            timeout = params.timeout, exhausted = { service.exhausted || nodeBudget?.exhausted() == true },
+            timeout = params.timeout, exhausted = { service.exhausted || nodeBudget?.allowance?.exhausted() == true },
             open = { neighborhood(arm == 2) },
         )
         return worker.bindEvidence(identity, provesResults = arm == 0).bindInvocation(requireNotNull(binding))
@@ -160,8 +160,8 @@ internal class TranscendentalWorkerAdapter(
                     SearchSolveParams(minOf(params.strategy.backtrack.maxDecisions,
                         params.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE)),
                     decisionBudget = SearchDecisionBudget {
-                        if (nodeBudget?.exhausted() == true) false else {
-                            nodeBudget?.spend()
+                        if (nodeBudget?.allowance?.exhausted() == true) false else {
+                            nodeBudget?.allowance?.spend()
                             true
                         }
                     },
@@ -250,7 +250,7 @@ internal class TranscendentalWorkerAdapter(
         val moves = if (adaptive) minOf(local.maxFlips, params.strategy.alnsIterations.toLong()) else local.maxFlips
         return ExactNeighborhood(source.boolCount, initialCenters(), this,
             coordinateValues = { sample -> centers(sample) }, adaptive = adaptive, seed = local.randomSeed ?: 0,
-            nodeBudget = nodeBudget, maximumMoves = moves,
+            nodeBudget = nodeBudget?.allowance, maximumMoves = moves,
             maximumInstructions = local.maxInstructions ?: Long.MAX_VALUE, nativeWork = { service.work })
     }
 

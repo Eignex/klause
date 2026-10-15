@@ -1262,7 +1262,7 @@ internal class ResumableMinimize(
         SearchRunLifecycle {
         override val solveParams: SearchSolveParams
             get() = SearchSolveParams(
-                maxDecisions = params.nodeBudget?.decisionsLeft() ?: Long.MAX_VALUE, restart = restart,
+                maxDecisions = params.nodeBudget?.allowance?.decisionsLeft() ?: Long.MAX_VALUE, restart = restart,
             )
         override val booleanBranching = BooleanBranching.None
 
@@ -1273,7 +1273,7 @@ internal class ResumableMinimize(
         // 20000 all visited the same 920695 nodes.
         override val decisionBudget = SearchDecisionBudget {
             val withinSlice = --decisionLimit >= 0L
-            val budget = params.nodeBudget ?: return@SearchDecisionBudget withinSlice
+            val budget = params.nodeBudget?.allowance ?: return@SearchDecisionBudget withinSlice
             budget.spend()
             withinSlice && !budget.exhausted()
         }

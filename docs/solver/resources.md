@@ -14,6 +14,19 @@ This page defines configuration, work currencies and quota lifetimes.
 [Sessions](sessions.md) owns handles; [presolve](presolve.md) and
 [portfolios](portfolio.md) own phase and slice policy.
 
+## Mechanism and compatibility
+
+`solver.resources.NodeAllowance` owns the synchronized decision/move ledger, native
+instruction conversion and persistent quota partitioning. It depends only on resource
+mechanisms and neutral utilities; strategy policy consumes that mechanism.
+`backtrack.NodeBudget` is the published compatibility facade. Its constructor,
+properties, methods and all existing parameter types retain their JVM and Native
+signatures. Each facade forwards to one resource allowance; cached quota facades
+reference the same resource children on every reopen. Unwrapping a facade does not
+copy counters, renew cancellation or allocate a new ledger. Peer strategies use the
+resource allowance for accounting and import instruction conversion from resources.
+The facade retains the historical conversion constant for compiled callers.
+
 ## Configuration and lifetime
 
 The CLI parses `auto`, `unlimited` and a nonnegative remaining amount as distinct

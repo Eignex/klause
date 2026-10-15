@@ -332,7 +332,7 @@ internal class QuadraticWorkerAdapter(
         val centers = completion.pointFixings(completion.algebraic.arithmetic::step)
         val maximum = if (adaptive) params.strategy.alnsIterations.toLong() else Long.MAX_VALUE
         val allowance = QuadraticNeighborhoodAllowance(maximum,
-            minOf(controls.maxFlips, controls.maxInstructions ?: Long.MAX_VALUE), controls.nodeBudget)
+            minOf(controls.maxFlips, controls.maxInstructions ?: Long.MAX_VALUE), controls.nodeBudget?.allowance)
         val total = sourceBoolCount + model.source.numIntVars + sourceRealCount
         return QuadraticNeighborhoodCursor(total, adaptive, controls.randomSeed ?: 0L, allowance, stop,
             { native.work }, propose = { released, radius, random ->

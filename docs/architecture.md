@@ -91,6 +91,7 @@ Packages below are under `com.eignex.klause` in
 | `lp.engine` | LP solving, basis state and exact certificates | Only `util`, `simplex.exact`, `lp.lattice` and `simplex.basis` among Klause packages |
 | Remaining `lp` packages | Factor relaxations, source reasoning, cuts and bounding policy | Depend on the engine; no reverse dependency |
 | `bound` | Combinatorial bounds over global constraints | Factors, IR, objectives, propagation and relaxation views; no `lp.engine` |
+| `solver.resources` | Shared decision/move ledgers, instruction conversion and persistent worker quotas | Only resource mechanisms and `util`; published `backtrack.NodeBudget` forwards here |
 | `backtrack` | Finite CP search policy and DFS integration | Uses propagation and shared search |
 | `localsearch`, `portfolio` | Local-search policy and engine orchestration | Select and schedule solver mechanisms |
 | `meta` | Adaptive large-neighbourhood search and core-guided optimization | Composes solver mechanisms |

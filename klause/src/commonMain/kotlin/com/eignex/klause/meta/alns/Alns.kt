@@ -2,7 +2,7 @@ package com.eignex.klause.meta.alns
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
+import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -239,7 +239,7 @@ internal class Alns(
         fun finished(params: LocalSearchParams): Boolean =
             iter >= maxIterations ||
                 params.maxInstructions?.let { telemetry.outerAllowance >= it } == true ||
-                params.nodeBudget?.movesLeft() == 0L
+                params.nodeBudget?.allowance?.movesLeft() == 0L
 
         fun advance(
             params: LocalSearchParams,
@@ -266,13 +266,13 @@ internal class Alns(
             val nodeBudget = params.nodeBudget
 
             while (iter < maxIterations && (instructionBudget == null || instructionsUsed < instructionBudget)) {
-                if (params.cancellation() || nodeBudget?.movesLeft() == 0L) break
+                if (params.cancellation() || nodeBudget?.allowance?.movesLeft() == 0L) break
                 // This iteration's repair allowance: flipsPerIteration, clipped to whatever budget remains
                 // so the last counted iteration can't overshoot by a whole flipsPerIteration.
                 val iterFlips = minOf(
                     flipsPerIteration,
                     instructionBudget?.let { it - instructionsUsed } ?: Long.MAX_VALUE,
-                    nodeBudget?.movesLeft() ?: Long.MAX_VALUE,
+                    nodeBudget?.allowance?.movesLeft() ?: Long.MAX_VALUE,
                 )
                 val perIterParams = params.copy(
                     maxFlips = iterFlips,
@@ -288,7 +288,7 @@ internal class Alns(
                 // and independent of what happened inside, same as LocalSearchSolver's counted restart.
                 instructionsUsed += iterFlips
                 telemetry.outerAllowance += iterFlips
-                nodeBudget?.spendMoves(iterFlips)
+                nodeBudget?.allowance?.spendMoves(iterFlips)
                 pooled.poll(bestObj)?.let { (sample, obj) ->
                     bestSample = sample
                     bestObj = obj

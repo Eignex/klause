@@ -11,6 +11,7 @@ ROOT = "com.eignex.klause"
 # Closed lists apply to mechanism packages; forbidden lists express caller separation.
 ALLOWED = {
     "util": ("util",),
+    "solver.resources": ("solver.resources", "util"),
     "ir": ("ir", "util"),
     "simplex.exact": ("simplex.exact", "util"),
     "simplex.basis": ("simplex.basis", "simplex.exact", "util"),
@@ -26,10 +27,13 @@ ALLOWED = {
 }
 FORBIDDEN = {
     "lowering": ("compile", "schema", "formats"),
+    "localsearch": ("backtrack.LS_INSTRUCTIONS_PER_WORK",),
+    "portfolio": ("backtrack.LS_INSTRUCTIONS_PER_WORK",),
+    "meta": ("backtrack.LS_INSTRUCTIONS_PER_WORK",),
     "formats": ("compile", "schema", "theory"),
     "bound": ("lp.engine",),
     "solver.pipeline": (
-        "formats", "theory.qflra.SourceBoundAtom", "theory.qflra.SourceBoundTerm", "theory.qflra.SourceBoundLimits",
+        "formats", "backtrack.LS_INSTRUCTIONS_PER_WORK", "theory.qflra.SourceBoundAtom", "theory.qflra.SourceBoundTerm", "theory.qflra.SourceBoundLimits",
     ),
     "lp": ("theory.qflra.SourceBoundAtom", "theory.qflra.SourceBoundTerm", "theory.qflra.SourceBoundLimits"),
     "solver.search": ("theory", "lp", "propagation", "backtrack"),

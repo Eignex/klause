@@ -46,7 +46,7 @@ internal class LocalSearchOptimizeRun(
     ): MinimizeResult? {
         verdict?.let { return it }
         checkOpen()
-        val available = params.nodeBudget?.movesLeft() ?: Long.MAX_VALUE
+        val available = params.nodeBudget?.allowance?.movesLeft() ?: Long.MAX_VALUE
         control.offer(global, sliceMillis, sliceInstructions, available)
         if (control.token() || sliceInstructions == 0L) return null
         if (available == 0L) {

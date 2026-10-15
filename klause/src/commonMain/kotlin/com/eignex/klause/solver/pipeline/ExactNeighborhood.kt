@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.solver.resources.NodeAllowance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -38,7 +38,7 @@ internal class ExactNeighborhood(
     private val coordinateValues: (Sample) -> List<BigFraction>,
     private val adaptive: Boolean = false,
     seed: Long = 0,
-    private val nodeBudget: NodeBudget? = null,
+    private val nodeBudget: NodeAllowance? = null,
     private val maximumMoves: Long = Long.MAX_VALUE,
     private val maximumInstructions: Long = Long.MAX_VALUE,
     private val maximumImprovementMoves: Long? = null,
