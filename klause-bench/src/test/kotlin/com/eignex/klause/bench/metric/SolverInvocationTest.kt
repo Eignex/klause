@@ -112,6 +112,24 @@ class SolverInvocationTest {
     }
 
     @Test
+    fun `subprocess exits remain visible after verdict publication`() {
+        for (dialect in SolverInvocation.Dialect.entries) {
+            val verdict = when (dialect) {
+                SolverInvocation.Dialect.MINIZINC -> "----------"
+                SolverInvocation.Dialect.PB_COMPETITION -> "s SATISFIABLE"
+                SolverInvocation.Dialect.SMT_LIB -> "sat"
+            }
+            for (exit in listOf(0, 7)) {
+                val result = SolverInvocation.invoke(
+                    listOf("sh", "-c", "printf '%s\\n' '$verdict'; exit $exit"), dialect,
+                )
+
+                assertEquals(exit.toString(), result.stats["exit"])
+            }
+        }
+    }
+
+    @Test
     fun `a model the solver declines is undecided rather than a failed run`() {
         val r = SolverInvocation.invoke(
             listOf(
