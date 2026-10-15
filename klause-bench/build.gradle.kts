@@ -88,6 +88,35 @@ val checkNativeVmSymbolQueries = tasks.register<Exec>("checkNativeVmSymbolQuerie
         "tools/native_vm_loaded_module.py", "tools/read_native_vm_metadata.py")
 }
 
+val checkNativeVmTaskGenerationReview = tasks.register<Exec>("checkNativeVmTaskGenerationReview") {
+    group = "verification"
+    description = "Test saved task entry delivery, initialization candidates and proof scope."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_native_vm_task_generation.py")
+    inputs.files(
+        "tools/bind_native_vm_boundary_entries.py",
+        "tools/native_compiler_observer.py",
+        "tools/native_vm_boundary_lifecycle.py",
+        "tools/native_vm_demangler.py",
+        "tools/native_vm_entry_decoder.py",
+        "tools/native_vm_event_loss.py",
+        "tools/native_vm_live_arguments.py",
+        "tools/native_vm_loaded_module.py",
+        "tools/native_vm_task_generation.py",
+        "tools/read_native_vm_entries.py",
+        "tools/read_native_vm_metadata.py",
+        "tools/read_native_vm_signatures.py",
+        "tools/read_native_vm_symbols.py",
+        "tools/review_native_vm_boundary_lifecycle.py",
+        "tools/review_native_vm_dwarf_records.py",
+        "tools/review_native_vm_entry_abi.py",
+        "tools/review_native_vm_live_arguments.py",
+        "tools/review_native_vm_task_generation.py",
+        "tools/review_native_vm_task_lifecycle_abi.py",
+        "tools/test_review_native_vm_task_generation.py",
+    )
+}
+
 val checkNativeVmTaskGeneration = tasks.register<Exec>("checkNativeVmTaskGeneration") {
     group = "verification"
     description = "Test source-bound task entry argument capture and retained proof guards."
@@ -316,7 +345,8 @@ tasks.named("check") {
         checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkNativeVmEntryTransfers,
         checkNativeVmDebugImage, checkNativeVmDwarfProvider, checkNativeVmDwarfRecords,
         checkNativeVmDwarfRecordReview, checkNativeVmDwarfContext, checkNativeVmDwarfLayoutReview,
-        checkNativeVmEntryAbi, checkNativeVmTaskCalls, checkNativeVmTaskLifecycleAbi, checkNativeVmTaskGeneration)
+        checkNativeVmEntryAbi, checkNativeVmTaskCalls, checkNativeVmTaskLifecycleAbi, checkNativeVmTaskGeneration,
+        checkNativeVmTaskGenerationReview)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
