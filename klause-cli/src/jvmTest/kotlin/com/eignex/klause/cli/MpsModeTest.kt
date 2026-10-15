@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
@@ -19,6 +20,39 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MpsModeTest {
+    @Test
+    fun `finite MPS execution retains original open declarations after bound closure`() {
+        val source = File.createTempFile("mps-original-declarations", ".mps").apply {
+            writeText("ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 0\n X COST 1 R 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 2\n" +
+                "BOUNDS\n FX B I 1\n LI B X 0\nINDICATORS\n IF R I 1\nENDATA\n")
+            deleteOnExit()
+        }
+        for (exact in listOf(false, true)) {
+            val loaded = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { this.exact = exact })
+
+            val original = assertIs<Problem>(loaded.finiteShape.preparedPlan.originalSource)
+            assertFalse(original.intBounds.hasUpper(1))
+            assertEquals(2L, loaded.finiteProblem.intBounds.upper(1))
+        }
+    }
+
+    @Test
+    fun `finite MPS maximization retains its original objective beside the minimized execution goal`() {
+        val source = File.createTempFile("mps-original-objective", ".mps").apply {
+            writeText("OBJSENSE\n MAX\nROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 1\n M1 'MARKER' 'INTEND'\nBOUNDS\n LI B I 0\n UI B I 2\nENDATA\n")
+            deleteOnExit()
+        }
+        for (exact in listOf(false, true)) {
+            val loaded = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { this.exact = exact })
+
+            assertTrue(loaded.finiteShape.preparedPlan.maximize)
+            assertEquals(1L, assertNotNull(loaded.finiteShape.preparedPlan.objective).intCoefficients[0])
+            assertEquals(-1L, assertNotNull(loaded.linearObjective).intCoefficients[0])
+        }
+    }
+
     @Test
     fun `open MPS indicator regions retain numerical optima under either certification policy`() {
         val source = File.createTempFile("mps-open-indicator", ".mps").apply {

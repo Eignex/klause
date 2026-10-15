@@ -92,6 +92,8 @@ internal class Solvable(
         routingLpStats: LpStats = LpStats(),
         /** Wall time spent proving bounds for pipeline selection. */
         routingElapsedMs: Long = 0L,
+        /** Existing finite source ownership selected by the frontend. */
+        preparedRoute: SourceProblemRoute.Finite? = null,
     ) : this(
         finite = problem?.finiteSolveShape(
             optimize,
@@ -101,6 +103,7 @@ internal class Solvable(
             objVarId,
             definitionalSweep,
             searchHints,
+            preparedRoute,
         ),
         render = render,
         objectiveValue = objectiveValue,
@@ -141,8 +144,10 @@ private fun Problem.finiteSolveShape(
     objectiveIntVar: Int?,
     definitionalSweep: DefinitionalSweep?,
     searchHints: SearchHints?,
+    preparedRoute: SourceProblemRoute.Finite?,
 ): FiniteSolveShape {
-    val route = pipelineRoute(linearObjective, maximize)
+    require(preparedRoute == null || preparedRoute.problem === this) { "finite route has a different execution model" }
+    val route = preparedRoute ?: pipelineRoute(linearObjective, maximize)
     require(route is SourceProblemRoute.Finite) { "finite solve requested for ${sourceRouteName(route)}" }
     return FiniteSolveShape(
         route.problem,

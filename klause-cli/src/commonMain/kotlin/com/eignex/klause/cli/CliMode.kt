@@ -708,6 +708,7 @@ internal fun linearSolvable(
     routingLpStats: LpStats = LpStats(),
     routingElapsedMs: Long = 0L,
     searchHints: com.eignex.klause.ir.SearchHints? = null,
+    preparedRoute: SourceProblemRoute.Finite? = null,
 ): Solvable {
     // Unit folds preserve literal moves. Wider folds derive from priced inputs;
     // excluding unpriced feasibility structure can stall constraint repair.
@@ -722,6 +723,7 @@ internal fun linearSolvable(
             routingLpStats = routingLpStats,
             routingElapsedMs = routingElapsedMs,
             searchHints = searchHints,
+            preparedRoute = preparedRoute,
         )
     }
     // The gradient view reads every fold (evaluating through a fold is always safe — it only needs
@@ -748,6 +750,7 @@ internal fun linearSolvable(
         routingLpStats = routingLpStats,
         routingElapsedMs = routingElapsedMs,
         searchHints = searchHints,
+        preparedRoute = preparedRoute,
     )
 }
 
