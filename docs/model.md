@@ -180,8 +180,10 @@ object, canonical execution model, source declaration counts, coordinate mapping
 component descriptors and objective direction. Its internal structural capture selects a
 sealed finite/linear, polynomial, nonlinear-integer, transcendental or declined
 payload. Each runnable variant carries its required model or completion directly;
-consumers dispatch on that variant. Declined polynomial assembly can retain a typed
-finite projection beside its explicit unsupported or resource cause. The public
+consumers dispatch on that variant. Declined assembly can retain a typed finite
+projection or a completed polynomial capture beside its explicit unsupported or
+resource cause. A stop after polynomial construction preserves that capture and
+its coordinate mappings while the decline still governs routing. The public
 kind and nullable projection getters remain compatibility views of that capture.
 Its descriptors use extensible
 semantic identifiers and retain original factor indices. `ComponentPlan` supplies

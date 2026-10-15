@@ -20,7 +20,7 @@ class PolynomialTheoryRequest internal constructor(
     val preparedPlan: PreparedSourcePlan = problem.prepareExecutionPlan(),
 ) {
     internal val sharedModel: SharedPolynomialModel?
-        get() = (preparedPlan.execution as? PreparedExecution.Polynomial)?.completion
+        get() = preparedPlan.execution.polynomial?.completion
             .takeIf { preparedPlan.originalSource is Problem }
 }
 
@@ -40,7 +40,7 @@ fun Problem.pipelineRequest(): PolynomialTheoryRequest {
 }
 
 internal fun PreparedSourcePlan.polynomialRequest(): PolynomialTheoryRequest {
-    val shared = requireNotNull(execution as? PreparedExecution.Polynomial).completion
+    val shared = requireNotNull(execution.polynomial).completion
     return PolynomialTheoryRequest(
         PolynomialRealProblem(
             shared.service.formula, shared.service.realCount, shared.source.numBoolVars,
@@ -51,7 +51,7 @@ internal fun PreparedSourcePlan.polynomialRequest(): PolynomialTheoryRequest {
 }
 
 internal fun PolynomialTheoryRequest.resolvedModel(): SharedPolynomialModel =
-    requireNotNull(preparedPlan.execution as? PreparedExecution.Polynomial) {
+    requireNotNull(preparedPlan.execution.polynomial) {
         "polynomial request has no prepared completion"
     }.completion
 
