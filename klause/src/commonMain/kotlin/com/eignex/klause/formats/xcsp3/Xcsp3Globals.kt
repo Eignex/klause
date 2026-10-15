@@ -51,7 +51,8 @@ internal fun Compiler.Builder.count(e: XmlElement) {
 
 internal fun Compiler.Builder.element(e: XmlElement) {
     e.child("matrix")?.let { return elementMatrix(e, it) }
-    val offset = e.attr("startIndex").ifBlank { "0" }.toInt()
+    val offset = selectionOffset(e)
+    requireAnySelectionRank(e)
     val idx = singleTermVar(
         e.child("index")?.textContent
             ?: throw UnsupportedXcsp3Exception("element: missing <index>"),
@@ -96,9 +97,9 @@ internal fun Compiler.Builder.element(e: XmlElement) {
     )
 }
 
-// Constant matrix selection uses a table; variable selection keeps the native element constraint.
 @Suppress("ThrowsCount") // one guard per unsupported shape (bad index, empty constant/variable matrix)
 internal fun Compiler.Builder.elementMatrix(e: XmlElement, matrix: XmlElement) {
+    requireAnySelectionRank(e)
     // Matrix element uses per-axis start indices (defaulting to 0), not a single startIndex.
     val rowOffset = e.attr("startRowIndex").ifBlank { "0" }.toInt()
     val colOffset = e.attr("startColIndex").ifBlank { "0" }.toInt()
@@ -111,15 +112,7 @@ internal fun Compiler.Builder.elementMatrix(e: XmlElement, matrix: XmlElement) {
     val constRows = constMatrixRows(matrix.textContent)
     if (constRows != null) {
         if (constRows.isEmpty()) throw UnsupportedXcsp3Exception("element: empty <matrix>")
-        val tuples = ArrayList<Int>(constRows.sumOf { it.size } * 3)
-        for (r in constRows.indices) {
-            for (c in constRows[r].indices) {
-                tuples.add(r + rowOffset)
-                tuples.add(c + colOffset)
-                tuples.add(constRows[r][c])
-            }
-        }
-        factors.add(Table(xs = intArrayOf(i, j, v), tuples = tuples.toIntArray().widenToLong()))
+        elementConstantMatrix(constRows, i, j, v, rowOffset, colOffset)
         return
     }
     val rows = matrixRows(matrix.textContent)
@@ -857,14 +850,21 @@ internal fun Compiler.Builder.allEqual(e: XmlElement) {
     }
 }
 
-/** `minimum`/`maximum` of a list constrained by a condition, via [ArrayMinMax] + the condition. */
 internal fun Compiler.Builder.minMax(e: XmlElement, max: Boolean) {
     // Entries may be plain variables or expressions (e.g. `sub(y,37)`), each resolved to an int var.
     val vars = requireNotNull(e.child("list")).textContent.splitWs()
         .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
+    requireAnySelectionRank(e)
     val m = newAuxVar(domainMin(vars), domainMin(vars) + domainSpan(vars) - 1)
     factors.add(ArrayMinMax(result = m, xs = vars, max = max))
-    postCondition(intArrayOf(1), intArrayOf(m), requireNotNull(e.child("condition")).textContent.trim())
+    val index = e.child("index")
+    if (index != null) {
+        factors.add(Element(singleTermVar(index.textContent), m, vars.widenToLong(),
+            arrIsVars = true, indexOffset = selectionOffset(e)))
+    }
+    val condition = e.child("condition")
+    if (condition != null) postCondition(intArrayOf(1), intArrayOf(m), condition.textContent.trim())
+    else if (index == null) throw UnsupportedXcsp3Exception("extremum: missing <condition> or <index>")
 }
 
 /** Global cardinality: each value in `<values>` occurs a fixed count, an interval, or a

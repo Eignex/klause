@@ -873,15 +873,8 @@ internal object Compiler {
 
         /** `if(cond, a, b)` as a linear term: a fresh int pinned to `a` or `b` by the condition. */
         internal fun ifTerm(args: List<FExpr>): IntComb {
-            val cond = compileBool(args[0])
-            val a = materializeVar(linear(args[1]))
-            val b = materializeVar(linear(args[2]))
-            val v = newAuxVar(minOf(domains[a].min, domains[b].min), maxOf(domains[a].max, domains[b].max))
-            val ea = reifyLinear(intArrayOf(1, -1), intArrayOf(v, a), LinearOp.EQ, 0)
-            val eb = reifyLinear(intArrayOf(1, -1), intArrayOf(v, b), LinearOp.EQ, 0)
-            factors.add(Clause(intArrayOf(Lit.negate(cond), ea))) // cond ⇒ v = a
-            factors.add(Clause(intArrayOf(cond, eb))) // ¬cond ⇒ v = b
-            return IntComb.Narrow(LinComb(mapOf(v to 1L), 0L))
+            return selectionTerm(compileBool(args[0]), materializeVar(linear(args[1])),
+                materializeVar(linear(args[2])))
         }
 
         internal fun divModTerm(args: List<FExpr>, mod: Boolean): IntComb {
