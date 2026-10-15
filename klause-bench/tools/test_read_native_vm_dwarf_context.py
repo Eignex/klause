@@ -76,7 +76,9 @@ class ReadNativeVmDwarfContextTest(unittest.TestCase):
 
     def test_serialized_headers_retain_names_and_decline_oversized_nested_values(self):
         self.assertEqual({'path': {'bytesHex': '66696c65'}, 'index': 0},
-                         context.serial({'path': b'file', 'index': 0, '_io': object()}))
+                         context.serial({'path': b'file', 'index': 0, '_io': object(),
+                                         'directory_entry_format_parser': object(),
+                                         'file_name_entry_format_parser': object()}))
         for raw in [[0] * (context.MAX_ENTRIES + 1), object()]:
             with self.subTest(kind=type(raw).__name__), self.assertRaises(ValueError):
                 context.serial(raw)
@@ -97,7 +99,8 @@ class ReadNativeVmDwarfContextTest(unittest.TestCase):
             with self.subTest(version=version):
                 top = SimpleNamespace(cu=SimpleNamespace(cu_offset=10), offset=21, attributes={})
                 unit = SimpleNamespace(cu_offset=10, header={'version': version}, get_top_DIE=Mock(return_value=top))
-                program = SimpleNamespace(header={'version': version, 'include_directory': [b'src'],
+                program = SimpleNamespace(header={'version': version, 'directory_entry_format': None,
+                                                  'file_name_entry_format': None, 'include_directory': [b'src'],
                                                   'file_entry': [{'name': b'compileTask.cpp', 'dir_index': base}]},
                                           get_entries=Mock())
                 reader = context.DwarfContext(SimpleNamespace(line_program_for_CU=Mock(return_value=program)))
@@ -191,6 +194,9 @@ class ReadNativeVmDwarfContextTest(unittest.TestCase):
                 reader.attempt(lambda: [])
         with self.assertRaises(context.ContextLimit):
             reader.attempt(Mock(side_effect=context.ContextLimit('too much input')))
+        reader.bind_budget(Mock(side_effect=context.ContextLimit('containing inventory full')))
+        with self.assertRaises(context.ContextLimit):
+            reader.attempt(lambda: [])
 
     def test_provider_wrapping_a_resource_failure_cannot_turn_it_into_an_unresolved_success(self):
         descriptor = namedtuple('Section', 'stream size')
@@ -245,7 +251,7 @@ class ReadNativeVmDwarfContextTest(unittest.TestCase):
             sys.path[:] = original_path
             sys.dont_write_bytecode = original_bytecode
 
-    def test_pinned_provider_reads_a_v4_line_header_without_executing_its_program(self):
+    def test_pinned_provider_reads_line_headers_without_executing_their_programs(self):
         original_path, original_bytecode = list(sys.path), sys.dont_write_bytecode
         try:
             with tempfile.TemporaryDirectory() as directory:
@@ -253,23 +259,30 @@ class ReadNativeVmDwarfContextTest(unittest.TestCase):
                 context.records.provider.load(Path(directory), provenance)
                 from elftools.dwarf.dwarfinfo import DWARFInfo, DebugSectionDescriptor
                 from elftools.dwarf.structs import DWARFStructs
-                header = bytes([1, 1, 1, 0xfb, 14, 13]) + bytes(12) + b'src\0\0file.cpp\0\x01\x00\x00\0'
-                body = b'\x04\x00' + len(header).to_bytes(4, 'little') + header
-                raw = len(body).to_bytes(4, 'little') + body
-                dwarf = DWARFInfo.__new__(DWARFInfo)
-                dwarf.debug_line_sec = DebugSectionDescriptor(io.BytesIO(raw), '.debug_line', 0, len(raw), 0)
-                dwarf._linetable_cache = {}
-                attr = SimpleNamespace(form='DW_FORM_sec_offset', value=0, raw_value=0, offset=1)
-                top = SimpleNamespace(cu=SimpleNamespace(cu_offset=0), offset=11, attributes={'DW_AT_stmt_list': attr})
-                unit = SimpleNamespace(cu_offset=0, header={'version': 4}, get_top_DIE=Mock(return_value=top),
-                                       structs=DWARFStructs(little_endian=True, dwarf_format=32, address_size=8, dwarf_version=4))
+                for version in [4, 5]:
+                    with self.subTest(version=version):
+                        common = bytes([1, 1, 1, 0xfb, 14, 13]) + bytes(12)
+                        tables = b'src\0\0file.cpp\0\x01\x00\x00\0' if version == 4 else \
+                            b'\x01\x01\x08\x01src\0\x02\x01\x08\x02\x0f\x01file.cpp\0\x00'
+                        header = common + tables
+                        body = version.to_bytes(2, 'little') + (b'\x08\x00' if version == 5 else b'') + \
+                            len(header).to_bytes(4, 'little') + header
+                        raw = len(body).to_bytes(4, 'little') + body
+                        dwarf = DWARFInfo.__new__(DWARFInfo)
+                        dwarf.debug_line_sec = DebugSectionDescriptor(io.BytesIO(raw), '.debug_line', 0, len(raw), 0)
+                        dwarf._linetable_cache = {}
+                        attr = SimpleNamespace(form='DW_FORM_sec_offset', value=0, raw_value=0, offset=1)
+                        top = SimpleNamespace(cu=SimpleNamespace(cu_offset=0), offset=11, attributes={'DW_AT_stmt_list': attr})
+                        unit = SimpleNamespace(cu_offset=0, header={'version': version}, get_top_DIE=Mock(return_value=top),
+                                               structs=DWARFStructs(little_endian=True, dwarf_format=32,
+                                                                    address_size=8, dwarf_version=version))
 
-                result = context.DwarfContext(dwarf).unit(unit)
+                        result = context.DwarfContext(dwarf).unit(unit)
 
-                self.assertEqual('decoded', result['lineHeader']['status'])
-                files = result['lineHeader']['data']['header']['file_entry']
-                self.assertEqual({'bytesHex': b'file.cpp'.hex()}, files[0]['name'])
-                self.assertFalse(result['lineProgramExecuted'])
+                        self.assertEqual('decoded', result['lineHeader']['status'], result['lineHeader'])
+                        files = result['lineHeader']['data']['header']['file_entry']
+                        self.assertEqual({'bytesHex': b'file.cpp'.hex()}, files[0]['name'])
+                        self.assertFalse(result['lineProgramExecuted'])
                 context.records.provider.verify(Path(provenance['directory']), provenance)
         finally:
             for name in tuple(sys.modules):
