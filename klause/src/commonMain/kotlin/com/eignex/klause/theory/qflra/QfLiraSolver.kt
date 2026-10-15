@@ -522,7 +522,9 @@ class ExactLiraSearchComponent private constructor(
     private fun agreementSourceRows(): List<ExactRationalInequality>? {
         lpStop.charge(model.numIntVars.toLong() + model.numRealVars + preparedRows.size + 1L)
         if (operationStop()) return null
-        return reduction.sourceRows(bools, node, lpStop)
+        val current = checkNotNull(context)
+        val bounded = node.withPublishedBounds(model.numIntVars, current::intLowerBound, current::intUpperBound)
+        return reduction.sourceRows(bools, bounded, lpStop)
     }
 
     private fun coordinateDeclined(context: SearchContext): ComponentCheck {
@@ -782,8 +784,7 @@ class ExactLiraSearchComponent private constructor(
             }
 
             is SearchDecision.IntAtMost, is SearchDecision.IntAtLeast, is SearchDecision.IntEqual -> {
-                node = node.withPublishedBounds(model.numIntVars, context::intLowerBound, context::intUpperBound)
-                    .copy(retainedReduction = null)
+                node = node.copy(retainedReduction = null)
             }
         }
         nodesByLevel.put(context.decisionLevel, node)
