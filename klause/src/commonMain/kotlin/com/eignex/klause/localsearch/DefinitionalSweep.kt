@@ -154,7 +154,7 @@ class DefinitionalSweep internal constructor(
                 for (f in factors) {
                     for (v in f.intVars) {
                         if (v in 0 until numIntVars) {
-                            if (f !is Product) nonProductOcc[v]++
+                            if (f !is Product && f !is Power) nonProductOcc[v]++
                         }
                     }
                 }

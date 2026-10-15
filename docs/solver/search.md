@@ -347,6 +347,13 @@ bounds. The inverse uses signed-word division comparisons, so it cannot overflow
 publish an approximate endpoint. Mixed-sign input domains retain their interior values;
 complete assignment checks still enforce the complete relation.
 
+Integer `Power` uses exact signed-word comparisons for forward and inverse bounds,
+preserving sign and both even roots. Each fire filters at most 256 present input and
+output values; wider domains retain bounds filtering and exact pinned checks. Hole
+exclusions cite their source value exclusions as well as bounds. Inverse comparisons
+and bounded value visits charge propagation work. A failed Power fire uses chronological
+fallback when no sharp complete conflict clause is available.
+
 ### Custom factor publication checks
 
 Custom factors retain the `Propagator` and `Invariant` extension paths. A custom

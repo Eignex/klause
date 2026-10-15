@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.util.LongArrayList
 
 /**
@@ -216,6 +217,10 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
             }
             if (invariants?.literalChannel(varId) != null) {
                 LiteralChannelRepair(state, this).propose(varId, newValue)
+                return
+            }
+            if (invariants?.intDefinition(varId) is FunctionalObjective.Power) {
+                PowerResultRepair(state, this).propose(varId, newValue)
                 return
             }
             if (invariants?.hasExtremumRepair(varId) != true) {

@@ -16,7 +16,7 @@ internal class PowerPropagator(private val base: Int, private val exponent: Int,
         val output = state.intDomains[result]
         val segments = if (exponent and 1 != 0) listOf(input.min to input.max) else
             listOf(input.min to minOf(-1L, input.max), maxOf(0L, input.min) to input.max)
-        val supported = segments.mapNotNull { (lo, hi) -> powerPreimage(lo, hi, exponent, output.min, output.max) }
+        val supported = segments.mapNotNull { (lo, hi) -> powerPreimage(lo, hi, exponent, output.min, output.max) { state.work++ } }
         if (supported.isEmpty()) return false
         if (!state.tightenIntMin(base, supported.minOf { it.first }, premises) ||
             !state.tightenIntMax(base, supported.maxOf { it.second }, premises)) return false
@@ -26,9 +26,10 @@ internal class PowerPropagator(private val base: Int, private val exponent: Int,
         val lower = if (exponent and 1 == 0 && narrowed.min <= 0 && narrowed.max >= 0) 0L else minOf(first, last)
         if (!state.tightenIntMin(result, lower, premises) ||
             !state.tightenIntMax(result, maxOf(first, last), premises)) return false
-        val span = state.intDomains[base].spanOrNull(256)
+        val span = state.intDomains[base].spanOrNull(MAX_FILTER_VALUES)
         val values = span?.let { LongArray(it.size) { i -> it.valueAt(i) } }
         if (values != null) for (i in 0 until values.size) {
+            state.work++
             val value = values[i]
             val image = integerPowerOrNull(value, exponent)
             if (image == null || image !in state.intDomains[result] || (base == result && image != value)) {
@@ -37,15 +38,16 @@ internal class PowerPropagator(private val base: Int, private val exponent: Int,
                 if (!state.excludeIntValue(base, value, reason)) return false
             }
         }
-        val resultSpan = state.intDomains[result].spanOrNull(256) ?: return true
+        val resultSpan = state.intDomains[result].spanOrNull(MAX_FILTER_VALUES) ?: return true
         val results = LongArray(resultSpan.size) { resultSpan.valueAt(it) }
         for (i in 0 until results.size) {
+            state.work++
             val value = results[i]
             val roots = if (exponent and 1 != 0) {
-                listOfNotNull(powerPreimage(Long.MIN_VALUE, Long.MAX_VALUE, exponent, value, value)?.first)
+                listOfNotNull(powerPreimage(Long.MIN_VALUE, Long.MAX_VALUE, exponent, value, value) { state.work++ }?.first)
             } else listOfNotNull(
-                powerPreimage(Long.MIN_VALUE, -1L, exponent, value, value)?.first,
-                powerPreimage(0L, Long.MAX_VALUE, exponent, value, value)?.first,
+                powerPreimage(Long.MIN_VALUE, -1L, exponent, value, value) { state.work++ }?.first,
+                powerPreimage(0L, Long.MAX_VALUE, exponent, value, value) { state.work++ }?.first,
             )
             if (roots.any { it in state.intDomains[base] && (base != result || it == value) }) continue
             val reason = (state.composeIntVarAtomAntecedents(variables) ?: intArrayOf()) +
@@ -60,5 +62,9 @@ internal class PowerPropagator(private val base: Int, private val exponent: Int,
         val literal = if (state.undoLogging) state.exclusionLiteral(variable, value, state.undo.size)
             else Lit.make(state.atomVarEq(variable, value), true)
         return if (literal == Lit.NONE) intArrayOf() else intArrayOf(literal)
+    }
+
+    private companion object {
+        const val MAX_FILTER_VALUES = 256L
     }
 }
