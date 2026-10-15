@@ -1048,6 +1048,31 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
+    fun `a deferred comparison retains the shared integer bound that refutes it`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0L, 0L), longArrayOf(10L, 10L), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val bound = SearchDecision.IntAtLeast(0, 4L)
+            assertIs<ComponentResult.Consistent>(session.push(bound))
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(0)))
+
+            assertEquals(
+                setOf(1, assertNotNull(session.atomLiteral(bound)) xor 1),
+                assertNotNull(conflict.explanation).literals.toSet(),
+            )
+        }
+    }
+
+    @Test
     fun `an extreme integer complement retains arbitrary precision source meaning`() {
         val model = Problem(numBoolVars = 0, intBounds = openBounds(), factors = emptyArray())
         ExactLiraSearchComponent(model).use { component ->
