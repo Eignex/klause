@@ -655,11 +655,13 @@ and source scope rather than substituting the local-search score for a witness c
 Self-owned optimization from a completion-checked incumbent with finite and continuous
 coordinates and a continuous objective term admits at most two completion probes per pick after source generation
 and configuration filtering. Uncompleted restart states retain ordinary traversal.
-Strict greedy descent retains its ordinary selection, including residual repairs
-and noise, unless a finite proposal directly increases the objective. That proposal,
-or a raw selection rejection, invokes a completion fallback over the best raw-ranked
-finite proposal and a rotating proposal without another random ranking draw.
-Other acceptance rules rank their bounded probes through the ordinary greedy reservoir.
+Strict greedy descent first offers its ordinary finite selection for completion.
+At a zero-score point the completed objective must improve; a residual-repair choice
+retains the recipe's repair/noise acceptance after source completion. Real-only
+choices and picks without completion credit retain ordinary traversal. A rejected raw
+selection invokes a completion fallback over the best raw-ranked finite proposal and
+a rotating proposal without another random ranking draw. Other acceptance rules rank
+their bounded probes through the ordinary greedy reservoir.
 Private finite proposals from a checked incumbent bypass raw objective rejection;
 only accepted completed candidates enter the fallback acceptance pools. Exploration
 does not insert a duplicate into a pool. An enabled `ObjectiveSeed` also offers a rotating finite
@@ -680,7 +682,7 @@ transition renews admission immediately, preserving productive descent. Successf
 usable without another numerical query. This pacing leaves time for the recipe to
 resample, repair and restart instead of spending every instruction on completion.
 
-Only accepted completions enter the recipe's noise/score pools. Their scores compare
+Only accepted completions enter the fallback's noise/score pools. Their scores compare
 the original objective on completed samples, and improving tabu aspiration uses that
 comparison. The recipe retains its acceptance, configuration, schedule and restart
 policies. A selected finite move and completed reals commit as one compound transition;
