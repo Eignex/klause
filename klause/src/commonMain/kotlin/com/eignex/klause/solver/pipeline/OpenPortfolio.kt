@@ -24,6 +24,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.evidence.absSourceWitnessContext
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceKind
@@ -559,7 +560,8 @@ internal fun openWitnessVerifier(
     val checked = if (model.factors.any { it is ExactSearchRow } ||
         sample.exactInts?.any { !it.fitsLong() } == true
     ) {
-        val source = model.linearAuthorityContext(objective ?: LinearObjective(), ObjectiveSense.MINIMIZE, cancellation)
+        val source = model.absSourceWitnessContext(objective ?: LinearObjective(), cancellation)
+            ?: model.linearAuthorityContext(objective ?: LinearObjective(), ObjectiveSense.MINIMIZE, cancellation)
             ?: return@CandidateVerifier Verification.Indeterminate("exact original-source witness check unavailable")
         source.linearWitnessVerifier(cancellation).verify(candidate)
     } else verifyOpenWitness(model, sample, cancellation)

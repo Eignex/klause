@@ -11,13 +11,16 @@ import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
 import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.solver.pipeline.openWitnessVerifier
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.toSample
 import com.eignex.klause.theory.qfnra.PolynomialFormula
@@ -42,6 +45,7 @@ class AbsEncodingTest {
         assertEquals("-9223372036854775808", result.assignment.intValue(relation.operand))
         assertEquals("9223372036854775808", result.assignment.intValue(relation.result))
         assertEquals(SourceEvidenceCheck.Checked, invocation.checkWitness(sample, Cancellation.Never))
+        assertIs<Verification.Accepted<*, *>>(openWitnessVerifier(source, null).verify(Candidate(sample, null)))
     }
 
     @Test
