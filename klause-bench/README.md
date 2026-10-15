@@ -1503,6 +1503,13 @@ checking. This isolates fresh-start native behavior; it is not a default portfol
 explicit warm start. These options are exclusive. Supplied runs report their initial
 cost and strict improvements separately; retaining the supplied point is not native
 search progress. Neither option changes default portfolio initialization.
+`supportEngine=true` adds a third, support-preserving variant to each engine. At a
+feasible point it gives a newly broken longer clause an unforced replacement literal
+ranked by native break score at the live point, then follows its unit implications. Such replacements
+are heuristic choices, not deductions. Conflicts and cancellation reject the proposal;
+each variable receives at most one value. The probe checks the full post-move hard cost
+of every returned compound before selection and reports support decisions separately.
+The extra grading check is diagnostic work; profile times do not establish throughput.
 
 ### Objective representation probe
 

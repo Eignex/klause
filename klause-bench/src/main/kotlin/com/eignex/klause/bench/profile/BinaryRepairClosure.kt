@@ -84,7 +84,11 @@ internal class BinaryRepairGraph private constructor(
     }
 }
 
-internal class BinaryRepairClosure(private val graph: BinaryRepairGraph, private val assumptions: Assumptions) {
+internal class BinaryRepairClosure(
+    private val graph: BinaryRepairGraph,
+    private val assumptions: Assumptions,
+    private val preserveSupport: Boolean = false,
+) {
     private val size = graph.edges.size / 2
     private val stamps = IntArray(size)
     private val values = BooleanArray(size)
@@ -112,6 +116,8 @@ internal class BinaryRepairClosure(private val graph: BinaryRepairGraph, private
         private set
     var naryLiteralVisits = 0L
         private set
+    var supportDecisions = 0L
+        private set
     var largestMove = 0
         private set
 
@@ -135,7 +141,7 @@ internal class BinaryRepairClosure(private val graph: BinaryRepairGraph, private
         return true
     }
 
-    private fun expand(cancellation: Cancellation): Boolean {
+    private fun expand(cancellation: Cancellation, supportState: LocalSearchState? = null): Boolean {
         var cursor = 0
         var visits = 0
         while (cursor < end) {
@@ -150,15 +156,18 @@ internal class BinaryRepairClosure(private val graph: BinaryRepairGraph, private
             for (row in graph.naryOccurrences[literal]) {
                 naryVisits++
                 if (visits++ % 256 == 0 && cancellation.isCancelled()) return false
-                if (!expandClause(graph.naryClauses[row], cancellation)) return false
+                if (!expandClause(graph.naryClauses[row], cancellation, supportState)) return false
             }
         }
         return !cancellation.isCancelled()
     }
 
-    private fun expandClause(literals: IntArray, cancellation: Cancellation): Boolean {
+    private fun expandClause(
+        literals: IntArray, cancellation: Cancellation, supportState: LocalSearchState?,
+    ): Boolean {
         var unknown = 0
         var last = Lit.NONE
+        var supported = false
         for ((index, literal) in literals.withIndex()) {
             naryLiteralVisits++
             if (index % 256 == 0 && cancellation.isCancelled()) return false
@@ -169,10 +178,32 @@ internal class BinaryRepairClosure(private val graph: BinaryRepairGraph, private
             if (value < 0) {
                 unknown++
                 last = literal
-                if (unknown > 1) return true
+                if (supportState != null && Lit.evaluate(literal, supportState.assignment.boolValue(variable))) {
+                    supported = true
+                }
+                if (unknown > 1 && supportState == null) return true
             } else if (Lit.evaluate(literal, value == 1)) return true
         }
-        return unknown == 1 && force(last)
+        if (unknown < 2) return unknown == 1 && force(last)
+        if (supportState == null || supported) return true
+        var chosen = Lit.NONE
+        var bestBreak = Int.MAX_VALUE
+        for ((index, literal) in literals.withIndex()) {
+            if (index % 256 == 0 && cancellation.isCancelled()) return false
+            val variable = Lit.variable(literal)
+            if (stamps[variable] == epoch || frozen[variable].toInt() >= 0 ||
+                supportState.invariants?.isDefinedBool(variable) == true
+            ) continue
+            val score = supportState.breakScore(Move.BoolFlip(variable))
+            if (chosen == Lit.NONE || score < bestBreak) {
+                chosen = literal
+                bestBreak = score
+            }
+        }
+        if (chosen == Lit.NONE) return false
+        // Replacement support is a heuristic choice, not an entailed literal.
+        supportDecisions++
+        return force(chosen)
     }
 
     fun seed(state: LocalSearchState, root: Int, desired: Boolean, cancellation: Cancellation): Boolean {
@@ -225,7 +256,8 @@ internal class BinaryRepairClosure(private val graph: BinaryRepairGraph, private
             val variable = seeds[i]
             if (seedParity[variable]) valid = force(Lit.make(variable, !state.assignment.boolValue(variable))) && valid
         }
-        if (!valid || !expand(cancellation)) {
+        val supportState = state.takeIf { preserveSupport && it.cost == 0L }
+        if (!valid || !expand(cancellation, supportState)) {
             if (cancellation.isCancelled()) cancelled++ else rejected++
             return null
         }
@@ -242,11 +274,13 @@ internal class BinaryRepairClosure(private val graph: BinaryRepairGraph, private
             ) closed.add(Move.BoolFlip(variable))
         }
         largestMove = maxOf(largestMove, closed.size)
-        return when (closed.size) {
+        val result = when (closed.size) {
             0 -> null
             1 -> closed.single()
             else -> Move.Compound(closed)
         }
+        if (supportState != null && result != null) check(state.netDelta(result) == 0L)
+        return result
     }
 
     fun wrap(strategy: SourceDrivenStrategy, cancellation: Cancellation): SourceDrivenStrategy =

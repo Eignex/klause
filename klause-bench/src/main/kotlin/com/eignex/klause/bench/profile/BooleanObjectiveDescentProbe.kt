@@ -63,7 +63,7 @@ internal object BooleanObjectiveDescentProbe {
         }
         require(options.keys - setOf(
             "prepareMs", "timeout", "conditional", "conditionalClosure", "conditionalRecipe",
-            "conditionalNary", "conditionalBound", "unseededEngine", "suppliedEngine",
+            "conditionalNary", "conditionalBound", "unseededEngine", "suppliedEngine", "supportEngine",
         ) ==
             setOf("suite", "problem", "sha256", "witness64", "work"))
         val suite = requireNotNull(options["suite"])
@@ -80,6 +80,8 @@ internal object BooleanObjectiveDescentProbe {
         val suppliedEngine = options["suppliedEngine"]?.toBooleanStrict() ?: false
         require(!(unseededEngine && suppliedEngine))
         val engineProbe = unseededEngine || suppliedEngine
+        val supportEngine = options["supportEngine"]?.toBooleanStrict() ?: false
+        require(!supportEngine || engineProbe)
         require(!engineProbe || conditional == 0)
         val bounded = options["conditionalBound"]?.toBooleanStrict() ?: false
         require(!bounded || conditional > 0)
@@ -139,7 +141,7 @@ internal object BooleanObjectiveDescentProbe {
         if (engineProbe) {
             val rows = nativeEngines(problem, objective, guide, sweep, work, timeout, suite, name,
                 digest, parsed.numOriginalBoolVars, sourceObjective, prepared.reconstruct,
-                if (suppliedEngine) initial else null)
+                if (suppliedEngine) initial else null, supportEngine)
             out.resolve("cases.json").writeText(rows.toString() + "\n")
             return
         }
@@ -428,13 +430,16 @@ internal object BooleanObjectiveDescentProbe {
         sourceObjective: LinearObjective,
         reconstruct: (Sample) -> Sample,
         initial: Sample?,
+        supportEngine: Boolean,
     ) = buildJsonArray {
         val pins = requireNotNull(LocalSearchModel.of(problem.bake()).pinsUnder(Assumptions.None))
         val identity = preparedIdentity(problem, objective, pins)
         val graph = BinaryRepairGraph.prepare(problem, pins, Cancellation.after(timeout.milliseconds), true)
         var index = 0
         for (label in listOf("cbls/fixed", "sa/adaptive-perturb")) {
-            for (closed in listOf(false, true)) {
+            for (mode in if (supportEngine) listOf(0, 1, 2) else listOf(0, 1)) {
+                val closed = mode != 0
+                val support = mode == 2
                 var cancellation: Cancellation = Cancellation.Never
                 val closures = mutableListOf<BinaryRepairClosure>()
                 val base = LocalSearchCatalog.byLabel(label)
@@ -445,7 +450,7 @@ internal object BooleanObjectiveDescentProbe {
                         if (seen !== state) {
                             pins.forEachBool { id, value -> check(state.assumptions.boolValueOrNull(id) == value) }
                             seen = state
-                            closure = BinaryRepairClosure(graph, state.assumptions).also { closures.add(it) }
+                            closure = BinaryRepairClosure(graph, state.assumptions, support).also { closures.add(it) }
                         }
                         checkNotNull(closure).close(state, move, cancellation)
                     }
@@ -482,10 +487,11 @@ internal object BooleanObjectiveDescentProbe {
                 }
                 val elapsed = System.nanoTime() - started
                 val sample = best?.let(reconstruct)
+                val modeLabel = if (support) "support" else if (closed) "closed" else "raw"
                 add(buildJsonObject {
                     put("index", index++); put("status", "DONE"); put("seed", 3)
                     put("arm",
-                        "${if (initial == null) "unseeded" else "supplied"}-$label-${if (closed) "closed" else "raw"}")
+                        "${if (initial == null) "unseeded" else "supplied"}-$label-$modeLabel")
                     put("problem", buildJsonObject {
                         put("suite", suite); put("problem", name); put("format", "WCNF")
                     })
@@ -505,15 +511,16 @@ internal object BooleanObjectiveDescentProbe {
                         } ?: JsonNull)
                         put("strictImprovements", strictImprovements)
                         put("retainedInitialCost", initial != null && bestValue == objective.evaluateExact(initial))
-                        put("recipe", label); put("closedRepairs", closed)
+                        put("recipe", label); put("closedRepairs", closed); put("supportRepairs", support)
                         put("nativeWitnesses", nativeWitnesses); put("elapsedNanos", elapsed)
                         put("closureCalls", closures.sumOf { it.candidateCalls })
                         put("closureNaryVisits", closures.sumOf { it.naryVisits })
                         put("closureRejected", closures.sumOf { it.rejected })
+                        put("closureSupportDecisions", closures.sumOf { it.supportDecisions })
                         put("stats", buildJsonObject { put("lsMoves", moves); put("lsRestarts", restarts) })
                     })
                 })
-                println("native-engine supplied=${initial != null} recipe=$label closed=$closed value=$bestValue " +
+                println("native-engine supplied=${initial != null} recipe=$label mode=$modeLabel value=$bestValue " +
                     "witnesses=$nativeWitnesses moves=$moves restarts=$restarts elapsed=$elapsed")
             }
         }
