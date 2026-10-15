@@ -1323,7 +1323,7 @@ class ExactLiraSearchComponent private constructor(
         if (partialPoint) {
             lpStop.charge(5)
             if (operationStop() || pointHintStop() || !context.consumeCheck()) return null
-            return finitePointAlternatives(variable, point, context)
+            return finitePointAlternatives(variable, point, context, fractional = true)
         }
         if (hasSourceDisjunctions) return null
         lpStop.charge(model.numIntVars.toLong() + model.numBoolVars + preparedRows.size + 1L)
@@ -1338,9 +1338,15 @@ class ExactLiraSearchComponent private constructor(
         variable: Int,
         point: List<BigFraction>,
         context: SearchContext,
+        fractional: Boolean = false,
     ): List<SearchDecision>? {
         val value = point[model.numRealVars + variable]
-        if (!value.isInteger() || !value.num.fitsLong()) return null
+        if (!value.isInteger()) {
+            if (!fractional || !hintScalar(value) || !hintPreflight(value, value)) return null
+            if (operationStop() || pointHintStop()) return null
+            return finiteFractionalBranch(variable, value, context)
+        }
+        if (!value.num.fitsLong()) return null
         val preferred = value.num.toLongExact()
         val lower = context.intLowerBound(variable) ?: return null
         val upper = context.intUpperBound(variable) ?: return null
@@ -1367,22 +1373,28 @@ class ExactLiraSearchComponent private constructor(
         return split?.alternatives()
     }
 
+    private fun finiteFractionalBranch(
+        variable: Int,
+        value: BigFraction,
+        context: SearchContext,
+    ): List<SearchDecision>? {
+        val floor = value.num / value.den -
+            if (value.num < BIG_ZERO && value.num % value.den != BIG_ZERO) BIG_ONE else BIG_ZERO
+        if (!floor.fitsLong() || floor >= bigIntOf(Long.MAX_VALUE)) return null
+        val threshold = floor.toLongExact()
+        val lower = context.intLowerBound(variable) ?: return null
+        val upper = context.intUpperBound(variable) ?: return null
+        if (threshold < lower || threshold >= upper) return null
+        return listOf(SearchDecision.IntAtMost(variable, threshold),
+            SearchDecision.IntAtLeast(variable, threshold + 1))
+    }
+
     private fun sourceIntegerSplit(point: List<BigFraction>, context: SearchContext): List<SearchDecision>? {
         if (point.size != model.numRealVars + model.numIntVars) return null
         for (integer in 0 until model.numIntVars) {
             val value = point[model.numRealVars + integer]
             if (value.isInteger()) continue
-            if (integer in finiteIntVars) {
-                val floor = value.num / value.den -
-                    if (value.num < BIG_ZERO && value.num % value.den != BIG_ZERO) BIG_ONE else BIG_ZERO
-                if (!floor.fitsLong() || floor >= bigIntOf(Long.MAX_VALUE)) return null
-                val threshold = floor.toLongExact()
-                val lower = context.intLowerBound(integer) ?: return null
-                val upper = context.intUpperBound(integer) ?: return null
-                if (threshold < lower || threshold >= upper) return null
-                return listOf(SearchDecision.IntAtMost(integer, threshold),
-                    SearchDecision.IntAtLeast(integer, threshold + 1))
-            }
+            if (integer in finiteIntVars) return finiteFractionalBranch(integer, value, context)
             return SourceBoundAtom.integerSplit(
                 context,
                 listOf(SourceBoundTerm(SearchIntValue(integer), BigFraction.ONE)),

@@ -49,7 +49,7 @@ data class TheoryParams(
      * with source integer or real coordinates, without a source-clause index
      * or Boolean draw. Original mixed integer/real sources can also select a primitive Boolean through
      * a separate live-point branch proposal before the ordinary heuristic. A live partial point can
-     * order exhaustive finite equality alternatives before primitive preferences and ordinary gates.
+     * order exhaustive finite equality or adjacent split alternatives before primitive preferences and ordinary gates.
      * Other built-in linear point guidance and compound source-clause preferences use
      * this opt-in. Zero permits bounded construction observations
      * but publishes no component preference; a positive value permits indexed preferences after caller

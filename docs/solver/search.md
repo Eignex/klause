@@ -168,12 +168,12 @@ LP and original-source checks. Origin observations count fresh captures without
 counting forward reuse as another LP capture.
 
 Before primitive preferences or ordinary Boolean gates, a default mixed opening
-can try an integral current finite coordinate. The shared CP owner
-receives its equality and the remaining lower/upper alternatives; the point adds
-no fact or proof authority. Unselected disjunctions still require their ordinary
+can try a current finite coordinate. The shared CP owner receives an integral
+coordinate's equality and remaining lower/upper alternatives, or a fractional
+coordinate's adjacent floor/ceiling split. The point adds no fact or proof authority.
+Unselected disjunctions still require their ordinary
 source checks; a residual point can only order the finite alternatives. Missing,
-fractional, stopped or out-of-interval point
-coordinates retain ordinary selection. Complete Boolean leaves retain their
+stopped, oversized or out-of-interval point coordinates retain ordinary selection. Complete Boolean leaves retain their
 existing arithmetic and finite priority. This partial-point choice charges owner
 visits and the ordinary branch check under the current operation token, with no
 new LP invocation or allowance.
