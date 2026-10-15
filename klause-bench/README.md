@@ -1469,11 +1469,22 @@ their objective delta and starts a fresh native CBLS satisfaction walk for each
 selected target. It preserves the prepared model's effective root pins, holds the
 target flipped, and reconciles its unary definitions. Each walk stops at feasibility,
 the counted `work` or `timeout` limit, or a missing move. It uses the public state
-and strategy kernel without engine restarts or further propagation. Rows report
+and strategy kernel without engine restarts or CP queries during the walk. Rows report
 remaining hard cost, pin preservation, setup and search times, and actual moves;
 only feasible rows carry original witnesses. A repaired target may worsen other
 objective terms, so strict improvements are measured against the original point.
 This conditional diagnostic does not measure whole-engine or default behavior.
+
+`conditionalRecipe=cbls/fixed|sa/adaptive-perturb` selects an existing recipe with its
+original parameters. `conditionalClosure=true` conditions an immutable binary-clause
+graph on the base pins, seeds its held-target closure and closes every native source
+and perturbation proposal. `conditionalNary=true` also follows unit implications in
+longer residual clauses. Both closures retain every original clause for grading and
+reject contradictory or canceled proposals; neither queries CP during the walk.
+`conditionalClosure=both` runs ordinary and closed variants over one prepared model
+and requires matching clause/objective/pin fingerprints. Records distinguish binary
+and longer-clause visits, accepted transitions, physical writes and seed-only witnesses.
+Closure construction and fixed-order profile timings do not establish default gains.
 
 ### Objective representation probe
 
