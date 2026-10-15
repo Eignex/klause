@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -32,6 +33,29 @@ class ContinuousProductInvariantTest {
                 assertEquals(state.cost - before, predicted)
                 assertEquals(predicted, applied.toLong())
             }
+        }
+    }
+
+    @Test
+    fun `finite choice guard flips agree with complete numerical regrading`() {
+        val factor = ContinuousProduct(0, 0, 1, 0, doubleArrayOf(0.125, 0.375),
+            intArrayOf(Lit.make(0, true), Lit.make(0, false)))
+        val source = Problem(1, 0, emptyArray(), arrayOf(factor), numRealVars = 2,
+            realLower = DoubleArray(2), realUpper = DoubleArray(2) { 1.0 })
+        val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
+        for (value in listOf(0.125, 0.375)) {
+            state.assignment.setReal(0, value)
+            state.assignment.setReal(1, value * value)
+            state.assignment.setBool(0, true)
+            state.recompute()
+            val before = state.cost
+            val predicted = state.netDelta(Move.BoolFlip(0))
+            state.assignment.setBool(0, false)
+            val applied = state.factors[0].applyBoolFlip(state, 0, 0)
+            state.recompute()
+
+            assertEquals(state.cost - before, predicted)
+            assertEquals(predicted, applied.toLong())
         }
     }
 
