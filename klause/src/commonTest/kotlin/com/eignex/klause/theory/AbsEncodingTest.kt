@@ -10,12 +10,16 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
 import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
+import com.eignex.klause.solver.pipeline.toSample
 import com.eignex.klause.theory.qfnra.PolynomialFormula
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -25,6 +29,21 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AbsEncodingTest {
+    @Test
+    fun `scalar absolute value source checks preserve a wide exact output magnitude`() {
+        val source = SmtLib.parse("(declare-const x Int) (assert (= x (- 9223372036854775808))) " +
+            "(assert (= (abs x) 9223372036854775808))").model
+        val relation = source.factors.filterIsInstance<Abs>().single()
+        val invocation = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
+
+        val result = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source).solve())
+        val sample = result.assignment.toSample(source)
+
+        assertEquals("-9223372036854775808", result.assignment.intValue(relation.operand))
+        assertEquals("9223372036854775808", result.assignment.intValue(relation.result))
+        assertEquals(SourceEvidenceCheck.Checked, invocation.checkWitness(sample, Cancellation.Never))
+    }
+
     @Test
     fun `polynomial participation agrees with exact native absolute value checks`() {
         val source = Problem(
