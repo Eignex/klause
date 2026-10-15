@@ -103,6 +103,7 @@ class ExactLiraSearchComponentTest {
             numBoolVars = 3, intBounds = openBounds(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
             factors = arrayOf(
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(0, true), Lit.make(2, true))),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
                 ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
                 ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
@@ -132,6 +133,33 @@ class ExactLiraSearchComponentTest {
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
             assertTrue(certifications > rootCertifications)
             assertIs<ComponentCheck.Feasible>(component.check(session))
+        }
+    }
+
+    @Test
+    fun `a retained point cannot complete a violated Boolean clause`() {
+        val model = Problem(
+            numBoolVars = 3, intBounds = openBounds(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(0, true))),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentCheck.Indeterminate>(component.check(session))
+
+            val result = session.push(SearchDecision.Bool(Lit.make(2, true)))
+
+            assertIs<ComponentResult.Conflict>(result)
         }
     }
 

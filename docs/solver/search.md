@@ -153,9 +153,11 @@ multiple completion owners retain their existing policy. This selection creates
 no source facts, numerical invocation or Boolean draw. `SearchCandidateHints`
 remains polarity-only; its consultation counters do not count the separate proposal.
 
-A bounded dependency scan identifies Boolean coefficients and disjunction
-members. Their variables retain numerical rechecking. Other matching activators
-can retain the same continuous point and comparison table; uncovered Boolean
+A bounded dependency scan identifies Boolean coefficients in numerical rows and
+disjunction members. Their variables retain numerical rechecking. Pure Boolean
+conjunctions leave numerical coordinates unchanged and retain their complete-leaf
+and source-proof row checks. Other matching activators can retain the same
+continuous point and comparison table; uncovered Boolean
 decisions change no arithmetic row. Current published finite integer bounds are
 checked before retaining that point, and the primitive cursor advances under the
 current operation token. Finite-bound updates can retain the point only when it

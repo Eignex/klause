@@ -18,12 +18,20 @@ import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.security.MessageDigest
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal object LinearPointAdmissionProfile {
     @JvmStatic
     fun main(args: Array<String>) {
+        val out = File(requireNotNull(System.getenv("OUT")))
+        if (System.getenv("KLAUSE_LINEAR_POINT_MEASURED_JVM") != "1") {
+            launchMeasuredJvm(args, out)
+            return
+        }
+        require(Runtime.getRuntime().availableProcessors() == 1)
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256"))
         val expected = options.getValue("sha256")
@@ -36,7 +44,6 @@ internal object LinearPointAdmissionProfile {
         val actual = MessageDigest.getInstance("SHA-256").digest(bytes)
             .joinToString("") { "%02x".format(it.toInt() and 0xff) }
         require(actual == expected) { "original source identity differs" }
-        val out = File(requireNotNull(System.getenv("OUT")))
         out.resolve("source.smt2").writeBytes(bytes)
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         val stop = Cancellation.after(60_000.milliseconds)
@@ -110,6 +117,28 @@ internal object LinearPointAdmissionProfile {
         }
         out.resolve("point-admission.json").writeText(result.toString() + "\n")
         println(result)
+    }
+
+    private fun launchMeasuredJvm(args: Array<String>, out: File) {
+        val command = arrayListOf(
+            File(System.getProperty("java.home"), "bin/java").path,
+            "-Xmx3g", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1",
+            "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector",
+            "-XX:StartFlightRecording=filename=${out.resolve("measured-profile.jfr")}," +
+                "settings=profile,dumponexit=true",
+        )
+        for (name in listOf("klause.workspace.root", "klause.bench.corpusCache")) {
+            System.getProperty(name)?.let { command += "-D$name=$it" }
+        }
+        command += listOf("-cp", System.getProperty("java.class.path"), javaClass.name)
+        command += args
+        out.resolve("launcher.json").writeText(buildJsonObject {
+            put("parentProcessors", Runtime.getRuntime().availableProcessors())
+            put("command", buildJsonArray { command.forEach { add(JsonPrimitive(it)) } })
+        }.toString() + "\n")
+        val builder = ProcessBuilder(command).inheritIO()
+        builder.environment()["KLAUSE_LINEAR_POINT_MEASURED_JVM"] = "1"
+        check(builder.start().waitFor() == 0) { "Measured point admission JVM failed" }
     }
 
     private fun field(owner: Any, name: String): Any? = owner.javaClass.getDeclaredField(name)

@@ -267,8 +267,9 @@ and polling its unchanged stops. Table publication and selection metadata commit
 together; an interrupted prefix supplies neither. Branch consultation reads the
 live metadata without another scan, point copy, numerical call or allowance.
 Closing releases the registration array and choice with the optional point table.
-Forwarding first builds a complete private set of Boolean coefficient and
-disjunction dependencies under the opening token. Entries share the existing
+Forwarding first builds a complete private set of numerical-row Boolean coefficient
+and disjunction dependencies under the opening token. Boolean conjunctions retain
+their full row checks without blocking numerical point reuse. Entries share the existing
 65,536 representation envelope and the scan permits at most 65,536 charged visits.
 An incomplete or over-limit set supplies no reuse authority. Matching unblocked
 activations can retain that same table and point during a

@@ -347,7 +347,8 @@ class ExactLiraSearchComponent private constructor(
             if (++visits > MAX_POINT_HINT_ENTRIES) return null
             stop.charge(1)
             if (stop()) return null
-            if (!prepared.disjunction && (prepared.booleans.isEmpty() ||
+            // Boolean conjunctions leave numerical coordinates unchanged; complete checks install their rows.
+            if (!prepared.disjunction && (!prepared.arithmetic || prepared.booleans.isEmpty() ||
                     (prepared.booleans.size == 1 && prepared.booleans[0] == prepared.row.activator))
             ) continue
             for (variable in prepared.booleans) {
@@ -1473,19 +1474,20 @@ private class PreparedExactLiraSource(
 
 private fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
     val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
+    val arithmeticRows = ArrayList<LinearRow>()
     val preparedRows = model.factors.flatMapIndexed { factorIndex, factor ->
         factor.linearRows.mapIndexed { index, row ->
+            val arithmetic = (0 until row.size).any { !Term.isBool(row.ref(it)) }
+            if (arithmetic) arithmeticRows += row
             PreparedSourceRow(
                 RowAddress(factorIndex, index),
                 row,
                 exactForms[factorIndex][index],
                 row.booleanVariables().toIntArray(),
                 factor.linearForm is LinearForm.Disjunction,
+                arithmetic,
             )
         }
-    }
-    val arithmeticRows = model.factors.flatMap { it.linearRows }.filter { row ->
-        (0 until row.size).any { !Term.isBool(row.ref(it)) }
     }
     val arithmeticVariables = arithmeticRows.flatMap { it.booleanVariables() }.toSet()
     return PreparedExactLiraSource(
@@ -1542,6 +1544,7 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
             forms += exact
             preparedRows += PreparedSourceRow(
                 RowAddress(factorIndex, rowIndex), row, exact, booleans.toIntArray(), form is LinearForm.Disjunction,
+                arithmetic,
             )
             if (arithmetic) {
                 arithmeticRows += row
@@ -2076,6 +2079,7 @@ private class PreparedSourceRow(
     val form: ExactRowForm,
     val booleans: IntArray,
     val disjunction: Boolean,
+    val arithmetic: Boolean,
 )
 
 private data class SearchNode(
