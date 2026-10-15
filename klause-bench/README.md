@@ -1526,6 +1526,25 @@ file, invoke a decoder, run a target or read private fields. A bound external fi
 establishes no calling convention, field layout, control-flow/runtime coverage,
 root census, clock agreement, generated-code size or compiler saving.
 
+`com.eignex.klause.bench.profile.NativeVmDwarfRecords` accepts no arguments and
+repeats the external-file binding before inspecting the original bound debug-file
+hash. A private hash-pinned pyelftools 0.33 wheel supplies the pure-Python reader;
+package member hashes, imported module paths and license texts are retained and
+rechecked. Installation is local to temporary worker storage. Neither native file
+is loaded or invoked; supplementary-file following and relocations are disabled.
+
+The reader retains compilation-unit headers and visits entries only for
+`compileBroker.cpp`, `compileTask.cpp`, `nmethod.cpp` and `compilerThread.cpp`.
+All matching compiler type/function/inline records, direct children and referenced
+type/origin/object-pointer records remain explicit, including duplicate candidates,
+missing names, unknown parents and failed references. Type-unit and supplementary
+references remain unresolved. Limits are 4096 indexed compilation units,
+2 million visited entries, 2048 selected records, 16384 graph nodes, 512 direct
+children, 128 scope levels and 32 MiB of retained metadata. The parent allows
+600 seconds. Location expressions/lists are retained as attributes without
+evaluation. Selected-unit coverage establishes no unique source layout, calling
+convention, register/field read, complete root census or compiler saving.
+
 ### Native executable entry bytes
 
 `com.eignex.klause.bench.profile.NativeVmEntryVerification` retains bytes for the
