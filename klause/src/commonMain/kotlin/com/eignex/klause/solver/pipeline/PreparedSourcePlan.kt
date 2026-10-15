@@ -300,8 +300,7 @@ internal fun Problem.prepareExecutionPlan(
     cancellation: Cancellation = Cancellation.Never,
 ): PreparedSourcePlan {
     projections.requireSource(this)
-    val continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true
-    if (requiresPolynomialCompletion(projections, preferFinite, continuousObjective)) {
+    if (requiresPolynomialCompletion(projections, preferFinite)) {
         return preparePolynomialExecutionPlan(original = original, objective = objective, maximize = maximize,
             providers = providers, projections = projections, cancellation = cancellation)
     }
@@ -320,13 +319,12 @@ internal fun Problem.prepareExecutionPlan(
 internal fun Problem.requiresPolynomialCompletion(
     projections: PreparedFactorProjections,
     preferFinite: Boolean = false,
-    continuousObjective: Boolean = false,
 ): Boolean = factors.indices.any { index ->
     !projections.encoder(index, EncodingTarget.LINEAR).enforcesSource &&
         projections.encoder(index, EncodingTarget.POLYNOMIAL).enforcesSource &&
         (factors[index].variables.reals.isNotEmpty() ||
             projections.capabilities(index).propagation == PropagationCapability.UNSUPPORTED) &&
-        (!(preferFinite || continuousObjective) || !finiteRealFactorSupported(index, projections))
+        (!preferFinite || !finiteRealFactorSupported(index, projections))
 }
 
 internal fun Problem.preparedWithComponents(
@@ -392,7 +390,6 @@ internal fun Problem.preparePolynomialExecutionPlan(
         cancellation() || encodingDecline == EncoderDecline.RESOURCE -> PreparedPlanDecline.RESOURCE
         openInteger -> PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER
         polynomial == null -> PreparedPlanDecline.POLYNOMIAL_ENCODING
-        objective?.realCoefficientValues?.any { it != 0.0 } == true -> PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE
         else -> null
     }
     val finiteFactors = polynomial?.finiteFactorIndices.orEmpty()

@@ -168,8 +168,8 @@ Pure polynomial snapshots retain declaration identities separately from private
 lowering auxiliaries. Nonlinear integer snapshots retain their own neutral source
 representation, with exact declaration-to-numeric coordinate mappings and no
 fabricated factor model or finite projection. The shared polynomial assembler explicitly declines open
-integer declarations and continuous linear objectives; preparation invents no
-finite bounds or operation support. `prepareConditionedLinearQuery()` selects an
+integer declarations; preparation invents no finite bounds or operation support.
+Affine objectives over continuous coordinates retain the exact polynomial optimization route. `prepareConditionedLinearQuery()` selects an
 exact linear completion capable of source-coordinate windows and strict cutoffs
 once, preserving finite ownership and original identity. Query state and rollback
 belong to each worker. Required nonlinear completion declines this hook; an empty

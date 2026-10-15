@@ -11,6 +11,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -220,7 +221,9 @@ class SourceStrategyTest {
 
     @Test
     fun `source factors without execution checks explicitly decline before finite construction`() {
-        val unchecked = object : Factor by Clause(intArrayOf(Lit.make(0, true))) {}
+        val unchecked = object : Factor by Clause(intArrayOf(Lit.make(0, true))) {
+            override val linearForm: LinearForm? = null
+        }
         val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(unchecked))
         for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
             val result = strategy.solve()
