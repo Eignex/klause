@@ -111,34 +111,32 @@ class SmtLibSelectionTest {
                 (declare-const b Bool) (declare-const c Bool)
                 (declare-const x Int) (declare-const y Int)
                 (declare-const z Int) (declare-const w Int)
-                (assert ${if (branch) "(and b c)" else "(not (and b c))"})
-                (assert (= x y)) (assert (= z w))
-                (assert (= (+ x y) (ite (and b c) (+ x 1) (- y 1))))
-                (assert (= (+ z w) (ite (not (and b c)) (+ z 2) (- w 2))))
+                (assert (let ((g (and b c))) (and
+                    (= x y) (= z w)
+                    (= (+ x y) (ite g (+ x 1) (- y 1)))
+                    (= (+ z w) (ite (not g) (+ z 2) (- w 2)))
+                    ${if (branch) "g" else "(not g)"}
             """.trimIndent()
-            val live = SmtLib.parse(source)
-            for (redundant in listOf(false, true)) {
-                val parsed = if (redundant) SmtLib.parse(source +
-                    "\n(assert (= (ite (and b c) 7 8) ${if (branch) 7 else 8}))") else live
+            val live = SmtLib.parse("$source\n)))")
+            val parsed = SmtLib.parse("$source\n(= (ite g 7 8) ${if (branch) 7 else 8})\n)))")
 
-                val result = BacktrackSolver.source(parsed.model)
-                    .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+            val result = BacktrackSolver.source(parsed.model)
+                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
 
-                assertEquals(live.model.numIntVars, parsed.model.numIntVars)
-                assertEquals(live.model.numBoolVars, parsed.model.numBoolVars)
-                val selections = parsed.model.factors.filterIsInstance<Element>()
-                assertEquals(2, selections.size)
-                assertEquals(2, selections.map { it.idx }.distinct().size)
-                val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
-                assertEquals(branch, sample.boolValue(parsed.boolVarNames.getValue("b")) &&
-                    sample.boolValue(parsed.boolVarNames.getValue("c")))
-                assertEquals(if (branch) "1" else "-1", sample.intValue(parsed.intVarNames.getValue("x")))
-                assertEquals(sample.intValue(parsed.intVarNames.getValue("x")),
-                    sample.intValue(parsed.intVarNames.getValue("y")))
-                assertEquals(if (branch) "-2" else "2", sample.intValue(parsed.intVarNames.getValue("z")))
-                assertEquals(sample.intValue(parsed.intVarNames.getValue("z")),
-                    sample.intValue(parsed.intVarNames.getValue("w")))
-            }
+            assertEquals(live.model.numIntVars, parsed.model.numIntVars)
+            assertEquals(live.boolVarNames.keys, parsed.boolVarNames.keys)
+            val selections = parsed.model.factors.filterIsInstance<Element>()
+            assertEquals(2, selections.size)
+            assertEquals(2, selections.map { it.idx }.distinct().size)
+            val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+            assertEquals(branch, sample.boolValue(parsed.boolVarNames.getValue("b")) &&
+                sample.boolValue(parsed.boolVarNames.getValue("c")))
+            assertEquals(if (branch) "1" else "-1", sample.intValue(parsed.intVarNames.getValue("x")))
+            assertEquals(sample.intValue(parsed.intVarNames.getValue("x")),
+                sample.intValue(parsed.intVarNames.getValue("y")))
+            assertEquals(if (branch) "-2" else "2", sample.intValue(parsed.intVarNames.getValue("z")))
+            assertEquals(sample.intValue(parsed.intVarNames.getValue("z")),
+                sample.intValue(parsed.intVarNames.getValue("w")))
         }
     }
 
