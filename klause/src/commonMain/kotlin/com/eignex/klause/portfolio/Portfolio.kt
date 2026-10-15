@@ -463,7 +463,8 @@ class Portfolio(
             check(claim)
             if (terminal is MinimizeResult.Unknown && terminal.reason == TerminationReason.SearchExhausted &&
                 observedCutoffs[arm] == null && incumbent.current() == null &&
-                worker.family == ArmFamily.Backtrack && !worker.improvementOnly && !worker.auxiliaryProof
+                worker.family == ArmFamily.Backtrack && !worker.improvementOnly && !worker.auxiliaryProof &&
+                worker.permitsSourceProofs
             ) {
                 // A shared callback with no finite cutoff leaves the complete arm's source space unrestricted.
                 terminal = MinimizeResult.Infeasible(stats = terminal.stats)
