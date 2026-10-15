@@ -1763,6 +1763,25 @@ code-size/root coverage, clocks or compiler savings, and never changes original
 argument-binding or capture-wide acceptance flags. The review performs no new
 field reads, observer attachment or captured JVM replay.
 
+### Polynomial witness work checkpoints
+
+`com.eignex.klause.bench.profile.PolynomialWitnessProbeProfile` diagnoses the bounded
+root witness producer before CAD. Its single `request64=<base64>` argument encodes
+up to eight `{id, base64, sha256}` original SMT sources. The decoded request is bounded
+to 48 KiB and each unchanged source to 32 KiB. Run it through an AWS lab profile at
+a pinned revision. The output retains original bytes, request, installed provenance
+and revision, plus alternating plain/observed producer records.
+
+The JVM-only observer reflects the existing root query and native owner. It records
+the stack and cumulative charge at the existing coupled-work stop checkpoint without
+returning cancellation or adding native charges. Both modes use the same source,
+fixings, default representation caps and a 60-second containing deadline. Two query
+checkpoints run normalization and bounded probing; no projection or lifting follows.
+All four native snapshots and outcome classes must agree. A pending producer supplies
+no verdict; a component witness still needs ordinary pipeline admission and independent
+original-source checking. Instrumented component timings establish no default-route
+performance gain. Field/method incompatibility fails the diagnostic explicitly.
+
 ### Table profiling
 
 ```sh
