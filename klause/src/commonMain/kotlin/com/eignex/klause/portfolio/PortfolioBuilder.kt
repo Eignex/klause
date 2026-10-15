@@ -72,6 +72,18 @@ object PortfolioBuilder {
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         profile: ProblemProfile,
+    ): List<FinitePortfolioFactory> = factories(problem, scenario, objective, lsObjective, definitionalSweep,
+        onEvent, profile, false)
+
+    internal fun factories(
+        problem: BakedProblem,
+        scenario: PortfolioScenario,
+        objective: LinearObjective?,
+        lsObjective: IncrementalObjective?,
+        definitionalSweep: DefinitionalSweep?,
+        onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+        profile: ProblemProfile,
+        numericalCompletion: Boolean,
     ): List<FinitePortfolioFactory> {
         val plan = PortfolioComposition.plan(scenario, ProblemFacts.of(problem, profile, scenario.lpCeiling, objective))
         val residuals = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
@@ -91,7 +103,12 @@ object PortfolioBuilder {
                 val admitted = if (config is CoreGuidedWorkerConfig && deferCore) {
                     config.withActiveTimeLimit()
                 } else config
-                val bounded = budget?.let(admitted::withNodeBudget) ?: admitted
+                val completion = if (numericalCompletion) when (admitted) {
+                    is LocalSearchWorkerConfig -> admitted.withNumericalCompletion()
+                    is AlnsWorkerConfig -> admitted.withNumericalCompletion()
+                    else -> admitted
+                } else admitted
+                val bounded = budget?.let(completion::withNodeBudget) ?: completion
                 bounded.materialize(
                     problem, index, armId, seed, scenario.lsLambda, objective, lsObjective,
                     definitionalSweep, onEvent, pools,

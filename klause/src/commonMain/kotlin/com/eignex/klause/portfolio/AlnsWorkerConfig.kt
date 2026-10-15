@@ -46,9 +46,15 @@ import kotlin.math.ln
  * scheduling allowance; [com.eignex.klause.solver.result.AlnsStats] records actual inner work separately.
  * Repairs remain bounded atomic fragment searches.
  */
-internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, val nodeBudget: NodeBudget? = null) :
+internal class AlnsWorkerConfig(
+    val profile: AlnsProfile = AlnsProfile.Default,
+    val nodeBudget: NodeBudget? = null,
+    private val numericalCompletion: Boolean = false,
+) :
     WorkerConfig {
-    override fun withNodeBudget(budget: NodeBudget): WorkerConfig = AlnsWorkerConfig(profile, budget)
+    override fun withNodeBudget(budget: NodeBudget): WorkerConfig = AlnsWorkerConfig(profile, budget, numericalCompletion)
+
+    fun withNumericalCompletion(): AlnsWorkerConfig = AlnsWorkerConfig(profile, nodeBudget, true)
 
     override val label: String get() = "alns-${profile.label}"
 
@@ -64,7 +70,7 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?,
     ): PortfolioWorker {
-        if (problem.numRealVars > 0) problem.fixedDiscreteSample()?.let { fixed ->
+        if (!numericalCompletion && problem.numRealVars > 0) problem.fixedDiscreteSample()?.let { fixed ->
             return finiteExactNeighborhoodWorker(problem, fixed, objective, nodeBudget, true, seed + index, armId)
         }
         val evidenceModel = ModelIdentity.of(problem, objective)
@@ -83,6 +89,8 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
                 problem,
                 definitionalSweep = definitionalSweep,
                 perMoveInvariants = definitionalSweep != null,
+                completion = if (numericalCompletion && problem.numRealVars > 0)
+                    LeafRealCompletion(problem, objective) else null,
             ).apply {
                 matchedPools?.localSearchProjection?.let { engine.projection = it }
                 matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }

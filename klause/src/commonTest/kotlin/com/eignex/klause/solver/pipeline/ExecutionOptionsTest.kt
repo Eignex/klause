@@ -12,12 +12,26 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ExecutionOptionsTest {
+    @Test
+    fun `numerical completion policy preserves captured tuning and independent consumption`() {
+        val options = ExecutionOptions.parse(listOf("seed=7", "arms=2"))
+
+        val numerical = options.withNumericalCompletion()
+
+        assertFalse(options.numericalCompletion)
+        assertTrue(numerical.numericalCompletion)
+        assertEquals(options.originalPairs, numerical.originalPairs)
+        assertEquals(buildPortfolioScenario(options.reader(), null, 1, Kind.CSP, EngineMix.BACKTRACK, 6),
+            buildPortfolioScenario(numerical.reader(), null, 1, Kind.CSP, EngineMix.BACKTRACK, 6))
+    }
+
     @Test
     fun `typed portfolio settings preserve parsed settings and seed precedence`() {
         val typed = ExecutionOptions(

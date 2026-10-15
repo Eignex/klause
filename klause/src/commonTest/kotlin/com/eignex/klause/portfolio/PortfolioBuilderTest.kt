@@ -9,8 +9,9 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
@@ -22,6 +23,25 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
+
+    @Test
+    fun `numerical completion materializes finite heuristic workers without theory neighborhoods`() {
+        val problem = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        for (engine in listOf(EngineMix.LOCAL_SEARCH, EngineMix.ALNS)) {
+            val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.CSP, engine = engine)
+            val factory = PortfolioBuilder.factories(problem, scenario, null, null, null, null,
+                ProblemProfile.of(problem, false), numericalCompletion = true).single()
+            val worker = factory.materialize(0, 3L, null)
+
+            worker.use {
+                val result = worker.solve(Cancellation.Never, maxInstructions = 10_000)
+
+                assertFalse("exact-neighborhood" in worker.label)
+                assertNotNull(assertIs<SolveResult.Sat>(result).assignment.exactReals)
+            }
+        }
+    }
 
     @Test
     fun `automatic core worker waits for sibling incumbent discovery`() {

@@ -2,8 +2,8 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.IntBounds
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.portfolio.ArmFault
@@ -665,7 +665,9 @@ internal object SolveCore {
                 solutionSetSensitive = solutionSetSensitive,
                 presolveBudget = presolveBudget,
                 cores = 1,
-                executionOptions = ExecutionOptions.parse(common.engineParams),
+                executionOptions = ExecutionOptions.parse(common.engineParams).let {
+                    if (solvable.numericalCompletion) it.withNumericalCompletion() else it
+                },
                 randomSeed = common.randomSeed,
                 defaultArms = 1,
                 lpConfig = lpConfig,
@@ -902,7 +904,9 @@ internal object SolveCore {
                 solutionSetSensitive = solutionSetSensitive,
                 presolveBudget = presolveBudget,
                 cores = cores,
-                executionOptions = ExecutionOptions.parse(engineParams),
+                executionOptions = ExecutionOptions.parse(engineParams).let {
+                    if (solvable.numericalCompletion) it.withNumericalCompletion() else it
+                },
                 randomSeed = common.randomSeed,
                 defaultArms = defaultArms,
                 lpConfig = lpCeiling,
