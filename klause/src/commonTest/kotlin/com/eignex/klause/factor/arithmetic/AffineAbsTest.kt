@@ -45,15 +45,15 @@ class AffineAbsTest {
 
     @Test
     fun `wide SMT source witnesses preserve magnitudes beyond signed word coordinates`() {
-        val input = SmtLib.parse("(declare-const x Int) (assert (= (+ x 1) 0)) " +
-            "(assert (= (abs (* 9223372036854775808 x)) 9223372036854775808))")
+        val input = SmtLib.parse("(declare-const x Int) (assert (= x 9223372036854775808)) " +
+            "(assert (= (abs (* 9223372036854775808 x)) 85070591730234615865843651857942052864))")
         val source = input.model
         val invocation = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
 
         val result = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source).solve())
         val sample = result.assignment.toSample(source)
 
-        assertEquals("-1", result.assignment.intValue(input.intVarNames.getValue("x")))
+        assertEquals("9223372036854775808", result.assignment.intValue(input.intVarNames.getValue("x")))
         assertTrue(assertNotNull(sample.exactInts).any { !it.fitsLong() })
         assertTrue(source.factors.filterIsInstance<AffineAbs>().single().isSatisfied(sample::exactIntValue))
         assertEquals(SourceEvidenceCheck.Checked, invocation.checkWitness(sample, Cancellation.Never))
