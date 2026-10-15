@@ -5982,6 +5982,25 @@ final class com.eignex.klause.factor.arithmetic/Product : com.eignex.klause.ir/F
     final fun structuralReduce(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.ir/FactorReduction // com.eignex.klause.factor.arithmetic/Product.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 }
 
+final class com.eignex.klause.factor.arithmetic/RealAbs : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.arithmetic/RealAbs|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int) // com.eignex.klause.factor.arithmetic/RealAbs.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+
+    final val linearForm // com.eignex.klause.factor.arithmetic/RealAbs.linearForm|{}linearForm[0]
+        final fun <get-linearForm>(): com.eignex.klause.ir/LinearForm // com.eignex.klause.factor.arithmetic/RealAbs.linearForm.<get-linearForm>|<get-linearForm>(){}[0]
+    final val operand // com.eignex.klause.factor.arithmetic/RealAbs.operand|{}operand[0]
+        final fun <get-operand>(): kotlin/Int // com.eignex.klause.factor.arithmetic/RealAbs.operand.<get-operand>|<get-operand>(){}[0]
+    final val result // com.eignex.klause.factor.arithmetic/RealAbs.result|{}result[0]
+        final fun <get-result>(): kotlin/Int // com.eignex.klause.factor.arithmetic/RealAbs.result.<get-result>|<get-result>(){}[0]
+    final val structuralKeyWeight // com.eignex.klause.factor.arithmetic/RealAbs.structuralKeyWeight|{}structuralKeyWeight[0]
+        final fun <get-structuralKeyWeight>(): kotlin/Int // com.eignex.klause.factor.arithmetic/RealAbs.structuralKeyWeight.<get-structuralKeyWeight>|<get-structuralKeyWeight>(){}[0]
+    final val variables // com.eignex.klause.factor.arithmetic/RealAbs.variables|{}variables[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/RealAbs.variables.<get-variables>|<get-variables>(){}[0]
+
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.arithmetic/RealAbs.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/RealAbs.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/RealAbs.structuralKey|structuralKey(){}[0]
+}
+
 final class com.eignex.klause.factor.arithmetic/RealProduct : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.arithmetic/RealProduct|null[0]
     constructor <init>(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Double, kotlin/Double) // com.eignex.klause.factor.arithmetic/RealProduct.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Double;kotlin.Double){}[0]
 

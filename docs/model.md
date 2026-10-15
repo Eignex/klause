@@ -358,3 +358,10 @@ source relation. Finite propagation keeps sign-aware bounds and filters holes
 when each visited domain has at most 1024 values. Larger domains retain bounds
 filtering and exact complete-point checks. Local scoring checks the full relation,
 repairs either role and maintains acyclic outputs through the definition network.
+
+`RealAbs` retains exact absolute value over source real coordinates. Exact FlatZinc
+`float_abs` produces this factor; its selected linear and polynomial consumers
+install the complete nonnegative equality alternatives. Its implied inequalities
+remain a relaxation. Finite propagation is inert for real coordinates, and floating
+local scores and repairs require exact source completion before publication.
+Default bucketed `float_abs` retains its separately declared grid semantics.

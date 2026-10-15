@@ -131,7 +131,7 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     is Circuit, is Cumulative, is Diffn,
     -> filteringRelaxation
     is ComparisonClause, is Xor, is LexLess, is Sort -> finiteFiltering
-    is RealProduct, is ReifiedRealLinear -> realArithmetic
+    is RealAbs, is RealProduct, is ReifiedRealLinear -> realArithmetic
     is ContinuousProduct -> FactorExecutionCapabilities(
         PropagationCapability.UNSUPPORTED,
         AssignmentCheckCapability.UNSUPPORTED,

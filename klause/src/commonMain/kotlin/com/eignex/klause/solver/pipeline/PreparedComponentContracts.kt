@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.LinearForm
@@ -59,7 +60,7 @@ internal fun Problem.finiteRealCompletionSupported(
     if (factor.variables.reals.isNotEmpty() && !encoder.enforcesSource &&
         encoder.support != EncoderSupport.CONDITIONED
     ) return@all false
-    factor.variables.reals.isEmpty() || factor is RealProduct ||
+    factor.variables.reals.isEmpty() || factor is RealProduct || factor is RealAbs ||
         ((factor.linearForm is LinearForm.Conjunction || factor.linearForm is LinearForm.Disjunction) &&
             factor.linearForm!!.rows.none { it.strict })
 }

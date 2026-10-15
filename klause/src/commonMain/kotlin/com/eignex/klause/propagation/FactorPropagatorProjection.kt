@@ -122,6 +122,8 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is PseudoBoolean -> PseudoBooleanPropagator(boolVars, intVars, weights, literals, op, bound)
 
+    is RealAbs -> NoPropagator
+
     is RealProduct -> NoPropagator
 
     is ReifiedCardinality -> ReifiedCardinalityPropagator(auxBoolVar, literals, min, max, boolVars, intVars)
