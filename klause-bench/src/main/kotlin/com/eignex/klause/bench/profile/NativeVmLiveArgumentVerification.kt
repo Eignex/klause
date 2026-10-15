@@ -22,7 +22,7 @@ internal object NativeVmLiveArgumentVerification {
             val out = File(requireNotNull(System.getenv("OUT"))).canonicalFile.apply { mkdirs() }
             val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
             val names = listOf("native_vm_live_arguments.py", "native_compiler_observer.py",
-                "read_native_vm_metadata.py", "native_vm_loaded_module.py")
+                "read_native_vm_metadata.py", "native_vm_loaded_module.py", "native_vm_event_loss.py")
             for (name in names) File(root, "klause-bench/tools/$name").copyTo(File(out, name))
             val runtime = File(System.getProperty("java.home")).canonicalFile
             val entries = File(out, "captured-entries.json")

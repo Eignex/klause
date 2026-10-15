@@ -160,10 +160,10 @@ def main():
         receipt['fields'] = fields
         receipt['toolSources'] = {name: observer.file_digest(Path(__file__).with_name(name)) for name in
                                   ['native_vm_live_arguments.py', 'native_compiler_observer.py',
-                                   'read_native_vm_metadata.py', 'native_vm_loaded_module.py']}
+                                   'read_native_vm_metadata.py', 'native_vm_loaded_module.py', 'native_vm_event_loss.py']}
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         observer.observe_appimage(out / 'observer', library, args.image, command, 120,
-                                  lambda path, pid: program(path, pid, fields))
+                                  lambda path, pid: program(path, pid, fields), capture_event_loss=True)
         if observer.file_digest(library) != LIBRARY_SHA256:
             raise ValueError('Target library changed during live capture')
         receipt['completed'] = True

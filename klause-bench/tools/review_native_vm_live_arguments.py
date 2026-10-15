@@ -8,7 +8,10 @@ import sys
 import tarfile
 import xml.etree.ElementTree as ET
 
+import native_vm_event_loss as event_loss
+
 LIBRARY_SHA256 = '5e0fb6e83a5676090f28ff0b453e9199df06af1ff90d473c1b9837e41096114c'
+OBSERVER_IMAGE_SHA256 = '16194f713ba1fbff2dd76b7abffad4cd61f91e5663b116a5b03c907ae3e20cd8'
 MAX_FILE_BYTES = 128 * 1024 * 1024
 MAX_RECORDS = 1000000
 PRIMARY = {'ENTRY', 'RETURN', 'USDT'}
@@ -19,6 +22,8 @@ INPUTS = ('live/live-layout.json', 'live/observer/observer-launch.json',
           'live/observer/child-before-exec.json', 'live/observer/observer.bt',
           'live/observer/observer.stdout', 'live/observer/observer.stderr',
           'child-compilations.stdout', 'live/hotspot.xml')
+LOSS_INPUTS = ('live/observer/event-loss.json', 'live/observer/event-loss.btf',
+               'live/observer/appimage-extraction.json', 'native_vm_event_loss.py')
 HOOKS = {'broker', 'post', 'total-size', 'queue-add', 'queue-remove', 'queue-stale',
          'queue-get', 'wrapper-construct', 'wrapper-destroy'}
 ENTRY_ROLES = {'broker': (('task', 'CompileTask', 0),),
@@ -154,6 +159,10 @@ def extract_inputs(manifest_path, expected, archive_path, destination, provenanc
     selected = {prefix + name: name for name in INPUTS}
     if not selected.keys() <= manifest['files'].keys():
         raise ValueError('Saved archive lacks required independent records')
+    if prefix + LOSS_INPUTS[0] in manifest['files']:
+        selected.update({prefix + name: name for name in LOSS_INPUTS})
+        if not selected.keys() <= manifest['files'].keys():
+            raise ValueError('Saved counter evidence lacks its BTF, extraction or source binding')
     destination.mkdir(exist_ok=False)
     seen, extracted, expanded = set(), [], 0
     with tarfile.open(archive_path, mode='r|gz') as source:
@@ -471,7 +480,8 @@ def correlate(native, layout, jfr, logs, diagnostics):
                          postCandidateMatches=posts,
                          independentIdentityMatched=True,
                          recordedArgumentBindingCorroborated=diagnostics['readWarningGuardPassed'] and
-                         diagnostics.get('sequencedDeliveryGuardPassed', False) and not native['errors'] and not issues)
+                         diagnostics.get('sequencedDeliveryGuardPassed', False) and
+                         diagnostics.get('finalLossCounterZeroProven', False) and not native['errors'] and not issues)
         except (ValueError, KeyError, IndexError) as error:
             frame['unprovenReason'] = str(error)
     matched = {id(row) for frame in invocations for row in frame.get('jfrMatches', [])}
@@ -511,11 +521,36 @@ def inspect(directory, report):
             int(exec_rows[0][4]) != launch['expectedUid']:
         raise ValueError('Selected original-user exec identity is absent or ambiguous')
     diagnostics = read_diagnostics(load('live/observer/observer.stderr').decode('utf-8'), script.decode(), native['otherLines'])
+    counter = {'finalLossCounterProven': False, 'finalLossCounterZeroProven': False,
+               'globalLossFreeCaptureProven': False, 'errors': []}
+    if (directory / LOSS_INPUTS[0]).exists():
+        raw_counter = json.loads(load(LOSS_INPUTS[0]))
+        report['rawEventLossCounter'] = raw_counter
+        try:
+            extraction = json.loads(load(LOSS_INPUTS[2]))
+            if extraction['packageSha256'] != OBSERVER_IMAGE_SHA256 or extraction['exit'] != 0 or \
+                    launch['observerBinarySha256'] != extraction['appRunSha256'] or not extraction['temporaryRemoved']:
+                raise ValueError('Pinned counter observer extraction binding is incomplete')
+            expected = {'pid': launch['observerPid'], 'startTicks': launch['observerStartTicks'],
+                        'executableSha256': extraction['executableSha256'], 'comm': 'bpftrace',
+                        'mountNamespace': launch['observerMountNamespace']}
+            source = load(LOSS_INPUTS[3])
+            if not all(launch.get(key) is True for key in ('lossMonitorRequested', 'lossMonitorReady', 'lossMonitorCompleted')) or \
+                    launch.get('lossMonitorCleanupError') or source != Path(event_loss.__file__).read_bytes():
+                raise ValueError('Executed counter source or launch lifecycle is unproved')
+            counter.update(event_loss.verify_report(raw_counter, load(LOSS_INPUTS[1]), expected,
+                                                    hashlib.sha256(source).hexdigest()))
+        except (ValueError, KeyError, TypeError, IndexError) as error:
+            counter['errors'].append({'type': type(error).__name__, 'message': str(error)})
+    else:
+        counter['errors'].append({'message': 'Explicit complete final counter snapshot is absent'})
+    diagnostics['finalLossCounterProven'] = counter['finalLossCounterProven']
+    diagnostics['finalLossCounterZeroProven'] = counter['finalLossCounterZeroProven']
     if any(group['pid'] != launch['rootPid'] for thread in native['threads'] for group in thread):
         raise ValueError('Captured native record belongs to a different process')
     delivery = terminal_delivery(native, layout, launch['rootPid'], diagnostics)
     diagnostics['sequencedDeliveryGuardPassed'] = delivery['sequencedNativeDeliveryProven']
-    report.update(nativeRecords=native, readDiagnostics=diagnostics, terminalDelivery=delivery,
+    report.update(nativeRecords=native, readDiagnostics=diagnostics, terminalDelivery=delivery, eventLossCounter=counter,
                   rawClockAnchors=launch['clockAnchors'])
     jfr = jfr_records(json.loads(load('child-compilations.stdout')))
     logs = log_records(load('live/hotspot.xml').decode('utf-8'))
