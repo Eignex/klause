@@ -30,6 +30,7 @@ class NumericalLinearRequestTest {
         assertEquals(0L, optimal.sample.intValue(0))
         assertEquals("numerical-mip", result.stats.run.backend)
         assertTrue(result.stats.smt.sourceLp.operations > 0)
+        assertTrue(result.stats.smt.sourceLp.floatWork > 0)
         assertNull(request.finiteRoute())
     }
 
