@@ -696,7 +696,7 @@ internal class WitnessProbe(
         repeat(2 * atoms.size + seed.size + 3) { arithmetic.step() }
         val payloads = ArrayList<List<PolynomialTerm>>()
         val selected = IntArray(atoms.size) { -1 }
-        val exponents = IntArray(seed.size)
+        val weights = DyadicWeights(seed.size)
         var total = 0
         for ((index, atom) in atoms.withIndex()) {
             arithmetic.step()
@@ -723,10 +723,10 @@ internal class WitnessProbe(
                     continue
                 }
                 val orientation = dyadicOrientation(atoms[index].relation, terms)
-                val chosen = dyadicLeadingTerm(terms, orientation, exponents) ?: return null
+                val chosen = dyadicLeadingTerm(terms, orientation, weights) ?: return null
                 arithmetic.step()
                 selected[index] = chosen
-                changed = dyadicGuide(terms, chosen, orientation, exponents, active, fixed, true)
+                changed = dyadicGuide(terms, chosen, orientation, weights, active, fixed, true)
                     ?.let { changed || it } ?: return null
             }
             if (!changed) break
@@ -736,12 +736,12 @@ internal class WitnessProbe(
             if (selected[index] < 0) continue
             dyadicGuide(payloads[index], selected[index],
                 dyadicOrientation(atoms[index].relation, payloads[index]),
-                exponents, active, fixed, false) ?: return null
+                weights, active, fixed, false) ?: return null
         }
         repeat(seed.size + 1) { arithmetic.step() }
         val base = seed.mapIndexed { id, value ->
             arithmetic.step()
-            if (id in active && id !in fixed) dyadicValue(exponents[id]) else value
+            if (id in active && id !in fixed) dyadicValue(weights[id]) else value
         }
         arithmetic.step()
         return base.takeIf { it.all(::admittedFraction) }
@@ -778,14 +778,14 @@ internal class WitnessProbe(
     private fun dyadicLeadingTerm(
         terms: List<PolynomialTerm>,
         orientation: Int,
-        exponents: IntArray,
+        weights: DyadicWeights,
     ): Int? {
         var selected: Int? = null
         var greatest = Long.MIN_VALUE
         for ((index, term) in terms.withIndex()) {
             arithmetic.step()
             if (term.coefficient.signum() * orientation <= 0) continue
-            val weight = dyadicWeight(term.monomial, exponents) ?: return null
+            val weight = weights.weight(term.monomial) ?: return null
             if (selected == null || weight > greatest) {
                 arithmetic.step()
                 selected = index
@@ -795,24 +795,51 @@ internal class WitnessProbe(
         return selected
     }
 
-    private fun dyadicWeight(monomial: Monomial, exponents: IntArray): Long? {
-        arithmetic.step()
-        val variables = monomial.variables
-        repeat(variables.size) { arithmetic.step() }
-        var weight = 0L
-        for (id in variables) {
+    private data class DyadicWeightEntry(val revision: Long, val value: Long)
+
+    private inner class DyadicWeights(val size: Int) {
+        init { arithmetic.step() }
+
+        private val exponents = IntArray(size)
+        private var revision = 0L
+        private val cache = HashMap<Monomial, DyadicWeightEntry>()
+
+        operator fun get(variable: Int): Int = exponents[variable]
+
+        fun replace(variable: Int, exponent: Int) {
             arithmetic.step()
-            if (id !in exponents.indices) return null
-            val degree = monomial.exponent(id).toLong()
-            val exponent = exponents[id].toLong()
-            if (degree < 0 || exponent !in -(MAX_WITNESS_BITS - 1L)..(MAX_WITNESS_BITS - 1L)) return null
+            check(revision < Long.MAX_VALUE)
             arithmetic.step()
-            // An Int degree times an admitted exponent fits Long before the checked sum.
-            val product = degree * exponent
-            weight = dyadicSum(weight, product) ?: return null
+            exponents[variable] = exponent
+            revision++
+            arithmetic.step()
         }
-        arithmetic.step()
-        return weight
+
+        fun weight(monomial: Monomial): Long? {
+            arithmetic.step()
+            val retained = cache[monomial]
+            arithmetic.step()
+            if (retained != null && retained.revision == revision) return retained.value
+            val variables = monomial.variables
+            repeat(variables.size) { arithmetic.step() }
+            var weight = 0L
+            for (id in variables) {
+                arithmetic.step()
+                if (id !in exponents.indices) return null
+                val degree = monomial.exponent(id).toLong()
+                val exponent = exponents[id].toLong()
+                if (degree < 0 || exponent !in -(MAX_WITNESS_BITS - 1L)..(MAX_WITNESS_BITS - 1L)) return null
+                arithmetic.step()
+                // An Int degree times an admitted exponent fits Long before the checked sum.
+                val product = degree * exponent
+                weight = dyadicSum(weight, product) ?: return null
+            }
+            arithmetic.step()
+            val completed = DyadicWeightEntry(revision, weight)
+            arithmetic.step()
+            cache[monomial] = completed
+            return weight
+        }
     }
 
     private fun dyadicSum(left: Long, right: Long): Long? {
@@ -827,7 +854,7 @@ internal class WitnessProbe(
         terms: List<PolynomialTerm>,
         chosen: Int,
         orientation: Int,
-        exponents: IntArray,
+        weights: DyadicWeights,
         active: Set<Int>,
         fixed: Map<Int, BigFraction>,
         repair: Boolean,
@@ -843,14 +870,14 @@ internal class WitnessProbe(
             arithmetic.step()
             if (negative.coefficient.signum() * orientation >= 0) continue
             val margin = dyadicMargin(positive.coefficient, negative.coefficient, negatives)
-            val left = dyadicWeight(positive.monomial, exponents) ?: return null
-            val right = dyadicWeight(negative.monomial, exponents) ?: return null
+            val left = weights.weight(positive.monomial) ?: return null
+            val right = weights.weight(negative.monomial) ?: return null
             val gap = dyadicSum(left, -right) ?: return null
             if (gap >= margin) continue
             if (!repair) return null
             val deficit = dyadicSum(margin, -gap) ?: return null
             if (!repairDyadicRow(positive.monomial, negative.monomial, deficit,
-                    exponents, active, fixed)) return null
+                    weights, active, fixed)) return null
             changed = true
         }
         return changed
@@ -876,14 +903,14 @@ internal class WitnessProbe(
         positive: Monomial,
         negative: Monomial,
         deficit: Long,
-        exponents: IntArray,
+        weights: DyadicWeights,
         active: Set<Int>,
         fixed: Map<Int, BigFraction>,
     ): Boolean {
         var selected = -1
         var greatest = 0L
         var replacement = 0
-        for (id in exponents.indices) {
+        for (id in 0 until weights.size) {
             arithmetic.step()
             if (id !in active || id in fixed) continue
             arithmetic.step()
@@ -892,7 +919,7 @@ internal class WitnessProbe(
             if (magnitude == 0L || magnitude <= greatest) continue
             arithmetic.step()
             val movement = (deficit - 1) / magnitude + 1
-            val value = dyadicSum(exponents[id].toLong(), if (coefficient > 0) movement else -movement)
+            val value = dyadicSum(weights[id].toLong(), if (coefficient > 0) movement else -movement)
                 ?: continue
             if (value !in -(MAX_WITNESS_BITS - 1L)..(MAX_WITNESS_BITS - 1L)) continue
             arithmetic.step()
@@ -901,9 +928,7 @@ internal class WitnessProbe(
             replacement = value.toInt()
         }
         if (selected < 0) return false
-        arithmetic.step()
-        exponents[selected] = replacement
-        arithmetic.step()
+        weights.replace(selected, replacement)
         return true
     }
 

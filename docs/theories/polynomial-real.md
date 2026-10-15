@@ -384,9 +384,14 @@ against the original seed dimension before excluding fixed coordinates. A bounde
 atomic copy of the existing support accessor polls and charges its entering
 operation, then charges the returned entries and each checked weight operation to
 the same owner. It creates no retained support cache or full-dimension pricing proxy.
-The private exponent vector starts at zero and only admitted bounded repairs mutate
-it; unused coordinates contribute zero without a dense scan. Constant weights also
-poll before returning. A complete recheck of the selected rows precedes bounded
+Each dyadic construction owns its zero-initialized exponent vector and completed
+monomial weights. Its sole mutation entry advances a private revision whenever an
+admitted repair changes a coordinate; only weights from that revision can be reused.
+The owner exposes no mutable array or caller cache, and another attempt starts fresh.
+Construction, consultations, revision updates and completed inserts poll and debit
+the same native token. Interrupted weights enter no cache. Unused coordinates
+contribute zero without a dense scan; constant and cached weights also poll before
+returning. A complete recheck of the selected rows precedes bounded
 exact shifts and point construction. Exponents admit numerator or denominator magnitudes up to the
 same 4,096-bit ceiling. Failed or incomplete construction retains the one center;
 unresolved positive equalities retain their affine completion and repair path.
