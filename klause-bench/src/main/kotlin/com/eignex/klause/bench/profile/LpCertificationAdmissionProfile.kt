@@ -4,9 +4,10 @@ import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
-import java.lang.reflect.Array as ReflectArray
 import java.lang.reflect.Proxy
 import java.security.MessageDigest
+import java.util.Locale
+import java.lang.reflect.Array as ReflectArray
 
 /** Measure structurally declined LP certification setup without a floating solve. */
 object LpCertificationAdmissionProfile {
@@ -20,9 +21,11 @@ object LpCertificationAdmissionProfile {
         val rounds = (options["rounds"] ?: "7").toInt().also { require(it in 1..31) }
         val warmup = (options["warmup"] ?: "5000").toInt().also { require(it in 0..100000) }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
-        out.resolve("settings.txt").writeText("rows=$rows\nattempts=$attempts\nrounds=$rounds\nwarmup=$warmup\n" +
-            "java=${System.getProperty("java.runtime.version")}\nvm=${System.getProperty("java.vm.name")}\n" +
-            "processors=${Runtime.getRuntime().availableProcessors()}\n")
+        out.resolve("settings.txt").writeText(
+            "rows=$rows\nattempts=$attempts\nrounds=$rounds\nwarmup=$warmup\n" +
+                "java=${System.getProperty("java.runtime.version")}\nvm=${System.getProperty("java.vm.name")}\n" +
+                "processors=${Runtime.getRuntime().availableProcessors()}\n",
+        )
         captureIdentity(out)
         val access = AdmissionAccess(rows)
         val meter = ManagementFactory.getThreadMXBean() as ThreadMXBean
@@ -57,7 +60,7 @@ object LpCertificationAdmissionProfile {
         check(classpath.all { it.isFile }) { "Classpath must contain installed jars" }
         fun hashes(files: List<File>): String = files.sortedBy { it.path }.joinToString("\n", postfix = "\n") {
             val digest = MessageDigest.getInstance("SHA-256").digest(it.readBytes())
-                .joinToString("") { byte -> "%02x".format(byte.toInt() and 255) }
+                .joinToString("") { byte -> "%02x".format(Locale.ROOT, byte.toInt() and 255) }
             "$digest  ${it.path}"
         }
         out.resolve("classpath-sha256.txt").writeText(hashes(classpath))
@@ -85,11 +88,24 @@ object LpCertificationAdmissionProfile {
         private val basisLimits = type("ExactBasisLimits").getConstructor().newInstance()
         private val continuationLimitsType = Class.forName("com.eignex.klause.simplex.exact.ExactContinuationLimits")
         private val continuationLimits = continuationLimitsType.getConstructor().newInstance()
-        private val verifyBasis = type("ExactBasisVerifyKt").getMethod("verifyExactBasis", modelType, basisType,
-            Integer::class.java, basisCache.javaClass, Cancellation::class.java, basisLimits.javaClass,
-            type("LpCertificationObserver"))
-        private val captureTarget = type("LpExactContinuationKt").getMethod("captureContinuationTarget", modelType,
-            solverType, type("FloatLpResult"), continuationLimitsType, Cancellation::class.java)
+        private val verifyBasis = type("ExactBasisVerifyKt").getMethod(
+            "verifyExactBasis",
+            modelType,
+            basisType,
+            Integer::class.java,
+            basisCache.javaClass,
+            Cancellation::class.java,
+            basisLimits.javaClass,
+            type("LpCertificationObserver"),
+        )
+        private val captureTarget = type("LpExactContinuationKt").getMethod(
+            "captureContinuationTarget",
+            modelType,
+            solverType,
+            type("FloatLpResult"),
+            continuationLimitsType,
+            Cancellation::class.java,
+        )
         private val model: Any
         private val basis: Any
         private val solver = Proxy.newProxyInstance(solverType.classLoader, arrayOf(solverType)) { _, method, _ ->
@@ -99,12 +115,23 @@ object LpCertificationAdmissionProfile {
         private var lastTarget: Any? = null
 
         init {
-            builderType.getMethod("addVar", Long::class.javaPrimitiveType, Long::class.javaPrimitiveType,
-                Long::class.javaPrimitiveType, Int::class.javaPrimitiveType).invoke(builder, 0L, 1L, 0L, -1)
+            builderType.getMethod(
+                "addVar",
+                Long::class.javaPrimitiveType,
+                Long::class.javaPrimitiveType,
+                Long::class.javaPrimitiveType,
+                Int::class.javaPrimitiveType,
+            ).invoke(builder, 0L, 1L, 0L, -1)
             val relation = type("Relation").enumConstants.single { it.toString() == "EQ" }
-            val addRow = builderType.getMethod("addRow", IntArray::class.java, LongArray::class.java,
-                type("Relation"), Long::class.javaPrimitiveType,
-                Boolean::class.javaPrimitiveType, type("LpRowPremises"))
+            val addRow = builderType.getMethod(
+                "addRow",
+                IntArray::class.java,
+                LongArray::class.java,
+                type("Relation"),
+                Long::class.javaPrimitiveType,
+                Boolean::class.javaPrimitiveType,
+                type("LpRowPremises"),
+            )
             repeat(rows) { addRow.invoke(builder, intArrayOf(0), longArrayOf(1L), relation, 1L, true, null) }
             val sense = type("Sense").enumConstants.single { it.toString() == "MINIMIZE" }
             model = builderType.getMethod("build", type("Sense")).invoke(builder, sense)
@@ -112,14 +139,25 @@ object LpCertificationAdmissionProfile {
             val basic = statusType.enumConstants.single { it.toString() == "BASIC" }
             val lower = statusType.enumConstants.single { it.toString() == "AT_LOWER" }
             repeat(rows + 1) { ReflectArray.set(statuses, it, if (it == 0) lower else basic) }
-            basis = basisType.getConstructor(IntArray::class.java, statuses.javaClass,
-                Boolean::class.javaPrimitiveType).newInstance(IntArray(rows) { it + 1 }, statuses, false)
+            basis = basisType.getConstructor(
+                IntArray::class.java,
+                statuses.javaClass,
+                Boolean::class.javaPrimitiveType,
+            ).newInstance(IntArray(rows) { it + 1 }, statuses, false)
         }
 
         fun attempt(mechanism: String) {
             if (mechanism == "basis") {
-                lastBasis = verifyBasis.invoke(null, model, basis, null, basisCache,
-                    Cancellation.Never, basisLimits, null)
+                lastBasis = verifyBasis.invoke(
+                    null,
+                    model,
+                    basis,
+                    null,
+                    basisCache,
+                    Cancellation.Never,
+                    basisLimits,
+                    null,
+                )
             } else {
                 lastTarget = captureTarget.invoke(null, model, solver, null, continuationLimits, Cancellation.Never)
             }
