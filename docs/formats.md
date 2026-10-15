@@ -30,8 +30,9 @@ See [local-search grading](solver/local-search.md#projections-and-preparation) a
 [theory encoding](theories.md#extension-roles-and-completeness).
 
 Schema multiplication, FlatZinc `int_times` and XCSP3 `mul` retain repeated operands
-and result aliases. MiniZinc fixed powers and bounded SMT-LIB integer powers use
-product chains; SMT-LIB exact polynomial expressions retain repeated operands directly.
+and result aliases. Fixed nonnegative powers from schema, FlatZinc/MiniZinc, bounded SMT-LIB and XCSP3
+retain `Power`; SMT-LIB exact polynomial snapshots retain native power expressions.
+Selected multiplication-only consumers can use the equivalent shared lowering DAG.
 FlatZinc float representations preserve the same roles under their declared exact or
 grid semantics. MPS admits linear arithmetic; DIMACS and WCNF admit Boolean clauses,
 so neither has an arithmetic product path. OPB/WBO Boolean monomials use conjunction:

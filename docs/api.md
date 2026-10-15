@@ -383,6 +383,9 @@ Coordinate projections remap declared conditions while factories use supplied vi
 coordinates. Source rewrites reselect, and objective rebinding retains the capture.
 
 `PolynomialExpression` and `PolynomialRealFormula` are immutable neutral syntax.
+`lowering.powerAsProducts` supplies an equivalent shared-squaring multiplication DAG
+for a selected consumer without a native power node, retaining every operand role
+and the caller's source-coordinate scope. Native polynomial encoders retain `Power`.
 Coordinates belong to their owning source or private projection scope. Use the
 receiving encoding's typed `integer`/`real` mappings and `conditional` allocator;
 private polynomial reals are not original source declarations. `EncodingAttribution`
