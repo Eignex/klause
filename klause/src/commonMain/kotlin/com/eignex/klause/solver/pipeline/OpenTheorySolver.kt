@@ -425,7 +425,10 @@ class OpenTheoryEngine internal constructor(
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
                 nodePolicy = nodePolicy,
                 candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage),
-                branchSelection = if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
+                branchSelection = if (plan.theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) {
+                    SearchBranchSelection.Priority(listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Boolean,
+                        SearchBranchKind.Finite))
+                } else if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
                     plan.cpIntVars.isNotEmpty()
                 ) SearchBranchSelection.Priority(listOf(SearchBranchKind.Boolean, SearchBranchKind.Arithmetic,
                     SearchBranchKind.Finite)) else SearchBranchSelection.Default,

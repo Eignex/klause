@@ -4,19 +4,17 @@ import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.arithmetic.difference.DifferenceFragment
 import com.eignex.klause.arithmetic.difference.Potentials
 import com.eignex.klause.arithmetic.difference.ShortestPaths
+import com.eignex.klause.arithmetic.difference.checkedDifferenceSubtract
 import com.eignex.klause.arithmetic.difference.checkedDifferenceSum
-import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.solver.PreparedFactorProjections
-import com.eignex.klause.solver.selectedFactorProjections
-import com.eignex.klause.theory.EncodingTarget
-import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.differenceFragmentOf
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
@@ -26,6 +24,9 @@ import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.contribute
+import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 
@@ -66,6 +67,8 @@ class DifferenceSearchComponent private constructor(
     private var potentialSeed: PotentialSeed? = null
     private var guardPropagation: DifferenceGuardPropagation? = null
     private var guardPreparationComplete = false
+    private var guardSource: DifferenceFragment? = null
+    private var relativeBranches: DifferenceRelativeBranches? = null
 
     constructor(
         model: Problem,
@@ -103,24 +106,25 @@ class DifferenceSearchComponent private constructor(
             return ComponentResult.Indeterminate
         }
         if (stopped()) return abandon()
+        val source = sourceFragment() ?: return ComponentResult.Consistent
         val fragment = fragment(context) ?: return ComponentResult.Consistent
         val active = BooleanArray(fragment.edges.size) { edge ->
             val guard = fragment.edges[edge].guard
             guard == DifferenceEdge.ALWAYS || context.boolValue(Lit.variable(guard)) == Lit.isPositive(guard)
         }
         val graph = fragment.graph()
-        if (!guardPreparationComplete && model.numBoolVars > 0) {
+        val numBools = relativeBranches?.numBools ?: model.numBoolVars
+        if ((!guardPreparationComplete || guardSource !== source) && numBools > 0) {
             val owner = context.executionControls.cancellation
             val preparationStop = object : Cancellation {
                 override fun isCancelled(): Boolean = stopped()
                 override fun deadline() = owner.deadline()
                 override fun workMeter() = owner.workMeter()
             }
-            guardPropagation = base?.let {
-                DifferenceGuardPropagation.create(it, model.numBoolVars, preparationStop)
-            }
+            guardPropagation = DifferenceGuardPropagation.create(source, numBools, preparationStop)
             if (stopped()) return abandon()
             guardPreparationComplete = true
+            guardSource = source
         }
         var point: LongArray? = null
         var cycle: IntArray? = null
@@ -179,8 +183,20 @@ class DifferenceSearchComponent private constructor(
         } else {
             // A spent budget is not a refutation: the check says it does not know, and the engine keeps
             // whatever verdict it already had rather than reading abandonment as infeasibility.
-            when (val outcome = fragment.potentialSample(model.numIntVars, bools, context::cancelled)) {
-                is Potentials.Found -> outcome.values
+            val active = BooleanArray(fragment.edges.size) { index ->
+                val guard = fragment.edges[index].guard
+                guard == DifferenceEdge.ALWAYS || context.boolValue(Lit.variable(guard)) == Lit.isPositive(guard)
+            }
+            when (val outcome = fragment.graph().potentials(active, context::cancelled)) {
+                is Potentials.Found -> {
+                    val zero = outcome.values[fragment.zeroNode]
+                    val values = LongArray(model.numIntVars)
+                    for (node in fragment.nodes.indices) {
+                        values[fragment.nodes[node]] = checkedDifferenceSubtract(outcome.values[node], zero)
+                            ?: return ComponentCheck.Indeterminate
+                    }
+                    values
+                }
                 Potentials.Infeasible -> return ComponentCheck.Infeasible()
                 Potentials.Abandoned -> return ComponentCheck.Indeterminate
             }
@@ -188,6 +204,7 @@ class DifferenceSearchComponent private constructor(
         if (values.indices.any { variable -> model.intDomainOrNull(variable)?.let {
                 values[variable] !in it
             } == true }) return ComponentCheck.Indeterminate
+        if (context.cancelled() || context.executionControls.exhausted) return ComponentCheck.Indeterminate
         assignment = Sample(bools, values)
         return ComponentCheck.Feasible
     }
@@ -226,12 +243,22 @@ class DifferenceSearchComponent private constructor(
         hintPoint = null
         guardPropagation = null
         guardPreparationComplete = false
+        guardSource = null
     }
 
     internal fun releaseSearchState() {
         potentialSeed = null
         assignment = null
         releasePotentialHints()
+        relativeBranches?.close()
+        relativeBranches = null
+    }
+
+    internal fun withRelativeBranches(stop: Cancellation): TheoryComponent {
+        val source = base ?: return this
+        val branches = DifferenceRelativeBranches.create(source, model.numBoolVars, stop) ?: return this
+        relativeBranches = branches
+        return object : TheoryComponent by this@DifferenceSearchComponent, SearchBranchProposal by branches {}
     }
 
     internal fun potentialHintAvailable(): Boolean = hintPoint?.let {
@@ -286,7 +313,7 @@ class DifferenceSearchComponent private constructor(
     }
 
     private fun fragment(context: SearchContext): DifferenceFragment? {
-        val original = base ?: return null
+        val original = sourceFragment() ?: return null
         val edges = ArrayList<DifferenceEdge>(original.edges.size + model.numIntVars * 2)
         edges.addAll(original.edges)
         for (variable in 0 until model.numIntVars) {
@@ -297,6 +324,8 @@ class DifferenceSearchComponent private constructor(
         }
         return DifferenceFragment(edges)
     }
+
+    private fun sourceFragment(): DifferenceFragment? = relativeBranches?.fragment ?: base
 
     /**
      * Publish consequences of always-active rows and the current root bounds.
@@ -358,7 +387,7 @@ class DifferenceSearchComponent private constructor(
     }
 
     private fun cycleExplanation(cycle: IntArray): SearchExplanation? {
-        val original = base ?: return null
+        val original = sourceFragment() ?: return null
         // Appended bounds have no Boolean premises; only immutable source edges may be discharged.
         if (cycle.any { it !in original.edges.indices }) return null
         val guards = cycle.map { original.edges[it].guard }.filter { it != DifferenceEdge.ALWAYS }

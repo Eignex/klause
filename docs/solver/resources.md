@@ -231,6 +231,13 @@ A conditioned check receives only its invocation's remaining allowance; new bran
 retractions and candidate retries do not renew it. Native work is forwarded once to
 the caller meter, and resource exhaustion withholds an incomplete verdict.
 
+Integer difference interval branching charges source scans, bounded ordering and
+private graph copies/indexing to the opening token. Registered complementary
+predicates retain one source-root name across siblings and restarts. Their active
+edges and ordinary graph checks spend the current invocation's controls; a rebuilt
+guard index grants no new allowance. Closing releases private interval and graph
+state. See [difference logic](../theories/difference.md).
+
 Exact-linear partial-point polarity hints reuse a completed arithmetic check. Source
 comparison visits and bounded rational operations charge that check's current operation
 token, including its native meter; they create no numerical invocation or allowance.

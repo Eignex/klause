@@ -26,6 +26,51 @@ class OpenTheoryEngineTest {
     private fun sourceRoute(model: Problem): ProblemPipeline = model.sourceRoute()
 
     @Test
+    fun `relative integer choices retain guarded source equalities and disequalities`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_IDL)
+                (declare-const x Int) (declare-const y Int) (declare-const z Int) (declare-const r Int)
+                (assert (and (>= (- x r) 0) (<= (- x r) 1)))
+                (assert (and (>= (- y r) 0) (<= (- y r) 1)))
+                (assert (and (>= (- z r) 0) (<= (- z r) 1)))
+                (assert (not (= (- x y) 0)))
+                (assert (not (= (- y z) 0)))
+                (assert (= (- x z) 0))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val result = OpenTheoryPipeline.engineFor(OpenTheoryRequest(parsed.model)).solve()
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+        val values = LongArray(4) { assignment.intValue(it).toLong() }
+        assertTrue((0..2).all { values[it] - values[3] in 0L..1L })
+        assertTrue(values[0] != values[1] && values[1] != values[2] && values[0] == values[2])
+    }
+
+    @Test
+    fun `relative integer traversal refutes incompatible source disequalities`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_IDL)
+                (declare-const x Int) (declare-const y Int) (declare-const z Int) (declare-const r Int)
+                (assert (and (>= (- x r) 0) (<= (- x r) 1)))
+                (assert (and (>= (- y r) 0) (<= (- y r) 1)))
+                (assert (and (>= (- z r) 0) (<= (- z r) 1)))
+                (assert (not (= (- x y) 0)))
+                (assert (not (= (- y z) 0)))
+                (assert (not (= (- x z) 0)))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val result = OpenTheoryPipeline.engineFor(OpenTheoryRequest(parsed.model)).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
     fun `a spent presolve phase leaves signed difference witnesses searchable`() {
         val parsed = SmtLib.parse(
             """
