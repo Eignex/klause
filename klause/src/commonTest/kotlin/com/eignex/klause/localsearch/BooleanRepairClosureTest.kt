@@ -150,24 +150,29 @@ class BooleanRepairClosureTest {
 
     @Test
     fun `canceled closure preserves assignment and write activity`() {
-        val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
-        ))
+        val count = 270
+        val factors = Array<Factor>(count + 1) { index ->
+            when {
+                index < count - 1 -> Clause(intArrayOf(Lit.make(index, false), Lit.make(index + 1, true)))
+                index == count - 1 -> Clause(intArrayOf(Lit.make(0, true), Lit.make(count, true)))
+                else -> Clause(intArrayOf(Lit.make(0, false), Lit.make(count, false)))
+            }
+        }
+        val problem = Problem(count + 1, 0, emptyArray(), factors)
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        state.assignment.setBool(1, true)
+        state.assignment.setBool(count, true)
         state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
-            BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
-        ))?.network(0, 2)
+            BoolFoldDefinition(count, intArrayOf(Lit.make(0, false)), true),
+        ))?.network(0, count + 1)
         state.recompute()
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
 
         var polls = 0
-        val move = closure.close(state, Move.BoolFlip(0), Cancellation { ++polls >= 4 })
+        val move = closure.close(state, Move.BoolFlip(0), Cancellation { ++polls >= 2 })
 
         assertNull(move)
-        assertFalse(state.assignment.boolValue(0))
-        assertTrue(state.assignment.boolValue(1))
+        assertTrue((0 until count).all { !state.assignment.boolValue(it) })
+        assertTrue(state.assignment.boolValue(count))
         assertEquals(0L, state.step)
         assertTrue(state.tabu.touchCount.all { it == 0 })
     }

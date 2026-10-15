@@ -179,6 +179,8 @@ cancel by parity. Closure facts are private heuristic proposals, with every orig
 clause, price and pin retained for full grading and source publication checks. Each
 accepted compound consumes the engine's existing single-transition instruction charge;
 physical write activity remains separate.
+Nested graph visits share a 256-operation cancellation window. Native grading and
+completed move boundaries poll directly; a short clause does not reset the window.
 Support queues and primitive grading buffers are retained alongside the graph.
 Break and objective grades are reused only within one source's proposal batch at an
 unchanged live assignment; every source and perturbation begins a fresh batch.
