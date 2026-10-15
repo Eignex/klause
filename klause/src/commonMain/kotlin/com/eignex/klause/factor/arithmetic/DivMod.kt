@@ -79,6 +79,22 @@ class DivMod private constructor(
         sink.intVar(remainder)
     }
 
+    internal fun wordOutputs(a: Long, b: Long): Pair<Long, Long>? {
+        if (b == 0L || (a == Long.MIN_VALUE && b == -1L)) return null
+        var quotient = a / b
+        var remainder = a % b
+        if (convention == DivisionConvention.EUCLIDEAN && remainder < 0L) {
+            if (b > 0L) {
+                quotient--
+                remainder += b
+            } else {
+                quotient++
+                remainder -= b
+            }
+        }
+        return quotient to remainder
+    }
+
     internal fun outputs(a: BigInt, b: BigInt): Pair<BigInt, BigInt>? {
         if (b.isZero()) return null
         var q = a / b

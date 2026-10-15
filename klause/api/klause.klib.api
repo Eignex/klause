@@ -46,6 +46,17 @@ final enum class com.eignex.klause.count/SampleQuality : kotlin/Enum<com.eignex.
     final fun values(): kotlin/Array<com.eignex.klause.count/SampleQuality> // com.eignex.klause.count/SampleQuality.values|values#static(){}[0]
 }
 
+final enum class com.eignex.klause.factor.arithmetic/DivisionConvention : kotlin/Enum<com.eignex.klause.factor.arithmetic/DivisionConvention> { // com.eignex.klause.factor.arithmetic/DivisionConvention|null[0]
+    enum entry EUCLIDEAN // com.eignex.klause.factor.arithmetic/DivisionConvention.EUCLIDEAN|null[0]
+    enum entry TRUNCATING // com.eignex.klause.factor.arithmetic/DivisionConvention.TRUNCATING|null[0]
+
+    final val entries // com.eignex.klause.factor.arithmetic/DivisionConvention.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.factor.arithmetic/DivisionConvention> // com.eignex.klause.factor.arithmetic/DivisionConvention.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.factor.arithmetic/DivisionConvention // com.eignex.klause.factor.arithmetic/DivisionConvention.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.factor.arithmetic/DivisionConvention> // com.eignex.klause.factor.arithmetic/DivisionConvention.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.formats.flatzinc/FlatZincSearchValueSelector : kotlin/Enum<com.eignex.klause.formats.flatzinc/FlatZincSearchValueSelector> { // com.eignex.klause.formats.flatzinc/FlatZincSearchValueSelector|null[0]
     enum entry IndomainMax // com.eignex.klause.formats.flatzinc/FlatZincSearchValueSelector.IndomainMax|null[0]
     enum entry IndomainMedian // com.eignex.klause.formats.flatzinc/FlatZincSearchValueSelector.IndomainMedian|null[0]
@@ -5840,6 +5851,30 @@ final class com.eignex.klause.factor.arithmetic/ContinuousProduct : com.eignex.k
 
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.arithmetic/ContinuousProduct.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ContinuousProduct.structuralKey|structuralKey(){}[0]
+}
+
+final class com.eignex.klause.factor.arithmetic/DivMod : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.arithmetic/DivMod|null[0]
+    constructor <init>(kotlin/Int, com.ionspin.kotlin.bignum.integer/BigInteger, kotlin/Int, kotlin/Int, com.eignex.klause.factor.arithmetic/DivisionConvention = ...) // com.eignex.klause.factor.arithmetic/DivMod.<init>|<init>(kotlin.Int;com.ionspin.kotlin.bignum.integer.BigInteger;kotlin.Int;kotlin.Int;com.eignex.klause.factor.arithmetic.DivisionConvention){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int, com.eignex.klause.factor.arithmetic/DivisionConvention = ...) // com.eignex.klause.factor.arithmetic/DivMod.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;com.eignex.klause.factor.arithmetic.DivisionConvention){}[0]
+
+    final val constantDivisor // com.eignex.klause.factor.arithmetic/DivMod.constantDivisor|{}constantDivisor[0]
+        final fun <get-constantDivisor>(): com.ionspin.kotlin.bignum.integer/BigInteger? // com.eignex.klause.factor.arithmetic/DivMod.constantDivisor.<get-constantDivisor>|<get-constantDivisor>(){}[0]
+    final val convention // com.eignex.klause.factor.arithmetic/DivMod.convention|{}convention[0]
+        final fun <get-convention>(): com.eignex.klause.factor.arithmetic/DivisionConvention // com.eignex.klause.factor.arithmetic/DivMod.convention.<get-convention>|<get-convention>(){}[0]
+    final val dividend // com.eignex.klause.factor.arithmetic/DivMod.dividend|{}dividend[0]
+        final fun <get-dividend>(): kotlin/Int // com.eignex.klause.factor.arithmetic/DivMod.dividend.<get-dividend>|<get-dividend>(){}[0]
+    final val divisor // com.eignex.klause.factor.arithmetic/DivMod.divisor|{}divisor[0]
+        final fun <get-divisor>(): kotlin/Int? // com.eignex.klause.factor.arithmetic/DivMod.divisor.<get-divisor>|<get-divisor>(){}[0]
+    final val quotient // com.eignex.klause.factor.arithmetic/DivMod.quotient|{}quotient[0]
+        final fun <get-quotient>(): kotlin/Int // com.eignex.klause.factor.arithmetic/DivMod.quotient.<get-quotient>|<get-quotient>(){}[0]
+    final val remainder // com.eignex.klause.factor.arithmetic/DivMod.remainder|{}remainder[0]
+        final fun <get-remainder>(): kotlin/Int // com.eignex.klause.factor.arithmetic/DivMod.remainder.<get-remainder>|<get-remainder>(){}[0]
+    final val variables // com.eignex.klause.factor.arithmetic/DivMod.variables|{}variables[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/DivMod.variables.<get-variables>|<get-variables>(){}[0]
+
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.arithmetic/DivMod.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/DivMod.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/DivMod.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.arithmetic/Linear : com.eignex.klause.ir/Factor, com.eignex.klause.ir/LinearRow { // com.eignex.klause.factor.arithmetic/Linear|null[0]

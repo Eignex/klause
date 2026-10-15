@@ -57,9 +57,10 @@ internal fun retainDivMod(
     val qMagnitude = aMagnitude + BIG_ONE
     val q = quotient ?: freshInt(bounded(BIG_ZERO - qMagnitude, qMagnitude))
     val rMagnitude = maxOf(BIG_ZERO, bMagnitude - BIG_ONE)
-    val r = remainder ?: freshInt(bounded(if (convention == DivisionConvention.EUCLIDEAN || dividendDomain.min >= 0L)
-        BIG_ZERO else BIG_ZERO - rMagnitude, if (convention == DivisionConvention.TRUNCATING && dividendDomain.max <= 0L)
-        BIG_ZERO else rMagnitude))
+    val lowerR = if (convention == DivisionConvention.EUCLIDEAN || dividendDomain.min >= 0L)
+        BIG_ZERO else BIG_ZERO - rMagnitude
+    val upperR = if (convention == DivisionConvention.TRUNCATING && dividendDomain.max <= 0L) BIG_ZERO else rMagnitude
+    val r = remainder ?: freshInt(bounded(lowerR, upperR))
     val factor = if (constant != null) DivMod(dividend, constant, q, r, convention)
         else DivMod(dividend, divisor, q, r, convention)
     return DivModRelation(q, r, listOf(factor))

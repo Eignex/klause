@@ -1203,6 +1203,40 @@ public final class com/eignex/klause/factor/arithmetic/ContinuousProduct : com/e
 	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
+public final class com/eignex/klause/factor/arithmetic/DivMod : com/eignex/klause/ir/Factor {
+	public fun <init> (IIIILcom/eignex/klause/factor/arithmetic/DivisionConvention;)V
+	public synthetic fun <init> (IIIILcom/eignex/klause/factor/arithmetic/DivisionConvention;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ILjava/math/BigInteger;IILcom/eignex/klause/factor/arithmetic/DivisionConvention;)V
+	public synthetic fun <init> (ILjava/math/BigInteger;IILcom/eignex/klause/factor/arithmetic/DivisionConvention;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun canSubstituteAffine (IIII)Z
+	public fun getBoolVars ()[I
+	public final fun getConstantDivisor ()Ljava/math/BigInteger;
+	public final fun getConvention ()Lcom/eignex/klause/factor/arithmetic/DivisionConvention;
+	public final fun getDividend ()I
+	public final fun getDivisor ()Ljava/lang/Integer;
+	public fun getIntVars ()[I
+	public fun getLinearForm ()Lcom/eignex/klause/ir/LinearForm;
+	public final fun getQuotient ()I
+	public final fun getRemainder ()I
+	public fun getStructuralKeyWeight ()I
+	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
+	public fun isValueAnonymous ()Z
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
+	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
+	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
+}
+
+public final class com/eignex/klause/factor/arithmetic/DivisionConvention : java/lang/Enum {
+	public static final field EUCLIDEAN Lcom/eignex/klause/factor/arithmetic/DivisionConvention;
+	public static final field TRUNCATING Lcom/eignex/klause/factor/arithmetic/DivisionConvention;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/factor/arithmetic/DivisionConvention;
+	public static fun values ()[Lcom/eignex/klause/factor/arithmetic/DivisionConvention;
+}
+
 public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klause/ir/Factor, com/eignex/klause/ir/LinearRow {
 	public fun <init> ([I[D[I[DLcom/eignex/klause/ir/LinearOp;DZ)V
 	public synthetic fun <init> ([I[D[I[DLcom/eignex/klause/ir/LinearOp;DZILkotlin/jvm/internal/DefaultConstructorMarker;)V
