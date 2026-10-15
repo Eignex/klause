@@ -82,9 +82,11 @@ leaves retain their existing arithmetic and finite priority. This partial-point 
 visits and the ordinary branch check under the current operation token, with no
 new LP invocation or allowance.
 
-With the finite owners fixed and a live default partial point, Boolean-free source
-disjunctions can precede Boolean choices through the existing exhaustive arithmetic
-alternatives. Their bounded source-factor index carries no point or proof authority;
+In a default mixed opening with finite owners and a live partial point,
+Boolean-free source disjunctions can precede finite point choices and Boolean
+choices through the existing exhaustive arithmetic alternatives. Bounded exact
+comparison can prefer a row satisfied by the point. Their bounded source-factor
+index carries no point or proof authority;
 Boolean-dependent groups retain complete Boolean selection. The [search contract](../solver/search.md)
 controls admission, lazy naming and full-source completion.
 

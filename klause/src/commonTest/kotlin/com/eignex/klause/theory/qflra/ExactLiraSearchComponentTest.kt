@@ -67,6 +67,67 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `source disjunction choices prefer a completed point`() {
+        val source = Problem(
+            numBoolVars = 3, numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 0)),
+            openIntLo = booleanArrayOf(false, true), openIntHi = booleanArrayOf(false, true),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, -2),
+                ComparisonClause(intArrayOf(1, 1), arrayOf(LinearOp.GE, LinearOp.LE), longArrayOf(2, 0)),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ReifiedLinear(2, intArrayOf(1), intArrayOf(1), LinearOp.LE, 0),
+            ),
+        )
+        source.componentPlan().search(source, emptyMap()).use { planned ->
+            val theory = assertIs<ExactLiraSearchComponent>(planned.theory)
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+            assertEquals(true, planned.candidateHints.preferredBool(2))
+            assertNull(planned.session.boolValue(2))
+            val expected = assertNotNull(SourceBoundAtom.integerSplit(planned.session,
+                listOf(SourceBoundTerm(SearchIntValue(1), BigFraction.ONE)), BigFraction.ZERO))
+
+            val alternatives = theory.nextBranch(planned.session)
+
+            assertEquals(listOf(SearchDecision.Theory(expected.positive), SearchDecision.Theory(expected.negative)),
+                alternatives)
+        }
+    }
+
+    @Test
+    fun `partial disjunction choices refresh after retraction`() {
+        val source = Problem(
+            numBoolVars = 3, numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 0)),
+            openIntLo = booleanArrayOf(false, true), openIntHi = booleanArrayOf(false, true),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, -2),
+                ComparisonClause(intArrayOf(1, 1), arrayOf(LinearOp.LE, LinearOp.GE), longArrayOf(0, 2)),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        source.componentPlan().search(source, emptyMap()).use { planned ->
+            val theory = assertIs<ExactLiraSearchComponent>(planned.theory)
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+            val first = assertNotNull(theory.nextBranch(planned.session))
+            assertIs<SearchDecision.Theory>(first.first())
+            assertIs<ComponentResult.Consistent>(planned.session.push(first.first()))
+            assertIs<SearchDecision.IntEqual>(assertNotNull(theory.nextBranch(planned.session)).first())
+
+            planned.session.popTo(0)
+            assertIs<ComponentResult.Consistent>(planned.session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            assertIs<SearchDecision.Theory>(assertNotNull(theory.nextBranch(planned.session)).first())
+        }
+    }
+
+    @Test
     fun `partial point choices defer disjunctions with Boolean coefficients`() {
         val declaration = object : Factor by ComparisonClause(
             intArrayOf(1, 1), arrayOf(LinearOp.GE, LinearOp.LE), longArrayOf(1, -1),

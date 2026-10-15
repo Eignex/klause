@@ -220,6 +220,7 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintBooleanSelection = false
     private var pointForwardBlocks: Set<Int>? = null
     private var pointDisjunctionFactors: IntArray? = null
+    private var pointDisjunctionCursor = 0
     private var pendingPointForward = false
     private var deferredSourceRows = false
     private var pointHintLevel = -1
@@ -328,6 +329,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintBooleanSelection = selectBooleans
         pointForwardBlocks = forward?.blockedBooleans
         pointDisjunctionFactors = forward?.disjunctionFactors
+        pointDisjunctionCursor = 0
         val variableIds = variables.toIntArray()
         pointHintVariables = variableIds.takeIf { pointHintBooleanSelection }
         return variableIds to SearchCandidateHints { variable ->
@@ -402,7 +404,7 @@ class ExactLiraSearchComponent private constructor(
 
     internal val hasDefaultPointBooleanProposal: Boolean get() = pointHintBooleanSelection
 
-    internal fun partialPointFiniteBranchAvailable(): Boolean =
+    internal fun partialPointArithmeticBranchAvailable(): Boolean =
         pointHintBooleanSelection && finiteIntVars.isNotEmpty() && candidate != null && partialPointHintAvailable()
 
     internal fun partialPointBranchProposal(): SearchBranchProposal? {
@@ -441,6 +443,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintBooleanSelection = false
         pointForwardBlocks = null
         pointDisjunctionFactors = null
+        pointDisjunctionCursor = 0
         pendingPointForward = false
         pointHintLevel = -1
         pointHintStop = Cancellation.Never
@@ -707,6 +710,7 @@ class ExactLiraSearchComponent private constructor(
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
     override fun onRestart(context: SearchContext) {
         pointHintValues = null
+        pointDisjunctionCursor = 0
         pendingPointForward = false
         lp.onRestart(context)
     }
@@ -817,10 +821,14 @@ class ExactLiraSearchComponent private constructor(
     )
 
     private fun disjunctionBranch(context: SearchContext, partialPoint: Boolean = false): List<SearchDecision>? {
-        val indices: Iterable<Int> = if (partialPoint) pointDisjunctionFactors?.asIterable() ?: return null
-            else model.factors.indices
+        val positions = if (partialPoint) {
+            pointDisjunctionCursor until (pointDisjunctionFactors?.size ?: 0)
+        } else model.factors.indices
         var registered = false
-        for (index in indices) {
+        for (position in positions) {
+            val index = if (partialPoint) {
+                pointDisjunctionFactors?.get(position) ?: return null
+            } else position
             if (partialPoint) {
                 lpStop.charge(1)
                 if (operationStop() || pointHintStop()) return null
@@ -840,8 +848,28 @@ class ExactLiraSearchComponent private constructor(
                 lpStop.charge(disjuncts.size.toLong() + 1L)
                 if (operationStop() || pointHintStop()) return null
             }
-            if (disjuncts.any { context.truth(it.holds) == true }) continue
-            val open = disjuncts.firstOrNull { context.truth(it.holds) == null }
+            if (disjuncts.any { context.truth(it.holds) == true }) {
+                if (partialPoint) pointDisjunctionCursor = position + 1
+                continue
+            }
+            var open: DisjunctAtom? = null
+            val point = candidate.takeIf { partialPoint }
+            for (disjunct in disjuncts) {
+                if (partialPoint) {
+                    lpStop.charge(1)
+                    if (operationStop() || pointHintStop()) return null
+                }
+                if (context.truth(disjunct.holds) != null) continue
+                if (open == null) open = disjunct
+                if (point == null) break
+                val comparison = exactForms[index][disjunct.address.row]
+                    .hintComparison({ null }, ::hintScalar, ::hintPreflight)
+                if (comparison != null && hintTruth(comparison, point) == true) {
+                    open = disjunct
+                    break
+                }
+            }
+            if (partialPoint && (operationStop() || pointHintStop())) return null
             if (open != null) return listOf(SearchDecision.Theory(open.holds), SearchDecision.Theory(open.fails))
             val reason = disjunctionReason(disjuncts, null, context)
             outcome = if (reason == null) {
@@ -1246,7 +1274,12 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun branch(context: SearchContext): List<SearchDecision>? {
-        val partialPoint = context === this.context && partialPointFiniteBranchAvailable()
+        val partialPoint = context === this.context && partialPointArithmeticBranchAvailable()
+        if (partialPoint && pointDisjunctionCursor < (pointDisjunctionFactors?.size ?: 0)) {
+            if (operationStop() || pointHintStop() || !context.consumeCheck()) return null
+            disjunctionBranch(context, partialPoint = true)?.let { return it }
+            if (outcome != null || operationStop() || pointHintStop()) return null
+        }
         val finite = finiteIntVars.firstOrNull { variable ->
             if (partialPoint) {
                 lpStop.charge(1)
@@ -1256,13 +1289,7 @@ class ExactLiraSearchComponent private constructor(
                 context.intLowerBound(variable) != context.intUpperBound(variable)
         }
         if (finite != null) return finitePointBranch(finite, context, partialPoint)
-        if (partialPoint) {
-            if (pointDisjunctionFactors?.isEmpty() != false || operationStop() || pointHintStop() ||
-                !context.consumeCheck()
-            ) return null
-            return disjunctionBranch(context, partialPoint = true)
-        }
-        if (bools.any { it == UNASSIGNED } || outcome != null) return null
+        if (partialPoint || bools.any { it == UNASSIGNED } || outcome != null) return null
         if (operationStop() || !context.consumeCheck()) {
             outcome = ComponentCheck.Indeterminate
             return null
@@ -1510,6 +1537,7 @@ class ExactLiraSearchComponent private constructor(
         outcome = null
         candidate = null
         pointHintValues = null
+        pointDisjunctionCursor = 0
         pendingPointForward = false
         deferredSourceRows = deferredSourceRows || pointForwardBlocks != null
         dirty = true

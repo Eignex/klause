@@ -299,8 +299,11 @@ index share the 65,536 representation envelope with primitive hints and forward
 blocks. Index admission declines independently when that envelope is full; forward
 reuse still requires its complete blocked-variable scan. Selecting a group charges
 factor and disjunct visits and consumes the ordinary branch check under the current
-operation token. Lazy source naming retains its existing registered-atom limits;
-this choice adds no numerical allowance or separate LP call.
+operation token. Point preferences borrow the prepared exact row terms; scalar
+admission and arithmetic preflight charge the same token before comparisons.
+The cursor advances only past a group held true on the current
+trail; retraction and restart reset it. Lazy source naming retains its existing
+registered-atom limits; this choice adds no numerical allowance or separate LP call.
 
 Other built-in linear guidance and compound indexed preferences remain opt-in.
 Their existing real-coordinate producer admission is unchanged.

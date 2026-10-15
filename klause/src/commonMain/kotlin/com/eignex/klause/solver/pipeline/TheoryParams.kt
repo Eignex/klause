@@ -50,8 +50,8 @@ data class TheoryParams(
      * or Boolean draw. Original mixed integer/real sources can also select a primitive Boolean through
      * a separate live-point branch proposal before the ordinary heuristic. A live partial point can
      * order exhaustive finite equality or adjacent split alternatives before primitive preferences and ordinary gates.
-     * With finite owners fixed, Boolean-free source disjunctions can precede Boolean choices under
-     * the same bounded metadata and point lifetime.
+     * In a default mixed opening with finite owners, Boolean-free source disjunctions can precede
+     * finite and Boolean choices under the same bounded metadata and point lifetime.
      * Other built-in linear point guidance and compound source-clause preferences use
      * this opt-in. Zero permits bounded construction observations
      * but publishes no component preference; a positive value permits indexed preferences after caller
@@ -66,7 +66,7 @@ data class TheoryParams(
     /**
      * Fallback Boolean branching for each feasibility traversal.
      *
-     * Default mixed live-point finite and Boolean choices can precede this heuristic. Without a
+     * Default mixed live-point arithmetic and Boolean choices can precede this heuristic. Without a
      * live point, arithmetic and finite proposals retain the selected route's category priority.
      * Every alternative retains its source-check obligations.
      */

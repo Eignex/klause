@@ -439,7 +439,7 @@ class OpenTheoryEngine internal constructor(
                 nodePolicy = nodePolicy,
                 candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage),
                 branchSelection = if (pointSelection) PointBranchSelection(ordinarySelection) {
-                    pointComponent?.partialPointFiniteBranchAvailable() == true
+                    pointComponent?.partialPointArithmeticBranchAvailable() == true
                 } else ordinarySelection,
             )
             handedOff = true

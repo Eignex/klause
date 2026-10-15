@@ -39,39 +39,41 @@ class OpenTheoryEngineTest {
     private fun sourceRoute(model: Problem): ProblemPipeline = model.sourceRoute()
 
     @Test
-    fun `partial finite choices select source disjunctions before Boolean gates`() {
-        val model = Problem(
-            numBoolVars = 2, numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 0)),
-            openIntLo = booleanArrayOf(false, true), openIntHi = booleanArrayOf(false, true),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
-            factors = arrayOf(
-                Clause(intArrayOf(Lit.make(1, true))),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
-                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
-                ComparisonClause(intArrayOf(1, 1), arrayOf(LinearOp.GE, LinearOp.LE), longArrayOf(1, -1)),
-                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
-            ),
-        )
-        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
-        val params = TheoryParams()
-        var pause = true
-        val policy = object : SearchNodePolicy {
-            override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
-                if (pause && context.decisionLevel > 1) SearchNodeDisposition.Pause
-                else SearchNodeDisposition.Expand
-        }
-        val started = assertIs<OpenTheoryStart.Running>(engine.begin(params, OpenTheorySolveState(params), policy))
-        started.run.use { run ->
-            assertNull(run.advance())
+    fun `source disjunction choices precede finite point choices and Boolean gates`() {
+        for (allowance in listOf(null, 0L, 1L)) {
+            val model = Problem(
+                numBoolVars = 2, numIntVars = 2,
+                intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 0)),
+                openIntLo = booleanArrayOf(false, true), openIntHi = booleanArrayOf(false, true),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+                factors = arrayOf(
+                    Clause(intArrayOf(Lit.make(1, true))),
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                    Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+                    ComparisonClause(intArrayOf(1, 1), arrayOf(LinearOp.GE, LinearOp.LE), longArrayOf(1, -1)),
+                    ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ),
+            )
+            val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+            val params = TheoryParams(openHintFlips = allowance)
+            var pause = true
+            val policy = object : SearchNodePolicy {
+                override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
+                    if (pause && context.decisionLevel > 0) SearchNodeDisposition.Pause
+                    else SearchNodeDisposition.Expand
+            }
+            val started = assertIs<OpenTheoryStart.Running>(engine.begin(params, OpenTheorySolveState(params), policy))
+            started.run.use { run ->
+                assertNull(run.advance())
 
-            assertNull(run.session.boolValue(0))
-            assertEquals(0L, run.session.intUpperBound(0))
-            pause = false
-            val assignment = assertIs<OpenTheoryResult.Sat>(run.advance()).assignment
-            assertTrue(assignment.toSample(model).exactIntValue(1) >= BIG_ONE)
-            assertEquals(true, assignment.boolValue(1))
+                assertEquals(if (allowance == null) null else false, run.session.boolValue(0))
+                assertEquals(2L, run.session.intUpperBound(0))
+                pause = false
+                val assignment = assertIs<OpenTheoryResult.Sat>(run.advance()).assignment
+                assertTrue(assignment.toSample(model).exactIntValue(1) >= BIG_ONE)
+                assertEquals(true, assignment.boolValue(1))
+            }
         }
     }
 
