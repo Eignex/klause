@@ -15,18 +15,9 @@ import kotlin.math.abs
 // (MiniZinc semantics); nothing in the supported front-ends requires Euclidean.
 internal object IntFunctionLowering {
 
-    // result = |operand|: operand ≤ result ∧ −operand ≤ result ∧ (result = operand ∨ result = −operand).
-    fun absFactors(operand: Int, result: Int, freshBool: () -> Int): List<Factor> {
-        val pa = freshBool()
-        val pb = freshBool()
-        return listOf(
-            Linear(intArrayOf(1, -1), intArrayOf(operand, result), LinearOp.LE, 0), // operand ≤ result
-            Linear(intArrayOf(-1, -1), intArrayOf(operand, result), LinearOp.LE, 0), // −operand ≤ result
-            ReifiedLinear(pa, intArrayOf(1, -1), intArrayOf(result, operand), LinearOp.EQ, 0), // pa ↔ result = operand
-            ReifiedLinear(pb, intArrayOf(1, 1), intArrayOf(result, operand), LinearOp.EQ, 0), // pb ↔ result = −operand
-            Clause(intArrayOf(Lit.make(pa, true), Lit.make(pb, true))),
-        )
-    }
+    @Suppress("UNUSED_PARAMETER")
+    fun absFactors(operand: Int, result: Int, freshBool: () -> Int): List<Factor> =
+        listOf(com.eignex.klause.factor.arithmetic.Abs(operand, result))
 
     // The disjunction of reified equalities pins result to exactly one arg value; without it
     // result could float strictly above the max or below the min.

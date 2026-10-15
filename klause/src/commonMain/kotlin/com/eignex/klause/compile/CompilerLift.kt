@@ -114,7 +114,7 @@ internal fun Lowering.materializeIntVar(expr: IntExpr): IntRef = when (expr) {
 internal fun Lowering.liftAbs(child: IntExpr): IntExpr {
     val lifted = lift(child)
     val d = domainOf(lifted)
-    val absMax = maxOf(if (d.min < 0) -d.min else d.min, if (d.max < 0) -d.max else d.max)
+    val absMax = if (d.min == Long.MIN_VALUE) Long.MAX_VALUE else maxOf(kotlin.math.abs(d.min), kotlin.math.abs(d.max))
     val auxName = newAuxIntVar(IntDomain(0L, absMax))
     val operandId = intVarOf(materializeIntVar(lifted).name)
     factors += IntFunctionLowering.absFactors(operandId, intVarOf(auxName)) { newBoolVar() }

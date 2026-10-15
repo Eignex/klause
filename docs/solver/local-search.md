@@ -123,6 +123,11 @@ declared destroy draw, repair allowance and outer iteration charge remain unchan
 
 ## Definitions and repairs
 
+Integer Abs outputs join acyclic functional definition cones. Competing definitions
+and result aliases remain searched. Abs scores and move deltas replace every aliased
+role together; direct repairs propose the output magnitude or either admissible
+operand sign. Signed-word overflow stays violated and receives no wrapped witness.
+
 Hinted min/max expression outputs, their materialized affine operands and output aliases
 form a one-way definition cone. Unhinted min/max globals remain searched. Competing
 definitions and cyclic cones remain searched; independent constraints on a defined
