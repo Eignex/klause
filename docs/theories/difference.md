@@ -191,10 +191,13 @@ retain that route.
 
 Admitted pure-real difference components under the production certification policy
 defer LP construction and check the active graph at partial and complete Boolean states,
-including the root. A feasible partial graph supplies consistency without a numerical
-guide or a model contribution. With default primitive guidance, the first live
-consultation after this admission supplies no preference and releases optional hint
-rows and values. Registration and all capture work already spent remain charged; later checks
+including the root. A feasible partial graph supplies consistency and can guide
+comparison polarity without a model contribution. Default direct guidance retains
+that point beside a source at-most-one or exactly-one Boolean cardinality over
+three or more literals. Graph preparation retains this source shape in its existing
+factor pass, with no extra graph check or allowance. Other admitted graph sources
+release optional hint rows and values at the first live default consultation and
+supply no preference. Registration and all capture work already spent remain charged; later checks
 skip released capture in the same opening. An unavailable point or a caller preference
 that bypasses the component does not trigger release. Explicit hint allowances retain
 their existing graph-point preferences. This policy changes neither graph admission
