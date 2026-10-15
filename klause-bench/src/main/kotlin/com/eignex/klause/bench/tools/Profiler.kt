@@ -30,10 +30,14 @@ internal data class ProfileConfig(
  * parsing and setup. Short runs may yield too few samples for a useful profile.
  */
 internal object Profiler {
+    private const val CLI_CALLER_DEPTH = 3
+
     fun summarizeCli(file: File) {
         val cpu = HashMap<String, Long>()
         val phases = HashMap<String, Long>()
         val allocation = HashMap<String, Long>()
+        val cpuCallers = HashMap<String, Long>()
+        val allocationCallers = HashMap<String, Long>()
         RecordingFile(file.toPath()).use { recording ->
             while (recording.hasMoreEvents()) {
                 val event = recording.readEvent()
@@ -41,18 +45,34 @@ internal object Profiler {
                     "jdk.ExecutionSample" -> {
                         topMethod(event)?.let { cpu.merge(it, 1L, Long::plus) }
                         phases.merge(cliPhase(event), 1L, Long::plus)
+                        cpuCallers.merge(cliOperationCallers(event), 1L, Long::plus)
                     }
                     "jdk.ObjectAllocationSample" -> {
                         val weight = event.getLong("weight")
                         allocation.merge(cliPhase(event), weight, Long::plus)
+                        allocationCallers.merge(cliOperationCallers(event), weight, Long::plus)
                     }
                 }
             }
         }
         printTable("whole CLI: CPU samples by phase (stack attribution)", phases, 40)
         printTable("whole CLI: CPU self-samples", cpu, 60)
+        printTable("whole CLI: CPU samples by captured callers", cpuCallers, 60)
         printTable("whole CLI: sampled allocation weight by phase (estimated bytes)", allocation, 40)
+        printTable("whole CLI: sampled allocation weight by captured callers (estimated bytes)", allocationCallers, 60)
     }
+
+    private fun cliOperationCallers(event: RecordedEvent): String =
+        cliOperationCallers(event.stackTrace?.frames.orEmpty().map { "${it.method.type.name}.${it.method.name}" })
+
+    internal fun cliOperationCallers(stack: List<String>): String = stack.asSequence()
+        .filter {
+            it.startsWith("com.eignex.klause.") &&
+                !it.startsWith("com.eignex.klause.util.") && !it.startsWith("com.eignex.klause.bench.")
+        }
+        .take(CLI_CALLER_DEPTH)
+        .joinToString(" <- ")
+        .ifEmpty { "no captured Klause operation" }
 
     private fun cliPhase(event: RecordedEvent): String =
         cliPhase(event.stackTrace?.frames.orEmpty().map { "${it.method.type.name}.${it.method.name}" })

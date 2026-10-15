@@ -421,6 +421,12 @@ preparation, theory source installation, session opening, root initialization,
 propagation, model checks and search. Presolve and legacy backtrack callers retain their outer phase.
 Utility frames without a recognized caller remain unclassified. These sampled
 categories describe visible operations, not exact wall time or theory-check counts.
+Separate caller tables retain the first three captured non-utility Klause frames,
+in stack order, for CPU samples and allocation weights. Runtime, neutral utilities
+and benchmark frames are skipped; a stack without an operation frame keeps an
+explicit unknown label. These paths supply sampled context for collection or
+runtime self-samples, not exact elapsed cost or a causal explanation. Summarization
+runs after subprocess timing and does not change the CLI recording configuration.
 
 `CliStreamCapture` with `checkSmt=true` checks complete satisfaction models against
 all original SMT assertions. Optimization streams also require each model's exact
