@@ -97,6 +97,10 @@ class EngineParams(pairs: List<String>) {
         }
     }
 
+    internal constructor(key: String, value: String) : this(emptyList()) {
+        map[key] = value
+    }
+
     fun long(key: String): Long? = map.remove(key)?.let {
         it.toLongOrNull() ?: fail("engine param `$key` expects an integer, got `$it`")
     }
