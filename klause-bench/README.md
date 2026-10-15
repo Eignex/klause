@@ -1770,7 +1770,8 @@ root witness producer before CAD. Its single `request64=<base64>` argument encod
 up to eight `{id, base64, sha256}` original SMT sources. The decoded request is bounded
 to 48 KiB and each unchanged source to 32 KiB. Run it through an AWS lab profile at
 a pinned revision. The output retains original bytes, request, installed provenance
-and revision, plus alternating plain/observed producer records.
+and revision, including installed harness hashes and actual JVM options/core count,
+plus alternating plain/observed producer records.
 
 The JVM-only observer reflects the existing root query and native owner. It records
 the stack and cumulative charge at the existing coupled-work stop checkpoint without
