@@ -24,7 +24,7 @@ class PortfolioCompositionTest {
     fun `annotated finite optimization admits unrestricted first fail beside source search`() {
         val annotation = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax)
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { false }
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
 
         val plan = PortfolioComposition.plan(scenario, facts)
 
@@ -45,7 +45,8 @@ class PortfolioCompositionTest {
             .toBacktrackParams(0, 3)
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
 
-        val composed = PortfolioComposition.compose(scenario)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { true }
+        val composed = PortfolioComposition.compose(scenario, facts)
 
         assertEquals(1, composed.count { it.label == "first-fail" })
         assertEquals(1, composed.count { it.label == "annotation" })
@@ -57,7 +58,8 @@ class PortfolioCompositionTest {
             annotationArm = BacktrackParams(variableSelector = SmallestDomain, valueSelector = IndomainMin),
         )
 
-        val composed = PortfolioComposition.compose(scenario)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { true }
+        val composed = PortfolioComposition.compose(scenario, facts)
 
         assertEquals(0, composed.count { it.label == "first-fail" })
         assertEquals(1, composed.count { it.label == "annotation" })
@@ -79,19 +81,23 @@ class PortfolioCompositionTest {
         )
 
         for (control in controls) {
-            val composed = PortfolioComposition.compose(control)
+            val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { true }
+            val composed = PortfolioComposition.compose(control, facts)
 
             assertEquals(0, composed.count { it.label == "first-fail" }, control.toString())
         }
     }
 
     @Test
-    fun `annotation diversity requires nonbinary finite domains`() {
+    fun `annotation diversity requires nonbinary finite circuit domains`() {
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = BacktrackParams())
         val profile = ProblemFacts.assumed(Kind.COP).profile
         val controls = ProblemClass.entries.filter { it != ProblemClass.FiniteCp }
-            .map { ProblemFacts(profile.copy(problemClass = it)) { true } } +
-            ProblemFacts(profile, binaryIntegers = true) { true }
+            .map { ProblemFacts(profile.copy(problemClass = it), circuit = true) { true } } +
+            listOf(
+                ProblemFacts(profile, binaryIntegers = true, circuit = true) { true },
+                ProblemFacts(profile) { true },
+            )
 
         for (facts in controls) {
             val composed = PortfolioComposition.compose(scenario, facts)
@@ -103,7 +109,7 @@ class PortfolioCompositionTest {
     @Test
     fun `expanded annotated pools admit first fail before any incumbent without duplicating it`() {
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = BacktrackParams())
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { false }
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
         val small = PortfolioComposition.plan(scenario, facts)
 
         for (count in listOf(9, 12, 18, 30)) {
@@ -122,7 +128,8 @@ class PortfolioCompositionTest {
             annotationArm = BacktrackParams(), nodeBudget = budget, lpCeiling = LpConfig.OFF,
         )
 
-        val composed = PortfolioComposition.compose(scenario)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { true }
+        val composed = PortfolioComposition.compose(scenario, facts)
 
         val generic = composed.filterIsInstance<BacktrackWorkerConfig>().single { it.label == "first-fail" }
         assertSame(budget, generic.recipe.build(1L, null).nodeBudget)

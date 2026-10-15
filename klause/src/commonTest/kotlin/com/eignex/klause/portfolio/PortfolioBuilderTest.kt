@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -27,23 +28,26 @@ import kotlin.test.assertTrue
 class PortfolioBuilderTest {
 
     @Test
-    fun `annotated first fail worker has initial admission and complete source authority`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray()).bake()
+    fun `annotated circuit diversity has initial admission and complete source authority`() {
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = BacktrackParams())
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L))
+        for (subcircuit in listOf(false, true)) {
+            val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) },
+                arrayOf(Circuit(intArrayOf(0, 1, 2), subcircuit = subcircuit))).bake()
 
-        val workers = PortfolioBuilder.build(problem, scenario, objective)
+            val workers = PortfolioBuilder.build(problem, scenario, objective)
 
-        try {
-            val generic = workers.single { it.label == "bt/first-fail" }
-            assertFalse(generic.improvementOnly)
-            assertEquals(ArmFamily.Backtrack, generic.family)
-            assertTrue(generic.permitsSourceProofs)
-            assertTrue(generic.controlsObjectiveCutoff)
-            assertNotNull(generic.sourceBinding)
-            assertSame(workers.first().sharingInvocation, generic.sharingInvocation)
-        } finally {
-            workers.forEach { it.close() }
+            try {
+                val generic = workers.single { it.label == "bt/first-fail" }
+                assertFalse(generic.improvementOnly)
+                assertEquals(ArmFamily.Backtrack, generic.family)
+                assertTrue(generic.permitsSourceProofs)
+                assertTrue(generic.controlsObjectiveCutoff)
+                assertNotNull(generic.sourceBinding)
+                assertSame(workers.first().sharingInvocation, generic.sharingInvocation)
+            } finally {
+                workers.forEach { it.close() }
+            }
         }
     }
 
