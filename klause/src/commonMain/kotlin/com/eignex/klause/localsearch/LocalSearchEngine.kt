@@ -137,9 +137,11 @@ internal class LocalSearchEngine(
                 configuredRestart.onLocalOptimum(state, sample, objective)
 
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                val previousBest = state.bestCostSeen
                 configuredRestart.restart(state, bestSoFar)
                 prepareAssignment(state)
                 state.recompute()
+                state.bestCostSeen = minOf(previousBest, state.cost)
             }
         }
     }
@@ -276,11 +278,11 @@ internal class LocalSearchEngine(
         val sample = params.initialAssignment ?: return false
         if (sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return false
         if (checkpoint == null) {
-            seedFrom(state, sample)
+            seedFrom(state, sample, recompute = false)
             if (reconcile) definitionalSweep?.let {
                 it.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
-                state.recompute()
             }
+            state.recompute()
         } else {
             prepareSteps(state.initialAssignmentSteps(sample), params, checkpoint)
             if (reconcile) definitionalSweep?.let {

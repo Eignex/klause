@@ -1,10 +1,12 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -14,10 +16,9 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
-import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
@@ -36,6 +37,70 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
+    @Test
+    fun `optimization seed cost observations follow definition reconciliation`() {
+        val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(0, true))),
+            Clause(intArrayOf(Lit.make(1, true))), Clause(intArrayOf(Lit.make(1, true))),
+        ))
+        val observed = mutableListOf<Long>()
+        val strategy = SourceDrivenStrategy(
+            sources = emptyList(),
+            perturbation = { observed += it.bestCostSeen; null },
+            feasibleDescent = FeasibleDescent.SelfOwned,
+        )
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
+            perMoveInvariants = true,
+            definitionalSweep = DefinitionalSweep.infer(problem, boolFolds = listOf(
+                BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+            )),
+        )
+        val params = LocalSearchParams(
+            maxFlips = 1L, initialAssignment = Sample(booleanArrayOf(true, true), longArrayOf()),
+        )
+
+        search.improvements(LinearObjective(boolWeights = longArrayOf(1, 0)), params, warm = null).toList()
+
+        assertEquals(listOf(2L), observed)
+    }
+
+    @Test
+    fun `restart cost observations follow definition reconciliation`() {
+        val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(0, true))),
+            Clause(intArrayOf(Lit.make(1, true))), Clause(intArrayOf(Lit.make(1, true))),
+        ))
+        val observed = mutableListOf<Long>()
+        val strategy = SourceDrivenStrategy(
+            sources = emptyList(),
+            perturbation = { observed += it.bestCostSeen; null },
+            feasibleDescent = FeasibleDescent.SelfOwned,
+        )
+        val policy = object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                state.assignment.setBool(0, true)
+                state.assignment.setBool(1, true)
+                state.recompute()
+            }
+        }
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy,
+            greedyRepairOnRestart = false, perMoveInvariants = true,
+            definitionalSweep = DefinitionalSweep.infer(problem, boolFolds = listOf(
+                BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+            )),
+        )
+
+        search.samples(LocalSearchParams(maxFlips = 1L), warm = null).toList()
+
+        assertEquals(listOf(2L), observed)
+    }
 
     @Test
     fun `suspended definition evaluation retains completed outputs`() {

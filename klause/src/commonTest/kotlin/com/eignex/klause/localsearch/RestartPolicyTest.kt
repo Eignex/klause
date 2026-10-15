@@ -1,7 +1,10 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
@@ -10,6 +13,7 @@ import com.eignex.klause.localsearch.schedule.RoundLog
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import kotlin.random.Random
@@ -19,6 +23,51 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RestartPolicyTest {
+    @Test
+    fun `anchored perturbations preserve Boolean and integer pins`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+        ))
+        val pins = Assumptions.None.withBool(0, true).withInt(0, 1)
+        val anchor = Sample(booleanArrayOf(true), longArrayOf(1))
+        for (kind in PerturbationKind.entries) {
+            for (seed in 0..3) {
+                val state = LocalSearchState(LocalSearchModel.open(problem), Random(seed), pins)
+
+                anchorAndPerturb(state, anchor, 1, kind)
+
+                assertTrue(state.assignment.boolValue(0))
+                assertEquals(1L, state.assignment.intValue(0))
+                assertEquals(0L, state.cost)
+            }
+        }
+    }
+
+    @Test
+    fun `an anchored restart cannot replace caller pins with anchor values`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0),
+            Assumptions.None.withBool(0, true).withInt(0, 1))
+        val anchor = Sample(booleanArrayOf(false), longArrayOf(0))
+
+        AdaptivePerturbationRestart(perturbationStrength = 0).restart(state, anchor)
+
+        assertTrue(state.assignment.boolValue(0))
+        assertEquals(1L, state.assignment.intValue(0))
+    }
+
+    @Test
+    fun `anchored restarts clear tabu tenure and preserve write activity`() {
+        val problem = Problem(1, 0, emptyArray(), emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.apply(Move.BoolFlip(0))
+        val anchor = state.assignment.snapshot()
+
+        AdaptivePerturbationRestart(perturbationStrength = 0).restart(state, anchor)
+
+        assertFalse(state.tabu.isTaboo(Move.BoolFlip(0), tenure = 10))
+        assertEquals(1, state.tabu.touchCount[0])
+    }
 
     @Test
     fun `fixed cadence triggers at boundary`() {
