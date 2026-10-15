@@ -143,6 +143,64 @@ def void_return(identity, graph):
             raise ValueError('Lifecycle void return type differs from its source signature')
 
 
+def physical_function_span(node, unit, pc, size):
+    if 'DW_AT_ranges' not in node['attributes']:
+        return abi.function_entry(node, pc, size)
+    if type(pc) is not int or type(size) is not int or not 0 <= pc < pc + size <= abi.MAX_ADDRESS:
+        raise ValueError('Split function symbol span is invalid')
+    if unit.get('version') not in (3, 4, 5) or 'DW_AT_high_pc' in node['attributes']:
+        raise ValueError('Unsupported split function version or conflicting contiguous range')
+    if node['attributes'].get('DW_AT_declaration', {}).get('value') not in (None, False, 0):
+        raise ValueError('A declaration does not establish a physical function span')
+    convention = abi.dwarf.scalar(node, 'DW_AT_calling_convention')
+    if 'DW_AT_calling_convention' in node['attributes'] and convention != 1:
+        raise ValueError('Non-normal or unresolved split function calling convention')
+    explicit = []
+    for name in ['DW_AT_entry_pc', 'DW_AT_low_pc']:
+        if name in node['attributes']:
+            value = abi.address(node, name)
+            if value is None or value != pc:
+                raise ValueError('Explicit DWARF function entry differs from the physical symbol')
+            explicit.append({'attribute': name, 'address': value})
+    description = node.get('context', {}).get('ranges', {})
+    rows = description.get('data')
+    if description.get('status') != 'decoded' or not isinstance(rows, list) or not rows or len(rows) > abi.MAX_LOCATIONS:
+        raise ValueError('Split function range list is unresolved or exceeds bounds')
+    base = abi.address({'attributes': unit.get('topAttributes', {})}, 'DW_AT_low_pc')
+    ranges = []
+    for row in rows:
+        fields = row['fields']
+        if row['kind'] == 'BaseAddressEntry':
+            base = fields['base_address']
+            if type(base) is not int or not 0 <= base <= abi.MAX_ADDRESS:
+                raise ValueError('Split function range base is invalid')
+            continue
+        if row['kind'] != 'RangeEntry':
+            raise ValueError('Unsupported split function range record')
+        start, end = fields['begin_offset'], fields['end_offset']
+        if type(start) is not int or type(end) is not int or type(fields['is_absolute']) is not bool or start < 0 or end < 0:
+            raise ValueError('Split function range operands are invalid')
+        if not fields['is_absolute']:
+            if base is None:
+                raise ValueError('Relative split function range has no base')
+            start, end = base + start, base + end
+        if not 0 <= start <= end <= abi.MAX_ADDRESS:
+            raise ValueError('Split function range is invalid or overflows')
+        ranges.append({'start': start, 'end': end, 'originalRecord': row})
+    occupied = sorted((row['start'], row['end']) for row in ranges if row['start'] != row['end'])
+    if any(left[1] > right[0] for left, right in zip(occupied, occupied[1:])):
+        raise ValueError('Split function ranges overlap')
+    matches = [row for row in ranges if row['start'] == pc and pc + size <= row['end']]
+    if len(matches) != 1:
+        raise ValueError('Complete canonical symbol does not start a unique split function range')
+    return {'start': pc, 'end': matches[0]['end'], 'symbolBytes': size, 'ranges': ranges,
+            'originalRangeDescription': description, 'entryBasis': 'canonical-ELF-function-symbol',
+            'explicitDwarfEntryAddressProven': bool(explicit), 'explicitDwarfEntries': explicit,
+            'scope': 'Canonical ordinary function symbol start and full span concordant with source-linked '
+                     'DWARF ranges. Missing explicit DWARF entry attributes are not synthesized; '
+                     'range order alone supplies no DWARF entry proof or compiled control-flow coverage.'}
+
+
 def bind_definition(role, selected, source, symbol, owners):
     plan = ROLES[role]
     graph = source['dwarf']['graph']
@@ -156,8 +214,8 @@ def bind_definition(role, selected, source, symbol, owners):
                  *abi.inherited(identity, 'DW_AT_MIPS_linkage_name', graph)]
         if not links or any(byte_text(value.get('value')) not in plan['names'] for _, value in links):
             raise ValueError('Lifecycle linkage differs from the fixed source signatures')
-        result['functionRange'] = abi.function_entry(node, pc, symbol['size'])
         unit = source['contextUnits'][node['context']['unitTopDie']]
+        result['functionRange'] = physical_function_span(node, unit, pc, symbol['size'])
         if unit['unitOffset'] != node['unitOffset'] or node.get('parentKnownFromSelectedTraversal') is not True:
             raise ValueError('Lifecycle function has an unresolved compilation-unit owner')
         result['sourceDeclarations'] = source_declarations(identity, graph, role)
@@ -241,7 +299,8 @@ def review(source, original, layout, groups, report):
                   lifecycleArgumentPlanProven=False)
     for role, plan in ROLES.items():
         target = report['roles'][role] = {'requiredSymbols': list(plan['names']), 'entries': [],
-                                         'unmatchedPhysicalDefinitions': [], 'argumentPlanProven': False}
+                                         'entryAssociationDiagnostics': [], 'unmatchedPhysicalDefinitions': [],
+                                         'argumentPlanProven': False}
         identities = {name: set() for name in plan['names']}
         for query, entries in groups.items():
             for index, entry in enumerate(entries):
@@ -259,9 +318,22 @@ def review(source, original, layout, groups, report):
                     identities[symbol['name']].add(physical)
                     for candidate in selected:
                         node = graph[candidate['die']]
-                        if node['tag'] != 'DW_TAG_subprogram' or abi.address(node, 'DW_AT_low_pc') != symbol['value'] or \
+                        if node['tag'] != 'DW_TAG_subprogram' or \
                                 not any(bytes.fromhex(name['nameHex']) == plan['sourceName'].encode('ascii')
                                         for name in candidate['nameCandidates']):
+                            continue
+                        if 'DW_AT_ranges' in node['attributes']:
+                            association = {'die': candidate['die'], 'symbolName': symbol['name'],
+                                           'physicalEntrySpanProven': False}
+                            target['entryAssociationDiagnostics'].append(association)
+                            try:
+                                unit = source['contextUnits'][node['context']['unitTopDie']]
+                                association['functionRange'] = physical_function_span(node, unit, symbol['value'], symbol['size'])
+                                association['physicalEntrySpanProven'] = True
+                            except Exception as error:
+                                association['error'] = {'type': type(error).__name__, 'message': str(error)}
+                                continue
+                        elif abi.address(node, 'DW_AT_low_pc') != symbol['value']:
                             continue
                         row['definitions'].append(bind_definition(role, candidate, source, symbol, owners))
                     row['argumentPlanProven'] = bool(row['definitions']) and all(
@@ -272,7 +344,8 @@ def review(source, original, layout, groups, report):
         for candidate in selected:
             node = graph[candidate['die']]
             if node['tag'] != 'DW_TAG_subprogram' or node['attributes'].get('DW_AT_declaration', {}).get('value') in (True, 1) or \
-                    'DW_AT_low_pc' not in node['attributes'] and 'DW_AT_inline' in node['attributes']:
+                    'DW_AT_low_pc' not in node['attributes'] and 'DW_AT_ranges' not in node['attributes'] and \
+                    'DW_AT_inline' in node['attributes']:
                 continue
             if not any(bytes.fromhex(name['nameHex']) == plan['sourceName'].encode('ascii')
                        for name in candidate['nameCandidates']):
@@ -387,11 +460,17 @@ def decline(report, error):
                   error={'type': type(error).__name__, 'message': str(error)})
     for role in report.get('roles', {}).values():
         role['argumentPlanProven'] = False
+        for association in role.get('entryAssociationDiagnostics', []):
+            association['physicalEntrySpanProven'] = False
+            if 'functionRange' in association:
+                association['functionRange']['explicitDwarfEntryAddressProven'] = False
         for row in role['entries']:
             row['argumentPlanProven'] = False
             for definition in row['definitions']:
                 definition['sourceBoundaryProven'] = definition['argumentPlanProven'] = False
                 definition['pointerReturnClassProven'] = False
+                if 'explicitDwarfEntryAddressProven' in definition.get('functionRange', {}):
+                    definition['functionRange']['explicitDwarfEntryAddressProven'] = False
                 for binding in definition['parameterBindings']:
                     binding['readBindingProven'] = False
 

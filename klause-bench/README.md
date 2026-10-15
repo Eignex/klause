@@ -1737,7 +1737,13 @@ constructor/destructor aliases. It rebinds every validated task definition and
 member/type-reference closure from the original context into the lifecycle
 context. Parser cache accounting may differ; semantic descriptions must agree.
 Each canonical physical entry requires its complete bytes, source declaration,
-concrete parameter inventory and object lineage. Only the requested task pointers
+concrete parameter inventory and object lineage. Split functions require the
+canonical ordinary ELF symbol to start exactly one decoded range containing its
+whole span. All ranges and base-address records are retained; overlapping ranges,
+unknown bases and conflicting explicit entries remain unproved. The association
+uses the physical function symbol. Missing explicit DWARF entry attributes are
+not synthesized from range order, and explicit entry evidence is recorded
+separately. Only the requested task pointers
 and initializer compile identity receive direct entry-register proofs. Unused
 locations remain uninterpreted. The allocator's normal pointer return class is
 separate from execution or delivery of a return. Wrapper destruction binds a

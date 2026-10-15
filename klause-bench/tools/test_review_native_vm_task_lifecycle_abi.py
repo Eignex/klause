@@ -12,7 +12,7 @@ import review_native_vm_task_lifecycle_abi as lifecycle
 
 class ReviewNativeVmTaskLifecycleAbiTest(unittest.TestCase):
     def test_every_fixed_lifecycle_role_and_alias_requires_its_complete_source_read_plan(self):
-        for mode in ['valid', 'missing-alias', 'conflicting-free', 'task-register', 'int-width',
+        for mode in ['valid', 'split-valid', 'missing-alias', 'conflicting-free', 'task-register', 'int-width',
                      'object-lineage', 'source-line', 'split-range', 'unmatched-definition', 'return-type']:
             with self.subTest(mode=mode):
                 graph = {}
@@ -97,6 +97,15 @@ class ReviewNativeVmTaskLifecycleAbiTest(unittest.TestCase):
                     graph['free']['attributes']['DW_AT_decl_line']['value'] = 1
                 elif mode == 'split-range':
                     graph['free']['attributes']['DW_AT_ranges'] = {'form': 'DW_FORM_sec_offset', 'value': 0}
+                elif mode == 'split-valid':
+                    for name in ['initialize', 'destroy']:
+                        node = graph[name]
+                        pc = node['attributes'].pop('DW_AT_low_pc')['value']
+                        node['attributes'].pop('DW_AT_high_pc')
+                        node['attributes']['DW_AT_ranges'] = {'form': 'DW_FORM_sec_offset', 'value': 0}
+                        node['context']['ranges'] = {'status': 'decoded', 'data': [
+                            {'kind': 'RangeEntry', 'fields': {'begin_offset': pc, 'end_offset': pc + 10, 'is_absolute': True}},
+                            {'kind': 'RangeEntry', 'fields': {'begin_offset': pc + 20, 'end_offset': pc + 25, 'is_absolute': True}}]}
                 elif mode == 'unmatched-definition':
                     graph['extra'] = copy.deepcopy(graph['free'])
                     graph['extra']['attributes']['DW_AT_low_pc']['value'] = 999
@@ -104,21 +113,89 @@ class ReviewNativeVmTaskLifecycleAbiTest(unittest.TestCase):
                 elif mode == 'return-type':
                     graph['allocate']['references']['DW_AT_type'] = 'int'
                 source = {'dwarf': {'graph': graph, 'selectedRecords': selected, 'nameErrors': []},
-                          'contextUnits': {'unit': {'unitOffset': 0, 'topDie': 'unit', 'topAttributes': {}}}}
+                          'contextUnits': {'unit': {'unitOffset': 0, 'topDie': 'unit', 'version': 4, 'topAttributes': {}}}}
                 report = {}
 
                 with patch.object(lifecycle, 'task_definitions', return_value={'CompileTask'}):
                     lifecycle.review(source, {}, {}, {'captured': entries}, report)
 
-                self.assertEqual(mode == 'valid', report['lifecycleArgumentPlanProven'])
+                self.assertEqual(mode in ['valid', 'split-valid'], report['lifecycleArgumentPlanProven'])
                 self.assertEqual(entries, report['entries']['captured'])
-                if mode == 'valid':
+                if mode in ['valid', 'split-valid']:
                     self.assertTrue(all(row['argumentPlanProven'] for row in report['roles'].values()))
                     returned = report['roles']['allocate']['entries'][0]['definitions'][0]
                     self.assertTrue(returned['pointerReturnClassProven'])
                     self.assertEqual(0, returned['pointerReturnClass']['dwarfRegister'])
                     constructed = report['roles']['construct']['entries'][0]['definitions'][0]
                     self.assertEqual(['task'], [row['name'] for row in constructed['parameterBindings']])
+
+    def test_split_spans_require_complete_nonoverlapping_ranges_and_the_physical_symbol_start(self):
+        for mode in ['absolute', 'relative', 'base-entry', 'explicit-entry', 'missing-base', 'interior',
+                     'oversized', 'overlap', 'conflicting-entry', 'constant-entry', 'unknown-kind',
+                     'undecoded', 'unknown-version', 'declaration', 'non-normal', 'overflow', 'empty']:
+            with self.subTest(mode=mode):
+                node = {'attributes': {'DW_AT_ranges': {'form': 'DW_FORM_sec_offset', 'value': 0}},
+                        'context': {'ranges': {'status': 'decoded', 'data': [
+                            {'kind': 'RangeEntry', 'fields': {'begin_offset': 100, 'end_offset': 110, 'is_absolute': True}},
+                            {'kind': 'RangeEntry', 'fields': {'begin_offset': 50, 'end_offset': 55, 'is_absolute': True}}]}}}
+                unit = {'version': 4, 'topAttributes': {}}
+                pc, size = 100, 10
+                if mode in ['relative', 'missing-base', 'base-entry']:
+                    for row in node['context']['ranges']['data']:
+                        row['fields']['is_absolute'] = False
+                    if mode == 'relative':
+                        unit['topAttributes']['DW_AT_low_pc'] = {'form': 'DW_FORM_addr', 'value': 0}
+                    elif mode == 'base-entry':
+                        node['context']['ranges']['data'].insert(0, {'kind': 'BaseAddressEntry', 'fields': {'base_address': 0}})
+                elif mode in ['explicit-entry', 'conflicting-entry', 'constant-entry']:
+                    node['attributes']['DW_AT_entry_pc'] = {'form': 'DW_FORM_addr' if mode != 'constant-entry' else 'DW_FORM_data1',
+                                                          'value': 101 if mode == 'conflicting-entry' else 100}
+                elif mode == 'interior':
+                    pc, size = 101, 1
+                elif mode == 'oversized':
+                    size = 11
+                elif mode == 'overlap':
+                    node['context']['ranges']['data'][1]['fields'].update(begin_offset=105, end_offset=115)
+                elif mode == 'unknown-kind':
+                    node['context']['ranges']['data'][1]['kind'] = 'UnknownEntry'
+                elif mode == 'undecoded':
+                    node['context']['ranges']['status'] = 'error'
+                elif mode == 'unknown-version':
+                    unit['version'] = 2
+                elif mode == 'declaration':
+                    node['attributes']['DW_AT_declaration'] = {'form': 'DW_FORM_flag_present', 'value': True}
+                elif mode == 'non-normal':
+                    node['attributes']['DW_AT_calling_convention'] = {'form': 'DW_FORM_data1', 'value': 2}
+                elif mode == 'overflow':
+                    node['context']['ranges']['data'][1]['fields']['end_offset'] = lifecycle.abi.MAX_ADDRESS + 1
+                elif mode == 'empty':
+                    node['context']['ranges']['data'] = []
+
+                if mode in ['absolute', 'relative', 'base-entry', 'explicit-entry']:
+                    result = lifecycle.physical_function_span(node, unit, pc, size)
+
+                    self.assertEqual('canonical-ELF-function-symbol', result['entryBasis'])
+                    self.assertEqual(mode == 'explicit-entry', result['explicitDwarfEntryAddressProven'])
+                    self.assertEqual(node['context']['ranges'], result['originalRangeDescription'])
+                    self.assertEqual(100, result['start'])
+                    self.assertEqual(110, result['end'])
+                else:
+                    with self.assertRaises(ValueError):
+                        lifecycle.physical_function_span(node, unit, pc, size)
+
+    def test_fatal_failure_clears_new_range_association_proofs_without_changing_saved_inputs(self):
+        original = {'explicitDwarfEntryAddressProven': True}
+        report = {'roles': {'initialize': {'argumentPlanProven': True, 'entries': [],
+                                         'entryAssociationDiagnostics': [{'physicalEntrySpanProven': True,
+                                                                         'functionRange': {'explicitDwarfEntryAddressProven': True}}]}},
+                  'entries': {'original': original}}
+
+        lifecycle.decline(report, ValueError('output limit'))
+
+        association = report['roles']['initialize']['entryAssociationDiagnostics'][0]
+        self.assertFalse(association['physicalEntrySpanProven'])
+        self.assertFalse(association['functionRange']['explicitDwarfEntryAddressProven'])
+        self.assertTrue(original['explicitDwarfEntryAddressProven'])
 
     def test_type_rebinding_allows_only_parser_accounting_to_change(self):
         for mode in ['cache', 'type-change', 'new-owner', 'missing-member']:
