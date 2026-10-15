@@ -191,6 +191,15 @@ internal object ExactFlatZincValidation {
                 val extreme = if ("maximum" in name) values.max() else values.min()
                 return extreme.compareTo(numeric(args[0])) == 0
             }
+            if (name == "all_different_int") {
+                require(args.size == 1)
+                val values = array(args.single()).map { value ->
+                    val integer = numeric(value)
+                    require(integer.integral) { "noninteger distinctness argument" }
+                    integer.toString()
+                }
+                return values.distinct().size == values.size
+            }
             val base = name.removeSuffix("_reif").removeSuffix("_imp")
             val arity = if ("_lin_" in base || base.endsWith("_times") ||
                 base.endsWith("_plus") || base == "float_div" || base in powerPredicates ||
