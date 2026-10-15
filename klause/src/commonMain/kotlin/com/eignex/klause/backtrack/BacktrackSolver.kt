@@ -34,6 +34,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
+import com.eignex.klause.solver.validation.composedFixpoint
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.time.ComparableTimeMark

@@ -14,6 +14,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.util.Cancellation
 import kotlin.math.ceil

@@ -33,6 +33,7 @@ separately at [eignex.com/docs/klause](https://eignex.com/docs/klause/).
 |---|---|
 | Caller scope | [Sessions and streams](solver/sessions.md): assumptions, active operations and retained state |
 | Preparation | [Presolve](solver/presolve.md): sound reductions, reconstruction and phase accounting |
+| Witness checking | [Source validation](solver/validation.md): shared finite/open coordinate checks and private verification state |
 | Complete traversal | [Search and propagation](solver/search.md): decisions, finite fixpoints, theory checks and explanations |
 | Heuristic search | [Local search](solver/local-search.md): assignments, definitions, moves, scoring and restarts |
 | Combined execution | [Portfolios](solver/portfolio.md): result admission, scheduling, shared incumbents and worker lifetimes |

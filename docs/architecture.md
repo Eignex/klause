@@ -101,6 +101,7 @@ Packages below are under `com.eignex.klause` in
 | `theory.qfnia` | Sound incomplete nonlinear integer candidate search and source checking | Uses neutral polynomial metadata and exact real completion; never finite CP domains |
 | `theory.qfnra` | Complete polynomial-real decision with exact CAD and Boolean search | Reads neutral polynomial formulas and the exact kernel; no finite domains or linear-engine state |
 | `theory.transcendental` | Sound incomplete real function source checks and relaxations | Reads neutral function formulas and numerical kernels; no finite domain state |
+| `solver.validation` | Source coordinate checks and private composed fixpoint verification | Source/factor data, propagation, sample/incumbent contracts and exact row views; no orchestration or concrete theories |
 | `solver.pipeline` | Source routing and one verdict surface | Selects theory once; frontends render assignments |
 | `solver.search` | Component protocol, exact source predicates, decisions, traversal, retraction, learning and complete checks | Owns shared lifecycle; no concrete theory, LP, propagation or backtracking dependencies |
 
@@ -111,9 +112,9 @@ closed dependency list couples reusable numerical work to model policy.
 [checkArchitecture](../scripts/check_architecture.py) checks production sources in every
 platform source set without compiling Kotlin. It enforces the closed numerical and
 IR lists, caller-independent lowering, frontend/compiler/theory separation, the
-pipeline's neutral metadata and the prohibition on finite-domain state in open
-theories. Imports, aliases, wildcard imports and qualified executable references
-are checked; comments and literal text are excluded. Compiler resolution and
+pipeline's neutral metadata, caller-independent [source validation](solver/validation.md)
+and the prohibition on finite-domain state in open theories. Imports, aliases,
+wildcard imports and qualified executable references are checked; comments and literal text are excluded. Compiler resolution and
 consumer behavior remain the responsibility of the JVM/native gates.
 [LpDeclineDisciplineTest](../klause/src/jvmTest/kotlin/com/eignex/klause/lp/LpDeclineDisciplineTest.kt)
 checks proof-decline behavior at engine consumers.

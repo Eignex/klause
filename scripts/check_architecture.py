@@ -24,6 +24,11 @@ ALLOWED = {
         "arithmetic.real", "arithmetic.polynomial", "arithmetic.transcendental", "simplex.exact", "util",
     ),
     "arithmetic.difference": ("arithmetic.difference", "ir", "util"),
+    "solver.validation": (
+        "solver.validation", "factor", "ir", "propagation", "simplex.exact", "util",
+        "solver.Sample", "solver.incumbent", "solver.objective", "solver.search",
+        "lp.ExactWitness", "lp.exactComparison",
+    ),
 }
 FORBIDDEN = {
     "lowering": ("compile", "schema", "formats"),

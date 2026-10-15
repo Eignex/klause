@@ -15,6 +15,10 @@ caller assumptions; [presolve](presolve.md) owns reconstruction;
 [local search](local-search.md) and [portfolios](portfolio.md) own their strategy
 state and scheduling. [Model ownership](../model.md) defines the engine views.
 
+Reusable candidate fixpoint checks belong to [source validation](validation.md).
+Traversal calls that service with its existing assumptions, cancellation and work
+accounting; validation retains no backtracking state.
+
 ## Shared component search
 
 [solver.search](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/)

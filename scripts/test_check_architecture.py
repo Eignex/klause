@@ -65,6 +65,18 @@ class CheckArchitectureTest(unittest.TestCase):
                     "import com.eignex.klause.solver.search.SourceBoundAtom\n"
                 ))
 
+    def test_source_validation_cannot_depend_on_orchestration(self):
+        for dependency in (
+            "backtrack.composedFixpoint", "portfolio.verifyRealCoordinates", "solver.pipeline.verifyOpenWitness",
+            "localsearch.Completion", "meta.coreguided.CoreGuidedSearch", "solver.evidence.SourceProofContext",
+            "theory.qflra.ExactLiraAssignment", "lp.engine.LpModel",
+        ):
+            with self.subTest(dependency=dependency):
+                self.assertTrue(violations(
+                    "package com.eignex.klause.solver.validation\n"
+                    f"import com.eignex.klause.{dependency}\n"
+                ))
+
     def test_wildcard_imports_cannot_hide_a_forbidden_symbol(self):
         self.assertTrue(violations("""package com.eignex.klause.theory.qflra
 import com.eignex.klause.ir.*

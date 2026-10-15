@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
@@ -13,28 +13,30 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.incumbent.Candidate
-import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.refuteOpenWitness
+import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.minus
+import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.unaryMinus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertSame
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class OpenWitnessTest {
     @Test

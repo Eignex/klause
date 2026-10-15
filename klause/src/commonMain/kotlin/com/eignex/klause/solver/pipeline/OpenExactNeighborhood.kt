@@ -6,7 +6,6 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
-import com.eignex.klause.portfolio.verifyRealCoordinates
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
@@ -19,6 +18,8 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.solver.validation.verifyOpenWitness
+import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation

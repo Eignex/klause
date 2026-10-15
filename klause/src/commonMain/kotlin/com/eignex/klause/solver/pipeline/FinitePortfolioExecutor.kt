@@ -15,16 +15,16 @@ import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.portfolio.continuousMajority
-import com.eignex.klause.portfolio.finiteWitnessVerifier
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
-import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.EngineInvocation
-import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
 
 /** Materializes [scenario] over [problem] and schedules it on one lane per core, checking every result an arm
