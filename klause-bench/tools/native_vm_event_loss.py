@@ -213,8 +213,8 @@ def verify_report(document, btf, expected_observer, expected_source):
             'scope': 'Complete owned tracer ring-buffer loss-counter slots only. Probe delivery, root census, lifetimes, clocks and compiler acceptance remain separate.'}
 
 
-def btf_counter(raw, section_id, slots):
-    if type(slots) is not int or not 1 <= slots <= MAX_CPU_SLOTS or not 24 <= len(raw) <= MAX_BTF_BYTES:
+def btf_types(raw):
+    if not 24 <= len(raw) <= MAX_BTF_BYTES:
         raise ValueError('BTF data exceeds bounds')
     magic, version, flags, header, type_off, type_len, str_off, str_len = struct.unpack_from('<HBBIIIII', raw)
     if magic != 0xeb9f or version != 1 or flags != 0 or header < 24 or \
@@ -244,6 +244,48 @@ def btf_counter(raw, section_id, slots):
         types[len(types) + 1] = {'name': name(name_off), 'kind': kind, 'count': count, 'value': value,
                                  'payload': raw[offset + 12:offset + 12 + sizes[kind]]}
         offset += 12 + sizes[kind]
+    return types
+
+
+def btf_type_graph(raw, identifier):
+    types = btf_types(raw)
+    pending, seen, result = [identifier], set(), []
+    while pending:
+        identifier = pending.pop(0)
+        if identifier in seen:
+            continue
+        if len(seen) >= 128:
+            raise ValueError('BTF diagnostic graph exceeds bounds')
+        seen.add(identifier)
+        value = types.get(identifier)
+        if value is None:
+            result.append({'id': identifier, 'error': 'Absent BTF type ID'})
+            continue
+        row = {key: data for key, data in value.items() if key != 'payload'}
+        row.update(id=identifier, payloadHex=value['payload'].hex())
+        kind = value['kind']
+        if kind == 15:
+            row['members'] = [dict(zip(('typeId', 'offset', 'bytes'), struct.unpack_from('<III', value['payload'], index * 12)))
+                              for index in range(value['count'])]
+            pending.extend(item['typeId'] for item in row['members'])
+        elif kind in (8, 9, 10, 11, 14, 18):
+            pending.append(value['value'])
+        elif kind == 3:
+            element, index, count = struct.unpack('<III', value['payload'])
+            row['array'] = {'elementTypeId': element, 'indexTypeId': index, 'elements': count}
+            pending.extend([element, index])
+        elif kind == 1:
+            encoded = struct.unpack('<I', value['payload'])[0]
+            row['integer'] = {'encoded': encoded, 'encoding': encoded >> 24 & 15,
+                              'offset': encoded >> 16 & 255, 'bits': encoded & 255}
+        result.append(row)
+    return result
+
+
+def btf_counter(raw, section_id, slots):
+    if type(slots) is not int or not 1 <= slots <= MAX_CPU_SLOTS:
+        raise ValueError('BTF counter slot count exceeds bounds')
+    types = btf_types(raw)
     section = types.get(section_id)
     if not section or section['kind'] != 15 or section['name'] != SECTION or section['count'] != 1:
         raise ValueError('Map BTF does not identify the unique loss-counter section')

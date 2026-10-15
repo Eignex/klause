@@ -16,7 +16,10 @@ internal object NativeVmLiveArgumentReview {
             require('=' in it)
             it.substringBefore('=') to it.substringAfter('=')
         }
-        require(args.size == 3 && options.keys == setOf("manifest", "manifest-sha256", "archive"))
+        val eventLoss = options["review"] == "event-loss"
+        val required = setOf("manifest", "manifest-sha256", "archive") +
+            if (eventLoss) setOf("review") else emptySet()
+        require(args.size == required.size && options.keys == required)
         val expected = requireNotNull(options["manifest-sha256"])
         require(expected.matches(Regex("[0-9a-f]{64}")))
         ProfileCaptureArchive.run {
@@ -39,8 +42,11 @@ internal object NativeVmLiveArgumentReview {
                 }
             }
             val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
-            val tool = File(root, "klause-bench/tools/review_native_vm_live_arguments.py")
-            tool.copyTo(File(out, tool.name))
+            val name = if (eventLoss) "review_native_vm_event_loss.py" else "review_native_vm_live_arguments.py"
+            val tool = File(root, "klause-bench/tools/$name")
+            for (source in listOf(name, "native_vm_event_loss.py", "review_native_vm_live_arguments.py").distinct()) {
+                File(root, "klause-bench/tools/$source").copyTo(File(out, source))
+            }
             val command = listOf("python3", tool.path, File(out, "captured-manifest.json").path, expected,
                 File(out, "captured-archive.tar.gz").path, File(out, "live-argument-review.json").path)
             val process = ProcessBuilder(command).directory(root)
