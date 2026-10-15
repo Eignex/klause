@@ -397,16 +397,27 @@ internal fun Problem.preparePolynomialExecutionPlan(
         polynomial == null -> PreparedPlanDecline.POLYNOMIAL_ENCODING
         else -> null
     }
-    val finiteFactors = polynomial?.finiteFactorIndices.orEmpty()
     val boundedIntegers = (0 until numIntVars).filter { intBounds.hasLower(it) && intBounds.hasUpper(it) }
+    val bounded = boundedIntegers.toSet()
+    val finiteFactors = polynomial?.finiteFactorIndices ?: if (cause == PreparedPlanDecline.RESOURCE) emptyList() else
+        factors.indices.filter { index ->
+            factors[index].variables.reals.isEmpty() && factors[index].intVars.all { it in bounded } &&
+                projections.capabilities(index).propagation != PropagationCapability.UNSUPPORTED
+        }
+    val finiteIndices = finiteFactors.toSet()
+    val ownership = if (polynomial != null || cause == PreparedPlanDecline.RESOURCE) null else ComponentPlan(
+        this, Array(numIntVars) { if (it in bounded) IntVariableOwner.CP else IntVariableOwner.THEORY },
+        Array(numFactors) { if (it in finiteIndices) FactorOwner.CP else FactorOwner.THEORY },
+        ProblemPipeline.UNSUPPORTED_OPEN, factorProjections = projections,
+    )
     val descriptors = listOf(
         ExecutionComponentDescriptor("finite", ComponentResponsibility.FINITE, finiteFactors,
             boundedIntegers, emptyList(), (0 until numBoolVars).toList(),
-            finiteComponentContract(finiteFactors, boundedIntegers, null, polynomial != null,
+            finiteComponentContract(finiteFactors, boundedIntegers, ownership, polynomial != null,
                 exactNeighborhood = false, projections = projections,
                 enforcingFactors = polynomial?.encodingAttributions?.map { it.sourceFactorIndex }?.toSet().orEmpty())),
         ExecutionComponentDescriptor("polynomial-real", ComponentResponsibility.COMPLETION,
-            factors.indices.filter { it !in finiteFactors }, emptyList(), (0 until numRealVars).toList(),
+            factors.indices.filter { it !in finiteIndices }, emptyList(), (0 until numRealVars).toList(),
             execution = if (polynomial != null) checkedCompletionContract(ProcedureCompleteness.DECISION)
             else unavailableContract(ExecutionDeclineCause.PREPARATION, "polynomial-real", cause),
             participatingFactorIndices = polynomial?.encodingAttributions?.map { it.sourceFactorIndex }.orEmpty()),
@@ -418,7 +429,7 @@ internal fun Problem.preparePolynomialExecutionPlan(
     val sourceReals = (original as? PolynomialRealProblem)?.sourceRealCount ?: numRealVars
     return PreparedSourcePlan(original, this,
         if (cause == null) PreparedExecutionKind.POLYNOMIAL else PreparedExecutionKind.DECLINED,
-        null, polynomial, descriptors, sourceBools, numIntVars, sourceReals, objective, maximize, cause,
+        ownership, polynomial, descriptors, sourceBools, numIntVars, sourceReals, objective, maximize, cause,
         factorProjections = projections)
 }
 

@@ -57,6 +57,31 @@ import kotlin.test.assertTrue
 
 class PreparedSourcePlanTest {
     @Test
+    fun `a declined open polynomial composition retains its finite source projection`() {
+        val domain = IntDomain(0, 2).excludeValue(1)
+        val source = Problem(0, 3, arrayOf(domain, IntDomain(0, 2), IntDomain(0, 1)),
+            arrayOf(ContinuousProduct(0, 0, 1), AllDifferent(intArrayOf(0, 1), 0, 3),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 0)),
+            openIntHi = booleanArrayOf(false, false, true), numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, 2.0), realUpper = doubleArrayOf(2.0, 2.0))
+
+        val plan = source.prepareExecutionPlan()
+
+        val ownership = assertNotNull(plan.componentPlan)
+        val finite = ownership.cpProjection(source, ownership.cpSourceDomains(source)).problem
+        assertEquals(PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER, plan.decline)
+        assertFalse(plan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
+        assertEquals(listOf(1), plan.components.single {
+            it.responsibility == ComponentResponsibility.FINITE
+        }.factorIndices)
+        assertEquals(IntVariableOwner.THEORY, ownership.intOwner(2))
+        assertEquals(2, finite.numIntVars)
+        assertEquals(domain, finite.intDomainOrNull(0))
+        assertIs<AllDifferent>(finite.factors.single())
+        assertTrue(source.intBounds.isOpenUpper(2))
+    }
+
+    @Test
     fun `linear theory preference preserves available finite mixed product completion`() {
         val source = Problem(0, 1, arrayOf(IntDomain(1, 2)), arrayOf(RealProduct(0, 0, 1, 1.0, 4.0)),
             numRealVars = 2, realLower = doubleArrayOf(1.0, 4.0), realUpper = doubleArrayOf(4.0, 4.0))
