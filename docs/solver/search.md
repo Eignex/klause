@@ -241,6 +241,14 @@ constructors share canonical equality and names through `SourceBoundPredicate`; 
 retain compatibility payload access when they create the first registration. Neither
 an atom nor its registration establishes multi-component witness agreement.
 
+The linear component names a source disjunction when arithmetic branching reaches
+that group. Only a completely named group enters disjunction propagation. A declined
+group retains spent names and leaves the search indeterminate under the same registry
+capacity; retraction preserves every registered meaning. Ordinary source rows can
+refute their relaxation before disjunction naming. A witness still requires selected
+rows for every source disjunction and exact full-source validation, including when a
+deferred group reuses an already asserted source predicate.
+
 Exact affine optimization contexts use the same session and chronological frame
 stack. Their model-facing authority component records Boolean and integer coverage
 alongside checked source bounds or refutations. Resolving one optimized node prunes

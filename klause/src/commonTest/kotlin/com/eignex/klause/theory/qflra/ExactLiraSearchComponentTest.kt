@@ -1842,6 +1842,68 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
+    fun `ordinary source contradiction needs no disjunction name capacity`() {
+        val model = Problem(
+            numBoolVars = 0, intBounds = openBounds(),
+            factors = arrayOf(
+                ComparisonClause(intArrayOf(0, 0), arrayOf(LinearOp.NE, LinearOp.NE), longArrayOf(0, 1)),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0, maxAtoms = 0))
+
+            session.initialize()
+
+            assertIs<SearchResult.Exhausted>(session.solve(0))
+        }
+    }
+
+    @Test
+    fun `unnamed source disjunction withholds a relaxation witness`() {
+        val model = Problem(
+            numBoolVars = 0, intBounds = openBounds(),
+            factors = arrayOf(
+                ComparisonClause(intArrayOf(0, 0), arrayOf(LinearOp.EQ, LinearOp.EQ), longArrayOf(1, 2)),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0, maxAtoms = 0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = session.solve(0)
+
+            assertIs<SearchResult.Indeterminate>(result)
+        }
+    }
+
+    @Test
+    fun `existing source predicate completes a deferred disjunction witness`() {
+        val model = Problem(
+            numBoolVars = 0, intBounds = openBounds(),
+            factors = arrayOf(
+                ComparisonClause(intArrayOf(0, 0), arrayOf(LinearOp.LE, LinearOp.GE), longArrayOf(0, 2)),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0, maxAtoms = 2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val split = assertNotNull(SourceBoundAtom.integerSplit(session,
+                listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)), BigFraction.ZERO))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.positive)))
+
+            val result = session.solve(0)
+
+            val witness = assertNotNull(assertIs<SearchResult.Satisfied>(result).model
+                .valueOf<ExactLiraAssignment>(component))
+            assertEquals(BIG_ZERO, witness.intValue(0))
+        }
+    }
+
+    @Test
     fun `a strict real disjunction is decided through its atoms`() {
         // r in [0, 1] with (r < 0) or (r > upper): sat past 1/2, refuted past 1.
         for ((upper, sat) in listOf(0.5 to true, 1.0 to false)) {
