@@ -1445,8 +1445,9 @@ from the queue; wrapper destruction and other returns never dereference a task.
 
 One warning-enabled observer retains a labelled invalid-read case, per-TID
 sequences, USDT identity lengths/bytes, returns, fork records and a drain marker.
-Explicit map presence/value lookup distinguishes fresh sequence keys from memory
-read failures. Raw boot/monotonic/realtime anchors surround child release, exit
+Key-presence guards precede ordinary map-value reads, distinguishing fresh
+sequence keys from memory read failures. Raw boot/monotonic/realtime anchors
+surround child release, exit
 and observer drain. Threshold-zero JFR and the compilation log are independent
 identity evidence; missing warnings or a successful exit alone prove no loss-free
 capture. Descendant JVMs, unmatched or inlined hooks, truncated identities,

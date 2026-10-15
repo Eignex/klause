@@ -73,7 +73,9 @@ def layout_fields(report):
 
 
 def sequence():
-    return 'let $sequence = 0; _ = find(@sequence, tid, $sequence); $sequence++; @sequence[tid] = $sequence; '
+    # Map-value lowering keeps map storage distinct from user-memory pointers.
+    return ('let $sequence = 0; if (has_key(@sequence, tid)) { $sequence = @sequence[tid]; } '
+            '$sequence++; @sequence[tid] = $sequence; ')
 
 
 def field_reads(kind, candidates, fields):
