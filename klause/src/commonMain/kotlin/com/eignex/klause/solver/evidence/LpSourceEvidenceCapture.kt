@@ -27,7 +27,7 @@ internal class LpSourceEvidenceCapture(
         cancellation: Cancellation = Cancellation.Never,
     ): SourceEvidence = capture(SourceClaim.Bound(
         if (context.scope.objective?.sense == ObjectiveSense.MAXIMIZE) bound.value.negated() else bound.value,
-    ), cancellation) { step ->
+    ), cancellation) { step, admitted ->
         val certificate = bound.certificate
         if (certificate != null && !certificate.belongsTo(model)) {
             missing("exact LP certificate belongs to another active model")
@@ -50,7 +50,7 @@ internal class LpSourceEvidenceCapture(
                 if (reduced.isZero) continue
                 val upper = reduced < BigFraction.ZERO
                 val row = endpoint(model, column, upper, images[column])
-                add(SourceDerivation.Combination.Term(if (upper) reduced.negated() else reduced, cite(row, step)))
+                add(SourceDerivation.Combination.Term(if (upper) reduced.negated() else reduced, cite(row, step, admitted)))
             }
         }
         SourceDerivation.Combination(terms)
@@ -60,7 +60,7 @@ internal class LpSourceEvidenceCapture(
         model: LpModel,
         conflict: BigRationalConflict,
         cancellation: Cancellation = Cancellation.Never,
-    ): SourceEvidence = capture(SourceClaim.Refutation, cancellation) { step ->
+    ): SourceEvidence = capture(SourceClaim.Refutation, cancellation) { step, admitted ->
         if (conflict.rows.size != conflict.multipliers.size ||
             conflict.rows.any { it !in 0 until model.m } || conflict.rows.toSet().size != conflict.rows.size
         ) missing("exact LP conflict has invalid row coordinates")
@@ -81,7 +81,7 @@ internal class LpSourceEvidenceCapture(
                 }
                 val row = endpoint(model, column, upper, images[column])
                 val weight = if (upper) coefficient.negated() else coefficient
-                add(SourceDerivation.Combination.Term(weight, cite(row, step)))
+                add(SourceDerivation.Combination.Term(weight, cite(row, step, admitted)))
             }
         }
         SourceDerivation.Combination(terms)
@@ -90,15 +90,24 @@ internal class LpSourceEvidenceCapture(
     private fun capture(
         claim: SourceClaim,
         cancellation: Cancellation,
-        proof: (() -> Unit) -> SourceDerivation,
+        proof: (() -> Unit, (SourcePremise) -> Boolean) -> SourceDerivation,
     ): SourceEvidence {
         var steps = 0
         val step = {
             if (cancellation() || steps++ >= maximumSteps) missing("source LP evidence capture allowance exhausted")
         }
+        var integerBounds: SourceIntegerBounds? = null
+        val admitted: (SourcePremise) -> Boolean = { premise ->
+            if (premise.integerPins.isEmpty()) true else {
+                val bounds = integerBounds ?: context.integerPinBounds(context.scope.condition,
+                    Cancellation { step(); false })?.also { integerBounds = it }
+                    ?: missing("integer source premise scope unavailable")
+                bounds.status(premise.integerPins) == IntegerPinStatus.Established
+            }
+        }
         val derivation = try {
             step()
-            proof(step)
+            proof(step, admitted)
         } catch (stop: LpSourceCaptureUnavailable) {
             SourceDerivation.Unavailable(stop.reason)
         }
@@ -139,10 +148,13 @@ internal class LpSourceEvidenceCapture(
             sign * (side.number.value - image.constant), side.strict)
     }
 
-    private fun cite(row: SourceInequality, step: () -> Unit): SourceDerivation {
+    private fun cite(
+        row: SourceInequality, step: () -> Unit, admitted: (SourcePremise) -> Boolean,
+    ): SourceDerivation {
         for ((id, premise) in context.premises) {
             step()
-            if (premise.guards.any { (id, value) -> context.scope.condition.bools[id] != value }) continue
+            if (premise.guards.any { (id, value) -> context.scope.condition.bools[id] != value } ||
+                !admitted(premise)) continue
             scaledCitation(premise.inequality, row, SourceDerivation.Premise(id), step)?.let { return it }
         }
         for ((coordinate, value) in context.scope.condition.lower) {
