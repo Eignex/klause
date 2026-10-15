@@ -168,6 +168,11 @@ them. Legacy construction retains its three-counter hash and text rendering and
 leaves observations absent, while instrumented zero counts are
 actual observations. A completed proposal base supplies no source-result authority.
 
+`PreparedSourcePlan` retains its published getters, objective-binding overloads and
+coordinate methods as a facade over internal typed execution payloads. Linear and
+quadratic rebinding preserve structural source ownership while capturing independent
+operation data; a bound facade does not authorize reuse of objective evidence.
+
 Experimental composition includes `PreparedSourcePlan` and its inspectable component,
 operation and strategy admission contracts, `ComponentPlan`, CP projection planning, shared
 search session/runner construction, direct pipeline engines and concrete theory

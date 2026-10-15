@@ -15,7 +15,7 @@ import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.lock
 
 internal fun TranscendentalProblem.prepareTranscendentalExecutionPlan(): PreparedSourcePlan = PreparedSourcePlan(
-    this, null, PreparedExecutionKind.TRANSCENDENTAL, null, null,
+    this, PreparedExecution.Transcendental(this),
     listOf(
         ExecutionComponentDescriptor(
         "transcendental",

@@ -417,7 +417,7 @@ internal class OpenPortfolio(
         objective: LinearObjective?,
     ): List<PortfolioArmFactory> {
         if (completeOnly) return emptyList()
-        val route = preparedPlan.componentPlan?.theoryPipeline ?: ProblemPipeline.UNSUPPORTED_OPEN
+        val route = preparedPlan.execution.finiteLinear?.ownership?.theoryPipeline ?: ProblemPipeline.UNSUPPORTED_OPEN
         if (route != ProblemPipeline.UNSUPPORTED_OPEN && route != ProblemPipeline.FINITE_CP) {
             return List(localSearchArms) { index ->
                 val adaptive = index == localSearchArms - 1 && localSearchArms > 1
