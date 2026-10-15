@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.scheduling.Cumulative
@@ -69,6 +70,7 @@ internal fun Problem.finiteRealFactorSupported(index: Int, projections: Prepared
     if (!encoder.enforcesSource && encoder.support != EncoderSupport.CONDITIONED) return false
     return factor is RealProduct || factor is RealAbs || factor is RealElement ||
         (factor is ContinuousProduct && factor.hasCompleteGuardedLpCompletion()) ||
+        (factor is Power && factor.base is Power.Coordinate.Real && factor.exponent <= 1) ||
         ((factor.linearForm is LinearForm.Conjunction || factor.linearForm is LinearForm.Disjunction) &&
             factor.linearForm!!.rows.none { it.strict })
 }
