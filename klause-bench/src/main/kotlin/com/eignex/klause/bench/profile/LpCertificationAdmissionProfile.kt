@@ -6,6 +6,7 @@ import java.io.File
 import java.lang.management.ManagementFactory
 import java.lang.reflect.Array as ReflectArray
 import java.lang.reflect.Proxy
+import java.security.MessageDigest
 
 /** Measure structurally declined LP certification setup without a floating solve. */
 object LpCertificationAdmissionProfile {
@@ -22,6 +23,7 @@ object LpCertificationAdmissionProfile {
         out.resolve("settings.txt").writeText("rows=$rows\nattempts=$attempts\nrounds=$rounds\nwarmup=$warmup\n" +
             "java=${System.getProperty("java.runtime.version")}\nvm=${System.getProperty("java.vm.name")}\n" +
             "processors=${Runtime.getRuntime().availableProcessors()}\n")
+        captureIdentity(out)
         val access = AdmissionAccess(rows)
         val meter = ManagementFactory.getThreadMXBean() as ThreadMXBean
         require(meter.isThreadAllocatedMemorySupported)
@@ -44,6 +46,29 @@ object LpCertificationAdmissionProfile {
             }
         }
         access.verify()
+    }
+
+    private fun captureIdentity(out: File) {
+        val root = File(System.getProperty("klause.workspace.root", "."))
+        val provenance = root.resolve("klause-bench/build/provenance.json")
+        check(provenance.isFile) { "Missing installed CLI/runtime provenance" }
+        provenance.copyTo(out.resolve("build-provenance.json"), overwrite = true)
+        val classpath = System.getProperty("java.class.path").split(File.pathSeparator).map(::File)
+        check(classpath.all { it.isFile }) { "Classpath must contain installed jars" }
+        fun hashes(files: List<File>): String = files.sortedBy { it.path }.joinToString("\n", postfix = "\n") {
+            val digest = MessageDigest.getInstance("SHA-256").digest(it.readBytes())
+                .joinToString("") { byte -> "%02x".format(byte.toInt() and 255) }
+            "$digest  ${it.path}"
+        }
+        out.resolve("classpath-sha256.txt").writeText(hashes(classpath))
+        val compilerRoot = File(System.getProperty("user.home"))
+            .resolve(".gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable")
+        val compiler = compilerRoot.walkTopDown().filter { it.isFile && it.extension == "jar" }.toList()
+        check(compiler.isNotEmpty()) { "Missing compiler artifact identity" }
+        out.resolve("compiler-sha256.txt").writeText(hashes(compiler))
+        out.resolve("runtime-options.txt").writeText(
+            ManagementFactory.getRuntimeMXBean().inputArguments.joinToString("\n", postfix = "\n"),
+        )
     }
 
     // Reflection keeps measurement of private numerical mechanisms out of the published API.

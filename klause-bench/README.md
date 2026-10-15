@@ -136,8 +136,10 @@ Reference agreement does not verify an exported solver proof certificate.
 `bench.profile.LpCertificationAdmissionProfile` measures exact basis verification and
 continuation-target dimension rejection without a floating solve. Submit it as a
 pinned lab profile with `rows=129 attempts=20000 rounds=7 warmup=5000`, one machine
-and one core. It saves settings and alternating per-mechanism elapsed/thread-allocation
-observations and requires a dimension decline with one entry work unit and no modeled
+and one measurement thread. It saves actual JVM processor visibility, installed CLI/runtime,
+classpath and compiler hashes, and alternating per-mechanism elapsed/thread-allocation
+observations. A requested lab core count need not constrain profile JVM processor
+visibility. It requires a dimension decline with one entry work unit and no modeled
 allocation. Reflection retains the numerical engine's private API. Compare identical
 profile source, settings and runtime identities across revisions; these setup timings
 and allocations do not establish whole-source solve speedups. Use uninstrumented,
