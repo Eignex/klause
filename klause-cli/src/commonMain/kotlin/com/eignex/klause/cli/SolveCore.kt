@@ -103,7 +103,10 @@ internal object SolveCore {
                 dropOpenOnlyParams(common)
                 output.begin(optimize = rawSolvable.optimize, maximize = rawSolvable.maximize)
                 val complete = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS
-                val result = pipeline.request.solve(params, complete)
+                val result = pipeline.request.solve(params, complete) { sample, value ->
+                    if (rawSolvable.optimize) publication.publish(
+                        pipeline.render(OpenTheoryAssignment.Sampled(sample)), SourceValue.Rational(value))
+                }
                 if (rawSolvable.optimize) {
                     reportLinearOptimization(result, { pipeline.render(OpenTheoryAssignment.Sampled(it)) },
                         output, publication, common.statistics, rawSolvable.routingElapsedMs,

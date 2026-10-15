@@ -84,6 +84,20 @@ class NumericalLinearRequestTest {
     }
 
     @Test
+    fun `interruption after a numerical witness retains progress without terminal authority`() {
+        val compiled = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA\n").toExactSourceProblem()
+        var cancelled = false
+
+        val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve(
+            TheoryParams(cancellation = Cancellation { cancelled })) { _, _ -> cancelled = true }
+
+        assertNotNull(result.incumbent)
+        assertEquals(BigFraction.ZERO, result.value)
+        assertNull(result.terminal)
+        assertEquals(TerminationReason.Cancelled, result.reason)
+    }
+
+    @Test
     fun `an exhausted numerical traversal cannot claim infeasibility`() {
         val compiled = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA\n").toExactSourceProblem()
 
