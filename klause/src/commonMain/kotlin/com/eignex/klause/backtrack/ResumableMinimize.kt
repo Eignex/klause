@@ -165,7 +165,8 @@ internal class ResumableMinimize(
     private var clausePrimalStarted = false
     private var clausePrimalCandidate: Sample? = null
     private val slice = SliceBudget(
-        { sink.search.searchWork + (clausePrimal?.work ?: 0L) },
+        { sink.search.searchWork + (clausePrimal?.work ?: 0L) +
+            (if (::lpEngine.isInitialized) lpEngine.primalSearchWork else 0L) },
         { (if (::lpEngine.isInitialized) lpEngine.totalSolveWork() else 0L) + sink.lp.standaloneWork },
         {
             (if (::cp.isInitialized) session.work else preparedSession?.work ?: 0L) +
@@ -1014,7 +1015,8 @@ internal class ResumableMinimize(
         if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null && params.componentFactory == null) {
             lpEngine.lbTreeSearch(objective, rootToken, params.assumptions, params.toleranceCheck,
                 complete = ::completeLeaf,
-                accept = { verifiedLpProposal(it, rootToken)?.assignment })?.let { seed ->
+                accept = { verifiedLpProposal(it, rootToken)?.assignment },
+                nodeBudget = params.nodeBudget)?.let { seed ->
                 if (!params.cancellation()) recordIfImproving(seed.sample, objective.evaluate(seed.sample))?.let { return it }
             }
         }
