@@ -36,6 +36,69 @@ import kotlin.test.assertTrue
 class DifferenceSearchComponentTest {
 
     @Test
+    fun `source cycle reasons retain signed guards across unconditional paths`() {
+        for (positive in listOf(false, true)) {
+            val open = Bits.full(3)
+            val relation = if (positive) LinearOp.LE else LinearOp.GE
+            val model = Problem(
+                numBoolVars = 2,
+                intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3), open, open),
+                factors = arrayOf(
+                    Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.LE, 0),
+                    ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(2, 1), relation, if (positive) -1 else 0),
+                    ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(0, 2), relation, if (positive) 0 else 1),
+                ),
+            )
+            val session = SearchSession(emptyList())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, positive))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, positive))))
+
+            val conflict = assertIs<ComponentResult.Conflict>(DifferenceSearchComponent(model).initialize(session))
+
+            assertEquals(setOf(Lit.make(0, !positive), Lit.make(1, !positive)), conflict.explanation?.literals?.toSet())
+        }
+    }
+
+    @Test
+    fun `cycle reasons discharge immutable declared bounds`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null),
+            factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, -1)),
+        )
+        val session = SearchSession(emptyList())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+        val conflict = assertIs<ComponentResult.Conflict>(DifferenceSearchComponent(model).initialize(session))
+
+        assertEquals(setOf(Lit.make(0, false)), conflict.explanation?.literals?.toSet())
+    }
+
+    @Test
+    fun `transient bound cycles withhold Boolean reasons across sibling retraction`() {
+        val open = Bits.full(1)
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
+            factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)),
+        )
+        val component = DifferenceSearchComponent(model)
+        val session = SearchSession(emptyList())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtLeast(0, 1)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+        val conflict = assertIs<ComponentResult.Conflict>(component.initialize(session))
+
+        assertNull(conflict.explanation)
+        session.popTo(0)
+        component.retract(0)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtMost(0, 0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        assertIs<ComponentResult.Consistent>(component.propagate(session))
+        assertIs<ComponentCheck.Feasible>(component.check(session))
+    }
+
+    @Test
     fun `partial graph guidance still requires a complete checked witness`() {
         val model = Problem(
             numBoolVars = 1,
