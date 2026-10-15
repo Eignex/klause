@@ -66,7 +66,10 @@ invocation limits or establish a verdict for an interrupted traversal.
 
 ## State and resources
 
-Source rows and forms are prepared read-only. The invocation owns asserted scopes,
+Source rows and forms are prepared read-only. Normalized linear term interning and
+definition lookup use ordered exact column/coefficient keys within one arithmetic
+opening. Equality still compares every column and rational coefficient; source bounds
+and scoped premises remain separate from term identity. The invocation owns asserted scopes,
 integer branches, reduction caches and LP state. Retraction removes scoped premises
 before evidence can be reused. [TheoryParams](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/pipeline/TheoryParams.kt)
 separates theory checks, open work, decisions and cancellation. Native numerical

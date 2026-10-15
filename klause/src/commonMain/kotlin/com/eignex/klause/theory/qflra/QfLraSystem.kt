@@ -141,7 +141,7 @@ internal class LiveQfLraSystem(
         if (lower.value != upper.value) return@mapIndexedNotNull null
         index to FixedSmtColumn(lower.value + column.origin.value, SearchAtomPremise.All(emptyList()))
     }.toMap()
-    private val canonicalTerms = HashMap<Map<Int, BigFraction>, Map<Int, BigFraction>>()
+    private val canonicalTerms = HashMap<SmtTermKey, Map<Int, BigFraction>>()
     private val preparedTerms = rowForms.flatten().associate { form ->
         val comparison = form.comparison(true) { false }
         comparison.ordered to SmtRowKeys(comparison.terms)
@@ -149,8 +149,11 @@ internal class LiveQfLraSystem(
     private val normalized = preparedTerms.values.associateTo(HashMap()) { keys ->
         keys.positive to SmtTermSlot(intern(keys.positive.expression(), declaredFixed))
     }
-    private val terms = normalized.values.map { it.term.coefficients }.filter { it.size != 1 }.distinct()
-    private val definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
+    private val terms = normalized.values.map { it.term.coefficients }.filter { it.size != 1 }
+        .distinctBy(SmtTermKey::of)
+    private val definitions = terms.withIndex().associate { (index, term) ->
+        SmtTermKey.of(term) to columns + index
+    }.toMutableMap()
 
     fun install(): Boolean {
         val structural = sourceColumns.map { column ->
@@ -217,7 +220,7 @@ internal class LiveQfLraSystem(
         }
         val term = slot.term
         val column = slot.column.takeIf { it >= 0 } ?: term.coefficients.keys.singleOrNull()
-            ?: definitions[term.coefficients] ?: return null
+            ?: definitions[SmtTermKey.of(term.coefficients)] ?: return null
         val threshold = term.bound(comparison.bound)
         val state = lp.state ?: return null
         for (sourceUpper in listOf(true, false)) {
@@ -281,7 +284,7 @@ internal class LiveQfLraSystem(
     }
 
     private fun definitionColumn(coefficients: Map<Int, BigFraction>): Int? =
-        coefficients.keys.singleOrNull() ?: definitions[coefficients] ?: run {
+        coefficients.keys.singleOrNull() ?: definitions[SmtTermKey.of(coefficients)] ?: run {
             val state = lp.state ?: return null
             val id = state.rows.lastId + 1L
             val next = state.model.numVars
@@ -297,13 +300,13 @@ internal class LiveQfLraSystem(
             ) {
                 return null
             }
-            definitions[coefficients] = next
+            definitions[SmtTermKey.of(coefficients)] = next
             next
         }
 
     private fun intern(expression: Map<Int, BigFraction>, fixed: Map<Int, FixedSmtColumn>): NormalizedSmtTerm {
         val term = normalizeSmtTerm(expression, fixed)
-        return term.copy(coefficients = canonicalTerms.getOrPut(term.coefficients) { term.coefficients })
+        return term.copy(coefficients = canonicalTerms.getOrPut(SmtTermKey.of(term.coefficients)) { term.coefficients })
     }
 
     private fun rootFixedColumns(columns: IntArray): Map<Int, FixedSmtColumn> {

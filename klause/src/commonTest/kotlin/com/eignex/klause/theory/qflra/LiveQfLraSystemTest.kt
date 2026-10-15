@@ -69,6 +69,39 @@ class LiveQfLraSystemTest {
     }
 
     @Test
+    fun `distinct sparse differences retain their exact source values`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 3.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(2, 3), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 7.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(3), doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+        )
+        val source = Problem(
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 4,
+            realLower = DoubleArray(4) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(4) { Double.POSITIVE_INFINITY },
+            factors = factors,
+        )
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp)
+            assertTrue(system.install())
+            for (factor in factors) {
+                val comparison = factor.linearRows.single().exactForm(4).comparison(true) { false }
+                assertTrue(system.assertComparison(comparison, null, axiom))
+            }
+
+            val result = assertNotNull(lp.solve())
+
+            assertEquals(
+                listOf(3L, 0L, 7L, 0L).map(BigFraction::ofLong),
+                result.exactPrimal?.take(4),
+            )
+        }
+    }
+
+    @Test
     fun `repeated and weaker rows preserve the active bound and its premise`() {
         for (upper in listOf(false, true)) {
             LpPropagator(object : LpSearchPolicy {}).use { lp ->
