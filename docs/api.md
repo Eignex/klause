@@ -67,7 +67,10 @@ sources, continuous products and open real coordinates, with exact objective val
 direction-aware bounds, attainment and incomplete results. `optimizeOpen` exposes
 the existing native `OpenTheoryExecution` for supported open-integer linear sources;
 its values retain native minimization sense. Neither entry point converts rounded
-finite scores into exact source claims.
+finite scores into exact source claims. Source `optimize` proves available integer
+bounds before polynomial preparation, retaining source identity, provider capture
+and declared holes. Surviving open integers retain the explicit unsupported result;
+a presolve refutation alone does not fabricate a quadratic engine certificate.
 
 The baked `BacktrackSolver` and `LocalSearchSolver` classes retain their finite
 sessions, streams, enumeration and resumable APIs. Their compiled/schema constructors
