@@ -46,9 +46,10 @@ internal fun Problem.prepareOpenSource(
     cancellation: Cancellation = Cancellation.Never,
     budget: PresolveBudget? = null,
     projections: PreparedFactorProjections? = null,
+    presolveCancellation: Cancellation = cancellation,
 ): OpenSourcePreparation {
     projections?.requireSource(this)
-    val preparation = budget?.orSpent(cancellation) ?: cancellation
+    val preparation = budget?.orSpent(presolveCancellation) ?: presolveCancellation
     val prepared = PresolvePipeline.prepareSource(
         this,
         config,

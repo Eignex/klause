@@ -72,6 +72,14 @@ polling boundaries. Partial propagation is sound but can forgo deductions. Cance
 is cooperative: propagation-state construction and work between polls can exceed a
 deadline. Probe-call caps do not establish a wall-clock bound.
 
+Open satisfaction separates optional source passes and bound closing from required
+component installation. The passes and bound closing retain the presolve phase token
+and ledger. Planning the resulting source uses the containing invocation token and
+its meter, so an exhausted presolve phase can forgo reductions while complete search
+still installs every required encoder. An interrupted installation retains its resource
+decline and cannot start search or publish a partial relation. Completed immutable
+planning can be retained after the optional phase stops; it retains no phase token.
+
 ## Phase allowance and telemetry
 
 [PresolveBudget](../../klause/src/commonMain/kotlin/com/eignex/klause/presolve/PresolveBudget.kt)

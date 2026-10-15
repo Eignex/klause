@@ -8,11 +8,14 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -21,6 +24,88 @@ import kotlin.test.assertTrue
 class OpenTheoryEngineTest {
 
     private fun sourceRoute(model: Problem): ProblemPipeline = model.sourceRoute()
+
+    @Test
+    fun `a spent presolve phase leaves signed difference witnesses searchable`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_IDL)
+                (declare-const x Int) (declare-const y Int) (declare-const z Int)
+                (assert (not (<= x y)))
+                (assert (<= y z))
+                (assert (<= z x))
+                (check-sat)
+            """.trimIndent(),
+        )
+        for (workLimited in listOf(false, true)) {
+            val budget = if (workLimited) PresolveBudget(0) else null
+            val request = OpenTheoryRequest(parsed.model).withPresolve(
+                PresolveConfig.DEFAULT,
+                cancellation = budget?.orSpent(Cancellation.Never) ?: Cancellation { true },
+                budget = budget,
+            )
+
+            val result = OpenTheoryPipeline.engineFor(request).solve()
+
+            val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+            val x = assignment.intValue(0).toLong()
+            val y = assignment.intValue(1).toLong()
+            val z = assignment.intValue(2).toLong()
+            assertTrue(x > y && y <= z && z <= x)
+        }
+    }
+
+    @Test
+    fun `a spent presolve phase leaves signed difference contradictions searchable`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_IDL)
+                (declare-const x Int) (declare-const y Int) (declare-const z Int)
+                (assert (<= x y))
+                (assert (<= y z))
+                (assert (not (<= x z)))
+                (check-sat)
+            """.trimIndent(),
+        )
+        for (workLimited in listOf(false, true)) {
+            val budget = if (workLimited) PresolveBudget(0) else null
+            val request = OpenTheoryRequest(parsed.model).withPresolve(
+                PresolveConfig.DEFAULT,
+                cancellation = budget?.orSpent(Cancellation.Never) ?: Cancellation { true },
+                budget = budget,
+            )
+
+            val result = OpenTheoryPipeline.engineFor(request).solve()
+
+            assertIs<OpenTheoryResult.Unsat>(result)
+        }
+    }
+
+    @Test
+    fun `required encoders retain the invocation meter after presolve stops`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_IDL)
+                (declare-const x Int) (declare-const y Int)
+                (assert (< x y))
+                (check-sat)
+            """.trimIndent(),
+        )
+        val request = OpenTheoryRequest(parsed.model).withPresolve(
+            PresolveConfig.DEFAULT, cancellation = Cancellation { true },
+        )
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = charged > 0L
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+
+        val result = OpenTheoryPipeline.engineFor(request).solve(TheoryParams(cancellation = stop))
+
+        assertIs<OpenTheoryResult.Unknown>(result)
+        assertTrue(charged > 0L)
+        assertEquals(0L, result.stats.openTheory.openTheoryChecks)
+    }
 
     @Test
     fun `open difference route executes through the planned shared session`() {
