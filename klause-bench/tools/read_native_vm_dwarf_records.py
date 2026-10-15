@@ -81,7 +81,7 @@ def names(die, seen=None, remaining=None):
     return result
 
 
-def inventory(dwarf, report):
+def inventory(dwarf, report, context=None):
     graph, pending, parents, selected_units = {}, deque(), {}, []
     report.update(units=[], selectedRecords=[], graph=graph, nameErrors=[], scannedDies=0,
                   selectedUnitTraversalCompleted=False, locationExpressionsEvaluated=False,
@@ -116,6 +116,8 @@ def inventory(dwarf, report):
                       'traversalCompleted': False})
         report['units'].append(row)
         if selected:
+            if context is not None:
+                row['context'] = retain(context.unit(unit))
             selected_units.append((unit, row, raw_name))
     for unit, row, raw_name in selected_units:
         coverage = {'unitOffset': unit.cu_offset, 'traversalCompleted': False}
@@ -177,14 +179,17 @@ def inventory(dwarf, report):
                 raise
             except Exception as error:
                 failures[attribute] = {'type': type(error).__name__, 'message': str(error)}
-        graph[key(die)] = retain({'offset': die.offset, 'unitOffset': die.cu.cu_offset, 'tag': die.tag,
-                                 'attributes': attributes(die), 'parent': parents.get(key(die)),
-                                 'parentKnownFromSelectedTraversal': key(die) in parents,
-                                 'references': references, 'referenceErrors': failures})
+        node = {'offset': die.offset, 'unitOffset': die.cu.cu_offset, 'tag': die.tag,
+                'attributes': attributes(die), 'parent': parents.get(key(die)),
+                'parentKnownFromSelectedTraversal': key(die) in parents,
+                'references': references, 'referenceErrors': failures}
+        if context is not None:
+            node['context'] = context.die(die)
+        graph[key(die)] = retain(node)
     report['selectedUnitTraversalCompleted'] = True
 
 
-def main():
+def main(context_factory=None):
     library, output = map(Path, sys.argv[1:])
     report = {'completed': False, 'diagnosticOnly': True, 'acceptedSavingsCredit': False,
               'sourceSha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
@@ -220,7 +225,12 @@ def main():
                 if not elf.has_dwarf_info(strict=True):
                     raise ValueError('Bound external file has no DWARF info section')
                 dwarf = elf.get_dwarf_info(relocate_dwarf_sections=False, follow_links=False)
-                inventory(dwarf, report.setdefault('dwarf', {}))
+                context = context_factory(dwarf) if context_factory is not None else None
+                if context is not None:
+                    report['contextSourceSha256'] = context.source_sha256()
+                    report['contextScope'] = context.scope()
+                    report['contextUnits'] = context.units
+                inventory(dwarf, report.setdefault('dwarf', {}), context)
                 source.seek(0)
                 if hashlib.file_digest(source, 'sha256').hexdigest() != DEBUG_SHA256 or \
                         binding.symbols.identity(before) != binding.symbols.identity(os.fstat(source.fileno())) or \
