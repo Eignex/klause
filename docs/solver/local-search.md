@@ -749,8 +749,10 @@ source tolerance callback also governs seed admission; without it, real coordina
 require exact validation. Portfolio pool identity checks retain source mapping and
 objective compatibility. An independently scoped inner local-search session has no
 captured consumer scope available to this admission path, so it uses bootstrap instead
-of importing a seed. Shared objective telemetry must agree with the consumer's
-objective; strict improvement is compared using its exact evaluation. Samples own
+of importing a seed. Shared objective telemetry passes the common objective
+admission check; ALNS re-evaluates the point against its own objective and compares
+strict improvement using its exact evaluation. Importing an already installed point
+does not publish that point again. Samples own
 immutable coordinates and do not transfer mutable worker state or proof authority.
 
 An absent, stale or unsuitable candidate leaves unfinished bootstrap preparation

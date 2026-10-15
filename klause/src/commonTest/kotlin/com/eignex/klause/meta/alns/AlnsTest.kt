@@ -257,6 +257,27 @@ class AlnsTest {
     }
 
     @Test
+    fun `a verified seed with rounded telemetry keeps its original objective`() {
+        val problem = selectProblem()
+        val seed = selectOptimum()
+        val value = selectObjective.evaluate(seed)
+        val rounded = Double.fromBits(value.toBits() + 1)
+        assertIs<Verification.Accepted<*, *>>(
+            finiteWitnessVerifier(problem, selectObjective).verify(Candidate(seed, rounded)),
+        )
+        val exchange = IncumbentExchange.minimizing<Sample>().apply { offer(seed, rounded) }
+
+        val result = assertIs<MinimizeResult.BestFound>(
+            Alns(NoFeasibleLs(problem), maxIterations = 0, pooledIncumbents = exchange)
+                .minimize(selectObjective, LocalSearchParams()),
+        )
+
+        assertEquals(seed, result.sample)
+        assertEquals(value, result.objective)
+        assertEquals(1L, assertNotNull(exchange.current()).version)
+    }
+
+    @Test
     fun `compatible pinned shared incumbents can seed repair`() {
         val seed = selectOptimum()
         val params = LocalSearchParams(assumptions = Assumptions(bools = mapOf(0 to seed.boolValue(0))))
