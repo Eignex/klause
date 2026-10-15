@@ -3,7 +3,10 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
@@ -50,6 +53,9 @@ class Xcsp3SourceCheckerTest {
         )
         val witness = "<instantiation><list>x b c</list><values>1 0 0</values></instantiation>"
         val parsed = Xcsp3.parse(model.readText())
+        val targetAbsent = parsed.problem.factors.filterIsInstance<ReifiedLinear>().single {
+            it.op == LinearOp.NE && it.vars.contentEquals(intArrayOf(parsed.intVarNames.getValue("x")))
+        }.auxBoolVar
         val cp = CpSearchComponent(PropagationSession(parsed.problem))
         cp.rebase()
         val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(parsed.problem.numBoolVars))
@@ -60,7 +66,7 @@ class Xcsp3SourceCheckerTest {
             shared.push(SearchDecision.IntEqual(parsed.intVarNames.getValue("c"), 1L)),
         )
         val conflict = assertIs<ComponentResult.Conflict>(
-            shared.push(SearchDecision.IntEqual(parsed.intVarNames.getValue("b"), 0L)),
+            shared.push(SearchDecision.Bool(Lit.make(targetAbsent, false))),
         )
         shared.popTo(0)
         shared.learn(conflict.explanation)
