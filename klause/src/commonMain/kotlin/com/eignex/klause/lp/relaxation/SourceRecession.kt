@@ -83,7 +83,8 @@ private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): 
             val result = factor.result as Power.Coordinate.Real
             when (factor.exponent) {
                 0 -> reals[result.id.index] == BigFraction.ONE && direction[result.id.index].isZero
-                1 -> reals[result.id.index] == reals[base.id.index] && direction[result.id.index] == direction[base.id.index]
+                1 -> reals[result.id.index] == reals[base.id.index] &&
+                    direction[result.id.index] == direction[base.id.index]
                 else -> false
             }
         }
