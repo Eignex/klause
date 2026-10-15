@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
 import kotlin.math.abs
@@ -16,6 +17,10 @@ internal fun FlatZincCompiler.emitFloatSelection(c: FznConstraint) {
     }
     if (x.lpOnly) {
         factors.add(RealElement(idx, x.varId, arr))
+        val domain = intDomains[idx]
+        if (domain.min == domain.max && domain.min in 1L..arr.size.toLong()) {
+            factors.add(Clause(intArrayOf(exactFloatValueLiteral(x.varId, arr[(domain.min - 1).toInt()]))))
+        }
         return
     }
     val stepX = if (x.buckets > 1) (x.hi - x.lo) / (x.buckets - 1) else 0.0

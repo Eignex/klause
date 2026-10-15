@@ -694,7 +694,7 @@ internal class CpToLpRelaxation(
         if (structurallyPersistent) for (fid in problem.factors.indices) {
             val factor = problem.factors[fid]
             if (factor is ReifiedLinear || factor is ReifiedPseudoBoolean || factor is ReifiedCardinality ||
-                factor is ReifiedRealLinear
+                factor is ReifiedRealLinear || factor is RealElement
             ) {
                 structurallyPersistent = false
                 break
