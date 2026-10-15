@@ -582,7 +582,8 @@ class LpBoundingTest {
             val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, successful ->
                 successful && certifier == LpCertifier.SAFE_OBJECTIVE
             })
-            LpEngine(compiled.model, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink, context).use { engine ->
+            val params = LpParams(lpPlan = LpPlan(bounding = true))
+            LpEngine(compiled.model, objective, params, sink, context).use { engine ->
                 val relaxer = assertNotNull(engine.lpRelaxer)
 
                 assertEquals(minimum, engine.rootLpRelaxationBound(relaxer, emptyList()))
