@@ -1,6 +1,5 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -162,25 +161,12 @@ internal fun Compiler.Builder.lowerOpenIteChains() {
 
 private fun Compiler.Builder.lowerIteChain(chain: IteChain) {
     val start = factors.size
-    if (!collapseToElement(chain)) lowerAsDecisionList(chain)
+    val parts = if (collapseToElement(chain)) factors.subList(start, factors.size).toList()
+        else exclusiveIntegerSelection(chain.result, chain.conds, chain.arms, chain.default)
     conditionalEqualities.define(
-        chain.result, chain.conds, chain.arms, chain.default, factors.subList(start, factors.size),
+        chain.result, chain.conds, chain.arms, chain.default, parts,
         chain.keys.map { GuardEquality(chain.selector, it, equal = true) },
     )
-}
-
-/**
- * The uncollapsed lowering: one implication per arm plus the default's, over the shared result
- * variable. The arms are mutually exclusive (distinct constants on one selector), so the decision
- * list's priority order carries no information and each arm can be posted independently.
- */
-private fun Compiler.Builder.lowerAsDecisionList(chain: IteChain) {
-    val self = LinComb(mapOf(chain.result to 1), 0)
-    for (i in chain.keys.indices) {
-        factors.add(Clause(intArrayOf(Lit.negate(chain.conds[i]), reifyEq(self, chain.arms[i]))))
-    }
-    val noArm = chain.conds.toIntArray() + reifyEq(self, chain.default)
-    factors.add(Clause(noArm))
 }
 
 /** Post the chain as one [Element] over the selector's whole domain, or decline. */

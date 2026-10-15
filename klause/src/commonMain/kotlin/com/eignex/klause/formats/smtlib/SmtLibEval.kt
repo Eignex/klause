@@ -449,20 +449,18 @@ private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
         val loU = if (aLo == null || bLo == null) null else minOf(aLo, bLo)
         val hiU = if (aHi == null || bHi == null) null else maxOf(aHi, bHi)
         val self = LinComb(mapOf(newInt(loU, hiU) to 1), 0)
-        val start = factors.size
-        factors.add(Clause(intArrayOf(Lit.negate(cond), reifyEq(self, a.lin)))) // cond ⇒ v = a
-        factors.add(Clause(intArrayOf(cond, reifyEq(self, b.lin)))) // ¬cond ⇒ v = b
+        val parts = exclusiveIntegerSelection(checkNotNull(self.asSimpleVar()), listOf(cond), listOf(a.lin), b.lin)
         conditionalEqualities.define(
-            checkNotNull(self.asSimpleVar()), listOf(cond), listOf(a.lin), b.lin, factors.subList(start, factors.size),
+            checkNotNull(self.asSimpleVar()), listOf(cond), listOf(a.lin), b.lin, parts,
             listOf(iteChains.guardEquality(cond)),
         )
         return narrowRes(self)
     }
     val magA = intCombMagnitude(a)
     val magB = intCombMagnitude(b)
-    val self = freshWideInt(if (magA == null || magB == null) null else maxOf(magA, magB))
-    factors.add(Clause(intArrayOf(Lit.negate(cond), reifyRelation("=", self, a))))
-    factors.add(Clause(intArrayOf(cond, reifyRelation("=", self, b))))
+    val magnitude = if (magA == null || magB == null) null else maxOf(magA, magB)
+    val self = freshWideInt(magnitude)
+    wideIntegerSelection(cond, self, a, b, magnitude)
     return Res.I(self)
 }
 
