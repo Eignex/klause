@@ -4,7 +4,6 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.RandomVariable
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -96,10 +95,11 @@ class LpBoundingTest {
             LpEngine(problem, objective, params, sink).use { engine ->
                 engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, 100.0,
                     sink, Cancellation.Never, -1, true, learn = learn)
-                val clauses = engine.lpNogoods?.drain().orEmpty()
                 session.popToLevel(0)
-                for (clause in clauses) session.addLearnedClause(Clause(clause), lbd = clause.size, permanent = true)
                 assertEquals(IntDomain(0, 1), session.intDomain(0))
+                session.pinInt(1, 1)
+                assertEquals(IntDomain(0, 1), session.intDomain(0))
+                session.popToLevel(0)
 
                 session.pinInt(1, 0)
 

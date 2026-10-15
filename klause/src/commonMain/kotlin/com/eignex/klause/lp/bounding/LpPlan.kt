@@ -344,7 +344,9 @@ data class LpPlan(
      * Retain source-feasibility clauses over absolute variable-bound atoms. Farkas certificates
      * produce conflict nogoods, mixed-row projections produce implications guarded by their complete
      * row and bound premises, and energetic reasoning produces over-subscription nogoods. The
-     * bounded LP pool registers them at restart so sibling subtrees can reuse the deduction.
+     * bounded LP pool admits row implications for immediate registration, so sibling subtrees can
+     * reuse them before restart. Restart shares these implications without registering them again;
+     * other queued clauses retain restart-time registration.
      * LP sources require [bounding]; energetic sources require [energeticReasoning].
      * When a conflict certificate resolves to an asserting
      * 1UIP clause the engine backjumps and learns immediately, so this helps even with

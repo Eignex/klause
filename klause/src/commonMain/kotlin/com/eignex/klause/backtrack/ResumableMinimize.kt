@@ -1076,9 +1076,12 @@ internal class ResumableMinimize(
 
     private fun drainLpNogoods(): Boolean {
         val lpNogoods = lpEngine.lpNogoods ?: return false
-        for (nogood in lpNogoods.drain()) {
-            val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
-            if (res is PropagationResult.Unsat) return true
+        for (entry in lpNogoods.drain()) {
+            val nogood = entry.literals
+            if (!entry.registered) {
+                val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
+                if (res is PropagationResult.Unsat) return true
+            }
             // Complete source premises make these feasibility clauses independent of the incumbent.
             params.clauseExchange?.publishGlobal(session.asSharedClause(nogood, nogood.size))
         }

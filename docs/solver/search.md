@@ -528,10 +528,12 @@ endpoint in the integer consequence. These projections share the node's numerica
 allowance. Unexpressible numerical
 scope withholds a consequence. Search-time row selection follows narrowed finite
 endpoints and Boolean pins; the resulting domain bounds retract on the CP trail.
-With LP learning enabled, each successful row tightening also queues its consequence
-literal and complete false premises in the existing bounded, deduplicating LP
-clause pool. Restart registration retains the conditional implication across undo
-and shares it through the existing source-feasibility clause path. These clauses
+With LP learning enabled, the existing bounded, deduplicating LP clause pool admits
+each successful row tightening's consequence literal and complete false premises.
+An admitted implication registers immediately in the persistent CP session, so it
+survives undo and can propagate in sibling branches before restart. Restart drains
+share these implications through the existing source-feasibility path without
+registering them again; other queued clauses retain restart-time registration. These clauses
 do not assume an incumbent cutoff; objective-relative fixing keeps its separate
 local reason path.
 At the end of an objective-bounding node pass, a successful row tightening can
