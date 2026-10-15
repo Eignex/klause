@@ -9,6 +9,11 @@ or resumes it, and closes its owner before changing scope. Published results rem
 readable independently of the live operation. This page defines capture, exclusion
 and cleanup; backend state follows [search](search.md) and [local search](local-search.md).
 
+Session ownership wrappers preserve the underlying handle's bootstrap readiness and
+cumulative scheduling instructions. ALNS scheduling allowances remain distinct from
+its observed inner LS moves when accessed through a session; bypassing bootstrap
+does not erase the offered instruction charge. See [ALNS acquisition](local-search.md#alns-incumbent-acquisition).
+
 ## Assumptions and conditioned queries
 
 `Solver.session()` opens a single-threaded scope owner. Every operation captures the

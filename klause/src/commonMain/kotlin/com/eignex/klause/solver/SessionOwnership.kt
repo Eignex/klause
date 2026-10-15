@@ -38,7 +38,8 @@ private class HandleOwnership<T : Any>(private val source: AutoCloseable, privat
 }
 
 private open class OwnedSearch(protected val source: ResumableSearch, release: () -> Unit) :
-    ResumableSearch by source, ReseedGuard {
+    ResumableSearch by source, ReseedGuard, IncumbentBootstrapSearch {
+    override val bootstrapPending: Boolean get() = (source as? IncumbentBootstrapSearch)?.bootstrapPending == true
     override val canReseed: Boolean get() = (source as? ReseedGuard)?.canReseed != false
     override val canContinuePreparation: Boolean get() = (source as? ReseedGuard)?.canContinuePreparation == true
     private val ownership = HandleOwnership<MinimizeResult>(source, release)
@@ -63,6 +64,8 @@ private open class OwnedSearch(protected val source: ResumableSearch, release: (
 
 private class OwnedInstructionSearch(private val instructionSource: InstructionSlicedSearch, release: () -> Unit) :
     OwnedSearch(instructionSource, release), InstructionSlicedSearch {
+    override val chargedInstructions: Long get() = instructionSource.chargedInstructions
+
     override fun runInstructionSlice(
         global: Cancellation,
         sliceMillis: Long,
