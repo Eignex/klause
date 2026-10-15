@@ -28,28 +28,31 @@ internal object AbsEncoding {
     val polynomial = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
         factor as Abs
         installPolynomial(absoluteValueRows(factor.operand, factor.result), encoding)
-        null
     }
 
     val realPolynomial = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
         factor as RealAbs
         installPolynomial(realAbsoluteValueRows(factor.operand, factor.result), encoding)
-        null
     }
 
     val gridLinear = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
-        for (form in gridAbsoluteValueRows(factor as GridAbs)) encoding.linear(form)
+        val forms = gridAbsoluteValueRows(factor as GridAbs, encoding.cancellation)
+            ?: return@Encoder EncoderDecline.RESOURCE
+        for (form in forms) encoding.linear(form)
         null
     }
 
     val gridPolynomial = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
-        installPolynomial(gridAbsoluteValueRows(factor as GridAbs), encoding)
-        null
+        val forms = gridAbsoluteValueRows(factor as GridAbs, encoding.cancellation)
+            ?: return@Encoder EncoderDecline.RESOURCE
+        installPolynomial(forms, encoding)
     }
 
-    private fun installPolynomial(forms: List<LinearForm>, encoding: TheoryEncoding) {
+    private fun installPolynomial(forms: List<LinearForm>, encoding: TheoryEncoding): EncoderDecline? {
         val formulas = forms.map { form ->
             val rows = form.rows.map {
+                if (encoding.cancellation()) return EncoderDecline.RESOURCE
+                encoding.cancellation.charge(it.size.toLong() + 1)
                 polynomialRow(
                     it,
                     { id -> encoding.integer(SourceIntId(id)) },
@@ -59,6 +62,8 @@ internal object AbsEncoding {
             }
             if (form is LinearForm.Disjunction) PolynomialRealFormula.Or(rows) else PolynomialRealFormula.And(rows)
         }
+        if (encoding.cancellation()) return EncoderDecline.RESOURCE
         encoding.polynomial(PolynomialRealFormula.And(formulas))
+        return null
     }
 }
