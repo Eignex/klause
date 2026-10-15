@@ -50,6 +50,49 @@ class ExactFlatZincValidationTest {
     """.trimIndent()
 
     @Test
+    fun `absolute value checks exact integer signs and magnitudes`() {
+        val source = "var int: x; var int: y; constraint int_abs(x,y); solve satisfy;"
+        for ((input, output) in listOf("-3" to "3", "0" to "0", "3" to "3",
+            "-9223372036854775808" to "9223372036854775808")) {
+            val result = ExactFlatZincValidation.inspect(source, "x = $input;\ny = $output;", null)
+
+            assertEquals("valid", result.status, result.reason)
+        }
+    }
+
+    @Test
+    fun `absolute value rejects relaxed and wrapped integer points`() {
+        val source = "var int: x; var int: y; constraint int_abs(x,y); solve satisfy;"
+        for ((input, output) in listOf("0" to "3", "-3" to "4", "3" to "-3",
+            "-9223372036854775808" to "-9223372036854775808")) {
+            val result = ExactFlatZincValidation.inspect(source, "x = $input;\ny = $output;", null)
+
+            assertEquals("invalid", result.status, result.reason)
+        }
+    }
+
+    @Test
+    fun `real absolute value checks exact rational coordinates`() {
+        val source = "var float: x; var float: y; constraint float_abs(x,y); solve satisfy;"
+        for ((input, output, status) in listOf(Triple("-1/3", "1/3", "valid"),
+            Triple("1/3", "1/3", "valid"), Triple("0", "1/3", "invalid"))) {
+            val result = ExactFlatZincValidation.inspect(source, "x = $input;\ny = $output;", null)
+
+            assertEquals(status, result.status, result.reason)
+        }
+    }
+
+    @Test
+    fun `absolute value aliases require a nonnegative coordinate`() {
+        val source = "var float: x; constraint float_abs(x,x); solve satisfy;"
+        for ((value, status) in listOf("-1/3" to "invalid", "0" to "valid", "1/3" to "valid")) {
+            val result = ExactFlatZincValidation.inspect(source, "x = $value;", null)
+
+            assertEquals(status, result.status, result.reason)
+        }
+    }
+
+    @Test
     fun `mixed finite float choices are checked from the original constant array`() {
         val source = "var 1..1: i; var 0.0..1.0: exact; var 0.0..1.0: grid; " +
             "constraint array_float_element(i, [0.125], exact); constraint float_le(grid, 0.5); solve satisfy;"

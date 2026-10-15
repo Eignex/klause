@@ -188,6 +188,12 @@ internal object ExactFlatZincValidation {
 
                 "float_ne", "int_ne" -> !equal(args[0], args[1])
 
+                "float_abs", "int_abs" -> {
+                    val input = numeric(args[0])
+                    val magnitude = if (input < zero) input * number("-1") else input
+                    magnitude.compareTo(numeric(args[1])) == 0
+                }
+
                 "float_le", "int_le" -> numeric(args[0]) <= numeric(args[1])
 
                 "float_lt", "int_lt" -> numeric(args[0]) < numeric(args[1])
