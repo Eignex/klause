@@ -1,5 +1,8 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.toExactSourceProblem
+import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
@@ -15,6 +18,58 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MpsModeTest {
+    @Test
+    fun `float rendering checks zero reconstruction against original source rows`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R -1\n" +
+                " M1 'MARKER' 'INTEND'\n X R 1\nRHS\n RHS R 0\nBOUNDS\n BV B I\n LO B X 0\nENDATA",
+        ).toExactSourceProblem()
+        for (residual in listOf(-5e-14, 5e-14)) {
+            val sample = Sample(BooleanArray(0), longArrayOf(0L), doubleArrayOf(residual))
+
+            val rendered = renderMpsFloat(compiled, sample)
+
+            assertEquals("v I=0 X=0", rendered)
+        }
+    }
+
+    @Test
+    fun `zero reconstruction preserves a nonzero original source equality`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n X COST 0 R 1\nRHS\n RHS R 0.00000000000001\n" +
+                "BOUNDS\n LO B X 0\nENDATA",
+        ).toExactSourceProblem()
+        val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(1e-14))
+
+        val rendered = renderMpsFloat(compiled, sample)
+
+        assertEquals("v X=${1e-14}", rendered)
+    }
+
+    @Test
+    fun `zero reconstruction preserves the source objective at the float point`() {
+        val compiled = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n LO B X 0\nENDATA")
+            .toExactSourceProblem()
+        val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(-5e-14))
+
+        val rendered = renderMpsFloat(compiled, sample)
+
+        assertEquals("v X=${-5e-14}", rendered)
+    }
+
+    @Test
+    fun `source inexact models retain their original float witness`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 3.0000000000000001\nRHS\n RHS R 1\nENDATA",
+        ).toProblem()
+        val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(-5e-14))
+        assertFalse(compiled.sourceExact)
+
+        val rendered = renderMpsFloat(compiled, sample)
+
+        assertEquals("v X=${-5e-14}", rendered)
+    }
+
     @Test
     fun `MPS publication uses the checked current source value before duplicate handling`() {
         var checked: BigFraction? = BigFraction.ONE * BigFraction.ofLong(2).reciprocal()

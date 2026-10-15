@@ -15,6 +15,38 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MpsCompiledTest {
+    @Test
+    fun `source witness entry limit admits a complete checked source`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 1\nBOUNDS\n LO B X 0\nENDATA",
+        ).toExactSourceProblem()
+
+        val witness = compiled.sourceWitnessOrNull(LongArray(0), listOf(BigFraction.ONE), maxEntries = 4)
+
+        assertEquals(BigFraction.ONE, assertNotNull(witness).objective)
+    }
+
+    @Test
+    fun `source witness entry limit declines an oversized source`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 1\nBOUNDS\n LO B X 0\nENDATA",
+        ).toExactSourceProblem()
+
+        val witness = compiled.sourceWitnessOrNull(LongArray(0), listOf(BigFraction.ONE), maxEntries = 3)
+
+        assertNull(witness)
+    }
+
+    @Test
+    fun `bounded source witness check rejects a violated source row`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 1\nBOUNDS\n LO B X 0\nENDATA",
+        ).toExactSourceProblem()
+
+        val witness = compiled.sourceWitnessOrNull(LongArray(0), listOf(BigFraction.ZERO), maxEntries = 4)
+
+        assertNull(witness)
+    }
 
     @Test
     fun `source coordinates retain integer values beyond Long`() {
