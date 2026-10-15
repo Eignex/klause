@@ -9,6 +9,7 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
@@ -18,6 +19,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class GridArithmeticTest {
     @Test
@@ -78,6 +80,26 @@ class GridArithmeticTest {
                 assertEquals(state.cost - before, predicted)
                 assertEquals(predicted, applied.toLong())
             }
+        }
+    }
+
+    @Test
+    fun `large grid inverse repairs retain both square roots without scanning the grid`() {
+        val input = GridCoordinate(0, -1.0, 1.0, 1024)
+        val output = GridCoordinate(1, 1.0, 1.0, 1)
+        for (relation in listOf<Factor>(GridProduct(input, input, output), GridPower(input, 2, output))) {
+            val problem = Problem(0, 2, arrayOf(IntDomain(0, 1023), IntDomain(0, 0)), arrayOf(relation))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
+            state.assignment.setInt(0, 500L)
+            state.assignment.setInt(1, 0L)
+            state.recompute()
+            val sink = MoveSink()
+
+            state.factors[0].proposeRepairMoves(state, 0, sink)
+
+            assertTrue(Move.IntSet(0, 0L) in sink.list)
+            assertTrue(Move.IntSet(0, 1023L) in sink.list)
+            assertTrue(sink.list.all { state.netDelta(it) < 0 })
         }
     }
 

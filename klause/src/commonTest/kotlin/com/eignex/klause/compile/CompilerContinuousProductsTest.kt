@@ -1,6 +1,7 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.GridPower
 import com.eignex.klause.factor.arithmetic.GridProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
@@ -16,6 +17,7 @@ import com.eignex.klause.model.SchemaEntry
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.plus
+import com.eignex.klause.schema.pow
 import com.eignex.klause.schema.times
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.skema.SchemaDef
@@ -175,6 +177,37 @@ class CompilerContinuousProductsTest {
         assertEquals(1, factor.output.variable)
         assertTrue(compiled.floatRepresentations.values.all { it.approximate })
         assertEquals(0, compiled.problem.numRealVars)
+    }
+
+    @Test
+    fun `schema grid powers retain fixed exponents and constant targets`() {
+        val x = FloatHandle("x", -2.0, 2.0)
+        val definition = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(-2.0, 2.0, 5),
+            "square" to NamedConstraint(x.pow(2) eq 4.0),
+            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.LT, 1.0)),
+        ))
+
+        val compiled = definition.compile()
+        val factor = compiled.problem.factors.filterIsInstance<GridPower>().single()
+
+        assertEquals(2, factor.exponent)
+        assertEquals(0, factor.base.variable)
+        assertEquals(4.0, factor.output.lower)
+        assertEquals(1, factor.output.buckets)
+        assertTrue(compiled.floatRepresentations.getValue("x").approximate)
+    }
+
+    @Test
+    fun `grid affine overflow declines before wrapping a source coefficient`() {
+        val x = FloatHandle("x", 0.0, 1.0)
+        val definition = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, 5),
+            "product" to NamedConstraint(((x * 1e30) * x) eq 1.0),
+            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.LT, 1.0)),
+        ))
+
+        assertFailsWith<IllegalArgumentException> { definition.compile() }
     }
 
     @Test
