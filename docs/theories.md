@@ -78,7 +78,8 @@ Shared Boolean clauses may remain in a reused full difference installation; the
 shared clause component retains their ownership, and complete difference checks
 also validate their installed Boolean relations. Omitting a nonparticipating finite
 factor requires a separate subset installation. Null or incomplete installations
-cannot supply a retained fragment. This reuse
+cannot supply a retained fragment. A stopped reuse consultation withholds both
+targets' installed fragments, including an earlier completed target. This reuse
 retains immutable relations, never mutable theory state or a cross-call cache.
 
 Participation and completeness are separate. A batch service can be sound and incomplete;

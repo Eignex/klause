@@ -483,7 +483,11 @@ fun Problem.componentPlan(
     }
     return ComponentPlan(this, intOwners, factorOwners, route,
         unownedOpenColumn?.let { unplaceable(it, projections, factorOwners) }, projections, encoded,
-        if (route == ProblemPipeline.DIFFERENCE_THEORY) differenceFragment else fragment,
+        when {
+            preparationStopped -> null
+            route == ProblemPipeline.DIFFERENCE_THEORY -> differenceFragment
+            else -> fragment
+        },
         if (route != ProblemPipeline.UNSUPPORTED_OPEN) null
         else if (preparationStopped || cancellation() || linearDecline == EncoderDecline.RESOURCE ||
             differenceDecline == EncoderDecline.RESOURCE) EncoderDecline.RESOURCE
