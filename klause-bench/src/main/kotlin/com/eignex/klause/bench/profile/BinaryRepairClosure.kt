@@ -101,6 +101,10 @@ internal class BinaryRepairClosure(
     }
     private var epoch = 0
     private var end = 0
+    private val supportRows = IntArray(graph.naryClauses.size + 1)
+    private val supportStamps = IntArray(graph.naryClauses.size)
+    private var supportHead = 0
+    private var supportTail = 0
 
     var candidateCalls = 0L
         private set
@@ -125,9 +129,12 @@ internal class BinaryRepairClosure(
         if (epoch == Int.MAX_VALUE) {
             stamps.fill(0)
             seedStamps.fill(0)
+            supportStamps.fill(0)
             epoch = 1
         } else epoch++
         end = 0
+        supportHead = 0
+        supportTail = 0
     }
 
     private fun force(literal: Int): Boolean {
@@ -144,18 +151,33 @@ internal class BinaryRepairClosure(
     private fun expand(cancellation: Cancellation, supportState: LocalSearchState? = null): Boolean {
         var cursor = 0
         var visits = 0
-        while (cursor < end) {
-            if (cursor % 256 == 0 && cancellation.isCancelled()) return false
-            val literal = queue[cursor++]
-            factVisits++
-            for (forced in graph.edges[literal]) {
-                edgeVisits++
-                if (visits++ % 256 == 0 && cancellation.isCancelled()) return false
-                if (!force(forced)) return false
+        while (cursor < end || supportHead != supportTail) {
+            while (cursor < end) {
+                if (cursor % 256 == 0 && cancellation.isCancelled()) return false
+                val literal = queue[cursor++]
+                factVisits++
+                for (forced in graph.edges[literal]) {
+                    edgeVisits++
+                    if (visits++ % 256 == 0 && cancellation.isCancelled()) return false
+                    if (!force(forced)) return false
+                }
+                for (row in graph.naryOccurrences[literal]) {
+                    naryVisits++
+                    if (visits++ % 256 == 0 && cancellation.isCancelled()) return false
+                    if (!expandClause(graph.naryClauses[row], cancellation, null)) return false
+                    if (supportState != null && supportStamps[row] != epoch) {
+                        supportStamps[row] = epoch
+                        supportRows[supportTail] = row
+                        supportTail++
+                        if (supportTail == supportRows.size) supportTail = 0
+                    }
+                }
             }
-            for (row in graph.naryOccurrences[literal]) {
-                naryVisits++
-                if (visits++ % 256 == 0 && cancellation.isCancelled()) return false
+            if (supportHead != supportTail) {
+                val row = supportRows[supportHead]
+                supportHead++
+                if (supportHead == supportRows.size) supportHead = 0
+                supportStamps[row] = 0
                 if (!expandClause(graph.naryClauses[row], cancellation, supportState)) return false
             }
         }
