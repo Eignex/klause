@@ -157,6 +157,7 @@ Other continuous terms still require their source endpoints. Search-time row
 selection follows the definitions into their consuming rows and includes the
 required equality supports. At most eight dense rows and 128 definitions per row
 are considered under the same allowance, after ordinary and paired projections.
+Their additional row selection and assembly also follow those completed projections.
 An incomplete expansion supplies no deduction. Completed projections retain all
 defining row premises and use the same source-map and retraction checks.
 

@@ -3,7 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.IntArrayList
 
-internal fun expandDefinedRowSupports(
+private fun expandDefinedRowSupports(
     state: LpExactState,
     continuousCounts: IntArray,
     selected: BooleanArray,
@@ -52,6 +52,7 @@ internal fun definedRowBounds(
     state: LpExactState,
     rows: Array<ArrayList<LpRowBoundTerm>>,
     continuousCounts: IntArray,
+    selected: BooleanArray,
     meter: MixedCertificateMeter,
     completed: MutableList<LpRowBound>,
 ) {
@@ -59,6 +60,7 @@ internal fun definedRowBounds(
             meter.step()
             it > 1
         }) return
+    prepareDefinedRows(state, rows, continuousCounts, selected, meter)
     meter.reserve(state.model.n.toLong() * 4L + 32L)
     val definitions = IntArray(state.model.n) { -1 }
     for (row in rows.indices) {
@@ -77,6 +79,37 @@ internal fun definedRowBounds(
         if (continuousCounts[row] < 2 || rows[row].isEmpty() || !state.rows.row(row).active) continue
         if (attempts++ == 8) break
         projectDefinedRow(state, row, rows, definitions, meter, completed)
+    }
+}
+
+private fun prepareDefinedRows(
+    state: LpExactState,
+    rows: Array<ArrayList<LpRowBoundTerm>>,
+    continuousCounts: IntArray,
+    selected: BooleanArray,
+    meter: MixedCertificateMeter,
+) {
+    meter.reserve(state.model.m.toLong() * 2L + 64L)
+    val expanded = selected.copyOf()
+    expandDefinedRowSupports(state, continuousCounts, expanded, meter)
+    val missing = BooleanArray(state.model.m) {
+        meter.step()
+        expanded[it] && rows[it].isEmpty()
+    }
+    if (missing.none {
+            meter.step()
+            it
+        }) return
+    for (column in 0 until state.model.n) {
+        meter.step()
+        for (entry in state.model.columnEntries(column)) {
+            meter.step()
+            if (!missing[entry.row] || entry.number.value.isZero) continue
+            meter.reserve(64L)
+            val integer = entry.number.exactLong()
+            val coefficient = if (integer == null) meter.read(entry.number.value) else entry.number.value
+            rows[entry.row].add(LpRowBoundTerm(column, coefficient, integer))
+        }
     }
 }
 
