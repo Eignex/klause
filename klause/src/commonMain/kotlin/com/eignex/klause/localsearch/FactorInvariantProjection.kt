@@ -121,14 +121,20 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
 
     is Product -> ProductInvariant(a, b, result)
 
-    is Power -> PowerInvariant((base as Power.Coordinate.Integer).id.index, exponent,
-        (result as Power.Coordinate.Integer).id.index)
+    is Power -> when (val coordinate = base) {
+        is Power.Coordinate.Integer -> PowerInvariant(coordinate.id.index, exponent,
+            (result as Power.Coordinate.Integer).id.index)
+        is Power.Coordinate.Real -> RealPowerInvariant(coordinate.id.index, exponent,
+            (result as Power.Coordinate.Real).id.index)
+    }
 
     is PseudoBoolean -> PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
 
     is RealAbs -> RealAbsInvariant(operand, result)
 
     is RealProduct -> RealProductInvariant(intOperand, realOperand, result)
+
+    is ContinuousProduct -> ContinuousProductInvariant(a, b, result)
 
     is ReifiedRealLinear -> RealRowInvariant(vars, intCoeffs, realVars, realCoeffs, op, bound, strict, aux)
 

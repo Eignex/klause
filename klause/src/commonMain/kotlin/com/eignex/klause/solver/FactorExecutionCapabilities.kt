@@ -121,10 +121,8 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     is WideDivMod -> finiteBounds
     is DivMod -> finiteDomains
     is Inverse, is ValuePrecede -> finiteDomains
-    is Power -> if (base is Power.Coordinate.Integer) finiteDomains else FactorExecutionCapabilities(
-        PropagationCapability.UNSUPPORTED, AssignmentCheckCapability.UNSUPPORTED,
-        AssignmentCheckCapability.UNSUPPORTED, ScoringCapability.UNSUPPORTED, RelaxationCapability.NONE,
-    )
+    is Power -> if (base is Power.Coordinate.Integer) finiteDomains else
+        realArithmetic.copy(relaxation = if (exponent <= 1) RelaxationCapability.SOUND else RelaxationCapability.NONE)
     is ArrayMinMax, is Product, is Increasing, is ReifiedLinear -> boundRelaxation
     is Linear -> if (constants is RealConstants) realArithmetic else boundRelaxation
     is Clause, is Cardinality, is PseudoBoolean, is ReifiedCardinality, is ReifiedPseudoBoolean,
@@ -132,13 +130,7 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     -> filteringRelaxation
     is ComparisonClause, is Xor, is LexLess, is Sort -> finiteFiltering
     is RealAbs, is RealProduct, is ReifiedRealLinear -> realArithmetic
-    is ContinuousProduct -> FactorExecutionCapabilities(
-        PropagationCapability.UNSUPPORTED,
-        AssignmentCheckCapability.UNSUPPORTED,
-        AssignmentCheckCapability.UNSUPPORTED,
-        ScoringCapability.UNSUPPORTED,
-        RelaxationCapability.NONE,
-    )
+    is ContinuousProduct -> realArithmetic.copy(relaxation = RelaxationCapability.NONE)
     is ObjectiveBoundFactor -> objectiveOverlay
     is GaussianXor, is DifferenceSystem -> redundantRows
     is SymmetryHandling -> symmetryRestriction

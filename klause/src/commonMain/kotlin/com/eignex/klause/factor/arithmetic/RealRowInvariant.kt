@@ -212,17 +212,8 @@ internal class RealProductInvariant(
     private val result: Int,
 ) : Invariant {
 
-    private fun residual(k: Long, x: Double, y: Double): Double = y - k.toDouble() * x
-
-    private fun degree(k: Long, x: Double, y: Double, softCap: Int): Int {
-        val r = abs(residual(k, x, y))
-        val scale = maxOf(1.0, abs(y), abs(k.toDouble() * x))
-        if (r <= PRODUCT_TOLERANCE * scale) return 0
-        return compressViolation(
-            maxOf(1L, ceil(r / (PRODUCT_UNIT * scale)).coerceAtMost(Long.MAX_VALUE.toDouble()).toLong()),
-            softCap,
-        )
-    }
+    private fun degree(k: Long, x: Double, y: Double, softCap: Int): Int =
+        numericalEqualityDegree(k.toDouble() * x, y, softCap)
 
     private fun current(state: LocalSearchState, k: Long = state.assignment.intValue(intOperand)): Int = degree(
         k,
@@ -288,8 +279,5 @@ internal class RealProductInvariant(
         }
     }
 
-    private companion object {
-        const val PRODUCT_TOLERANCE: Double = 1e-9
-        const val PRODUCT_UNIT: Double = 1e-6
-    }
+
 }
