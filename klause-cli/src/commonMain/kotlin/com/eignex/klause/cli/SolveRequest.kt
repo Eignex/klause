@@ -1,7 +1,7 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -10,10 +10,11 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExactTheorySatisfactionRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveShape
+import com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryRequest
+import com.eignex.klause.solver.pipeline.NumericalLinearRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.PolynomialTheoryRequest
-import com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryRequest
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
@@ -107,11 +108,14 @@ internal class Solvable(
     /** Finite CP problem. */
     val problem: Problem? get() = finite?.problem
     val optimize: Boolean get() = finite?.optimize ?: (
-        openRequest?.objective != null || polynomial?.objective != null || quadratic != null
+        openRequest?.objective != null || polynomial?.objective != null || quadratic != null ||
+            numerical?.request?.objective != null
     )
     val maximize: Boolean get() = finite?.maximize ?: (
-        openRequest?.maximize ?: polynomial?.maximize ?: (quadratic?.sense == ObjectiveSense.MAXIMIZE)
+        openRequest?.maximize ?: polynomial?.maximize ?: numerical?.request?.maximize ?:
+            (quadratic?.sense == ObjectiveSense.MAXIMIZE)
     )
+    private val numerical: SolvablePipeline.NumericalLinear? get() = pipeline as? SolvablePipeline.NumericalLinear
     private val quadratic: SolvablePipeline.QuadraticTheory? get() = pipeline as? SolvablePipeline.QuadraticTheory
     private val polynomial: SolvablePipeline.PolynomialTheory? get() = pipeline as? SolvablePipeline.PolynomialTheory
     private val openRequest: OpenTheoryRequest? get() = (pipeline as? SolvablePipeline.OpenTheory)?.request
@@ -159,6 +163,11 @@ private fun sourceRouteName(route: SourceProblemRoute): String = when (route) {
 
 /** A concrete solve pipeline, selected before [SolveCore] starts its finite CP loop. */
 internal sealed interface SolvablePipeline {
+    data class NumericalLinear(
+        val request: NumericalLinearRequest,
+        val render: (OpenTheoryAssignment) -> String,
+    ) : SolvablePipeline
+
     data class ExactTheorySatisfaction(
         val request: ExactTheorySatisfactionRequest,
         val render: (OpenTheoryAssignment) -> String,

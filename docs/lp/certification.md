@@ -307,6 +307,11 @@ The adapter's bounded numerical owners share one source operation budget through
 closure, feasibility and dual reconstruction. Production traversal and result
 publication retain their separate admission contracts.
 
+`NumericalLinearRequest.solve` directly invokes the numerical affine authority
+traversal for MPS, without exact-theory descent or theory workers. Its unsupported
+source captures and unresolved leaves retain incomplete results. The existing finite
+MPS path retains its separate numerical and tolerance policies.
+
 `OpenTheoryPipeline.optimizeLinear` executes a complete exact affine context with
 the existing shared search session. Boolean and integer alternatives retain typed
 coverage trees. A branch optimum or limit only becomes a global result after all

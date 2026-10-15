@@ -20,6 +20,28 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `open MPS optimization executes numerical relaxations under default and exact policy`() {
+        val source = File.createTempFile("mps-open-numerical", ".mps").apply {
+            writeText("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 1 R 1\n M1 'MARKER' 'INTEND'\n X R 1\n" +
+                "BOUNDS\n LI B I 0\n FR B X\nENDATA\n")
+            deleteOnExit()
+        }
+        for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
+            val text = capture {
+                assertEquals(0, runCli(arrayOf("-s", "-e", "cp", "-p", "1", *flags, source.absolutePath)))
+            }
+
+            assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+            assertTrue("o 0" in text.lines(), text)
+            assertTrue("v I=0 X=0" in text.lines(), text)
+            assertTrue("solvePipeline=numerical-mip" in text, text)
+            assertTrue("reportedBackend=numerical-mip" in text, text)
+            assertFalse("declaredTheoryRoute=" in text, text)
+        }
+    }
+
+    @Test
     fun `exact continuous decimals retain numerical execution and source certificates`() {
         val source = File.createTempFile("mps-exact-continuous", ".mps").apply {
             writeText("ROWS\n N COST\n E R\nCOLUMNS\n X COST 0.1 R 3\nRHS\n RHS R 1\n" +
@@ -257,7 +279,7 @@ class MpsModeTest {
 
             val solvable = MpsMode.newSession().load(mps.absolutePath, CommonOptions())
 
-            val pipeline = solvable.pipeline as SolvablePipeline.OpenTheory
+            val pipeline = solvable.pipeline as SolvablePipeline.NumericalLinear
             assertNotNull(pipeline.request.objective)
             assertEquals(sense == "MAX", pipeline.request.maximize)
         }
@@ -320,7 +342,7 @@ class MpsModeTest {
 
         val solvable = MpsMode.newSession().load(mps.absolutePath, CommonOptions().apply { exact = true })
 
-        assertTrue(solvable.pipeline is SolvablePipeline.OpenTheory)
+        assertTrue(solvable.pipeline is SolvablePipeline.NumericalLinear)
         assertNull(solvable.toleranceCheck)
     }
 
@@ -336,7 +358,7 @@ class MpsModeTest {
         }
         val session = MpsMode.newSession()
         val solvable = session.load(mps.absolutePath, CommonOptions())
-        val pipeline = solvable.pipeline as SolvablePipeline.OpenTheory
+        val pipeline = solvable.pipeline as SolvablePipeline.NumericalLinear
         val assignment = OpenTheoryAssignment.Sampled(
             Sample(BooleanArray(0), longArrayOf(0L), doubleArrayOf(1.0), listOf(BigFraction.ONE)),
         )
@@ -366,7 +388,7 @@ class MpsModeTest {
         }
         val session = MpsMode.newSession()
         val solvable = session.load(mps.absolutePath, CommonOptions())
-        val pipeline = solvable.pipeline as SolvablePipeline.OpenTheory
+        val pipeline = solvable.pipeline as SolvablePipeline.NumericalLinear
         val assignment = OpenTheoryAssignment.Sampled(
             Sample(BooleanArray(0), longArrayOf(1L), doubleArrayOf(0.0), listOf(BigFraction.ZERO)),
         )
@@ -611,13 +633,13 @@ class MpsModeTest {
             }
         }
         val session = MpsMode.newSession()
-        val original = session.load(files[0].absolutePath, CommonOptions()).pipeline as SolvablePipeline.OpenTheory
+        val original = session.load(files[0].absolutePath, CommonOptions()).pipeline as SolvablePipeline.NumericalLinear
         val output = session.output(CommonOptions())
         val assignment = OpenTheoryAssignment.Sampled(
             Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0), listOf(BigFraction.ONE)),
         )
         val rendered = original.render(assignment)
-        val next = session.load(files[1].absolutePath, CommonOptions()).pipeline as SolvablePipeline.OpenTheory
+        val next = session.load(files[1].absolutePath, CommonOptions()).pipeline as SolvablePipeline.NumericalLinear
         next.render(assignment)
 
         val text = capture {

@@ -221,3 +221,7 @@ They retain fixed float power, square, independent product and chained product r
 real intervals, with objectives attained at exactly representable endpoints. They
 exercise grid and exact arithmetic paths and original MiniZinc witness checks; grid objective
 and exhaustion claims retain their approximation limits.
+
+The self-authored `klause-bench/smoke-corpus/mps-numerical` sources exercise open
+integer numerical optima, exhaustive integer gaps, integer infeasibility beside an
+unbounded relaxation and integral improving rays. They contain no external data.

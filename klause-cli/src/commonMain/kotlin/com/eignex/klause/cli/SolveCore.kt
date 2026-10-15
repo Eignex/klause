@@ -94,6 +94,36 @@ internal object SolveCore {
         // `-p N` gives the open portfolio a lane per core, as it does the finite one.
         val openCores = common.parallel ?: 1
         when (val pipeline = rawSolvable.pipeline) {
+            is SolvablePipeline.NumericalLinear -> {
+                if (solutionSetSensitive) usageError("all-solution enumeration is unavailable for numerical MIP")
+                val work = takeOpenNodeLimit(common) ?: Long.MAX_VALUE
+                val params = TheoryParams(openWorkLimit = work,
+                    maxDecisions = takeOpenLongParam(common, "max-decisions", nonNegative = true) ?: Long.MAX_VALUE,
+                    timeout = deadlineCancel, cancellation = deadlineCancel)
+                dropOpenOnlyParams(common)
+                output.begin(optimize = rawSolvable.optimize, maximize = rawSolvable.maximize)
+                val complete = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS
+                val result = pipeline.request.solve(params, complete)
+                if (rawSolvable.optimize) {
+                    reportLinearOptimization(result, { pipeline.render(OpenTheoryAssignment.Sampled(it)) },
+                        output, publication, common.statistics, rawSolvable.routingElapsedMs,
+                        completePool = complete, routingLpStats = rawSolvable.routingLpStats)
+                } else {
+                    output.onVerdictContext(VerdictContext(terminationReason = result.reason))
+                    val point = result.incumbent
+                    if (point != null) output.onSolution(pipeline.render(OpenTheoryAssignment.Sampled(point)), null)
+                    output.onComplete(when {
+                        point != null -> Verdict.SATISFIABLE
+                        result.terminal?.claim == com.eignex.klause.solver.evidence.SourceClaim.Refutation ->
+                            Verdict.UNSATISFIABLE
+                        else -> Verdict.UNKNOWN
+                    })
+                    if (common.statistics) output.onStatistics(result.stats,
+                        result.stats.run.wallMs + rawSolvable.routingElapsedMs, if (point == null) 0 else 1)
+                }
+                return
+            }
+
             is SolvablePipeline.QuadraticTheory -> {
                 if (solutionSetSensitive) usageError("all-solution enumeration is unavailable for quadratic objectives")
                 output.begin(optimize = true, maximize = pipeline.sense == ObjectiveSense.MAXIMIZE)

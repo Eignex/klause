@@ -49,8 +49,9 @@ have exact finite filtering and scores; continuous rows have heuristic scores an
 source-certified completion. Wide coefficients, RHS values and objective definitions
 admit exact positive row normalization for the numerical LP, preserving rational
 certificate authority and source units independently of floating working values.
-Nonzero projection underflow or nonfinite working entries decline numerical completion. A numerical representation decline leaves the selected
-arithmetic encoding available, with bounded integers retaining finite ownership.
+Nonzero projection underflow or nonfinite working entries decline the affected
+numerical procedure without selecting arithmetic-theory execution. Bounded integers
+retain finite ownership when numerical completion is admitted.
 Named objectives without terms retain their source constant and direction.
 The shared pipeline selects execution from these capabilities after bound closure;
 `sourceExact` and exact coefficient storage alone do not request whole-model exact
@@ -98,28 +99,28 @@ Optimal output includes `optimizationStatus=attained-optimum` or
 
 ## Routing and result strength
 
-Default purely continuous MPS sources use the finite LP lane, including fractional
-objectives and its tolerance guarantee. When hybrid lowering differs from a source
-with integer columns, or an explicit exact request requires original decimals, the
-frontend prepares exact source rows before routing and bound closure. Bounded
-integers retain finite ownership when numerical completion is available. Open
-integer sides and unsupported numerical rows use admitted arithmetic completion.
-A rounded-model routing refutation cannot establish original-source infeasibility.
+MPS selects numerical execution independently of certification policy. Default
+purely continuous sources use the finite LP lane and its tolerance guarantee.
+Supported bounded integer sources retain the existing finite search and numerical
+completion. Open integer declarations retain their missing sides and use numerical
+LP relaxations with exhaustive integer splits; no finite window changes source scope.
+Explicit `--exact` changes source correspondence and certificate requirements without
+selecting arithmetic theory or theory portfolio workers.
 
-On arithmetic routes, BACKTRACK and FIXED run the admitted complete traversal. LS and ALNS
-search exact-coordinate neighborhoods with source-checked incumbent authority;
-their conditional refutations cannot refute the original source. MIXED combines
-that complete arm and the heuristic arms under the existing shared portfolio.
-Continuous coordinates remain arithmetic-owned, and heuristic integer windows
-do not restrict original source proof scope.
+The numerical source traversal retains exact original rows and objective direction.
+Each fractional integer endpoint splits at its floor into both exhaustive alternatives.
+A checked branch optimum or refutation supplies only branch authority until every
+required sibling has certified coverage. A source-valid improving ray requires an
+integral feasible base and an integral recession step for every source integer.
+An unbounded LP relaxation alone cannot establish MIP unboundedness. Numerical
+representation, resource, source-capture or certification limits return an incomplete
+result with any independently checked incumbent and root bound. They never trigger
+open-theory or theory-worker fallback, and an unresolved leaf cannot become infeasible.
 
-Integral objective descent retains exact bound and recession checks. Supported
-Boolean or continuous linear objectives also admit strict-improvement theory rounds
-beside heuristic repair. Completed refutations and attained optima retain source
-proof authority; terminating optimization is not guaranteed for every admitted
-source. Rational feasibility descent has no recession certificate and can return
-an incumbent with an incomplete reason on an unbounded objective. Numerical or
-arithmetic representation declines withhold terminal claims.
+The direct numerical traversal currently requires a complete affine source capture.
+An open source with an unsupported guarded relation explicitly declines. Supported
+finite indicator models retain their numerical completion. LS and ALNS requests
+withhold numerical bounds and terminal claims and can publish checked witnesses only.
 
 Every open candidate is checked against original rows, bounds, indicators and
 integrality before publication. Its objective is recomputed from original numbers,
