@@ -123,7 +123,8 @@ internal object MpsMode : CliMode {
                 )).withNumericalCompletion()
             } else {
                 Solvable(finite = null, render = render, objectiveValue = null,
-                    pipeline = SolvablePipeline.NumericalLinear(numerical, renderOpen),
+                    pipeline = SolvablePipeline.NumericalLinear(
+                        NumericalLinearRequest(compiled.model, objective, compiled.maximize), renderOpen),
                     routingLpStats = routingLpStats, routingElapsedMs = routingElapsedMs)
             }
         }
