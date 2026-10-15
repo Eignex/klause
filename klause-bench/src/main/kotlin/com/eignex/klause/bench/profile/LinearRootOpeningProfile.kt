@@ -5,7 +5,8 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
-import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.formats.smtlib.SmtLibAdmission
+import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
@@ -51,7 +52,10 @@ internal object LinearRootOpeningProfile {
         out.resolve("source.smt2").writeBytes(bytes)
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         val parsingStarted = System.nanoTime()
-        val compiled = SmtLib.parse(bytes.decodeToString())
+        val admitted = SmtLibAdmission.parse(bytes.decodeToString())
+        val compiled = requireNotNull((admitted as? SmtLibInput.Linear)?.problem) {
+            "source admission did not select linear lowering"
+        }
         val parsingNs = System.nanoTime() - parsingStarted
         require(compiled.objective == null) { "only satisfaction openings are supported" }
         val deadlineStarted = System.nanoTime()
@@ -84,6 +88,7 @@ internal object LinearRootOpeningProfile {
                 put("suite", options.getValue("suite"))
                 put("problem", options.getValue("problem"))
                 put("entryPoint", "direct-library-linear-root-opening")
+                put("sourceAdmission", admitted.javaClass.simpleName)
                 put("cliRoutingEquivalence", "unverified")
                 put("sourceVerdictClaim", false)
                 put("traversalAdvanced", false)
