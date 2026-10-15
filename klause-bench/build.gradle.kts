@@ -88,6 +88,24 @@ val checkNativeVmSymbolQueries = tasks.register<Exec>("checkNativeVmSymbolQuerie
         "tools/native_vm_loaded_module.py", "tools/read_native_vm_metadata.py")
 }
 
+val checkNativeVmDwarfProvider = tasks.register<Exec>("checkNativeVmDwarfProvider") {
+    group = "verification"
+    description = "Test private hash-bound DWARF provider extraction and imports."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_native_vm_dwarf_provider.py")
+    inputs.files("tools/native_vm_dwarf_provider.py", "tools/test_native_vm_dwarf_provider.py")
+}
+
+val checkNativeVmDwarfRecords = tasks.register<Exec>("checkNativeVmDwarfRecords") {
+    group = "verification"
+    description = "Test bounded compiler DWARF record and reference inventories."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_read_native_vm_dwarf_records.py")
+    inputs.files("tools/read_native_vm_dwarf_records.py", "tools/test_read_native_vm_dwarf_records.py",
+        "tools/native_vm_dwarf_provider.py",
+        "tools/bind_native_vm_debug_image.py", "tools/read_native_vm_symbols.py")
+}
+
 val checkNativeVmDebugImage = tasks.register<Exec>("checkNativeVmDebugImage") {
     group = "verification"
     description = "Test official external JVM debug-file archive and identity binding."
@@ -229,7 +247,8 @@ tasks.named("check") {
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,
         checkNativeVmLiveArgumentReview, checkNativeVmEventLoss, checkNativeVmEventLossReview,
         checkNativeVmBoundaryEntries, checkNativeVmBoundaryLifecycle, checkNativeVmBoundaryLifecycleReview,
-        checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkNativeVmEntryTransfers, checkNativeVmDebugImage)
+        checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkNativeVmEntryTransfers,
+        checkNativeVmDebugImage, checkNativeVmDwarfProvider, checkNativeVmDwarfRecords)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
