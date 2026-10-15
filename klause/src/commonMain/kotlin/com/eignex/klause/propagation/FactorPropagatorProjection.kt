@@ -11,6 +11,7 @@ import com.eignex.klause.factor.scheduling.*
 import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.symmetry.SymmetryPropagator
 import com.eignex.klause.factor.table.*
+import com.eignex.klause.lowering.gridAbsoluteValueTable
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.RealConstants
@@ -45,6 +46,8 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
     )
 
     is Abs -> AbsPropagator(operand, result)
+
+    is GridAbs -> gridAbsoluteValueTable(this).buildPropagatorProjection(preparation)
 
     is ArrayMinMax -> ArrayMinMaxPropagator(result, xs, max, boolVars, intVars)
 

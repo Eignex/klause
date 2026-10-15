@@ -13,6 +13,7 @@ import com.eignex.klause.factor.objective.objectiveSumIsWide
 import com.eignex.klause.factor.scheduling.*
 import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.*
+import com.eignex.klause.lowering.gridAbsoluteValueTable
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.util.IntArrayList
@@ -40,6 +41,8 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
     is AllDifferent -> allDifferentInvariantProjection()
 
     is Abs -> AbsInvariant(operand, result)
+
+    is GridAbs -> gridAbsoluteValueTable(this).buildInvariantProjection(domains)
 
     is ArrayMinMax -> ArrayMinMaxInvariant(result, xs, max)
 

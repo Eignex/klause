@@ -1,5 +1,7 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.factor.arithmetic.GridAbs
+import com.eignex.klause.lowering.gridAbsoluteValueTable
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -43,6 +45,7 @@ internal fun Factor.buildLpRelaxation(builder: RelaxationBuilder, linearProjecti
         is Regular -> emitLpRelaxation(builder)
         is ReifiedCardinality -> emitLpRelaxation(builder)
         is ReifiedPseudoBoolean -> emitLpRelaxation(builder)
+        is GridAbs -> gridAbsoluteValueTable(this).emitLpRelaxation(builder)
         is Table -> emitLpRelaxation(builder)
         else -> Unit
     }

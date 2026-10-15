@@ -72,7 +72,9 @@ continuous. Unrestricted continuous-by-continuous products are outside linear
 arithmetic.
 
 Bucketed search decides a finite grid. It may miss solutions between grid points;
-rounding can produce candidates violating the source constraints. Source-check a
+rounding can produce candidates violating the source constraints. Bucketed
+absolute values retain `GridAbs` with the same rounding image; their tuple
+encodings belong to selected private consumers. Source-check a
 returned candidate before assigning it feasibility credit. Even a source-valid
 grid witness does not turn a grid optimum or refutation into a source proof.
 

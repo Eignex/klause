@@ -396,7 +396,7 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     )
 }
 
-/** Lower `float_abs(x, y)` (`y = |x|`) to a bucket-index table, mirroring [emitFloatTimes]. */
+/** Retain `float_abs(x, y)` under its component's exact or bucketed semantics. */
 internal fun FlatZincCompiler.emitFloatAbs(c: FznConstraint) {
     expectArity(c, 2)
     val xRef = resolveFloatVarOrConst(c.args[0])
@@ -426,28 +426,11 @@ internal fun FlatZincCompiler.emitFloatAbs(c: FznConstraint) {
         factors.add(com.eignex.klause.factor.arithmetic.RealAbs(x.varId, y.varId))
         return
     }
-    val stepX = if (x.buckets > 1) (x.hi - x.lo) / (x.buckets - 1) else 0.0
-    val stepY = if (y.buckets > 1) (y.hi - y.lo) / (y.buckets - 1) else 0.0
-    val rows = LongArrayList(x.buckets * 2)
-    val tolerance = 0.5
-    for (ix in 0 until x.buckets) {
-        val vy = abs(x.lo + ix * stepX)
-        if (vy < y.lo - stepY * tolerance || vy > y.hi + stepY * tolerance) continue
-        val iy = if (stepY == 0.0) {
-            0
-        } else {
-            ((vy - y.lo) / stepY).let {
-                val rounded = round(it).toInt()
-                if (abs(it - rounded) > tolerance) return@let -1
-                rounded
-            }
-        }
-        if (iy < 0 || iy >= y.buckets) continue
-        rows.add(ix.toLong())
-        rows.add(iy.toLong())
-    }
-    if (rows.isEmpty()) failHere("float_abs: not representable under the current float bucketing")
-    factors.add(Table(intArrayOf(x.varId, y.varId), rows.toLongArray()))
+    val relation = com.eignex.klause.factor.arithmetic.GridAbs(
+        x.varId, y.varId, x.lo, x.hi, x.buckets, y.lo, y.hi, y.buckets,
+    )
+    if (!relation.hasImage) failHere("float_abs: not representable under the current float bucketing")
+    factors.add(relation)
 }
 
 /** Lower `array_float_element(idx, arr, x)` (`x = arr[idx]`, 1-based, `arr` a float-constant array)
