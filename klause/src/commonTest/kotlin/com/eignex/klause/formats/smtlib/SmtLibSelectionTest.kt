@@ -68,6 +68,20 @@ class SmtLibSelectionTest {
     }
 
     @Test
+    fun `wide constants remain exact beside an open conditional branch`() {
+        val magnitude = "18446744073709551623"
+        val parsed = SmtLib.parse("""
+            (declare-const b Bool) (declare-const x Int) (declare-const y Int)
+            (assert b) (assert (= y (ite b $magnitude x)))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        assertEquals(magnitude, assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+            .intValue(parsed.intVarNames.getValue("y")))
+    }
+
+    @Test
     fun `wide conditional digits share one source condition`() {
         val magnitude = "18446744073709551623"
         for (branch in listOf(true, false)) {
