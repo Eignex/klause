@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack.lp
 
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -12,6 +13,8 @@ import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
@@ -248,11 +251,46 @@ class LpBoundingLbTreeSearchTest {
         engine(problem, objective).use { parent ->
             assertNull(parent.lbTreeSearch(objective, Cancellation { cancelled }, complete = { _, _, _ ->
                 cancelled = true
-                com.eignex.klause.lp.relaxation.LeafRealResult(
-                    com.eignex.klause.lp.engine.LpVerdict.TOLERANCE_OPTIMUM, doubleArrayOf(0.0))
+                LeafRealResult(
+                    LpVerdict.TOLERANCE_OPTIMUM, doubleArrayOf(0.0))
             }, toleranceCheck = { true }))
             assertTrue(parent.totalSolveWork() > 0L)
             assertTrue(parent.primalPropagationWork > 0L)
+        }
+    }
+
+    @Test
+    fun `a nonlinear real leaf declines numerical completion`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(ContinuousProduct(0, 1, 2)),
+            numRealVars = 3, realLower = doubleArrayOf(0.0, 0.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0, 1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+
+        engine(problem, objective).use { parent ->
+            assertNull(parent.lbTreeSearch(objective, Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `fractional alternatives retain a completed mixed cover under source assumptions`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1)),
+            numRealVars = 1, realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.5))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1),
+            constant = 3L, realCoefficients = doubleArrayOf(0.5))
+
+        for (assumptions in listOf(Assumptions.None, Assumptions.None.withInt(0, 0L))) {
+            val sample = engine(problem, objective).use {
+                assertNotNull(it.lbTreeSearch(objective, Cancellation.Never, assumptions)).sample
+            }
+
+            assertEquals(5.25, objective.evaluate(sample))
+            assertEquals(0.5, sample.reals.single())
+            assertTrue(sample.ints[0] + sample.ints[1] >= 1L)
+            assertTrue(sample.ints[1] + sample.ints[2] >= 1L)
+            assertTrue(sample.ints[0] + sample.ints[2] >= 1L)
+            if (assumptions != Assumptions.None) assertEquals(0L, sample.ints[0])
         }
     }
 
