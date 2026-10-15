@@ -518,7 +518,9 @@ the original certificate had a finite supporting endpoint. Node bounding supplie
 narrowed integral columns as ordering hints, including when mixed relaxations are
 rebuilt without a bound trail. Mixed-row feasibility certificates also provide
 integer domain bounds without an incumbent. Interval reasons exclude the target's own
-endpoint and retain all supporting row and bound premises. Optional integer-residue
+endpoint and retain all supporting row and bound premises. Singleton-continuous
+row pairs can cancel their shared continuous term before projection; their reasons
+include both row scopes and each supporting logical endpoint. Optional integer-residue
 checks retain both real interval sides and the prior target endpoint that delimits
 their excluded prefix or suffix. Unexpressible numerical
 scope withholds a consequence. Search-time row selection follows narrowed finite
