@@ -2,9 +2,9 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
-import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,7 +16,7 @@ class RealArrayMinMaxInvariantTest {
             val source = Problem(0, 0, emptyArray(),
                 arrayOf<Factor>(RealArrayMinMax(0, intArrayOf(0, 1, 0), max)),
                 numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(4.0, 4.0))
-            val state = LocalSearchState(source.bake(), Random(0))
+            val state = LocalSearchState(LocalSearchModel.open(source), Random(0))
             state.assignment.setReal(0, if (max) 1.0 else 3.0)
             state.assignment.setReal(1, 2.0)
             state.recompute()

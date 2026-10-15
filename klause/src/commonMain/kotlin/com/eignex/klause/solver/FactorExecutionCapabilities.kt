@@ -130,7 +130,8 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     -> filteringRelaxation
     is ComparisonClause, is Xor, is LexLess, is Sort -> finiteFiltering
     is RealElement -> realArithmetic.copy(propagation = PropagationCapability.BOUNDS_FILTERING, inertReason = null)
-    is RealAbs, is RealProduct, is RealArrayMinMax, is ReifiedRealLinear -> realArithmetic
+    is RealArrayMinMax -> realArithmetic.copy(propagation = PropagationCapability.UNSUPPORTED, inertReason = null)
+    is RealAbs, is RealProduct, is ReifiedRealLinear -> realArithmetic
     is ContinuousProduct -> realArithmetic.copy(relaxation = RelaxationCapability.NONE)
     is ObjectiveBoundFactor -> objectiveOverlay
     is GaussianXor, is DifferenceSystem -> redundantRows

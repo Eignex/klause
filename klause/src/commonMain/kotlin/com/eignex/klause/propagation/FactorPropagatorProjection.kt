@@ -130,7 +130,7 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is PseudoBoolean -> PseudoBooleanPropagator(boolVars, intVars, weights, literals, op, bound)
 
-    is RealAbs, is RealArrayMinMax -> NoPropagator
+    is RealAbs -> NoPropagator
 
     is RealProduct, is ContinuousProduct -> NoPropagator
     is RealElement -> RealElementPropagator(this)
