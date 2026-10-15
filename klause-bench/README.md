@@ -1618,6 +1618,25 @@ live field read, complete root census or compiler saving.
 Input is bounded at 8 MiB, output review records at 32 MiB, type chains at
 32 records, and the parent allows 60 seconds. Partial reports remain failures.
 
+`com.eignex.klause.bench.profile.NativeVmDwarfLayoutReview` accepts `context=`,
+`context-sha256=`, `layout=` and `layout-sha256=`. Both saved inputs are retained
+byte for byte before review. It accepts the pinned context-reader pair and one
+original hash-bound exported-layout capture from the same JVM library. Context
+input is bounded at 64 MiB, exported metadata at 1 MiB and output at 32 MiB;
+the parent allows 60 seconds. This profile loads no native library.
+
+The review retains all type/function/inline candidates and compares every retained
+non-declaration of global `CompileTask`. Its size and five exported anchors must
+agree with the independent metadata. Requested members must belong directly to
+that owner and match the pinned source header path, declaration line and compiled
+storage type. Signed integer widths come from the exported primitive type;
+pointer widths must be explicit in both records and the `Method` target resolved.
+Bit fields, overlapping declared fields, incomplete unit coverage, name errors,
+duplicate exports, unknown parents and conflicting definitions prevent proof.
+Concordance is limited to the pinned library/debug files and selected compiler
+units. Entry calling convention and private-field-read authorization remain false;
+layout concordance supplies no live read, complete root census or compiler saving.
+
 ### Native executable entry bytes
 
 `com.eignex.klause.bench.profile.NativeVmEntryVerification` retains bytes for the
