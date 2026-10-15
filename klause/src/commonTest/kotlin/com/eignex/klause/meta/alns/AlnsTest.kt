@@ -3,11 +3,13 @@ package com.eignex.klause.meta.alns
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.AcceptanceCriterion
@@ -25,13 +27,16 @@ import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.random.Random
@@ -87,6 +92,47 @@ class AlnsTest {
     }
 
     @Test
+    fun `a mixed seed reaches an improving exact source witness through neighborhood repair`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
+            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0))
+        val seed = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0), listOf(BigFraction.ONE))
+        for (shared in listOf(false, true)) {
+            val exchange = IncumbentExchange.minimizing<Sample>().apply { offer(seed, 10.0) }
+            val alns = Alns(
+                inner = NoFeasibleLs(problem),
+                backtrack = BacktrackSolver(problem),
+                backtrackParams = BacktrackParams(randomSeed = 3),
+                pooledIncumbents = exchange.takeIf { shared },
+                repairOperators = listOf(BacktrackRepair(maxDecisions = 8)),
+                minDestroyFraction = 1.0,
+                maxDestroyFraction = 1.0,
+                maxIterations = 1,
+                flipsPerIteration = 8,
+                rng = Random(3),
+            )
+            val incumbents = mutableListOf<Double>()
+            val handle = assertIs<InstructionSlicedSearch>(alns.resumable(objective, LocalSearchParams(
+                initialAssignment = seed.takeUnless { shared }, maxInstructions = 8,
+            )))
+
+            val result = handle.use {
+                assertNotNull(it.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 8) { found ->
+                    incumbents += objective.evaluate(found.sample)
+                })
+            }
+
+            val sample = assertNotNull(result.assignment)
+            assertEquals(listOf(10.0, 1.0), incumbents)
+            assertEquals(BigFraction.ONE, objective.evaluateExact(sample))
+            assertIs<Verification.Accepted<*, *>>(finiteWitnessVerifier(problem, objective).verify(Candidate(sample, 1.0)))
+            assertEquals(0L, result.stats.alns.bootstrapCpNodes)
+            assertEquals(8L, result.stats.alns.outerAllowance)
+        }
+    }
+
+    @Test
     fun `an incumbent arriving between slices releases both bootstrap handles before repair`() {
         val problem = selectProblem()
         val exchange = IncumbentExchange.minimizing<Sample>()
@@ -97,7 +143,7 @@ class AlnsTest {
         var repairs = 0
         val cp = object : ResumableSearch {
             override val isDone: Boolean get() = false
-            override val stats: SolveStats get() = SolveStats(search = SearchStats(nodes = SumResult(13.0)))
+            override val stats: SolveStats get() = SolveStats(search = SearchStats(nodes = SumResult(13.0 + cpCloses)))
             override fun runSlice(
                 global: Cancellation,
                 sliceMillis: Long,
@@ -107,7 +153,7 @@ class AlnsTest {
             override fun close() { cpCloses++ }
         }
         val ls = object : ResumableSearch by cp {
-            override val stats: SolveStats get() = SolveStats(ls = LocalSearchStats(moves = SumResult(7.0)))
+            override val stats: SolveStats get() = SolveStats(ls = LocalSearchStats(moves = SumResult(7.0 + lsCloses)))
             override fun runSlice(
                 global: Cancellation,
                 sliceMillis: Long,
@@ -157,8 +203,8 @@ class AlnsTest {
         assertEquals(1, cpCloses)
         assertEquals(1, lsCloses)
         assertEquals(1, repairs)
-        assertEquals(13L, result.stats.alns.bootstrapCpNodes)
-        assertEquals(7L, result.stats.alns.bootstrapLsMoves)
+        assertEquals(14L, result.stats.alns.bootstrapCpNodes)
+        assertEquals(8L, result.stats.alns.bootstrapLsMoves)
         assertEquals(150L, handle.chargedInstructions)
         assertEquals(50L, result.stats.alns.outerAllowance)
     }
