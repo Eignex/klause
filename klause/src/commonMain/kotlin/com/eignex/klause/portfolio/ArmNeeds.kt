@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
@@ -40,6 +41,7 @@ internal class ProblemFacts(
     val continuousObjective: Boolean = false,
     val integerLinear: Boolean = false,
     val booleanObjective: Boolean = false,
+    val circuit: Boolean = false,
     private val relaxation: (LpEmphasis) -> Boolean,
 ) {
     private val relaxations = HashMap<LpEmphasis, Boolean>()
@@ -74,6 +76,7 @@ internal class ProblemFacts(
                 CoreGuidedSearch.eligible(problem, it) &&
                     it.boolWeightValues.any { weight -> weight != 0L }
             } == true,
+            circuit = problem.factors.any { it is Circuit },
             relaxation = { emphasis ->
                 LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
             },
