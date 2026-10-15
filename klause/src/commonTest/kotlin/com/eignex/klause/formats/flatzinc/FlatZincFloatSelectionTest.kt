@@ -45,7 +45,7 @@ class FlatZincFloatSelectionTest {
 
         val value = program.floatVarsByName.getValue("x")
         assertTrue(value.lpOnly)
-        assertEquals(0.375, assertIs<SolveResult.Sat>(result).assignment.realValue(value.varId))
+        assertEquals(0.375, assertIs<SolveResult.Sat>(result).assignment.reals[value.varId])
         assertEquals(1, program.problem.factors.filterIsInstance<RealElement>().size)
     }
 

@@ -49,7 +49,7 @@ class RealElementTest {
 
         val result = BacktrackSolver(source.bake()).solve(BacktrackParams(randomSeed = 0))
 
-        assertEquals(2.5, assertIs<SolveResult.Sat>(result).assignment.realValue(0))
+        assertEquals(2.5, assertIs<SolveResult.Sat>(result).assignment.reals[0])
     }
 
     @Test
@@ -72,7 +72,7 @@ class RealElementTest {
 
         val result = BacktrackSolver(source.bake()).solve(BacktrackParams(randomSeed = 0))
 
-        assertEquals(3.0, assertIs<SolveResult.Sat>(result).assignment.realValue(1))
+        assertEquals(3.0, assertIs<SolveResult.Sat>(result).assignment.reals[1])
     }
 
     @Test
