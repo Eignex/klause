@@ -322,6 +322,15 @@ control owner. Source strategies charge polynomial installation against their na
 installer entry. Caller meters receive construction and execution charges once;
 runtime polynomial counters remain distinct from source construction work. Successfully installed relations can be reused without retaining the
 construction token; rewritten or conditioned relations receive their current controls.
+Component planning charges one consultation unit to the same containing token before
+reusing each completed full-source target installation. Its ordered-subset size check
+does not scan or copy installed relations. Earlier installation charges remain spent;
+skipped repeated construction incurs no construction charge. An initial target's resource
+decline disables reuse in that call; fresh installation retains per-target decline and
+fallback semantics. Cancellation observed by a reuse consultation stops the remaining
+target preparation and retains an explicit resource cause even if a predicate token
+subsequently clears. Reuse cannot bypass the containing stop or transfer an installation
+between linear and difference targets.
 
 The exact-linear source factory charges factor, row and coefficient visits to its
 supplied cancellation meter. Exact rational row conversion and owned-buffer copies
