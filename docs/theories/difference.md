@@ -106,6 +106,12 @@ Boolean guards can be negated into a shared explanation. Missing explanation
 coverage retains chronological conflict handling rather than inventing a clause.
 A stopped graph check is indeterminate.
 
+Integer cycle explanations negate every active signed guard in a checked cycle
+of immutable source edges. Unconditional source rows and declared bounds require
+no Boolean premise. A cycle containing a transient shared integer bound retains
+chronological conflict handling because that bound has no captured Boolean reason.
+The immutable source edge prefix is preserved when invocation bounds are appended.
+
 Objective admission is separate from graph feasibility. The open minimizer must
 keep every improving cutoff within a supported theory; an arbitrary linear
 objective can leave the difference fragment. [Input semantics](../formats.md)
