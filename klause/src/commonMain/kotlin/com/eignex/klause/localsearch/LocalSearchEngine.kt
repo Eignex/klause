@@ -837,7 +837,7 @@ internal class LocalSearchEngine(
                     cancelCountdown = 0
                 }
             }
-            if (state.cost == 0L || pendingCompletedMove) {
+            if (state.cost == 0L || liveCompletion is Completion.Witness) {
                 pendingCompletedMove = false
                 // Each descent step is O(numVars); the once-per-CANCEL_CHECK_INTERVAL throttle above
                 // is too coarse to keep the optimize phase deadline-responsive. One extra poll per

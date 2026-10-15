@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
@@ -939,7 +940,7 @@ class LocalSearchEngineTest {
 
     @Test
     fun `numerical completion improves the original mixed MPS objective`() {
-        val source = Mps.parse(
+        val parsed = Mps.parse(
             """
             NAME FIXEDCOST
             ROWS
@@ -958,23 +959,26 @@ class LocalSearchEngineTest {
              UP BND X 1
             ENDATA
             """.trimIndent(),
-        ).toProblem()
-        val objective = checkNotNull(source.objective).toLinearObjective()
-        val search = LocalSearchEngine(
-            LocalSearchModel.of(source.model.bake()), greedyRepairOnRestart = false,
-            completion = LeafRealCompletion(source.model, objective),
         )
-        val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))
+        for (source in listOf(parsed.toProblem(), parsed.toExactSourceProblem())) {
+            val objective = checkNotNull(source.objective).toLinearObjective()
+            val search = LocalSearchEngine(
+                LocalSearchModel.of(source.model.bake()), greedyRepairOnRestart = false,
+                completion = LeafRealCompletion(source.model, objective),
+            )
+            val coordinates = DoubleArray(source.model.numRealVars) { if (it == 0) 1.0 else 10.0 }
+            val initial = Sample(BooleanArray(0), longArrayOf(0), coordinates)
 
-        val result = search.improvements(
-            objective, LocalSearchParams(maxInstructions = 20, randomSeed = 3, initialAssignment = initial), null,
-        ).last()
+            val result = search.improvements(
+                objective, LocalSearchParams(maxInstructions = 5, randomSeed = 3, initialAssignment = initial), null,
+            ).last()
 
-        val best = assertIs<MinimizeResult.BestFound>(result)
-        val checked = source.sourceWitness(best.sample.ints, best.sample.exactReals)
-        assertEquals(BigFraction.ofLong(10), source.sourceWitness(initial.ints, listOf(BigFraction.ONE)).objective)
-        assertEquals(BigFraction.ONE, checked.objective)
-        assertEquals(listOf(BigFraction.ONE, BigFraction.ZERO), checked.values)
+            val best = assertIs<MinimizeResult.BestFound>(result)
+            val checked = source.sourceWitness(best.sample.ints, best.sample.exactReals)
+            assertEquals(BigFraction.ofLong(10), source.sourceWitness(initial.ints, listOf(BigFraction.ONE)).objective)
+            assertEquals(BigFraction.ONE, checked.objective)
+            assertEquals(listOf(BigFraction.ONE, BigFraction.ZERO), checked.values)
+        }
     }
 
     @Test
@@ -1053,6 +1057,25 @@ class LocalSearchEngineTest {
         assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
         assertTrue(budget.exhausted())
         assertEquals(2, calls)
+    }
+
+    @Test
+    fun `continuous move exploration preserves finite invocation pins`() {
+        val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
+        val candidates = mutableListOf<Long>()
+        val search = engine { candidate, _ ->
+            candidates += candidate.intValue(0)
+            Completion.Witness(candidate)
+        }
+
+        val result = search.improvements(
+            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+            LocalSearchParams(maxInstructions = 3, initialAssignment = initial,
+                assumptions = Assumptions(ints = mapOf(0 to 2L))), null,
+        ).last()
+
+        assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
+        assertEquals(listOf(2L), candidates)
     }
 
     @Test

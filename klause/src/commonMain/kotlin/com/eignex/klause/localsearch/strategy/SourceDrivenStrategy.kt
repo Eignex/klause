@@ -193,7 +193,7 @@ class SourceDrivenStrategy(
         for (cs in sources) {
             if (!cs.enabled) continue
             if (cs.stallGated && !stalled) continue
-            if (!cs.effectivePhase.appliesAt(state.cost)) continue
+            if (!cs.effectivePhase.appliesAt(if (evaluation == null) state.cost else 0L)) continue
             val sink = if (cs.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
             val closure = state.booleanRepairs
             if (closure == null) {
@@ -262,7 +262,7 @@ class SourceDrivenStrategy(
         val effectiveAcceptance = when {
             // Feasible phase: descend the objective with the strategy's own feasible-phase acceptance
             // (CBLS: strict-improvement greedy) instead of the noisy feasibility-fight acceptance.
-            state.cost == 0L && feasibleAcceptance != null -> feasibleAcceptance
+            (state.cost == 0L || evaluation != null) && feasibleAcceptance != null -> feasibleAcceptance
 
             noiseSchedule != null && (noiseMoves.isNotEmpty() || scoreMoves.isNotEmpty()) -> {
                 if (stall == null) noiseSchedule.observe(state.cost)

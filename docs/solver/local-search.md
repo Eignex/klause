@@ -653,7 +653,9 @@ and source scope rather than substituting the local-search score for a witness c
 
 Self-owned optimization with finite and continuous coordinates admits at most two
 completion probes per pick after source generation and configuration filtering. One
-probe follows the best raw score; the other explores a rotating proposal. A rotating
+probe follows the best raw score. If that productive raw direction completes to an
+improvement, selection retains it without another numerical query. Otherwise a second
+probe explores a rotating proposal. A rotating
 finite coordinate touching a continuous factor also offers a channeling-aware flip,
 neighbor or domain endpoint, including directions whose direct objective cost rises.
 Raw feasibility and objective deltas order probes without rejecting that exploration.
@@ -665,6 +667,8 @@ the original objective on completed samples, and improving tabu aspiration uses 
 comparison. The recipe retains its acceptance, configuration, schedule and restart
 policies. A selected finite move and completed reals commit as one compound transition;
 its authoritative sample is retained for publication without repeating completion.
+An accepted source completion supplies feasible-phase authority even when floating
+row scores retain a residual; source tolerance does not become an exact proof.
 Reverted probes preserve assignment, definitions, costs, configuration and activity.
 Failed, canceled or undecided attempts cannot replace an incumbent. Finite-only,
 continuous-only and ratchet recipes retain their existing move selection. A completed
