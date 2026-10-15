@@ -1065,11 +1065,17 @@ requested revisions do not establish the historical process's runtime identity.
 `com.eignex.klause.bench.profile.MpsLinearProof` accepts original MPS paths and captures the
 ordinary exact-source optimization result, original coordinate mapping, rows and derivation.
 It runs [verify_mps_linear_proof.py](tools/verify_mps_linear_proof.py) in a separate Python
-process using only standard-library exact fractions. The checker parses original unguarded
+process using only standard-library exact fractions. The checker parses original
 linear MPS bytes, checks every captured premise against source rows or integral declarations,
 eliminates an exact objective auxiliary, and validates nonnegative dual combinations,
 integer branch coverage or an integral improving recession step. Unsupported source features
 and missing derivations fail closed. This checks mathematical claims rather than timings.
+Conditional rows retain optional `integerPins` maps from original `Integer/id` coordinates
+to exact integer strings. A cited pin must follow from original singleton bounds and the
+current exhaustive integer branches; an incumbent cannot authorize a guarded global bound.
+Witnesses check the original indicator implications. Guarded recession steps require fixed
+guard coordinates and the enabled rows' recession signs. Capturing an unsupported producer
+derivation remains unavailable.
 The self-authored inputs in `smoke-corpus/linear-authority` cover a constant objective,
 a coupled integral/real ray, an objective coefficient beyond binary64 precision and
 an integer gap requiring exhaustive split coverage. Separate incumbent/value and

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Check captured affine MPS proofs against original bytes using only exact fractions.
 
-Accepts unguarded linear MPS sources, nonnegative row combinations, integer split
-coverage and integral recession steps. Unsupported sources or derivations fail closed.
+Accepts linear MPS sources with integer indicators, nonnegative row combinations,
+scoped integer split coverage and integral recession steps with fixed guards.
+Unsupported sources or derivations fail closed.
 No Klause arithmetic, parser or proof checker is imported.
 """
 
@@ -31,7 +32,7 @@ def add(left, right, scale=F(1)):
 
 def parse_mps(text):
     section, cost, maximize, marker = None, None, False, False
-    rows, coefficients, rhs, ranges, lower, upper = {}, {}, {}, {}, {}, {}
+    rows, coefficients, rhs, ranges, lower, upper, indicators = {}, {}, {}, {}, {}, {}, {}
     columns, integers, vectors = set(), set(), {}
     for raw in text.splitlines():
         parts = raw.split()
@@ -39,8 +40,10 @@ def parse_mps(text):
             continue
         if raw[0] not in " \t":
             section = parts[0]
-            assert section in {"NAME", "ROWS", "COLUMNS", "RHS", "RANGES", "BOUNDS", "OBJSENSE", "ENDATA"}
+            assert section in {"NAME", "ROWS", "COLUMNS", "RHS", "RANGES", "BOUNDS", "INDICATORS", "OBJSENSE", "ENDATA"}
             assert section == "NAME" or len(parts) == 1
+            if section == "ENDATA":
+                break
             continue
         if section == "OBJSENSE":
             assert parts[0] in {"MIN", "MAX", "MINIMIZE", "MAXIMIZE"}
@@ -102,10 +105,17 @@ def parse_mps(text):
                 raise ValueError(f"unsupported bound {kind}")
             if kind in {"LI", "UI"}:
                 integers.add(column)
+        elif section == "INDICATORS":
+            assert len(parts) == 4 and parts[0] == "IF" and parts[3] in {"0", "1"}
+            _, row, column, trigger = parts
+            assert row not in indicators
+            indicators[row] = column, number(trigger)
         else:
             raise ValueError(f"unsupported section {section}")
     assert cost is not None and all(row in rows for row in coefficients)
-    constraints, rounded = [], []
+    assert all(row in rows and rows[row] != "N" and column in columns and column in integers
+               for row, (column, _) in indicators.items())
+    constraints, rounded, conditional = [], [], []
     for column in columns:
         lo, hi = lower.get(column, F(0)), upper.get(column)
         if column in integers and column not in lower and column not in upper:
@@ -122,17 +132,23 @@ def parse_mps(text):
         if kind == "N":
             continue
         terms, bound, span = clean(coefficients.get(row, {})), rhs.get(row, F(0)), ranges.get(row)
+        sides = []
         if kind in "EG":
             side = bound + (span if kind == "E" and span is not None and span < 0 else 0)
-            constraints.append(({k: -v for k, v in terms.items()}, -side))
+            sides.append(({k: -v for k, v in terms.items()}, -side))
         if kind in "EL":
             side = bound + (span if kind == "E" and span is not None and span > 0 else 0)
-            constraints.append((terms, side))
+            sides.append((terms, side))
         if span is not None and kind == "L":
-            constraints.append(({k: -v for k, v in terms.items()}, -(bound - abs(span))))
+            sides.append(({k: -v for k, v in terms.items()}, -(bound - abs(span))))
         if span is not None and kind == "G":
-            constraints.append((terms, bound + abs(span)))
-    return columns, integers, constraints, rounded, clean(coefficients.get(cost, {})), -rhs.get(cost, F(0)), maximize
+            sides.append((terms, bound + abs(span)))
+        if row in indicators:
+            conditional.extend((side, indicators[row]) for side in sides)
+        else:
+            constraints.extend(sides)
+    return (columns, integers, constraints, rounded, clean(coefficients.get(cost, {})),
+            -rhs.get(cost, F(0)), maximize, conditional)
 
 
 def multiple(row, original):
@@ -149,7 +165,7 @@ def multiple(row, original):
 
 def verify(source, record):
     assert record["sourceSHA256"] == hashlib.sha256(source).hexdigest()
-    names, integers, constraints, rounded, objective, constant, maximize = parse_mps(source.decode())
+    names, integers, constraints, rounded, objective, constant, maximize, conditional = parse_mps(source.decode())
     mapping = record["columns"]
     assert set(mapping) == names and len(set(mapping.values())) == len(mapping)
     assert all(mapping[name].startswith("Integer/" if name in integers else "Real/") for name in names)
@@ -174,20 +190,62 @@ def verify(source, record):
 
     cost_terms, cost_rhs = expand(captured_objective, -number(record["constant"]))
     assert cost_terms == objective and cost_rhs == -constant and record["maximize"] == maximize
-    rows = {}
+    rows, row_pins = {}, {}
     for row_id, row in record["rows"].items():
         terms = clean({k: number(v) for k, v in row["coefficients"].items()})
         bound = number(row["rhs"])
         expanded, rhs = expand(terms, bound)
-        assert (not expanded and rhs >= 0) or any(multiple((expanded, rhs), original)
-                                                     for original in constraints + rounded), row_id
+        raw_pins = row.get("integerPins", {})
+        assert isinstance(raw_pins, dict)
+        pins = {}
+        for coordinate, value in raw_pins.items():
+            assert coordinate in inverse and inverse[coordinate] in integers and isinstance(value, str)
+            pins[coordinate] = number(value)
+            assert pins[coordinate].denominator == 1
+        unconditional = (not expanded and rhs >= 0) or any(
+            multiple((expanded, rhs), original) for original in constraints + rounded)
+        guarded = any(multiple((expanded, rhs), original) and pins.get(mapping[column]) == trigger
+                      for original, (column, trigger) in conditional)
+        assert unconditional or guarded, row_id
         rows[row_id] = terms, bound
+        row_pins[row_id] = pins
+
+    source_bounds = {}
+    for terms, rhs in constraints + rounded:
+        if len(terms) != 1:
+            continue
+        name, coefficient = next(iter(terms.items()))
+        if name not in integers:
+            continue
+        upper = coefficient > 0
+        bound = rhs / coefficient
+        bound = F(math.floor(bound) if upper else math.ceil(bound))
+        key = name, upper
+        previous = source_bounds.get(key)
+        if previous is None or (bound < previous if upper else bound > previous):
+            source_bounds[key] = bound
+
+    def pins_hold(pins, assumptions):
+        for coordinate, value in pins.items():
+            sides = {}
+            for upper in (False, True):
+                bound = source_bounds.get((inverse[coordinate], upper))
+                assumption = assumptions.get((coordinate, upper))
+                if assumption is not None:
+                    scoped = assumption[1] if upper else -assumption[1]
+                    if bound is None or (scoped < bound if upper else scoped > bound):
+                        bound = scoped
+                sides[upper] = bound
+            if sides[False] is None or sides[True] is None or sides[False] < value or sides[True] > value:
+                return False
+        return True
 
     def check_point(point):
         values = {name: number(point[coordinate]) for name, coordinate in mapping.items()}
         assert all(values[name].denominator == 1 for name in integers)
+        active = [row for row, (column, trigger) in conditional if values[column] == trigger]
         assert all(sum(value * values[name] for name, value in terms.items()) <= rhs
-                   for terms, rhs in constraints)
+                   for terms, rhs in constraints + active)
         source_value = constant + sum(value * values[name] for name, value in objective.items())
         if auxiliary:
             assert number(point[auxiliary]) == source_value
@@ -217,6 +275,7 @@ def verify(source, record):
             assert steps <= 100_000 and depth <= 128
             kind, *args = proof
             if kind == "row":
+                assert pins_hold(row_pins[args[0]], assumptions), args[0]
                 return rows[args[0]]
             if kind == "assume":
                 return assumptions[args[0], args[1]]
@@ -229,6 +288,14 @@ def verify(source, record):
                 terms, rhs = add(terms, coefficients, weight), rhs + weight * bound
             return terms, rhs
 
+        def with_bound(assumptions, coordinate, upper, rhs):
+            result = assumptions.copy()
+            key = coordinate, upper
+            previous = result.get(key)
+            if previous is None or rhs < previous[1]:
+                result[key] = {coordinate: F(1) if upper else F(-1)}, rhs
+            return result
+
         def coverage(proof, assumptions, depth=0):
             nonlocal steps
             steps += 1
@@ -238,8 +305,8 @@ def verify(source, record):
                 assert coordinate in inverse and inverse[coordinate] in integers
                 threshold = number(threshold)
                 assert threshold.denominator == 1
-                coverage(below, {**assumptions, (coordinate, True): ({coordinate: F(1)}, threshold)}, depth + 1)
-                coverage(above, {**assumptions, (coordinate, False): ({coordinate: F(-1)}, -threshold - 1)}, depth + 1)
+                coverage(below, with_bound(assumptions, coordinate, True, threshold), depth + 1)
+                coverage(above, with_bound(assumptions, coordinate, False, -threshold - 1), depth + 1)
             else:
                 coefficients, rhs = derive(proof, assumptions)
                 assert (not coefficients and rhs < 0) or (target is not None and coefficients == target[0] and rhs <= target[1])
@@ -250,7 +317,10 @@ def verify(source, record):
         direction = {name: number(record["ray"].get(coordinate, 0)) for name, coordinate in mapping.items()}
         assert set(record["ray"]) <= set(inverse) | extra
         assert all(direction[name].denominator == 1 for name in integers)
-        assert all(sum(value * direction[name] for name, value in terms.items()) <= 0 for terms, _ in constraints)
+        assert all(direction[column] == 0 for _, (column, _) in conditional)
+        active = [row for row, (column, trigger) in conditional if number(point[mapping[column]]) == trigger]
+        assert all(sum(value * direction[name] for name, value in terms.items()) <= 0
+                   for terms, _ in constraints + active)
         improvement = sum(value * direction[name] for name, value in objective.items())
         assert improvement > 0 if maximize else improvement < 0
         if auxiliary:
@@ -268,7 +338,7 @@ def verify(source, record):
     if global_bound is not None:
         check_proof(global_proof, number(global_bound))
     return {"sourceSHA256": record["sourceSHA256"], "claim": record["kind"], "checked": True,
-            "checker": "mps-linear-fraction-v2", "globalBound": global_bound}
+            "checker": "mps-linear-fraction-v3", "globalBound": global_bound}
 
 
 if __name__ == "__main__":
