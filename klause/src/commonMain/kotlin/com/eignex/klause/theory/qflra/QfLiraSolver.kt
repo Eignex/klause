@@ -195,6 +195,8 @@ class ExactLiraSearchComponent private constructor(
     private val hasPrivateReals = sourceRealCount != model.numRealVars
     private var smtStats: SmtStatsSink? = null
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
+    private var unassignedBooleans = model.numBoolVars
+    private var completeTraversalObserved = false
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
     private val root = SearchNode()
     private val disjunctionAtoms = HashMap<Int, List<DisjunctAtom>>()
@@ -284,6 +286,12 @@ class ExactLiraSearchComponent private constructor(
 
     internal fun observeWith(stats: SmtStatsSink) {
         smtStats = stats
+    }
+
+    internal fun observeCompleteTraversal() {
+        check(context == null && !completeTraversalObserved)
+        completeTraversalObserved = true
+        smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
     }
 
     internal fun partialPointHints(
@@ -721,6 +729,10 @@ class ExactLiraSearchComponent private constructor(
         when (decision) {
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
+                if (completeTraversalObserved && bools[variable] == UNASSIGNED) {
+                    unassignedBooleans--
+                    smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
+                }
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
                 node = node.copy(
@@ -1003,6 +1015,8 @@ class ExactLiraSearchComponent private constructor(
             return ComponentResult.Indeterminate
         }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
+        val partial = bools.any { it == UNASSIGNED }
+        if (completeTraversalObserved && !partial) smtStats?.observeCompleteSearchLinearCheck()
         val result = lp.solve(sparsePointRecovery = true)
             ?: return ComponentResult.Indeterminate
         if (operationStop()) return ComponentResult.Indeterminate
@@ -1014,7 +1028,8 @@ class ExactLiraSearchComponent private constructor(
             outcome = ComponentCheck.Infeasible(explanation)
             return ComponentResult.Conflict(explanation)
         }
-        if (bools.any { it == UNASSIGNED }) candidate?.let { capturePointHints(it, context) }
+        if (completeTraversalObserved && !partial && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
+        if (partial) candidate?.let { capturePointHints(it, context) }
         if (operationStop()) return ComponentResult.Indeterminate
         captureCompleteWitness(candidate)
         // Source integer branching requires an independently checked continuous witness.
@@ -1237,6 +1252,7 @@ class ExactLiraSearchComponent private constructor(
         }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
+                if (completeTraversalObserved) unassignedBooleans++
                 bools[variable] = UNASSIGNED
                 boolLevels[variable] = -1
             }

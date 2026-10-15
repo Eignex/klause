@@ -81,31 +81,52 @@ data class SmtStats(
     val lpPointHintCaptures: Long = 0L,
     /** Live default consultations that released a graph-first opening's optional hints. */
     val defaultGraphHintReleases: Long = 0L,
+    /** Compiled Boolean coordinates in the complete traversal at its smallest observed unresolved count. */
+    val completeSearchBooleanVariables: Int? = null,
+    /** Smallest unresolved compiled Boolean count observed by a complete traversal, excluding private queries. */
+    val completeSearchMinUnassignedBooleans: Int? = null,
+    /** LP attempts with every compiled Boolean assigned; null until a complete traversal is observed. */
+    val completeSearchLinearChecks: Long? = null,
+    /** Returned continuous points before source acceptance; null until a complete traversal is observed. */
+    val completeSearchLinearPoints: Long? = null,
 ) {
     /** Combine independent solve slices. */
-    fun mergedWith(other: SmtStats): SmtStats = SmtStats(
-        conflicts + other.conflicts,
-        explainedConflicts + other.explainedConflicts,
-        unexplainedConflicts + other.unexplainedConflicts,
-        conflictLiterals + other.conflictLiterals,
-        reductionRequests + other.reductionRequests,
-        reductionCacheHits + other.reductionCacheHits,
-        reductionAccepted + other.reductionAccepted,
-        reductionDeclined + other.reductionDeclined,
-        reductionNs + other.reductionNs,
-        witnessCandidates + other.witnessCandidates,
-        witnessAccepted + other.witnessAccepted,
-        strictWitnessCandidates + other.strictWitnessCandidates,
-        strictWitnessAccepted + other.strictWitnessAccepted,
-        wideWitnessCandidates + other.wideWitnessCandidates,
-        wideWitnessAccepted + other.wideWitnessAccepted,
-        continuation.mergedWith(other.continuation),
-        sourceLp.mergedWith(other.sourceLp),
-        realGraphOpenings + other.realGraphOpenings,
-        graphPointHintCaptures + other.graphPointHintCaptures,
-        lpPointHintCaptures + other.lpPointHintCaptures,
-        defaultGraphHintReleases + other.defaultGraphHintReleases,
-    )
+    fun mergedWith(other: SmtStats): SmtStats {
+        val minimum = when {
+            completeSearchMinUnassignedBooleans == null -> other
+            other.completeSearchMinUnassignedBooleans == null -> this
+            other.completeSearchMinUnassignedBooleans < completeSearchMinUnassignedBooleans -> other
+            else -> this
+        }
+        return SmtStats(
+            conflicts + other.conflicts,
+            explainedConflicts + other.explainedConflicts,
+            unexplainedConflicts + other.unexplainedConflicts,
+            conflictLiterals + other.conflictLiterals,
+            reductionRequests + other.reductionRequests,
+            reductionCacheHits + other.reductionCacheHits,
+            reductionAccepted + other.reductionAccepted,
+            reductionDeclined + other.reductionDeclined,
+            reductionNs + other.reductionNs,
+            witnessCandidates + other.witnessCandidates,
+            witnessAccepted + other.witnessAccepted,
+            strictWitnessCandidates + other.strictWitnessCandidates,
+            strictWitnessAccepted + other.strictWitnessAccepted,
+            wideWitnessCandidates + other.wideWitnessCandidates,
+            wideWitnessAccepted + other.wideWitnessAccepted,
+            continuation.mergedWith(other.continuation),
+            sourceLp.mergedWith(other.sourceLp),
+            realGraphOpenings + other.realGraphOpenings,
+            graphPointHintCaptures + other.graphPointHintCaptures,
+            lpPointHintCaptures + other.lpPointHintCaptures,
+            defaultGraphHintReleases + other.defaultGraphHintReleases,
+            minimum.completeSearchBooleanVariables, minimum.completeSearchMinUnassignedBooleans,
+            completeSearchLinearChecks?.let { it + (other.completeSearchLinearChecks ?: 0L) }
+                ?: other.completeSearchLinearChecks,
+            completeSearchLinearPoints?.let { it + (other.completeSearchLinearPoints ?: 0L) }
+                ?: other.completeSearchLinearPoints,
+        )
+    }
 }
 
 /** Mutable exact-SMT telemetry for one top-level open-theory request. */
@@ -150,6 +171,28 @@ internal class SmtStatsSink {
     private var graphPointHintCaptures = 0L
     private var lpPointHintCaptures = 0L
     private var defaultGraphHintReleases = 0L
+    private var completeSearchBooleanVariables: Int? = null
+    private var completeSearchMinUnassignedBooleans: Int? = null
+    private var completeSearchLinearChecks: Long? = null
+    private var completeSearchLinearPoints: Long? = null
+
+    fun observeCompleteSearchBooleans(variables: Int, unassigned: Int) {
+        if (completeSearchLinearChecks == null) completeSearchLinearChecks = 0L
+        if (completeSearchLinearPoints == null) completeSearchLinearPoints = 0L
+        val previous = completeSearchMinUnassignedBooleans
+        if (previous == null || unassigned < previous) {
+            completeSearchBooleanVariables = variables
+            completeSearchMinUnassignedBooleans = unassigned
+        }
+    }
+
+    fun observeCompleteSearchLinearCheck() {
+        completeSearchLinearChecks = (completeSearchLinearChecks ?: 0L) + 1L
+    }
+
+    fun observeCompleteSearchLinearPoint() {
+        completeSearchLinearPoints = (completeSearchLinearPoints ?: 0L) + 1L
+    }
 
     fun observeRealGraphOpening() {
         realGraphOpenings++
@@ -200,5 +243,7 @@ internal class SmtStatsSink {
         witnessCandidates, witnessAccepted, strictWitnessCandidates, strictWitnessAccepted,
         wideWitnessCandidates, wideWitnessAccepted, continuation, sourceLp,
         realGraphOpenings, graphPointHintCaptures, lpPointHintCaptures, defaultGraphHintReleases,
+        completeSearchBooleanVariables, completeSearchMinUnassignedBooleans,
+        completeSearchLinearChecks, completeSearchLinearPoints,
     )
 }
