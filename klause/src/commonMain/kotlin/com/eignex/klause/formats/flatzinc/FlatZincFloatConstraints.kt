@@ -351,14 +351,8 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
         emitFiniteFloatProduct(aRef, bRef, cRef)
         return
     }
-    fun coordinate(ref: FloatRef): GridCoordinate = when (ref) {
-        is FloatRef.Var -> ref.bk.let { GridCoordinate(it.varId, it.lo, it.hi, it.buckets) }
-        is FloatRef.Const -> resolveFloatElement(FznExpr.FloatLit(ref.value),
-            "__grid_product_${floatVars.size}", lpOnly = false).let {
-            GridCoordinate(it.varId, it.lo, it.hi, it.buckets)
-        }
-    }
-    factors.add(GridProduct(coordinate(aRef), coordinate(bRef), coordinate(cRef)))
+    factors.add(GridProduct(gridArithmeticCoordinate(aRef, "__grid_product"),
+        gridArithmeticCoordinate(bRef, "__grid_product"), gridArithmeticCoordinate(cRef, "__grid_product")))
 }
 
 /** Retain `float_abs(x, y)` under its component's exact or bucketed semantics. */

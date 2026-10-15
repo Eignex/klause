@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.table.Table
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -20,6 +21,14 @@ class FlatZincGridArithmeticTest {
         assertEquals(5, factor.a.buckets)
         assertFalse(program.problem.factors.any { it is Table })
         assertTrue(program.floatRepresentations.values.all { it.approximate })
+    }
+
+    @Test
+    fun `overflowing grid ranges decline with a format diagnostic`() {
+        val source = "var -1.0e308..1.0e308: x; var 0.0..1.0: y; " +
+            "constraint float_times(x, x, y); solve satisfy;"
+
+        assertFailsWith<UnsupportedFlatZincException> { parseFlatZinc(source) }
     }
 
     @Test
