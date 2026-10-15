@@ -1758,7 +1758,7 @@ class PortfolioTest {
         }
 
         assertIs<MinimizeResult.Unknown>(result)
-        assertTrue(slices[0] > 140, "complete search ran ${slices[0]} of ${slices.sum()} slices")
+        assertTrue(slices[0] > 2 * slices[1], "complete search ran ${slices[0]} of ${slices.sum()} slices")
         assertTrue(result.stats.portfolio.arms[1].credit.getValue("Violation") > 0.0)
         assertFalse(result.stats.portfolio.arms[1].credit.containsKey("FirstSolution"))
     }
@@ -1784,8 +1784,10 @@ class PortfolioTest {
                         ))
                     } else SolveStats.EMPTY
             }
-            if (arm == 2) PortfolioWorker.ofMinimize("heuristic", arm, countsInstructions = true, resumable = { handle }) {
-                _, _, _, _ -> error("the retained handle must resume")
+            if (arm == 2) {
+                PortfolioWorker.ofMinimize(
+                    "heuristic", arm, countsInstructions = true, resumable = { handle },
+                ) { _, _, _, _ -> error("the retained handle must resume") }
             } else trackingWorker("arm$arm", arm, handle)
         }
 
@@ -1874,8 +1876,10 @@ class PortfolioTest {
             }).also { it.family = ArmFamily.LocalSearch },
         )
         var checks = 0
-        val portfolio = Portfolio.thompson(workers, seed = 3L, witnessCheck = { _, _ -> checks++; null })
-            .also { it.runTimeSource = clock }
+        val portfolio = Portfolio.thompson(workers, seed = 3L, witnessCheck = { _, _ ->
+            checks++
+            null
+        }).also { it.runTimeSource = clock }
 
         val result = portfolio.use { it.minimize(Cancellation { elapsed.sum() >= 6_000L }) }
 
