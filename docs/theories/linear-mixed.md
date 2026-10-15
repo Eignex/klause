@@ -57,8 +57,10 @@ A complete worker can try witness recovery when an existing LP float point lacks
 an exact primal package. After Boolean and source disjunction choices are complete
 and every finite integer is fixed, it rounds the point's integer coordinates as
 private guesses and substitutes them into all selected source rows and current
-branch bounds. If the remaining real system is entirely a supported
-difference graph, an exact graph point can complete those guesses. The full rows,
+branch bounds. It first checks the exact IEEE real prefix and rationally reconstructed
+source reals against those rows, independently of LP auxiliary columns. If neither
+point passes and the remaining real system is entirely a supported difference graph,
+an exact graph point can complete those guesses. The full rows,
 strictness, integrality and source reconstruction still gate acceptance. Failed or
 unsupported guesses supply no conflict, bound or exhaustion claim. This path adds
 no LP solve and uses the current operation allowance; private neighborhood openings

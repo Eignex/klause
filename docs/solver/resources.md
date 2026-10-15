@@ -197,8 +197,8 @@ publishes no point, model or conflict, and optional seed storage is released eve
 when hint indexing declines.
 
 Complete mixed witness recovery uses the current exact-linear operation token for
-integer guesses, selected-row substitution, graph construction and full-row
-validation. Its difference potential query charges copied cells and conservative
+integer guesses, source-prefix reconstruction, selected-row substitution, graph
+construction and full-row validation. Its difference potential query charges copied cells and conservative
 edge-sweep and predecessor-walk batches to that same token. These nonrefundable
 batches add no allowance. An observed stop withholds the recovered point, and a
 failed guessed integer assignment supplies no source refutation.
