@@ -12,6 +12,103 @@ import read_native_vm_dwarf_records as records
 
 
 class ReadNativeVmDwarfRecordsTest(unittest.TestCase):
+    def test_lifecycle_selection_retains_additional_names_without_changing_the_default(self):
+        for selection in ['compiler', 'task-lifecycle']:
+            with self.subTest(selection=selection):
+                unit = SimpleNamespace(cu_offset=0, size=100, header={'version': 5})
+                root = SimpleNamespace(cu=unit, offset=0, tag='DW_TAG_compile_unit', has_children=True,
+                                       attributes={'DW_AT_name': SimpleNamespace(form='DW_FORM_string', value=b'compileTask.cpp', raw_value=b'compileTask.cpp', offset=0)})
+                declared = [('DW_TAG_class_type', b'CompileTask'), ('DW_TAG_class_type', b'CompileTaskWrapper'),
+                            ('DW_TAG_subprogram', b'invoke_compiler_on_method'),
+                            *[('DW_TAG_subprogram', name) for name in
+                              [b'allocate', b'initialize', b'free', b'CompileTaskWrapper', b'~CompileTaskWrapper']],
+                            ('DW_TAG_subprogram', b'unrelated')]
+                entries = [SimpleNamespace(cu=unit, offset=index, tag=tag, has_children=False,
+                                           attributes={'DW_AT_name': SimpleNamespace(form='DW_FORM_string', value=name, raw_value=name, offset=index)},
+                                           iter_children=Mock(return_value=iter([])))
+                           for index, (tag, name) in enumerate(declared, 1)]
+                unit.get_top_DIE = Mock(return_value=root)
+                unit.iter_DIEs = Mock(return_value=iter([root, *entries, SimpleNamespace(cu=unit, tag=None)]))
+                report = {}
+
+                records.inventory(SimpleNamespace(iter_CUs=Mock(return_value=iter([unit]))), report,
+                                  selection=selection)
+
+                expected = {b'CompileTask', b'invoke_compiler_on_method'}
+                if selection == 'task-lifecycle':
+                    expected |= {b'CompileTaskWrapper', b'~CompileTaskWrapper', b'allocate', b'initialize', b'free'}
+                retained = {bytes.fromhex(name['nameHex']) for row in report['selectedRecords']
+                            for name in row['nameCandidates']}
+                self.assertEqual(expected, retained)
+                self.assertEqual(selection, report['selectionPlan']['name'])
+                self.assertEqual(['compileBroker.cpp', 'compileTask.cpp', 'compilerThread.cpp', 'nmethod.cpp'],
+                                 sorted(report['requestedUnitCoverage']))
+                self.assertTrue(report['selectedUnitTraversalCompleted'])
+
+    def test_lifecycle_origins_and_inline_records_retain_declarations_children_and_errors(self):
+        unit = SimpleNamespace(cu_offset=0, size=100, header={'version': 5})
+        root = SimpleNamespace(cu=unit, offset=0, tag='DW_TAG_compile_unit', has_children=True,
+                               attributes={'DW_AT_name': SimpleNamespace(form='DW_FORM_string', value=b'compileTask.cpp', raw_value=b'compileTask.cpp', offset=0)})
+        declared = SimpleNamespace(cu=unit, offset=1, tag='DW_TAG_subprogram', has_children=False,
+                                   attributes={'DW_AT_name': SimpleNamespace(form='DW_FORM_string', value=b'free', raw_value=b'free', offset=1),
+                                               'DW_AT_declaration': SimpleNamespace(form='DW_FORM_flag', value=True, raw_value=True, offset=2)},
+                                   iter_children=Mock(return_value=iter([])))
+        concrete = SimpleNamespace(cu=unit, offset=2, tag='DW_TAG_subprogram', has_children=False,
+                                   attributes={'DW_AT_specification': SimpleNamespace(form='DW_FORM_ref4', value=1, raw_value=1, offset=3)},
+                                   get_DIE_from_attribute=Mock(return_value=declared), iter_children=Mock(return_value=iter([])))
+        inline = SimpleNamespace(cu=unit, offset=3, tag='DW_TAG_inlined_subroutine', has_children=True,
+                                 attributes={'DW_AT_abstract_origin': SimpleNamespace(form='DW_FORM_ref4', value=1, raw_value=1, offset=4)},
+                                 get_DIE_from_attribute=Mock(return_value=declared))
+        child = SimpleNamespace(cu=unit, offset=4, tag='DW_TAG_formal_parameter', has_children=False,
+                                attributes={'DW_AT_type': SimpleNamespace(form='DW_FORM_ref4', value=5, raw_value=5, offset=5)},
+                                get_DIE_from_attribute=Mock(side_effect=LookupError('missing parameter type')))
+        inline.iter_children = Mock(return_value=iter([child]))
+        unit.get_top_DIE = Mock(return_value=root)
+        unit.iter_DIEs = Mock(return_value=iter([root, declared, concrete, inline, child,
+                                               SimpleNamespace(cu=unit, tag=None), SimpleNamespace(cu=unit, tag=None)]))
+        report = {}
+
+        records.inventory(SimpleNamespace(iter_CUs=Mock(return_value=iter([unit]))), report,
+                          selection='task-lifecycle')
+
+        self.assertEqual([records.key(declared), records.key(concrete), records.key(inline)],
+                         [row['die'] for row in report['selectedRecords']])
+        self.assertEqual([records.key(child)], report['selectedRecords'][2]['children'])
+        self.assertEqual('LookupError', report['graph'][records.key(child)]['referenceErrors']['DW_AT_type']['type'])
+        self.assertTrue(report['graph'][records.key(declared)]['attributes']['DW_AT_declaration']['value'])
+        self.assertFalse(report['locationExpressionsEvaluated'])
+
+    def test_unknown_selection_is_rejected_before_visiting_native_metadata(self):
+        dwarf = Mock()
+        report = {}
+
+        with self.assertRaises(ValueError):
+            records.inventory(dwarf, report, selection='other')
+
+        dwarf.iter_CUs.assert_not_called()
+        self.assertEqual({}, report)
+
+    def test_lifecycle_and_invalid_cli_options_retain_failure_before_provider_access(self):
+        for options, selection in [(['--task-lifecycle'], 'task-lifecycle'), (['--unknown'], None),
+                                   (['--task-lifecycle', '--task-lifecycle'], None)]:
+            with self.subTest(options=options), tempfile.TemporaryDirectory() as directory:
+                library, output = Path(directory) / 'library', Path(directory) / 'report.json'
+                library.write_bytes(b'wrong library')
+                with patch.object(records.sys, 'argv', ['reader', str(library), str(output), *options]), \
+                        patch.object(records.binding, 'download') as download, patch.object(records.provider, 'load') as load, \
+                        self.assertRaises(ValueError):
+                    records.main()
+
+                download.assert_not_called()
+                load.assert_not_called()
+                report = json.loads(output.read_text())
+                self.assertEqual(selection, report.get('selectionPlan', {}).get('name'))
+                self.assertEqual('ValueError', report['error']['type'])
+                for key in ['completed', 'acceptedSavingsCredit', 'actualFieldLayoutProven',
+                            'actualTargetCallingConventionProven', 'actualControlFlowCoverageProven', 'rootCensusProven',
+                            'actualCompiledTaskLifetimeProven', 'actualTaskGenerationProven', 'privateFieldReadsAuthorized']:
+                    self.assertFalse(report[key])
+
     def test_pinned_provider_reads_a_complete_synthetic_class_and_member_graph(self):
         abbreviations = bytes([1, 0x11, 1, 3, 8, 0, 0,
                                2, 2, 1, 3, 8, 0x0b, 0x0b, 0, 0,
@@ -196,8 +293,9 @@ class ReadNativeVmDwarfRecordsTest(unittest.TestCase):
         self.assertEqual([records.key(member)], report['selectedRecords'][0]['children'])
 
     def test_inventory_resource_bounds_fail_without_claiming_completed_traversal(self):
-        for limit in ['MAX_UNITS', 'MAX_DIES', 'MAX_GRAPH', 'MAX_SELECTED', 'MAX_CHILDREN', 'MAX_DEPTH', 'MAX_RETAINED_BYTES']:
-            with self.subTest(limit=limit):
+        limits = ['MAX_UNITS', 'MAX_DIES', 'MAX_GRAPH', 'MAX_SELECTED', 'MAX_CHILDREN', 'MAX_DEPTH', 'MAX_RETAINED_BYTES']
+        for selection, limit in ((mode, limit) for mode in ['compiler', 'task-lifecycle'] for limit in limits):
+            with self.subTest(selection=selection, limit=limit):
                 unit = SimpleNamespace(cu_offset=0, size=100, header={'version': 5})
                 root = SimpleNamespace(cu=unit, offset=0, tag='DW_TAG_compile_unit', has_children=True,
                                        attributes={'DW_AT_name': SimpleNamespace(form='DW_FORM_string', value=b'compileTask.cpp', raw_value=b'compileTask.cpp', offset=0)})
@@ -210,7 +308,8 @@ class ReadNativeVmDwarfRecordsTest(unittest.TestCase):
                 report = {}
 
                 with patch.object(records, limit, 0), self.assertRaises(ValueError):
-                    records.inventory(SimpleNamespace(iter_CUs=Mock(return_value=iter([unit]))), report)
+                    records.inventory(SimpleNamespace(iter_CUs=Mock(return_value=iter([unit]))), report,
+                                      selection=selection)
 
                 self.assertFalse(report['selectedUnitTraversalCompleted'])
 

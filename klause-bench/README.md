@@ -1596,7 +1596,7 @@ establishes no calling convention, field layout, control-flow/runtime coverage,
 root census, clock agreement, generated-code size or compiler saving.
 
 `com.eignex.klause.bench.profile.NativeVmDwarfRecords` accepts no arguments or
-`context=true`. It repeats the external-file binding before inspecting the original bound debug-file
+`context=true`, or `task-lifecycle=true`. It repeats the external-file binding before inspecting the original bound debug-file
 hash. A private hash-pinned pyelftools 0.33 wheel supplies the pure-Python reader;
 package member hashes, imported module paths and license texts are retained and
 rechecked. Installation is local to temporary worker storage. Neither native file
@@ -1613,6 +1613,15 @@ children, 128 scope levels and 32 MiB of retained metadata. The parent allows
 600 seconds. Location expressions/lists are retained as attributes without
 evaluation. Selected-unit coverage establishes no unique source layout, calling
 convention, register/field read, complete root census or compiler saving.
+
+The task-lifecycle mode retains the existing compiler selection and additionally
+requests `CompileTaskWrapper`, task allocation, initialization and free functions,
+and wrapper constructor/destructor names. The capture records its exact type and
+function name plan. Matching declarations, physical functions and inline records
+remain separate, with all aliases and reference failures retained. This mode also
+includes the bounded source/range/location contexts below and keeps the same four
+compilation units and resource limits. Selection supplies no lifecycle coverage,
+entry ABI, task generation, private-read authorization or compiler-cost proof.
 
 `context=true` also retains each compilation-unit root, line-table header and
 the header file/directory entries referenced by declarations and inline calls.
