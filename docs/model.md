@@ -30,6 +30,8 @@ check exact assignments and maintain functional outputs. Polynomial encoders ret
 one native power expression; linear encoders enforce exponent zero or one, or a
 higher integer power under a captured operand fixing whose power fits a signed word.
 Neither floating scores nor a product relaxation enforce the source relation.
+Generic `Problem` polynomial composition keeps its [finite integer boundary](theories/polynomial-real.md#scope-and-boundaries);
+admitted open/wide SMT powers retain their exact nonlinear source snapshots.
 
 ## Published assignments and objectives
 
