@@ -111,6 +111,13 @@ named witnesses against the original XML. The contradictory count variant requir
 four region memberships across three cells, while every cell belongs to exactly one
 region. It exercises source lowering and complete search without a wall-clock budget.
 
+The self-authored Apache-2.0
+[reified-hole-tiny.xml](../../klause-bench/src/test/resources/xcsp3/reified-hole-tiny.xml)
+ties a disequality indicator to a table that can remove its target without moving
+the domain bounds. A branch with that hole conflicts with the opposite indicator.
+After rollback and learning, a source-checked assignment using the restored target
+must remain feasible.
+
 ## XCSP3 reference importer
 
 [`test_solve.py`](../../klause-bench/xcsp3-cpsat/test_solve.py) contains self-authored

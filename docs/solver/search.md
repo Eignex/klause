@@ -477,6 +477,13 @@ disequality indicators over root domains contained in `{0, 1}` propagate as dire
 channels: an indicator fixes its integer value, and a fixed integer pins the indicator.
 Wider domains retain the general linear propagator.
 
+Single-variable equality and disequality reifications also watch target membership.
+A missing interior target retains its removal premise when pinning the indicator
+or explaining an opposing assignment. Bounds alone cannot justify that conflict.
+A target absent from the declared root domain needs no search premise. The
+[source hole fixture](../testing/fixtures.md#xcsp3-source-checking) checks that
+learning and rollback preserve assignments that restore the target.
+
 Factor cores traverse the full reason graph with session-owned dense-id scratch. The
 traversal clears visited ids between extractions and reads learned native clause
 variables directly, retaining the same factor-core membership across restarts and
