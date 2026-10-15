@@ -35,6 +35,7 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
             """.trimIndent()
             "open-linear" -> """
                 (declare-const b Bool) (declare-const x Real)
+                (assert (and (<= 0 x) (<= x (/ 1 3))))
                 (assert (=> b (= (* 3 x) 0)))
                 (assert (=> (not b) (= (* 3 x) 1)))
                 ($direction ${if (maximize) "(- 7 x)" else "(+ 7 x)"}) (check-sat)
