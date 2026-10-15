@@ -318,6 +318,11 @@ Encoder construction observes the containing invocation token during normal sour
 routing, component preparation and polynomial assembly. Exact linear formula expansion
 charges row, term and distribution visits to that token's meter; polynomial assembly
 charges factor visits and installers can charge their native construction work.
+In open satisfaction, required post-presolve installation uses the containing invocation
+token and meter; optional source passes and bound closing keep the presolve phase's
+time and work limits. Spending that optional allowance cannot retire the complete
+worker before its required installation. Invocation cancellation or an installer resource
+decline still withholds search, without refunding construction charges.
 Interrupted construction discards every emitted relation and private definition and
 retains its charges. Explicit installer resource declines retain the resource cause
 even when the containing token has not fired. Decline diagnostics use selected

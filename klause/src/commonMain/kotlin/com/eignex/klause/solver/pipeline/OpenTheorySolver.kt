@@ -266,6 +266,7 @@ class OpenTheoryEngine internal constructor(
                 cancellation = cancellation,
                 budget = presolveBudget,
                 projections = projections,
+                presolveCancellation = presolveCancellation or cancellation,
             )
         },
         presolveCancellation,
@@ -479,8 +480,8 @@ class OpenTheoryEngine internal constructor(
 
     /** Prepare the source under the caller's stop, once per engine. */
     private fun prepare(cancellation: Cancellation): OpenSourcePreparation = preparation
-        ?: prepareSource(alsoStoppedBy(cancellation)).also {
-            if (!alsoStoppedBy(cancellation)() &&
+        ?: prepareSource(cancellation).also {
+            if (!cancellation() &&
                 (it as? OpenSourcePreparation.Planned)?.plan?.encodingDecline != EncoderDecline.RESOURCE
             ) preparation = it
         }
