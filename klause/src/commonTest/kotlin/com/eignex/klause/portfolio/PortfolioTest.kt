@@ -1736,6 +1736,199 @@ class PortfolioTest {
     }
 
     @Test
+    fun `violation progress followed by stagnation cedes time before an accepted incumbent`() {
+        val slices = IntArray(2)
+        val source = ScriptedSearch({ false }) { slices[1]++ }
+        val heuristic = object : ResumableSearch by source {
+            override val stats: SolveStats
+                get() = SolveStats(ls = LocalSearchStats(
+                    moves = SumResult(slices[1] * 10.0),
+                    incumbentViolation = if (slices[1] < 3) 10.0 else 5.0,
+                ))
+        }
+        val workers = listOf(
+            trackingWorker("complete", 0, ScriptedSearch({ false }) { slices[0]++ }),
+            PortfolioWorker.ofMinimize("heuristic", 1, countsInstructions = true, resumable = { heuristic }) {
+                _, _, _, _ -> error("the retained handle must resume")
+            },
+        )
+
+        val result = Portfolio.thompson(workers, seed = 3L).use {
+            it.minimize(Cancellation { slices.sum() >= 200 })
+        }
+
+        assertIs<MinimizeResult.Unknown>(result)
+        assertTrue(slices[0] > 2 * slices[1], "complete search ran ${slices[0]} of ${slices.sum()} slices")
+        assertTrue(result.stats.portfolio.arms[1].credit.getValue("Violation") > 0.0)
+        assertFalse(result.stats.portfolio.arms[1].credit.containsKey("FirstSolution"))
+    }
+
+    @Test
+    fun `cancelled heuristic initialization preserves feasibility feedback regardless of charged work`() {
+        val schedules = listOf(0L, 17L).map { initialWork ->
+            val visits = ArrayList<Int>()
+            var moves = 0
+            val source = ScriptedSearch({ false }) {
+                visits += 1
+                moves++
+            }
+            val heuristic = object : ResumableSearch by source {
+                override val stats: SolveStats
+                    get() = SolveStats(ls = LocalSearchStats(moves = SumResult(moves * 10.0)))
+            }
+            val workers = listOf(
+                trackingWorker("complete", 0, ScriptedSearch({ false }) { visits += 0 }),
+                PortfolioWorker.ofMinimize("heuristic", 1, countsInstructions = true, resumable = { heuristic }) {
+                    _, _, _, _ -> error("the retained handle must resume")
+                },
+                PortfolioWorker.ofMinimize("opening", 2, countsInstructions = true, resumable = {
+                    visits += 2
+                    throw SearchInitializationCancelled(SolveStats.EMPTY, initialWork)
+                }) { _, _, _, _ -> error("cancelled initialization must retire") },
+            )
+            val bandit = object : UnivariateBandit {
+                override val nbrArms = workers.size
+                override val random = Random(3)
+                override fun choose() = 0
+                override fun update(armIndex: Int, value: Double, weight: Double) = Unit
+                override fun reset() = Unit
+            }
+
+            Portfolio(workers, bandit).also { it.runTimeSource = TestTimeSource() }.use {
+                it.minimize(Cancellation { visits.size >= 200 })
+            }
+            visits
+        }
+
+        assertEquals(schedules.first(), schedules.last())
+    }
+
+    @Test
+    fun `complete workers receive elapsed opportunity despite heterogeneous segment costs`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(3)
+        val visits = IntArray(3)
+        val costs = longArrayOf(10L, 100L, 500L)
+        val workers = List(3) { arm ->
+            val source = ScriptedSearch({ false }) {
+                visits[arm]++
+                elapsed[arm] += costs[arm]
+                clock += costs[arm].milliseconds
+            }
+            val handle = object : ResumableSearch by source {
+                override val stats: SolveStats
+                    get() = if (arm == 2) {
+                        SolveStats(ls = LocalSearchStats(
+                            moves = SumResult(visits[arm] * 10.0),
+                            incumbentViolation = 1.0 / (visits[arm] + 1),
+                        ))
+                    } else SolveStats.EMPTY
+            }
+            if (arm == 2) {
+                PortfolioWorker.ofMinimize(
+                    "heuristic", arm, countsInstructions = true, resumable = { handle },
+                ) { _, _, _, _ -> error("the retained handle must resume") }
+            } else trackingWorker("arm$arm", arm, handle)
+        }
+
+        val result = Portfolio.thompson(workers, seed = 3L).also { it.runTimeSource = clock }.use {
+            it.minimize(Cancellation { elapsed.sum() >= 6_000L })
+        }
+
+        assertIs<MinimizeResult.Unknown>(result)
+        val owed = (elapsed.sum() - 2_000L) / 4
+        assertTrue(elapsed[0] >= owed - costs.max(), "cheap complete worker received ${elapsed[0]} ms, owed $owed")
+        assertTrue(elapsed[1] >= owed - costs.max(), "costly complete worker received ${elapsed[1]} ms, owed $owed")
+        assertTrue(visits[0] > visits[1])
+        assertTrue(elapsed[2] > 0L)
+    }
+
+    @Test
+    fun `finished complete workers leave elapsed coverage to their live siblings`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(3)
+        val finished = TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.BudgetExhausted), onRun = {
+            elapsed[0] += 250L
+            clock += 250.milliseconds
+        })
+        val workers = listOf(
+            trackingWorker("finished", 0, finished),
+            trackingWorker("live", 1, ScriptedSearch({ false }) {
+                elapsed[1] += 10L
+                clock += 10.milliseconds
+            }),
+            trackingWorker("heuristic", 2, ScriptedSearch({ false }) {
+                elapsed[2] += 500L
+                clock += 500.milliseconds
+            }).also { it.family = ArmFamily.LocalSearch },
+        )
+
+        Portfolio.thompson(workers, seed = 3L).also { it.runTimeSource = clock }.use {
+            it.minimize(Cancellation { elapsed.sum() >= 6_000L })
+        }
+
+        assertEquals(250L, elapsed[0])
+        assertEquals(1, finished.closes)
+        assertTrue(elapsed[1] >= (elapsed[1] + elapsed[2] - 2_000L) / 2 - 500L)
+        assertTrue(elapsed[2] > 0L)
+    }
+
+    @Test
+    fun `repeated heuristic preparation preserves elapsed opportunity for silent complete search`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(2)
+        val complete = TrackingResumableSearch(null, onRun = {
+            elapsed[0] += 10L
+            clock += 10.milliseconds
+        })
+        val preparing = TrackingResumableSearch(null, onRun = {
+            elapsed[1] += 500L
+            clock += 500.milliseconds
+        }, preparationPending = true)
+        val workers = listOf(
+            trackingWorker("complete", 0, complete),
+            trackingWorker("preparing", 1, preparing).also { it.family = ArmFamily.LocalSearch },
+        )
+
+        val result = Portfolio.thompson(workers, seed = 3L).also { it.runTimeSource = clock }.use {
+            it.minimize(Cancellation { elapsed.sum() >= 6_000L })
+        }
+
+        assertIs<MinimizeResult.Unknown>(result)
+        assertTrue(elapsed[0] >= (elapsed.sum() - 2_000L) / 2 - 500L)
+        assertEquals(1, complete.closes)
+        assertEquals(1, preparing.closes)
+        assertEquals(0L, result.stats.portfolio.arms[0].work)
+    }
+
+    @Test
+    fun `an accepted incumbent ends feasibility elapsed coverage`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(2)
+        val workers = listOf(
+            trackingWorker("complete", 0, ScriptedSearch({ false }) {
+                elapsed[0] += 10L
+                clock += 10.milliseconds
+            }),
+            trackingWorker("improver", 1, ScriptedSearch({ true }) {
+                elapsed[1] += 500L
+                clock += 500.milliseconds
+            }).also { it.family = ArmFamily.LocalSearch },
+        )
+        var checks = 0
+        val portfolio = Portfolio.thompson(workers, seed = 3L, witnessCheck = { _, _ ->
+            checks++
+            null
+        }).also { it.runTimeSource = clock }
+
+        val result = portfolio.use { it.minimize(Cancellation { elapsed.sum() >= 6_000L }) }
+
+        assertIs<MinimizeResult.BestFound>(result)
+        assertTrue(checks > 0)
+        assertTrue(elapsed[0] < 500L)
+    }
+
+    @Test
     fun `the arm that found the first solution loses its lead to the arm improving it`() {
         val slices = IntArray(2)
         val finder = ScriptedSearch({ it == 0 }, start = 1_000.0) { slices[0]++ }
@@ -1797,7 +1990,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `neutral family shares do not grow with the local search arm count`() {
+    fun `stagnant feasibility search cedes family share regardless of the local search arm count`() {
         for (locals in listOf(1, 4, 8)) {
             val slices = IntArray(locals + 1)
             val workers = List(locals + 1) { arm ->
@@ -1810,7 +2003,7 @@ class PortfolioTest {
             Portfolio.thompson(workers, seed = 3L).use { it.solve(Cancellation { slices.sum() >= 1_000 }) }
 
             val localShare = slices.drop(1).sum().toDouble() / slices.sum()
-            assertTrue(localShare in 0.44..0.56, "$locals local search arms took $localShare of the segments")
+            assertTrue(localShare < 0.35, "$locals local search arms took $localShare of the segments")
         }
     }
 

@@ -263,18 +263,43 @@ Before the first incumbent, an optimization arm with pending private preparation
 local-search arm that has not executed an instruction receives preparation revisits
 after all initial siblings have been admitted. Unfinished arms rotate in arm order until
 they enter search or terminate. Each revisit uses the base allowance and the regular
-family time share; it does not grow later slices. Dedicated lanes resume their own
-handles directly. No preparation revisit delays an unadmitted sibling.
+family time share; it does not grow later slices. Explicit minimum shares and the
+feasibility elapsed floor bound repeated revisits after initial admission. Dedicated
+lanes resume their own handles directly. No preparation revisit delays an unadmitted sibling.
 
 Before the first accepted witness, a selected complete-search family runs its available
 arm with the least charged work. Shared clauses, root fixings and objective floors
 remain credited, but cannot exclude a silent search from its family's coverage. Before a
-witness, observable violation reductions can earn a family more turns; complete-search
+witness, observable violation reductions can earn a family more turns. A positive-work
+heuristic search segment without progress supplies plateau feedback even without an
+accepted incumbent; private preparation, cancelled initialization and zero-work pauses
+supply no such feasibility failure. An internal violation score does not install an incumbent or change the
+objective phase. Complete-search
 root fixings and glue clauses do not favor its family, because deduction throughput does
 not predict the first witness. Those counters remain recorded. After the first witness,
-arm selection also follows that policy. Initial admission, preparation revisits and
-explicit minimum time shares retain precedence. A segment reporting no charged work uses
+arm selection also follows that policy. Initial admission and explicit minimum time
+shares retain precedence. A segment reporting no charged work uses
 its slice allowance for coverage accounting.
+
+Before the first accepted witness or completed refutation, ordinary complete workers
+also retain an elapsed coverage floor. Each live complete worker is owed an equal
+part of one neutral family share of active segment time, with one base time allowance
+of aggregate lag. Heuristic bootstrap and local search share the other feasibility
+family; additional heuristic variants do not enlarge it. The floor uses elapsed time
+including construction and checking, plus currently running segments on other lanes.
+It does not weight family rewards or change charged work. Below-floor complete workers
+run before ordinary family selection, choosing the least elapsed available sibling.
+Initial admission and explicit minimum shares retain precedence. Coverage can interrupt
+preparation revisits without closing or restarting their retained cursors.
+Retired, deferred and auxiliary proof workers supply no coverage debt; paused handles
+retain their elapsed credit. An accepted incumbent ends this floor at installation;
+the ordinary reward phase settles with its producing segment. Dedicated lanes, segment
+deadlines and containing work/native allowances retain their controls.
+The lag and cooperative segment overspend bound the opportunity guarantee; no fixed
+number of milliseconds or result is promised to an individual worker. Work bounds keep
+each segment's stopping point stable for the same incoming state. Elapsed coverage can
+change later selections even when those work bounds bind before segment deadlines,
+so a single lane and seed alone do not make the full schedule reproducible.
 
 Slices yield before consuming an alternative or after a completed node. A pending
 sibling cannot be skipped when yielding, and reset discards a pending alternative.
