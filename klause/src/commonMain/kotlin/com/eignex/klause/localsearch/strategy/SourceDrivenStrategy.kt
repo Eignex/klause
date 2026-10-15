@@ -282,9 +282,7 @@ class SourceDrivenStrategy(
         val gatedObjective = feasibleDescent == FeasibleDescent.SelfOwned &&
             state.shaping.feasibilityGated && state.shaping.objective != null
         if (state.cost == 0L && (feasibleAcceptance != null || gatedObjective)) {
-            if (state.netDelta(move) > 0L) return Double.POSITIVE_INFINITY
-            val objective = state.shaping.objective ?: return 0.0
-            return state.objectiveDelta(objective, move) ?: 0.0
+            return state.feasibleObjectiveDelta(state.shaping.objective, move)
         }
         return when (scoring) {
             MoveScoring.Break -> state.shapedBreakScore(move)

@@ -533,6 +533,11 @@ changes after feasibility; the zero pre-feasibility coefficient does not erase t
 gradient. Explicit linear shaping retains its configured scale, while a strategy's
 separate feasible acceptance retains its own unscaled objective policy.
 
+Feasible grading of definition inputs reads hard cost and a built-in linear or
+functional objective from one propagated probe. A hard violation rejects the move
+before valuing its post-move objective. Other objective implementations retain their
+ordinary incremental eligibility and are not called for rejected hard violations.
+
 Moves feeding definitions score the complete propagated assignment, including derived
 factor degrees and objective coordinates. Compounds without definition readers retain
 additive linear objective scoring for distinct coordinates and the objective's own
