@@ -26,6 +26,24 @@ import kotlin.test.assertTrue
 
 class SmtLibAdmissionTest {
     @Test
+    fun `an unrelated open linear integer preserves a bounded mixed product source`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const n Int) (declare-const q Int) (declare-const x Real) (declare-const y Real) " +
+                "(assert (and (>= n 1) (<= n 2) (>= q 0) (= x 2) (= y 4))) " +
+                "(assert (= (* (to_real n) x) y)) (check-sat)",
+        )
+        val source = assertIs<SmtLibInput.Linear>(input).problem
+
+        val result = BacktrackSolver.source(source.model).solve()
+
+        val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertTrue(source.model.factors.any { it is RealProduct })
+        assertEquals("2", witness.intValue(source.intVarNames.getValue("n")))
+        assertTrue(witness.intValue(source.intVarNames.getValue("q")).toLong() >= 0)
+        assertTrue(source.model.intBounds.isOpenUpper(source.intVarNames.getValue("q")))
+    }
+
+    @Test
     fun `polynomial fallback retains numeric selection guards and ordered branches`() {
         for (sort in listOf("Real", "Int")) {
             val input = SmtLibAdmission.parse("""

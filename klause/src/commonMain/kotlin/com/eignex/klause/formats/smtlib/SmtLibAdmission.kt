@@ -14,6 +14,8 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.pipeline.requiresPolynomialCompletion
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
@@ -218,7 +220,7 @@ private fun parseLinearAdmission(
         } &&
         (builder.intNames.isEmpty() || (0 until problem.model.numIntVars).any { id ->
             problem.model.intBounds.isOpenLower(id) || problem.model.intBounds.isOpenUpper(id)
-        })) {
+        } && problem.model.requiresPolynomialCompletion(FactorProjectionProviders.Default.prepare(problem.model)))) {
         smtUnsupported("pure real nonlinear source requires polynomial lowering")
     }
     return problem
