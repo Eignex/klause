@@ -1000,10 +1000,11 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun branch(context: SearchContext): List<SearchDecision>? {
-        if (finiteIntVars.any { variable ->
-                context.intLowerBound(variable) == null ||
-                    context.intLowerBound(variable) != context.intUpperBound(variable)
-            }) return null
+        val finite = finiteIntVars.firstOrNull { variable ->
+            context.intLowerBound(variable) == null ||
+                context.intLowerBound(variable) != context.intUpperBound(variable)
+        }
+        if (finite != null) return finitePointBranch(finite, context)
         if (bools.any { it == UNASSIGNED } || outcome != null) return null
         if (operationStop() || !context.consumeCheck()) {
             outcome = ComponentCheck.Indeterminate
@@ -1108,6 +1109,27 @@ class ExactLiraSearchComponent private constructor(
         return null
     }
 
+    private fun finitePointBranch(variable: Int, context: SearchContext): List<SearchDecision>? {
+        if (dirty || bools.any { it == UNASSIGNED } || disjunctionAtoms.isNotEmpty() ||
+            node.nextDisequality(model, disjunctionAtoms, bools) != null ||
+            (outcome != null && outcome != ComponentCheck.Feasible)
+        ) return null
+        val point = candidate ?: return null
+        if (operationStop() || !context.consumeCheck()) return null
+        sourceIntegerSplit(point, context)?.let { return it }
+        val value = point[model.numRealVars + variable]
+        if (!value.isInteger() || !value.num.fitsLong()) return null
+        val preferred = value.num.toLongExact()
+        val lower = context.intLowerBound(variable) ?: return null
+        val upper = context.intUpperBound(variable) ?: return null
+        if (preferred !in lower..upper) return null
+        return buildList {
+            add(SearchDecision.IntEqual(variable, preferred))
+            if (preferred > lower) add(SearchDecision.IntAtMost(variable, preferred - 1))
+            if (preferred < upper) add(SearchDecision.IntAtLeast(variable, preferred + 1))
+        }
+    }
+
     private fun registeredSplit(
         reduced: ExactLiraReduction.Bounded,
         integer: Int,
@@ -1128,6 +1150,17 @@ class ExactLiraSearchComponent private constructor(
         for (integer in 0 until model.numIntVars) {
             val value = point[model.numRealVars + integer]
             if (value.isInteger()) continue
+            if (integer in finiteIntVars) {
+                val floor = value.num / value.den -
+                    if (value.num < BIG_ZERO && value.num % value.den != BIG_ZERO) BIG_ONE else BIG_ZERO
+                if (!floor.fitsLong() || floor >= bigIntOf(Long.MAX_VALUE)) return null
+                val threshold = floor.toLongExact()
+                val lower = context.intLowerBound(integer) ?: return null
+                val upper = context.intUpperBound(integer) ?: return null
+                if (threshold < lower || threshold >= upper) return null
+                return listOf(SearchDecision.IntAtMost(integer, threshold),
+                    SearchDecision.IntAtLeast(integer, threshold + 1))
+            }
             return SourceBoundAtom.integerSplit(
                 context,
                 listOf(SourceBoundTerm(SearchIntValue(integer), BigFraction.ONE)),

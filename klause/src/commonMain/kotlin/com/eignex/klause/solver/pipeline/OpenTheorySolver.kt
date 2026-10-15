@@ -28,6 +28,8 @@ import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRestart
 import com.eignex.klause.solver.search.SearchRun
+import com.eignex.klause.solver.search.SearchBranchKind
+import com.eignex.klause.solver.search.SearchBranchSelection
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
@@ -422,6 +424,10 @@ class OpenTheoryEngine internal constructor(
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
                 nodePolicy = nodePolicy,
                 candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage),
+                branchSelection = if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
+                    plan.cpIntVars.isNotEmpty()
+                ) SearchBranchSelection.Priority(listOf(SearchBranchKind.Boolean, SearchBranchKind.Arithmetic,
+                    SearchBranchKind.Finite)) else SearchBranchSelection.Default,
             )
             handedOff = true
             return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, stats, state, params))
