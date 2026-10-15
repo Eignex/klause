@@ -1736,6 +1736,29 @@ class PortfolioTest {
     }
 
     @Test
+    fun `violation progress followed by stagnation cedes time before an accepted incumbent`() {
+        val slices = IntArray(2)
+        val source = ScriptedSearch({ false }) { slices[1]++ }
+        val heuristic = object : ResumableSearch by source {
+            override val stats: SolveStats
+                get() = SolveStats(ls = LocalSearchStats(incumbentViolation = if (slices[1] < 3) 10.0 else 5.0))
+        }
+        val workers = listOf(
+            trackingWorker("complete", 0, ScriptedSearch({ false }) { slices[0]++ }),
+            trackingWorker("heuristic", 1, heuristic).also { it.family = ArmFamily.LocalSearch },
+        )
+
+        val result = Portfolio.thompson(workers, seed = 3L).use {
+            it.minimize(Cancellation { slices.sum() >= 200 })
+        }
+
+        assertIs<MinimizeResult.Unknown>(result)
+        assertTrue(slices[0] > 140, "complete search ran ${slices[0]} of ${slices.sum()} slices")
+        assertTrue(result.stats.portfolio.arms[1].credit.getValue("Violation") > 0.0)
+        assertFalse(result.stats.portfolio.arms[1].credit.containsKey("FirstSolution"))
+    }
+
+    @Test
     fun `the arm that found the first solution loses its lead to the arm improving it`() {
         val slices = IntArray(2)
         val finder = ScriptedSearch({ it == 0 }, start = 1_000.0) { slices[0]++ }
@@ -1797,7 +1820,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `neutral family shares do not grow with the local search arm count`() {
+    fun `stagnant feasibility search cedes family share regardless of the local search arm count`() {
         for (locals in listOf(1, 4, 8)) {
             val slices = IntArray(locals + 1)
             val workers = List(locals + 1) { arm ->
@@ -1810,7 +1833,7 @@ class PortfolioTest {
             Portfolio.thompson(workers, seed = 3L).use { it.solve(Cancellation { slices.sum() >= 1_000 }) }
 
             val localShare = slices.drop(1).sum().toDouble() / slices.sum()
-            assertTrue(localShare in 0.44..0.56, "$locals local search arms took $localShare of the segments")
+            assertTrue(localShare < 0.35, "$locals local search arms took $localShare of the segments")
         }
     }
 
