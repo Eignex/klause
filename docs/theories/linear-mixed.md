@@ -45,6 +45,14 @@ fractional source integer is not a model value and integrality remains a
 complete-check requirement. Integer branches, retraction, stops and opening close
 retain the component point lifetime and existing work owners.
 
+Open mixed traversal consults arithmetic proposals before the finite fallback. A completed
+continuous point can guide adjacent exhaustive integer splits while bounded declarations
+retain CP ownership. Integral point coordinates guide a finite equality and its remaining
+lower/upper alternatives; CP enforces domains, holes and unrelated finite factors on each
+alternative. A point supplies no pin or publication authority. Missing points, unresolved
+disjunctions and stops retain the ordinary finite fallback. Complete checks still require
+all finite coordinates to be fixed, and retraction discards the point with its LP scope.
+
 Complete workers and open local search can share checked incumbents under the
 same source and objective. Candidate integer windows guide heuristic search; they
 do not bound the source model for a refutation. [Portfolios](../solver/portfolio.md)
