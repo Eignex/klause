@@ -1107,6 +1107,10 @@ those files. A failed checker or incomplete profile supplies no validated termin
 fallback; the default `--route=theory` retains the ordinary exact-source strategy.
 The capture records numerical source operations and floating work separately from
 the route label. CLI stream captures establish frontend selection independently.
+Numerical captures retain conditional integer source pins on indicator rows;
+branch restrictions authorize their use independently of the incumbent. The
+fraction checker checks those pins and original enabled rows, with fixed guard
+coordinates required for recession authority.
 Leading options select the real public route: `--engine=cp|fixed|mixed|ls|alns`,
 `--cores=N`, `--checks=N`, `--work=N` and `--timeout=MS`. Defaults are cp, one core,
 1000 checks, 2000000 work and 3000 ms per input. Complete routes must return typed

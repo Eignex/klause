@@ -225,4 +225,8 @@ and exhaustion claims retain their approximation limits.
 The self-authored `klause-bench/smoke-corpus/mps-numerical` sources exercise open
 integer numerical optima, marker versus general bounds, wide attained coordinates,
 constant contradictions, exhaustive integer gaps, integer infeasibility beside an
-unbounded relaxation and integral improving rays. They contain no external data.
+unbounded relaxation and integral improving rays. Precision controls retain decimal
+rows, objectives and indicators, including nonzero numerical underflow refusal.
+Integer guard fixtures cover fixed zero/one triggers, exhaustive conditional
+refutations and the inactive regions of one-sided/free declarations. They contain
+no external data and use the repository's Apache-2.0 license.

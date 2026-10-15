@@ -21,6 +21,35 @@ class LinearSourceSemanticsCheckerTest {
     private val checker = LinearSourceSemanticsChecker(setOf(x), listOf(lower), mapOf(x to BigFraction.MINUS_ONE))
 
     @Test
+    fun `integer indicator rows constrain exactly the enabled original points`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        for (trigger in listOf(0L, 1L)) {
+            val row = SourcePremise(lower.inequality, emptyMap(), mapOf(integer to BigFraction.ofLong(trigger)))
+            val checker = LinearSourceSemanticsChecker(setOf(x, integer), listOf(row))
+            val enabled = Sample(booleanArrayOf(), longArrayOf(trigger), doubleArrayOf(0.0),
+                exactReals = listOf(BigFraction.ZERO))
+            val disabled = Sample(booleanArrayOf(), longArrayOf(1L - trigger), doubleArrayOf(0.0),
+                exactReals = listOf(BigFraction.ZERO))
+
+            assertIs<SourceEvidenceCheck.Rejected>(checker.witness(enabled, scope, Cancellation.Never))
+            assertEquals(SourceEvidenceCheck.Checked, checker.witness(disabled, scope, Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `integer guard recession requires the original trigger coordinate to remain fixed`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val row = SourcePremise(lower.inequality, emptyMap(), mapOf(integer to BigFraction.ONE))
+        val checker = LinearSourceSemanticsChecker(setOf(x, integer), listOf(row), mapOf(x to BigFraction.MINUS_ONE))
+        val base = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
+        val fixed = SourceClaim.Ray(base, mapOf(x to BigFraction.ONE))
+        val moving = SourceClaim.Ray(base, mapOf(x to BigFraction.ONE, integer to BigFraction.ONE))
+
+        assertEquals(SourceEvidenceCheck.Checked, checker.ray(fixed, scope, Cancellation.Never))
+        assertIs<SourceEvidenceCheck.Unavailable>(checker.ray(moving, scope, Cancellation.Never))
+    }
+
+    @Test
     fun `an exact rational point satisfies original source rows`() {
         val value = BigFraction.of(bigIntOf(3), bigIntOf(2))
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(value.toDouble()),

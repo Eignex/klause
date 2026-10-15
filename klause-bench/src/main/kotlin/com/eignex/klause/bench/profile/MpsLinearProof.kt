@@ -130,6 +130,7 @@ object MpsLinearProof {
                         put(id, buildJsonObject {
                             put("coefficients", coefficients(row.inequality.coefficients))
                             put("rhs", row.inequality.rhs.toString())
+                            if (row.integerPins.isNotEmpty()) put("integerPins", coefficients(row.integerPins))
                         })
                     }
                 })

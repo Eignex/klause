@@ -7,6 +7,7 @@ import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.IntegerPinStatus
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
@@ -16,6 +17,7 @@ import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.compareTo
@@ -48,10 +50,16 @@ internal class LinearAuthority(private val budget: SourceLpBudget) {
         ) return LinearAuthorityResult()
         val context = source.withLinearAuthority()
         val numeric = source.numericContext()
+        val premises = numeric.premises
+        val integerBounds = if (premises.values.any { it.integerPins.isNotEmpty() }) {
+            numeric.integerPinBounds(source.scope.condition, cancellation) ?: return LinearAuthorityResult()
+        } else null
         val cited = ArrayList<Pair<SourceInequality, SourceDerivation>>()
-        for ((id, premise) in numeric.premises) {
+        for ((id, premise) in premises) {
             if (cancellation()) return LinearAuthorityResult()
-            if (premise.guards.all { (bool, value) -> source.scope.condition.bools[bool] == value }) {
+            if (premise.guards.all { (bool, value) -> source.scope.condition.bools[bool] == value } &&
+                (premise.integerPins.isEmpty() ||
+                    integerBounds?.status(premise.integerPins) == IntegerPinStatus.Established)) {
                 cited += premise.inequality to SourceDerivation.Premise(id)
             }
         }

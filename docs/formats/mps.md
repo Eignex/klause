@@ -128,9 +128,14 @@ representation, resource, source-capture or certification limits return an incom
 result with any independently checked incumbent and root bound. They never trigger
 open-theory or theory-worker fallback, and an unresolved leaf cannot become infeasible.
 
-The direct numerical traversal currently requires a complete affine source capture.
-An open source with an unsupported guarded relation explicitly declines. Supported
-finite indicator models retain their numerical completion. LS and ALNS requests
+The direct numerical traversal requires a complete affine source capture and
+retains native integer indicators as conditional source rows. An unresolved trigger
+can split into the regions below, at and above its exact integer value through
+adjacent exhaustive alternatives. No inactive region is clamped away. Bounds use
+only rows whose original guards are established in that branch; source witnesses
+still check every enabled original row. Recession capture requires fixed integer
+guards. Other unsupported guarded relations explicitly decline. Supported finite
+indicator models retain their numerical completion. LS and ALNS requests
 withhold numerical bounds and terminal claims and can publish checked witnesses only.
 
 Every open candidate is checked against original rows, bounds, indicators and
