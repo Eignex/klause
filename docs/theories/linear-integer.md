@@ -74,8 +74,9 @@ scope before that merge; the source LP retains its scoped bound assertions.
 The final shared integer-bound pass batches exact source-column sides after active
 source rows and before disequality processing. Each side retains its own source
 premise. The first contradictory prefix can produce a conflict; a declined batch
-publishes no new witnesses. Sharing the numerical snapshot retains the per-bound
-native allowance debit and does not change source-row completion markers.
+publishes no new witnesses. Sharing the numerical snapshot retains caller-provided
+per-bound edit accounting and does not change source-row completion markers. Native
+engine work retains the containing operation token and allowance.
 The invocation owns asserted scopes,
 integer branches, reduction caches and LP state. Retraction removes scoped premises
 before evidence can be reused. [TheoryParams](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/pipeline/TheoryParams.kt)
