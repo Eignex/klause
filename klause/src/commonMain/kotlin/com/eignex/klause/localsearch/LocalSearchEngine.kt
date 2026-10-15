@@ -777,8 +777,9 @@ internal class LocalSearchEngine(
         val roundFeedback = RoundFeedback.of(satisfyStrategy, configuredRestart)
         var cancelCountdown = 0
         var lastCheckMs = 0L
-        val completedMoves = if (completion != null && problem.numRealVars > 0 &&
-            problem.numBoolVars + problem.numIntVars > 0 && feasibleMode == FeasibleDescent.SelfOwned
+        val completedMoves = if (completion != null && problem.numRealVars > 0 && objective is LinearObjective &&
+            objective.realCoefficientValues.any { it != 0.0 } && problem.numBoolVars + problem.numIntVars > 0 &&
+            feasibleMode == FeasibleDescent.SelfOwned
         ) CompletedMoveEvaluation(
             state, objective, params.cancellation,
             mayAttempt = {
@@ -1139,20 +1140,28 @@ internal class LocalSearchEngine(
         charge: (Long) -> Unit,
     ): Completion {
         if (unscoredCandidateCheck == null && completion == null) return Completion.Witness(candidate)
-        val real = completion?.complete(candidate, cancellation) ?: Completion.Witness(candidate)
+        val checkBefore = unscoredCandidateCheck?.requiresReals == false
+        val preliminary = if (checkBefore) {
+            checkNotNull(unscoredCandidateCheck).check(candidate, state.assumptions, cancellation)
+        } else Completion.Witness(candidate)
+        val real = if (preliminary is Completion.Witness) {
+            completion?.complete(candidate, cancellation) ?: preliminary
+        } else preliminary
         val compatible = if (real is Completion.Witness &&
-            (cancellation() || real.sample.numBoolVars != candidate.numBoolVars ||
-                real.sample.numIntVars != candidate.numIntVars ||
+            (real.sample.numBoolVars != candidate.numBoolVars || real.sample.numIntVars != candidate.numIntVars ||
                 (problem.numRealVars > 0 && real.sample.numRealVars != candidate.numRealVars) ||
                 candidate.hammingDistanceTo(real.sample) != 0)
         ) Completion.Undecided(real.work) else real
-        val decided = if (compatible is Completion.Witness) {
+        val sourceChecked = if (!checkBefore && compatible is Completion.Witness) {
             when (val checked = unscoredCandidateCheck?.check(compatible.sample, state.assumptions, cancellation)) {
                 null, is Completion.Witness -> compatible
                 is Completion.Refuted -> Completion.Refuted(checked.factors, compatible.work + checked.work)
                 is Completion.Undecided -> Completion.Undecided(compatible.work + checked.work)
             }
         } else compatible
+        val decided = if (sourceChecked is Completion.Witness && cancellation()) {
+            Completion.Undecided(sourceChecked.work)
+        } else sourceChecked
         charge(decided.work)
         stats?.recordCompletion(refuted = decided is Completion.Refuted, undecided = decided is Completion.Undecided)
         if (decided is Completion.Refuted) {

@@ -32,7 +32,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-/** Capture numerical mixed local-search improvements from an original-source supplied point. */
 internal object MixedMoveCompletionProbe {
     @JvmStatic
     fun main(args: Array<String>) {
