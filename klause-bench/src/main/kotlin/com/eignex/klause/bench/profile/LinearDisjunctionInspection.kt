@@ -23,9 +23,21 @@ import kotlinx.serialization.json.put
 internal object LinearDisjunctionInspection {
     fun inspect(engine: Any, stop: Cancellation, out: File) {
         val started = System.nanoTime()
-        val preparation = requireNotNull(field(engine, "preparation"))
-        val model = member(preparation, "getModel") as Problem
-        val plan = member(preparation, "getPlan") as ComponentPlan
+        if (stop()) {
+            skipped(out, "original-deadline-spent", stop)
+            return
+        }
+        val preparation = field(engine, "preparation")
+        if (preparation == null) {
+            skipped(out, "cached-preparation-unavailable", stop)
+            return
+        }
+        val model = member(preparation, "getModel") as? Problem
+        val plan = member(preparation, "getPlan") as? ComponentPlan
+        if (model == null || plan == null) {
+            skipped(out, "cached-preparation-has-no-plan", stop)
+            return
+        }
         val fragment = field(plan, "installedFragment") as? Problem ?: plan.theoryFragment(model)
         val prepare = Class.forName("com.eignex.klause.theory.qflra.QfLiraSolverKt").declaredMethods.single {
             it.name.startsWith("prepareExactLiraSource") && it.parameterCount == 2
@@ -180,8 +192,22 @@ internal object LinearDisjunctionInspection {
     private fun assertions(registry: SearchAtomRegistry): List<RegisteredTheoryDecision> =
         (field(registry, "assertions") as List<*>).map { it as RegisteredTheoryDecision }
 
-    private fun member(owner: Any, name: String): Any =
-        requireNotNull(owner.javaClass.methods.single { it.name == name && it.parameterCount == 0 }.invoke(owner))
+    private fun skipped(out: File, reason: String, stop: Cancellation) {
+        val result = buildJsonObject {
+            put("mode", "isolated-disjunction-naming")
+            put("status", "skipped")
+            put("reason", reason)
+            put("stoppedAtReturn", stop())
+            put("sourceVerdictClaim", false)
+            put("solverInitialized", false)
+            put("deadlineRenewed", false)
+        }
+        out.resolve("disjunction-naming.json").writeText(result.toString() + "\n")
+        println(result)
+    }
+
+    private fun member(owner: Any, name: String): Any? = owner.javaClass.methods
+        .singleOrNull { it.name == name && it.parameterCount == 0 }?.invoke(owner)
 
     private fun field(owner: Any, name: String): Any? = owner.javaClass.getDeclaredField(name)
         .apply { isAccessible = true }.get(owner)
