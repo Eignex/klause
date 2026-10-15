@@ -120,16 +120,16 @@ internal class QuadraticWorkerAdapter(
         close()
     }
 
-    fun worker(arm: Int): PortfolioWorker = if (arm == 0) {
+    fun worker(arm: Int, prepared: PreparedSourcePlan = request.preparedPlan): PortfolioWorker = if (arm == 0) {
         PortfolioWorker.ofMinimize("bt+exact-quadratic", arm, resumable = { completeHandle() }) { _, _, _, _ ->
             error("quadratic traversal runs by slice")
-        }.bindSource(SourceWorkerBinding(identity, preparedPlan = request.preparedPlan,
+        }.bindSource(SourceWorkerBinding(identity, preparedPlan = prepared,
             quadraticInvocation = proofScope))
     } else {
         PortfolioWorker.ofMinimize(if (arm == 2) "alns+exact-quadratic" else "ls+exact-quadratic", arm,
             countsInstructions = true, resumable = { neighborhoodHandle(arm == 2) }) { _, _, _, _ ->
             error("quadratic neighborhood runs by slice")
-        }.bindSource(SourceWorkerBinding(identity, provesResults = false, preparedPlan = request.preparedPlan,
+        }.bindSource(SourceWorkerBinding(identity, provesResults = false, preparedPlan = prepared,
             quadraticInvocation = proofScope))
     }
 

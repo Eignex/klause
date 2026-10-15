@@ -1,8 +1,11 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
@@ -115,11 +118,12 @@ class PortfolioWorkerTest {
 
     @Test
     fun `low level workers retain unbound caller trusted execution`() {
-        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Unsat() }
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val worker = PortfolioWorker.of("fixture", 0, BacktrackSolver(source.bake()).session(), BacktrackParams())
 
         val result = Portfolio.thompson(listOf(worker)).use { it.solve() }
 
-        assertTrue(result is SolveResult.Unsat)
+        assertTrue(result is SolveResult.Sat)
         assertNull(worker.sourceBinding)
     }
 
