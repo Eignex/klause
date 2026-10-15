@@ -270,6 +270,7 @@ private class CheckerArithmeticGuard(private val assignment: Map<String, Int>) :
     }
 
     private fun checkElement(c: XCtr) {
+        if (c.childs[0].type.name == "matrix") return checkMatrixElement(c)
         if (c.childs.size != 3 || c.childs[1].value !is XVarInteger) decline("unindexed or matrix element")
         val list = c.childs[0].value as? Array<*> ?: decline("element list")
         if (list.any { it !is XVarInteger && it !is Number }) decline("element list")
@@ -281,6 +282,32 @@ private class CheckerArithmeticGuard(private val assignment: Map<String, Int>) :
         integer(index, "element index offset")
         if (index < BigInteger.ZERO || index >= BigInteger.valueOf(list.size.toLong())) decline("element index range")
         integers(list).forEach { integer(it, "element entry") }
+    }
+
+    private fun checkMatrixElement(c: XCtr) {
+        if (c.childs.size != 3) decline("matrix element shape")
+        val matrix = c.childs[0].value as? Array<*> ?: decline("element matrix")
+        val indexes = c.childs[1].value as? Array<*> ?: decline("matrix element indexes")
+        if (indexes.size != 2 || indexes.any { it !is XVarInteger }) decline("matrix element indexes")
+        val rank = c.childs[1].attributes.entries.singleOrNull { it.key.name == "rank" }?.value
+        if (rank != null && rank.toString().lowercase() != "any") decline("ranked matrix element")
+        val offsets = listOf("startRowIndex", "startColIndex").map { name ->
+            c.childs[0].attributes.entries.singleOrNull { it.key.name == name }?.value
+                ?.let { it.toString().toIntOrNull() ?: decline("matrix element start index") } ?: 0
+        }
+        val positions = indexes.indices.map { axis ->
+            val position = integers(checkNotNull(indexes[axis])).single() - BigInteger.valueOf(offsets[axis].toLong())
+            integer(position, "matrix element index offset")
+            position
+        }
+        if (positions[0] < BigInteger.ZERO || positions[0] >= BigInteger.valueOf(matrix.size.toLong())) {
+            decline("matrix element row range")
+        }
+        val row = matrix[positions[0].intValueExact()] as? Array<*> ?: decline("matrix element row")
+        if (positions[1] < BigInteger.ZERO || positions[1] >= BigInteger.valueOf(row.size.toLong())) {
+            decline("matrix element column range")
+        }
+        integers(matrix).forEach { integer(it, "matrix element entry") }
     }
 
     private fun checkEndpoints(origins: Any, lengths: Any) {
