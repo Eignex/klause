@@ -321,6 +321,25 @@ private fun selectContinuation(
         cancellation,
     )
     budget.phase = ContinuationPhase.ADMISSION
+    if (basis != null && !limits.admitsDimensions(model)) {
+        val decline = try {
+            budget.step()
+            ContinuationDecline.DIMENSION
+        } catch (stop: ContinuationStop) {
+            stop.reason
+        }
+        return ContinuationSelection(
+            combineContinuationMetrics(exported, ExactContinuationMetrics(
+                work = budget.work,
+                allocation = budget.allocation,
+                elapsedNs = budget.elapsedNs,
+                phase = budget.phase,
+                decline = decline,
+                workByPhase = budget.workByPhase.toMap(),
+                allocationByPhase = budget.allocationByPhase.toMap(),
+            )),
+        )
+    }
     var decline: ContinuationDecline? = null
     var invalidated = false
     try {
