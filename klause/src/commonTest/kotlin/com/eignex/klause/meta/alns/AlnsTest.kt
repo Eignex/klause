@@ -368,6 +368,28 @@ class AlnsTest {
     }
 
     @Test
+    fun `a checked supplied seed survives invocation expiry before shared polling`() {
+        val problem = Problem(0, 0, emptyArray(), emptyList<Factor>(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val seed = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
+        var checked = false
+        var polls = 0
+        val inner = object : Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+            override fun minimize(objective: LinearObjective, params: LocalSearchParams) = error("bootstrap")
+        }
+        val alns = Alns(inner, maxIterations = 0).apply {
+            incumbentToleranceCheck = { checked = true; it.approximateRealValue(0) == 0.5 }
+        }
+        val handle = alns.resumable(objective, LocalSearchParams(initialAssignment = seed))
+
+        val first = handle.runSlice(Cancellation { checked && ++polls >= 3 }, Long.MAX_VALUE) {}
+        val result = handle.use { first ?: assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE) {}) }
+
+        assertEquals(seed, result.assignment)
+    }
+
+    @Test
     fun `cancelled seed validation retries the same shared version on resume`() {
         val problem = Problem(0, 0, emptyArray(), emptyList<Factor>(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()

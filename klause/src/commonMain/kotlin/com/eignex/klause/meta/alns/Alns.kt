@@ -185,7 +185,7 @@ internal class Alns(
                 params.initialAssignment?.let { if (accepts(it, best, cancellation)) best = it }
                 supplied = !cancellation()
             }
-            if (cancellation()) return null
+            if (cancellation()) return best.takeUnless { it === current }
             val fresh = exchange?.current()
             if (fresh != null && fresh.version > seenVersion) {
                 if (fresh.assignment !== current && fresh.objective.isFinite() &&
