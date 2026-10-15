@@ -367,6 +367,10 @@ class ExactLiraSearchComponent private constructor(
 
     internal val hasDefaultPointBooleanProposal: Boolean get() = pointHintBooleanSelection
 
+    internal fun partialPointFiniteBranchAvailable(): Boolean =
+        pointHintBooleanSelection && finiteIntVars.isNotEmpty() && disjunctionAtoms.isEmpty() &&
+            candidate != null && partialPointHintAvailable()
+
     internal fun partialPointBranchProposal(): SearchBranchProposal? {
         check(context == null)
         if (model.numIntVars == 0 || sourceRealCount == 0 || model.numBoolVars == 0) return null
@@ -1196,12 +1200,17 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun branch(context: SearchContext): List<SearchDecision>? {
+        val partialPoint = context === this.context && partialPointFiniteBranchAvailable()
         val finite = finiteIntVars.firstOrNull { variable ->
+            if (partialPoint) {
+                lpStop.charge(1)
+                if (operationStop()) return null
+            }
             context.intLowerBound(variable) == null ||
                 context.intLowerBound(variable) != context.intUpperBound(variable)
         }
-        if (finite != null) return finitePointBranch(finite, context)
-        if (bools.any { it == UNASSIGNED } || outcome != null) return null
+        if (finite != null) return finitePointBranch(finite, context, partialPoint)
+        if (partialPoint || bools.any { it == UNASSIGNED } || outcome != null) return null
         if (operationStop() || !context.consumeCheck()) {
             outcome = ComponentCheck.Indeterminate
             return null
@@ -1305,16 +1314,33 @@ class ExactLiraSearchComponent private constructor(
         return null
     }
 
-    private fun finitePointBranch(variable: Int, context: SearchContext): List<SearchDecision>? {
+    private fun finitePointBranch(
+        variable: Int,
+        context: SearchContext,
+        partialPoint: Boolean,
+    ): List<SearchDecision>? {
         if (dirty || hasSourceDisjunctions ||
             (outcome != null && outcome != ComponentCheck.Feasible)
         ) return null
         val point = candidate ?: return null
+        if (partialPoint) {
+            lpStop.charge(5)
+            if (operationStop() || pointHintStop() || !context.consumeCheck()) return null
+            return finitePointAlternatives(variable, point, context)
+        }
         lpStop.charge(model.numIntVars.toLong() + model.numBoolVars + preparedRows.size + 1L)
         if (operationStop() || bools.any { it == UNASSIGNED } ||
             node.nextDisequality(model, disjunctionAtoms, bools) != null || !context.consumeCheck()
         ) return null
         sourceIntegerSplit(point, context)?.let { return it }
+        return finitePointAlternatives(variable, point, context)
+    }
+
+    private fun finitePointAlternatives(
+        variable: Int,
+        point: List<BigFraction>,
+        context: SearchContext,
+    ): List<SearchDecision>? {
         val value = point[model.numRealVars + variable]
         if (!value.isInteger() || !value.num.fitsLong()) return null
         val preferred = value.num.toLongExact()

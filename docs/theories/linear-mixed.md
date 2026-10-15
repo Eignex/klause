@@ -71,6 +71,15 @@ verdict: pending rows are installed before source-proof queries and complete-lea
 LP and original-source checks. Origin observations count fresh captures without
 counting forward reuse as another LP capture.
 
+After available primitive preferences, a default mixed opening can try an integral
+current finite coordinate before an uncovered Boolean gate. The shared CP owner
+receives its equality and the remaining lower/upper alternatives; the point adds
+no fact or proof authority. Missing, fractional, stopped or out-of-interval point
+coordinates retain ordinary selection. Complete Boolean leaves retain their
+existing arithmetic and finite priority. This partial-point choice charges owner
+visits and the ordinary branch check under the current operation token, with no
+new LP invocation or allowance.
+
 Open mixed traversal consults arithmetic proposals before the finite fallback. A completed
 continuous point can guide adjacent exhaustive integer splits while bounded declarations
 retain CP ownership. Integral point coordinates guide a finite equality and its remaining

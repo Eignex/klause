@@ -428,8 +428,9 @@ class OpenTheoryEngine internal constructor(
                 SearchBranchSelection.Priority(listOf(SearchBranchKind.Boolean, SearchBranchKind.Arithmetic,
                     SearchBranchKind.Finite))
             } else SearchBranchSelection.Default
+            val pointComponent = planned.theory as? ExactLiraSearchComponent
             val pointSelection = params.openHintFlips == null && hints === SearchCandidateHints.None &&
-                (planned.theory as? ExactLiraSearchComponent)?.hasDefaultPointBooleanProposal == true
+                pointComponent?.hasDefaultPointBooleanProposal == true
             val run = planned.session.openRun(
                 model.numBoolVars,
                 solveParams,
@@ -437,7 +438,9 @@ class OpenTheoryEngine internal constructor(
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
                 nodePolicy = nodePolicy,
                 candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage),
-                branchSelection = if (pointSelection) PointBooleanSelection(ordinarySelection) else ordinarySelection,
+                branchSelection = if (pointSelection) PointBranchSelection(ordinarySelection) {
+                    pointComponent?.partialPointFiniteBranchAvailable() == true
+                } else ordinarySelection,
             )
             handedOff = true
             return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, stats, state, params))
@@ -649,7 +652,15 @@ internal sealed interface OpenTheoryStart {
     class Running(val run: OpenTheoryEngine.OpenTheoryRun) : OpenTheoryStart
 }
 
-internal class PointBooleanSelection(private val fallback: SearchBranchSelection) : SearchBranchSelection {
-    override fun alternatives(sources: SearchBranchSources): List<SearchDecision>? =
-        sources.componentAlternatives(SearchBranchKind.Boolean) ?: fallback.alternatives(sources)
+internal class PointBranchSelection(
+    private val fallback: SearchBranchSelection,
+    private val finitePointAvailable: () -> Boolean,
+) : SearchBranchSelection {
+    override fun alternatives(sources: SearchBranchSources): List<SearchDecision>? {
+        sources.componentAlternatives(SearchBranchKind.Boolean)?.let { return it }
+        if (finitePointAvailable()) {
+            sources.componentAlternatives(SearchBranchKind.Arithmetic)?.let { return it }
+        }
+        return fallback.alternatives(sources)
+    }
 }

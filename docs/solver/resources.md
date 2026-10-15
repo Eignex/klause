@@ -264,7 +264,7 @@ Default mixed Boolean proposals retain one ID from the existing primitive
 registration array. Selecting that ID scans only registered primitives while the
 point table is captured, charging each visit to the same numerical operation token
 and polling its unchanged stops. Table publication and selection metadata commit
-together; an interrupted prefix supplies neither. Branch consultation reads the
+together; an interrupted prefix supplies neither. Boolean consultation reads the
 live metadata without another scan, point copy, numerical call or allowance.
 Closing releases the registration array and choice with the optional point table.
 Forwarding first builds a complete private set of numerical-row Boolean coefficient
@@ -280,6 +280,13 @@ that point's monotone scope. Finite-bound updates charge owner lookup and can
 retain the point only after its full interval check. Open arithmetic changes and
 retraction invalidate reuse; source-proof queries and complete leaves materialize
 pending rows. No forward check renews a numerical allowance or counts as a new point capture.
+
+A live default mixed partial point can also order a finite equality and its
+remaining interval alternatives before uncovered Boolean gates. Finding its
+current unfixed finite owner charges each visit to the existing operation token;
+the value/bound consultation charges that token and consumes the ordinary branch
+check. Missing or nonintegral coordinates retain the ordinary fallback. This
+choice creates no LP invocation, proof authority, model value or new allowance.
 
 Other built-in linear guidance and compound indexed preferences remain opt-in.
 Their existing real-coordinate producer admission is unchanged.
