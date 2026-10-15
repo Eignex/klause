@@ -10,6 +10,10 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
+import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
+import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
+import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.theory.qfnra.PolynomialFormula
 import com.eignex.klause.util.Cancellation
@@ -17,6 +21,7 @@ import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -48,6 +53,33 @@ class GridArithmeticEncoderTest {
 
                 val expected = (index - 2L) * (index - 2L)
                 assertEquals(if (result == expected) PolynomialFormula.TRUE else PolynomialFormula.FALSE, truth)
+            }
+        }
+    }
+
+    @Test
+    fun `private linear grid relations retain conditioning and retraction`() {
+        val input = GridCoordinate(0, -2.0, 2.0, 5)
+        val output = GridCoordinate(1, 0.0, 4.0, 5)
+        for (relation in listOf<Factor>(GridProduct(input, input, output), GridPower(input, 2, output))) {
+            val source = Problem(0, 2, Array(2) { IntDomain(0, 4) }, arrayOf(relation))
+            val encoded = assertNotNull(FactorProjectionProviders.Default.prepare(source)
+                .linearTheoryModel(EncodingTarget.LINEAR))
+            val queries = OpenExactNeighborhood(encoded, TheoryParams(), preparedSource = encoded.prepareExecutionPlan())
+            queries.use {
+                val conflict = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO,
+                    1 to BigFraction.ZERO), emptyMap())
+                val negative = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO,
+                    1 to BigFraction.ofLong(4)), emptyMap())
+                val zero = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ofLong(2),
+                    1 to BigFraction.ZERO), emptyMap())
+                assertIs<ExactNeighborhoodResult.Refuted>(it.check(conflict, Cancellation.Never))
+                assertIs<ExactNeighborhoodResult.Undecided>(it.check(negative, Cancellation { true }))
+                val first = assertIs<ExactNeighborhoodResult.Witness>(it.check(negative, Cancellation.Never)).sample
+                assertIs<ExactNeighborhoodResult.Witness>(it.check(zero, Cancellation.Never))
+
+                assertEquals(0L, first.intValue(0))
+                assertEquals(4L, first.intValue(1))
             }
         }
     }
