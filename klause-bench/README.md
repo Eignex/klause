@@ -333,6 +333,16 @@ control must remain unknown; conflicting source equations are analytic UNSAT con
 and do not receive an independent proof check. JFR and construction are included in
 these diagnostic timings; they are not ordinary CLI throughput measurements.
 
+`bench.profile.LinearPointAdmissionProfile` inspects one default exact-linear opening
+from a hash-pinned original catalog SMT source. Pass `suite=<suite>`, `problem=<name>`
+and `sha256=<original source digest>` through a committed remote lab profile. It retains
+the original source, build/runtime identity, declared and prepared dimensions,
+registered point rows and primitives, completed dependency admission, finite owners
+and the first point primitive's dependency status. The opening uses seed3 and a
+60-second deadline; it makes no traversal decision or source verdict claim. Internal
+reflection is confined to this diagnostic and does not change solver registration,
+work limits or the published API. This is admission evidence, not a solve timing.
+
 `bench.profile.EncoderProviderProfile` runs caller-supplied factor-admitted SMT files
 through normal source routing with default and private equivalent linear encoders.
 Pass `inputs=<comma-separated repository-relative or absolute paths> repeats=N warmups=N seed=N`.
