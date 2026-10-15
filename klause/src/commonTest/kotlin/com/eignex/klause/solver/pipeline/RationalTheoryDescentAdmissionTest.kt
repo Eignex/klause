@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.Candidate
