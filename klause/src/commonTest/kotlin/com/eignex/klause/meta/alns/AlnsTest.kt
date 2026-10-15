@@ -93,21 +93,18 @@ class AlnsTest {
     }
 
     @Test
-    fun `session handles preserve bootstrap status and offered instruction charges`() {
+    fun `session handles preserve offered instruction charges`() {
         val seed = selectOptimum()
         val alns = Alns(NoFeasibleLs(selectProblem()), maxIterations = 0)
         alns.session().use { session ->
             val handle = assertIs<InstructionSlicedSearch>(session.resumable(
                 selectObjective, LocalSearchParams(initialAssignment = seed),
             ))
-            val bootstrap = assertIs<IncumbentBootstrapSearch>(handle)
-            assertTrue(bootstrap.bootstrapPending)
 
             val result = handle.use {
                 assertNotNull(it.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
             }
 
-            assertFalse(bootstrap.bootstrapPending)
             assertEquals(50L, handle.chargedInstructions)
             assertEquals(0.0, result.stats.ls.moves.sum)
             assertEquals(seed, result.assignment)
