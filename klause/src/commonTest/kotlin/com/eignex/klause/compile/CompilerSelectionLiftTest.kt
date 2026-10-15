@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.model.IntLit
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.element
@@ -25,7 +26,7 @@ class CompilerSelectionLiftTest {
         class S : VariableSchema() {
             val b by boolVar()
             val x by intVar(0, 2)
-            val relation by constraint { b iff (max(x, 1) eq 2) }
+            val relation by constraint { b iff (max(x, IntLit(1)) eq 2) }
         }
         val compiled = S().compile()
         val solver = BacktrackSolver(compiled)
@@ -44,7 +45,7 @@ class CompilerSelectionLiftTest {
     fun `optional defaults retain their selection inside an extremum`() {
         class S : VariableSchema() {
             val x by optIntVar(1, 3)
-            val relation by constraint { min(x.valueOr(2), 3) eq 2 }
+            val relation by constraint { min(x.valueOr(2), IntLit(3)) eq 2 }
         }
         val schema = S()
         val compiled = schema.compile()
