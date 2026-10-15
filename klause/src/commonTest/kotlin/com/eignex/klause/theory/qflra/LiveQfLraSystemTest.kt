@@ -13,7 +13,13 @@ import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.PersistentLpSolver
+import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.exactForm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -84,7 +90,7 @@ class LiveQfLraSystemTest {
 
     @Test
     fun `a declined definition batch preserves a conflicting source prefix`() {
-        val factors = arrayOf(
+        val factors = arrayOf<Factor>(
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.LE, 3.0),
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.GE, 4.0),
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.LE, 5.0),
@@ -104,7 +110,7 @@ class LiveQfLraSystemTest {
 
     @Test
     fun `an earlier source equality simplifies a later expression without row capacity`() {
-        val factors = arrayOf(
+        val factors = arrayOf<Factor>(
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 2.0),
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.LE, 3.0),
         )
@@ -125,16 +131,40 @@ class LiveQfLraSystemTest {
     }
 
     @Test
-    fun `cancelled definition preparation leaves capacity for a later assertion`() {
-        val factor = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
-            doubleArrayOf(1.0, 1.0), LinearOp.LE, 3.0)
-        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 1) }).use { lp ->
-            val system = LiveQfLraSystem(source().withFactors(arrayOf(factor)), lp)
+    fun `cancellation during a definition append leaves its mappings uncommitted`() {
+        var cancelled = false
+        val stop = Cancellation { cancelled }
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val solver = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                if (model.m == 2) cancelled = true
+                return solver
+            }
+        }
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.LE, 3.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.LE, 5.0),
+        )
+        LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(engineFactory = factory),
+            cancellation = stop).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(factors), lp)
             assertTrue(system.install())
-            val comparison = factor.linearRows.single().exactForm(2).comparison(true) { false }
+            val comparisons = factors.map { it.linearRows.single().exactForm(2).comparison(true) { false } }
 
-            assertNull(system.prepareComparisons(listOf(comparison), 0, Cancellation { true }))
-            assertTrue(system.assertRow(row(listOf(1, 2), 4), axiom))
+            assertNull(system.prepareComparisons(comparisons, 0, stop))
+            assertTrue(cancelled)
+            cancelled = false
+            assertTrue(system.assertComparison(comparisons.first(), null, axiom))
 
             assertEquals(LpVerdict.ATTAINED_OPTIMUM, assertNotNull(lp.solve()).verdict)
         }
