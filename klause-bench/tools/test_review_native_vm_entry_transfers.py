@@ -12,7 +12,7 @@ import review_native_vm_entry_transfers as review
 class ReviewNativeVmEntryTransfersTest(unittest.TestCase):
     def test_direct_targets_keep_boundary_and_capture_span_distinctions(self):
         rows = [{'address': 100 + index, 'bytesHex': '90', 'mnemonic': 'call', 'operands': operand}
-                for index, operand in enumerate(['0x64', '0x69', '0x6c', '0x80'])]
+                for index, operand in enumerate(['0x64', '0x69', '0x70', '0x80'])]
 
         result = review.classify(rows, {'value': 100, 'size': 20}, 10, {})
 
