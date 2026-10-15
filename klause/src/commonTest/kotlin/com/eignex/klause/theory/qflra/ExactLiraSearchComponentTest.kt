@@ -66,6 +66,69 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `mixed point Boolean proposals expire across retraction and refresh with a new point`() {
+        val model = Problem(
+            numBoolVars = 3, intBounds = openBounds(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+            val proposal = assertNotNull(component.partialPointBranchProposal())
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3), proposals = listOf(proposal))
+            assertNull(proposal.nextBranch(session))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val alternatives = listOf(SearchDecision.Bool(Lit.make(1, true)), SearchDecision.Bool(Lit.make(1, false)))
+            assertEquals(alternatives, proposal.nextBranch(session))
+            assertNull(session.boolValue(1))
+            assertIs<ComponentResult.Consistent>(session.push(alternatives.first()))
+
+            session.popTo(0)
+
+            assertNull(proposal.nextBranch(session))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertEquals(alternatives, proposal.nextBranch(session))
+        }
+    }
+
+    @Test
+    fun `stopped point Boolean proposals retain ordinary source completion`() {
+        var stopped = false
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = stopped
+        }
+        val model = Problem(
+            numBoolVars = 3, intBounds = openBounds(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            assertNotNull(component.partialPointHints(stop, defaultOpening = true))
+            val proposal = assertNotNull(component.partialPointBranchProposal())
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3), proposals = listOf(proposal))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertNotNull(proposal.nextBranch(session))
+
+            stopped = true
+
+            assertNull(proposal.nextBranch(session))
+            val result = assertIs<SearchResult.Satisfied>(session.solve(3))
+            val witness = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertEquals(witness.ints[0] <= BIG_ZERO, witness.boolValue(1))
+            assertEquals(true, witness.boolValue(2))
+            assertEquals(BigFraction.ZERO, witness.reals.single())
+        }
+    }
+
+    @Test
     fun `explicit integer point preparation declines without charging its caller`() {
         var charged = 0L
         val stop = object : Cancellation {

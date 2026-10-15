@@ -45,6 +45,18 @@ fractional source integer is not a model value and integrality remains a
 complete-check requirement. Integer branches, retraction, stops and opening close
 retain the component point lifetime and existing work owners.
 
+For a default opening with original integer and real coordinates, the completed
+point table can supply a separate Boolean proposal before the ordinary Boolean
+heuristic. It chooses an available unassigned primitive and tries its point
+preference before the complement. Capture retains one ID from the existing
+registered primitive array under the current numerical operation token; each
+consultation checks the same point lifetime without a new scan or numerical call.
+Unavailable metadata retains the ordinary heuristic and arithmetic/finite priority.
+Explicit allowances, custom registered providers and multiple completion owners
+retain their existing policy. The arithmetic component keeps its identity and
+model contributions; proposal registration precedes shared session construction.
+Point polarity hints retain their separate polarity-only interface and observations.
+
 Open mixed traversal consults arithmetic proposals before the finite fallback. A completed
 continuous point can guide adjacent exhaustive integer splits while bounded declarations
 retain CP ownership. Integral point coordinates guide a finite equality and its remaining

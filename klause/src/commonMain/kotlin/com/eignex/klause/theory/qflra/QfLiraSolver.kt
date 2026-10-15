@@ -59,6 +59,7 @@ import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchProposal
+import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchContext
@@ -215,6 +216,9 @@ class ExactLiraSearchComponent private constructor(
     private var candidate: List<BigFraction>? = null
     private var pointHintRows: List<PreparedSourceRow>? = null
     private var pointHintValues: IntArray? = null
+    private var pointHintVariables: IntArray? = null
+    private var pointHintVariable = -1
+    private var pointHintBooleanSelection = false
     private var pointHintLevel = -1
     private var pointHintStop = Cancellation.Never
     private var dirty = true
@@ -315,7 +319,10 @@ class ExactLiraSearchComponent private constructor(
         if (stop() || rows.isEmpty()) return null
         pointHintRows = rows.toList()
         pointHintStop = stop
-        return variables.toIntArray() to SearchCandidateHints { variable ->
+        pointHintBooleanSelection = defaultOpening && model.numIntVars > 0 && sourceRealCount > 0
+        val variableIds = variables.toIntArray()
+        pointHintVariables = variableIds.takeIf { pointHintBooleanSelection }
+        return variableIds to SearchCandidateHints { variable ->
             if (!partialPointHintAvailable()) null
             else if (defaultOpening && graphFirst && !defaultGraphSelections) {
                 smtStats?.observeDefaultGraphHintRelease()
@@ -323,6 +330,27 @@ class ExactLiraSearchComponent private constructor(
                 null
             } else pointHintValues?.getOrNull(variable)?.let { value ->
                 when (value) { TRUE -> true; FALSE -> false; else -> null }
+            }
+        }
+    }
+
+    internal val hasDefaultPointBooleanProposal: Boolean get() = pointHintBooleanSelection
+
+    internal fun partialPointBranchProposal(): SearchBranchProposal? {
+        check(context == null)
+        if (model.numIntVars == 0 || sourceRealCount == 0 || model.numBoolVars == 0) return null
+        return object : SearchBranchProposal {
+            override val branchKind: SearchBranchKind get() = SearchBranchKind.Boolean
+
+            override fun nextBranch(context: SearchContext): List<SearchDecision>? {
+                if (context !== this@ExactLiraSearchComponent.context ||
+                    !pointHintBooleanSelection || !partialPointHintAvailable()
+                ) return null
+                val variable = pointHintVariable
+                val value = pointHintValues?.getOrNull(variable) ?: return null
+                if ((value != TRUE && value != FALSE) || context.boolValue(variable) != null) return null
+                val literal = Lit.make(variable, value == TRUE)
+                return listOf(SearchDecision.Bool(literal), SearchDecision.Bool(literal xor 1))
             }
         }
     }
@@ -339,12 +367,16 @@ class ExactLiraSearchComponent private constructor(
     internal fun releasePartialPointHints() {
         pointHintRows = null
         pointHintValues = null
+        pointHintVariables = null
+        pointHintVariable = -1
+        pointHintBooleanSelection = false
         pointHintLevel = -1
         pointHintStop = Cancellation.Never
     }
 
     private fun capturePointHints(point: List<BigFraction>, context: SearchContext, graph: Boolean = false) {
         pointHintValues = null
+        pointHintVariable = -1
         val rows = pointHintRows ?: return
         if (point.size != model.numRealVars + model.numIntVars || operationStop() || pointHintStop()) return
         operationStop.charge(model.numBoolVars.toLong() + point.size + 1L)
@@ -371,7 +403,20 @@ class ExactLiraSearchComponent private constructor(
                 values[variable] = value
             }
         }
+        var nextVariable = -1
+        val variables = pointHintVariables
+        if (pointHintBooleanSelection && variables != null) {
+            for (variable in variables) {
+                operationStop.charge(1)
+                if (operationStop() || pointHintStop()) return
+                if ((values[variable] == TRUE || values[variable] == FALSE) && context.boolValue(variable) == null) {
+                    nextVariable = variable
+                    break
+                }
+            }
+        }
         if (operationStop() || pointHintStop()) return
+        pointHintVariable = nextVariable
         pointHintLevel = context.decisionLevel
         pointHintValues = values
         smtStats?.observePointHintCapture(graph)

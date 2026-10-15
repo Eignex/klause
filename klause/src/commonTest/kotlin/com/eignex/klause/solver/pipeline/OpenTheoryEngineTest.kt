@@ -3,11 +3,13 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -16,6 +18,9 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchNodeDisposition
+import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
@@ -24,11 +29,49 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpenTheoryEngineTest {
 
     private fun sourceRoute(model: Problem): ProblemPipeline = model.sourceRoute()
+
+    @Test
+    fun `default mixed point choices precede fallback Boolean selection`() {
+        for (allowance in listOf(null, 0L, 1L)) {
+            val open = Bits.full(1)
+            val model = Problem(
+                numBoolVars = 3,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+                factors = arrayOf(
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                    ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                    ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ),
+            )
+            val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+            val params = TheoryParams(openHintFlips = allowance)
+            var pause = true
+            val policy = object : SearchNodePolicy {
+                override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
+                    if (pause && context.decisionLevel > 0) SearchNodeDisposition.Pause else SearchNodeDisposition.Expand
+            }
+            val started = assertIs<OpenTheoryStart.Running>(engine.begin(params, OpenTheorySolveState(params), policy))
+            started.run.use { run ->
+                assertNull(run.advance())
+
+                assertEquals(false, run.session.boolValue(0))
+                assertEquals(if (allowance == null) true else null, run.session.boolValue(1))
+                pause = false
+                val assignment = assertIs<OpenTheoryResult.Sat>(run.advance()).assignment
+                assertEquals(assignment.intValue(0).toLong() <= 0L, assignment.boolValue(1))
+                assertEquals(true, assignment.boolValue(2))
+                assertEquals("0", assignment.realValue(0))
+            }
+        }
+    }
 
     @Test
     fun `difference openings retain their component owned model payload`() {

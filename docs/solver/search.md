@@ -142,6 +142,17 @@ live default consultation and supply no preference. Registration and all complet
 capture work retain their spent debit; later checks do not recapture released hints in that
 opening. An unavailable point or a caller preference that bypasses the component does
 not trigger this release. Source checks and graph or LP fallback retain their owners.
+Default openings with original integer and real coordinates can also register a
+separate Boolean branch proposal beside the unchanged arithmetic component. An
+existing completed point table retains its first available unassigned primitive
+ID. That proposal precedes the ordinary Boolean heuristic, returning the same two
+complementary source literals with the point preference first. Missing, stale,
+stopped or already assigned metadata retains ordinary selection and its existing
+arithmetic/finite priority. Explicit allowances, custom registered providers and
+multiple completion owners retain their existing policy. This selection creates
+no source facts, numerical invocation or Boolean draw. `SearchCandidateHints`
+remains polarity-only; its consultation counters do not count the separate proposal.
+
 Other built-in exact-linear point guidance and compound source-clause preferences
 use the existing `openHintFlips` opt-in, retaining their real-coordinate producer
 admission. Explicit zero permits bounded construction observations but supplies no

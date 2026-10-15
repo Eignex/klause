@@ -47,7 +47,9 @@ data class TheoryParams(
      *
      * A null allowance permits direct primitive point preferences for one linear completion owner
      * with source integer or real coordinates, without a source-clause index
-     * or Boolean draw. Other built-in linear point guidance and compound source-clause preferences use
+     * or Boolean draw. Original mixed integer/real sources can also select a primitive Boolean through
+     * a separate live-point branch proposal before the ordinary heuristic. Other built-in linear point
+     * guidance and compound source-clause preferences use
      * this opt-in. Zero permits bounded construction observations
      * but publishes no component preference; a positive value permits indexed preferences after caller
      * or deferred hints decline. Construction and arithmetic comparisons retain their existing owners
@@ -59,10 +61,10 @@ data class TheoryParams(
      */
     val openHintFlips: Long? = null,
     /**
-     * Boolean branching for each feasibility traversal.
+     * Fallback Boolean branching for each feasibility traversal.
      *
-     * Only the Boolean skeleton is branched here, so this is the whole variable-order lever the open
-     * route has; the theory decides the arithmetic residual at a leaf either way.
+     * Default mixed live-point proposals can precede this heuristic. Arithmetic and finite proposals
+     * retain the selected route's category priority and source-check obligations.
      */
     val openBranching: OpenBranching = OpenBranching.SourceOrder,
     /**

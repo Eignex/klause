@@ -55,6 +55,9 @@ precedes component initialization; capture and bounded exact comparison evaluati
 retain the existing numerical operation owner. No extra LP,
 graph check, Boolean draw or source-clause index is created. A custom registered
 provider retains precedence, even when it declines a selected Boolean.
+Mixed sources can separately select an available primitive through their
+[Boolean proposal policy](linear-mixed.md#solving-and-composition); the polarity
+interface and pure-real variable selection remain unchanged.
 When initialization establishes complete pure-real difference-graph admission under
 the production certification policy, direct default preferences remain enabled beside
 an at-most-one or exactly-one Boolean cardinality over three or more literals.

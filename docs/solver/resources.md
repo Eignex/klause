@@ -260,6 +260,14 @@ The opening registration and all capture work already spent remain charged witho
 checks skip released hint capture. No live consultation means this release has not
 occurred, including when caller preferences bypass the component. Required source,
 graph, LP and witness work retains its existing token and limits.
+Default mixed Boolean proposals retain one ID from the existing primitive
+registration array. Selecting that ID scans only registered primitives while the
+point table is captured, charging each visit to the same numerical operation token
+and polling its unchanged stops. Table publication and selection metadata commit
+together; an interrupted prefix supplies neither. Branch consultation reads the
+live metadata without another scan, point copy, numerical call or allowance.
+Closing releases the registration array and choice with the optional point table.
+
 Other built-in linear guidance and compound indexed preferences remain opt-in.
 Their existing real-coordinate producer admission is unchanged.
 Explicit zero can retain construction observations but withholds component

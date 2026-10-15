@@ -25,7 +25,9 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchSelection
+import com.eignex.klause.solver.search.SearchBranchSources
 import com.eignex.klause.solver.search.SearchCandidateHints
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRestart
@@ -37,6 +39,7 @@ import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.util.BigInt
@@ -418,6 +421,15 @@ class OpenTheoryEngine internal constructor(
                 OpenBranching.SourceOrder -> BooleanBranching.SourceOrder(model.numBoolVars)
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
             }
+            val ordinarySelection = if (plan.theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) {
+                SearchBranchSelection.Priority(listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Boolean,
+                    SearchBranchKind.Finite))
+            } else if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA && plan.cpIntVars.isNotEmpty()) {
+                SearchBranchSelection.Priority(listOf(SearchBranchKind.Boolean, SearchBranchKind.Arithmetic,
+                    SearchBranchKind.Finite))
+            } else SearchBranchSelection.Default
+            val pointSelection = params.openHintFlips == null && hints === SearchCandidateHints.None &&
+                (planned.theory as? ExactLiraSearchComponent)?.hasDefaultPointBooleanProposal == true
             val run = planned.session.openRun(
                 model.numBoolVars,
                 solveParams,
@@ -425,13 +437,7 @@ class OpenTheoryEngine internal constructor(
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
                 nodePolicy = nodePolicy,
                 candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage),
-                branchSelection = if (plan.theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) {
-                    SearchBranchSelection.Priority(listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Boolean,
-                        SearchBranchKind.Finite))
-                } else if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
-                    plan.cpIntVars.isNotEmpty()
-                ) SearchBranchSelection.Priority(listOf(SearchBranchKind.Boolean, SearchBranchKind.Arithmetic,
-                    SearchBranchKind.Finite)) else SearchBranchSelection.Default,
+                branchSelection = if (pointSelection) PointBooleanSelection(ordinarySelection) else ordinarySelection,
             )
             handedOff = true
             return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, stats, state, params))
@@ -641,4 +647,9 @@ internal sealed interface OpenTheoryStart {
 
     /** The search is set up; [run] drives it. */
     class Running(val run: OpenTheoryEngine.OpenTheoryRun) : OpenTheoryStart
+}
+
+internal class PointBooleanSelection(private val fallback: SearchBranchSelection) : SearchBranchSelection {
+    override fun alternatives(sources: SearchBranchSources): List<SearchDecision>? =
+        sources.componentAlternatives(SearchBranchKind.Boolean) ?: fallback.alternatives(sources)
 }

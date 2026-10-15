@@ -72,6 +72,8 @@ internal fun ComponentPlan.theoryComponentFactory(
                         openHintFlips = opening.openHintFlips,
                     )
                 }
+            } else {
+                component.partialPointBranchProposal()?.let(opening::registerBranchProposal)
             }
         })
     }
