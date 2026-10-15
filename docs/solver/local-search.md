@@ -132,7 +132,9 @@ Integer `Power` outputs form functional definition nodes with exact signed-word
 power evaluation before domain clipping. Overflow cannot satisfy a signed endpoint.
 Competing and cyclic definitions remain searched. Native repairs include the current
 power value and every admissible exact signed root of the current output; alias moves
-substitute into both operand and result roles before grading.
+substitute into both operand and result roles before grading. Requests to maintained
+power outputs backsolve at most sixteen nested power definitions into their admissible
+signed roots, using the ordinary channeling and affine input repair sinks.
 
 Hinted min/max expression outputs, their materialized affine operands and output aliases
 form a one-way definition cone. Unhinted min/max globals remain searched. Competing
