@@ -8,6 +8,11 @@ row snapshot cannot substitute for that original-source binding. An omitted affi
 objective has no affine bound authority; it does not describe a constant objective.
 Source-specific objective derivations belong to the declared semantics checker.
 
+Original-IR witness contexts call [shared source validation](validation.md) directly
+for finite factor and rational coordinate checks. Their exact source restrictions
+and specialized affine, algebraic and symbolic checks retain their existing scope;
+a runtime publication or heuristic score supplies no additional authority.
+
 `SourceScope` captures original revision and declared semantics, exact invocation
 restrictions, objective identity and direction. Every check compares this scope
 before considering the derivation. Imports must name the same revision, semantics

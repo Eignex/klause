@@ -47,7 +47,7 @@ internal fun combineCounts(proven: Count, approximate: () -> Count): Count {
         estimate = approx.estimate.coerceIn(lower, upper),
         lower = lower,
         upper = upper,
-        exact = lower == upper,
+        exact = approx.exact,
         confidence = approx.confidence,
     )
 }

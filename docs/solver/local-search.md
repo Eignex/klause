@@ -15,7 +15,8 @@ A run prepares its model projection, initializes an assignment, generates and sc
 moves, accepts selected changes, and restarts when needed. Candidate publication
 checks every required source constraint, including arithmetic completion. A low
 score guides the walk; it does not prove feasibility, optimality or infeasibility.
-Propagation-only custom factors receive a private full-coordinate check before
+Propagation-only custom factors use the shared [source validation](validation.md)
+service for a private full-coordinate check before
 caller completion or publication; see [custom factor checks](search.md#custom-factor-publication-checks).
 
 The sections follow preparation, move mechanics and run lifetime, then diagnostics.
@@ -36,7 +37,10 @@ relation. Repeated operands in fixed-power chains and result aliases use this ru
 the state's shared violation compression. Product residuals subtract the result exactly
 before capping the distance; an overflowing product cannot satisfy a signed-word endpoint.
 Representable products keep the primitive path, while overflow uses a private 128-bit
-temporary with no retained invariant payload. Assignments, RNGs,
+temporary with no retained invariant payload. Increasing chains compare adjacent values
+without adding their strict gap at a signed-word endpoint. Their graded distance adds
+the gap after subtraction, and seeds and moves decline an unrepresentable successor or
+predecessor. Assignments, RNGs,
 weights and invariant payloads belong to each live state. Immutable per-factor integer
 lookups store their arrays on one owner, shared with the projection. Compact key ranges
 use offset arrays; sparse ranges use primitive probing with storage bounded by entry

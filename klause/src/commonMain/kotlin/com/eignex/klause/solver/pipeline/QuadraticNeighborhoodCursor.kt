@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.solver.resources.NodeAllowance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SolveStats
@@ -12,7 +12,7 @@ import kotlin.random.Random
 internal class QuadraticNeighborhoodAllowance(
     val maximumMoves: Long,
     val maximumInstructions: Long,
-    private val nodeBudget: NodeBudget?,
+    private val nodeBudget: NodeAllowance?,
 ) {
     init { require(maximumMoves >= 0 && maximumInstructions >= 0) }
     var moves: Long = 0

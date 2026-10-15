@@ -15,6 +15,10 @@ caller assumptions; [presolve](presolve.md) owns reconstruction;
 [local search](local-search.md) and [portfolios](portfolio.md) own their strategy
 state and scheduling. [Model ownership](../model.md) defines the engine views.
 
+Reusable candidate fixpoint checks belong to [source validation](validation.md).
+Traversal calls that service with its existing assumptions, cancellation and work
+accounting; validation retains no backtracking state.
+
 ## Shared component search
 
 [solver.search](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/)
@@ -348,6 +352,12 @@ unfixed columns can still join unary guarded bounds. Objective-bound overlays
 deliberately omit CP propagation. Every inert built-in role carries a reason. A sound LP
 family can decline emission under feature, resource or domain gates, and omitted rows
 weaken the relaxation.
+
+Strict increasing chains reject an endpoint that needs a successor above `Long.MAX_VALUE`
+or a predecessor below `Long.MIN_VALUE`. Distinct-value kernel scans compare signed
+bounds directly and keep group initialization separate from legitimate endpoint values.
+Lexicographic comparisons with an empty common prefix use the vector-length tie-break;
+a length-only conflict has no domain premises.
 
 Product bounds clamp corner products to signed-word endpoints instead of wrapping them.
 Repeated operands use nonnegative square bounds and exact integer square-root inverse

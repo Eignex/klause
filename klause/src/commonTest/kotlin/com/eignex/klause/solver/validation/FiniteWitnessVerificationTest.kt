@@ -1,4 +1,4 @@
-package com.eignex.klause.portfolio
+package com.eignex.klause.solver.validation
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct

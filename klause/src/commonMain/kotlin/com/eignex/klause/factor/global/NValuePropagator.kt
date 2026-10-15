@@ -373,12 +373,10 @@ internal class NValuePropagator(
     ): Int {
         // Scan variables in value order (lower bound ascending, or upper bound descending), ties by
         // index descending, so the kernel grouping is deterministic across fires. A window closes
-        // whenever the next variable cannot overlap the running one. The
-        // sort key `primary` is `minVal` (or `-maxVal` to sort descending) and ties break by index
-        // descending; sorting an index permutation by the full `Long` key (rather than packing key and
-        // index into one word) keeps wide bounds intact.
-        val primary = LongArray(nv) { if (lowerPass) minVal[it] else -maxVal[it] }
-        val sorted = (0 until nv).sortedWith(compareBy<Int> { primary[it] }.thenByDescending { it })
+        // whenever the next variable cannot overlap the running one.
+        // Compare full bounds directly: negating Long.MIN_VALUE cannot reverse its order.
+        val comparator = if (lowerPass) compareBy<Int> { minVal[it] } else compareByDescending<Int> { maxVal[it] }
+        val sorted = (0 until nv).sortedWith(comparator.thenByDescending { it })
         for (idx in 0 until nv) order[idx] = sorted[idx]
         val kerRep = BooleanArray(nv)
         // Per group: the member whose bound closes its window (its least upper bound in the lower pass), and
@@ -390,7 +388,7 @@ internal class NValuePropagator(
         var nbKer = 0
         for (idx in 0 until nv) {
             val node = order[idx]
-            if (min == Long.MIN_VALUE) {
+            if (idx == 0) {
                 min = minVal[node]
                 max = maxVal[node]
                 nbKer++

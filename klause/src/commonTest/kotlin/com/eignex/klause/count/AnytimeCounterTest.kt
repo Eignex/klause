@@ -57,6 +57,28 @@ class AnytimeCounterTest {
     }
 
     @Test
+    fun `a bounded check budget counts a prefix of an unindexable integer domain`() {
+        val domain = IntDomain(0L, Int.MAX_VALUE.toLong())
+        val solver = BacktrackSolver(Problem(0, 1, arrayOf(domain), emptyArray()).bake())
+
+        val result = solver.exactCount(ExactCountConfig(maxChecks = 3L)).last()
+
+        assertEquals(2L, result.lower)
+        assertEquals(Int.MAX_VALUE.toLong() + 1L, result.upper)
+        assertFalse(result.exact)
+    }
+
+    @Test
+    fun `integer counting stops at the largest Long value without wrapping`() {
+        val domain = IntDomain(Long.MAX_VALUE - 1L, Long.MAX_VALUE)
+        val solver = BacktrackSolver(Problem(0, 1, arrayOf(domain), emptyArray()).bake())
+
+        val result = solver.exactCount(ExactCountConfig(maxChecks = 3L)).last()
+
+        assertEquals(Count(2L, 2L, 2L, exact = true, confidence = 1.0), result)
+    }
+
+    @Test
     fun `mixed projection retains the deeper frontier at every budget boundary`() {
         val solver = BacktrackSolver(Problem(2, 2, Array(2) { IntDomain(0, 2) }, emptyArray()).bake())
         val config = ExactCountConfig(samplingSet = intArrayOf(1), intSamplingSet = intArrayOf(0), reportEvery = 1L)

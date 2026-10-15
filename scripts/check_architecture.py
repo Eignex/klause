@@ -11,6 +11,7 @@ ROOT = "com.eignex.klause"
 # Closed lists apply to mechanism packages; forbidden lists express caller separation.
 ALLOWED = {
     "util": ("util",),
+    "solver.resources": ("solver.resources", "util"),
     "ir": ("ir", "util"),
     "simplex.exact": ("simplex.exact", "util"),
     "simplex.basis": ("simplex.basis", "simplex.exact", "util"),
@@ -23,13 +24,26 @@ ALLOWED = {
         "arithmetic.real", "arithmetic.polynomial", "arithmetic.transcendental", "simplex.exact", "util",
     ),
     "arithmetic.difference": ("arithmetic.difference", "ir", "util"),
+    "solver.validation": (
+        "solver.validation", "factor", "ir", "propagation", "simplex.exact", "util",
+        "solver.Sample", "solver.incumbent", "solver.objective", "solver.search",
+        "lp.ExactWitness", "lp.exactComparison",
+    ),
 }
 FORBIDDEN = {
     "lowering": ("compile", "schema", "formats"),
+    "localsearch": ("backtrack.LS_INSTRUCTIONS_PER_WORK",),
+    "portfolio": ("backtrack.LS_INSTRUCTIONS_PER_WORK",),
+    "meta": ("backtrack.LS_INSTRUCTIONS_PER_WORK",),
     "formats": ("compile", "schema", "theory"),
     "bound": ("lp.engine",),
+    "solver.evidence": (
+        "backtrack.composedFixpoint", "portfolio.verifyRealCoordinates", "portfolio.finiteWitnessVerifier",
+        "solver.pipeline.verifyOpenWitness", "solver.pipeline.refuteOpenWitness",
+    ),
+    "localsearch": ("backtrack.composedFixpoint", "portfolio.verifyRealCoordinates"),
     "solver.pipeline": (
-        "formats", "theory.qflra.SourceBoundAtom", "theory.qflra.SourceBoundTerm", "theory.qflra.SourceBoundLimits",
+        "formats", "backtrack.LS_INSTRUCTIONS_PER_WORK", "theory.qflra.SourceBoundAtom", "theory.qflra.SourceBoundTerm", "theory.qflra.SourceBoundLimits",
     ),
     "lp": ("theory.qflra.SourceBoundAtom", "theory.qflra.SourceBoundTerm", "theory.qflra.SourceBoundLimits"),
     "solver.search": ("theory", "lp", "propagation", "backtrack"),

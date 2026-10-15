@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
-import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.simplex.exact.BigFraction
@@ -9,6 +8,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.validation.composedFixpoint
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation
 import com.eignex.klause.theory.qfnra.QfNraResult
@@ -59,7 +59,8 @@ internal class PolynomialExactNeighborhood(
     fun search(adaptive: Boolean, seed: Long, maximumMoves: Long, maximumInstructions: Long,
         maximumImprovementMoves: Long?, nodeBudget: NodeBudget?): ExactNeighborhood = ExactNeighborhood(
         0, List(coordinates.size) { BigFraction.ZERO }, this, objective,
-        coordinateValues = { sample -> centers(sample) }, adaptive = adaptive, seed = seed, nodeBudget = nodeBudget,
+        coordinateValues = { sample -> centers(sample) }, adaptive = adaptive, seed = seed,
+        nodeBudget = nodeBudget?.allowance,
         maximumMoves = maximumMoves, maximumInstructions = maximumInstructions,
         maximumImprovementMoves = maximumImprovementMoves, nativeWork = { invocation.stats.workSpent },
     )

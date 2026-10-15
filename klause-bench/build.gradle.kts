@@ -88,6 +88,15 @@ val checkNativeVmSymbolQueries = tasks.register<Exec>("checkNativeVmSymbolQuerie
         "tools/native_vm_loaded_module.py", "tools/read_native_vm_metadata.py")
 }
 
+val checkNativeVmDebugImage = tasks.register<Exec>("checkNativeVmDebugImage") {
+    group = "verification"
+    description = "Test official external JVM debug-file archive and identity binding."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_bind_native_vm_debug_image.py")
+    inputs.files("tools/bind_native_vm_debug_image.py", "tools/test_bind_native_vm_debug_image.py",
+        "tools/read_native_vm_symbols.py")
+}
+
 val checkNativeVmEntries = tasks.register<Exec>("checkNativeVmEntries") {
     group = "verification"
     description = "Test executable entry byte ownership and partial decoder captures."
@@ -220,7 +229,7 @@ tasks.named("check") {
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,
         checkNativeVmLiveArgumentReview, checkNativeVmEventLoss, checkNativeVmEventLossReview,
         checkNativeVmBoundaryEntries, checkNativeVmBoundaryLifecycle, checkNativeVmBoundaryLifecycleReview,
-        checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkNativeVmEntryTransfers)
+        checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkNativeVmEntryTransfers, checkNativeVmDebugImage)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.

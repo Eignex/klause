@@ -35,6 +35,35 @@ class NValuePropagatorTest {
     }
 
     @Test
+    fun `equal minimum signed word values require only one distinct value`() {
+        for (mode in listOf(NValue.Mode.Eq, NValue.Mode.AtMost)) {
+            val problem = nvalueProblem(
+                xsDomains = Array(2) { IntDomain(Long.MIN_VALUE, Long.MIN_VALUE) },
+                nDomain = IntDomain(1, 1),
+                mode = mode,
+            )
+            val state = PropagationState(problem, Assumptions.None)
+            state.currentFactor = 0
+
+            assertTrue(problem.propagators[0].propagate(state, 0), "mode=$mode")
+        }
+    }
+
+    @Test
+    fun `two distinct values exclude a third value beside the minimum signed word endpoint`() {
+        val problem = nvalueProblem(
+            xsDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MIN_VALUE), IntDomain(0, 0), IntDomain(0, 1)),
+            nDomain = IntDomain(2, 2),
+            mode = NValue.Mode.AtMost,
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.currentFactor = 0
+
+        assertTrue(problem.propagators[0].propagate(state, 0))
+        assertEquals(0L, state.intDomains[2].max)
+    }
+
+    @Test
     fun `atleast nvalues forces a variable pinned by the maximum matching`() {
         // x0 ∈ {0}, x1 ∈ {0,1}, with at-least 2 distinct values required. x1 = 0 would leave only
         // one distinct value, so the maximum matching forces x1 = 1. Layout: x0=0, x1=1, n=2.

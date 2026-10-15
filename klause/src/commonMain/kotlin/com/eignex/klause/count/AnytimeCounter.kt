@@ -101,7 +101,7 @@ internal object AnytimeCounter {
             val d = node.depth
             val isBool = d < boolVars.size
             val varId = if (isBool) boolVars[d] else intVars[d - boolVars.size]
-            val values: List<Long> = if (isBool) listOf(0L, 1L) else valuesOf(problem, varId)
+            val values = if (isBool) sequenceOf(0L, 1L) else valuesOf(problem, varId)
 
             for (raw in values) {
                 if (checks >= config.maxChecks) break
@@ -140,9 +140,11 @@ internal object AnytimeCounter {
         maxDecisions = config.maxDecisionsPerCheck,
     )
 
-    private fun valuesOf(problem: BakedProblem, intVar: Int): List<Long> {
-        val span = problem.rootIntDomain(intVar).span()
-        return List(span.size) { span.valueAt(it) }
+    private fun valuesOf(problem: BakedProblem, intVar: Int): Sequence<Long> {
+        val domain = problem.rootIntDomain(intVar)
+        return generateSequence(domain.min) { value ->
+            if (value == domain.max) null else domain.higher(value)
+        }
     }
 
     private fun clampToLong(mass: BigInt): Long =

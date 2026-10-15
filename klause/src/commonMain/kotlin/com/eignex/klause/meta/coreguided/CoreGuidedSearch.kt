@@ -4,7 +4,6 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.PROPAGATION_WORK_PER_NODE
 import com.eignex.klause.backtrack.ResumableSatisfaction
-import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -32,6 +31,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
+import com.eignex.klause.solver.validation.composedFixpoint
 import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
@@ -221,7 +221,7 @@ internal class CoreGuidedSearch(
             }
             val decisionLimit = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
             val decisions = addWork(completedStats.search.nodes.sum.toLong(), handle.stats.search.nodes.sum.toLong())
-            val quotaExhausted = params.nodeBudget?.exhausted() == true || decisions >= decisionLimit
+            val quotaExhausted = params.nodeBudget?.allowance?.exhausted() == true || decisions >= decisionLimit
             val paused = result is SolveResult.Unknown &&
                 (result.reason == TerminationReason.Cancelled || result.reason == TerminationReason.BudgetExhausted) &&
                 segment() && !token() && !quotaExhausted

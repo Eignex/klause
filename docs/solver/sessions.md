@@ -84,10 +84,15 @@ expansion retains its unchecked siblings and the deeper frontier. An `Unknown` c
 retains its entire subtree in the upper bound and prevents an exact result.
 
 Subtree products and frontier updates use exact integer arithmetic, including integer
-domain widths and holes. Published lower bounds rise and upper bounds fall.
+domain widths and holes. Integer values are visited lazily through domain successors,
+so a bounded check budget does not materialize a whole domain or require an `Int`-sized
+value count. Published lower bounds rise and upper bounds fall.
 `Count.upper == Long.MAX_VALUE` is an unbounded sentinel when the bound exceeds the
 public `Long` range; saturation does not establish exactness. Exactness requires all
 projected branches to be decided and a representable count.
+Hash-scaled approximate estimates saturate at that same sentinel. Intersecting an
+approximate interval with proven bounds retains the fallback's confidence and cannot
+establish exactness merely because the interval collapses to one value.
 
 ## Theory invocation scopes
 

@@ -1,6 +1,5 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
@@ -12,6 +11,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.validation.composedFixpoint
 import com.eignex.klause.util.Cancellation
 
 internal class UnscoredCandidateCheck(

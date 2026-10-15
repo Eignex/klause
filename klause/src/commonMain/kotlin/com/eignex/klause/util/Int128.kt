@@ -141,6 +141,8 @@ internal class Int128 {
         // Arithmetic shift right of the 128-bit (nHi signed, nLo unsigned) by k < 64.
         val shLo = ((nLo shr k) or (nHi shl (64 - k))).toLong()
         val shHi = nHi.toLong() shr k // arithmetic (sign-propagating)
+        // The negated quotient may be 2^63 even though the result fits Long.MIN_VALUE.
+        if (shHi == 0L && shLo == Long.MIN_VALUE) return Long.MIN_VALUE
         // floor(−value / 2ᵏ) = (shHi, shLo); ceil(value / 2ᵏ) = −that. Require it fit a Long first.
         if (shHi != (shLo shr 63)) return null
         // Negate the Long result (safe unless it is Long.MIN_VALUE, which then cannot be a Long anyway).
@@ -240,6 +242,7 @@ internal class Int128 {
         }
         if (qHi != 0uL) return null // quotient exceeds 64 bits ⇒ does not fit a Long
         if (!negative) return if (qLo <= Long.MAX_VALUE.toULong()) qLo.toLong() else null
+        if (qLo > Long.MAX_VALUE.toULong() + 1uL) return null
         // Floor of a negative dividend rounds the magnitude up when there is a remainder.
         val mag = if (rem == 0uL) qLo else qLo + 1uL
         return when {

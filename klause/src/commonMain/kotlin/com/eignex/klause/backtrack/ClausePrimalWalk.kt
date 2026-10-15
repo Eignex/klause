@@ -73,7 +73,7 @@ internal class ClausePrimalWalk(
         val startWork = work
         while (!contradiction && unsatisfiedSize > 0 && trialMoves < values.size) {
             if (cancellation() || (workLimit >= 0L && work - startWork >= workLimit)) return null
-            if (nodeBudget?.movesLeft() == 0L) return null
+            if (nodeBudget?.allowance?.movesLeft() == 0L) return null
             val clause = clauses[unsatisfied[random.nextInt(unsatisfiedSize)]]
             visits += clause.literals.size
             val candidates = clause.literals.map { Lit.variable(it) }.distinct().filter { !fixed[it] }
@@ -100,7 +100,7 @@ internal class ClausePrimalWalk(
             flip(selected)
             visits++
             trialMoves++
-            nodeBudget?.spendMoves(1L)
+            nodeBudget?.allowance?.spendMoves(1L)
         }
         val feasible = !contradiction && unsatisfiedSize == 0
         if (!feasible) {

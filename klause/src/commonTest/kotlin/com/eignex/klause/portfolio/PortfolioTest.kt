@@ -31,17 +31,17 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.incumbent.Candidate
-import com.eignex.klause.solver.incumbent.EngineInvocation
-import com.eignex.klause.solver.incumbent.ModelIdentity
-import com.eignex.klause.solver.pipeline.prepareExecutionPlan
-import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.StatelessSession
+import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.ownSearch
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.RunStats
@@ -49,6 +49,7 @@ import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.compareTo
@@ -63,8 +64,8 @@ import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -547,7 +548,6 @@ class PortfolioTest {
         assertEquals(2.0, result.stats.portfolio.sliceGrowth)
         assertEquals(50L, handles.sumOf { it.work })
     }
-
 
     @Test
     fun `a caught reseed close failure retires the arm and retains its incumbent`() {
