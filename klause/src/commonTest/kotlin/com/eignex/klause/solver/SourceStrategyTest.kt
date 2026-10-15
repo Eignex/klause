@@ -63,6 +63,40 @@ import kotlin.test.assertTrue
 
 class SourceStrategyTest {
     @Test
+    fun `bounded conditioned products retain finite holes beside an open linear integer`() {
+        val source = Problem(0, 3, arrayOf(IntDomain(0, 2).excludeValue(1), IntDomain(0, 2), IntDomain(0, 1)),
+            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0), AllDifferent(intArrayOf(0, 1), 0, 3),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 0)),
+            openIntHi = booleanArrayOf(false, false, true), numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 2.0), realUpper = doubleArrayOf(1.0, 2.0))
+        val params = PolynomialTheoryParams(maximumWork = 0, strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(maxFlips = 128, randomSeed = 17),
+        ))
+
+        for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
+            val witness = assertIs<OpenTheoryResult.Sat>(strategy.solve(params)).assignment
+
+            assertEquals("2", witness.intValue(0))
+            assertTrue(witness.intValue(1).toLong() in 0L..1L)
+            assertTrue(witness.intValue(2).toLong() >= 0)
+        }
+        assertTrue(source.intBounds.isOpenUpper(2))
+    }
+
+    @Test
+    fun `conditioned products share one source integer across arithmetic checks`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0), RealProduct(0, 0, 2, 1.0, 1.0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0)),
+            openIntHi = booleanArrayOf(false, true), numRealVars = 3,
+            realLower = doubleArrayOf(1.0, 0.0, 1.0), realUpper = doubleArrayOf(1.0, 0.0, 1.0))
+
+        val result = BacktrackSolver.source(source).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
     fun `a spent polynomial allowance does not block proved finite completion`() {
         val source = Problem(0, 2,
             arrayOf(IntDomain(0, 2), IntDomain(0, 2).excludeValue(1)), arrayOf(

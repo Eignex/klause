@@ -75,8 +75,9 @@ deadline. Probe-call caps do not establish a wall-clock bound.
 Source routing attempts bound closing before rejecting a polynomial composition
 on open integer declarations. Proved bounds retain declared domain holes and
 original factor identities; unrelated finite globals keep their finite owner.
-A surviving open side remains arithmetic-owned and can still decline polynomial
-admission. Native exact indicator rows participate in bound closure only
+A surviving open side remains arithmetic-owned. Bounded integer-conditioned
+linear encoders may supply complete guarded coverage beside that open linear
+fragment; an uncovered nonlinear open composition still declines polynomial admission. Native exact indicator rows participate in bound closure only
 when the source declaration fixes their integer trigger to the enabling value.
 Invocation-local fixings are not permanent source bounds.
 
