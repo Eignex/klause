@@ -1,7 +1,6 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.lock
+import com.eignex.klause.solver.resources.NodeAllowance
 
 /**
  * A solve-wide decision and local-search allowance, retained across resumes, reseeds and repairs.
@@ -15,80 +14,30 @@ import com.eignex.kumulant.stream.lock
  * that work remains charged and cancellation stops later operations at their polling boundaries.
  * Aggregation is synchronized, but concurrent scheduling is not reproducible.
  */
-class NodeBudget private constructor(
-    /** Decision-node equivalents available to this solve or worker quota. */
-    val limit: Long,
-    private val ledger: Ledger,
-    private val parent: NodeBudget?,
-) {
+class NodeBudget private constructor(internal val allowance: NodeAllowance) {
     /** Create a solve allowance, including an already exhausted zero allowance. */
-    constructor(limit: Long) : this(limit, Ledger(), null)
+    constructor(limit: Long) : this(NodeAllowance(limit))
 
-    init {
-        require(limit >= 0L) { "node budget must be nonnegative, got $limit" }
-    }
-
-    private var used = 0L
-    private var moves = 0L
-    private var children: List<NodeBudget>? = null
+    /** Decision-node equivalents available to this solve or worker quota. */
+    val limit: Long get() = allowance.limit
 
     /** Completed decision-node equivalents, including cooperative overspend. */
-    val spent: Long get() = ledger.lock.withLock { spentUnlocked() }
-
-    internal fun spend() = ledger.lock.withLock {
-        record(nodes = 1L, instructions = 0L)
-    }
-
-    internal fun spendMoves(count: Long) = ledger.lock.withLock {
-        if (count > 0L) record(nodes = 0L, instructions = count)
-    }
-
-    internal fun decisionsLeft(): Long = ledger.lock.withLock { (limit - spentUnlocked()).coerceAtLeast(0L) }
-
-    internal fun movesLeft(): Long = ledger.lock.withLock {
-        val capacity = instructionsFor((limit - used).coerceAtLeast(0L))
-        (capacity - moves).coerceAtLeast(0L)
-    }
+    val spent: Long get() = allowance.spent
 
     /** Whether completed work has consumed this allowance. */
-    fun exhausted(): Boolean = ledger.lock.withLock { spentUnlocked() >= limit }
+    fun exhausted(): Boolean = allowance.exhausted()
 
-    internal fun quotas(count: Int): List<NodeBudget> = ledger.lock.withLock {
-        require(count > 0)
-        children?.let {
-            require(it.size == count) { "a solve allowance cannot be repartitioned for another worker count" }
-            return@withLock it
-        }
-        val remaining = (limit - spentUnlocked()).coerceAtLeast(0L)
-        val share = remaining / count
-        val remainder = remaining % count
-        List(count) { index -> NodeBudget(share + if (index < remainder) 1L else 0L, ledger, this) }
-            .also { children = it }
-    }
+    internal fun spend() = allowance.spend()
+    internal fun spendMoves(count: Long) = allowance.spendMoves(count)
+    internal fun decisionsLeft(): Long = allowance.decisionsLeft()
+    internal fun movesLeft(): Long = allowance.movesLeft()
 
-    private fun spentUnlocked(): Long = saturatedSum(used, pricedInstructions(moves))
+    private var children: List<NodeBudget>? = null
 
-    private fun record(nodes: Long, instructions: Long) {
-        used = saturatedSum(used, nodes)
-        moves = saturatedSum(moves, instructions)
-        parent?.record(nodes, instructions)
-    }
-
-    private class Ledger {
-        val lock = Concurrency.Strict.lock()
+    internal fun quotas(count: Int): List<NodeBudget> = allowance.mapQuotas(count) { quotas ->
+        children ?: quotas.map { NodeBudget(it) }.also { children = it }
     }
 }
 
-private fun pricedInstructions(instructions: Long): Long =
-    saturatedSum(saturatedProduct(instructions / 4L, 5L), instructions % 4L * 5L / 4L)
-
-private fun instructionsFor(work: Long): Long = work / 5L * 4L + work % 5L * 4L / 5L
-
-private fun saturatedProduct(value: Long, weight: Long): Long =
-    if (value > Long.MAX_VALUE / weight) Long.MAX_VALUE else value * weight
-
-private fun saturatedSum(left: Long, right: Long): Long =
-    if (right > Long.MAX_VALUE - left) Long.MAX_VALUE else left + right
-
-// Portfolio policy converts native local-search instructions at four instructions per five work units.
-internal const val LS_INSTRUCTIONS_PER_WORK: Double = 0.8
+internal const val LS_INSTRUCTIONS_PER_WORK: Double =
+    com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK

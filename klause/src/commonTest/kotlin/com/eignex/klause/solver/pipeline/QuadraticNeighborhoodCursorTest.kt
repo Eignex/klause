@@ -75,7 +75,7 @@ class QuadraticNeighborhoodCursorTest {
     @Test
     fun `atomic repair work charges the shared allowance once`() {
         val budget = NodeBudget(5)
-        val allowance = QuadraticNeighborhoodAllowance(10, 100, budget)
+        val allowance = QuadraticNeighborhoodAllowance(10, 100, budget.allowance)
         var nativeWork = 0L
         val completion = ExactNeighborhoodCompletion { _, _ ->
             nativeWork += 5

@@ -17,4 +17,22 @@ class NodeBudgetConcurrencyTest {
         assertEquals(400L, budget.spent)
         assertTrue(quotas.all { it.exhausted() })
     }
+    @Test
+    fun `parallel facade and resource workers charge one containing ledger`() {
+        val budget = NodeBudget(400)
+        val facades = budget.quotas(4)
+        val resources = budget.allowance.quotas(4)
+
+        val workers = facades.mapIndexed { index, facade -> thread {
+            repeat(50) {
+                facade.spend()
+                resources[index].spend()
+            }
+        } }
+        workers.forEach { it.join() }
+
+        assertEquals(400L, budget.spent)
+        assertTrue(facades.all { it.exhausted() })
+    }
+
 }

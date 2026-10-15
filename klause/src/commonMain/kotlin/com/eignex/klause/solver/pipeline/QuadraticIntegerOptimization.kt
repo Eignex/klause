@@ -285,7 +285,7 @@ internal class QuadraticIntegerOptimization(
         initialize()
         readIncumbent()?.let { accept(it, heuristic = false) }
         val stop = native.polynomial or controls.strategy.backtrack.cancellation or Cancellation {
-            operation() || budget?.exhausted() == true
+            operation() || budget?.allowance?.exhausted() == true
         }
         if (stop() || params.maximumCandidates == 0L) { terminal = partial(); return }
         val cursor: QuadraticIntegerTraversalCursor = traversal ?: kotlin.run {
@@ -300,7 +300,7 @@ internal class QuadraticIntegerOptimization(
                     listOf(SearchDecision.Bool((id shl 1) or 1), SearchDecision.Bool(id shl 1))
                 }
             }, SearchDecisionBudget {
-                if (budget?.exhausted() == true) false else { budget?.spend(); true }
+                if (budget?.allowance?.exhausted() == true) false else { budget?.allowance?.spend(); true }
             }, stop, ::countedWork).also { traversal = it }
         }
         val event = cursor.advance(global, millis, work) { node ->
@@ -410,7 +410,7 @@ internal class QuadraticIntegerOptimization(
 
     private fun complete(): QuadraticOptimizationResult {
         val stop = native.polynomial or controls.strategy.backtrack.cancellation or Cancellation {
-            budget?.exhausted() == true
+            budget?.allowance?.exhausted() == true
         }
         if (stop() || params.maximumCandidates == 0L) return partial()
         val exhausted = traverse(root, stop, global = true)
@@ -474,7 +474,7 @@ internal class QuadraticIntegerOptimization(
                     }
                 },
                 decisionBudget = SearchDecisionBudget {
-                    if (budget?.exhausted() == true) false else { budget?.spend(); true }
+                    if (budget?.allowance?.exhausted() == true) false else { budget?.allowance?.spend(); true }
                 }, nodePolicy = component,
             )
             while (!stop()) {
@@ -690,7 +690,7 @@ internal class QuadraticIntegerOptimization(
         val worker = controls.strategy.localSearch
         val maximum = minOf(params.maximumMoves,
             if (adaptive) controls.strategy.alnsIterations.toLong() else Long.MAX_VALUE)
-        val stop = native.polynomial or worker.cancellation or Cancellation { budget?.exhausted() == true }
+        val stop = native.polynomial or worker.cancellation or Cancellation { budget?.allowance?.exhausted() == true }
         val seeds = source.integerSeeds(stop, relaxation.arithmetic::step).mapIndexed { id, value ->
             relaxation.arithmetic.step()
             val coordinate = source.integerCoordinates[id]
@@ -723,7 +723,7 @@ internal class QuadraticIntegerOptimization(
         val total = source.boolCount + intCount + source.realCoordinates.size
         return QuadraticNeighborhoodCursor(total, adaptive, worker.randomSeed ?: 1L,
             QuadraticNeighborhoodAllowance(maximum, minOf(worker.maxFlips, worker.maxInstructions ?: Long.MAX_VALUE),
-                budget), stop, { native.work }, propose = { released, radius, random ->
+                budget?.allowance), stop, { native.work }, propose = { released, radius, random ->
                 readIncumbent()?.let { accept(it, heuristic = true) }
                 val lower = mutableMapOf<Int, BigFraction>()
                 val upper = mutableMapOf<Int, BigFraction>()

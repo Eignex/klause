@@ -104,7 +104,7 @@ class ExactNeighborhoodTest {
         val search = ExactNeighborhood(0, emptyList(), ExactNeighborhoodCompletion { _, _ ->
             checks++
             ExactNeighborhoodResult.Refuted
-        }, coordinateValues = { emptyList() }, nodeBudget = NodeBudget(0))
+        }, coordinateValues = { emptyList() }, nodeBudget = NodeBudget(0).allowance)
 
         search.advance(Cancellation.Never, 10)
 

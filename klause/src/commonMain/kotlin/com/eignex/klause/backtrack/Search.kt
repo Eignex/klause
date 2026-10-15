@@ -419,13 +419,13 @@ private class CpSatisfactionTraversalPolicy(
     override val solveParams = SearchSolveParams(
         maxDecisions = minOf(
             params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE,
-            params.nodeBudget?.decisionsLeft() ?: Long.MAX_VALUE,
+            params.nodeBudget?.allowance?.decisionsLeft() ?: Long.MAX_VALUE,
         ),
         restart = restart,
     )
     override val booleanBranching = BooleanBranching.None
     override val decisionBudget = SearchDecisionBudget {
-        params.nodeBudget?.let { budget ->
+        params.nodeBudget?.allowance?.let { budget ->
             budget.spend()
             !budget.exhausted()
         } ?: true
