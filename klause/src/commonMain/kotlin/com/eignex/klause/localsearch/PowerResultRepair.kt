@@ -12,7 +12,7 @@ internal class PowerResultRepair(private val state: LocalSearchState, private va
                 sink.addChannelingIntSet(state, variable, value)
                 return
             }
-            if (!sink.allowsDefinedInt(variable) || state.assumptions.isFrozenInt(variable) ||
+            if (depth == MAX_POWER_DEPTH || !sink.allowsDefinedInt(variable) || state.assumptions.isFrozenInt(variable) ||
                 definition.exponent == 0 || definition.base.varId < 0) return
             val base = definition.base.varId
             val domain = state.rootDomains[base]

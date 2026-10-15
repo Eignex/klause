@@ -1845,7 +1845,11 @@ Zero complete cost must agree with an exact valid source witness; unsupported ch
 fail the diagnostic. Signed powers, aliases, zero exponents and overflow use original
 source numbers. `source-checks.json` keeps source hashes, coordinates, check scope and
 agreement separately from native grading. Run it through the same AWS lab profile
-client at a pinned revision. It measures no throughput and exports no proofs.
+client at a pinned revision. Alternatively, `suite=<catalog suite> problem=<name>`
+freshly compiles a MiniZinc source and retains its original files, compiled FlatZinc,
+compiler/build identity and parsed native Power factors without solving. It fails
+when compilation retains no Power relation. These diagnostics measure no throughput
+and export no proofs.
 
 ### Definition probe
 
