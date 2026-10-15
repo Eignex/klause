@@ -46,6 +46,7 @@ class OpenTheoryEngineTest {
                 numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
                 factors = arrayOf(
                     Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
                     ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
                     ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
                         doubleArrayOf(1.0), LinearOp.LE, 0.0),

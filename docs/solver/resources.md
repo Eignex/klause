@@ -267,6 +267,17 @@ and polling its unchanged stops. Table publication and selection metadata commit
 together; an interrupted prefix supplies neither. Branch consultation reads the
 live metadata without another scan, point copy, numerical call or allowance.
 Closing releases the registration array and choice with the optional point table.
+Forwarding first builds a complete private set of Boolean coefficient and
+disjunction dependencies under the opening token. Entries share the existing
+65,536 representation envelope and the scan permits at most 65,536 charged visits.
+An incomplete or over-limit set supplies no reuse authority. Matching unblocked
+activations can retain that same table and point during a
+partial Boolean traversal. Each forward check consumes the ordinary theory-check
+allowance and charges current finite-bound comparisons and cursor visits to the
+existing operation token. Advancing never revisits earlier primitive IDs within
+that point's monotone scope. Arithmetic changes and retraction invalidate reuse;
+source-proof queries and complete leaves materialize pending rows. No forward
+check renews a numerical allowance or counts as a new point capture.
 
 Other built-in linear guidance and compound indexed preferences remain opt-in.
 Their existing real-coordinate producer admission is unchanged.

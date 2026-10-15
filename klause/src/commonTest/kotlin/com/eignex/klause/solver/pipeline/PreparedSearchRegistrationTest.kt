@@ -5,12 +5,16 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.PropagationProjectionProvider
@@ -27,8 +31,8 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchBoolValue
 import com.eignex.klause.solver.search.SearchCandidateHints
-import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchInvocationResources
@@ -38,6 +42,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
@@ -53,6 +58,46 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PreparedSearchRegistrationTest {
+    @Test
+    fun `published finite bounds invalidate a matching mixed point before reuse`() {
+        val source = Problem(
+            numBoolVars = 3, numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 0)),
+            openIntLo = booleanArrayOf(false, false, true), openIntHi = booleanArrayOf(false, false, true),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 2),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        var certifications = 0
+        val plan = source.componentPlan()
+        assertEquals(IntVariableOwner.CP, plan.intOwner(0))
+        assertEquals(IntVariableOwner.CP, plan.intOwner(1))
+        plan.search(source, emptyMap()).use { planned ->
+            val theory = assertIs<ExactLiraSearchComponent>(planned.theory)
+            theory.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { _, success ->
+                certifications++
+                success
+            }))
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+            val rootCertifications = certifications
+            assertTrue(rootCertifications > 0)
+
+            assertIs<ComponentResult.Consistent>(planned.session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertEquals(1L, planned.session.intLowerBound(1))
+            assertTrue(certifications > rootCertifications)
+            val result = assertIs<SearchResult.Satisfied>(planned.session.solve(3))
+            assertEquals(BIG_ZERO, result.model.valueOf(SearchExactIntValue(SourceIntId(0))))
+            assertEquals(BIG_ONE,
+                result.model.valueOf(SearchExactIntValue(SourceIntId(1))))
+        }
+    }
+
     @Test
     fun `factory openings without a default component keep null preparation absent and zero observable`() {
         for (integerCount in listOf(0, 1)) {

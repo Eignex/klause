@@ -66,11 +66,82 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `Boolean coefficients retain arithmetic checking for a matching primitive`() {
+        val declaration = object : Factor by Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0) {
+            override val linearForm: LinearForm = LinearForm.Conjunction(listOf(TaggedLinearRow(
+                intArrayOf(Term.ofIntVar(0), Term.ofLit(Lit.make(0, true))),
+                IntegerConstants(constsOf(longArrayOf(1, 1)), 0L), LinearOp.LE,
+            )))
+        }
+        val model = Problem(
+            numBoolVars = 3, intBounds = openBounds(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                declaration,
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+            val proposal = assertNotNull(component.partialPointBranchProposal())
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3), proposals = listOf(proposal))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(SearchDecision.Bool(Lit.make(0, true)), assertNotNull(proposal.nextBranch(session)).first())
+
+            val result = session.push(SearchDecision.Bool(Lit.make(0, true)))
+
+            assertIs<ComponentResult.Conflict>(result)
+        }
+    }
+
+    @Test
+    fun `matching point choices retain numerical work until complete source checking`() {
+        val model = Problem(
+            numBoolVars = 3, intBounds = openBounds(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        var certifications = 0
+        ExactLiraSearchComponent(model).use { component ->
+            component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { _, success ->
+                certifications++
+                success
+            }))
+            assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+            val proposal = assertNotNull(component.partialPointBranchProposal())
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3), proposals = listOf(proposal))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val rootCertifications = certifications
+            assertTrue(rootCertifications > 0)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            assertEquals(rootCertifications, certifications)
+            assertEquals(listOf(SearchDecision.Bool(Lit.make(2, true)), SearchDecision.Bool(Lit.make(2, false))),
+                proposal.nextBranch(session))
+            assertIs<ComponentCheck.Indeterminate>(component.check(session))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+            assertTrue(certifications > rootCertifications)
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+        }
+    }
+
+    @Test
     fun `mixed point Boolean proposals expire across retraction and refresh with a new point`() {
         val model = Problem(
             numBoolVars = 3, intBounds = openBounds(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
             factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
                 ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
                 ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
                     doubleArrayOf(1.0), LinearOp.LE, 0.0),
@@ -105,6 +176,7 @@ class ExactLiraSearchComponentTest {
             numBoolVars = 3, intBounds = openBounds(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
             factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
                 ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
                 ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
                     doubleArrayOf(1.0), LinearOp.LE, 0.0),

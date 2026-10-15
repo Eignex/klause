@@ -57,6 +57,17 @@ retain their existing policy. The arithmetic component keeps its identity and
 model contributions; proposal registration precedes shared session construction.
 Point polarity hints retain their separate polarity-only interface and observations.
 
+A bounded dependency scan identifies Boolean coefficients and disjunction
+members. Their variables retain numerical rechecking. Other matching activators
+can retain the same continuous point and comparison table; uncovered Boolean
+decisions change no arithmetic row. Current published finite integer bounds are
+checked before retaining that point, and the primitive cursor advances under the
+current operation token. Nonmatching or arithmetic decisions, changed bounds,
+retraction and stops retain numerical rechecking. Forwarding supplies no complete
+verdict: pending rows are installed before source-proof queries and complete-leaf
+LP and original-source checks. Origin observations count fresh captures without
+counting forward reuse as another LP capture.
+
 Open mixed traversal consults arithmetic proposals before the finite fallback. A completed
 continuous point can guide adjacent exhaustive integer splits while bounded declarations
 retain CP ownership. Integral point coordinates guide a finite equality and its remaining
