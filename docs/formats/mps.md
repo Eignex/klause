@@ -33,7 +33,8 @@ projection retains its explicit tolerance correspondence.
 `MpsModel.toExactSourceProblem` preserves parsed decimal numbers in native
 `ExactLinear` rows, clearing denominators without rounding. Real column
 bounds are exact rows with open real declaration arrays; integer bounds outside
-`Long` also remain rows. Declared integer columns retain integrality. `LinearIndicator` retains the source integer trigger and enabled comparison;
+`Long` also remain rows. Declared integer columns retain integrality. `LinearIndicator` retains the source
+integer trigger and enabled comparison;
 selected LINEAR and POLYNOMIAL encoders install the equivalent guarded relation
 privately. Finite integer checks and numerical row emission read that same source
 implication. Numerical rows enabled by a finite pin retain both equality premises,
@@ -42,7 +43,8 @@ Integral integer objectives retain their source coefficients directly. Other
 objectives use an auxiliary equality retaining original decimal coefficients and
 constant in source units. The returned column mapping omits this auxiliary and
 its source witness check requires exact feasibility, independently of the hybrid
-lowering's tolerance correspondence. Both loading entry points use the same factor execution views. Integer-only rows
+lowering's tolerance correspondence. Both loading entry points use the same factor
+execution views. Integer-only rows
 have exact finite filtering and scores; continuous rows have heuristic scores and
 source-certified completion. Scaled integer constants feed the numerical LP without
 changing source numbers. A numerical representation decline leaves the selected
@@ -94,12 +96,13 @@ Optimal output includes `optimizationStatus=attained-optimum` or
 
 Default purely continuous MPS sources use the finite LP lane, including fractional
 objectives and its tolerance guarantee. When hybrid lowering differs from a source
-with integer columns, or an explicit exact request, the frontend prepares original
-decimal source rows before routing or bound closure. The shared exact linear route
-owns those rows for both bounded and open mixed models. A rounded-model routing
-refutation cannot establish original-source infeasibility.
+with integer columns, or an explicit exact request requires original decimals, the
+frontend prepares exact source rows before routing and bound closure. Bounded
+integers retain finite ownership when numerical completion is available. Open
+integer sides and unsupported numerical rows use admitted arithmetic completion.
+A rounded-model routing refutation cannot establish original-source infeasibility.
 
-BACKTRACK and FIXED run the admitted complete arithmetic traversal. LS and ALNS
+On arithmetic routes, BACKTRACK and FIXED run the admitted complete traversal. LS and ALNS
 search exact-coordinate neighborhoods with source-checked incumbent authority;
 their conditional refutations cannot refute the original source. MIXED combines
 that complete arm and the heuristic arms under the existing shared portfolio.
