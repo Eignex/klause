@@ -1493,6 +1493,13 @@ cost, bound cost and combined search cost, and hash the overlay identity separat
 Only a source-checked feasible witness establishes improvement; an unknown bounded
 walk supplies no lower bound or refutation.
 
+`unseededEngine=true` runs the public native engine with existing CBLS and SA recipes,
+ordinary and closed sources, maintained definitions and no supplied starting assignment.
+The encoded witness only establishes the input reference; it is never passed to those
+workers. Each variant receives the same move/time limits and graph/root pins. Rows
+without native witnesses stay unknown, and feasible rows require independent source
+checking. This isolates fresh-start native behavior; it is not a default portfolio run.
+
 ### Objective representation probe
 
 `com.eignex.klause.bench.profile.ObjectiveRepresentationProbe` measures the public

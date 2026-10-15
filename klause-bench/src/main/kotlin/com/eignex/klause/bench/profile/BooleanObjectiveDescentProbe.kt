@@ -18,6 +18,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
+import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
@@ -27,7 +28,9 @@ import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -59,7 +62,8 @@ internal object BooleanObjectiveDescentProbe {
             parts[0] to parts[1]
         }
         require(options.keys - setOf(
-            "prepareMs", "timeout", "conditional", "conditionalClosure", "conditionalRecipe", "conditionalNary", "conditionalBound",
+            "prepareMs", "timeout", "conditional", "conditionalClosure", "conditionalRecipe",
+            "conditionalNary", "conditionalBound", "unseededEngine",
         ) ==
             setOf("suite", "problem", "sha256", "witness64", "work"))
         val suite = requireNotNull(options["suite"])
@@ -72,8 +76,11 @@ internal object BooleanObjectiveDescentProbe {
         require(closureMode in listOf("true", "false", "both"))
         require(conditional in 0..32)
         require(closureMode == "false" || conditional > 0)
+        val unseededEngine = options["unseededEngine"]?.toBooleanStrict() ?: false
+        require(!unseededEngine || conditional == 0)
         val bounded = options["conditionalBound"]?.toBooleanStrict() ?: false
         require(!bounded || conditional > 0)
+        require(!unseededEngine || closureMode == "false")
         val includeNary = options["conditionalNary"]?.toBooleanStrict() ?: false
         require(!includeNary || closureMode != "false")
         val recipeLabel = options["conditionalRecipe"] ?: "cbls/fixed"
@@ -126,6 +133,12 @@ internal object BooleanObjectiveDescentProbe {
         out.resolve("sources").mkdirs()
         out.resolve("sources/$digest.txt").writeBytes(bytes)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
+        if (unseededEngine) {
+            val rows = unseededEngines(problem, objective, guide, sweep, work, timeout, suite, name,
+                digest, parsed.numOriginalBoolVars, sourceObjective, prepared.reconstruct)
+            out.resolve("cases.json").writeText(rows.toString() + "\n")
+            return
+        }
         if (conditional > 0) {
             val roots = parsed.boolFolds.map { Lit.variable(it.lits.single()) }.distinct()
             val variants = if (closureMode == "both") listOf(false, true) else listOf(closureMode == "true")
@@ -395,6 +408,102 @@ internal object BooleanObjectiveDescentProbe {
                 "sourceObjective=$value moves=$moves elapsedNanos=$elapsedNanos")
         }
         println("conditional targets=${targets.size} requested=$count sharedSetupNanos=$sharedSetupNanos")
+    }
+
+    private fun unseededEngines(
+        problem: Problem,
+        objective: LinearObjective,
+        guide: IncrementalObjective,
+        sweep: DefinitionalSweep,
+        work: Long,
+        timeout: Long,
+        suite: String,
+        name: String,
+        digest: String,
+        originalBools: Int,
+        sourceObjective: LinearObjective,
+        reconstruct: (Sample) -> Sample,
+    ) = buildJsonArray {
+        val pins = requireNotNull(LocalSearchModel.of(problem.bake()).pinsUnder(Assumptions.None))
+        val identity = preparedIdentity(problem, objective, pins)
+        val graph = BinaryRepairGraph.prepare(problem, pins, Cancellation.after(timeout.milliseconds), true)
+        var index = 0
+        for (label in listOf("cbls/fixed", "sa/adaptive-perturb")) {
+            for (closed in listOf(false, true)) {
+                var cancellation: Cancellation = Cancellation.Never
+                val closures = mutableListOf<BinaryRepairClosure>()
+                val base = LocalSearchCatalog.byLabel(label)
+                fun decorate(strategy: SourceDrivenStrategy): SourceDrivenStrategy {
+                    var seen: LocalSearchState? = null
+                    var closure: BinaryRepairClosure? = null
+                    return wrapBooleanRepairs(strategy) { state, move ->
+                        if (seen !== state) {
+                            pins.forEachBool { id, value -> check(state.assumptions.boolValueOrNull(id) == value) }
+                            seen = state
+                            closure = BinaryRepairClosure(graph, state.assumptions).also { closures.add(it) }
+                        }
+                        checkNotNull(closure).close(state, move, cancellation)
+                    }
+                }
+                val recipe = if (!closed) base else LocalSearchRecipe(
+                    base.label, decorate(base.strategy), base.optimizeStrategy?.let(::decorate),
+                    base.perMoveInvariants, base.seedImplicitOnRestart,
+                )
+                val worker = PortfolioBuilder.build(
+                    problem.bake(), PortfolioScenario(1, 1, Kind.COP, EngineMix.LOCAL_SEARCH,
+                        seed = 3L, lsPool = listOf({ recipe })), objective, guide, sweep,
+                ).single()
+                var best: Sample? = null
+                var bestValue: BigFraction? = null
+                var nativeWitnesses = 0
+                var moves = 0.0
+                var restarts = 0.0
+                cancellation = Cancellation.after(timeout.milliseconds)
+                val started = System.nanoTime()
+                worker.use {
+                    for (result in it.improvements({ Double.POSITIVE_INFINITY }, cancellation, null, work)) {
+                        moves = maxOf(moves, result.stats.ls.moves.sum)
+                        restarts = maxOf(restarts, result.stats.search.restarts.sum)
+                        if (result !is MinimizeResult.WithSample) continue
+                        val value = objective.evaluateExact(result.sample)
+                        nativeWitnesses++
+                        if (bestValue == null || value < checkNotNull(bestValue)) {
+                            best = result.sample
+                            bestValue = value
+                        }
+                    }
+                }
+                val elapsed = System.nanoTime() - started
+                val sample = best?.let(reconstruct)
+                add(buildJsonObject {
+                    put("index", index++); put("status", "DONE"); put("seed", 3)
+                    put("arm", "unseeded-$label-${if (closed) "closed" else "raw"}")
+                    put("problem", buildJsonObject {
+                        put("suite", suite); put("problem", name); put("format", "WCNF")
+                    })
+                    put("record", buildJsonObject {
+                        put("feasible", if (sample == null) JsonNull else JsonPrimitive(true))
+                        put("proven", false); put("maximize", false)
+                        if (sample != null) {
+                            put("exactObjective", sourceObjective.evaluateExact(sample).toString())
+                            put("finalWitness", "v " + (0 until originalBools).joinToString("") {
+                                if (sample.boolValue(it)) "1" else "0"
+                            })
+                        }
+                        put("sourceHashes", buildJsonObject { put("model", digest) })
+                        put("preparedModelSha256", identity); put("initialAssignmentProvided", false)
+                        put("recipe", label); put("closedRepairs", closed)
+                        put("nativeWitnesses", nativeWitnesses); put("elapsedNanos", elapsed)
+                        put("closureCalls", closures.sumOf { it.candidateCalls })
+                        put("closureNaryVisits", closures.sumOf { it.naryVisits })
+                        put("closureRejected", closures.sumOf { it.rejected })
+                        put("stats", buildJsonObject { put("lsMoves", moves); put("lsRestarts", restarts) })
+                    })
+                })
+                println("unseeded recipe=$label closed=$closed value=$bestValue " +
+                    "witnesses=$nativeWitnesses moves=$moves restarts=$restarts elapsed=$elapsed")
+            }
+        }
     }
 
     private fun strictObjectiveProblem(problem: Problem, objective: LinearObjective, initial: Sample): Problem {

@@ -249,32 +249,38 @@ internal class BinaryRepairClosure(private val graph: BinaryRepairGraph, private
         }
     }
 
-    fun wrap(strategy: SourceDrivenStrategy, cancellation: Cancellation): SourceDrivenStrategy = strategy.copy(
-        sources = strategy.sources.map { configured ->
-            val source = configured.source
-            val wrapped = object : MoveSource by source {
-                private val raw = MoveSink()
+    fun wrap(strategy: SourceDrivenStrategy, cancellation: Cancellation): SourceDrivenStrategy =
+        wrapBooleanRepairs(strategy) { state, move -> close(state, move, cancellation) }
+}
 
-                override fun generate(state: LocalSearchState, sink: MoveSink) {
-                    raw.clear()
-                    raw.setAssumptions(state.assumptions)
-                    raw.setInvariants(state.invariants)
-                    raw.setOwners(state.seeding.ownerInt)
-                    source.generate(state, raw)
-                    for (move in raw.list) {
-                        when (val closed = close(state, move, cancellation)) {
-                            is Move.BoolFlip -> sink.addBoolFlip(closed.varId)
-                            is Move.Compound -> sink.addCompound(closed.parts)
-                            null -> Unit
-                            else -> error("Boolean closure returned a non-Boolean move")
-                        }
+internal fun wrapBooleanRepairs(
+    strategy: SourceDrivenStrategy,
+    close: (LocalSearchState, Move) -> Move?,
+): SourceDrivenStrategy = strategy.copy(
+    sources = strategy.sources.map { configured ->
+        val source = configured.source
+        val wrapped = object : MoveSource by source {
+            private val raw = MoveSink()
+
+            override fun generate(state: LocalSearchState, sink: MoveSink) {
+                raw.clear()
+                raw.setAssumptions(state.assumptions)
+                raw.setInvariants(state.invariants)
+                raw.setOwners(state.seeding.ownerInt)
+                source.generate(state, raw)
+                for (move in raw.list) {
+                    when (val closed = close(state, move)) {
+                        is Move.BoolFlip -> sink.addBoolFlip(closed.varId)
+                        is Move.Compound -> sink.addCompound(closed.parts)
+                        null -> Unit
+                        else -> error("Boolean closure returned a non-Boolean move")
                     }
                 }
             }
-            ConfiguredSource(wrapped, configured.cap, configured.enabled, configured.stallGated, configured.phase)
-        },
-        perturbation = strategy.perturbation?.let { hook ->
-            { state -> hook(state)?.let { close(state, it, cancellation) } }
-        },
-    )
-}
+        }
+        ConfiguredSource(wrapped, configured.cap, configured.enabled, configured.stallGated, configured.phase)
+    },
+    perturbation = strategy.perturbation?.let { hook ->
+        { state -> hook(state)?.let { close(state, it) } }
+    },
+)
