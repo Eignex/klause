@@ -5,7 +5,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.LinComb
 
-/** Fewest arms worth reading as a table; below it the chain is a decision tree (see [IteChain]). */
+/** Fewest arms worth indexing directly by the source selector (see [IteChain]). */
 private const val MIN_CHAIN_DEPTH = 16
 
 /** Widest array the collapse will build — the propagator's per-value support walk stops above this. */
@@ -46,11 +46,9 @@ internal class GuardEquality(val variable: Int, val value: Long, val equal: Bool
  *    an identity default (`d` is the selector) as the position's own index value, which is exact
  *    because `idx = i` selects position `i`.
  *
- * Below [MIN_CHAIN_DEPTH] arms the extensional form is the *worse* encoding, not merely a costlier one:
- * short chains in practice are sparse decision trees whose default is a further test on a different
- * selector, so their constants spread far beyond the arm count and the dense array is mostly fill. The
- * span conditions express the same applicability judgement — an array wider than [MAX_CHAIN_SPAN] also
- * loses the propagator's value walk, and with it the domain consistency the collapse is for.
+ * Short or sparse chains use a private choice index over their arms and default, avoiding a dense
+ * source-selector array. The span conditions keep direct selector arrays within [MAX_CHAIN_SPAN],
+ * where the propagator can retain its per-value support walk.
  *
  * [result] is shared by every level of the chain: an interior level's value is consumed only by the
  * level that extends it, so re-using the variable (widening its domain per arm) leaves no undefined

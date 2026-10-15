@@ -4,11 +4,21 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
+import com.eignex.klause.lowering.toWide
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.div
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.rem
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.toLongExact
 
 internal fun Compiler.Builder.exclusiveIntegerSelection(
     result: Int,
@@ -32,10 +42,8 @@ internal fun Compiler.Builder.wideIntegerSelection(
     whenFalse: IntComb,
     magnitude: BigInt?,
 ) {
-    val trueValue = freshWideInt(magnitude)
-    val falseValue = freshWideInt(magnitude)
-    assertRelation("=", trueValue, whenTrue)
-    assertRelation("=", falseValue, whenFalse)
+    val trueValue = selectionWideValue(whenTrue, magnitude)
+    val falseValue = selectionWideValue(whenFalse, magnitude)
     val index = selectionIndex(listOf(condition))
     when (result) {
         is IntComb.Narrow -> factors.add(Element(index, checkNotNull(result.lin.asSimpleVar()), longArrayOf(
@@ -51,6 +59,32 @@ internal fun Compiler.Builder.wideIntegerSelection(
             }
         }
     }
+}
+
+private fun Compiler.Builder.selectionWideValue(term: IntComb, magnitude: BigInt?): IntComb {
+    val value = freshWideInt(magnitude)
+    val source = term.toWide()
+    if (source.coeffs.isNotEmpty()) {
+        assertRelation("=", value, term)
+        return value
+    }
+    var remaining = source.constant
+    val columns = when (value) {
+        is IntComb.Narrow -> listOf(checkNotNull(value.lin.asSimpleVar()))
+        is IntComb.Wide -> value.lin.coeffs.entries.sortedBy { it.value }.map { it.key }
+    }
+    for ((position, column) in columns.withIndex()) {
+        val digit = if (position == columns.lastIndex) remaining.toLongExact() else {
+            val domain = (intDomains[column] as PresolveDomain.Finite).domain
+            val radix = bigIntOf(domain.max) + BIG_ONE
+            val remainder = remaining % radix
+            val normalized = if (remainder.signum() < 0) remainder + radix else remainder
+            remaining = (remaining - normalized) / radix
+            normalized.toLongExact()
+        }
+        intDomains[column] = PresolveDomain.Finite(IntDomain(digit, digit))
+    }
+    return value
 }
 
 private fun Compiler.Builder.selectionIndex(conditions: List<Int>): Int {
