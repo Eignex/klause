@@ -344,4 +344,23 @@ class LpBoundingLbTreeSearchTest {
         assertEquals(fixture.persistentOpened, fixture.persistentClosed)
     }
 
+    @Test
+    fun `an integral LP point completes a mixed incumbent without pinning every domain`() {
+        val count = 257
+        val problem = Problem(0, count, Array(count) { IntDomain(0, 1) }, arrayOf(
+            Linear(IntArray(count) { 1 }, IntArray(count) { it }, LinearOp.GE, 1)),
+            numRealVars = 1, realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.5))
+        val objective = LinearObjective(intCoefficients = LongArray(count) { 1 },
+            realCoefficients = doubleArrayOf(1.0))
+
+        engine(problem, objective).use { parent ->
+            val sample = assertNotNull(parent.lbTreeSearch(objective, Cancellation.Never)).sample
+
+            assertEquals(1L, sample.ints.sum())
+            assertEquals(0.5, sample.reals.single())
+            assertEquals(1.5, objective.evaluate(sample))
+            assertEquals(0L, parent.primalSearchWork)
+        }
+    }
+
 }

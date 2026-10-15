@@ -733,16 +733,20 @@ class ResumableMinimizeTest {
 
     @Test
     fun `mixed tree decisions spend the containing solve allowance`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1)),
+            numRealVars = 1, realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.5)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1),
+            realCoefficients = doubleArrayOf(0.5))
         for (limit in listOf(0L, 1L)) {
-            val fixture = UnresolvedRealLeafFixture(true)
-            fixture.acceptProof = { _, _ -> true }
             val budget = NodeBudget(limit)
             val offered = ArrayList<Sample>()
-            val params = fixture.params.copy(nodeBudget = budget, maxDecisions = 0L,
-                lpPlan = fixture.params.lpPlan.copy(bounding = true, lbTreeSearch = true,
-                    probe = false, rootCutHarvest = false))
+            val params = BacktrackParams(nodeBudget = budget, maxDecisions = 0L,
+                lpPlan = LpPlan(bounding = true, lbTreeSearch = true, probe = false, rootCutHarvest = false))
 
-            fixture.solver.resumable(fixture.objective, params).use { search ->
+            BacktrackSolver(problem).resumable(objective, params).use { search ->
                 val result = search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
                 assertIs<MinimizeResult.Unknown>(result)
                 assertEquals(0.0, search.stats.search.nodes.sum)
@@ -751,8 +755,6 @@ class ResumableMinimizeTest {
 
             assertEquals(limit, budget.spent)
             assertTrue(offered.isEmpty())
-            assertEquals(fixture.opened, fixture.closed)
-            assertEquals(fixture.persistentOpened, fixture.persistentClosed)
         }
     }
 
