@@ -27,9 +27,27 @@ internal fun gridArithmeticEncoder(factor: GridArithmetic, target: EncodingTarge
             }
         }
         if (target == EncodingTarget.LINEAR) {
-            encoding.linearFormula(LinearEncodingFormula.Or(alternatives.map { rows ->
-                LinearEncodingFormula.Relation(LinearForm.Conjunction(rows))
-            }))
+            val inputs = view.inputs.map { it.variable }.distinct()
+            if (inputs.size == 1) {
+                val input = inputs.single()
+                val position = view.intVars.indexOf(input)
+                val cover = alternatives.map { rows -> rows[position] }
+                encoding.linear(LinearForm.Disjunction(cover))
+                for (tuple in tuples) {
+                    if (encoding.cancellation()) return@Encoder EncoderDecline.RESOURCE
+                    encoding.cancellation.charge(1)
+                    val inputValue = tuple[position]
+                    val outputPosition = view.intVars.indexOf(view.output.variable)
+                    encoding.linear(LinearForm.Disjunction(listOf(
+                        Linear(longArrayOf(1L), intArrayOf(input), LinearOp.NE, inputValue),
+                        Linear(longArrayOf(1L), intArrayOf(view.output.variable), LinearOp.EQ, tuple[outputPosition]),
+                    )))
+                }
+            } else {
+                encoding.linearFormula(LinearEncodingFormula.Or(alternatives.map { rows ->
+                    LinearEncodingFormula.Relation(LinearForm.Conjunction(rows))
+                }))
+            }
         } else {
             val formula = PolynomialRealFormula.Or(alternatives.map { rows ->
                 PolynomialRealFormula.And(rows.map { row -> polynomialRow(row,
