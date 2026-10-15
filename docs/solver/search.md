@@ -523,8 +523,12 @@ checks retain both real interval sides and the prior target endpoint that delimi
 their excluded prefix or suffix. Unexpressible numerical
 scope withholds a consequence. Search-time row selection follows narrowed finite
 endpoints and Boolean pins; the resulting domain bounds retract on the CP trail.
-This bounded post-LP pass does not own incremental
-theory state. There is no explanation weakening pass.
+At the end of an objective-bounding node pass, a successful row tightening can
+refresh the retained source bounds and run one additional row projection without
+another floating solve. Both projections spend the same arithmetic allowance;
+source refresh keeps ordinary assembly and edit charges. Each projection uses its
+complete current source map and endpoint premises. The bounded follow-up does not
+claim a row fixpoint or own incremental theory state. There is no explanation weakening pass.
 See [LP consumer contracts](../lp/architecture.md#consumers-explanations-and-cuts).
 
 ## Learned-clause retention

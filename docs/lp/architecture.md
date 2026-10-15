@@ -20,7 +20,11 @@ state identity and supported explanations. Their callers own activation, cutoff
 policy, applying domain changes and retraction; the numerical engine owns none of
 that search state. Node bounding invokes mixed certification under its existing
 query allowance, retains the strongest checked objective bound, and applies only
-integral-coordinate consequences with complete CP explanations.
+integral-coordinate consequences with complete CP explanations. After row fixing,
+an objective-bounding node can refresh source bounds for one follow-up projection.
+The refresh retains the scoped numerical owner, performs no floating solve and
+does not reuse a certificate across exact states. The caller withholds the old
+external warm-basis hint after refresh; the scoped owner retains its own basis.
 
 ## Boundaries
 
