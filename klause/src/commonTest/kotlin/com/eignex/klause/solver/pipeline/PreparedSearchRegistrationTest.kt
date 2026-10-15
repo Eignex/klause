@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -38,8 +39,10 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.plus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -312,6 +315,103 @@ class PreparedSearchRegistrationTest {
     }
 
     @Test
+    fun `default integer openings guide primitive polarity and retain a conflicting caller alternative`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
+        )
+        val plan = source.componentPlan()
+        assertEquals(ProblemPipeline.EXACT_LIRA, plan.theoryPipeline)
+        assertTrue(plan.cpIntVars.isEmpty())
+        for (variable in 0..1) assertEquals(IntVariableOwner.THEORY, plan.intOwner(variable))
+        for (callerWins in listOf(false, true)) {
+            val stats = SmtStatsSink()
+            plan.search(source, emptyMap(), Long.MAX_VALUE, Cancellation.Never,
+                SearchLearnedDbParams(), stats).use { planned ->
+                assertNull(planned.candidateHints.preferredBool(0))
+                assertIs<ComponentResult.Consistent>(planned.session.initialize())
+                assertNull(planned.session.boolValue(0))
+                assertEquals(true, planned.candidateHints.preferredBool(0))
+                val caller = if (callerWins) SearchCandidateHints { false } else SearchCandidateHints.None
+
+                val result = assertIs<SearchResult.Satisfied>(planned.session.solve(1,
+                    SearchSolveParams(maxDecisions = if (callerWins) 2 else 1),
+                    candidateHints = observedCandidateHints(caller, planned.candidateHints, stats.hintUsage)))
+
+                assertEquals(true, result.model.valueOf(SearchBoolValue(0)))
+                val first = kotlin.test.assertNotNull(result.model.valueOf(SearchExactIntValue(SourceIntId(0))))
+                val second = kotlin.test.assertNotNull(result.model.valueOf(SearchExactIntValue(SourceIntId(1))))
+                assertEquals(BIG_ZERO, first + second)
+            }
+            val usage = stats.hintUsage.snapshot()
+            assertEquals(if (callerWins) 0L else 1L, usage.componentSelections)
+            assertEquals(if (callerWins) 1L else 0L, usage.callerSelections)
+            assertEquals(0L, usage.clauseConsultations)
+            assertEquals(0L, usage.indexesAdmitted)
+            assertNull(usage.rawLedgerDebits)
+        }
+    }
+
+    @Test
+    fun `explicit integer opening allowances retain absent primitive preparation`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
+        )
+        for (allowance in listOf(0L, 1L)) {
+            val stats = SmtStatsSink()
+            source.componentPlan().search(source, emptyMap(), Long.MAX_VALUE, Cancellation.Never,
+                SearchLearnedDbParams(), stats, openHintFlips = allowance).use { planned ->
+                assertIs<ComponentResult.Consistent>(planned.session.initialize())
+
+                assertSame(SearchCandidateHints.None, planned.candidateHints)
+                assertEquals(false, assertIs<ExactLiraSearchComponent>(planned.theory).partialPointHintAvailable())
+            }
+            val usage = stats.hintUsage.snapshot()
+            assertEquals(1L, usage.noProvider)
+            assertEquals(0L, usage.componentSelections)
+            assertEquals(0L, usage.indexesAdmitted)
+            assertNull(usage.rawLedgerDebits)
+        }
+    }
+
+    @Test
+    fun `default integer openings without an active arithmetic row retain ordinary traversal`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 0)),
+        )
+        val plan = source.componentPlan()
+        assertEquals(ProblemPipeline.EXACT_LIRA, plan.theoryPipeline)
+        val stats = SmtStatsSink()
+        plan.search(source, emptyMap(), Long.MAX_VALUE, Cancellation.Never,
+            SearchLearnedDbParams(), stats).use { planned ->
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+            assertNull(planned.session.boolValue(0))
+
+            assertNull(planned.candidateHints.preferredBool(0))
+
+            assertIs<SearchResult.Satisfied>(planned.session.solve(1,
+                candidateHints = observedCandidateHints(SearchCandidateHints.None,
+                    planned.candidateHints, stats.hintUsage)))
+        }
+        assertEquals(0L, stats.hintUsage.snapshot().componentSelections)
+        assertEquals(0L, stats.hintUsage.snapshot().indexesAdmitted)
+    }
+
+    @Test
     fun `default mixed openings without an active arithmetic row retain ordinary traversal`() {
         val source = Problem(
             numBoolVars = 1,
@@ -375,8 +475,16 @@ class PreparedSearchRegistrationTest {
 
     @Test
     fun `a custom provider declines or prefers without consulting the default primitive component`() {
-        for (integerCount in listOf(0, 1)) {
-            val source = Problem(
+        for ((integerCount, realCount) in listOf(0 to 1, 1 to 1, 2 to 0)) {
+            val open = Bits(integerCount).also { bits -> repeat(integerCount, bits::set) }
+            val source = if (realCount == 0) Problem(
+                numBoolVars = 1,
+                intBounds = IntBounds.fromModelBounds(LongArray(integerCount), LongArray(integerCount), open, open),
+                factors = arrayOf(
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                    ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
+            ) else Problem(
                 numBoolVars = 1,
                 intBounds = IntBounds.fromModelBounds(LongArray(integerCount), LongArray(integerCount), null, null),
                 numRealVars = 1,

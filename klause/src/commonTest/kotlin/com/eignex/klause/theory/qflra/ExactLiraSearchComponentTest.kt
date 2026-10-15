@@ -66,7 +66,7 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
-    fun `integer only sources retain traversal without optional real point hint work`() {
+    fun `explicit integer point preparation declines without charging its caller`() {
         var charged = 0L
         val stop = object : Cancellation {
             override fun isCancelled(): Boolean = false
@@ -79,6 +79,23 @@ class ExactLiraSearchComponentTest {
         ExactLiraSearchComponent(model).use { component ->
             assertNull(component.partialPointHints(stop))
             assertEquals(0L, charged)
+        }
+    }
+
+    @Test
+    fun `interrupted integer point preparation retains its registration debit`() {
+        var stopped = false
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = stopped
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it; stopped = true }
+        }
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            assertNull(component.partialPointHints(stop, allowIntegerOnly = true))
+
+            assertTrue(charged > 0L)
+            assertTrue(stopped)
+            assertEquals(false, component.partialPointHintAvailable())
         }
     }
 
@@ -123,9 +140,17 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `mixed partial point preferences do not accept fractional source integers`() {
-        for (relation in listOf(LinearOp.EQ, LinearOp.GE)) {
-            val model = Problem(
+    fun `partial point preferences do not accept fractional source integers`() {
+        for (integerOnly in listOf(false, true)) for (relation in listOf(LinearOp.EQ, LinearOp.GE)) {
+            val model = if (integerOnly) Problem(
+                numBoolVars = 1, intBounds = openBounds(2),
+                factors = arrayOf(
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), relation, 1),
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ),
+            ) else Problem(
                 numBoolVars = 1, intBounds = openBounds(), numRealVars = 1,
                 realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
                 factors = arrayOf(
@@ -138,7 +163,8 @@ class ExactLiraSearchComponentTest {
                 ),
             )
             ExactLiraSearchComponent(model).use { component ->
-                val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never,
+                    allowIntegerOnly = integerOnly)).second
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 assertEquals(false, hints.preferredBool(0))
@@ -152,8 +178,8 @@ class ExactLiraSearchComponentTest {
                 } else {
                     val witness = assertNotNull(assertIs<SearchResult.Satisfied>(result)
                         .model.valueOf<ExactLiraAssignment>(component))
-                    assertEquals(BIG_ONE, witness.ints.single())
-                    assertEquals(BigFraction.ZERO, witness.reals.single())
+                    assertContentEquals(Array(if (integerOnly) 2 else 1) { BIG_ONE }, witness.ints)
+                    assertEquals(if (integerOnly) emptyList() else listOf(BigFraction.ZERO), witness.reals)
                     assertEquals(false, witness.boolValue(0))
                 }
             }
@@ -161,38 +187,48 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `mixed point preferences expire across integer branch retraction`() {
-        val model = Problem(
-            numBoolVars = 1, intBounds = openBounds(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
-            factors = arrayOf(
-                Linear(intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.GE, 1.0),
-                ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
-            ),
-        )
-        val component = ExactLiraSearchComponent(model)
-        val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
-        try {
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
-            assertIs<ComponentResult.Consistent>(session.initialize())
-            assertEquals(false, hints.preferredBool(0))
-            val split = assertNotNull(SourceBoundAtom.integerSplit(session,
-                listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
-                BigFraction.of(bigIntOf(1), bigIntOf(2))))
+    fun `point preferences expire across integer branch retraction`() {
+        for (integerOnly in listOf(false, true)) {
+            val model = if (integerOnly) Problem(
+                numBoolVars = 1, intBounds = openBounds(2),
+                factors = arrayOf(
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ),
+            ) else Problem(
+                numBoolVars = 1, intBounds = openBounds(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+                factors = arrayOf(
+                    Linear(intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.GE, 1.0),
+                    ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ),
+            )
+            val component = ExactLiraSearchComponent(model)
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never,
+                allowIntegerOnly = integerOnly)).second
+            try {
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertEquals(false, hints.preferredBool(0))
+                val split = assertNotNull(SourceBoundAtom.integerSplit(session,
+                    listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
+                    BigFraction.of(bigIntOf(1), bigIntOf(2))))
 
-            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(split.positive)))
-            assertNull(hints.preferredBool(0))
-            session.popTo(0)
-            assertNull(hints.preferredBool(0))
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
+                assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(split.positive)))
+                assertNull(hints.preferredBool(0))
+                session.popTo(0)
+                assertNull(hints.preferredBool(0))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
 
-            assertEquals(false, hints.preferredBool(0))
-        } finally {
-            component.close()
+                assertEquals(false, hints.preferredBool(0))
+            } finally {
+                component.close()
+            }
+            assertNull(hints.preferredBool(0))
         }
-        assertNull(hints.preferredBool(0))
     }
 
     @Test
@@ -315,25 +351,28 @@ class ExactLiraSearchComponentTest {
 
     @Test
     fun `containing cancellation withholds hints under a separate theory token`() {
-        var cancelled = false
-        val model = Problem(
-            numBoolVars = 1, intBounds = openBounds(0), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
-            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                doubleArrayOf(1.0), LinearOp.LE, 0.0)),
-        )
-        ExactLiraSearchComponent(model).use { component ->
-            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
-            component.useSolveStop(Cancellation.Never)
-            val session = SearchSession(listOf(component), cancellation = Cancellation { cancelled },
-                atoms = SearchAtomRegistry(1))
-            assertIs<ComponentResult.Consistent>(session.initialize())
-            assertEquals(true, hints.preferredBool(0))
+        for (integerOnly in listOf(false, true)) {
+            var cancelled = false
+            val model = if (integerOnly) partialModel() else Problem(
+                numBoolVars = 1, intBounds = openBounds(0), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+                factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0)),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never,
+                    allowIntegerOnly = integerOnly)).second
+                component.useSolveStop(Cancellation.Never)
+                val session = SearchSession(listOf(component), cancellation = Cancellation { cancelled },
+                    atoms = SearchAtomRegistry(model.numBoolVars))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertEquals(!integerOnly, hints.preferredBool(0))
 
-            cancelled = true
+                cancelled = true
 
-            assertNull(hints.preferredBool(0))
-            assertNull(session.boolValue(0))
+                assertNull(hints.preferredBool(0))
+                assertNull(session.boolValue(0))
+            }
         }
     }
 

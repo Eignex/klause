@@ -13,6 +13,7 @@ internal fun nodeDualCertificate(
     eliminateContinuousObjective: Boolean = false,
     onAdditionalCertificate: ((LpDeductionCertificate) -> Unit)? = null,
     sharedMeter: MixedCertificateMeter? = null,
+    preferredColumns: IntArray? = null,
 ): LpDeductionCertificate? {
     if (!model.hasContinuous) return integerCertify(model, duals, observer = observer)
     val meter = sharedMeter ?: MixedCertificateMeter(cancellation)
@@ -86,9 +87,13 @@ internal fun nodeDualCertificate(
     }
     val alternative = if (fixingCertificate != null && fixingCertificate !== primary) {
         fixingCertificate
-    } else if (primary != null && objectiveCertificate != null) {
+    } else if (primary != null && onAdditionalCertificate != null) {
         try {
-            meter.attempt(observer, "BLENDED") { blendedCertificate(model, primary, objectiveCertificate, meter) }
+            meter.attempt(observer, "FINITE_ENDPOINT_CANCEL") {
+                finiteEndpointCancellation(model, primary, meter, preferredColumns)
+            } ?: objectiveCertificate?.let {
+                meter.attempt(observer, "BLENDED") { blendedCertificate(model, primary, it, meter) }
+            }
         } catch (_: LpProjectionStop) {
             null
         }
@@ -323,6 +328,103 @@ private fun reconstructedMixedCertificate(
         meter.multiply(BigFraction.ofLong(rational.numerator), BigFraction.ofLong(rational.denominator).reciprocal())
     }
     return mixedCertificate(model, state, y, meter)
+}
+
+private fun finiteEndpointCancellation(
+    model: LpModel,
+    certificate: LpDeductionCertificate,
+    meter: MixedCertificateMeter,
+    preferredColumns: IntArray?,
+): LpDeductionCertificate? {
+    val state = model.exactState ?: return null
+    var first = -1
+    for (column in 0 until model.n) {
+        meter.step()
+        if (state.model.column(column).integral) continue
+        val sign = certificate.reducedCostSign(column)
+        val bounds = model.exactBounds(column)
+        if ((sign > 0 && bounds.lower != null) || (sign < 0 && bounds.upper != null)) {
+            first = column
+            break
+        }
+    }
+    if (first < 0) return null
+    val changedRows = changedIntegralRows(state, meter, preferredColumns)
+    meter.reserve(model.m * 8L + 128L)
+    val y = MutableList(model.m) { meter.multiplier(certificate, it) }
+    val counts = continuousRowCounts(model, state, meter)
+    var attempts = 0
+    val passes = if (changedRows == null) 1 else 2
+    for (pass in 0 until passes) {
+        val preferred = pass == 0
+        for (column in first until model.n) {
+            meter.step()
+            if (state.model.column(column).integral) continue
+            val entries = state.model.columnEntries(column)
+            if (changedRows != null && entries.none {
+                    meter.step()
+                    changedRows[it.row] == preferred && state.rows.row(it.row).active &&
+                        counts[it.row] == 1 && !it.number.value.isZero
+                }) continue
+            var residual = meter.read(model.exactCost(column))
+            model.forEachRationalColumn(column) { row, coefficient ->
+                meter.step()
+                residual = meter.add(residual, meter.multiply(y[row], coefficient).negated())
+            }
+            if (residual.isZero) continue
+            val bounds = model.exactBounds(column)
+            val endpoint = if (residual.signum() > 0) bounds.lower else bounds.upper
+            if (endpoint == null) continue
+            for (entry in entries) {
+                meter.step()
+                if (changedRows != null && changedRows[entry.row] != preferred) continue
+                if (!state.rows.row(entry.row).active || counts[entry.row] != 1 || entry.number.value.isZero) continue
+                val inverse = meter.read(meter.read(entry.number.value).reciprocal())
+                val proposed = meter.add(y[entry.row], meter.multiply(residual, inverse))
+                val slack = model.slackCol(entry.row)
+                val cost = meter.read(model.exactCost(slack))
+                val sides = model.exactBounds(slack)
+                if ((sides.lower == null && proposed < cost) || (sides.upper == null && proposed > cost)) continue
+                if (proposed != cost) {
+                    val support = state.activeSide(slack, proposed > cost) ?: continue
+                    if (support.witness >= 0L || support.side.premises != null) continue
+                }
+                if (attempts++ == 8) return null
+                val previous = y[entry.row]
+                y[entry.row] = proposed
+                mixedCertificate(model, state, y, meter)?.let { return it }
+                y[entry.row] = previous
+            }
+        }
+    }
+    return null
+}
+
+private fun changedIntegralRows(
+    state: LpExactState,
+    meter: MixedCertificateMeter,
+    preferredColumns: IntArray?,
+): BooleanArray? {
+    val source = state.model
+    val columns = if (preferredColumns != null) preferredColumns.asIterable() else {
+        meter.reserve(source.numVars.toLong() * 8L + 64L)
+        state.changedColumns
+    }
+    if (!columns.iterator().hasNext()) return null
+    meter.reserve(source.m.toLong() + 32L)
+    val selected = BooleanArray(source.m)
+    var any = false
+    for (column in columns) {
+        meter.step()
+        if (column !in 0 until source.n || !source.column(column).integral) continue
+        for (entry in source.columnEntries(column)) {
+            meter.step()
+            if (entry.number.value.isZero || !state.rows.row(entry.row).active) continue
+            selected[entry.row] = true
+            any = true
+        }
+    }
+    return if (any) selected else null
 }
 
 private fun repairMixedEndpoints(

@@ -97,9 +97,10 @@ checks; reuse does not replenish spending.
 `LpDeductionCertificate` exposes exact source-objective bounds, reduced costs,
 owned multiplier snapshots and movement limits for integral coordinates.
 `IntegerCertificate` implements this interface while retaining its concrete
-certificate fields and integer certification entry points. The mixed operations
-are internal numerical calls; node bounding uses its integer certificate path.
-The integer-specific lower-bound policy retains its integral-objective gate.
+certificate fields and integer certification entry points. Node bounding invokes
+mixed operations when exact authority contains continuous declarations; integer
+models retain integer certification. The integer-specific lower-bound policy
+retains its integral-objective gate.
 
 `nodeDualCertificate` checks a supplied dual vector against an `LpExactState`.
 Integral-valued data admits Int128 evaluation even when structural declarations
@@ -117,6 +118,21 @@ source objective expression, a blended vector or an equality eliminating its
 continuous term. An objective lattice requires exact declared integrality or a
 checked defining equality; its row remains part of the support. Additional
 candidates share the same allowance and return complete certificates separately.
+A finite minimizing endpoint also permits a candidate that cancels its nonzero
+continuous reduced cost through an active singleton-continuous row. Logical
+endpoint signs must remain supported, with no separately scoped or unsupported
+logical side, and the complete adjusted vector is checked again. At most eight row adjustments are tried, returning one completed candidate.
+The operation requires a primary certificate, independently of an objective lattice
+or objective-expression candidate. A charged eligibility scan precedes workspace
+allocation. Rows incident to the caller's preferred integral columns precede other
+rows. Without an explicit preference, the exact query's changed columns supply the
+ordering; a query without either retains source order. Invalid and continuous
+column hints are ignored. These preferences supply no proof premise, and the
+complete selected vector still requires verification.
+This candidate can expose an integral fixing direction even when the original
+certificate already has valid finite endpoint support. An equality-derived
+candidate takes precedence; otherwise finite-endpoint cancellation precedes a
+blended candidate. The operation returns at most three complete certificates.
 
 `mixedRowBounds` projects active mixed rows onto integral structural coordinates.
 Each interval projection cites the exact minimizing or maximizing side of every
@@ -125,6 +141,25 @@ that direction. Source origins precede integer rounding, and strict supporting
 endpoints exclude equality. Integral data uses checked Int128 arithmetic, with a
 rational fallback after overflow or fractional admission. The caller may select
 rows incident to specified columns. Integral-only rows allocate no projection terms.
+Rows containing one continuous column can also pair with another singleton row
+on that column. An exact weighted sum cancels the continuous term and projects the
+remaining integral coordinates, retaining both logical columns and both row scopes.
+At most eight pairs per continuous column are tried under the same arithmetic and
+allocation allowance. Selected rows include their singleton companions. Missing
+logical endpoint support declines a direction; cancellation supplies no authority
+for an unrelated continuous endpoint. Completed row deductions survive optional
+pair exhaustion, and cancellation withholds unpublished results.
+
+Dense mixed rows can substitute active singleton-continuous equalities before
+projection. Each substitution retains the defining row's logical column and
+scope; the exact weighted row sum supplies the projected RHS and coefficients.
+Other continuous terms still require their source endpoints. Search-time row
+selection follows the definitions into their consuming rows and includes the
+required equality supports. At most eight dense rows and 128 definitions per row
+are considered under the same allowance, after ordinary and paired projections.
+Their additional row selection and assembly also follow those completed projections.
+An incomplete expansion supplies no deduction. Completed projections retain all
+defining row premises and use the same source-map and retraction checks.
 
 After interval projection, a fixed base logical equality can restrict a target
 through the gcd of the other integer coefficients. Finite real intervals and
@@ -135,20 +170,35 @@ products share the arithmetic allowance. These deductions retain both endpoint
 directions of other terms and the prior target side bounding the searched prefix
 or suffix. Their integer declarations must map to CP integer or Boolean variables.
 
-`LpExplanation` admits a row consequence only with complete row and endpoint
-premises. Separately scoped real or logical sides without a supported CP
+`LpExplanation` admits row consequences and objective explanations only with
+complete row and endpoint premises. Nonzero logical reduced costs also require
+their supporting side to match the declared side without separate scope. Separately scoped real or logical sides without a supported CP
 interpretation withhold it. Certificate identity binds all deductions to their
 exact state; pop, bound changes and objective edits prevent reuse across states.
 The caller owns applying consequences and retracting them with their scope.
+
+Node bounding uses the strongest completed certificate for pruning and can use
+weaker certificates for independent conditional fixings. Exact rational cutoff
+gaps and endpoint movements remain in minimized source units. A directly integral
+source objective supplies its native lattice for mixed models; pure integer CP
+models retain their separate Long objective-range guard. Continuous coordinates
+remain outside CP fixing targets. Objective certification and fixing precede row
+projection under the shared allowance. Feasibility queries without an objective
+operation can still apply row bounds. Root row projection considers all mixed
+rows; during search it considers rows incident to narrowed integer endpoints or
+Boolean pins. The CP trail retracts deductions with their supporting branches.
 
 Mixed operations share 128-bit scalar admission, 250,000 work units and 16 MiB of
 metered allocation. Failed attempts retain their charges. Ordinary cancellation
 polls use a 64-call/4096-work stride; work-metered cancellation is immediate and
 publication polls directly. Resource decline can retain completed independent
 projections; cancellation discards unpublished deductions. `NODE_DEDUCTION`
-phase outcomes describe these numerical attempts and their work. They add no
-LP solve, cut, search policy or publication authority. Source-evidence capture
-still requires original premises and a complete multiplier snapshot.
+phase outcomes describe these numerical attempts and their work. Outcome-specific
+entries overlap the aggregate deduction phase and must not be summed with it.
+`NODE_ROW_FIXING` records actual row consequences separately from objective-relative
+fixing. These operations add no LP solve, cut or publication authority.
+Source-evidence capture still requires original premises and a complete multiplier
+snapshot.
 
 ## Continuation rejection details
 
