@@ -24,6 +24,9 @@ internal object XcspArchiveReplay {
             val stream = requireNotNull(XcspArchiveReplay::class.java.getResourceAsStream(resource))
             writeBytes(stream.use { it.readBytes() })
         }
+        val methodResource = "/xcsp-archive-replay/MethodOverlay.java"
+        val methodStream = requireNotNull(XcspArchiveReplay::class.java.getResourceAsStream(methodResource))
+        out.resolve("MethodOverlay.java").writeBytes(methodStream.use { it.readBytes() })
         CorpusSourceCapture.execute(
             listOf("/usr/bin/setsid", "/usr/bin/python3", "-I", worker.path, request.path, out.path,
                 System.getProperty("java.home"), System.getProperty("java.class.path")),

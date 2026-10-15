@@ -970,6 +970,12 @@ baseline distribution on the classpath. Optional `wallMillis` replaces the sole
 classes with a value from 2000 through 60000. Use this diagnostic intervention
 only after auditing those classes' default slice policy. Class hashes and edited
 byte offsets are retained; these cases are explicitly instrumented executions.
+An overlay may additionally select `methods` by unique name in a single class.
+The JDK class-file API copies only those methods into the baseline class, requires
+matching descriptors and verifies the result. Donor and baseline bytes are retained.
+The same-method baseline control checks that the intervention preserves the original
+behavior. Whole-class overlays require compatible internal ABIs; worker failures
+make a case ineligible for causal attribution even if the CLI exits successfully.
 
 The request is capped at 60 KiB compressed and 2 MiB expanded. Each archive is
 capped at 64 MiB compressed and 96 MiB expanded, and traversal, links, duplicate
