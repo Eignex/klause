@@ -1455,6 +1455,22 @@ unfinished tasks and failed reads remain coverage gaps. Accept no ABI, live
 pointer, task/root, return-size, clock or compiler-saving claim without the
 corresponding independent validation.
 
+`com.eignex.klause.bench.profile.NativeVmLiveArgumentReview` reviews saved captures
+on a remote worker with `manifest=<https URL>`, `manifest-sha256=<hash>` and
+`archive=<https URL>`. It verifies the manifest, archive and selected member hashes,
+then extracts only the eight layout, launch, native record, JFR JSON and compilation
+log inputs. Expansion bounds and regular-file membership reject links, duplicate
+names and traversal. It never attaches an observer or reruns the captured JVM.
+
+The review checks exported field widths and owner bounds against the original
+tables, per-thread sequences and call lifetimes, raw candidate argument slots,
+USDT identity bytes, JFR compilation/thread identities and compatible log records.
+Omitted log levels remain unknown. A separately labelled invalid read must appear;
+additional read errors or reported losses prevent argument corroboration. Every raw
+record, unmatched lifetime and independent compilation identity remains available.
+Per-record association supplies no complete calling convention, queue/root census,
+loss-free capture, return-size semantics, clock alignment or compiler-saving proof.
+
 ### Table profiling
 
 ```sh

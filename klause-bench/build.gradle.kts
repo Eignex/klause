@@ -122,10 +122,19 @@ val checkNativeCompilerObserverSetup = tasks.register<Exec>("checkNativeCompiler
     inputs.files("tools/native_compiler_observer.py", "tools/test_native_compiler_observer_setup.py")
 }
 
+val checkNativeVmLiveArgumentReview = tasks.register<Exec>("checkNativeVmLiveArgumentReview") {
+    group = "verification"
+    description = "Test saved native argument identities, read failures and bounded archive extraction."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_native_vm_live_arguments.py")
+    inputs.files("tools/review_native_vm_live_arguments.py", "tools/test_review_native_vm_live_arguments.py")
+}
+
 tasks.named("check") {
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
-        checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup)
+        checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,
+        checkNativeVmLiveArgumentReview)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
