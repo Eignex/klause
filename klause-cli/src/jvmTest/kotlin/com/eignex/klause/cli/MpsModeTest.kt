@@ -146,7 +146,7 @@ class MpsModeTest {
 
             assertTrue(loaded.numericalCompletion)
             assertTrue("s SATISFIABLE" in text.lines(), text)
-            assertTrue("v X=0" in text.lines(), text)
+            assertEquals(0.0, text.lines().single { it.startsWith("v ") }.substringAfter("X=").toDouble())
             assertFalse("exact-neighborhood" in text, text)
             assertFalse("declaredTheoryRoute=" in text, text)
         }

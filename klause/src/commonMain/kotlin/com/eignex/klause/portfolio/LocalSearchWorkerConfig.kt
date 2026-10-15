@@ -59,10 +59,12 @@ internal class LocalSearchWorkerConfig private constructor(
     override val label: String get() = recipe.label
 
     override fun withLsResiduals(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes, seedOffset, numericalCompletion, toleranceCheck)
+        LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes, seedOffset,
+            numericalCompletion, toleranceCheck)
 
     override fun withLsPhaseTimes(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true, seedOffset, numericalCompletion, toleranceCheck)
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true, seedOffset,
+            numericalCompletion, toleranceCheck)
 
     /** Build an LS worker: its [LocalSearchSolver] session (with the per-move invariant network when
      *  a [definitionalSweep] is present and the recipe enables it) + λ-shaped params, exposing the

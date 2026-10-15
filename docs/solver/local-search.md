@@ -659,7 +659,7 @@ it carries no optimum proof. Without the callback, including explicit exact MPS
 invocations, unavailable exact certification leaves completion undecided. Both
 policies retain numerical execution and the containing cancellation/work ledger.
 
-Linear completion retains a worker-private conditioned query owner. Boolean pins
+Theory-backed linear completion retains a worker-private conditioned query owner. Boolean pins
 and arbitrary-width integer equalities use the prepared source plan's arithmetic
 route; continuous coordinates remain theory-owned. Native work charges each
 candidate's delta against the same containing ledger. Workers share immutable
