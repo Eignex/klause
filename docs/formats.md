@@ -9,6 +9,11 @@ This page explains shared routing and current coverage. Detailed parsing,
 representation and publication contracts live with their source format. The
 [CLI](cli.md#formats-and-dispatch) lists dispatch names and extensions.
 
+Bounded integer/real products retain finite completion when it is available,
+including frontend requests that prefer exact linear traversal. That preference
+selects an admitted linear component; it does not require polynomial completion
+of a nonlinear source relation. Original source checks still govern publication.
+
 ## Source contracts
 
 | Source | Detailed contract |

@@ -185,7 +185,7 @@ private fun Problem.pipelineRouteObserved(
         initial.objective === objective && initial.maximize == maximize
     val stopped = reuseInitial && boundCancellation()
     val preparationStop = if (stopped) Cancellation { true } or boundCancellation else boundCancellation
-    val finiteCompletion = finiteIntegerRanges && !routeLinearToTheory &&
+    val finiteCompletion = finiteIntegerRanges &&
         objective?.realCoefficientValues?.any { it != 0.0 } != true &&
         routed.requiresPolynomialCompletion(projections) && routed.finiteRealCompletionSupported(projections)
     val arithmeticStop = if (routed.requiresPolynomialCompletion(projections, preferFinite = finiteCompletion)) {

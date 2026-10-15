@@ -57,6 +57,18 @@ import kotlin.test.assertTrue
 
 class PreparedSourcePlanTest {
     @Test
+    fun `linear theory preference preserves available finite mixed product completion`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 2)), arrayOf(RealProduct(0, 0, 1, 1.0, 4.0)),
+            numRealVars = 2, realLower = doubleArrayOf(1.0, 4.0), realUpper = doubleArrayOf(4.0, 4.0))
+
+        val route = source.pipelineRoute(routeLinearToTheory = true)
+
+        val finite = assertIs<SourceProblemRoute.Finite>(route)
+        assertEquals(IntVariableOwner.CP, finite.componentPlan.intOwner(0))
+        assertSame(source.factors[0], finite.problem.factors[0])
+    }
+
+    @Test
     fun `bound closure precedes polynomial admission beside finite globals`() {
         val source = Problem(0, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 3).excludeValue(1)), arrayOf(
             ContinuousProduct(0, 0, 0),
