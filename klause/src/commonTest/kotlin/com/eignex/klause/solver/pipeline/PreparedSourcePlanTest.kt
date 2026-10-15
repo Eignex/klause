@@ -51,6 +51,125 @@ import kotlin.test.assertTrue
 
 class PreparedSourcePlanTest {
     @Test
+    fun `routing retains resource declines during encoder reinstallation after bound closure`() {
+        for (interruption in listOf("none", "installer", "cancellation", "work")) {
+            val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+                arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
+                openIntHi = booleanArrayOf(true))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1), constant = 7)
+            var boundsComplete = false
+            var initialInstallations = 0
+            var laterInstallations = 0
+            var cancelled = false
+            var charged = 0L
+            var limit = Long.MAX_VALUE
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = cancelled || charged >= limit
+                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            }
+            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (target != EncodingTarget.LINEAR || !selected.enforcesSource) selected
+                else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                    val decline = selected.install(view, encoding)
+                    if (!boundsComplete) {
+                        initialInstallations++
+                        decline
+                    } else {
+                        laterInstallations++
+                        when (interruption) {
+                            "installer" -> EncoderDecline.RESOURCE
+                            "cancellation" -> {
+                                cancelled = true
+                                decline
+                            }
+                            "work" -> {
+                                encoding.cancellation.charge(1_000_000)
+                                decline
+                            }
+                            else -> decline
+                        }
+                    }
+                }
+            })
+
+            val route = source.pipelineRoute(providers, objective, maximize = true, boundCancellation = stop,
+                onLpStats = {
+                    assertTrue(initialInstallations > 0)
+                    boundsComplete = true
+                    if (interruption == "work") limit = charged + 1_000_000
+                })
+
+            assertTrue(boundsComplete)
+            assertTrue(laterInstallations > 0)
+            val prepared = if (interruption == "none") {
+                assertIs<SourceProblemRoute.Finite>(route).preparedPlan.also {
+                    assertEquals(IntVariableOwner.CP, assertNotNull(it.componentPlan).intOwner(0))
+                }
+            } else {
+                assertIs<SourceProblemRoute.UnsupportedOpen>(route).preparedPlan.also {
+                    assertEquals(PreparedExecutionKind.DECLINED, it.kind)
+                    assertEquals(PreparedPlanDecline.RESOURCE, it.decline)
+                    assertNull(it.componentPlan)
+                    assertNull(it.polynomialModel)
+                    assertFalse(it.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
+                }
+            }
+            assertSame(source, prepared.originalSource)
+            assertSame(objective, prepared.objective)
+            assertTrue(prepared.maximize)
+            val bounded = assertNotNull(prepared.model)
+            assertTrue(bounded !== source)
+            assertEquals(2L, bounded.intBounds.upper(0))
+            assertFalse(source.intBounds.hasUpper(0))
+            assertNotNull(prepared.factorProjections).requireSource(bounded)
+            if (interruption == "work") assertTrue(charged >= limit)
+            if (interruption == "installer") assertFalse(stop())
+        }
+    }
+
+    @Test
+    fun `finite ownership selection declines when the containing stop follows arithmetic reuse`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1), constant = 7)
+        var boundsComplete = false
+        var reuseAllowed = false
+        var stopObserved = false
+        val stop = Cancellation {
+            when {
+                !boundsComplete -> false
+                !reuseAllowed -> {
+                    reuseAllowed = true
+                    false
+                }
+                else -> {
+                    stopObserved = true
+                    true
+                }
+            }
+        }
+
+        val route = assertIs<SourceProblemRoute.UnsupportedOpen>(source.pipelineRoute(
+            objective = objective, maximize = true, boundCancellation = stop,
+            onLpStats = { boundsComplete = true },
+        ))
+
+        assertTrue(reuseAllowed)
+        assertTrue(stopObserved)
+        assertEquals(PreparedExecutionKind.DECLINED, route.preparedPlan.kind)
+        assertEquals(PreparedPlanDecline.RESOURCE, route.preparedPlan.decline)
+        assertNull(route.preparedPlan.componentPlan)
+        assertNull(route.preparedPlan.polynomialModel)
+        assertFalse(route.preparedPlan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
+        assertSame(source, route.problem)
+        assertSame(source, route.preparedPlan.originalSource)
+        assertSame(source, route.preparedPlan.model)
+        assertSame(objective, route.preparedPlan.objective)
+        assertTrue(route.preparedPlan.maximize)
+    }
+
+    @Test
     fun `complete component encodings retain spent work independently per target and call`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
             arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
