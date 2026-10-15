@@ -757,7 +757,9 @@ provisioning happen outside the CLI solve budget. A failed setup is recorded onc
 later cases still capture output and record their unavailable checker outcome.
 `checkFzn=true` checks every complete FlatZinc publication with the existing independent
 flattened-text checker and records its `valid`, `invalid`, or `unknown` outcome in
-`source-check-fzn.json`. It uses authoritative coordinate comments when supplied and
+`source-check-fzn.json`. Satisfaction publications retain their source assertions
+without an objective cost; optimization publications require exact cost consistency
+and strict improvement in the original direction. It uses authoritative coordinate comments when supplied and
 checks binary integer/float extrema, integer array extrema, and constant or variable
 integer/Boolean array selection directly from the original predicates. Index bounds
 and repeated entries retain their source meaning. It checks the preceding `% objective=` cost or finite `_objective` field against the
