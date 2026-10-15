@@ -181,7 +181,7 @@ internal class PreparedSearchRegistrations(
                 theory,
                 resources,
                 opening.candidateHints(source, theory.takeIf {
-                    arithmetic.size == 1 && source.numIntVars == 0 && source.numRealVars > 0
+                    arithmetic.size == 1 && source.numRealVars > 0
                 }),
             )
         } catch (failure: Throwable) {

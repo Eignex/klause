@@ -111,10 +111,11 @@ Strictly increasing operand variable IDs establish canonical distinctness during
 the charged pair-and-copy pass; other orders retain sorting and distinctness checks.
 Missing leaves, incomplete or ambiguous definitions, cycles and cancellation supply
 no derived gate preference. The adapter performs no second Boolean or arithmetic search.
-A default opening with source real coordinates, no source integers and exactly one
-linear completion owner can reuse its completed point for direct primitive
-preferences. It registers bounded comparison rows before component initialization,
-then evaluates them only after an existing numerical check produces a point. It
+A default opening with source real coordinates and exactly one linear completion
+owner can reuse its completed point for direct primitive preferences. Mixed source
+integers may be fractional in that point; complete integrality checks and exhaustive
+integer branching retain their authority. Registration precedes component
+initialization; evaluation uses a point from an existing numerical check. It
 constructs no source-clause index and draws no Boolean proposal. Custom registered
 providers retain precedence, and primitive preferences retain their dirty,
 retraction, containing-stop and close lifetime.

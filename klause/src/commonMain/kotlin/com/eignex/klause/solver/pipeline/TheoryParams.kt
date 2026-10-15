@@ -45,9 +45,10 @@ data class TheoryParams(
      * switch: it runs the producer under an allowance it cannot reach a proposal within, which is what
      * separates the producer's own cost from the proposal's effect.
      *
-     * A null allowance permits direct primitive point preferences for one pure-real linear completion
-     * owner, without a source-clause index or Boolean draw. Other built-in linear point guidance and
-     * compound source-clause preferences use this opt-in. Zero permits bounded construction observations
+     * A null allowance permits direct primitive point preferences for one linear completion owner
+     * with source real coordinates, including mixed integer/real sources, without a source-clause index
+     * or Boolean draw. Other built-in linear point guidance and compound source-clause preferences use
+     * this opt-in. Zero permits bounded construction observations
      * but publishes no component preference; a positive value permits indexed preferences after caller
      * or deferred hints decline. Construction and arithmetic comparisons retain their existing owners
      * and limits; this flip ceiling supplies no separate allowance for them.

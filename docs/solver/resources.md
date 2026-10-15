@@ -216,10 +216,12 @@ the caller meter, and resource exhaustion withholds an incomplete verdict.
 Exact-linear partial-point polarity hints reuse a completed arithmetic check. Source
 comparison visits and bounded rational operations charge that check's current operation
 token, including its native meter; they create no numerical invocation or allowance.
-With null `openHintFlips`, one pure-real linear completion owner can register bounded
-comparison rows, charging the opening token. Evaluation of its existing completed
-point charges that check's existing operation token. This direct primitive path
-creates no source-clause index or Boolean draw.
+With null `openHintFlips`, one linear completion owner with source real coordinates
+can register bounded comparison rows, charging the opening token. Mixed integer
+columns use the same entry and scalar limits; their fractional point values remain
+branch-order guesses. Evaluation of its existing completed point charges that
+check's existing operation token. This direct primitive path creates no source-clause
+index or Boolean draw.
 Other built-in linear guidance and compound indexed preferences remain opt-in.
 Explicit zero can retain construction observations but withholds component
 preferences; positive values permit indexed guidance. The local-search flip ceiling
