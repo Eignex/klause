@@ -123,9 +123,11 @@ def main():
               'actualTargetCallingConventionProven': False,
               'scope': 'Linear decoding of symbol-owned bytes; no control-flow, argument, field-offset or live task inference'}
     try:
+        queries = symbols.query_names(tuple(sys.argv[4:]) if len(sys.argv) > 4 else QUERIES)
+        report['queries'] = queries
         from native_vm_entry_decoder import load_decoder
         decoder = load_decoder(output.parent, report)
-        inspect_file(library, expected, decoder, report)
+        inspect_file(library, expected, decoder, report, queries=queries)
     except Exception as error:
         report['error'] = {'type': type(error).__name__, 'message': str(error)}
         raise
