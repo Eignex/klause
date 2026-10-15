@@ -1763,6 +1763,28 @@ unmatched physical definitions remain unproved. The complete calling convention,
 compiled lifetime, task generation, kernel callbacks, private reads, root census,
 clocks, code size and compiler savings remain unproved.
 
+`com.eignex.klause.bench.profile.NativeVmTaskGenerationVerification` accepts no
+arguments. It retains the fixed lifecycle read-plan and canonical compiler-entry
+ABI reports before binding their complete symbols to freshly hash-checked library
+bytes. Every fixed role, alias and needed parameter proof must remain complete.
+Physical aliases share one probe while retaining every original reference;
+conflicting names or shared locations between different roles prevent attachment.
+Proof inputs are bounded at 4 MiB each and the complete physical probe set at 32.
+
+The dedicated version child runs under the existing isolated observer lifecycle
+and complete owned loss-counter controls. Entry callbacks record task pointers,
+the initializer's signed 32-bit compile identity, the post-publication receiver,
+and per-thread sequences. Destruction records a boundary with no argument read.
+Allocation returns and target private fields are not read. Kernel lifecycle,
+bounded public USDT identities, final sequences, raw JFR and compilation logs
+remain retained, with Compilation and CompilerPhase thresholds at zero.
+
+The raw capture does not reconstruct generations or prove pointer lifetime.
+Missing, duplicate, unfinished and conflicting observations require a separate
+saved-record review. Zero owned buffer-loss counters establish only that counter
+scope; kernel probe delivery, generation/lifetime, private-read authorization,
+complete roots, clocks, code size and compiler savings remain unproved.
+
 ### Native executable entry bytes
 
 `com.eignex.klause.bench.profile.NativeVmEntryVerification` retains bytes for the
