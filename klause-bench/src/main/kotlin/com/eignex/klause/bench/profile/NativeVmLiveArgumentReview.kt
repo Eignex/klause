@@ -16,9 +16,10 @@ internal object NativeVmLiveArgumentReview {
             require('=' in it)
             it.substringBefore('=') to it.substringAfter('=')
         }
-        val eventLoss = options["review"] == "event-loss"
+        val review = options["review"]
+        require(review == null || review in setOf("event-loss", "log-identities"))
         val required = setOf("manifest", "manifest-sha256", "archive") +
-            if (eventLoss) setOf("review") else emptySet()
+            if (review != null) setOf("review") else emptySet()
         require(args.size == required.size && options.keys == required)
         val expected = requireNotNull(options["manifest-sha256"])
         require(expected.matches(Regex("[0-9a-f]{64}")))
@@ -42,7 +43,11 @@ internal object NativeVmLiveArgumentReview {
                 }
             }
             val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
-            val name = if (eventLoss) "review_native_vm_event_loss.py" else "review_native_vm_live_arguments.py"
+            val name = when (review) {
+                "event-loss" -> "review_native_vm_event_loss.py"
+                "log-identities" -> "review_native_vm_log_identities.py"
+                else -> "review_native_vm_live_arguments.py"
+            }
             val tool = File(root, "klause-bench/tools/$name")
             for (source in listOf(name, "native_vm_event_loss.py", "review_native_vm_live_arguments.py").distinct()) {
                 File(root, "klause-bench/tools/$source").copyTo(File(out, source))
