@@ -525,6 +525,12 @@ checks retain both real interval sides and the prior target endpoint that delimi
 their excluded prefix or suffix. Unexpressible numerical
 scope withholds a consequence. Search-time row selection follows narrowed finite
 endpoints and Boolean pins; the resulting domain bounds retract on the CP trail.
+With LP learning enabled, each successful row tightening also queues its consequence
+literal and complete false premises in the existing bounded, deduplicating LP
+clause pool. Restart registration retains the conditional implication across undo
+and shares it through the existing source-feasibility clause path. These clauses
+do not assume an incumbent cutoff; objective-relative fixing keeps its separate
+local reason path.
 At the end of an objective-bounding node pass, a successful row tightening can
 refresh the retained source bounds and run one additional row projection without
 another floating solve. Both projections spend the same arithmetic allowance;
