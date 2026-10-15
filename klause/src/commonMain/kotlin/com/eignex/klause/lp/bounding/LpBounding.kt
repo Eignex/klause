@@ -604,6 +604,9 @@ internal fun LpEngine.sparseSafePrune(
                 eliminateContinuousObjective = !canPrune && objectiveCeiling != null,
                 onAdditionalCertificate = if (canFix) { { additionalCertificates.add(it) } } else null,
                 sharedMeter = rowMeter,
+                preferredColumns = if (rowMeter != null && canFix && session.decisionLevel > 0) {
+                    narrowedRowColumns(boundRel, session, cancellation)
+                } else null,
             ),
         ).also {
             // The node path is where certification actually happens; the certified wrapper is not on it.
