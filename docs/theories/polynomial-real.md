@@ -420,6 +420,12 @@ Interrupted checking or capture publishes no witness and refunds no work. Ordina
 CAD point evaluation and the existing query, proposal and phase limits remain intact.
 
 Equalities under negation or disjunction are proposal guides, never asserted facts.
+Scalar equality repair ranks a rejected proposal using the completed source-atom
+signs from that proposal's full point check. The signs remain private to the check
+and its immediate rank callback; ranking charges each comparison to the same owner.
+Only a complete rank can replace the best proposal, with the existing strict score
+tie break, root order and proposal limits. Interruption publishes neither a rank nor
+a witness.
 For a nonlinear conjunction of numeric inequalities and disequalities, an optional guide view
 complements directly negated atoms without changing the source formula. It excludes
 Boolean alternatives and unresolved positive equalities. Per-coordinate boundaries

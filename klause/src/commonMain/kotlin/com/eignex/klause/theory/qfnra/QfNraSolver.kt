@@ -421,17 +421,13 @@ internal class WitnessProbe(
                                 repeat(realCount + 1) { arithmetic.step() }
                                 val proposed = LinkedHashMap(point)
                                 proposed[variable] = root
-                                candidate(proposed)?.let { return it }
                                 var score = 0
-                                for (comparison in formula.atoms) {
-                                    arithmetic.step()
-                                    if (comparison.holds(
-                                            algebraic.sign(algebraic.evaluate(comparison.polynomial, proposed)),
-                                        )
-                                    ) {
-                                        score++
+                                candidate(proposed) { signs ->
+                                    for ((index, comparison) in formula.atoms.withIndex()) {
+                                        arithmetic.step()
+                                        if (comparison.holds(signs[index])) score++
                                     }
-                                }
+                                }?.let { return it }
                                 if (score > bestScore) {
                                     best = proposed
                                     bestScore = score
@@ -459,14 +455,19 @@ internal class WitnessProbe(
         }
     }
 
-    fun candidate(point: Map<Int, AlgebraicReal>): QfNraAssignment? {
+    fun candidate(point: Map<Int, AlgebraicReal>): QfNraAssignment? = candidate(point, null)
+
+    private fun candidate(point: Map<Int, AlgebraicReal>, rank: ((IntArray) -> Unit)?): QfNraAssignment? {
         if (exhausted) return null
         arithmetic.step()
         proposals++
         val context = retentionGuides
         return checkSample(
             formula, point, boolCount, arithmetic, algebraic,
-            if (context == null) null else { captured, signs -> retainRejectedPoint(captured, signs, context) },
+            if (context == null && rank == null) null else { captured, signs ->
+                if (context != null) retainRejectedPoint(captured, signs, context)
+                rank?.invoke(signs)
+            },
             reusePowers = true,
         )
     }

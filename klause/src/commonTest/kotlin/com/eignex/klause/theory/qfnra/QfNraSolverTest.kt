@@ -24,6 +24,28 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `successive scalar equality repairs retain the positive completed point within caller work`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (and (= (* x x) 2) (= (* y y) 3) (> x 0) (> y 0)))
+        """.trimIndent())
+        val work = QfNraWork(QfNraParams(maximumWork = 8192))
+        val arithmetic = PolynomialArithmetic(work)
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic), work)
+
+        val assignment = assertIs<QfNraAssignment>(work.probe {
+            probe.probeWitness(source.realCount, emptyMap()) { null }
+        })
+
+        assertEquals(BigFraction.ofLong(2), algebraic.power(assignment.realValue(0), 2).rational)
+        assertEquals(BigFraction.ofLong(3), algebraic.power(assignment.realValue(1), 2).rational)
+        assertEquals(1, algebraic.sign(assignment.realValue(0)))
+        assertEquals(1, algebraic.sign(assignment.realValue(1)))
+    }
+
+    @Test
     fun `coupled line completion retains checked irrational coordinates and source fixings`() {
         val source = SmtLibPolynomial.parse("""
             (declare-const x Real)
