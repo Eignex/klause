@@ -5,6 +5,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
@@ -55,7 +56,7 @@ class PolynomialFormulaTest {
 
     @Test
     fun `cancelled private selection encoding exposes no partial normalized formula`() {
-        val source = PolynomialRealFormula.Selection(SourceRealId(0),
+        val source = PolynomialSelection(SourceRealId(0),
             PolynomialRealFormula.BooleanVariable(SourceBoolId(0)),
             PolynomialExpression.Constant.of(bigIntOf(1)), PolynomialExpression.Constant.of(bigIntOf(2)))
         val arithmetic = PolynomialArithmetic(Cancellation { true })

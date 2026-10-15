@@ -51,13 +51,13 @@ class PolynomialRealFormulaTest {
     @Test
     fun `selection remaps retain result guard and branch aliases`() {
         val zero = PolynomialExpression.Variable(SourceRealId(0))
-        val source = PolynomialRealFormula.Selection(SourceRealId(0),
+        val source = PolynomialSelection(SourceRealId(0),
             PolynomialRealFormula.BooleanVariable(SourceBoolId(0)),
             PolynomialExpression.Variable(SourceRealId(1)), PolynomialExpression.Power(zero, 2))
 
         val mapped = source.remap(VarRemap(intArrayOf(2), intArrayOf(), intArrayOf(3, 4)))
 
-        assertEquals(PolynomialRealFormula.Selection(SourceRealId(3),
+        assertEquals(PolynomialSelection(SourceRealId(3),
             PolynomialRealFormula.BooleanVariable(SourceBoolId(2)),
             PolynomialExpression.Variable(SourceRealId(4)),
             PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(3)), 2)), mapped)
@@ -89,11 +89,11 @@ class PolynomialRealFormulaTest {
     fun `source variable count validation rejects out of range identities`() {
         val cases = listOf(
             PolynomialRealFormula.BooleanVariable(SourceBoolId(1)),
-            PolynomialRealFormula.Selection(SourceRealId(1), PolynomialRealFormula.Constant(true),
+            PolynomialSelection(SourceRealId(1), PolynomialRealFormula.Constant(true),
                 PolynomialExpression.Constant.of(bigIntOf(0)), PolynomialExpression.Constant.of(bigIntOf(1))),
-            PolynomialRealFormula.Selection(SourceRealId(0), PolynomialRealFormula.BooleanVariable(SourceBoolId(1)),
+            PolynomialSelection(SourceRealId(0), PolynomialRealFormula.BooleanVariable(SourceBoolId(1)),
                 PolynomialExpression.Constant.of(bigIntOf(0)), PolynomialExpression.Constant.of(bigIntOf(1))),
-            PolynomialRealFormula.Selection(SourceRealId(0), PolynomialRealFormula.Constant(false),
+            PolynomialSelection(SourceRealId(0), PolynomialRealFormula.Constant(false),
                 PolynomialExpression.Variable(SourceRealId(1)), PolynomialExpression.Constant.of(bigIntOf(1))),
             PolynomialRealFormula.Atom(
                 PolynomialExpression.Variable(SourceRealId(1)), PolynomialRelation.NE,

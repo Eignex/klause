@@ -3,9 +3,10 @@ package com.eignex.klause.lowering
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
+import com.eignex.klause.ir.PolynomialSelection
 
 internal fun polynomialSelectionEncoding(
-    selection: PolynomialRealFormula.Selection,
+    selection: PolynomialSelection,
     checkpoint: () -> Unit,
 ): PolynomialRealFormula {
     checkpoint()

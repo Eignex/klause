@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.util.Cancellation
 
@@ -30,7 +31,7 @@ internal fun validatePolynomialEncodingCoordinates(
                 pending.addLast(node.left)
                 pending.addLast(node.right)
             }
-            is PolynomialRealFormula.Selection -> {
+            is PolynomialSelection -> {
                 require(node.result.index in realIds) { "unattributed polynomial selection result" }
                 pending.addLast(node.condition)
                 pending.addLast(node.whenTrue)
