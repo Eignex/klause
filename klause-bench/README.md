@@ -1659,6 +1659,29 @@ It reports bounded BTF type graphs and integer encodings from the saved bytes,
 including unsupported and missing types. It neither reads live maps nor reruns the
 target, and does not relax the counter's type, ownership or acceptance guards.
 
+With `review=log-identities` and the same three pinned archive arguments,
+`NativeVmLiveArgumentReview` reproduces the original argument review in
+`original-argument-review.json`, then reports complementary compilation-log
+metadata separately. A task must have one explicit compile ID, method, level and
+OSR identity under its compiler-thread log, whose start marker records the
+captured native thread and process IDs. One direct `task_done` must agree with the
+public compilation outcome. Duplicate task identities remain ambiguous before
+outcomes are considered; missing levels remain unknown.
+
+Successful publication corroboration additionally requires a unique global
+`nmethod` identity with the matching compiler label and completed post callbacks
+whose task and method metadata agree with the broker entry. Publication records
+can omit the OSR BCI: that missing value remains unknown, while the task log and
+native task/nmethod fields must carry the same exact BCI. Duplicate publication
+identities remain ambiguous before compiler labels are considered. Failed
+compilations can retain a matching thread-owned task outcome without publication
+credit. Raw attributes, fragments and rejected candidates remain in the report;
+`task_done`'s `nmsize` is retained as content-size metadata, not total code size.
+The original JFR matches, unfinished lifetimes, read diagnostics, delivery and
+loss-counter results are preserved unchanged. Complementary log metadata does
+not establish argument binding, calling convention, root completeness, clock
+alignment, total code size or compiler savings.
+
 ### Table profiling
 
 ```sh
