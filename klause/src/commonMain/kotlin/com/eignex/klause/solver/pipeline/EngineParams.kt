@@ -710,7 +710,7 @@ internal fun resolveBtRecipes(p: ExecutionOptionReader, kind: Kind): BtResolutio
     val btArm = p[ExecutionOption.BacktrackArmsByLabel]
     val edit = backtrackOverride(p, allowSelectors = true)
     if (btArm == null) return BtResolution(null, edit)
-    val labels = btArm.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    val labels = btArm
     if (labels.isEmpty()) pipelineConfigError("bt-arm: expected a comma-separated list of backtrack arm labels")
     val known = BacktrackCatalog.labels(kind).toSet()
     for (label in labels) {

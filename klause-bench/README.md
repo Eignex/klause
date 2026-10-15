@@ -316,6 +316,16 @@ the documented lab client. These component/provider measurements include prepara
 and differ from ordinary whole-CLI timings; pair them with matched source-checked CLI
 controls before claiming end-to-end parity.
 
+`bench.profile.ExecutionOptionsProfile` compares legacy request parsing, captured frontend
+options and directly typed options while repeatedly resolving the same portfolio settings.
+`rounds` (default seven) alternates mode order after one warmup round; `plans` (default
+10,000) sets the plans per measurement. The profile retains wall nanoseconds, thread
+allocation bytes, actual revision, runtime/options, classpath hashes and resolved
+seed/core/arm/slice settings under `$OUT/execution-options.json`. Run it through the
+AWS lab client at a pushed pinned revision. These planning costs exclude model
+preparation, worker execution and source checking; use matched whole-CLI controls
+for end-to-end comparisons.
+
 `bench.profile.PublishedAbiSnapshot` captures compiler-generated JVM and Kotlin/Native
 published API declarations from the profile job's pinned checkout. It runs
 `:klause:updateKotlinAbi` remotely, retains both exact dumps, the generation log and
