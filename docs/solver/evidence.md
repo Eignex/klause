@@ -66,6 +66,12 @@ implied rows. Guarded premises retain Boolean pins; source disequality alternati
 are not invented. Open integer sides provide no finite-box premise. Other declared
 frontend semantics require their own original-source checker. Explicit invocation
 pins are captured; derived restrictions require their own justifications.
+The native integer Abs checker evaluates scalar and wide affine magnitudes at exact
+source coordinates and checks every accompanying complete linear conjunction or
+disjunction, including reified comparisons and Boolean clauses. Declared integer
+sets and invocation restrictions remain required. Implied magnitude inequalities
+alone supply no complete source check, and this point checker supplies no recession
+authority for Abs relations.
 
 `PreparedSourcePlan.sourceResultCapture` uses the plan's retained original exact IR,
 explicit invocation pins and source objective direction. Narrowed execution bounds
