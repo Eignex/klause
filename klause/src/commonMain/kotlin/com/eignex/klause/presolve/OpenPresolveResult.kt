@@ -180,6 +180,9 @@ internal fun Problem.closeOpenBounds(
         if (declared[v].lo == null && bounds[v].lo != null) closed++
         if (declared[v].hi == null && bounds[v].hi != null) closed++
     }
+    if (declared.indices.all { declared[it].lo == bounds[it].lo && declared[it].hi == bounds[it].hi }) {
+        return OpenPresolveResult.Tightened(problem, closedSides = 0)
+    }
     // The proved range narrows sides that were already closed as well as open ones, and either kind of
     // narrowing can empty a declared value set, so it is taken whether or not an open side closed. A
     // column that stayed open keeps its box; only one the proof closed on both sides is reboxed.

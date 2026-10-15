@@ -4,6 +4,7 @@ import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
@@ -111,16 +112,16 @@ class NonlinearIntegerTheoryRequestTest {
     }
 
     @Test
-    fun `finite mixed products complete through the shared factor model`() {
+    fun `finite mixed products complete through finite source ownership`() {
         val source = assertIs<SmtLibInput.Linear>(SmtLibAdmission.parse(
             "(declare-const n Int) (declare-const x Real) " +
                 "(assert (and (<= 1 n 3) (<= 1.0 x 2.0) (= (* (to_real n) x) 6.0)))",
         )).problem
-        val route = assertIs<SourceProblemRoute.PolynomialTheory>(source.model.pipelineRoute())
+        val route = assertIs<SourceProblemRoute.Finite>(source.model.pipelineRoute())
 
-        val execution = OpenTheoryPipeline.execute(route.request, engine = FiniteEngine.BACKTRACK)
+        val result = BacktrackSolver.source(route.problem).solve()
 
-        val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
+        val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
         assertEquals("3", witness.intValue(source.intVarNames.getValue("n")))
         assertEquals("2", witness.realValue(source.realVarNames.getValue("x")))
     }
