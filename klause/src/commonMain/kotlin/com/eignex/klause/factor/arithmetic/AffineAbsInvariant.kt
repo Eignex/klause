@@ -3,7 +3,9 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.factor.arithmetic.internals.ceilDiv
 import com.eignex.klause.factor.arithmetic.internals.floorDiv
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
@@ -52,13 +54,14 @@ internal class AffineAbsInvariant(private val factor: AffineAbs) : Invariant {
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val before = score(state)
         for (branch in branches) {
-            val constants = checkNotNull(branch.integralConstants)
+            val constants = branch.constants as IntegralConstants
+            val variables = IntArray(branch.size) { Term.intVar(branch.ref(it)) }
             var activity = BIG_ZERO
-            for (index in branch.vars.indices) {
-                activity += constants.exactCoeff(index) * bigIntOf(state.assignment.intValue(branch.vars[index]))
+            for (index in variables.indices) {
+                activity += constants.exactCoeff(index) * bigIntOf(state.assignment.intValue(variables[index]))
             }
-            for (index in branch.vars.indices) {
-                val variable = branch.vars[index]
+            for (index in variables.indices) {
+                val variable = variables[index]
                 val coefficient = constants.exactCoeff(index)
                 val numerator = constants.exactBound - activity +
                     coefficient * bigIntOf(state.assignment.intValue(variable))

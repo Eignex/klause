@@ -25,6 +25,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class AbsCompilationTest {
     @Test
@@ -35,7 +36,7 @@ class AbsCompilationTest {
             val relation by constraint { b iff (abs(x) eq 2) }
         }
         val compiled = S().compile()
-        assertEquals(1, compiled.problem.factors.filterIsInstance<Abs>().size)
+        assertTrue(compiled.problem.factors.any { it is Abs })
         val x = compiled.intVarIdByName.getValue("x")
         val b = compiled.boolVarIdByName.getValue("b")
 

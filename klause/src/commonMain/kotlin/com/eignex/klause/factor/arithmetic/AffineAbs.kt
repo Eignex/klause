@@ -6,9 +6,12 @@ import com.eignex.klause.ir.IntVars
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.ir.WideConstants
+import com.eignex.klause.ir.WideConsts
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
@@ -45,13 +48,17 @@ internal class AbsAffineValue(coefficients: Map<Int, BigInt>, val constant: BigI
         return AbsAffineValue(renamed, constant)
     }
 
-    fun comparedTo(other: AbsAffineValue, sign: BigInt, op: LinearOp): Linear {
+    fun comparedTo(other: AbsAffineValue, sign: BigInt, op: LinearOp): LinearRow {
         val terms = LinkedHashMap(coefficients)
         for ((variable, coefficient) in other.coefficients) {
             terms[variable] = (terms[variable] ?: BIG_ZERO) - sign * coefficient
         }
         val kept = terms.filterValues { it != BIG_ZERO }
-        return Linear(kept.keys.toIntArray(), kept.values.toTypedArray(), op, sign * other.constant - constant)
+        val direction = if (op == LinearOp.GE) -BIG_ONE else BIG_ONE
+        return LinearRow.ofColumns(kept.keys.toIntArray(), intArrayOf(),
+            WideConstants(WideConsts(kept.values.map { direction * it }.toTypedArray()),
+                direction * (sign * other.constant - constant)),
+            if (op == LinearOp.GE) LinearOp.LE else op)
     }
 
     private val constantDigits = constant.toString().map { it.code }.toIntArray()

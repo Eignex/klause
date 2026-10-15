@@ -2,7 +2,10 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.arithmetic.internals.ceilDiv
 import com.eignex.klause.factor.arithmetic.internals.floorDiv
+import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Term
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.BIG_ONE
@@ -20,7 +23,7 @@ import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 
 internal class AffineAbsPropagator(private val factor: AffineAbs) : Propagator {
-    private val lowerRows = factor.linearForm.rows.map { it as Linear }
+    private val lowerRows = factor.linearForm.rows
     private val positive = factor.result.comparedTo(factor.operand, BIG_ONE, LinearOp.EQ)
     private val negative = factor.result.comparedTo(factor.operand, -BIG_ONE, LinearOp.EQ)
 
@@ -53,24 +56,26 @@ internal class AffineAbsPropagator(private val factor: AffineAbs) : Propagator {
         return lower to upper
     }
 
-    private fun possible(row: Linear, state: PropagationState): Boolean {
-        val constants = checkNotNull(row.integralConstants)
-        val value = AbsAffineValue(row.vars.indices.associate { row.vars[it] to constants.exactCoeff(it) },
+    private fun possible(row: LinearRow, state: PropagationState): Boolean {
+        val constants = row.constants as IntegralConstants
+        val variables = IntArray(row.size) { Term.intVar(row.ref(it)) }
+        val value = AbsAffineValue(variables.indices.associate { variables[it] to constants.exactCoeff(it) },
             -constants.exactBound)
         val (lo, hi) = range(value, state)
         return lo <= BIG_ZERO && hi >= BIG_ZERO
     }
 
     // Selected signs are premises of these deductions; absent clause reasons retain chronological fallback.
-    private fun enforce(row: Linear, state: PropagationState): Boolean {
-        val constants = checkNotNull(row.integralConstants)
-        val coefficients = Array(row.vars.size) { constants.exactCoeff(it) }
-        val lower = Array(row.vars.size) { index ->
-            val domain = state.intDomains[row.vars[index]]
+    private fun enforce(row: LinearRow, state: PropagationState): Boolean {
+        val constants = row.constants as IntegralConstants
+        val variables = IntArray(row.size) { Term.intVar(row.ref(it)) }
+        val coefficients = Array(variables.size) { constants.exactCoeff(it) }
+        val lower = Array(variables.size) { index ->
+            val domain = state.intDomains[variables[index]]
             minOf(coefficients[index] * bigIntOf(domain.min), coefficients[index] * bigIntOf(domain.max))
         }
-        val upper = Array(row.vars.size) { index ->
-            val domain = state.intDomains[row.vars[index]]
+        val upper = Array(variables.size) { index ->
+            val domain = state.intDomains[variables[index]]
             maxOf(coefficients[index] * bigIntOf(domain.min), coefficients[index] * bigIntOf(domain.max))
         }
         var totalLower = BIG_ZERO
@@ -80,15 +85,15 @@ internal class AffineAbsPropagator(private val factor: AffineAbs) : Propagator {
             totalUpper += upper[index]
         }
         val bound = constants.exactBound
-        if (totalLower > bound || (row.op == LinearOp.EQ && totalUpper < bound)) return false
+        if (totalLower > bound || (row.relation == LinearOp.EQ && totalUpper < bound)) return false
         for (index in coefficients.indices) {
             val coefficient = coefficients[index]
-            val variable = row.vars[index]
+            val variable = variables[index]
             val rhsUpper = bound - (totalLower - lower[index])
             if (coefficient > BIG_ZERO) {
                 if (!tightenUpper(state, variable, floorDiv(rhsUpper, coefficient))) return false
             } else if (!tightenLower(state, variable, ceilDiv(rhsUpper, coefficient))) return false
-            if (row.op == LinearOp.EQ) {
+            if (row.relation == LinearOp.EQ) {
                 val rhsLower = bound - (totalUpper - upper[index])
                 if (coefficient > BIG_ZERO) {
                     if (!tightenLower(state, variable, ceilDiv(rhsLower, coefficient))) return false

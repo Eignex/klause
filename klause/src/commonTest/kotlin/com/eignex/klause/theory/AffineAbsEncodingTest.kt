@@ -11,6 +11,9 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
 import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
@@ -47,7 +50,9 @@ class AffineAbsEncodingTest {
             "(assert (= (abs (* 9223372036854775808 x)) 9223372036854775808)) " +
             "(assert (or b (= x 0)))")
         val source = input.model
-        val queries = OpenExactNeighborhood(source, TheoryParams(), preparedSource = source.prepareExecutionPlan())
+        val prepared = source.prepareExecutionPlan()
+        val binding = EngineInvocation(prepared, ModelIdentity.of(source))
+        val queries = OpenExactNeighborhood(source, TheoryParams(), preparedSource = prepared, invocation = { binding })
         queries.use {
             val refuted = ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap())
             val feasible = ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap())
@@ -59,6 +64,9 @@ class AffineAbsEncodingTest {
             assertTrue(sample.boolValue(0))
             assertTrue(sample.exactIntValue(input.intVarNames.getValue("x")).toString() in setOf("-1", "1"))
             assertTrue(source.factors.filterIsInstance<AffineAbs>().single().isSatisfied(sample::exactIntValue))
+            assertEquals(SourceEvidenceCheck.Checked, binding.checkWitness(sample, Cancellation.Never))
+            val rejected = sample.copy(bools = sample.bools.also { values -> values[0] = false })
+            assertIs<SourceEvidenceCheck.Rejected>(binding.checkWitness(rejected, Cancellation.Never))
         }
     }
 
