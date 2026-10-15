@@ -69,28 +69,33 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
         if (dividends.size.toLong() * (divisors?.size ?: 1) > MAX_PAIRS) return true
         val variables = relation.intVars.distinct()
         val supports = variables.associateWith { HashSet<Long>() }
+        val roles = relation.divisor?.let { intArrayOf(relation.dividend, it, relation.quotient, relation.remainder) }
+            ?: intArrayOf(relation.dividend, relation.quotient, relation.remainder)
         for (i in 0 until dividends.size) {
             val av = dividends.valueAt(i)
             for (j in 0 until (divisors?.size ?: 1)) {
                 val bv = divisors?.valueAt(j)
-                val outputs = relation.outputs(bigIntOf(av), bv?.let(::bigIntOf) ?: checkNotNull(constant)) ?: continue
-                if (!outputs.first.fitsLong() || !outputs.second.fitsLong()) continue
-                val tuple = linkedMapOf(relation.dividend to av)
-                fun put(v: Int, value: Long): Boolean {
-                    if (value !in state.intDomains[v]) return false
-                    val previous = tuple.put(v, value)
-                    return previous == null || previous == value
-                }
-                if (relation.divisor != null && !put(relation.divisor, checkNotNull(bv))) continue
-                if (!put(relation.quotient, outputs.first.toLongExact()) ||
-                    !put(relation.remainder, outputs.second.toLongExact())) continue
-                for ((v, value) in tuple) supports.getValue(v).add(value)
+                val wordDivisor = bv ?: constant?.takeIf { it.fitsLong() }?.toLongExact()
+                val outputs = if (wordDivisor != null) relation.wordOutputs(av, wordDivisor) else {
+                    val exact = relation.outputs(bigIntOf(av), checkNotNull(constant)) ?: continue
+                    if (!exact.first.fitsLong() || !exact.second.fitsLong()) continue
+                    exact.first.toLongExact() to exact.second.toLongExact()
+                } ?: continue
+                val values = if (relation.divisor == null) longArrayOf(av, outputs.first, outputs.second)
+                    else longArrayOf(av, checkNotNull(bv), outputs.first, outputs.second)
+                if (roles.indices.any { role -> values[role] !in state.intDomains[roles[role]] ||
+                        (0 until role).any { previous ->
+                            roles[previous] == roles[role] && values[previous] != values[role]
+                        }
+                    }) continue
+                for (role in roles.indices) supports.getValue(roles[role]).add(values[role])
             }
         }
         for (v in variables) {
             val values = supports.getValue(v)
             if (values.isEmpty()) return false
-            if (!state.tightenIntMin(v, values.min(), reason) || !state.tightenIntMax(v, values.max(), reason)) return false
+            if (!state.tightenIntMin(v, values.min(), reason) ||
+                !state.tightenIntMax(v, values.max(), reason)) return false
             val domain = state.intDomains[v].spanOrNull(MAX_PAIRS.toLong()) ?: continue
             for (i in 0 until domain.size) {
                 val value = domain.valueAt(i)

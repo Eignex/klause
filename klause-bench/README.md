@@ -759,7 +759,9 @@ and repeated entries retain their source meaning. It checks the preceding `% obj
 original solve objective. When both are present, their exact values must agree. Its source scope
 is `flatzinc-binary64`, as described under source validation below. Interrupted
 captures reject verdict markers and terminal `optimizationStatus` comments, including
-unattained boundaries; these belong after invocation completion.
+unattained boundaries; these belong after invocation completion. Integer `int_div`
+and `int_mod` checks use exact truncating arithmetic and reject zero divisors,
+including word-boundary cases without wraparound.
 `com.eignex.klause.bench.profile.SmtStreamReplay` checks saved SMT output through a
 lab profile without invoking the CLI again. Its one argument is a base64 JSON array
 of records containing `sourceRevision`, original `source` and `stdout` text, and

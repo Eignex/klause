@@ -4,10 +4,8 @@ import com.eignex.klause.factor.arithmetic.DivMod
 import com.eignex.klause.factor.arithmetic.DivisionConvention
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
-import com.eignex.klause.lowering.WideLinComb
 import com.eignex.klause.lowering.toWide
 import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.div
 import com.eignex.klause.util.fitsLong
@@ -15,8 +13,6 @@ import com.eignex.klause.util.isZero
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.toLongExact
-
-internal data class SmtDivModKey(val dividend: WideLinComb, val divisor: BigInt)
 
 internal fun Compiler.Builder.retainedEuclideanDivMod(a: IntComb, b: IntComb, quotient: Boolean): IntComb {
     val bw = b.toWide()

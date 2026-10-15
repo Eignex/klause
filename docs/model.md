@@ -48,7 +48,10 @@ convention, retaining equality rows for distinct declared outputs. Source factor
 remain intact during consumer selection. Shared equivalent formulas live in
 `lowering.DivModEncoding`; the linear encoder handles a literal divisor or explicitly
 requires a variable-divisor fixing. Polynomial encoding enforces the entire relation,
-including the nonzero and sign cases. Difference encoding is unsupported. No product
+including the nonzero and sign cases, with finite integer choices retaining their
+source domains. An open variable-divisor relation has no general linear completion;
+a polynomial real encoding alone does not decide open integer division. Difference
+encoding is unsupported. No product
 relaxation supplies division enforcement. Installed formulas retain the original factor
 attribution and condition lifetime under the [theory contract](theories.md).
 
