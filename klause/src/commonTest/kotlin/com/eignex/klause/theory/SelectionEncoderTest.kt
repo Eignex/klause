@@ -23,8 +23,8 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.search.ComponentResult
-import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchIntValue
+import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
