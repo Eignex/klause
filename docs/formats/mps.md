@@ -46,8 +46,10 @@ its source witness check requires exact feasibility, independently of the hybrid
 lowering's tolerance correspondence. Both loading entry points use the same factor
 execution views. Integer-only rows
 have exact finite filtering and scores; continuous rows have heuristic scores and
-source-certified completion. Scaled integer constants feed the numerical LP without
-changing source numbers. A numerical representation decline leaves the selected
+source-certified completion. Wide coefficients, RHS values and objective definitions
+admit exact positive row normalization for the numerical LP, preserving rational
+certificate authority and source units independently of floating working values.
+Nonzero projection underflow or nonfinite working entries decline numerical completion. A numerical representation decline leaves the selected
 arithmetic encoding available, with bounded integers retaining finite ownership.
 Named objectives without terms retain their source constant and direction.
 The shared pipeline selects execution from these capabilities after bound closure;

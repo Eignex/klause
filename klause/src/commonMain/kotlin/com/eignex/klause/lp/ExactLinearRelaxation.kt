@@ -7,7 +7,8 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
 
-internal fun ExactLinear.finiteRelaxationSupported(): Boolean = numericalRow() != null
+internal fun ExactLinear.finiteRelaxationSupported(): Boolean = relation != LinearOp.NE &&
+    (compactRelaxationSupported() || numericalRow() != null)
 
 private fun ExactLinear.compactRelaxationSupported(): Boolean =
     constants.exactBound.fitsLong() &&

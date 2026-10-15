@@ -12,6 +12,8 @@ import com.eignex.klause.lp.relaxation.LeafRealSolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.parseBigInt
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -53,17 +55,20 @@ class LinearIndicatorTest {
 
     @Test
     fun `retracting an indicator pin removes its infeasible numerical row`() {
-        val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
-            LinearOp.GE, BigFraction.ONE)
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(LinearIndicator(0, true, row)),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
-        LeafRealSolver(source, null).use { completion ->
-            val enabled = completion.solve(Sample(booleanArrayOf(), longArrayOf(1)))
-            val disabled = completion.solve(Sample(booleanArrayOf(), longArrayOf(0)))
+        val tiny = BigFraction.of(BIG_ONE, parseBigInt("100000000000000000000"))
+        for (coefficient in listOf(BigFraction.ONE, tiny)) {
+            val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(coefficient),
+                LinearOp.GE, BigFraction.ONE)
+            val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(LinearIndicator(0, true, row)),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+            LeafRealSolver(source, null).use { completion ->
+                val enabled = completion.solve(Sample(booleanArrayOf(), longArrayOf(1)))
+                val disabled = completion.solve(Sample(booleanArrayOf(), longArrayOf(0)))
 
-            assertEquals(LpVerdict.INFEASIBLE, enabled.verdict)
-            assertEquals(LpVerdict.ATTAINED_OPTIMUM, disabled.verdict)
-            assertTrue(enabled.refutingFactors.contains(0))
+                assertEquals(LpVerdict.INFEASIBLE, enabled.verdict)
+                assertEquals(LpVerdict.ATTAINED_OPTIMUM, disabled.verdict)
+                assertTrue(enabled.refutingFactors.contains(0))
+            }
         }
     }
 }
