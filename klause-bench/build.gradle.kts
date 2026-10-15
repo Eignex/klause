@@ -142,11 +142,20 @@ val checkNativeVmEventLoss = tasks.register<Exec>("checkNativeVmEventLoss") {
     inputs.files("tools/native_vm_event_loss.py", "tools/test_native_vm_event_loss.py")
 }
 
+val checkNativeVmEventLossReview = tasks.register<Exec>("checkNativeVmEventLossReview") {
+    group = "verification"
+    description = "Test saved counter BTF graph diagnostics without relaxing acceptance guards."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_native_vm_event_loss.py")
+    inputs.files("tools/native_vm_event_loss.py", "tools/review_native_vm_event_loss.py",
+        "tools/test_review_native_vm_event_loss.py", "tools/review_native_vm_live_arguments.py")
+}
+
 tasks.named("check") {
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,
-        checkNativeVmLiveArgumentReview, checkNativeVmEventLoss)
+        checkNativeVmLiveArgumentReview, checkNativeVmEventLoss, checkNativeVmEventLossReview)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.

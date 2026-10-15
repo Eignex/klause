@@ -143,7 +143,7 @@ def terminal_delivery(native, layout, root_pid, diagnostics):
     return result
 
 
-def extract_inputs(manifest_path, expected, archive_path, destination, provenance):
+def extract_inputs(manifest_path, expected, archive_path, destination, provenance, required_inputs=INPUTS):
     raw = read_file(manifest_path, provenance)
     if not re.fullmatch('[0-9a-f]{64}', expected) or hashlib.sha256(raw).hexdigest() != expected:
         raise ValueError('Saved manifest differs from pinned identity')
@@ -152,14 +152,14 @@ def extract_inputs(manifest_path, expected, archive_path, destination, provenanc
     raw_archive = read_file(archive_path, provenance)
     if len(raw_archive) != archive['size'] or hashlib.sha256(raw_archive).hexdigest() != archive['sha256']:
         raise ValueError('Saved archive differs from manifest')
-    prefixes = [name.removesuffix(INPUTS[0]) for name in manifest['files'] if name.endswith('/' + INPUTS[0])]
+    prefixes = [name.removesuffix(required_inputs[0]) for name in manifest['files'] if name.endswith('/' + required_inputs[0])]
     if len(prefixes) != 1 or not re.fullmatch(r'profile[0-9]+/', prefixes[0]):
         raise ValueError('Saved archive profile identity is absent or ambiguous')
     prefix = prefixes[0]
-    selected = {prefix + name: name for name in INPUTS}
+    selected = {prefix + name: name for name in required_inputs}
     if not selected.keys() <= manifest['files'].keys():
         raise ValueError('Saved archive lacks required independent records')
-    if prefix + LOSS_INPUTS[0] in manifest['files']:
+    if required_inputs == INPUTS and prefix + LOSS_INPUTS[0] in manifest['files']:
         selected.update({prefix + name: name for name in LOSS_INPUTS})
         if not selected.keys() <= manifest['files'].keys():
             raise ValueError('Saved counter evidence lacks its BTF, extraction or source binding')
