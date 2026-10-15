@@ -53,6 +53,17 @@ alternative. A point supplies no pin or publication authority. Missing points, u
 disjunctions and stops retain the ordinary finite fallback. Complete checks still require
 all finite coordinates to be fixed, and retraction discards the point with its LP scope.
 
+A complete worker can try witness recovery when an existing LP float point lacks
+an exact primal package. After Boolean and source disjunction choices are complete
+and every finite integer is fixed, it rounds the point's integer coordinates as
+private guesses and substitutes them into all selected source rows and current
+branch bounds. If the remaining real system is entirely a supported
+difference graph, an exact graph point can complete those guesses. The full rows,
+strictness, integrality and source reconstruction still gate acceptance. Failed or
+unsupported guesses supply no conflict, bound or exhaustion claim. This path adds
+no LP solve and uses the current operation allowance; private neighborhood openings
+retain their own completion path.
+
 Complete workers and open local search can share checked incumbents under the
 same source and objective. Candidate integer windows guide heuristic search; they
 do not bound the source model for a refutation. [Portfolios](../solver/portfolio.md)
