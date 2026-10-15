@@ -1395,6 +1395,7 @@ abstract interface com.eignex.klause.lp/RelaxationBuilder { // com.eignex.klause
     abstract fun row(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.ir/LinearOp, kotlin/Long, com.eignex.klause.lp/Contribution = ...) // com.eignex.klause.lp/RelaxationBuilder.row|row(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.ir.LinearOp;kotlin.Long;com.eignex.klause.lp.Contribution){}[0]
     abstract fun statesLowerBound(kotlin/Int): kotlin/Boolean // com.eignex.klause.lp/RelaxationBuilder.statesLowerBound|statesLowerBound(kotlin.Int){}[0]
     abstract fun statesUpperBound(kotlin/Int): kotlin/Boolean // com.eignex.klause.lp/RelaxationBuilder.statesUpperBound|statesUpperBound(kotlin.Int){}[0]
+    open fun conditionedRow(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.ir/LinearOp, kotlin/Long, kotlin/Int, kotlin/Long) // com.eignex.klause.lp/RelaxationBuilder.conditionedRow|conditionedRow(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.ir.LinearOp;kotlin.Long;kotlin.Int;kotlin.Long){}[0]
     open fun liveBool(kotlin/Int): kotlin/Boolean? // com.eignex.klause.lp/RelaxationBuilder.liveBool|liveBool(kotlin.Int){}[0]
     open fun realColumn(kotlin/Int): kotlin/Int // com.eignex.klause.lp/RelaxationBuilder.realColumn|realColumn(kotlin.Int){}[0]
     open fun realRow(kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.ir/LinearOp, kotlin/Double, kotlin/Boolean = ..., kotlin/IntArray = ...) // com.eignex.klause.lp/RelaxationBuilder.realRow|realRow(kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.ir.LinearOp;kotlin.Double;kotlin.Boolean;kotlin.IntArray){}[0]
@@ -5878,6 +5879,28 @@ final class com.eignex.klause.factor.arithmetic/DivMod : com.eignex.klause.ir/Fa
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/DivMod.structuralKey|structuralKey(){}[0]
 }
 
+final class com.eignex.klause.factor.arithmetic/ExactLinear : com.eignex.klause.ir/Factor, com.eignex.klause.ir/LinearRow { // com.eignex.klause.factor.arithmetic/ExactLinear|null[0]
+    final val constants // com.eignex.klause.factor.arithmetic/ExactLinear.constants|{}constants[0]
+        final fun <get-constants>(): com.eignex.klause.ir/IntegralConstants // com.eignex.klause.factor.arithmetic/ExactLinear.constants.<get-constants>|<get-constants>(){}[0]
+    final val linearForm // com.eignex.klause.factor.arithmetic/ExactLinear.linearForm|{}linearForm[0]
+        final fun <get-linearForm>(): com.eignex.klause.ir/LinearForm // com.eignex.klause.factor.arithmetic/ExactLinear.linearForm.<get-linearForm>|<get-linearForm>(){}[0]
+    final val relation // com.eignex.klause.factor.arithmetic/ExactLinear.relation|{}relation[0]
+        final fun <get-relation>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/ExactLinear.relation.<get-relation>|<get-relation>(){}[0]
+    final val size // com.eignex.klause.factor.arithmetic/ExactLinear.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.factor.arithmetic/ExactLinear.size.<get-size>|<get-size>(){}[0]
+    final val variables // com.eignex.klause.factor.arithmetic/ExactLinear.variables|{}variables[0]
+        final fun <get-variables>(): com.eignex.klause.ir/MixedVars // com.eignex.klause.factor.arithmetic/ExactLinear.variables.<get-variables>|<get-variables>(){}[0]
+
+    final fun ref(kotlin/Int): kotlin/Int // com.eignex.klause.factor.arithmetic/ExactLinear.ref|ref(kotlin.Int){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.factor.arithmetic/ExactLinear // com.eignex.klause.factor.arithmetic/ExactLinear.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ExactLinear.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ExactLinear.structuralKey|structuralKey(){}[0]
+
+    final object Companion { // com.eignex.klause.factor.arithmetic/ExactLinear.Companion|null[0]
+        final fun of(kotlin/IntArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.ir/LinearOp, com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.factor.arithmetic/ExactLinear // com.eignex.klause.factor.arithmetic/ExactLinear.Companion.of|of(kotlin.IntArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.ir.LinearOp;com.eignex.klause.simplex.exact.BigFraction){}[0]
+    }
+}
+
 final class com.eignex.klause.factor.arithmetic/Linear : com.eignex.klause.ir/Factor, com.eignex.klause.ir/LinearRow { // com.eignex.klause.factor.arithmetic/Linear|null[0]
     constructor <init>(kotlin/IntArray, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>, com.eignex.klause.ir/LinearOp, com.ionspin.kotlin.bignum.integer/BigInteger) // com.eignex.klause.factor.arithmetic/Linear.<init>|<init>(kotlin.IntArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;com.eignex.klause.ir.LinearOp;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
     constructor <init>(kotlin/IntArray, kotlin/DoubleArray, kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.ir/LinearOp, kotlin/Double, kotlin/Boolean = ...) // com.eignex.klause.factor.arithmetic/Linear.<init>|<init>(kotlin.IntArray;kotlin.DoubleArray;kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.ir.LinearOp;kotlin.Double;kotlin.Boolean){}[0]
@@ -5918,6 +5941,23 @@ final class com.eignex.klause.factor.arithmetic/Linear : com.eignex.klause.ir/Fa
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/Linear.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.ir/Factor? // com.eignex.klause.factor.arithmetic/Linear.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/Linear.structuralKey|structuralKey(){}[0]
+}
+
+final class com.eignex.klause.factor.arithmetic/LinearIndicator : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.arithmetic/LinearIndicator|null[0]
+    constructor <init>(kotlin/Int, kotlin/Boolean, com.eignex.klause.factor.arithmetic/ExactLinear) // com.eignex.klause.factor.arithmetic/LinearIndicator.<init>|<init>(kotlin.Int;kotlin.Boolean;com.eignex.klause.factor.arithmetic.ExactLinear){}[0]
+
+    final val indicator // com.eignex.klause.factor.arithmetic/LinearIndicator.indicator|{}indicator[0]
+        final fun <get-indicator>(): kotlin/Int // com.eignex.klause.factor.arithmetic/LinearIndicator.indicator.<get-indicator>|<get-indicator>(){}[0]
+    final val row // com.eignex.klause.factor.arithmetic/LinearIndicator.row|{}row[0]
+        final fun <get-row>(): com.eignex.klause.factor.arithmetic/ExactLinear // com.eignex.klause.factor.arithmetic/LinearIndicator.row.<get-row>|<get-row>(){}[0]
+    final val variables // com.eignex.klause.factor.arithmetic/LinearIndicator.variables|{}variables[0]
+        final fun <get-variables>(): com.eignex.klause.ir/MixedVars // com.eignex.klause.factor.arithmetic/LinearIndicator.variables.<get-variables>|<get-variables>(){}[0]
+    final val whenOne // com.eignex.klause.factor.arithmetic/LinearIndicator.whenOne|{}whenOne[0]
+        final fun <get-whenOne>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/LinearIndicator.whenOne.<get-whenOne>|<get-whenOne>(){}[0]
+
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.arithmetic/LinearIndicator.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/LinearIndicator.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/LinearIndicator.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.arithmetic/Power : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.arithmetic/Power|null[0]
