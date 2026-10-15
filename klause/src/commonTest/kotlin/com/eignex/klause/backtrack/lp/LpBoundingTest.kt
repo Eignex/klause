@@ -47,6 +47,38 @@ import kotlin.test.assertTrue
 
 class LpBoundingTest {
     @Test
+    fun `dense mixed row deductions retract with a defining integer branch`() {
+        for (learn in listOf(false, true)) {
+            val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)), arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.EQ, 0.0),
+                Linear(intArrayOf(1), doubleArrayOf(-1.0), intArrayOf(1), doubleArrayOf(1.0),
+                    LinearOp.EQ, 0.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0),
+                    LinearOp.GE, 0.75),
+            ), numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY))
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0, 1.0))
+            val session = PropagationSession(problem)
+            session.pinInt(1, 0)
+            val sink = SolveStatsSink(backend = "defined-row")
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val relaxer = assertNotNull(engine.lpRelaxer)
+                engine.sparseSafePrune(relaxer, session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+                assertEquals(IntDomain(1, 1), session.intDomain(0))
+
+                session.popToLevel(0)
+                val result = engine.sparseSafePrune(relaxer, session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+
+                assertFalse(result.prune)
+                assertEquals(IntDomain(0, 1), session.intDomain(0))
+            }
+        }
+    }
+
+    @Test
     fun `learned mixed row implications propagate when a supporting branch is revisited`() {
         for (learn in listOf(false, true)) {
             val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)), arrayOf(
