@@ -1505,7 +1505,8 @@ cost and strict improvements separately; retaining the supplied point is not nat
 search progress. Neither option changes default portfolio initialization.
 `supportEngine=true` adds a third, support-preserving variant to each engine. At a
 feasible point it gives a newly broken longer clause an unforced replacement literal
-ranked by native break score at the live point. Mandatory implications reach a
+ranked by native break score and then raw objective delta at the live point.
+Mandatory implications reach a
 fixpoint before each replacement; affected clauses can re-enter the support queue.
 Such replacements
 are heuristic choices, not deductions. Conflicts and cancellation reject the proposal;

@@ -210,16 +210,23 @@ internal class BinaryRepairClosure(
         if (supportState == null || supported) return true
         var chosen = Lit.NONE
         var bestBreak = Int.MAX_VALUE
+        var bestObjective = Double.POSITIVE_INFINITY
         for ((index, literal) in literals.withIndex()) {
             if (index % 256 == 0 && cancellation.isCancelled()) return false
             val variable = Lit.variable(literal)
             if (stamps[variable] == epoch || frozen[variable].toInt() >= 0 ||
                 supportState.invariants?.isDefinedBool(variable) == true
             ) continue
-            val score = supportState.breakScore(Move.BoolFlip(variable))
-            if (chosen == Lit.NONE || score < bestBreak) {
+            val move = Move.BoolFlip(variable)
+            val score = supportState.breakScore(move)
+            if (score > bestBreak) continue
+            val objectiveDelta = supportState.shaping.objective?.let {
+                supportState.objectiveDelta(it, move)
+            } ?: 0.0
+            if (chosen == Lit.NONE || score < bestBreak || objectiveDelta < bestObjective) {
                 chosen = literal
                 bestBreak = score
+                bestObjective = objectiveDelta
             }
         }
         if (chosen == Lit.NONE) return false
