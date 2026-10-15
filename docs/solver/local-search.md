@@ -46,8 +46,8 @@ account for aliased positions. These lookups allocate no mutable per-worker cach
 Resumable handles retain
 private initialization cursors for state buffers,
 assignment loading or randomization, implicit seed election and ownership, definition
-readers and evaluation, warm weights and activity, greedy coordinate order, and factor
-payloads. Cancellation is polled before each retained step. Explicit loops advance in
+readers and evaluation, Boolean repair graphs, warm weights and activity, greedy
+coordinate order, and factor payloads. Cancellation is polled before each retained step. Explicit loops advance in
 batches of at most 256 coordinates, words, factors or reader edges; implicit seeding
 polls between individual globals. Random Boolean words precede integer draws, followed
 by anchored integer draws, pins and real starts. Suspension draws no additional random
@@ -156,8 +156,39 @@ primary-repair policy.
 
 The source-driven strategy generates candidates into its retained pools before its
 selection helper applies configuration and tabu filters, supplemental scoring and
-acceptance. Generation and selection keep their existing candidate order and RNG
-cadence; this boundary adds no pool copies or scratch owners.
+acceptance. Generation and selection retain their source order and RNG cadence.
+
+Boolean-only clause models with maintained unit definitions close native proposals
+under clause implications before ranking. Each state's graph is conditioned on its
+exact invocation pins during retained initialization; it keeps binary edges and
+longer residual clauses without querying CP during search. A proposal follows forced
+literals through both forms. At a feasible live point, mandatory implications reach
+a fixpoint before any newly broken longer clause receives a replacement supporter.
+Supporters rank by current-point break score, raw objective delta and literal order.
+Each coordinate receives at most one proposed value; conflicts and cancellation reject
+the complete proposal. Replacement choices are heuristic, not logical deductions.
+Complete propagated grading must retain zero hard cost before a feasible proposal
+reaches selection. Only changed decision coordinates enter the returned move;
+maintained outputs follow the committed inputs.
+
+Each source closes its candidates through the ordinary move sink, retaining source
+order and its primitive-before-compound lanes. Supplemental pools and perturbations
+use the same closure. Completed candidates remain available when a later construction
+is canceled. Configuration checking, tabu, complete grading and acceptance follow it. Models without
+unit definitions and models with non-clausal factors retain their ordinary neighborhoods.
+
+The graph and scratch belong to one live state and survive its restart epochs. Graph
+preparation consumes initialization time without search instructions; candidate expansion
+polls the current invocation cancellation and exposes no partial move. Duplicate flips
+cancel by parity. Closure facts are private heuristic proposals, with every original
+clause, price and pin retained for full grading and source publication checks. Each
+accepted compound consumes the engine's existing single-transition instruction charge;
+physical write activity remains separate.
+Support queues and primitive grading buffers are retained alongside the graph.
+Break and objective grades are reused only within one source's proposal batch at an
+unchanged live assignment; every source and perturbation begins a fresh batch.
+Strategies allocate their raw proposal sinks on first use of clause closure. These
+scratch owners do not enter warm captures or cross invocations.
 
 CBLS and optimizing SA reserve the first satisfied-factor draw for an elected
 structural global, then sample the remaining factors uniformly from the model.

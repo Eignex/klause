@@ -12,6 +12,7 @@ import com.eignex.klause.localsearch.schedule.RoundAccumulator
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.schedule.StallSchedule
 import com.eignex.klause.localsearch.scoring.MoveScoring
+import com.eignex.klause.util.Cancellation
 
 /** Temperature a Metropolis acceptance falls back to when the schedule axis supplies none. */
 private const val DEFAULT_METROPOLIS_TEMPERATURE = 1.0
@@ -131,9 +132,13 @@ class SourceDrivenStrategy(
     private val noiseSink = MoveSink()
     private val scoreSink = MoveSink()
     private val alternativeSink = MoveSink()
+    private var repairSink: MoveSink? = null
+    private var repairAlternativeSink: MoveSink? = null
 
     /** Pick the next move to apply, or `null` when no candidate is available (the engine restarts). */
-    fun pickMove(state: LocalSearchState): Move? {
+    fun pickMove(state: LocalSearchState): Move? = pickMove(state, Cancellation.Never)
+
+    internal fun pickMove(state: LocalSearchState, cancellation: Cancellation): Move? {
         val stall = schedule.noise as? StallSchedule
         val fraction = if ((schedule.weights != null || stall != null) && scoring != MoveScoring.Break) {
             state.cumulativeRepairFraction()
@@ -153,7 +158,12 @@ class SourceDrivenStrategy(
         stall?.update(state.step, state.cost, fraction)
         val stalled = stall?.stalled ?: false
         // A triggered kick pre-empts the normal pick.
-        perturbation?.invoke(state)?.let { return it }
+        perturbation?.invoke(state)?.let { proposed ->
+            val closure = state.booleanRepairs
+            if (closure == null) return proposed
+            closure.beginScoringBatch()
+            closure.close(state, proposed, cancellation)?.let { return it }
+        }
 
         noiseSink.clear()
         scoreSink.clear()
@@ -176,7 +186,28 @@ class SourceDrivenStrategy(
             if (cs.stallGated && !stalled) continue
             if (!cs.effectivePhase.appliesAt(state.cost)) continue
             val sink = if (cs.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
-            cs.source.generate(state, sink)
+            val closure = state.booleanRepairs
+            if (closure == null) {
+                cs.source.generate(state, sink)
+            } else {
+                val raw = repairSink ?: MoveSink().also { repairSink = it }
+                raw.clear()
+                raw.setAssumptions(state.assumptions)
+                raw.setInvariants(state.invariants)
+                raw.setOwners(state.seeding.ownerInt)
+                val alternatives = if (prioritizePrimaryRepairs) {
+                    (repairAlternativeSink ?: MoveSink().also { repairAlternativeSink = it }).also {
+                        it.clear()
+                        it.setAssumptions(state.assumptions)
+                        it.setInvariants(state.invariants)
+                        it.setOwners(state.seeding.ownerInt)
+                        raw.alternativeRepairs = it
+                    }
+                } else null
+                cs.source.generate(state, raw)
+                closure.closeInto(state, raw.list, sink, cancellation)
+                if (alternatives != null) closure.closeInto(state, alternatives.list, alternativeSink, cancellation)
+            }
         }
         return selectMove(state, stall, stalled)
     }
