@@ -13,10 +13,12 @@ import com.eignex.klause.lowering.toWide
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.div
+import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
-import com.eignex.klause.util.rem
+import com.eignex.klause.util.rem as truncatedRemainder
 import com.eignex.klause.util.signum
 import com.eignex.klause.util.toLongExact
 
@@ -64,20 +66,20 @@ internal fun Compiler.Builder.wideIntegerSelection(
 private fun Compiler.Builder.selectionWideValue(term: IntComb, magnitude: BigInt?): IntComb {
     val value = freshWideInt(magnitude)
     val source = term.toWide()
-    if (source.coeffs.isNotEmpty()) {
+    if (source.coeffs.isNotEmpty() || value is IntComb.Narrow && !source.constant.fitsLong()) {
         assertRelation("=", value, term)
         return value
     }
     var remaining = source.constant
     val columns = when (value) {
         is IntComb.Narrow -> listOf(checkNotNull(value.lin.asSimpleVar()))
-        is IntComb.Wide -> value.lin.coeffs.entries.sortedBy { it.value }.map { it.key }
+        is IntComb.Wide -> value.lin.coeffs.entries.sortedWith { a, b -> a.value.compareTo(b.value) }.map { it.key }
     }
     for ((position, column) in columns.withIndex()) {
         val digit = if (position == columns.lastIndex) remaining.toLongExact() else {
             val domain = (intDomains[column] as PresolveDomain.Finite).domain
             val radix = bigIntOf(domain.max) + BIG_ONE
-            val remainder = remaining % radix
+            val remainder = remaining.truncatedRemainder(radix)
             val normalized = if (remainder.signum() < 0) remainder + radix else remainder
             remaining = (remaining - normalized) / radix
             normalized.toLongExact()
