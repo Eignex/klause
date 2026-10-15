@@ -3,6 +3,8 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
@@ -406,6 +408,7 @@ internal object PortfolioComposition {
             arms += backtrack
         }
         if (alns) arms += AlnsWorkerConfig(nodeBudget = scenario.nodeBudget)
+        annotationDiversityArm(scenario, facts, arms)?.let { arms += it }
         // Appending retains the incumbent cores and every existing worker's seed position.
         continuousLpArm(scenario, facts, arms)?.let { arms += it }
         integerLinearLpArm(scenario, facts, arms)?.let { arms += it }
@@ -415,6 +418,29 @@ internal object PortfolioComposition {
             arms += CoreGuidedWorkerConfig(scenario.nodeBudget, edit = scenario.btEdit)
         }
         return arms
+    }
+
+    private fun annotationDiversityArm(
+        scenario: PortfolioScenario,
+        facts: ProblemFacts,
+        arms: List<WorkerConfig>,
+    ): BacktrackWorkerConfig? {
+        val annotation = scenario.annotationArm ?: return null
+        if (scenario.cores != 1 || scenario.kind != Kind.COP ||
+            scenario.arms < PortfolioScenario.DEFAULT_ARMS || scenario.lsPool != null ||
+            scenario.btPool != null || scenario.btEdit != null ||
+            facts.profile.problemClass != ProblemClass.FiniteCp || facts.binaryIntegers ||
+            arms.any { it.label == BacktrackArm.FirstFail.label }
+        ) {
+            return null
+        }
+        if (annotation.variableSelector == SmallestDomain && annotation.valueSelector == IndomainMin) return null
+        // Source tiers restrict branching even when every tier names first-fail.
+        return BacktrackWorkerConfig(
+            BacktrackCatalog.byLabel(BacktrackArm.FirstFail.label)
+                .capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
+            scenario.zeroObjectivePricing,
+        )
     }
 
     private fun integerLinearLpArm(

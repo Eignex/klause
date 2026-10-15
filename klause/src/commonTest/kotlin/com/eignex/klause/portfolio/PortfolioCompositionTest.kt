@@ -2,6 +2,13 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.toBacktrackParams
+import com.eignex.klause.backtrack.selector.IndomainMax
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.SmallestDomain
+import com.eignex.klause.ir.SearchGroup
+import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.solver.ProblemClass
@@ -12,6 +19,114 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PortfolioCompositionTest {
+
+    @Test
+    fun `annotated finite optimization admits unrestricted first fail beside source search`() {
+        val annotation = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax)
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { false }
+
+        val plan = PortfolioComposition.plan(scenario, facts)
+
+        assertEquals(listOf("satOptimized", "annotation"), plan.arms.take(2).map { it.label })
+        assertEquals("first-fail", plan.arms.last().label)
+        assertEquals(plan.arms.size, plan.firstSolutionCount)
+        val source = (plan.arms[1] as BacktrackWorkerConfig).recipe.build(1L, null)
+        assertSame(annotation.variableSelector, source.variableSelector)
+        assertSame(annotation.valueSelector, source.valueSelector)
+        val generic = (plan.arms.last() as BacktrackWorkerConfig).recipe.build(1L, null)
+        assertSame(SmallestDomain, generic.variableSelector)
+        assertSame(IndomainMin, generic.valueSelector)
+    }
+
+    @Test
+    fun `tiered first fail retains unrestricted search diversity`() {
+        val annotation = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(1, 0))))
+            .toBacktrackParams(0, 3)
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
+
+        val composed = PortfolioComposition.compose(scenario)
+
+        assertEquals(1, composed.count { it.label == "first-fail" })
+        assertEquals(1, composed.count { it.label == "annotation" })
+    }
+
+    @Test
+    fun `unrestricted annotation already supplies first fail branching`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(
+            annotationArm = BacktrackParams(variableSelector = SmallestDomain, valueSelector = IndomainMin),
+        )
+
+        val composed = PortfolioComposition.compose(scenario)
+
+        assertEquals(0, composed.count { it.label == "first-fail" })
+        assertEquals(1, composed.count { it.label == "annotation" })
+    }
+
+    @Test
+    fun `annotation diversity preserves explicit pools small counts and parallel composition`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = BacktrackParams())
+        val controls = (1..5).map { scenario.copy(arms = it) } + listOf(
+            scenario.copy(cores = 2),
+            scenario.copy(kind = Kind.CSP),
+            scenario.copy(engine = EngineMix.BACKTRACK),
+            scenario.copy(engine = EngineMix.LOCAL_SEARCH),
+            scenario.copy(engine = EngineMix.ALNS),
+            scenario.copy(annotationArm = null),
+            scenario.copy(btEdit = { it }),
+            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
+            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
+        )
+
+        for (control in controls) {
+            val composed = PortfolioComposition.compose(control)
+
+            assertEquals(0, composed.count { it.label == "first-fail" }, control.toString())
+        }
+    }
+
+    @Test
+    fun `annotation diversity requires nonbinary finite domains`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = BacktrackParams())
+        val profile = ProblemFacts.assumed(Kind.COP).profile
+        val controls = ProblemClass.entries.filter { it != ProblemClass.FiniteCp }
+            .map { ProblemFacts(profile.copy(problemClass = it)) { true } } +
+            ProblemFacts(profile, binaryIntegers = true) { true }
+
+        for (facts in controls) {
+            val composed = PortfolioComposition.compose(scenario, facts)
+
+            assertEquals(0, composed.count { it.label == "first-fail" })
+        }
+    }
+
+    @Test
+    fun `expanded annotated pools admit first fail before any incumbent without duplicating it`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = BacktrackParams())
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { false }
+        val small = PortfolioComposition.plan(scenario, facts)
+
+        for (count in listOf(9, 12, 18, 30)) {
+            val expanded = PortfolioComposition.plan(scenario.copy(arms = count), facts)
+
+            assertEquals(small.arms.map { it.label }, expanded.arms.take(small.arms.size).map { it.label })
+            assertEquals(1, expanded.arms.count { it.label == "first-fail" })
+            assertEquals(small.firstSolutionCount, expanded.firstSolutionCount)
+        }
+    }
+
+    @Test
+    fun `annotation diversity spends the containing node allowance`() {
+        val budget = NodeBudget(limit = 100)
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(
+            annotationArm = BacktrackParams(), nodeBudget = budget, lpCeiling = LpConfig.OFF,
+        )
+
+        val composed = PortfolioComposition.compose(scenario)
+
+        val generic = composed.filterIsInstance<BacktrackWorkerConfig>().single { it.label == "first-fail" }
+        assertSame(budget, generic.recipe.build(1L, null).nodeBudget)
+    }
 
     @Test
     fun `integer linear companion preserves existing worker positions`() {

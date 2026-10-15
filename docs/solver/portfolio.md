@@ -452,6 +452,24 @@ Element repairs to complete improving fallback selection. The original arm retai
 its full repair neighborhood. Explicit local-search pools, local-search-only execution,
 parallel pools and non-scheduling models retain their selected recipes.
 
+### Annotated finite-domain diversity
+
+A curated single-core mixed optimization pool with at least six configured arms
+retains unrestricted first-fail search beside a source annotation on nonbinary
+finite-CP models. The annotation keeps its selected slot and branch preferences.
+If the selected pool lacks `first-fail`, composition appends that existing recipe
+after the incumbent workers; all existing worker positions and seeds are preserved.
+The appended worker joins the initial executable pool, including in expanded pools,
+and has the ordinary complete worker's source proof authority. An unrestricted
+smallest-domain/minimum-value annotation already supplies this branching capability;
+a tiered first-fail annotation still restricts candidate scope and remains distinct.
+
+This adds at most one complete worker, without adding a family, processor, allowance
+or scheduling reservation. Existing first-fail recipes are reused without an extra
+copy. Explicit pools, backtrack edits, smaller configured pools, parallel execution,
+satisfaction, binary-domain and continuous models retain their selected composition.
+The containing resource budgets and complete-family scheduling remain shared.
+
 ### Finite objective recipe diversity
 
 A curated single-core mixed finite-CP optimization pool with at least six configured
