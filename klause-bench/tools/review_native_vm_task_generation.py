@@ -119,54 +119,80 @@ def parse_records(text, root_pid, selected):
 
 
 def initialization_candidates(native):
-    initializations, by_pointer, entries = [], {}, []
+    initializations, by_pointer, entries, pointer_sets = [], {}, [], []
     for rows in native['threads']:
         for group in rows:
-            for row in group['primary']:
+            for primary_index, row in enumerate(group['primary']):
                 if row['type'] != 'TASK_ENTRY':
                     continue
                 entry = {'event': [group['pid'], group['tid'], group['sequence']],
                          'timestamp': row['timestamp'], 'role': row['kind'],
                          'taskPointer': row['taskPointer'], 'compileId': row['compileId'],
-                         'groupErrors': list(group['errors']), 'callback': row}
+                         'groupErrors': list(group['errors']), 'primaryIndex': primary_index,
+                         'candidatePointerSet': None, 'actualTaskGenerationProven': False}
                 entries.append(entry)
                 if row['kind'] == 'initialize':
-                    initializations.append(entry)
+                    index = len(entries) - 1
+                    initializations.append(index)
                     if row['taskPointer'] != 0:
-                        by_pointer.setdefault(row['taskPointer'], []).append(len(initializations) - 1)
+                        pointer = row['taskPointer']
+                        if pointer not in by_pointer:
+                            by_pointer[pointer] = len(pointer_sets)
+                            pointer_sets.append({'taskPointer': pointer, 'initializationEntries': []})
+                        pointer_sets[by_pointer[pointer]]['initializationEntries'].append(index)
     relations = 0
     for entry in entries:
-        entry['initializationCandidates'] = []
-        entry['actualTaskGenerationProven'] = False
         if entry['role'] in ('initialize', 'destroy'):
             continue
-        for index in by_pointer.get(entry['taskPointer'], []):
+        entry['candidatePointerSet'] = by_pointer.get(entry['taskPointer'])
+        possible = pointer_sets[entry['candidatePointerSet']]['initializationEntries'] \
+            if entry['candidatePointerSet'] is not None else []
+        eligible = False
+        for index in possible:
             relations += 1
             if relations > MAX_RELATIONS:
                 raise ValueError('Task initialization candidate graph exceeds bounds')
-            candidate = initializations[index]
+            candidate = entries[index]
             same_thread = candidate['event'][:2] == entry['event'][:2]
-            if same_thread and candidate['event'][2] >= entry['event'][2]:
-                continue
-            entry['initializationCandidates'].append({
-                'initializationIndex': index, 'initializationEvent': candidate['event'],
-                'compileId': candidate['compileId'],
-                'sameThreadEarlierSequence': same_thread,
-                'reportedTimestampRelation': 'before' if candidate['timestamp'] < entry['timestamp'] else
-                    'equal' if candidate['timestamp'] == entry['timestamp'] else 'after',
-                'crossThreadOrderProven': False, 'actualTaskGenerationProven': False})
+            if not same_thread or candidate['event'][2] < entry['event'][2]:
+                eligible = True
         entry['unresolvedReason'] = 'null task pointer' if entry['taskPointer'] == 0 else \
-            'no eligible observed initialization' if not entry['initializationCandidates'] else \
+            'no eligible observed initialization' if not eligible else \
             'initialization candidates do not exclude unobserved reuse or prove cross-thread order'
-    return {'initializations': initializations, 'taskEntries': entries,
+    return {'schema': 2, 'initializationEntries': initializations, 'taskEntries': entries,
+            'pointerInitializationSets': pointer_sets, 'crossThreadOrderProven': False,
             'actualTaskGenerationProven': False,
-            'scope': 'Every observed initialization and task entry retained. Candidate edges require pointer '
-                     'equality and respect known per-thread sequence only. Cross-thread timestamps, hidden '
-                     'initializations and frees do not authorize a generation or pointer-lifetime claim.'}
+            'candidateRule': 'Follow candidatePointerSet to all equal-pointer initializationEntries; '
+                             'exclude only same-thread initialization sequences at or after the task entry.',
+            'scope': 'Every initialization and task entry retained once. Native callback references use '
+                     '(event, primaryIndex); initialization indices refer to taskEntries. Shared pointer sets '
+                     'and the explicit per-thread sequence rule retain every candidate without expanding '
+                     'edges. Node timestamps retain every before/equal/after relation without proving '
+                     'cross-thread order. Hidden initializations and frees authorize no generation or lifetime.'}
+
+
+def eligible_initializations(graph, entry):
+    index = entry['candidatePointerSet']
+    if index is None:
+        return
+    for candidate_index in graph['pointerInitializationSets'][index]['initializationEntries']:
+        candidate = graph['taskEntries'][candidate_index]
+        if candidate['event'][:2] == entry['event'][:2] and candidate['event'][2] >= entry['event'][2]:
+            continue
+        yield candidate_index, candidate
+
+
+def jfr_identities(document):
+    positions = [index for index, event in enumerate(document['recording']['events'])
+                 if event['type'] == 'jdk.Compilation']
+    return [{**{key: value for key, value in row.items() if key != 'raw'}, 'recordingEventIndex': index}
+            for row, index in zip(previous.jfr_records(document), positions, strict=True)]
 
 
 def public_contexts(native, candidates, jfr, logs):
-    by_event = {tuple(row['event']): row for row in candidates['taskEntries']}
+    by_event = {tuple(row['event']): index for index, row in enumerate(candidates['taskEntries'])}
+    native_groups = {(group['pid'], group['tid'], group['sequence']): group
+                     for rows in native['threads'] for group in rows}
     if len(jfr) > MAX_RECORDS or len(logs) > MAX_RECORDS:
         raise ValueError('Independent compilation identity inventory exceeds bounds')
     jfr_index, log_index = {}, {}
@@ -181,28 +207,28 @@ def public_contexts(native, candidates, jfr, logs):
         for group in rows:
             event = group['pid'], group['tid'], group['sequence']
             if group['errors'] or len(group['primary']) != 1:
-                invalid.append({'event': event, 'group': group})
+                invalid.append({'event': event, 'groupErrors': list(group['errors'])})
                 continue
             row = group['primary'][0]
             if row['type'] == 'TASK_ENTRY' and row['kind'] == 'construct':
-                frame = {'entryEvent': event, 'taskPointer': row['taskPointer'], 'construct': row,
+                frame = {'entryEvent': event, 'taskPointer': row['taskPointer'],
                          'destroy': None, 'brokers': [], 'posts': [], 'public': [], 'issues': []}
                 stack.append(frame)
                 frames.append(frame)
             elif row['type'] == 'TASK_ENTRY' and row['kind'] == 'destroy':
                 if stack:
                     frame = stack.pop()
-                    frame['destroy'] = {'event': event, 'callback': row}
+                    frame['destroy'] = {'event': event}
                 else:
-                    orphans.append({'event': event, 'callback': row, 'reason': 'destruction without construction'})
+                    orphans.append({'event': event, 'reason': 'destruction without construction'})
             elif row['type'] == 'USDT' or (row['type'] == 'TASK_ENTRY' and row['kind'] in ('broker', 'post')):
                 if not stack:
-                    orphans.append({'event': event, 'callback': row, 'reason': 'callback outside observed wrapper'})
+                    orphans.append({'event': event, 'reason': 'callback outside observed wrapper'})
                 elif row['type'] == 'USDT':
-                    stack[-1]['public'].append({'event': event, 'group': group})
+                    stack[-1]['public'].append({'event': event})
                 else:
                     stack[-1]['brokers' if row['kind'] == 'broker' else 'posts'].append(
-                        {'event': event, 'entry': by_event[event]})
+                        {'event': event, 'entryIndex': by_event[event]})
             elif row['type'] == 'LIFECYCLE' and row['kind'] == 'EXIT':
                 for frame in stack:
                     frame['issues'].append({'event': event, 'reason': 'thread exit with unfinished wrapper'})
@@ -216,21 +242,24 @@ def public_contexts(native, candidates, jfr, logs):
             if len(frame['brokers']) != 1 or len(frame['public']) != 2 or frame['destroy'] is None:
                 raise ValueError('Observed wrapper, broker or public pair is incomplete or ambiguous')
             broker = frame['brokers'][0]
+            task = candidates['taskEntries'][broker['entryIndex']]
             begin, end = frame['public']
-            if begin['group']['primary'][0]['kind'] != 'begin' or end['group']['primary'][0]['kind'] != 'end' or \
+            begin_group, end_group = native_groups[tuple(begin['event'])], native_groups[tuple(end['event'])]
+            if begin_group['primary'][0]['kind'] != 'begin' or end_group['primary'][0]['kind'] != 'end' or \
                     not (frame['entryEvent'][2] < broker['event'][2] < begin['event'][2] <
                          end['event'][2] < frame['destroy']['event'][2]):
                 raise ValueError('Observed wrapper and public sequence order differs')
-            if frame['taskPointer'] == 0 or broker['entry']['taskPointer'] != frame['taskPointer'] or \
-                    any(post['entry']['taskPointer'] != frame['taskPointer'] for post in frame['posts']):
+            if frame['taskPointer'] == 0 or task['taskPointer'] != frame['taskPointer'] or \
+                    any(candidates['taskEntries'][post['entryIndex']]['taskPointer'] != frame['taskPointer']
+                        for post in frame['posts']):
                 raise ValueError('Observed wrapper, broker or post task pointer differs')
-            identity = previous.decode_identity(begin['group'])
-            if identity != previous.decode_identity(end['group']):
+            identity = previous.decode_identity(begin_group)
+            if identity != previous.decode_identity(end_group):
                 raise ValueError('Public compilation identities differ')
             frame['publicIdentity'] = identity
-            ids = {row['compileId'] for row in broker['entry']['initializationCandidates']}
+            ids = {row['compileId'] for _, row in eligible_initializations(candidates, task)}
             key = (frame['entryEvent'][1], previous.method_name(identity), identity['compiler'].casefold(),
-                   bool(int(end['group']['primary'][0]['values'][0])))
+                   bool(int(end_group['primary'][0]['values'][0])))
             for index in jfr_index.get(key, []):
                 relations += 1
                 if relations > MAX_RELATIONS:
@@ -253,7 +282,8 @@ def public_contexts(native, candidates, jfr, logs):
         except (ValueError, KeyError, IndexError, TypeError, UnicodeError) as error:
             frame['issues'].append({'reason': str(error)})
     return {'observedWrappers': frames, 'orphanCallbacks': orphans, 'invalidGroups': invalid,
-            'scope': 'Observed per-thread construction/destruction nesting and public identity candidates only. '
+            'scope': 'Event references address nativeRecords groups; entryIndex addresses '
+                     'initializationCandidates.taskEntries. Observed per-thread nesting and identity candidates only. '
                      'Destruction has no captured receiver; nesting cannot establish actual wrapper identity '
                      'or broker return. Candidate uniqueness does not prove a task generation or lifetime.'}
 
@@ -348,7 +378,7 @@ def inspect(directory, library, out, report):
     delivery['scope'] = 'Selected observed task-entry/kernel/USDT groups and fragments only; no hidden '
     delivery['scope'] += 'initialization, actual kernel coverage, complete compiler roots or elapsed-time proof.'
     document = json.loads(raw['child-compilations.stdout'])
-    jfr = previous.jfr_records(document)
+    jfr = jfr_identities(document)
     log_text = raw['live/hotspot.xml'].decode()
     logs = previous.log_records(log_text)
     tree = ET.fromstring(log_text)
@@ -370,7 +400,7 @@ def inspect(directory, library, out, report):
 def main():
     manifest, expected, archive, library, output = sys.argv[1:]
     manifest, archive, library, output = map(Path, (manifest, archive, library, output))
-    report = {'completed': False, 'diagnosticOnly': True, 'observedTaskEntryRecordsValidated': False,
+    report = {'schema': 2, 'completed': False, 'diagnosticOnly': True, 'observedTaskEntryRecordsValidated': False,
               'sourceSha256': capture.observer.file_digest(Path(__file__)),
               **{key: False for key in DENIED},
               'scope': 'Saved task entries, initialization and public-identity candidates only. Every '
@@ -383,7 +413,7 @@ def main():
         selected = output.parent / 'selected-inputs'
         report['savedArchive'] = previous.extract_inputs(manifest, expected, archive, selected, {}, INPUTS)
         inspect(selected, library, output.parent, report)
-        if len(json.dumps(report, indent=2).encode()) > MAX_OUTPUT_BYTES:
+        if len(report_bytes(report)) > MAX_OUTPUT_BYTES:
             raise ValueError('Saved task review output exceeds bounds')
     except Exception as error:
         report.update(completed=False, observedTaskEntryRecordsValidated=False,
@@ -395,7 +425,7 @@ def main():
         raise
     finally:
         report.update({key: False for key in DENIED})
-        if len(json.dumps(report, indent=2).encode()) > MAX_OUTPUT_BYTES:
+        if len(report_bytes(report)) > MAX_OUTPUT_BYTES:
             for key in ['nativeRecords', 'initializationCandidates', 'threadContexts', 'independentJfrDocument',
                         'independentJfrCompilations', 'independentLogIdentities', 'independentLogNodeInventory',
                         'originalCaptureReport', 'originalLossCounter']:
@@ -406,7 +436,11 @@ def main():
                 report['delivery']['selectedSequencedDeliveryProven'] = False
             if 'lossCounter' in report:
                 report['lossCounter'].update(finalLossCounterProven=False, finalLossCounterZeroProven=False)
-        output.write_text(json.dumps(report, indent=2) + '\n')
+        output.write_bytes(report_bytes(report))
+
+
+def report_bytes(report):
+    return (json.dumps(report, separators=(',', ':')) + '\n').encode()
 
 
 if __name__ == '__main__':
