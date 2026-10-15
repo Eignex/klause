@@ -76,18 +76,18 @@ class OpenTheoryEngineTest {
     }
 
     @Test
-    fun `default mixed finite point choices precede uncovered Boolean gates`() {
+    fun `default mixed finite point choices precede primitive Boolean preferences`() {
         for (allowance in listOf(null, 0L, 1L)) {
             val model = Problem(
-                numBoolVars = 2, numIntVars = 2,
+                numBoolVars = 3, numIntVars = 2,
                 intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 0)),
                 openIntLo = booleanArrayOf(false, true), openIntHi = booleanArrayOf(false, true),
                 numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
                 factors = arrayOf(
-                    Clause(intArrayOf(Lit.make(1, true))),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
                     Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
-                    ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.LE, 0),
+                    ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
                         doubleArrayOf(1.0), LinearOp.LE, 0.0),
                 ),
             )
@@ -104,12 +104,14 @@ class OpenTheoryEngineTest {
                 assertNull(run.advance())
 
                 assertEquals(if (allowance == null) null else false, run.session.boolValue(0))
+                assertNull(run.session.boolValue(1))
                 assertEquals(0L, run.session.intLowerBound(0))
                 assertEquals(if (allowance == null) 0L else 2L, run.session.intUpperBound(0))
                 pause = false
                 val assignment = assertIs<OpenTheoryResult.Sat>(run.advance()).assignment
                 assertTrue(assignment.intValue(0).toLong() in 0L..2L)
-                assertEquals(true, assignment.boolValue(1))
+                assertEquals(assignment.intValue(1).toLong() <= 0L, assignment.boolValue(1))
+                assertEquals(true, assignment.boolValue(2))
                 assertEquals("0", assignment.realValue(0))
             }
         }

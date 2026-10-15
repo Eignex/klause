@@ -657,10 +657,9 @@ internal class PointBranchSelection(
     private val finitePointAvailable: () -> Boolean,
 ) : SearchBranchSelection {
     override fun alternatives(sources: SearchBranchSources): List<SearchDecision>? {
-        sources.componentAlternatives(SearchBranchKind.Boolean)?.let { return it }
         if (finitePointAvailable()) {
             sources.componentAlternatives(SearchBranchKind.Arithmetic)?.let { return it }
         }
-        return fallback.alternatives(sources)
+        return sources.componentAlternatives(SearchBranchKind.Boolean) ?: fallback.alternatives(sources)
     }
 }

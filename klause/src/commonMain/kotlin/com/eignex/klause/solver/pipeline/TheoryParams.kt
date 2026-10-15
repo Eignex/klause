@@ -49,8 +49,8 @@ data class TheoryParams(
      * with source integer or real coordinates, without a source-clause index
      * or Boolean draw. Original mixed integer/real sources can also select a primitive Boolean through
      * a separate live-point branch proposal before the ordinary heuristic. A live partial point can
-     * also order exhaustive finite equality alternatives before uncovered Boolean gates. Other built-in linear point
-     * guidance and compound source-clause preferences use
+     * order exhaustive finite equality alternatives before primitive preferences and ordinary gates.
+     * Other built-in linear point guidance and compound source-clause preferences use
      * this opt-in. Zero permits bounded construction observations
      * but publishes no component preference; a positive value permits indexed preferences after caller
      * or deferred hints decline. Construction and arithmetic comparisons retain their existing owners
@@ -64,7 +64,7 @@ data class TheoryParams(
     /**
      * Fallback Boolean branching for each feasibility traversal.
      *
-     * Default mixed live-point Boolean and finite choices can precede this heuristic. Without a
+     * Default mixed live-point finite and Boolean choices can precede this heuristic. Without a
      * live point, arithmetic and finite proposals retain the selected route's category priority.
      * Every alternative retains its source-check obligations.
      */

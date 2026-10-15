@@ -71,8 +71,8 @@ verdict: pending rows are installed before source-proof queries and complete-lea
 LP and original-source checks. Origin observations count fresh captures without
 counting forward reuse as another LP capture.
 
-After available primitive preferences, a default mixed opening can try an integral
-current finite coordinate before an uncovered Boolean gate. The shared CP owner
+Before primitive preferences or ordinary Boolean gates, a default mixed opening
+can try an integral current finite coordinate. The shared CP owner
 receives its equality and the remaining lower/upper alternatives; the point adds
 no fact or proof authority. Unselected disjunctions still require their ordinary
 source checks; a residual point can only order the finite alternatives. Missing,
