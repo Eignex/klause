@@ -28,13 +28,16 @@ internal class RealDifferenceSystem private constructor(
 ) {
     private var potentials: LongArray? = null
 
-    fun check(bools: IntArray, stop: Cancellation): Result {
+    fun check(bools: IntArray, stop: Cancellation, onWork: ((Long) -> Unit)? = null): Result {
+        onWork?.invoke(guards.size.toLong() + graph.numVars)
         val active = BooleanArray(guards.size) { index ->
             val guard = guards[index]
             guard == ALWAYS || bools[Lit.variable(guard)] == if (Lit.isPositive(guard)) 1 else 0
         }
         var cycle: IntArray? = null
-        return when (val result = graph.potentials(active, stop::invoke, potentials) { cycle = it }) {
+        val result = graph.potentials(active, stop::invoke, potentials,
+            onNegativeCycle = { cycle = it }, onWork = onWork)
+        return when (result) {
             Potentials.Abandoned -> Result.Interrupted
             Potentials.Infeasible -> {
                 // ALWAYS edges are immutable source rows and declared bounds, not scoped LP assertions.
@@ -106,6 +109,25 @@ internal class RealDifferenceSystem private constructor(
                     }
                 }
             }
+            return build(zero, edges, stop)
+        }
+
+        fun prepareRows(
+            realColumns: Int,
+            rows: List<ExactRationalInequality>,
+            stop: Cancellation,
+        ): RealDifferenceSystem? {
+            if (realColumns !in 1..10000 || rows.size > 100000 || stop()) return null
+            val edges = ArrayList<Edge>()
+            for (row in rows) {
+                if (row.columns.any { it !in 0 until realColumns } ||
+                    !append(row, ALWAYS, realColumns, edges, stop)
+                ) return null
+            }
+            return build(realColumns, edges, stop)
+        }
+
+        private fun build(zero: Int, edges: List<Edge>, stop: Cancellation): RealDifferenceSystem? {
             if (edges.isEmpty() || edges.size > 100000) return null
             var denominator = 1L
             for (edge in edges) {

@@ -808,8 +808,8 @@ the compiled model's Boolean count with its smallest observed
 only input declarations. The pair is absent until observed and survives retraction
 and aggregation as a historical minimum. `smtCompleteSearchLinearChecks` counts LP
 attempts with all those Booleans assigned; `smtCompleteSearchLinearPoints` counts
-their returned continuous points before source-disjunction selection, integrality
-and full-source acceptance. Unobserved counts remain absent rather than zero.
+their returned LP continuous points before source-disjunction selection, integrality
+and full-source acceptance; independent mixed graph recovery is excluded. Unobserved counts remain absent rather than zero.
 `smtCompleteSearchLinearOutcome_*` counts returned verdicts, float completion,
 raw exact-point presence and existing stage declines before the caller stop check.
 An absent stage differs from a present stage without a decline; neither establishes
