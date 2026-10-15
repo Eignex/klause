@@ -290,7 +290,10 @@ Retired, deferred and auxiliary proof workers supply no coverage debt; paused ha
 retain their elapsed credit. A first accepted incumbent ends this floor. Dedicated
 lanes, segment deadlines and containing work/native allowances retain their controls.
 The lag and cooperative segment overspend bound the opportunity guarantee; no fixed
-number of milliseconds or result is promised to an individual worker.
+number of milliseconds or result is promised to an individual worker. Work bounds keep
+each segment's stopping point stable for the same incoming state. Elapsed coverage can
+change later selections even when those work bounds bind before segment deadlines,
+so a single lane and seed alone do not make the full schedule reproducible.
 
 Slices yield before consuming an alternative or after a completed node. A pending
 sibling cannot be skipped when yielding, and reset discards a pending alternative.
