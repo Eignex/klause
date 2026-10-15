@@ -91,6 +91,8 @@ data class SmtStats(
     val completeSearchLinearPoints: Long? = null,
     /** Returned LP verdict and stage observations before the caller stop check; excludes private queries. */
     val completeSearchLinearOutcomes: Map<String, Long>? = null,
+    /** Complete-traversal branch and mixed recovery stages; null until observed. */
+    val completeSearchStages: Map<String, Long>? = null,
 ) {
     /** Combine independent solve slices. */
     fun mergedWith(other: SmtStats): SmtStats {
@@ -127,15 +129,18 @@ data class SmtStats(
                 ?: other.completeSearchLinearChecks,
             completeSearchLinearPoints?.let { it + (other.completeSearchLinearPoints ?: 0L) }
                 ?: other.completeSearchLinearPoints,
-            when {
-                completeSearchLinearOutcomes == null -> other.completeSearchLinearOutcomes
-                other.completeSearchLinearOutcomes == null -> completeSearchLinearOutcomes
-                else -> (completeSearchLinearOutcomes.keys + other.completeSearchLinearOutcomes.keys)
-                    .associateWith { (completeSearchLinearOutcomes[it] ?: 0L) +
-                        (other.completeSearchLinearOutcomes[it] ?: 0L) }
-            },
+            mergeCompleteSearchCounts(completeSearchLinearOutcomes, other.completeSearchLinearOutcomes),
+            mergeCompleteSearchCounts(completeSearchStages, other.completeSearchStages),
         )
     }
+}
+
+private fun mergeCompleteSearchCounts(
+    first: Map<String, Long>?, second: Map<String, Long>?,
+): Map<String, Long>? = when {
+    first == null -> second
+    second == null -> first
+    else -> (first.keys + second.keys).associateWith { (first[it] ?: 0L) + (second[it] ?: 0L) }
 }
 
 /** Mutable exact-SMT telemetry for one top-level open-theory request. */
@@ -185,11 +190,13 @@ internal class SmtStatsSink {
     private var completeSearchLinearChecks: Long? = null
     private var completeSearchLinearPoints: Long? = null
     private var completeSearchLinearOutcomes: MutableMap<String, Long>? = null
+    private var completeSearchStages: MutableMap<String, Long>? = null
 
     fun observeCompleteSearchBooleans(variables: Int, unassigned: Int) {
         if (completeSearchLinearChecks == null) completeSearchLinearChecks = 0L
         if (completeSearchLinearPoints == null) completeSearchLinearPoints = 0L
         if (completeSearchLinearOutcomes == null) completeSearchLinearOutcomes = linkedMapOf()
+        if (completeSearchStages == null) completeSearchStages = linkedMapOf()
         val previous = completeSearchMinUnassignedBooleans
         if (previous == null || unassigned < previous) {
             completeSearchBooleanVariables = variables
@@ -204,6 +211,11 @@ internal class SmtStatsSink {
     fun observeCompleteSearchLinearOutcome(key: String) {
         val outcomes = checkNotNull(completeSearchLinearOutcomes)
         outcomes[key] = (outcomes[key] ?: 0L) + 1L
+    }
+
+    fun observeCompleteSearchStage(key: String) {
+        val stages = checkNotNull(completeSearchStages)
+        stages[key] = (stages[key] ?: 0L) + 1L
     }
 
     fun observeCompleteSearchLinearPoint() {
@@ -261,5 +273,6 @@ internal class SmtStatsSink {
         realGraphOpenings, graphPointHintCaptures, lpPointHintCaptures, defaultGraphHintReleases,
         completeSearchBooleanVariables, completeSearchMinUnassignedBooleans,
         completeSearchLinearChecks, completeSearchLinearPoints, completeSearchLinearOutcomes?.toMap(),
+        completeSearchStages?.toMap(),
     )
 }

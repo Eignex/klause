@@ -815,6 +815,13 @@ raw exact-point presence and existing stage declines before the caller stop chec
 An absent stage differs from a present stage without a decline; neither establishes
 why another stage failed. A returned raw point can be withheld by the stop check
 and is not a source witness. These counters exclude private queries.
+`smtCompleteSearchStage_*` observes existing branch paths: finite choices pending,
+finite and Boolean choices complete, source disjunction or disequality branches,
+and source branchers offering no further choice. `RECOVERY_*` records an actual mixed point attempt
+and its existing return path. These are component stages, not full-source acceptance
+or explanations for UNKNOWN. A missing recovery attempt cannot identify which earlier
+stage stopped progress without the corresponding observations. Stage recording adds
+no scan, owner poll, numerical query or work allowance.
 These observations add no scan, numerical query,
 allowance or result authority and do not explain an UNKNOWN verdict by themselves.
 
