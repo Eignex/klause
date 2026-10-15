@@ -332,8 +332,11 @@ sealed class ExecutionOption<T> private constructor(internal val id: String) {
     }
 
     /** The `bt-arm` execution setting. */
-    data object BacktrackArmsByLabel : ExecutionOption<String>("bt-arm") {
-        override fun decode(params: EngineParams): String? = params.string(id)
+    data object BacktrackArmsByLabel : ExecutionOption<List<String>>("bt-arm") {
+        override fun capture(value: List<String>): List<String> = value.toList()
+        override fun decode(params: EngineParams): List<String>? = params.string(id)?.let { raw ->
+            raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        }
     }
 
     /** The `dry-run-presolve` execution setting. */

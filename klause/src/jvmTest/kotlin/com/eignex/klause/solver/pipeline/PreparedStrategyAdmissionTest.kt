@@ -56,7 +56,7 @@ class PreparedStrategyAdmissionTest(private val model: String, private val engin
                     componentPlan = assertNotNull(plan.componentPlan), preparedPlan = plan),
                 engine = engine, presolveConfig = PresolveConfig.NONE, explicitPresolveConfig = true,
                 solutionSetSensitive = false, cancellation = Cancellation.Never, presolveBudget = null,
-                cores = 1, engineParams = emptyList(), randomSeed = 17, defaultArms = 1,
+                cores = 1, executionOptions = ExecutionOptions(), randomSeed = 17, defaultArms = 1,
                 lpConfig = LpConfig(), zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
                 nodeBudget = null, solveBudgetMillis = null, allSolutions = false, solutionCap = null,
                 deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,

@@ -32,6 +32,7 @@ import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
+import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveShape
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
@@ -221,7 +222,7 @@ class LpTerminalDeclineTest {
                 cancellation = cancellation,
                 presolveBudget = null,
                 cores = 1,
-                engineParams = emptyList(),
+                executionOptions = ExecutionOptions(),
                 randomSeed = 1L,
                 defaultArms = 1,
                 lpConfig = LpConfig(),
