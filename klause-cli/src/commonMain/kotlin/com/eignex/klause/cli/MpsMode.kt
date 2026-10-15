@@ -95,7 +95,7 @@ internal object MpsMode : CliMode {
             val route = compiled.model.pipelineRoute(
                 objective,
                 compiled.maximize,
-                routePureRealToTheory = usesExactSource,
+                routePureRealToTheory = false,
                 boundCancellation = common.routingCancellation(),
                 routeLinearToTheory = false,
                 onLpStats = { routingLpStats = it },
