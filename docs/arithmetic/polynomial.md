@@ -94,7 +94,13 @@ lookups and completed inserts debit the same arithmetic token; an interrupted
 power installs no value. The ordinary evaluator keeps no retained powers. Both
 paths preserve coefficient-first multiplication order and exact scalar metadata.
 The point owner exposes its captured coordinates separately from arithmetic work,
-so callers can publish the same immutable values they evaluated.
+so callers can publish the same immutable values they evaluated. A completed scan of
+known rational coordinates creates a private constant-line image owner; exact
+fraction arithmetic replaces repeated algebraic scalar wrappers. Classification,
+construction and consultations charge the same token. Missing or nonrational
+coordinates retain the ordinary captured-point evaluator, and interrupted
+classification installs no completed owner. Published coordinates still come from
+the original capture.
 
 An affine-line evaluation captures rational offsets and directions by original
 coordinate ID. It retains only completed rational univariate images and coordinate

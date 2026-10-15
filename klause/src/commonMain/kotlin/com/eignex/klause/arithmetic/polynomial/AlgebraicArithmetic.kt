@@ -232,11 +232,37 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             }
         }
         private val powers = HashMap<Pair<Int, Int>, AlgebraicReal>()
+        private var constantPoint: AffineLineEvaluation.Point? = null
+        private var classified = false
         val coordinateCount: Int get() = point.size
 
         fun coordinate(variable: Int): AlgebraicReal = point.getValue(variable)
 
-        fun evaluate(polynomial: Polynomial): AlgebraicReal = evaluateAt(polynomial, ::power)
+        fun evaluate(polynomial: Polynomial): AlgebraicReal =
+            capturedConstantPoint()?.evaluate(polynomial) ?: evaluateAt(polynomial, ::power)
+
+        private fun capturedConstantPoint(): AffineLineEvaluation.Point? {
+            arithmetic.step()
+            if (classified) return constantPoint
+            val base = ArrayList<BigFraction>()
+            for (id in 0 until point.size) {
+                arithmetic.step()
+                val value = point[id]?.rational
+                if (value == null) {
+                    arithmetic.step()
+                    classified = true
+                    return null
+                }
+                base.add(value)
+            }
+            val direction = List(base.size) { arithmetic.step(); BigFraction.ZERO }
+            val completed = AffineLineEvaluation(base, direction, this@AlgebraicArithmetic)
+                .at(rational(BigFraction.ZERO))
+            arithmetic.step()
+            constantPoint = completed
+            classified = true
+            return completed
+        }
 
         private fun power(variable: Int, exponent: Int): AlgebraicReal {
             arithmetic.step()

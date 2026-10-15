@@ -33,6 +33,8 @@ internal class AffineLineEvaluation(
         fun coordinate(variable: Int): AlgebraicReal = algebraic.evaluate(coordinates[variable], parameter)
 
         fun sign(polynomial: Polynomial): Int = algebraic.signAt(image(polynomial), parameter)
+
+        fun evaluate(polynomial: Polynomial): AlgebraicReal = algebraic.evaluate(image(polynomial), parameter)
     }
 
     private fun image(polynomial: Polynomial): RationalPolynomial {

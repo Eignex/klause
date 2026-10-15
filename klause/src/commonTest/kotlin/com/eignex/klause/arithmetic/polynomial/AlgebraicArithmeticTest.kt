@@ -13,6 +13,45 @@ class AlgebraicArithmeticTest {
     private val arithmetic = AlgebraicArithmetic(polynomial)
 
     @Test
+    fun `known rational point images evaluate mixed source monomials exactly`() {
+        val source = polynomial.add(
+            polynomial.multiply(Polynomial.variable(0), Polynomial.variable(1)),
+            polynomial.power(Polynomial.variable(0), 2),
+        )
+        val point = arithmetic.pointEvaluation(mapOf(
+            0 to arithmetic.rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+            1 to arithmetic.rational(BigFraction.ofLong(5) * BigFraction.ofLong(3).reciprocal()),
+        ))
+
+        val value = point.evaluate(source)
+
+        assertEquals(BigFraction.ofLong(19) * BigFraction.ofLong(4).reciprocal(), value.rational)
+    }
+
+    @Test
+    fun `rational point images use captured values after caller mutation`() {
+        val coordinates = mutableMapOf(0 to arithmetic.rational(BigFraction.ofLong(2)))
+        val point = arithmetic.pointEvaluation(coordinates)
+        coordinates[0] = arithmetic.rational(BigFraction.ofLong(3))
+
+        val value = point.evaluate(polynomial.power(Polynomial.variable(0), 2))
+
+        assertEquals(BigFraction.ofLong(4), value.rational)
+    }
+
+    @Test
+    fun `rational point images reject unrepresentable constant powers before expansion`() {
+        val point = arithmetic.pointEvaluation(mapOf(0 to arithmetic.rational(BigFraction.ofLong(4))))
+        val source = Polynomial.of(listOf(
+            PolynomialTerm(Monomial.of(mapOf(0 to Int.MAX_VALUE)), BigFraction.ONE),
+        ))
+
+        val failure = assertFailsWith<PolynomialResourceLimit> { point.evaluate(source) }
+
+        assertEquals(PolynomialResource.DEGREE_OVERFLOW, failure.resource)
+    }
+
+    @Test
     fun `completed point powers fit the remaining caller work`() {
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val source = polynomial.add(
@@ -69,14 +108,16 @@ class AlgebraicArithmeticTest {
     @Test
     fun `completed point powers still obey caller cancellation`() {
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
-        var cancelled = false
-        val counted = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
-        val point = counted.pointEvaluation(mapOf(0 to root))
-        val source = polynomial.power(Polynomial.variable(0), 2)
-        point.evaluate(source)
-        cancelled = true
+        for (coordinate in listOf(root, arithmetic.rational(BigFraction.ofLong(2)))) {
+            var cancelled = false
+            val counted = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
+            val point = counted.pointEvaluation(mapOf(0 to coordinate))
+            val source = polynomial.power(Polynomial.variable(0), 2)
+            point.evaluate(source)
+            cancelled = true
 
-        assertFailsWith<PolynomialInterrupted> { point.evaluate(source) }
+            assertFailsWith<PolynomialInterrupted> { point.evaluate(source) }
+        }
     }
 
     @Test
