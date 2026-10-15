@@ -32,21 +32,21 @@ internal fun SourceProofContext.integerPinBounds(
 ): SourceIntegerBounds? {
     val lower = linkedMapOf<SourceCoordinate, BigFraction>()
     val upper = linkedMapOf<SourceCoordinate, BigFraction>()
-    fun bound(id: SourceCoordinate, value: BigFraction, above: Boolean, strict: Boolean = false) {
+    fun bound(id: SourceCoordinate, value: BigFraction, isUpper: Boolean, strict: Boolean = false) {
         if (id.kind != SourceCoordinate.Kind.Integer) return
         val ceiling = BigFraction.of(value.ceilInteger(), BIG_ONE)
         val floor = BigFraction.of(value.negated().ceilInteger(), BIG_ONE).negated()
-        val rounded = if (above) {
+        val rounded = if (isUpper) {
             if (strict) ceiling - BigFraction.ONE else floor
         } else if (strict) floor + BigFraction.ONE else ceiling
-        val bounds = if (above) upper else lower
+        val bounds = if (isUpper) upper else lower
         val previous = bounds[id]
-        if (previous == null || if (above) rounded < previous else rounded > previous) bounds[id] = rounded
+        if (previous == null || if (isUpper) rounded < previous else rounded > previous) bounds[id] = rounded
     }
-    for ((above, bounds) in listOf(false to condition.lower, true to condition.upper)) {
+    for ((isUpper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
         for ((id, value) in bounds) {
             if (cancellation()) return null
-            bound(id, value, above)
+            bound(id, value, isUpper)
         }
     }
     // Conditional rows cannot establish their own pins or activate each other circularly.
@@ -57,7 +57,9 @@ internal fun SourceProofContext.integerPinBounds(
         val row = premise.inequality
         if (row.coefficients.size != 1) continue
         val (id, coefficient) = row.coefficients.entries.single()
-        if (!coefficient.isZero) bound(id, row.rhs / coefficient, coefficient > BigFraction.ZERO, row.strict)
+        if (id.kind == SourceCoordinate.Kind.Integer && !coefficient.isZero) {
+            bound(id, row.rhs / coefficient, coefficient > BigFraction.ZERO, row.strict)
+        }
     }
     return if (cancellation()) null else SourceIntegerBounds(lower, upper)
 }
