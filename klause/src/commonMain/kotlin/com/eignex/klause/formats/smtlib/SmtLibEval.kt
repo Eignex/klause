@@ -441,17 +441,19 @@ private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
         if (cond == Lit.negate(trueLitCache)) return Res.I(b)
     }
     if (a is IntComb.Narrow && b is IntComb.Narrow) {
+        val thenTerm = branchUnder(a.lin, cond)
+        val elseTerm = branchUnder(b.lin, Lit.negate(cond))
         // A chain of equality tests on one selector defines the same quantity, and defers its lowering
         // until the chain's extent is known.
-        chainIte(cond, a.lin, b.lin)?.let { return narrowRes(it) }
-        val (aLo, aHi) = linCombRange(a.lin)
-        val (bLo, bHi) = linCombRange(b.lin)
+        chainIte(cond, thenTerm, elseTerm)?.let { return narrowRes(it) }
+        val (aLo, aHi) = linCombRange(thenTerm)
+        val (bLo, bHi) = linCombRange(elseTerm)
         val loU = if (aLo == null || bLo == null) null else minOf(aLo, bLo)
         val hiU = if (aHi == null || bHi == null) null else maxOf(aHi, bHi)
         val self = LinComb(mapOf(newInt(loU, hiU) to 1), 0)
-        val parts = exclusiveIntegerSelection(checkNotNull(self.asSimpleVar()), listOf(cond), listOf(a.lin), b.lin)
+        val parts = exclusiveIntegerSelection(checkNotNull(self.asSimpleVar()), listOf(cond), listOf(thenTerm), elseTerm)
         conditionalEqualities.define(
-            checkNotNull(self.asSimpleVar()), listOf(cond), listOf(a.lin), b.lin, parts,
+            checkNotNull(self.asSimpleVar()), listOf(cond), listOf(thenTerm), elseTerm, parts,
             listOf(iteChains.guardEquality(cond)),
         )
         return narrowRes(self)
@@ -462,6 +464,14 @@ private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
     val self = freshWideInt(magnitude)
     wideIntegerSelection(cond, self, a, b, magnitude)
     return Res.I(self)
+}
+
+private fun Compiler.Builder.branchUnder(term: LinComb, knownLiteral: Int): LinComb {
+    val variable = term.asSimpleVar() ?: return term
+    // An inner definition can have independent consumers outside this branch.
+    return iteChains.branchUnder(variable, knownLiteral)
+        ?: conditionalEqualities.branchUnder(variable, knownLiteral)
+        ?: term
 }
 
 /** Post a hard linear relation `a ⟨op⟩ b`; a variable-free relation is checked for consistency

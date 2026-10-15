@@ -83,6 +83,9 @@ Immutable guard meanings exclude unreachable arms from those images. A default
 omits selector values covered by its guards, and a fully covered selector image
 excludes the default even when that default is open arithmetic.
 An integer conditional with a constant guard returns its selected branch directly.
+A directly nested single-guard integer conditional can be restricted by the enclosing
+branch's compiled literal or complement. This reads its definition without changing
+shared uses; unmatched, multiple-guard and wide terms retain their exact lowering.
 Conditional definitions retain immutable equality meanings for their guards.
 When a branch compares a simple integer variable with a constant, these meanings
 can exclude conflicting selector tests and omit guard tests implied by that comparison.

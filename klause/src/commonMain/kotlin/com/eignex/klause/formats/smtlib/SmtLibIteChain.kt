@@ -102,6 +102,16 @@ internal class IteChainTable {
 
     fun openAt(variable: Int): IteChain? = chains[variable]
 
+    fun branchUnder(variable: Int, knownLiteral: Int): LinComb? {
+        val chain = chains[variable] ?: return null
+        val guard = chain.conds.singleOrNull() ?: return null
+        return when (knownLiteral) {
+            guard -> chain.arms.single()
+            Lit.negate(guard) -> chain.default
+            else -> null
+        }
+    }
+
     /** Remove and return the chain defining [variable], if any — it can no longer be extended. */
     fun close(variable: Int): IteChain? = chains.remove(variable)
 
