@@ -5,6 +5,47 @@ import kotlin.test.assertEquals
 
 class ProfilerTest {
     @Test
+    fun `operation caller paths preserve captured order beyond utilities`() {
+        val callers = Profiler.cliOperationCallers(listOf(
+            "java.util.HashMap.getNode",
+            "com.eignex.klause.util.OrCancellation.isCancelled",
+            "com.eignex.klause.theory.qflra.LiveQfLraSystem.install",
+            "com.eignex.klause.solver.search.SearchSession.initialize",
+        ))
+
+        assertEquals(
+            "com.eignex.klause.theory.qflra.LiveQfLraSystem.install <- " +
+                "com.eignex.klause.solver.search.SearchSession.initialize",
+            callers,
+        )
+    }
+
+    @Test
+    fun `operation caller paths retain at most three frames`() {
+        val stack = listOf("First", "Second", "Third", "Fourth").map { "com.eignex.klause.solver.$it.run" }
+
+        val callers = Profiler.cliOperationCallers(stack)
+
+        assertEquals(
+            "com.eignex.klause.solver.First.run <- com.eignex.klause.solver.Second.run <- " +
+                "com.eignex.klause.solver.Third.run",
+            callers,
+        )
+    }
+
+    @Test
+    fun `stacks without operation callers keep an explicit unknown label`() {
+        for (stack in listOf(emptyList(), listOf("java.util.HashMap.getNode"), listOf(
+            "com.eignex.klause.util.OrCancellation.isCancelled",
+            "com.eignex.klause.bench.tools.Profiler.summarizeCli",
+        ))) {
+            val callers = Profiler.cliOperationCallers(stack)
+
+            assertEquals("no captured Klause operation", callers)
+        }
+    }
+
+    @Test
     fun `resumed initialization and restart frames retain their phases`() {
         for ((method, expected) in listOf(
             "newMinimizeState" to "local-search seeding",
