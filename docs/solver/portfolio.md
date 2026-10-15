@@ -264,7 +264,11 @@ handles directly. No preparation revisit delays an unadmitted sibling.
 Before the first accepted witness, a selected complete-search family runs its available
 arm with the least charged work. Shared clauses, root fixings and objective floors
 remain credited, but cannot exclude a silent search from its family's coverage. Before a
-witness, observable violation reductions can earn a family more turns; complete-search
+witness, observable violation reductions can earn a family more turns. A positive-work
+heuristic search segment without progress supplies plateau feedback even without an
+accepted incumbent; private preparation and zero-work pauses supply no such feasibility
+failure. An internal violation score does not install an incumbent or change the
+objective phase. Complete-search
 root fixings and glue clauses do not favor its family, because deduction throughput does
 not predict the first witness. Those counters remain recorded. After the first witness,
 arm selection also follows that policy. Initial admission, preparation revisits and
