@@ -199,7 +199,7 @@ class ExactLiraSearchComponent private constructor(
     private val root = SearchNode()
     private val disjunctionAtoms = HashMap<Int, List<DisjunctAtom>>()
     private val disjunctOwner = Any()
-    private var disjunctionRegistrationDeclined = false
+    private val hasSourceDisjunctions = model.factors.any { it.linearForm is LinearForm.Disjunction }
     private val exactForms = preparedSource.exactForms
     private val preparedRows = preparedSource.preparedRows
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
@@ -416,6 +416,11 @@ class ExactLiraSearchComponent private constructor(
             "unsupported exact linear component"
         }
         nodesByLevel.put(0, root)
+        for ((index, factor) in model.factors.withIndex()) {
+            if ((factor.linearForm as? LinearForm.Disjunction)?.rows?.isEmpty() == true) {
+                disjunctionAtoms[index] = emptyList()
+            }
+        }
     }
 
     override fun initialize(context: SearchContext): ComponentResult {
@@ -424,13 +429,12 @@ class ExactLiraSearchComponent private constructor(
         val contextStop = context.executionControls.cancellation
         parentStop = solveStop ?: contextStop
         pollContextStop = solveStop != null && solveStop !== contextStop
-        registerDisjunctions(context)
         beginOperation()
         return try {
             graphFirst = !hasPrivateReals && model.numIntVars == 0 &&
                 solveContext.certificationPolicy === ProductionLpCertificationPolicy && realDifference != null
             if (graphFirst) smtStats?.observeRealGraphOpening()
-            if (disjunctionRegistrationDeclined || (!graphFirst && !installSource()) || operationStop()) {
+            if ((!graphFirst && !installSource()) || operationStop()) {
                 ComponentResult.Indeterminate
             } else {
                 lp.initialize(context).takeUnless { operationStop() } ?: ComponentResult.Indeterminate
@@ -573,21 +577,15 @@ class ExactLiraSearchComponent private constructor(
         closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
     }
 
-    private fun registerDisjunctions(context: SearchContext) {
-        for ((index, factor) in model.factors.withIndex()) {
-            if (factor.linearForm !is LinearForm.Disjunction || factor.linearRows.isEmpty()) continue
-            val disjuncts = ArrayList<DisjunctAtom>(factor.linearRows.size)
-            for ((rowIndex, row) in factor.linearRows.withIndex()) {
-                val address = RowAddress(index, rowIndex)
-                val disjunct = registerDisjunct(row, context, address) ?: break
-                disjuncts += disjunct
-            }
-            if (disjuncts.size == factor.linearRows.size) {
-                disjunctionAtoms[index] = disjuncts
-            } else {
-                disjunctionRegistrationDeclined = true
-            }
+    private fun registerDisjunction(index: Int, context: SearchContext): List<DisjunctAtom>? {
+        val rows = model.factors[index].linearRows
+        val disjuncts = ArrayList<DisjunctAtom>(rows.size)
+        for ((rowIndex, row) in rows.withIndex()) {
+            val address = RowAddress(index, rowIndex)
+            disjuncts += registerDisjunct(row, context, address) ?: return null
         }
+        disjunctionAtoms[index] = disjuncts
+        return disjuncts
     }
 
     private fun nameableDisjunct(row: LinearRow): Boolean {
@@ -681,12 +679,17 @@ class ExactLiraSearchComponent private constructor(
     )
 
     private fun disjunctionBranch(context: SearchContext): List<SearchDecision>? {
+        var registered = false
         for ((index, factor) in model.factors.withIndex()) {
             if (factor.linearForm !is LinearForm.Disjunction) continue
-            val disjuncts = disjunctionAtoms[index]
-            if (disjuncts == null) {
-                outcome = ComponentCheck.Indeterminate
-                return null
+            val disjuncts = disjunctionAtoms[index] ?: run {
+                val created = registerDisjunction(index, context)
+                if (created == null) {
+                    outcome = ComponentCheck.Indeterminate
+                    return null
+                }
+                registered = true
+                created
             }
             if (disjuncts.any { context.truth(it.holds) == true }) continue
             val open = disjuncts.firstOrNull { context.truth(it.holds) == null }
@@ -700,6 +703,7 @@ class ExactLiraSearchComponent private constructor(
             }
             return null
         }
+        if (registered) captureCompleteWitness(candidate)
         return null
     }
 
@@ -998,16 +1002,7 @@ class ExactLiraSearchComponent private constructor(
         }
         if (bools.any { it == UNASSIGNED }) candidate?.let { capturePointHints(it, context) }
         if (operationStop()) return ComponentResult.Indeterminate
-        val complete = bools.none { it == UNASSIGNED } && node.selectsEveryDisjunction(model, disjunctionAtoms) &&
-            node.nextDisequality(model, disjunctionAtoms, bools) == null
-        if (complete) {
-            result.exactPrimal?.take(model.numRealVars + model.numIntVars)?.let { point ->
-                acceptWitness(point)?.let {
-                    assignment = it
-                    outcome = ComponentCheck.Feasible
-                }
-            }
-        }
+        captureCompleteWitness(candidate)
         // Source integer branching requires an independently checked continuous witness.
         return ComponentResult.Consistent
     }
@@ -1123,7 +1118,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun finitePointBranch(variable: Int, context: SearchContext): List<SearchDecision>? {
-        if (dirty || disjunctionAtoms.isNotEmpty() ||
+        if (dirty || hasSourceDisjunctions ||
             (outcome != null && outcome != ComponentCheck.Feasible)
         ) return null
         val point = candidate ?: return null
@@ -1183,6 +1178,17 @@ class ExactLiraSearchComponent private constructor(
             )?.alternatives()
         }
         return null
+    }
+
+    private fun captureCompleteWitness(point: List<BigFraction>?) {
+        if (point == null || operationStop() || bools.any { it == UNASSIGNED } ||
+            !node.selectsEveryDisjunction(model, disjunctionAtoms) ||
+            node.nextDisequality(model, disjunctionAtoms, bools) != null
+        ) return
+        acceptWitness(point)?.let {
+            assignment = it
+            outcome = ComponentCheck.Feasible
+        }
     }
 
     private fun acceptWitness(point: List<BigFraction>): ExactLiraAssignment? {
