@@ -1649,6 +1649,33 @@ Concordance is limited to the pinned library/debug files and selected compiler
 units. Entry calling convention and private-field-read authorization remain false;
 layout concordance supplies no live read, complete root census or compiler saving.
 
+`com.eignex.klause.bench.profile.NativeVmEntryAbiReview` accepts `context=`,
+`context-sha256=`, `layout=`, `layout-sha256=`, `entries=` and `entries-sha256=`.
+It retains the three exact supported saved captures before review: bound compiler
+DWARF contexts, proven task layouts and executable entry records. Each input is
+bounded at 32 MiB, review records at 32 MiB and child execution at 60 seconds.
+The original entry producer's five default queries remain explicit when its
+capture lacks a query field. No native library or decoder is loaded.
+
+The fixed plan covers the canonical `CompileBroker::invoke_compiler_on_method`
+and `nmethod::post_compiled_method` symbols only. A complete symbol span and exact
+DWARF entry must agree. Concrete parameter ownership, pointer widths/targets,
+artificial object references and all matching descriptions at that entry must
+agree with the source signature and normal AMD64 register convention. Direct
+`DW_OP_regN` and `DW_OP_regx` descriptions are recognized. Relative location lists
+require an explicit compilation-unit base; default locations apply only when no
+bounded range covers entry. Empty covered descriptions remain unavailable.
+
+Other aliases and query groups remain retained outside that plan. Conflicting
+definitions or canonical symbol addresses, unresolved origins, partial spans,
+split function ranges, entry-value/composite expressions and non-normal calling
+conventions remain unproved. The result supplies no task-lifetime, control-flow,
+root-census, clock, code-size or compiler-saving proof. Private live-field-read
+authorization remains false. Register numbering follows the
+[AMD64 ABI](https://gitlab.com/x86-psABIs/x86-64-ABI/-/blob/master/x86-64-ABI/low-level-sys-info.tex),
+and canonical source symbol encoding follows the
+[C++ ABI](https://itanium-cxx-abi.github.io/cxx-abi/abi.html#mangling).
+
 ### Native executable entry bytes
 
 `com.eignex.klause.bench.profile.NativeVmEntryVerification` retains bytes for the
