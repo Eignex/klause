@@ -88,6 +88,15 @@ val checkNativeVmSymbolQueries = tasks.register<Exec>("checkNativeVmSymbolQuerie
         "tools/native_vm_loaded_module.py", "tools/read_native_vm_metadata.py")
 }
 
+val checkNativeVmTaskLifecycleAbi = tasks.register<Exec>("checkNativeVmTaskLifecycleAbi") {
+    group = "verification"
+    description = "Test saved lifecycle source, physical boundaries and explicit ABI reads."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_native_vm_task_lifecycle_abi.py")
+    inputs.files("tools/review_native_vm_task_lifecycle_abi.py", "tools/test_review_native_vm_task_lifecycle_abi.py",
+        "tools/review_native_vm_entry_abi.py", "tools/review_native_vm_dwarf_records.py")
+}
+
 val checkNativeVmTaskCalls = tasks.register<Exec>("checkNativeVmTaskCalls") {
     group = "verification"
     description = "Test saved compiler caller declarations and normal call continuations."
@@ -295,7 +304,7 @@ tasks.named("check") {
         checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkNativeVmEntryTransfers,
         checkNativeVmDebugImage, checkNativeVmDwarfProvider, checkNativeVmDwarfRecords,
         checkNativeVmDwarfRecordReview, checkNativeVmDwarfContext, checkNativeVmDwarfLayoutReview,
-        checkNativeVmEntryAbi, checkNativeVmTaskCalls)
+        checkNativeVmEntryAbi, checkNativeVmTaskCalls, checkNativeVmTaskLifecycleAbi)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
