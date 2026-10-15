@@ -87,7 +87,7 @@ internal class ContinuousProductChoices(val operand: Int, values: DoubleArray, g
 
     fun nearest(value: Double): Double {
         if (!value.isFinite() || captured.isEmpty()) return Double.NaN
-        val found = captured.binarySearch(value)
+        val found = entries.binarySearch { it.first.compareTo(value) }
         if (found >= 0) return captured[found]
         val next = -found - 1
         if (next == 0) return captured.first()
