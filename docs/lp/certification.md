@@ -214,7 +214,8 @@ including source scaling and external constants, without integer lattice roundin
 or a Long objective-range requirement. Root publication retains the same accepted
 continuous bound, composed with the relaxation constant exactly and projected
 downward. CLI root-bound statistics retain the complete round-trip Double value;
-rate formatting cannot round a bound upward. Declined certification supplies no bound, and a bound supplies neither
+rate formatting cannot round a bound upward. MPS also reports its objective scale
+so consumers can recover original source units exactly. Declined certification supplies no bound, and a bound supplies neither
 a witness nor attainment authority. Pure integer objectives retain the Long
 source-range and enclosing-cutoff guards. Continuous coordinates
 remain outside CP fixing targets. Objective certification and fixing precede row

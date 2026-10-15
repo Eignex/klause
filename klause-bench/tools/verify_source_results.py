@@ -478,17 +478,20 @@ def source_query_solver(constraints, variables, is_smt, objective):
     return solver, 'finite binary' if binary else 'general', query
 
 
-def check_mps_root_bound(text, bound, maximize, problem):
+def check_mps_root_bound(text, bound, maximize, problem, scale=1):
     value = float(bound)
     assert math.isfinite(value), "nonfinite MPS root bound"
     constraints, objective, _, source_maximize = mps(text)
     assert source_maximize == maximize, "objective orientation differs from source"
-    exact = fractions.Fraction.from_float(value)
+    scale = fractions.Fraction(str(scale))
+    assert scale.denominator == 1 and scale > 0, "invalid MPS root objective scale"
+    exact = fractions.Fraction.from_float(value) / scale
     solver = z3.Solver()
     solver.set(timeout=120000)
     solver.add(*constraints, objective < rational(exact))
     require_verdict(solver, z3.unsat, problem, 'source root bound exclusion')
-    return {"value": str(exact), "sense": "minimized", "scope": "original MPS constraints",
+    return {"value": str(exact), "objectiveScale": str(scale), "sense": "minimized",
+            "scope": "original MPS constraints",
             "check": "strictly better source objective unsat", "nativeCertificateChecked": False}
 
 
@@ -517,7 +520,8 @@ def check(cases, source_root=None, progress=None, witness_only=False, root_bound
         key = (record["sourceHashes"]["model"], record["kind"], record["feasible"], str(reported_objective),
                record.get("exactObjective") is not None, record["proven"], record.get("maximize"),
                record.get("finalWitness"), exact, tolerance_optimum,
-               record.get("stats", {}).get("lpRootBound") if root_bounds else None)
+               record.get("stats", {}).get("lpRootBound") if root_bounds else None,
+               record.get("stats", {}).get("lpRootBoundScale") if root_bounds else None)
         if key in cache:
             results.append({"index": case["index"], "check": cache[key]})
             if progress is not None:
@@ -528,8 +532,14 @@ def check(cases, source_root=None, progress=None, witness_only=False, root_bound
         if root_bounds:
             assert case["problem"]["suite"] not in SMT_SUITES, "root-bound checking requires MPS"
             bound = record.get("stats", {}).get("lpRootBound")
-            result["rootBoundCheck"] = check_mps_root_bound(text, bound, record["maximize"], record["problem"]) \
-                if bound is not None else {"check": "unavailable: no recorded root bound"}
+            scale = record.get("stats", {}).get("lpRootBoundScale")
+            if bound is None:
+                result["rootBoundCheck"] = {"check": "unavailable: no recorded root bound"}
+            elif scale is None:
+                result["rootBoundCheck"] = {"check": "unavailable: no source objective scale"}
+            else:
+                result["rootBoundCheck"] = check_mps_root_bound(text, bound, record["maximize"],
+                                                              record["problem"], scale)
         if witness_only:
             result["verificationScope"] = "witness-only"
             result["proofCertificateChecked"] = False

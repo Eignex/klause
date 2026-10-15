@@ -48,6 +48,20 @@ class ProofCheckTest(unittest.TestCase):
 
         self.assertEqual(result['check'], 'strictly better source objective unsat')
 
+    def test_root_bound_check_undoes_source_scaling_exactly(self):
+        source = 'ROWS\n N cost\n G row\nCOLUMNS\n x cost 1 row 3\nRHS\n r row 1\nENDATA\n'
+
+        result = proof_check.check_mps_root_bound(source, '1', False, 'root', scale='3')
+
+        self.assertEqual(result['value'], '1/3')
+        with self.assertRaisesRegex(AssertionError, 'source root bound exclusion expected unsat'):
+            proof_check.check_mps_root_bound(source, '1.1', False, 'root', scale='3')
+
+    def test_invalid_root_objective_scales_are_rejected(self):
+        for scale in ['0', '-1', '1/2']:
+            with self.subTest(scale=scale), self.assertRaisesRegex(AssertionError, 'invalid MPS root objective scale'):
+                proof_check.check_mps_root_bound(self.mps_source, '-1', False, 'root', scale=scale)
+
     def test_nonfinite_saved_root_bounds_are_rejected(self):
         for bound in ['NaN', 'Infinity', '-Infinity']:
             with self.subTest(bound=bound), self.assertRaisesRegex(AssertionError, 'nonfinite MPS root bound'):
@@ -55,16 +69,24 @@ class ProofCheckTest(unittest.TestCase):
 
     def test_saved_root_bounds_are_checked_even_when_no_witness_is_claimed(self):
         cases = [self.case(suite='mps-core', feasible=None, objective=None, proven=False, finalWitness=None,
-                           stats={'lpRootBound': '-0.10000000000000002'})]
+                           stats={'lpRootBound': '-0.10000000000000002', 'lpRootBoundScale': '1'})]
         with mock.patch.object(proof_check, 'source', return_value=self.mps_source):
             results = proof_check.check(cases, root_bounds=True)
 
         self.assertEqual(results[0]['check']['verdictCheck'], 'no claimed verdict')
         self.assertEqual(results[0]['check']['rootBoundCheck']['check'], 'strictly better source objective unsat')
 
+    def test_saved_root_bounds_without_source_scale_remain_unavailable(self):
+        cases = [self.case(suite='mps-core', feasible=None, objective=None, proven=False, finalWitness=None,
+                           stats={'lpRootBound': '0'})]
+        with mock.patch.object(proof_check, 'source', return_value=self.mps_source):
+            results = proof_check.check(cases, root_bounds=True)
+
+        self.assertEqual(results[0]['check']['rootBoundCheck']['check'], 'unavailable: no source objective scale')
+
     def test_cached_source_checks_do_not_hide_a_different_root_bound(self):
         cases = [self.case(suite='mps-core', feasible=None, objective=None, proven=False, finalWitness=None,
-                           stats={'lpRootBound': bound}) for bound in ['-1', '0']]
+                           stats={'lpRootBound': bound, 'lpRootBoundScale': '1'}) for bound in ['-1', '0']]
         with mock.patch.object(proof_check, 'source', return_value=self.mps_source):
             with self.assertRaisesRegex(AssertionError, 'source root bound exclusion expected unsat'):
                 proof_check.check(cases, root_bounds=True)

@@ -8,6 +8,10 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.result.RunStats
+import com.eignex.klause.solver.result.SolveStats
+import com.eignex.kumulant.stat.summary.SumResult
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -333,6 +337,20 @@ class MpsModeTest {
             val text = capture { output.onExactSolution("v X=$sign", BigFraction.ofLong(sign)) }
 
             assertTrue("o ${if (sign < 0) "-" else ""}1/3" in text, text)
+        }
+    }
+
+    @Test
+    fun `MPS root statistics retain their source objective scale`() {
+        for (scale in listOf(1L, 3L, 100L)) {
+            val output = MpsOutput(objectiveScale = scale)
+            val stats = SolveStats(run = RunStats(backend = "backtrack"),
+                lp = LpStats(solves = SumResult(1.0), rootBound = -1.23456789))
+
+            val text = capture { output.onStatistics(stats, 1L, 0L) }
+
+            assertTrue("c lpRootBound=-1.23456789\n" in text, text)
+            assertTrue("c lpRootBoundScale=$scale\n" in text, text)
         }
     }
 
