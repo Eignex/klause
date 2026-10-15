@@ -368,6 +368,14 @@ when each visited domain has at most 1024 values. Larger domains retain bounds
 filtering and exact complete-point checks. Local scoring checks the full relation,
 repairs either role and maintains acyclic outputs through the definition network.
 
+Wide SMT absolute values retain `AffineAbs` over exact integer affine operand and
+result payloads. Finite wide quantities keep their digit columns and source ranges;
+open quantities keep symbolic integer coordinates. Native finite consumers evaluate
+and filter the full relation with arbitrary-precision arithmetic. Selected arithmetic
+consumers install the nonnegative equality alternatives, with the same original factor
+attribution. Rational source checks evaluate the affine magnitudes exactly, including
+coordinates beyond the signed-word range. The implied inequalities remain a relaxation.
+
 `RealAbs` retains exact absolute value over source real coordinates. Exact FlatZinc
 `float_abs` produces this factor; its selected linear and polynomial consumers
 install the complete nonnegative equality alternatives. Its implied inequalities

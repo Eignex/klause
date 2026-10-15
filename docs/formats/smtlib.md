@@ -48,6 +48,11 @@ with exact defining equalities. Zero and identity powers simplify arithmetically
 Polynomial source snapshots retain native power nodes. Wide exponents retain compact squaring DAGs;
 representation limits produce explicit UNKNOWN without truncating the source.
 
+Integer absolute values retain `Abs` for scalar operands and results, and
+`AffineAbs` for exact wide affine values. Finite wide intermediates preserve their
+digit columns. Arithmetic consumers receive equivalent nonnegative equality
+alternatives; source factors expose only the implied inequality relaxation.
+
 ## Integer division
 
 Constant-divisor `div` and `mod` retain a shared Euclidean `DivMod` factor, with
