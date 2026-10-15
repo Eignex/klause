@@ -49,6 +49,31 @@ internal fun finiteWitnessVerifier(
     ) {
         return@CandidateVerifier Verification.Rejected("assignment does not cover finite real coordinates")
     }
+    val restrictions = assumptions.deductions
+    restrictions.forEachIntMin { id, lower ->
+        if (cancellation()) return@CandidateVerifier Verification.Indeterminate("restriction check cancelled")
+        if (id !in 0 until sample.numIntVars || sample.intValue(id) < lower) {
+            return@CandidateVerifier Verification.Rejected("assignment violates a deduced lower bound")
+        }
+    }
+    restrictions.forEachIntMax { id, upper ->
+        if (cancellation()) return@CandidateVerifier Verification.Indeterminate("restriction check cancelled")
+        if (id !in 0 until sample.numIntVars || sample.intValue(id) > upper) {
+            return@CandidateVerifier Verification.Rejected("assignment violates a deduced upper bound")
+        }
+    }
+    restrictions.forEachIntHole { id, excluded ->
+        if (cancellation()) return@CandidateVerifier Verification.Indeterminate("restriction check cancelled")
+        if (id !in 0 until sample.numIntVars || sample.intValue(id) == excluded) {
+            return@CandidateVerifier Verification.Rejected("assignment violates a deduced hole")
+        }
+    }
+    restrictions.forEachIntSet { id, survivors ->
+        if (cancellation()) return@CandidateVerifier Verification.Indeterminate("restriction check cancelled")
+        if (id !in 0 until sample.numIntVars || sample.intValue(id) !in survivors) {
+            return@CandidateVerifier Verification.Rejected("assignment violates a deduced value set")
+        }
+    }
     when (val verdict = composedFixpoint(problem, Candidate(sample, Unit), cancellation, assumptions)) {
         is Verification.Rejected -> return@CandidateVerifier verdict
         is Verification.Indeterminate -> return@CandidateVerifier verdict

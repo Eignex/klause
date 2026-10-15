@@ -37,7 +37,7 @@ internal fun <V> composedFixpoint(
     try {
         if (session.isUnsatAtRoot) return Verification.Rejected("root propagation refutes the assignment")
         if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
-        if ((!assumptions.isEmpty || !assumptions.deductions.isEmpty) && session.seed(assumptions) is PropagationResult.Unsat) {
+        if (!assumptions.isEmpty && session.seed(assumptions) is PropagationResult.Unsat) {
             return Verification.Rejected("the assumptions refute the assignment")
         }
         for (b in 0 until problem.numBoolVars) {
