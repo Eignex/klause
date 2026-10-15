@@ -107,6 +107,7 @@ internal enum class FactorKind {
     WIDE_DIV_MOD,
     REAL_ELEMENT,
     REAL_ARRAY_MIN_MAX,
+    GRID_ARRAY_MIN_MAX,
 }
 
 // Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments into a

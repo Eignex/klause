@@ -278,6 +278,12 @@ linear or polynomial encoders also require equality to an operand. Native scores
 are heuristic and exact source-coordinate checking remains authoritative. Direct
 finite propagation is unavailable until a complete arithmetic consumer is selected.
 
+`GridArrayMinMax` retains per-coordinate grid steps, origins and the component's
+scaling policy. Its finite projection filters envelope rows and remaining
+operand equalities; exact finite checking and selected arithmetic encoders use
+the same signed coefficient and offset rounding. This relation does not establish exact physical source
+arithmetic outside the declared grid policy.
+
 `RealElement` retains an integer index and ordered binary64 constants or real-column
 entries. Its finite propagation restricts the index range; exact arithmetic checks
 certify the selected real equality. A fixed index emits that equality into the LP

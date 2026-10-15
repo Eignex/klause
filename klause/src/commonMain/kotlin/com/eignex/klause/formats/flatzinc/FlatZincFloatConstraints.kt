@@ -237,10 +237,9 @@ internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: B
     )
 }
 
-/** Retain real extrema or lower the component's scaled grid comparisons. */
 internal fun FlatZincCompiler.emitFloatMinMax(c: FznConstraint, max: Boolean) {
     expectArity(c, 3)
-    if (emitRealMinMax(c, max)) return
+    if (emitRealMinMax(c, max) || emitGridMinMax(c, max)) return
     val argA = c.args[0]
     val argB = c.args[1]
     val argC = c.args[2]
