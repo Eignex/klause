@@ -652,9 +652,10 @@ against those constraints before publication; a rejected or indeterminate candid
 cannot refute the source model. Completed samples retain authoritative coordinates
 and source scope rather than substituting the local-search score for a witness check.
 
-Self-owned optimization with finite and continuous coordinates and a continuous
-objective term admits at most two completion probes per pick after source generation
-and configuration filtering. One
+Self-owned optimization from a completion-checked incumbent with finite and continuous
+coordinates and a continuous objective term admits at most two completion probes per pick after source generation
+and configuration filtering. Uncompleted restart states retain ordinary traversal;
+private finite proposals from a checked incumbent bypass raw objective rejection. One
 probe follows the best raw score. If that productive raw direction completes to an
 improvement, strict greedy descent retains its reservoir-selected proposal without
 another numerical query or tie draw. Existing proposal multiplicities are retained;

@@ -1079,6 +1079,43 @@ class LocalSearchEngineTest {
     }
 
     @Test
+    fun `worse restart states retain ordinary completion admission`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(Linear(
+                intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0,
+            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val initial = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0))
+        var calls = 0
+        var restarts = 0
+        val restart = object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int) = false
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                restarts++
+                state.assignment.setInt(0, 0)
+                state.assignment.setReal(0, 1.0)
+                state.recompute()
+            }
+        }
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), greedyRepairOnRestart = false, restartPolicy = restart,
+            strategy = SourceDrivenStrategy(
+                sources = emptyList(), feasibleDescent = FeasibleDescent.SelfOwned,
+                feasibleAcceptance = AcceptanceRule.GreedyDescent,
+            ), completion = { candidate, _ -> calls++; Completion.Witness(candidate) },
+        )
+
+        val result = search.improvements(
+            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+            LocalSearchParams(maxInstructions = 3, initialAssignment = initial), null,
+        ).last()
+
+        assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
+        assertTrue(restarts > 0)
+        assertEquals(1, calls)
+    }
+
+    @Test
     fun `unproductive completion descent returns residual rows to repair`() {
         val problem = Problem(
             0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(

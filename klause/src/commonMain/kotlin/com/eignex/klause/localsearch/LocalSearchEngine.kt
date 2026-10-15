@@ -872,7 +872,7 @@ internal class LocalSearchEngine(
                 } else {
                     objective.evaluate(state.assignment)
                 }
-                if ((completedMoves != null || liveCompletion is Completion.Witness || obj < bestObj) &&
+                if ((liveCompletion is Completion.Witness || obj < bestObj) &&
                     state.intValuesInDomain()
                 ) {
                     val decided = liveCompletion ?: decide(
@@ -951,20 +951,21 @@ internal class LocalSearchEngine(
                     // states. Best-feasible is snapshotted above, so wandering never loses the incumbent. A
                     // feasibility-breaking pick is reverted and retried; a null pick is a local optimum.
                     FeasibleDescent.SelfOwned -> {
+                        val moveEvaluation = completedMoves?.takeIf { liveCompletion is Completion.Witness }
                         val m = timing.inPhase("selection") {
-                            (descentStrategy ?: strategy).pickMove(state, params.cancellation, completedMoves)
+                            (descentStrategy ?: strategy).pickMove(state, params.cancellation, moveEvaluation)
                         }
                         if (m != null) {
                             feasibleMisses = 0
-                            if (completedMoves != null) {
-                                val solution = completedMoves.sample(m) ?: completedMoves.attempt(m)
+                            if (moveEvaluation != null) {
+                                val solution = moveEvaluation.sample(m) ?: moveEvaluation.attempt(m)
                                 if (solution != null) {
                                     timing.inPhase("application") {
-                                        completedMoves.commitMove(m, solution)?.let(state::apply)
+                                        moveEvaluation.commitMove(m, solution)?.let(state::apply)
                                     }
                                     liveCompletion = Completion.Witness(solution)
                                     pendingCompletedMove = true
-                                    if ((completedMoves.score(m) ?: 0.0) < 0.0) nextMoveCompletion = totalFlips
+                                    if ((moveEvaluation.score(m) ?: 0.0) < 0.0) nextMoveCompletion = totalFlips
                                 }
                             } else {
                                 val savedSnap = state.assignment.snapshot()
@@ -985,7 +986,7 @@ internal class LocalSearchEngine(
                             cancelCountdown = 0
                             continue
                         }
-                        if (completedMoves != null && state.cost != 0L) {
+                        if (moveEvaluation != null && state.cost != 0L) {
                             liveCompletion = null
                             continue
                         }
