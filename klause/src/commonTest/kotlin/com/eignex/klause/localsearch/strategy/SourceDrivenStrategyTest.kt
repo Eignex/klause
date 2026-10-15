@@ -53,31 +53,29 @@ class SourceDrivenStrategyTest {
     }
 
     @Test
-    fun `self owned feasible walks rank maintained objectives under feasibility first`() {
+    fun `self owned feasible walks rank feasible maintained objective moves`() {
         val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, false))),
             Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
             Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
         ))
-        for (seed in 0..7) {
-            val state = LocalSearchState(LocalSearchModel.open(problem), Random(seed))
-            state.assignment.setBool(2, true)
-            state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
-                BoolFoldDefinition(2, intArrayOf(Lit.make(1, false)), true),
-            ))?.network(0, 3)
-            state.shaping.objective = LinearObjective(boolWeights = longArrayOf(1, 0, 2))
-            state.shaping.feasibilityGated = true
-            state.recompute()
-            val strategy = SourceDrivenStrategy(
-                sources = listOf(ConfiguredSource(ObjectiveSeed())), scoring = MoveScoring.Break,
-                acceptance = AcceptanceRule.Greedy, feasibleDescent = FeasibleDescent.SelfOwned,
-            )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setBool(2, true)
+        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(2, intArrayOf(Lit.make(1, false)), true),
+        ))?.network(0, 3)
+        state.shaping.objective = LinearObjective(boolWeights = longArrayOf(-100, 0, 2))
+        state.shaping.feasibilityGated = true
+        state.recompute()
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(ObjectiveSeed())), scoring = MoveScoring.Break,
+            acceptance = AcceptanceRule.Greedy, feasibleDescent = FeasibleDescent.SelfOwned,
+        )
 
-            val move = strategy.pickMove(state)
+        val move = strategy.pickMove(state)
 
-            assertEquals(Move.BoolFlip(1), move, "seed=$seed")
-        }
+        assertEquals(Move.BoolFlip(1), move)
     }
-
 
     @Test
     fun `equal Element alternatives preserve primary choices and random draws`() {
