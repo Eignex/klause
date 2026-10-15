@@ -9,10 +9,10 @@ import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.validation.composedFixpoint as validateComposedFixpoint
 import com.eignex.klause.util.Cancellation
 import kotlin.math.nextDown
 import kotlin.math.nextUp
+import com.eignex.klause.solver.validation.composedFixpoint as validateComposedFixpoint
 
 internal class SourceObjectiveScore(reported: Double, val exact: BigFraction? = null) {
     val pruningBound: Double = exact?.let { exactDoubleCeiling(it, reported) } ?: reported

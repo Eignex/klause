@@ -33,6 +33,11 @@ FORBIDDEN = {
     "lowering": ("compile", "schema", "formats"),
     "formats": ("compile", "schema", "theory"),
     "bound": ("lp.engine",),
+    "solver.evidence": (
+        "backtrack.composedFixpoint", "portfolio.verifyRealCoordinates", "portfolio.finiteWitnessVerifier",
+        "solver.pipeline.verifyOpenWitness", "solver.pipeline.refuteOpenWitness",
+    ),
+    "localsearch": ("backtrack.composedFixpoint", "portfolio.verifyRealCoordinates"),
     "solver.pipeline": (
         "formats", "theory.qflra.SourceBoundAtom", "theory.qflra.SourceBoundTerm", "theory.qflra.SourceBoundLimits",
     ),
