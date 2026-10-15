@@ -160,6 +160,7 @@ internal class BacktrackWorkerConfig(
             objective = objective,
             withBound = withBound,
         ).bindEvidence(evidenceModel).also {
+            it.controlsObjectiveCutoff = objective != null
             it.restartingSearch = params.modeSwitchingRestart || params.emaRestart || params.adaptiveRestart ||
                 params.lubyRestartBase != null
             it.sharedPools = matchedPools

@@ -41,15 +41,18 @@ class PortfolioEvidenceTest {
         val objective = LinearObjective()
         val identity = ModelIdentity.of(source, objective)
         val invocation = EngineInvocation(source.prepareExecutionPlan(objective), identity, objective)
-        for (proofs in listOf(false, true)) {
+        for ((proofs, controlled) in listOf(false to true, true to false, true to true)) {
             val worker = PortfolioWorker.ofMinimize("exhausted", 0) { bound, _, _, _ ->
                 assertEquals(Double.POSITIVE_INFINITY, bound())
                 sequenceOf(MinimizeResult.Unknown(TerminationReason.SearchExhausted))
-            }.bindEvidence(identity, provesResults = proofs).bindInvocation(invocation)
+            }.bindEvidence(identity, provesResults = proofs).bindInvocation(invocation).also {
+                it.controlsObjectiveCutoff = controlled
+            }
 
             val result = Portfolio.thompson(listOf(worker)).use { it.minimize() }
 
-            if (proofs) assertIs<MinimizeResult.Infeasible>(result) else assertIs<MinimizeResult.Unknown>(result)
+            if (proofs && controlled) assertIs<MinimizeResult.Infeasible>(result)
+            else assertIs<MinimizeResult.Unknown>(result)
         }
     }
 

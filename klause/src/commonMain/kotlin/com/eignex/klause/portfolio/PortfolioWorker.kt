@@ -71,6 +71,8 @@ class PortfolioWorker private constructor(
 
     internal var auxiliaryProof: Boolean = false
 
+    internal var controlsObjectiveCutoff: Boolean = false
+
     internal var evidenceModel: ModelIdentity? = null
         private set
     private var provesSourceResults = true
