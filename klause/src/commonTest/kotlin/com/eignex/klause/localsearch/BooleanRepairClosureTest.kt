@@ -23,6 +23,26 @@ import kotlin.test.assertTrue
 
 class BooleanRepairClosureTest {
     @Test
+    fun `closed pools retain primitive lane order`() {
+        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+        ))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setBool(2, true)
+        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(2, intArrayOf(Lit.make(0, false)), true),
+        ))?.network(0, 4)
+        state.recompute()
+        val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
+
+        val moves = closure.closeAll(state, listOf(Move.BoolFlip(0), Move.BoolFlip(3)), Cancellation.Never)
+
+        assertEquals(Move.BoolFlip(3), moves.first())
+    }
+
+    @Test
     fun `objective seeds follow forced ternary consequences before ranking`() {
         val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),

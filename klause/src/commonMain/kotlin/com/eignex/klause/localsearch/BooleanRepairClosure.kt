@@ -127,11 +127,19 @@ internal class BooleanRepairClosure private constructor(
     }
 
     fun closeAll(state: LocalSearchState, moves: List<Move>, cancellation: Cancellation): List<Move> {
+        if (moves.isEmpty()) return emptyList()
         val result = ArrayList<Move>(moves.size)
+        val compounds = ArrayList<Move>()
         for (move in moves) {
             if (cancellation.isCancelled()) return emptyList()
-            close(state, move, cancellation)?.let(result::add)
+            when (val closed = close(state, move, cancellation)) {
+                is Move.Compound -> compounds.add(closed)
+                null -> Unit
+                else -> result.add(closed)
+            }
         }
+        // MoveSink exposes primitive lanes before its compound side storage.
+        result.addAll(compounds)
         return result
     }
 
