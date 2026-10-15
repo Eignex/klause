@@ -18,6 +18,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.DeducedRestrictions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.IncumbentBootstrapSearch
@@ -148,7 +149,9 @@ class AlnsTest {
             val sample = assertNotNull(result.assignment)
             assertEquals(listOf(10.0, 1.0), incumbents)
             assertEquals(BigFraction.ONE, objective.evaluateExact(sample))
-            assertIs<Verification.Accepted<*, *>>(finiteWitnessVerifier(problem, objective).verify(Candidate(sample, 1.0)))
+            assertIs<Verification.Accepted<*, *>>(
+                finiteWitnessVerifier(problem, objective).verify(Candidate(sample, 1.0)),
+            )
             assertEquals(0L, result.stats.alns.bootstrapCpNodes)
             assertEquals(8L, result.stats.alns.outerAllowance)
         }
@@ -285,15 +288,28 @@ class AlnsTest {
     }
 
     @Test
-    fun `deduced restrictions reject a supplied incumbent without exact pins`() {
+    fun `deduced restrictions admit only compatible supplied incumbents without exact pins`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyList<Factor>()).bake()
-        val seed = Sample(BooleanArray(0), longArrayOf(0))
-        val result = Alns(NoFeasibleLs(problem), maxIterations = 0).minimize(
-            LinearObjective(intCoefficients = longArrayOf(1)),
-            LocalSearchParams(initialAssignment = seed, assumptions = Assumptions.None.withTightenedMin(0, 1)),
+        val restrictions = listOf(
+            Assumptions.None.withTightenedMin(0, 1) to 0L,
+            Assumptions.None.withTightenedMax(0, 1) to 2L,
+            Assumptions.None.withIntHole(0, 0) to 0L,
+            Assumptions(
+                IntArray(0), BooleanArray(0), IntArray(0), LongArray(0),
+                DeducedRestrictions(intSetKeys = intArrayOf(0), intSetOffsets = intArrayOf(0, 1),
+                    intSetValues = longArrayOf(1)),
+            ) to 0L,
         )
+        for ((assumptions, excluded) in restrictions) for (value in listOf(excluded, 1L)) {
+            val seed = Sample(BooleanArray(0), longArrayOf(value))
+            val result = Alns(NoFeasibleLs(problem), maxIterations = 0).minimize(
+                LinearObjective(intCoefficients = longArrayOf(1)),
+                LocalSearchParams(initialAssignment = seed, assumptions = assumptions),
+            )
 
-        assertIs<MinimizeResult.Unknown>(result)
+            if (value == excluded) assertIs<MinimizeResult.Unknown>(result)
+            else assertEquals(seed, result.assignment)
+        }
     }
 
     @Test
@@ -330,17 +346,24 @@ class AlnsTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val approximate = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
-        val exact = approximate.copy(reals = doubleArrayOf(0.5), exactReals = listOf(BigFraction.ofLong(2).reciprocal()))
+        val exact = approximate.copy(
+            reals = doubleArrayOf(0.5), exactReals = listOf(BigFraction.ofLong(2).reciprocal()),
+        )
         for (tolerance in listOf(false, true)) for (seed in listOf(approximate, exact,
             Sample(BooleanArray(0), LongArray(0)),
             Sample(BooleanArray(0), LongArray(0), doubleArrayOf(Double.NaN)))) {
             val alns = Alns(NoFeasibleLs(problem), maxIterations = 0).apply {
-                incumbentToleranceCheck = if (tolerance) ({ it.numRealVars == 1 && it.approximateRealValue(0) == 0.5 }) else null
+                incumbentToleranceCheck = if (tolerance) {
+                    { sample -> sample.numRealVars == 1 && sample.approximateRealValue(0) == 0.5 }
+                } else null
             }
             val result = alns.minimize(objective, LocalSearchParams(initialAssignment = seed))
 
-            if (seed === exact || tolerance && seed === approximate) assertEquals(seed, result.assignment)
-            else assertIs<MinimizeResult.Unknown>(result)
+            if (seed === exact || (tolerance && seed === approximate)) {
+                assertEquals(seed, result.assignment)
+            } else {
+                assertIs<MinimizeResult.Unknown>(result)
+            }
         }
     }
 
