@@ -10,7 +10,12 @@ import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.model.IntSpec
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.SchemaEntry
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import com.eignex.klause.schema.IntHandle
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.pow
@@ -42,4 +47,22 @@ class PowerCompilationTest {
             assertEquals(setOf(-2L, 2L), values)
         }
     }
+    @Test
+    fun `reified source power conditions retract before their negated sibling`() {
+        val source = parseFlatZinc("var -3..3: x; var 0..9: r; var bool: b; " +
+            "constraint int_pow(x, 2, r); constraint int_eq_reif(r, 4, b); solve satisfy;").problem
+        val session = PropagationSession(source)
+        session.seed(Assumptions.None)
+        session.pinBool(0, true)
+        assertTrue(2L in session.intDomain(0))
+        assertTrue(-2L in session.intDomain(0))
+
+        session.popLast()
+        val sibling = session.pinBool(0, false)
+
+        assertIs<PropagationResult.Implied>(sibling)
+        assertFalse(2L in session.intDomain(0))
+        assertFalse(-2L in session.intDomain(0))
+    }
+
 }
