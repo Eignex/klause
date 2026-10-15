@@ -204,7 +204,7 @@ class NraSourceCheckTest(unittest.TestCase):
 
     def test_nonpolynomial_and_incremental_sources_are_declined(self):
         variants = (
-            '(declare-const x Int) (assert (= (div x 2) 1))',
+            '(declare-const x Int) (assert (= (div x x) 1))',
             '(declare-const x Real) (declare-const y Real) (assert (= (/ x y) 1))',
             '(declare-const x Real) (assert (= (^ x (- 1)) 1))',
             '(declare-const x Real) (assert (= (^ x (/ 1 2)) 1))',
