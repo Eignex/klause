@@ -658,6 +658,10 @@ internal class LocalSearchEngine(
                     val costBefore = state.cost
                     val move = timing.inPhase("selection") { strategy.pickMove(state, params.cancellation) }
                     if (move == null) {
+                        if (params.cancellation()) {
+                            cancelCountdown = 0
+                            continue
+                        }
                         countedRestart()
                         roundFeedback?.endRound()
                         if (checkpoint?.shouldPause(moves) == true) {
@@ -924,6 +928,10 @@ internal class LocalSearchEngine(
                             totalFlips++
                             continue
                         }
+                        if (params.cancellation()) {
+                            cancelCountdown = 0
+                            continue
+                        }
                         // No move this draw. For a sampled strategy that is usually an unlucky draw rather
                         // than a true local optimum, so re-sample (and let the stall machinery engage) up to
                         // feasibleResampleCap times before diversifying — a restart here discards the current
@@ -961,6 +969,10 @@ internal class LocalSearchEngine(
                 else strategy.pickMove(state, params.cancellation)
             }
             if (move == null) {
+                if (params.cancellation()) {
+                    cancelCountdown = 0
+                    continue
+                }
                 restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
                 restartCount++
                 flipsSinceRestart = 0

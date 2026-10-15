@@ -184,6 +184,9 @@ Break and objective grades are reused only within one source's proposal batch at
 unchanged live assignment; every source and perturbation begins a fresh batch.
 Strategies allocate their raw proposal sinks on first use of clause closure. These
 scratch owners do not enter warm captures or cross invocations.
+An interrupted pick returning no move reaches the existing cancellation pause before
+local-optimum handling. It retains the live assignment and consumes no restart,
+resample or search instruction.
 
 CBLS and optimizing SA reserve the first satisfied-factor draw for an elected
 structural global, then sample the remaining factors uniformly from the model.

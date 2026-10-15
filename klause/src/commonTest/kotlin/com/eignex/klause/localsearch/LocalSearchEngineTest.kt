@@ -42,6 +42,97 @@ import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
     @Test
+    fun `satisfaction resumes an interrupted pick without a restart instruction`() {
+        val problem = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))))
+        var expired = false
+        var picks = 0
+        val strategy = SourceDrivenStrategy(
+            sources = emptyList(), feasibleDescent = FeasibleDescent.SelfOwned,
+            perturbation = {
+                if (picks++ == 0) {
+                    expired = true
+                    null
+                } else Move.BoolFlip(0)
+            },
+        )
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false)
+        val params = LocalSearchParams(
+            maxFlips = 2L, randomSeed = 0L, initialAssignment = Sample(booleanArrayOf(false), longArrayOf()),
+        )
+
+        search.resumableSolve(params).use { handle ->
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L))
+            assertEquals(0.0, handle.stats.ls.moves.sum)
+            expired = false
+
+            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+            assertTrue(assertIs<SolveResult.Sat>(result).sample.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `infeasible optimization resumes an interrupted pick without a restart instruction`() {
+        val problem = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))))
+        var expired = false
+        var picks = 0
+        val strategy = SourceDrivenStrategy(
+            sources = emptyList(), feasibleDescent = FeasibleDescent.SelfOwned,
+            perturbation = {
+                if (picks++ == 0) {
+                    expired = true
+                    null
+                } else Move.BoolFlip(0)
+            },
+        )
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false)
+        val params = LocalSearchParams(
+            maxFlips = 2L, randomSeed = 0L, initialAssignment = Sample(booleanArrayOf(false), longArrayOf()),
+        )
+
+        search.resumable(LinearObjective(boolWeights = longArrayOf(1)), params).use { handle ->
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) {})
+            assertEquals(0.0, handle.stats.ls.moves.sum)
+            expired = false
+
+            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+
+            assertTrue(assertIs<MinimizeResult.BestFound>(result).sample.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `feasible optimization resumes an interrupted pick without a restart instruction`() {
+        val problem = Problem(1, 0, emptyArray(), emptyArray())
+        val objective = LinearObjective(boolWeights = longArrayOf(1))
+        var expired = false
+        var picks = 0
+        val strategy = SourceDrivenStrategy(
+            sources = emptyList(), feasibleDescent = FeasibleDescent.SelfOwned,
+            perturbation = {
+                if (picks++ == 0) {
+                    expired = true
+                    null
+                } else Move.BoolFlip(0)
+            },
+        )
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false)
+        val params = LocalSearchParams(
+            maxFlips = 2L, randomSeed = 0L, initialAssignment = Sample(booleanArrayOf(true), longArrayOf()),
+        )
+
+        search.resumable(objective, params).use { handle ->
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) {})
+            assertEquals(0.0, handle.stats.ls.moves.sum)
+            expired = false
+
+            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+
+            assertEquals(0.0, objective.evaluate(assertIs<MinimizeResult.BestFound>(result).sample))
+        }
+    }
+
+    @Test
     fun `native objective descent replaces support around maintained unit definitions`() {
         val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(2, true))),
