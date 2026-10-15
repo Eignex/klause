@@ -1741,11 +1741,16 @@ class PortfolioTest {
         val source = ScriptedSearch({ false }) { slices[1]++ }
         val heuristic = object : ResumableSearch by source {
             override val stats: SolveStats
-                get() = SolveStats(ls = LocalSearchStats(incumbentViolation = if (slices[1] < 3) 10.0 else 5.0))
+                get() = SolveStats(ls = LocalSearchStats(
+                    moves = SumResult(slices[1] * 10.0),
+                    incumbentViolation = if (slices[1] < 3) 10.0 else 5.0,
+                ))
         }
         val workers = listOf(
             trackingWorker("complete", 0, ScriptedSearch({ false }) { slices[0]++ }),
-            trackingWorker("heuristic", 1, heuristic).also { it.family = ArmFamily.LocalSearch },
+            PortfolioWorker.ofMinimize("heuristic", 1, countsInstructions = true, resumable = { heuristic }) {
+                _, _, _, _ -> error("the retained handle must resume")
+            },
         )
 
         val result = Portfolio.thompson(workers, seed = 3L).use {
@@ -1756,6 +1761,74 @@ class PortfolioTest {
         assertTrue(slices[0] > 140, "complete search ran ${slices[0]} of ${slices.sum()} slices")
         assertTrue(result.stats.portfolio.arms[1].credit.getValue("Violation") > 0.0)
         assertFalse(result.stats.portfolio.arms[1].credit.containsKey("FirstSolution"))
+    }
+
+    @Test
+    fun `complete workers receive elapsed opportunity despite heterogeneous segment costs`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(3)
+        val visits = IntArray(3)
+        val costs = longArrayOf(10L, 100L, 500L)
+        val workers = List(3) { arm ->
+            val source = ScriptedSearch({ false }) {
+                visits[arm]++
+                elapsed[arm] += costs[arm]
+                clock += costs[arm].milliseconds
+            }
+            val handle = object : ResumableSearch by source {
+                override val stats: SolveStats
+                    get() = if (arm == 2) {
+                        SolveStats(ls = LocalSearchStats(
+                            moves = SumResult(visits[arm] * 10.0),
+                            incumbentViolation = 1.0 / (visits[arm] + 1),
+                        ))
+                    } else SolveStats.EMPTY
+            }
+            if (arm == 2) PortfolioWorker.ofMinimize("heuristic", arm, countsInstructions = true, resumable = { handle }) {
+                _, _, _, _ -> error("the retained handle must resume")
+            } else trackingWorker("arm$arm", arm, handle)
+        }
+
+        val result = Portfolio.thompson(workers, seed = 3L).also { it.runTimeSource = clock }.use {
+            it.minimize(Cancellation { elapsed.sum() >= 6_000L })
+        }
+
+        assertIs<MinimizeResult.Unknown>(result)
+        val owed = (elapsed.sum() - 2_000L) / 4
+        assertTrue(elapsed[0] >= owed - costs.max(), "cheap complete worker received ${elapsed[0]} ms, owed $owed")
+        assertTrue(elapsed[1] >= owed - costs.max(), "costly complete worker received ${elapsed[1]} ms, owed $owed")
+        assertTrue(visits[0] > visits[1])
+        assertTrue(elapsed[2] > 0L)
+    }
+
+    @Test
+    fun `finished complete workers leave elapsed coverage to their live siblings`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(3)
+        val finished = TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.BudgetExhausted), onRun = {
+            elapsed[0] += 250L
+            clock += 250.milliseconds
+        })
+        val workers = listOf(
+            trackingWorker("finished", 0, finished),
+            trackingWorker("live", 1, ScriptedSearch({ false }) {
+                elapsed[1] += 10L
+                clock += 10.milliseconds
+            }),
+            trackingWorker("heuristic", 2, ScriptedSearch({ false }) {
+                elapsed[2] += 500L
+                clock += 500.milliseconds
+            }).also { it.family = ArmFamily.LocalSearch },
+        )
+
+        Portfolio.thompson(workers, seed = 3L).also { it.runTimeSource = clock }.use {
+            it.minimize(Cancellation { elapsed.sum() >= 6_000L })
+        }
+
+        assertEquals(250L, elapsed[0])
+        assertEquals(1, finished.closes)
+        assertTrue(elapsed[1] >= (elapsed[1] + elapsed[2] - 2_000L) / 2 - 500L)
+        assertTrue(elapsed[2] > 0L)
     }
 
     @Test
