@@ -1491,6 +1491,26 @@ suffixes and failures are retained. There is no global installation or target
 library loading. Linear decoding establishes no control-flow or argument proof;
 do not derive private field offsets, task lifetime or compiler savings from it.
 
+### Captured source and executable entry associations
+
+`com.eignex.klause.bench.profile.NativeVmBoundaryEntryBinding` accepts
+`entries=<https URL>`, `entries-sha256=<hash>`, `signatures=<https URL>` and
+`signatures-sha256=<hash>`. Each download is bounded to 2 MiB and retained byte
+for byte. Inputs must come from the reviewed entry and signature readers, carry
+their exact producer hashes and identify the same pinned JVM library. Authenticate
+the original captures and their provenance before supplying their hashes.
+
+The child associates whole original symbol records across both captures and
+rechecks their bounded executable bytes against the pinned library. It retains
+all original records, references every association and groups aliases of one
+physical definition. Missing records, incomplete inspections, partial symbol
+tables and distinct physical definitions remain explicit. Bounds are 256 entry
+records and 4096 association pairs across all query groups.
+
+This diagnostic neither loads the target nor invokes the decoder or demangler.
+A unique captured association supplies no calling-convention, private-field,
+live task/thread, full-root, clock/loss, code-size or compiler savings proof.
+
 ### Live native argument candidates
 
 `com.eignex.klause.bench.profile.NativeVmLiveArgumentVerification` captures a
