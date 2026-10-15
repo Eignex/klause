@@ -24,6 +24,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
+import com.eignex.klause.lp.ExactRelaxationBuilder
+import com.eignex.klause.lp.NumericalLinearRow
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFlags
 import com.eignex.klause.lp.LinearLpProjection
@@ -874,8 +876,9 @@ internal class CpToLpRelaxation(
         private val cancellation: Cancellation = Cancellation.Never,
         private val region: LpEmissionRegion? = null,
         private val columnDomains: RelaxationDomains = domains,
-    ) : RelaxationBuilder {
+    ) : ExactRelaxationBuilder {
         private val builder = LpBuilder()
+        private val exactRows = ExactRelaxationRows()
         private val intCol = IntArray(if (region == null) problem.numIntVars else 0) { -1 }
         private val boolCol = IntArray(if (region == null) problem.numBoolVars else 0) { -1 }
         private val realCol = IntArray(if (region == null) problem.numRealVars else 0) { -1 }
@@ -1339,7 +1342,8 @@ internal class CpToLpRelaxation(
             }
 
             attributeRows(-1)
-            val model = builder.build(Sense.MINIMIZE)
+            val built = builder.build(Sense.MINIMIZE)
+            val model = exactRows.project(built, cancellation) ?: throw LpAssemblyCancelled()
             val reqs = colReq.toTypedArray()
             val presentUpper = LongArray(colPresentUpper.size) { colPresentUpper[it] }
             // Persistent re-binding needs each column re-derivable from the live session: either
@@ -1593,6 +1597,22 @@ internal class CpToLpRelaxation(
             }
             val expandedCoefficients = coeffs + LongArray(mirrored.size) { -coeffs[mirrored[it]] }
             builder.addRow(expandedColumns, expandedCoefficients, relation, rhs, premises == null, premises)
+        }
+
+        override fun exactRow(
+            columns: IntArray, row: NumericalLinearRow, op: LinearOp, indicator: Int, value: Long,
+        ) {
+            checkCancellation()
+            val rel = relationOf(op) ?: return
+            val premises = if (indicator < 0) null else {
+                val domain = liveDomain(indicator)
+                if (domain.min != value || domain.max != value) return
+                LpRowPremises(intArrayOf(indicator, indicator), booleanArrayOf(false, true), longArrayOf(value, value))
+            }
+            val mirrored = columns.indices.filter { realNegOf.containsKey(columns[it]) }
+            val expanded = columns + IntArray(mirrored.size) { realNegOf.getOrDefault(columns[mirrored[it]], -1) }
+            val coefficients = row.coefficients + mirrored.map { row.coefficients[it].negated() }
+            exactRows.add(builder, expanded, coefficients, rel, row.rhs, premises)
         }
 
         override fun realRow(

@@ -14,6 +14,26 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class MpsOpenPipelineTest {
+    @Test
+    fun `wide source rows objectives and indicators admit finite numerical completion`() {
+        for ((coefficient, objective, indicator) in listOf(
+            Triple("0.1", "1", ""),
+            Triple("1e-20", "1", ""),
+            Triple("1", "1.0000000000000000001", ""),
+            Triple("0.123456789012345678901", "1", "INDICATORS\n IF R I 1\n"),
+        )) {
+            val compiled = Mps.parse(
+                "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST $objective R 1\n" +
+                    " M1 'MARKER' 'INTEND'\n X R $coefficient\nRHS\n RHS R 0.1\n" +
+                    "BOUNDS\n LI B I 0\n UI B I 1\n LO B X 0\n UP B X 1\n" + indicator + "ENDATA",
+            ).toExactSourceProblem()
+
+            val route = compiled.model.pipelineRoute()
+
+            assertIs<SourceProblemRoute.Finite>(route)
+        }
+    }
+
 
     @Test
     fun `source fixed indicators prove finite ownership without changing the source declaration`() {
