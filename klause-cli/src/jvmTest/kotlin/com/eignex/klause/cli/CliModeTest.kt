@@ -1593,10 +1593,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `declining the bound proof sends a provably bounded model to the open theory instead`() {
-        // `x` is declared bounded below only, so the model is open — but the row `x <= 5` implies the
-        // missing side, so the proof closes it and the finite lane owns the model. Declining the proof
-        // sends the same model to the open theory, which is what lets one instance run down both lanes.
+    fun `declining MPS bound closure retains numerical solving under both certification policies`() {
         val mps = File.createTempFile("cli", ".mps").apply {
             writeText(
                 "NAME          T\nROWS\n N  COST\n L  R1\nCOLUMNS\n" +
@@ -1608,20 +1605,20 @@ class CliModeTest {
             deleteOnExit()
         }
 
-        var keptCode = -1
-        var declinedCode = -1
-        val kept = capture { keptCode = runCli(arrayOf("-s", "-t", "10000", mps.absolutePath)) }
-        val declined = capture {
-            declinedCode = runCli(arrayOf("-s", "-t", "10000", "--param", "open-bound-proof=false", mps.absolutePath))
-        }
+        for (exact in listOf(false, true)) {
+            val policy = if (exact) arrayOf("--exact") else emptyArray()
+            val kept = capture { assertEquals(0, runCli(arrayOf("-s", "-t", "10000") + policy + mps.absolutePath)) }
+            val declined = capture {
+                assertEquals(0, runCli(arrayOf("-s", "-t", "10000", "--param", "open-bound-proof=false") +
+                    policy + mps.absolutePath))
+            }
 
-        assertEquals(0, keptCode, kept)
-        assertEquals(0, declinedCode, declined)
-        assertTrue("openTheoryChecks=0" in kept, "expected the finite lane, got: $kept")
-        // Both halves: the block is reported at all (a run that printed none would satisfy a bare
-        // `assertFalse` without ever reaching a theory), and the count it reports is not zero.
-        assertTrue("openTheoryChecks=" in declined, "expected an open-theory counter, got: $declined")
-        assertFalse("openTheoryChecks=0" in declined, "expected the open theory, got: $declined")
+            assertTrue("solvePipeline=finite-cp" in kept, kept)
+            assertTrue("solvePipeline=numerical-mip" in declined, declined)
+            assertTrue("s OPTIMUM FOUND" in declined, declined)
+            assertTrue("v x=5" in declined, declined)
+            assertFalse("cancelled" in declined, declined)
+        }
     }
 
     @Test

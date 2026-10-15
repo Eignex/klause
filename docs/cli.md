@@ -345,10 +345,10 @@ unavailable. Existing LS counters remain independent; `--param ls-phase-times=tr
 enables the finite portfolio's optional `lsPhaseNanos.*` measurements, but the open
 portfolio does not wire that option into its LS workers.
 
-`--param open-bound-proof=false` declines the routing bound proof, so a model whose open sides the
-relaxation would have closed goes to the open theory instead of the finite lane. That is what runs one
-instance down both lanes; shrinking `-t` does not substitute, since it starves the solve along with the
-proof. Read by the front-ends that route open models — MPS, SMT-LIB and exact FlatZinc — and rejected by the others.
+`--param open-bound-proof=false` declines only the routing bound proof. A model whose open sides
+the relaxation could close retains open traversal: numerical LP/MIP for MPS, or the supported theory
+route for SMT-LIB and exact FlatZinc. The solve keeps its containing allowance and deadline; a stopped
+routing slice does not cancel the solve. Other frontends reject the option.
 
 MiniZinc-mode-only flags:
 
