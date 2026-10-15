@@ -104,6 +104,80 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
             with self.subTest(pid=pid), self.assertRaises(ValueError):
                 review.parse_records('', pid, entries)
 
+    def test_compiler_warning_rendering_requires_original_context_and_an_unambiguous_attachment_boundary(self):
+        script = 'BEGIN { printf("VALIDATION_FAULT_EXPECTED"); buf(uptr(0), 1); }'
+        path = '/original/observer.bt'
+        launch = {'observerBinary': '/original/AppRun', 'observerCommand': [
+            'sudo', '-n', 'unshare', '--mount', '--propagation', 'private', 'env',
+            '__BPFTRACE_NOTIFY_PROBES_ATTACHED=1', 'BPFTRACE_MAX_STRLEN=132', 'sh', '-c',
+            'printf "%s\\n" "$$" > "$1"; exec "$3" -k -B none "$2"',
+            'observer', '/original/observer.pid', path, '/original/AppRun']}
+        warning = [path + ':1: WARNING: found external warnings', script,
+                   'HINT: include/header.h:1: warning: declaration does not declare anything',
+                   '1 warning generated.']
+        boundary = ['Attaching 2 probes...', review.capture.observer.ATTACHED]
+        variants = {
+            'complete': warning + boundary,
+            'without warnings': boundary,
+            'foreign source': [warning[0].replace('/original/', '/foreign/'), *warning[1:], *boundary],
+            'invalid span': [warning[0].replace(':1:', ':0:'), *warning[1:], *boundary],
+            'wide span': [warning[0].replace(':1:', ':1-2:'), *warning[1:], *boundary],
+            'different context': [warning[0], script + ' changed', *warning[2:], *boundary],
+            'missing context': [warning[0], *warning[2:], *boundary],
+            'missing hint': warning[:2] + boundary,
+            'empty hint': warning[:2] + ['HINT: '] + boundary,
+            'duplicate warning': warning * 2 + boundary,
+            'compiler error': [*warning, 'include/header.h:2: error: invalid declaration', *boundary],
+            'runtime error': [*warning, 'observer.bt:1:1-2: WARNING: Bad address', *boundary],
+            'loss text': [*warning, 'dropped 1 event', *boundary],
+            'interleaved callback': [*warning, 'LIFECYCLE\tEXEC\t1\t10\t10\t1\t1000', *boundary],
+            'interleaved terminal': [*warning, 'DRAIN_MARKER\t1', *boundary],
+            'extra hint': [*warning, 'HINT: another diagnostic', *boundary],
+            'escape sequence': [*warning, '\x1b[31mchanged', *boundary],
+            'no attachment': warning + boundary[1:],
+            'zero attachment': warning + ['Attaching 0 probes...', boundary[1]],
+            'duplicate attachment': warning + [boundary[0], *boundary],
+            'no readiness': warning + boundary[:1],
+            'duplicate readiness': warning + [*boundary, boundary[1]],
+            'readiness before attachment': warning + boundary[::-1],
+            'unknown prefix': ['unknown', *warning, *boundary],
+            'byte bound': warning + boundary,
+            'prefix line bound': warning + boundary,
+        }
+        for name, lines in variants.items():
+            with self.subTest(name=name), \
+                    patch.object(review, 'MAX_DIAGNOSTIC_BYTES', 1 if name == 'byte bound' else 1024 * 1024), \
+                    patch.object(review, 'MAX_DIAGNOSTIC_LINES', 2 if name == 'prefix line bound' else 4096):
+                text = '\n'.join(lines)
+
+                result = review.compiler_diagnostics(text, script, launch)
+
+                accepted = name in ('complete', 'without warnings')
+                self.assertEqual(accepted, result['renderingProven'])
+                self.assertFalse(result['compilerWarningSafetyProven'])
+                if name == 'complete':
+                    self.assertEqual(warning, result['warnings'][0]['rawLines'])
+                if not accepted:
+                    self.assertEqual(0, result['prefixLines'])
+                    self.assertTrue(result['errors'])
+
+    def test_compiler_diagnostic_rendering_rejects_unbound_observer_invocations(self):
+        for launch in [{}, {'observerCommand': None}, {'observerCommand': []},
+                       {'observerCommand': ['foreign'] * 16},
+                       {'observerCommand': ['foreign'] * 14 + [None, '/AppRun']}]:
+            with self.subTest(launch=launch):
+                result = review.compiler_diagnostics('', '', launch)
+
+                self.assertFalse(result['renderingProven'])
+                self.assertEqual([], result['warnings'])
+                self.assertEqual(0, result['prefixLines'])
+
+    def test_compiler_diagnostic_input_bounds_precede_any_partial_rendering(self):
+        for text, script, bound in [('one\ntwo', '', 'MAX_RECORDS'), ('', 'one\ntwo', 'MAX_DIAGNOSTIC_LINES')]:
+            with self.subTest(bound=bound), patch.object(review, bound, 0), \
+                    self.assertRaisesRegex(ValueError, 'line inventory'):
+                review.compiler_diagnostics(text, script, {})
+
     def test_cross_thread_pointer_reuse_keeps_all_initialization_candidates_without_clock_order(self):
         selected = {role: [{'name': names[0]}] for role, (names, _) in review.capture.HOOKS.items()}
         initialize, broker = selected['initialize'][0]['name'], selected['broker'][0]['name']
@@ -291,7 +365,9 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
             self.assertEqual(set(review.INPUTS), set(report['inputSha256']))
 
     def test_saved_source_process_and_counter_guards_require_their_own_complete_evidence(self):
-        for mode in ['valid', 'source', 'selection', 'script', 'namespace', 'missing-counter', 'bad-counter']:
+        for mode in ['valid', 'compiler-warning', 'late-warning', 'unknown-output', 'missing-ready',
+                     'read-warning', 'invocation', 'source', 'selection', 'script', 'namespace',
+                     'missing-counter', 'bad-counter']:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
                 out = Path(directory)
                 selected = {role: [{'name': names[0]}] for role, (names, _) in review.capture.HOOKS.items()}
@@ -315,10 +391,18 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
                           'command': command, 'observerBinarySha256': 'app-run', 'observerPid': 9,
                           'observerStartTicks': 1, 'lossMonitorRequested': mode != 'missing-counter',
                           'lossMonitorReady': True, 'lossMonitorCompleted': True}
+                launch['observerBinary'] = '/original/AppRun'
+                launch['observerCommand'] = [
+                    'sudo', '-n', 'unshare', '--mount', '--propagation', 'private', 'env',
+                    '__BPFTRACE_NOTIFY_PROBES_ATTACHED=1', 'BPFTRACE_MAX_STRLEN=132', 'sh', '-c',
+                    'printf "%s\\n" "$$" > "$1"; exec "$3" -k -B none "$2"',
+                    'observer', '/original/observer.pid', '/original/observer.bt', '/original/AppRun']
                 if mode == 'source':
                     captured['sourceSha256'] = 'foreign'
                 if mode == 'namespace':
                     child['mountNamespace'] = 'foreign'
+                if mode == 'invocation':
+                    launch['observerCommand'][7] = 'FOREIGN=1'
                 data = {
                     'live/task-generation-entries.json': json.dumps(captured).encode(),
                     'live/captured-task-lifecycle.json': b'{}', 'live/captured-task-abi.json': b'{}',
@@ -339,6 +423,22 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
                     'native_vm_event_loss.py': Path(review.event_loss.__file__).read_bytes(),
                     'child-compilations.stdout': b'{"recording":{"events":[]}}',
                     'live/hotspot.xml': b'<hotspot_log><failure reason="retained"/></hotspot_log>'}
+                ready = b'Attaching 2 probes...\n__BPFTRACE_NOTIFY_PROBES_ATTACHED\n'
+                data['live/observer/observer.stdout'] = ready + data['live/observer/observer.stdout']
+                warning = (f'/original/observer.bt:1-{len(script.decode().splitlines())}: WARNING: found external warnings\n'.encode()
+                           + script + b'HINT: include/header.h:1: warning: declaration does not declare anything\n'
+                           b'1 warning generated.\n')
+                if mode == 'compiler-warning':
+                    data['live/observer/observer.stdout'] = warning + data['live/observer/observer.stdout']
+                if mode == 'late-warning':
+                    data['live/observer/observer.stdout'] += warning
+                if mode == 'unknown-output':
+                    data['live/observer/observer.stdout'] += b'unknown output retained\n'
+                if mode == 'missing-ready':
+                    data['live/observer/observer.stdout'] = data['live/observer/observer.stdout'].replace(
+                        b'__BPFTRACE_NOTIFY_PROBES_ATTACHED\n', b'')
+                if mode == 'read-warning':
+                    data['live/observer/observer.stderr'] += b'observer.bt:2:1-2: WARNING: Bad address\n'
                 for name, raw in data.items():
                     path = out / name
                     path.parent.mkdir(parents=True, exist_ok=True)
@@ -355,9 +455,17 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
                         review.inspect(out, Path(library), out, report)
 
                         self.assertTrue(report['completed'])
-                        self.assertTrue(report['delivery']['selectedSequencedDeliveryProven'])
-                        self.assertEqual(mode == 'valid', report['observedTaskEntryRecordsValidated'])
-                        self.assertEqual(mode == 'valid', report['lossCounter']['finalLossCounterZeroProven'])
+                        delivered = mode not in ('late-warning', 'unknown-output', 'missing-ready', 'read-warning', 'invocation')
+                        self.assertEqual(delivered, report['delivery']['selectedSequencedDeliveryProven'])
+                        self.assertEqual(mode in ('valid', 'compiler-warning'), report['observedTaskEntryRecordsValidated'])
+                        self.assertEqual(mode not in ('missing-counter', 'bad-counter'),
+                                         report['lossCounter']['finalLossCounterZeroProven'])
+                        self.assertFalse(report['diagnostics']['compilerDiagnostics']['compilerWarningSafetyProven'])
+                        if mode == 'compiler-warning':
+                            self.assertEqual(warning.decode().splitlines(),
+                                             report['diagnostics']['compilerDiagnostics']['warnings'][0]['rawLines'])
+                            self.assertEqual(warning.decode().splitlines(),
+                                             report['nativeRecords']['otherLines'][:len(warning.decode().splitlines())])
                         self.assertEqual('failure', report['independentLogNodeInventory'][1]['tag'])
                         self.assertEqual({'reason': 'retained'}, report['independentLogNodeInventory'][1]['attributes'])
                 self.assertTrue(all((out / name).read_bytes() == raw for name, raw in data.items()))

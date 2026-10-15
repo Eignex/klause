@@ -1,7 +1,7 @@
 """Review saved task entry observations without granting compiled lifetime authority."""
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -16,6 +16,8 @@ MAX_TOTAL_BYTES = 64 * 1024 * 1024
 MAX_OUTPUT_BYTES = 64 * 1024 * 1024
 MAX_RECORDS = 100000
 MAX_RELATIONS = 1000000
+MAX_DIAGNOSTIC_LINES = 4096
+MAX_DIAGNOSTIC_BYTES = 1024 * 1024
 INPUTS = ('live/task-generation-entries.json', 'live/captured-task-lifecycle.json',
           'live/captured-task-abi.json', 'live/observer/observer-launch.json',
           'live/observer/child-before-exec.json', 'live/observer/observer.bt',
@@ -116,6 +118,102 @@ def parse_records(text, root_pid, selected):
                 if group['primary'][0]['type'] == 'LIFECYCLE' and group['primary'][0]['kind'] == 'EXIT':
                     exited = True
     return {'threads': list(threads.values()), 'otherLines': other, 'errors': errors}
+
+
+def compiler_diagnostics(text, script, launch):
+    result = {'renderingProven': False, 'prefixLines': 0, 'warnings': [], 'errors': [],
+              'compilerWarningSafetyProven': False,
+              'scope': 'Pinned pre-execution compiler diagnostic rendering only; no warning safety, '
+                       'probe coverage, calling convention, task lifetime or compiler-cost proof.'}
+    lines, source = text.splitlines(), script.splitlines()
+    if len(lines) > MAX_RECORDS * 5 or len(source) > MAX_DIAGNOSTIC_LINES:
+        raise ValueError('Compiler diagnostic line inventory exceeds bounds')
+    try:
+        command = launch['observerCommand']
+        if not isinstance(command, list) or len(command) != 16 or not all(isinstance(arg, str) for arg in command):
+            raise ValueError('Original observer command is absent or malformed')
+        name = command[-2]
+        path = PurePosixPath(name)
+        if not path.is_absolute() or str(path) != name or path.name != 'observer.bt' or '..' in path.parts or \
+                name.startswith('//') or \
+                any(ord(char) < 32 or ord(char) == 127 for char in name):
+            raise ValueError('Original observer script path differs')
+        expected = ['sudo', '-n', 'unshare', '--mount', '--propagation', 'private',
+                    'env', capture.observer.ATTACHED + '=1',
+                    'BPFTRACE_MAX_STRLEN=' + str(capture.observer.MAX_BYTES + capture.observer.BUFFER_HEADER_BYTES),
+                    'sh', '-c', 'printf "%s\\n" "$$" > "$1"; exec "$3" -k -B none "$2"',
+                    'observer', str(path.with_name('observer.pid')), name, launch['observerBinary']]
+        if command != expected:
+            raise ValueError('Original observer invocation differs from its pinned source')
+        attached = [index for index, line in enumerate(lines) if re.fullmatch(r'Attaching [1-9][0-9]* probes\.\.\.', line)]
+        ready = [index for index, line in enumerate(lines) if line == capture.observer.ATTACHED]
+        if len(attached) != 1 or ready != [attached[0] + 1]:
+            raise ValueError('Observer attachment and readiness boundary is absent or ambiguous')
+        prefix = lines[:attached[0]]
+        if len(prefix) > MAX_DIAGNOSTIC_LINES or len('\n'.join(prefix).encode()) > MAX_DIAGNOSTIC_BYTES:
+            raise ValueError('Compiler diagnostic prefix exceeds bounds')
+        if any(line.split('\t')[0] in ('TASK_ENTRY', 'USDT', 'IDENTITY', 'LIFECYCLE',
+                                       'VALIDATION_FAULT_EXPECTED', 'FINAL_SEQUENCE',
+                                       'FINAL_SEQUENCE_TOTAL', 'DRAIN_MARKER') for line in prefix):
+            raise ValueError('Protocol records precede the observer attachment boundary')
+        start = 0
+        while start < len(prefix) and not prefix[start]:
+            start += 1
+        if start < len(prefix):
+            header = re.fullmatch(re.escape(name) + r':([1-9][0-9]*)(?:-([1-9][0-9]*))?: WARNING: found external warnings',
+                                  prefix[start])
+            if header is None:
+                raise ValueError('Unrecognized pre-execution diagnostic header')
+            first, last = int(header[1]), int(header[2] or header[1])
+            if not 1 <= first <= last <= len(source):
+                raise ValueError('Compiler diagnostic source span is invalid')
+            end = start + 1 + last - first + 1
+            if prefix[start + 1:end] != source[first - 1:last]:
+                raise ValueError('Compiler diagnostic context differs from original source')
+            hint = end
+            while hint < len(prefix) and not prefix[hint]:
+                hint += 1
+            if hint == len(prefix) or not prefix[hint].startswith('HINT: ') or not prefix[hint][6:].strip():
+                raise ValueError('Compiler diagnostic hint is absent or truncated')
+            payload = prefix[hint:]
+            if any(re.search(r'\b(?:error|bug):|\b(?:lost|dropped)\b|WARNING: Bad address|retcode:', line,
+                             re.IGNORECASE) or '\x1b' in line or
+                   line.split('\t')[0] in ('TASK_ENTRY', 'USDT', 'IDENTITY', 'LIFECYCLE',
+                                           'VALIDATION_FAULT_EXPECTED', 'FINAL_SEQUENCE',
+                                           'FINAL_SEQUENCE_TOTAL', 'DRAIN_MARKER') or
+                   re.search(r'observer\.bt:.*: WARNING:', line) or
+                   (index > 0 and line.startswith('HINT: '))
+                   for index, line in enumerate(payload)):
+                raise ValueError('Compiler diagnostic hint contains an error, control or another diagnostic')
+            result['warnings'].append({'header': prefix[start], 'sourceLines': [first, last],
+                                       'sourceContext': prefix[start + 1:end], 'hintLines': payload,
+                                       'rawLines': prefix[start:]})
+        result.update(renderingProven=True, prefixLines=len(prefix))
+    except (ValueError, KeyError, TypeError, IndexError) as error:
+        result['errors'].append(str(error))
+    return result
+
+
+def task_diagnostics(text, stderr, script, launch, native):
+    compiler = compiler_diagnostics(text, script, launch)
+    prefix = compiler['prefixLines'] if compiler['renderingProven'] else 0
+    if native['otherLines'][:prefix] != text.splitlines()[:prefix]:
+        compiler['renderingProven'] = False
+        compiler['errors'].append('Diagnostic prefix differs from the retained raw record inventory')
+        prefix = 0
+    other = native['otherLines'][prefix:]
+    diagnostics = previous.read_diagnostics(stderr, script, other)
+    controls = [line.split('\t') for line in other if line.startswith('VALIDATION_FAULT_EXPECTED\t')]
+    diagnostics['compilerDiagnostics'] = compiler
+    diagnostics['invalidReadControlRecords'] = controls
+    diagnostics['unrecognizedLines'] = [line for line in other if line and
+        not line.startswith(('VALIDATION_FAULT_EXPECTED\t', 'FINAL_SEQUENCE\t',
+                             'FINAL_SEQUENCE_TOTAL\t', 'DRAIN_MARKER\t')) and
+        line != capture.observer.ATTACHED and not re.fullmatch(r'Attaching [1-9][0-9]* probes\.\.\.', line)]
+    diagnostics['readWarningGuardPassed'] = diagnostics['readWarningGuardPassed'] and \
+        compiler['renderingProven'] and len(controls) == 1 and len(controls[0]) == 3 and \
+        controls[0][1].isdecimal() and not diagnostics['unrecognizedLines']
+    return diagnostics
 
 
 def initialization_candidates(native):
@@ -341,17 +439,8 @@ def inspect(directory, library, out, report):
              group['primary'][0]['kind'] == 'EXEC']
     if len(execs) != 1 or execs[0]['values'] != [str(launch['expectedUid'])]:
         raise ValueError('Original selected-user exec callback is absent or ambiguous')
-    diagnostics = previous.read_diagnostics(raw['live/observer/observer.stderr'].decode(),
-                                            script.decode(), native['otherLines'])
-    controls = [line.split('\t') for line in native['otherLines'] if line.startswith('VALIDATION_FAULT_EXPECTED\t')]
-    diagnostics['invalidReadControlRecords'] = controls
-    diagnostics['unrecognizedLines'] = [line for line in native['otherLines'] if line and
-        not line.startswith(('VALIDATION_FAULT_EXPECTED\t', 'FINAL_SEQUENCE\t',
-                             'FINAL_SEQUENCE_TOTAL\t', 'DRAIN_MARKER\t')) and
-        not re.fullmatch(r'Attaching [0-9]+ probes\.\.\.', line)]
-    diagnostics['readWarningGuardPassed'] = diagnostics['readWarningGuardPassed'] and \
-        len(controls) == 1 and len(controls[0]) == 3 and controls[0][1].isdecimal() and \
-        not diagnostics['unrecognizedLines']
+    diagnostics = task_diagnostics(raw['live/observer/observer.stdout'].decode(),
+                                   raw['live/observer/observer.stderr'].decode(), script.decode(), launch, native)
     extraction = json.loads(raw['live/observer/appimage-extraction.json'])
     if extraction['packageSha256'] != capture.IMAGE_SHA256 or extraction['exit'] != 0 or \
             launch['observerBinarySha256'] != extraction['appRunSha256'] or not extraction['temporaryRemoved']:

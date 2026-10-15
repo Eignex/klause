@@ -1826,6 +1826,17 @@ physical alias/source definition, library span and executed program.
 The manifest binds saved bytes; accepting an observation also requires the
 original capture's authenticated source and worker provenance.
 
+The pinned observer emits compiler diagnostics on stdout before attachment.
+The reviewer recognizes a single external-warning rendering only when its
+location and context exactly match the original script and its hint precedes
+one attachment/readiness boundary. The original observer command must match the
+source-bound invocation. Diagnostic prefixes are bounded at 4096 lines and 1 MiB;
+malformed, duplicated, interleaved, late or unexplained output declines the guard.
+All diagnostic bytes remain retained. Recognizing this rendering proves no
+compiler-warning safety or probe coverage. The expected invalid-read control,
+runtime warning checks, callback sequences and owned loss proof retain their
+independent requirements.
+
 Saved task entries retain their source names, signed compile identities, raw
 pointer arguments, process/thread sequences and payload errors. Selected terminal
 delivery and the complete owned loss-counter proof remain separate from global
