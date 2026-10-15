@@ -12,6 +12,7 @@ import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.meta.alns.Alns
 import com.eignex.klause.meta.alns.BacktrackRepair
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -46,16 +47,26 @@ import kotlin.math.ln
  * scheduling allowance; [com.eignex.klause.solver.result.AlnsStats] records actual inner work separately.
  * Repairs remain bounded atomic fragment searches.
  */
-internal class AlnsWorkerConfig(
-    val profile: AlnsProfile = AlnsProfile.Default,
-    val nodeBudget: NodeBudget? = null,
-    private val numericalCompletion: Boolean = false,
+internal class AlnsWorkerConfig private constructor(
+    val profile: AlnsProfile,
+    val nodeBudget: NodeBudget?,
+    private val numericalCompletion: Boolean,
+    private val toleranceCheck: ((Sample) -> Boolean)?,
 ) :
     WorkerConfig {
-    override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        AlnsWorkerConfig(profile, budget, numericalCompletion)
+    constructor(
+        profile: AlnsProfile = AlnsProfile.Default,
+        nodeBudget: NodeBudget? = null,
+        numericalCompletion: Boolean = false,
+    ) : this(profile, nodeBudget, numericalCompletion, null)
 
-    fun withNumericalCompletion(): AlnsWorkerConfig = AlnsWorkerConfig(profile, nodeBudget, true)
+    fun withToleranceCheck(check: (Sample) -> Boolean): AlnsWorkerConfig =
+        AlnsWorkerConfig(profile, nodeBudget, numericalCompletion, check)
+
+    override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
+        AlnsWorkerConfig(profile, budget, numericalCompletion, toleranceCheck)
+
+    fun withNumericalCompletion(): AlnsWorkerConfig = AlnsWorkerConfig(profile, nodeBudget, true, toleranceCheck)
 
     override val label: String get() = "alns-${profile.label}"
 
@@ -91,7 +102,7 @@ internal class AlnsWorkerConfig(
                 definitionalSweep = definitionalSweep,
                 perMoveInvariants = definitionalSweep != null,
                 completion = if (numericalCompletion && problem.numRealVars > 0)
-                    LeafRealCompletion(problem, objective) else null,
+                    LeafRealCompletion(problem, objective, toleranceCheck) else null,
             ).apply {
                 matchedPools?.localSearchProjection?.let { engine.projection = it }
                 matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
@@ -102,6 +113,7 @@ internal class AlnsWorkerConfig(
                 randomSeed = seed + index,
                 clauseExchange = PoolClauseExchange(repairClauses, skipPermanent = true, shareGlobalNogoods = false),
                 nodeBudget = nodeBudget,
+                toleranceCheck = toleranceCheck,
             ),
             minDestroyFraction = profile.minDestroyFraction,
             maxDestroyFraction = profile.maxDestroyFraction,
