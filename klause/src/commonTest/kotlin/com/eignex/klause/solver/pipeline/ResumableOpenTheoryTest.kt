@@ -3,6 +3,9 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
@@ -13,9 +16,38 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ResumableOpenTheoryTest {
+
+    @Test
+    fun `mixed point guidance retains finite holes`() {
+        val holes = assertNotNull(IntDomain(0, 2).excludeValues(longArrayOf(1)))
+        val source = Problem(0, 1, arrayOf(holes), arrayOf<Factor>(
+            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val request = OpenTheoryRequest(source).withPresolve(PresolveConfig.NONE)
+
+        val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(request)).result
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `mixed point guidance retains finite global enforcement`() {
+        val source = Problem(0, 2, Array(2) { IntDomain(0, 2) }, arrayOf<Factor>(
+            AllDifferent(intArrayOf(0, 1), 0, 3),
+            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
+            Linear(intArrayOf(1), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val request = OpenTheoryRequest(source).withPresolve(PresolveConfig.NONE)
+
+        val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(request)).result
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
 
     // b_i ⇔ x_i ≥ 5 over open x_i, every pair of neighbours with exactly one b true, and Σ x_i ≤ total.
     private fun chain(n: Int, total: Int): Problem {

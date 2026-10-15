@@ -23,13 +23,13 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.HeuristicBooleanBranching
+import com.eignex.klause.solver.search.SearchBranchKind
+import com.eignex.klause.solver.search.SearchBranchSelection
 import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRestart
 import com.eignex.klause.solver.search.SearchRun
-import com.eignex.klause.solver.search.SearchBranchKind
-import com.eignex.klause.solver.search.SearchBranchSelection
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
