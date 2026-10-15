@@ -63,7 +63,7 @@ class LpBoundingTest {
 
                 assertFalse(result.prune)
                 assertEquals(IntDomain(1, 1), session.intDomain(1))
-                assertEquals(1L, sink.lp.solves.read().sum)
+                assertEquals(1.0, sink.lp.solves.read().sum)
             }
         }
     }
