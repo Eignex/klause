@@ -23,9 +23,10 @@ class MpsModeTest {
     fun `exact continuous decimals retain numerical execution and source certificates`() {
         val source = File.createTempFile("mps-exact-continuous", ".mps").apply {
             writeText("ROWS\n N COST\n E R\nCOLUMNS\n X COST 0.1 R 3\nRHS\n RHS R 1\n" +
-                "BOUNDS\n LO B X 0\n UP B X 1\nENDATA\n")
+                "BOUNDS\n LO B X 0.1\n UP B X 1\nENDATA\n")
             deleteOnExit()
         }
+        assertFalse(Mps.parse(source.readText()).toProblem().sourceExact)
         val loaded = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { exact = true })
 
         val text = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--exact", source.absolutePath))) }
