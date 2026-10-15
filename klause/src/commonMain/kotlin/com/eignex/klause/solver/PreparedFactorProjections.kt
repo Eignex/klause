@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.ir.IntDomain
@@ -64,7 +65,8 @@ class PreparedFactorProjections internal constructor(
 
     internal val requiresRealSourceCheck: Boolean = problem.factors.indices.any { id ->
         problem.factors[id].variables.reals.isNotEmpty() &&
-            (problem.factors[id] is RealAbs || propagation[id]?.builtIn != true || !usesBuiltInRelaxation(id))
+            (problem.factors[id] is RealAbs || problem.factors[id] is ContinuousProduct ||
+                propagation[id]?.builtIn != true || !usesBuiltInRelaxation(id))
     }
 
     /** Retain selection only for the identical canonical source; rewrites select against their own factors. */

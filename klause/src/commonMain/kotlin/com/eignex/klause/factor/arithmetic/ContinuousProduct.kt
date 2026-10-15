@@ -13,7 +13,8 @@ import com.eignex.klause.ir.VarRemap
  * Exact continuous equality `result = a * b`, with every ID in the source real namespace.
  * Aliasing in any role is valid: `a == b` expresses a square. Products can share results and
  * operands to form chains. Exact rational or algebraic theory witnesses enforce this equality;
- * finite propagation, floating scores and linear relaxations cannot certify it.
+ * floating scores cannot certify it. Frontend variants retain declared finite operand values and their
+ * exact choice guards; selected linear consumers can enforce those variants under the captured guards.
  */
 class ContinuousProduct private constructor(
     /** First real operand ID. */
@@ -59,7 +60,8 @@ class ContinuousProduct private constructor(
         }
     }
 
-    override val structuralKeyWeight: Int get() = 3 + (finiteChoices?.let { 3 + it.size * if (it.hasGuards) 2 else 1 } ?: 0)
+    override val structuralKeyWeight: Int get() =
+        3 + (finiteChoices?.let { 3 + it.size * (if (it.hasGuards) 2 else 1) } ?: 0)
 }
 
 internal class ContinuousProductChoices(val operand: Int, values: DoubleArray, guards: IntArray? = null) {

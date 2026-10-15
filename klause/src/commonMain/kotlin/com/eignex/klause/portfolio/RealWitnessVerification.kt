@@ -2,12 +2,14 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.AffineAbs
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.ExactWitness
 import com.eignex.klause.lp.exactComparison
@@ -53,6 +55,26 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
     }
     for ((id, factor) in model.factors.withIndex()) {
         if (factor.variables.reals.isEmpty()) continue
+        if (factor is ContinuousProduct) {
+            if (reals[factor.a] * reals[factor.b] != reals[factor.result]) {
+                return Verification.Rejected("real factor $id refutes the assignment")
+            }
+            factor.finiteChoices?.let { choices ->
+                var admitted = false
+                for (index in 0 until choices.size) {
+                    val matches = reals[choices.operand] == BigFraction.ofDouble(choices.valueAt(index))
+                    admitted = admitted || matches
+                    if (choices.hasGuards) {
+                        val literal = choices.literalAt(index)
+                        if (Lit.evaluate(literal, sample.boolValue(Lit.variable(literal))) != matches) {
+                            return Verification.Rejected("real factor $id refutes its choice guards")
+                        }
+                    }
+                }
+                if (!admitted) return Verification.Rejected("real factor $id refutes its operand domain")
+            }
+            continue
+        }
         if (factor is RealAbs) {
             val operand = reals[factor.operand]
             val magnitude = if (operand < BigFraction.ZERO) operand.negated() else operand
