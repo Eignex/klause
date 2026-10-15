@@ -1867,6 +1867,15 @@ saving its records. Agreement checks incremental state consistency; original-sou
 witness validation remains a separate obligation. This profile measures no solve
 throughput and verifies no proof.
 
+`PowerMoveSourceProfile` accepts the same `sources` and `seed` arguments for
+FlatZinc inputs. It retains the incremental records, then checks each complete
+coordinate assignment against the independent original FlatZinc predicate checker.
+Zero complete cost must agree with an exact valid source witness; unsupported checks
+fail the diagnostic. Signed powers, aliases, zero exponents and overflow use original
+source numbers. `source-checks.json` keeps source hashes, coordinates, check scope and
+agreement separately from native grading. Run it through the same AWS lab profile
+client at a pinned revision. It measures no throughput and exports no proofs.
+
 ### Definition probe
 
 [scripts/definition-probes](scripts/definition-probes/) measures repeated complete

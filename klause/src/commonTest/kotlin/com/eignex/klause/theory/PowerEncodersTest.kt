@@ -1,7 +1,10 @@
 package com.eignex.klause.theory
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.Power
+import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.PolynomialRealFormula
@@ -21,6 +24,11 @@ import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.pow
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraResult
@@ -111,6 +119,38 @@ class PowerEncodersTest {
                 assertIs<QfNraResult.Satisfiable>(result)
             }
         }
+    }
+
+    @Test
+    fun `polynomial completion preserves finite power choices and holes`() {
+        for (value in listOf(3.0, 4.0)) {
+            val source = Problem(0, 2, arrayOf(IntDomain(-2, 2).excludeValue(0), IntDomain(0, 4)),
+                arrayOf<Factor>(Power(0, 2, 1), RealProduct(1, 0, 1, 1.0, 1.0)), numRealVars = 2,
+                realLower = doubleArrayOf(1.0, value), realUpper = doubleArrayOf(1.0, value))
+
+            val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+
+            if (value == 3.0) assertIs<OpenTheoryResult.Unsat>(execution.result)
+            else {
+                val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
+                assertEquals("4", witness.intValue(1))
+                val input = witness.intValue(0).toLong()
+                assertEquals(4L, input * input)
+            }
+        }
+    }
+
+    @Test
+    fun `exact real power witnesses retain their algebraic coordinate`() {
+        val source = parseFlatZinc("var -2.0..2.0: x; constraint float_pow(x, 2.0, 2.0); solve satisfy;",
+            exactFloats = true).problem
+        val model = assertNotNull(source.prepareExecutionPlan().polynomialModel)
+
+        val result = model.service.invocation().use { it.check() }
+
+        val root = assertIs<QfNraResult.Satisfiable>(result).assignment.realValue(0)
+        assertNull(root.rational)
+        assertEquals(0, AlgebraicArithmetic().signAt(RationalPolynomial.of(-2, 0, 1), root))
     }
 
     @Test
