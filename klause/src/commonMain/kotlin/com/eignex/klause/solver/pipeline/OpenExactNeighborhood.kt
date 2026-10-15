@@ -57,8 +57,9 @@ internal class OpenExactNeighborhood(
             objective, cancellation = construction,
         )).prepareConditionedLinearQuery(construction) ?: return null
         if (stop()) return null
-        val working = requireNotNull(source.model)
-        val plan = requireNotNull(source.componentPlan)
+        val projection = requireNotNull(source.execution.finiteLinear)
+        val working = projection.model
+        val plan = projection.ownership
         val selected = PreparedSearchComponents(plan, working, plan.cpSourceDomains(working))
         if (stop()) return null
         prepared = source
@@ -68,9 +69,9 @@ internal class OpenExactNeighborhood(
 
     private val queries = RetainedLinearQueries(model, params, objective, hints = { stop, state ->
         val source = prepared
-        val plan = source?.componentPlan
-        if (plan == null) SearchCandidateHints.None
-        else state.candidateHints(plan, requireNotNull(source?.model), stop)
+        val projection = source?.execution?.finiteLinear
+        if (projection == null) SearchCandidateHints.None
+        else state.candidateHints(projection.ownership, projection.model, stop)
     }, open = ::open)
     val exhausted: Boolean get() = queries.exhausted
     val work: Long get() = queries.work

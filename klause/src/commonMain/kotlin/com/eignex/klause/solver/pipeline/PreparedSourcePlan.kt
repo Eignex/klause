@@ -6,7 +6,6 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
-import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
@@ -97,7 +96,7 @@ enum class PreparedPlanDecline {
     /** A continuous source factor has no exact polynomial encoding. */
     POLYNOMIAL_ENCODING,
 
-    /** Linear-objective polynomial execution requires a discrete objective. */
+    /** Legacy objective-only decline; a supported rebind retains the prepared source completion. */
     CONTINUOUS_LINEAR_OBJECTIVE,
 
     /** An open source column or factor has no complete owner. */
@@ -111,105 +110,108 @@ enum class PreparedPlanDecline {
  * read-only under the model contract. [model] may contain proved bound narrowing; its coordinate
  * namespaces agree with the source. Arithmetic-owned values never become guessed finite domains.
  */
-class PreparedSourcePlan internal constructor(
-    /** Original neutral source object, including its declaration identities and representation. */
-    val originalSource: Any,
-    /** Canonical factor model, absent for a nonlinear integer source retaining its own representation. */
-    val model: Problem?,
-    /** Representation selected for execution. */
-    val kind: PreparedExecutionKind,
-    /** Finite/linear projection data, absent for polynomial or declined preparation. */
-    val componentPlan: ComponentPlan?,
-    internal val polynomialModel: SharedPolynomialModel?,
-    components: List<ExecutionComponentDescriptor>,
-    /** Original Boolean declarations, excluding private auxiliaries. */
-    val sourceBoolCount: Int,
-    /** Original integer declarations. */
-    val sourceIntCount: Int,
-    /** Original real declarations, excluding private auxiliaries. */
-    val sourceRealCount: Int,
-    /** Source objective preserved across coordinate-identical bound preparation. */
-    val objective: LinearObjective? = null,
-    /** Direction of [objective]. */
-    val maximize: Boolean = false,
-    /** Explicit unsupported cause; resource stops belong to the invocation. */
-    val decline: PreparedPlanDecline? = null,
-    integerCoordinates: List<Int> = (0 until sourceIntCount).toList(),
-    realCoordinates: List<Int> = (0 until sourceRealCount).toList(),
-    private val operations: Set<ExecutionOperation> = sourceOperations,
-    /** Exact quadratic source objective captured for this operation, or null. */
-    val quadraticObjective: QuadraticObjectiveSpec? = null,
-    /** Direction of [quadraticObjective]. */
-    val quadraticSense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-    /** Immutable mechanism descriptors captured against [model], absent for a non-factor source. */
-    val factorProjections: PreparedFactorProjections? = componentPlan?.factorProjections
-        ?: model?.let { FactorProjectionProviders.Default.prepare(it) },
+class PreparedSourcePlan private constructor(
+    private val preparation: PreparedSourceStructure,
+    private val operation: PreparedOperationBinding,
 ) {
-    internal val finiteFactorProjections: PreparedFactorProjections? = polynomialModel?.let { polynomial ->
-        factorProjections?.projected(polynomial.finite, polynomial.finiteFactorIndices.toIntArray())
-    } ?: factorProjections
+    internal constructor(
+        originalSource: Any,
+        execution: PreparedExecution,
+        components: List<ExecutionComponentDescriptor>,
+        sourceBoolCount: Int,
+        sourceIntCount: Int,
+        sourceRealCount: Int,
+        objective: LinearObjective? = null,
+        maximize: Boolean = false,
+        integerCoordinates: List<Int> = (0 until sourceIntCount).toList(),
+        realCoordinates: List<Int> = (0 until sourceRealCount).toList(),
+        operations: Set<ExecutionOperation> = sourceOperations,
+        factorProjections: PreparedFactorProjections? = execution.componentPlan?.factorProjections
+            ?: execution.model?.let { FactorProjectionProviders.Default.prepare(it) },
+    ) : this(
+        PreparedSourceStructure(originalSource, execution, components, sourceBoolCount, sourceIntCount, sourceRealCount,
+            integerCoordinates, realCoordinates, operations, factorProjections),
+        PreparedOperationBinding(objective, maximize),
+    )
 
-    private val descriptions = components.toList()
-    private val integerMapping = integerCoordinates.toList()
-    private val realMapping = realCoordinates.toList()
+    internal constructor(
+        originalSource: Any,
+        model: Problem?,
+        kind: PreparedExecutionKind,
+        componentPlan: ComponentPlan?,
+        polynomialModel: SharedPolynomialModel?,
+        components: List<ExecutionComponentDescriptor>,
+        sourceBoolCount: Int,
+        sourceIntCount: Int,
+        sourceRealCount: Int,
+        objective: LinearObjective? = null,
+        maximize: Boolean = false,
+        decline: PreparedPlanDecline? = null,
+        integerCoordinates: List<Int> = (0 until sourceIntCount).toList(),
+        realCoordinates: List<Int> = (0 until sourceRealCount).toList(),
+        operations: Set<ExecutionOperation> = sourceOperations,
+        quadraticObjective: QuadraticObjectiveSpec? = null,
+        quadraticSense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+        factorProjections: PreparedFactorProjections? = componentPlan?.factorProjections
+            ?: model?.let { FactorProjectionProviders.Default.prepare(it) },
+    ) : this(
+        PreparedSourceStructure(originalSource, legacyPreparedExecution(originalSource, model, kind, componentPlan,
+            polynomialModel, decline), components, sourceBoolCount, sourceIntCount, sourceRealCount,
+            integerCoordinates, realCoordinates, operations, factorProjections),
+        PreparedOperationBinding(objective, maximize, quadraticObjective, quadraticSense,
+            decline.takeIf { it == PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE }),
+    )
 
-    init {
-        require(integerMapping.size == sourceIntCount && realMapping.size == sourceRealCount)
-        model?.let { factorProjections?.requireSource(it) }
-    }
+    internal val execution: PreparedExecution get() = preparation.execution
+
+    /** Original neutral source object, including its declaration identities and representation. */
+    val originalSource: Any get() = preparation.originalSource
+    /** Canonical factor model, absent for a native source retaining its own representation. */
+    val model: Problem? get() = execution.model
+    /** Representation selected for execution. */
+    val kind: PreparedExecutionKind get() = if (operation.decline != null) PreparedExecutionKind.DECLINED
+        else execution.kind
+    /** Finite/linear projection data, including a retained projection from declined preparation. */
+    val componentPlan: ComponentPlan? get() = execution.componentPlan
+    internal val polynomialModel: SharedPolynomialModel? get() = execution.polynomial?.completion
+    /** Original Boolean declarations, excluding private auxiliaries. */
+    val sourceBoolCount: Int get() = preparation.sourceBoolCount
+    /** Original integer declarations. */
+    val sourceIntCount: Int get() = preparation.sourceIntCount
+    /** Original real declarations, excluding private auxiliaries. */
+    val sourceRealCount: Int get() = preparation.sourceRealCount
+    /** Source objective preserved across coordinate-identical bound preparation. */
+    val objective: LinearObjective? get() = operation.objective
+    /** Direction of [objective]. */
+    val maximize: Boolean get() = operation.maximize
+    /** Explicit preparation cause; an operation decline does not erase structural preparation. */
+    val decline: PreparedPlanDecline? get() = operation.decline ?: execution.decline
+    /** Exact quadratic source objective captured for this operation, or null. */
+    val quadraticObjective: QuadraticObjectiveSpec? get() = operation.quadraticObjective
+    /** Direction of [quadraticObjective]. */
+    val quadraticSense: ObjectiveSense get() = operation.quadraticSense
+    /** Immutable mechanism descriptors captured against [model], absent for a non-factor source. */
+    val factorProjections: PreparedFactorProjections? get() = preparation.factorProjections
+    internal val finiteFactorProjections: PreparedFactorProjections? get() = preparation.finiteFactorProjections
 
     /** Operation and strategy admission derived from this plan's installed component contracts. */
-    val capabilities: ExecutionCapabilities = ExecutionCapabilities(descriptions, operations, objectiveSupported())
-
-    private fun objectiveSupported(): Boolean {
-        if (quadraticObjective != null) {
-            return (polynomialModel != null || kind == PreparedExecutionKind.NONLINEAR_INTEGER) &&
-                quadraticObjective.terms.all { term -> listOfNotNull(term.first, term.second).all { variable ->
-                    when (variable) {
-                        is QuadraticVariable.Bool -> variable.id.index in 0 until sourceBoolCount
-                        is QuadraticVariable.Int -> variable.id.index in 0 until sourceIntCount
-                        is QuadraticVariable.Real -> variable.id.index in 0 until sourceRealCount
-                    }
-                } }
-        }
-        val linear = objective ?: return false
-        if (linear.realCoefficientValues.any { !it.isFinite() } ||
-            linear.realCoefficientValues.size > sourceRealCount || linear.intCoefficientValues.size > sourceIntCount ||
-            linear.boolWeightValues.size > sourceBoolCount
-        ) return false
-        if (kind == PreparedExecutionKind.NONLINEAR_INTEGER ||
-            kind == PreparedExecutionKind.TRANSCENDENTAL
-        ) return false
-        return true
-    }
+    val capabilities: ExecutionCapabilities = ExecutionCapabilities(
+        preparation.components, preparation.operations, operation.supportedBy(preparation),
+    )
 
     /** Bind an immutable linear objective without reselecting source ownership. */
-    fun withObjective(objective: LinearObjective, maximize: Boolean = false): PreparedSourcePlan = PreparedSourcePlan(
-        originalSource, model, reboundKind(), componentPlan, polynomialModel, descriptions,
-        sourceBoolCount, sourceIntCount, sourceRealCount, objective, maximize, structuralDecline(),
-        integerMapping, realMapping, operations, factorProjections = factorProjections,
-    )
+    fun withObjective(objective: LinearObjective, maximize: Boolean = false): PreparedSourcePlan =
+        PreparedSourcePlan(preparation, PreparedOperationBinding(objective, maximize))
 
     /** Bind an exact quadratic objective while preserving source coordinate mappings and completion. */
     fun withObjective(
         objective: QuadraticObjectiveSpec,
         sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-    ): PreparedSourcePlan = PreparedSourcePlan(
-        originalSource, model, reboundKind(), componentPlan, polynomialModel, descriptions,
-        sourceBoolCount, sourceIntCount, sourceRealCount, decline = structuralDecline(),
-        integerCoordinates = integerMapping, realCoordinates = realMapping, operations = operations,
-        quadraticObjective = objective, quadraticSense = sense, factorProjections = factorProjections,
-    )
-
-    private fun structuralDecline(): PreparedPlanDecline? =
-        decline.takeUnless { it == PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE }
-
-    private fun reboundKind(): PreparedExecutionKind = if (
-        decline == PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE && polynomialModel != null
-    ) PreparedExecutionKind.POLYNOMIAL else kind
+    ): PreparedSourcePlan = PreparedSourcePlan(preparation,
+        PreparedOperationBinding(quadraticObjective = objective, quadraticSense = sense))
 
     /** Independent component list whose values own their coordinate and factor lists. */
-    val components: List<ExecutionComponentDescriptor> get() = descriptions.toList()
+    val components: List<ExecutionComponentDescriptor> get() = preparation.components.toList()
 
     /**
      * Prepare the same ownership for exact linear coordinate windows and strict objective cutoffs.
@@ -220,10 +222,11 @@ class PreparedSourcePlan internal constructor(
 
     /** Prepare the conditioned linear adapter under the current containing construction controls. */
     fun prepareConditionedLinearQuery(cancellation: Cancellation): PreparedSourcePlan? {
-        val canonical = model ?: return null
-        val ownership = componentPlan?.forLinearConditions(canonical, cancellation = cancellation) ?: return null
+        val selected = execution.finiteLinear ?: return null
+        val ownership = selected.ownership.forLinearConditions(selected.model, cancellation = cancellation)
+            ?: return null
         val original = originalSource as? Problem ?: return null
-        return canonical.preparedWithComponents(ownership, original, objective, maximize)
+        return selected.model.preparedWithComponents(ownership, original, objective, maximize)
     }
 
     /** Whether this plan retains [source] as its original source object. */
@@ -235,25 +238,33 @@ class PreparedSourcePlan internal constructor(
     /** Compact finite projection coordinate, or null for a theory-owned integer. */
     fun finiteIntegerCoordinate(sourceId: Int): Int? {
         val id = integerCoordinate(sourceId)
-        if (polynomialModel != null) return id
-        return componentPlan?.cpIntVars?.indexOf(id)?.takeIf { it >= 0 }
+        return when (val selected = execution) {
+            is PreparedExecution.Polynomial -> id
+            is PreparedExecution.FiniteLinear -> selected.ownership.cpIntVars.indexOf(id).takeIf { it >= 0 }
+            is PreparedExecution.Declined -> when (val retained = selected.retained) {
+                is PreparedExecution.Polynomial -> id
+                is PreparedExecution.FiniteLinear -> retained.ownership.cpIntVars.indexOf(id).takeIf { it >= 0 }
+                null -> null
+            }
+            is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
+        }
     }
 
     /** Original integer coordinate's canonical location. */
     fun integerCoordinate(sourceId: Int): Int {
         require(sourceId in 0 until sourceIntCount)
-        return integerMapping[sourceId]
+        return preparation.integerCoordinates[sourceId]
     }
 
     /** Original real coordinate's canonical location; lowering auxiliaries are not source coordinates. */
     fun realCoordinate(sourceId: Int): Int {
         require(sourceId in 0 until sourceRealCount)
-        return realMapping[sourceId]
+        return preparation.realCoordinates[sourceId]
     }
 
     /** Polynomial completion column for a finite integer, or null when no embedding is required. */
     fun polynomialIntegerCoordinate(sourceId: Int): Int? =
-        polynomialModel?.integerColumns?.get(integerCoordinate(sourceId))
+        execution.polynomial?.completion?.integerColumns?.get(integerCoordinate(sourceId))
 }
 
 /** Prepare source ownership and completion without running a solver or inventing finite bounds. */
@@ -307,13 +318,13 @@ internal fun Problem.prepareExecutionPlan(
     }
     val ownership = componentPlan(projections, preferFinite, cancellation)
     if (cancellation() || ownership.encodingDecline == EncoderDecline.RESOURCE) return PreparedSourcePlan(
-        original, this, PreparedExecutionKind.DECLINED,
-        null, null, listOf(ExecutionComponentDescriptor("interrupted-preparation", ComponentResponsibility.UNPLACED,
+        original, PreparedExecution.Declined(this, PreparedPlanDecline.RESOURCE),
+        listOf(ExecutionComponentDescriptor("interrupted-preparation", ComponentResponsibility.UNPLACED,
             factors.indices.toList(), (0 until numIntVars).toList(), (0 until numRealVars).toList(),
             (0 until numBoolVars).toList(), unavailableContract(ExecutionDeclineCause.PREPARATION,
                 "interrupted-preparation", PreparedPlanDecline.RESOURCE))),
         original.numBoolVars, original.numIntVars, original.numRealVars, objective, maximize,
-        PreparedPlanDecline.RESOURCE, factorProjections = projections)
+        factorProjections = projections)
     return preparedWithComponents(ownership, original, objective, maximize)
 }
 
@@ -369,11 +380,9 @@ internal fun Problem.preparedWithComponents(
     ).filter { it.responsibility == ComponentResponsibility.FINITE ||
         it.participatingFactorIndices.isNotEmpty() || it.booleanCoordinates.isNotEmpty() ||
         it.integerCoordinates.isNotEmpty() || it.realCoordinates.isNotEmpty() }
-    return PreparedSourcePlan(original, this, PreparedExecutionKind.FINITE_LINEAR, ownership, null, descriptors,
+    return PreparedSourcePlan(original, PreparedExecution.FiniteLinear(this, ownership), descriptors,
         original.numBoolVars, original.numIntVars, original.numRealVars, objective, maximize,
-        PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT.takeIf {
-            ownership.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN
-        }, operations = if (ownership.hasTheoryComponent) sourceOperations else finiteOperations)
+        operations = if (ownership.hasTheoryComponent) sourceOperations else finiteOperations)
 
 }
 
@@ -427,10 +436,11 @@ internal fun Problem.preparePolynomialExecutionPlan(
     else emptyList()
     val sourceBools = (original as? PolynomialRealProblem)?.sourceBoolCount ?: numBoolVars
     val sourceReals = (original as? PolynomialRealProblem)?.sourceRealCount ?: numRealVars
-    return PreparedSourcePlan(original, this,
-        if (cause == null) PreparedExecutionKind.POLYNOMIAL else PreparedExecutionKind.DECLINED,
-        ownership, polynomial, descriptors, sourceBools, numIntVars, sourceReals, objective, maximize, cause,
-        factorProjections = projections)
+    val execution = if (cause == null) PreparedExecution.Polynomial(requireNotNull(polynomial))
+        else PreparedExecution.Declined(this, cause, polynomial?.let { PreparedExecution.Polynomial(it) }
+            ?: ownership?.let { PreparedExecution.FiniteLinear(this, it) })
+    return PreparedSourcePlan(original, execution, descriptors, sourceBools, numIntVars, sourceReals,
+        objective, maximize, factorProjections = projections)
 }
 
 /** Preserve the original polynomial snapshot while preparing its finite and completion projections. */
@@ -443,7 +453,7 @@ fun PolynomialRealProblem.prepareExecutionPlan(): PreparedSourcePlan = Problem(
 
 /** Preserve nonlinear integer source syntax and its exact declaration-to-numeric projection. */
 fun NonlinearIntegerProblem.prepareExecutionPlan(): PreparedSourcePlan = PreparedSourcePlan(
-    this, null, PreparedExecutionKind.NONLINEAR_INTEGER, null, null,
+    this, PreparedExecution.NonlinearInteger(this),
     listOf(ExecutionComponentDescriptor("polynomial-integer", ComponentResponsibility.COMPLETION,
         emptyList(), integerCoordinates, (0 until numericCount).filter { it !in integerCoordinates },
         (0 until boolCount).toList(), ComponentExecutionContract(

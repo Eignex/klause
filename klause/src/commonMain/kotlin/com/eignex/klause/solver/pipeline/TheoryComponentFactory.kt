@@ -82,6 +82,8 @@ internal fun ComponentPlan.theoryComponentFactory(
             val factory: (SearchComponentOpening) -> List<SearchComponent> = { opening ->
                 val component = DifferenceSearchComponent.withRootBounds(fragment, owned, finite)
                 opening.own(AutoCloseable { component.releaseSearchState() })
+                if (finite.isEmpty()) component.prepareRelativeBranches(opening.cancellation)
+                    ?.let(opening::registerBranchProposal)
                 listOf(component)
             }
             factory

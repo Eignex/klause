@@ -20,7 +20,8 @@ class PolynomialTheoryRequest internal constructor(
     val preparedPlan: PreparedSourcePlan = problem.prepareExecutionPlan(),
 ) {
     internal val sharedModel: SharedPolynomialModel?
-        get() = preparedPlan.polynomialModel.takeIf { preparedPlan.originalSource is Problem }
+        get() = preparedPlan.execution.polynomial?.completion
+            .takeIf { preparedPlan.originalSource is Problem }
 }
 
 /** Select the complete polynomial-real theory without materializing finite domains. */
@@ -32,14 +33,14 @@ fun PolynomialRealProblem.pipelineRequest(): PolynomialTheoryRequest = Polynomia
  */
 fun Problem.pipelineRequest(): PolynomialTheoryRequest {
     val plan = preparePolynomialExecutionPlan()
-    require(plan.kind == PreparedExecutionKind.POLYNOMIAL) {
+    require(plan.execution is PreparedExecution.Polynomial) {
         "the shared polynomial pipeline requires finite integers and exactly encodable continuous factors"
     }
     return plan.polynomialRequest()
 }
 
 internal fun PreparedSourcePlan.polynomialRequest(): PolynomialTheoryRequest {
-    val shared = requireNotNull(polynomialModel)
+    val shared = requireNotNull(execution.polynomial).completion
     return PolynomialTheoryRequest(
         PolynomialRealProblem(
             shared.service.formula, shared.service.realCount, shared.source.numBoolVars,
@@ -50,7 +51,9 @@ internal fun PreparedSourcePlan.polynomialRequest(): PolynomialTheoryRequest {
 }
 
 internal fun PolynomialTheoryRequest.resolvedModel(): SharedPolynomialModel =
-    requireNotNull(preparedPlan.polynomialModel) { "polynomial request has no prepared completion" }
+    requireNotNull(preparedPlan.execution.polynomial) {
+        "polynomial request has no prepared completion"
+    }.completion
 
 /** Controls for one complete polynomial-real invocation, in native arithmetic units. */
 data class PolynomialTheoryParams(

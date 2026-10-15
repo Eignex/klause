@@ -44,7 +44,8 @@ premise. A contradictory member refutes its entire signed row group, whereas
 satisfying one member supplies no entailment. Shared source clauses propagate these
 primitive facts through equality and disequality gates.
 
-This optional closure uses only immutable base edges. Transient published integer
+This optional closure uses immutable source rows and registered difference
+predicates. Transient published integer
 bounds remain in ordinary feasibility checks but are excluded from proof paths.
 The existing completed cycle sweep supplies a feasible numerical reweighting;
 a point influenced by transient bounds gives those bounds no explanation authority.
@@ -98,6 +99,21 @@ The pipeline can compose theory-owned columns with a finite projection where the
 ownership plan admits that decomposition. Source variables keep their identities;
 extracting a graph never authorizes dropping factors outside its fragment.
 
+An entirely theory-owned integer graph can branch on small directly proved relative
+intervals before its ordinary Boolean choices. Opposite unconditional source edges
+bound `x-y` without bounding either source coordinate absolutely. Narrower intervals
+precede wider ones, with source identities breaking ties. First relative values
+rotate using the interval ordinal's digit sum modulo interval cardinality; this
+ordering preference creates no numerical fact. Each split registers
+`x-y <= c` and `y-x <= -c-1` as exclusive, exhaustive integer alternatives through
+the shared atom registry. No finite CP domain or fixed anchor is introduced.
+Retraction restores the active interval from the shared Boolean trail; immutable
+predicate names survive siblings and restarts. Source comparison guards can receive
+explained consequences from these named edges. Unused names impose neither side at
+a complete graph check. Final original-source checks retain witness authority.
+Once the original Boolean skeleton is settled, graph feasibility supplies its
+arithmetic completion without further relative decisions.
+
 ## Results and proof authority
 
 Completed graph feasibility supplies an integer potential sample or a rational
@@ -107,10 +123,10 @@ coverage retains chronological conflict handling rather than inventing a clause.
 A stopped graph check is indeterminate.
 
 Integer cycle explanations negate every active signed guard in a checked cycle
-of immutable source edges. Unconditional source rows and declared bounds require
+of immutable source edges and registered predicates. Unconditional source rows and declared bounds require
 no Boolean premise. A cycle containing a transient shared integer bound retains
 chronological conflict handling because that bound has no captured Boolean reason.
-The immutable source edge prefix is preserved when invocation bounds are appended.
+The source and registered-predicate edge prefix is preserved when invocation bounds are appended.
 
 Objective admission is separate from graph feasibility. The open minimizer must
 keep every improving cutoff within a supported theory; an arbitrary linear
@@ -130,6 +146,13 @@ query scratch and resets the origin cursor without retaining cancellation across
 later calls; [resource allowances](../solver/resources.md) defines the boundaries.
 Representation or safety declines retain another admitted route or an undecided
 result, rather than an invented bounded model.
+
+Relative-interval preparation and each registered-graph extension charge and poll
+the containing opening token. Registered edges share the 65,536-edge private
+representation envelope. Intervals wider than 255 retain ordinary graph search.
+Reaching the edge envelope or atom capacity retains ordinary Boolean
+search over the current valid scope. Index rebuilding retains spent work and the
+live deadline. Closing discards interval splits and private graph extensions.
 
 Explicitly requested hint storage admits at most 65,536 edge incidences and source
 factor/index entries. These are private index representation bounds; declining an index retains
@@ -168,10 +191,14 @@ retain that route.
 
 Admitted pure-real difference components under the production certification policy
 defer LP construction and check the active graph at partial and complete Boolean states,
-including the root. A feasible partial graph supplies consistency without a numerical
-guide or a model contribution. With default primitive guidance, the first live
-consultation after this admission supplies no preference and releases optional hint
-rows and values. Registration and all capture work already spent remain charged; later checks
+including the root. A feasible partial graph supplies consistency and can guide
+comparison polarity without a model contribution. Default direct guidance retains
+that point beside a source at-most-one or exactly-one Boolean cardinality over
+three or more literals. Bounded opening classification reads the full source under
+its existing token, including cardinalities retained by the finite owner outside
+the arithmetic fragment. It adds no graph check or allowance. Other admitted graph sources
+release optional hint rows and values at the first live default consultation and
+supply no preference. Registration and all capture work already spent remain charged; later checks
 skip released capture in the same opening. An unavailable point or a caller preference
 that bypasses the component does not trigger release. Explicit hint allowances retain
 their existing graph-point preferences. This policy changes neither graph admission

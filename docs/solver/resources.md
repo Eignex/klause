@@ -231,6 +231,13 @@ A conditioned check receives only its invocation's remaining allowance; new bran
 retractions and candidate retries do not renew it. Native work is forwarded once to
 the caller meter, and resource exhaustion withholds an incomplete verdict.
 
+Integer difference interval branching charges source scans, bounded ordering and
+private graph copies/indexing to the opening token. Registered complementary
+predicates retain one source-root name across siblings and restarts. Their active
+edges and ordinary graph checks spend the current invocation's controls; a rebuilt
+guard index grants no new allowance. Closing releases private interval and graph
+state. See [difference logic](../theories/difference.md).
+
 Exact-linear partial-point polarity hints reuse a completed arithmetic check. Source
 comparison visits and bounded rational operations charge that check's current operation
 token, including its native meter; they create no numerical invocation or allowance.
@@ -241,7 +248,14 @@ branch-order guesses. Evaluation of its existing completed point charges that
 check's existing operation token. This direct primitive path creates no source-clause
 index or Boolean draw.
 For a default opening with an established complete pure-real difference graph,
-the first live primitive consultation releases only optional hint rows and values.
+an at-most-one or exactly-one source Boolean cardinality over three or more
+literals retains direct comparison guidance under the existing operation token.
+Opening classification charges at most 65,536 full-source factor visits to its
+existing token, stopping at the first qualifying cardinality. A private source-size
+decline retains ordinary graph polarity; cancellation withholds the provider.
+The captured Boolean metadata transfers neither factor enforcement nor ownership.
+Other graph sources release only optional hint rows and values at the first live
+primitive consultation.
 The opening registration and all capture work already spent remain charged without refund; subsequent
 checks skip released hint capture. No live consultation means this release has not
 occurred, including when caller preferences bypass the component. Required source,

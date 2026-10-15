@@ -285,6 +285,7 @@ class ExactLiraSearchComponent private constructor(
     internal fun partialPointHints(
         stop: Cancellation,
         defaultOpening: Boolean = false,
+        defaultGraphSelections: Boolean = false,
     ): Pair<IntArray, SearchCandidateHints>? {
         check(context == null)
         if (model.numRealVars == 0 && (!defaultOpening || model.numIntVars == 0)) return null
@@ -312,7 +313,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintStop = stop
         return variables.toIntArray() to SearchCandidateHints { variable ->
             if (!partialPointHintAvailable()) null
-            else if (defaultOpening && graphFirst) {
+            else if (defaultOpening && graphFirst && !defaultGraphSelections) {
                 smtStats?.observeDefaultGraphHintRelease()
                 releasePartialPointHints()
                 null

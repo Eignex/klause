@@ -54,7 +54,7 @@ internal class SharedPolynomialModel private constructor(
             source: Problem,
             sourceFormula: PolynomialRealFormula? = null,
         ): SharedPolynomialModel? {
-            return source.preparePolynomialExecutionPlan(sourceFormula).polynomialModel
+            return source.preparePolynomialExecutionPlan(sourceFormula).execution.polynomial?.completion
         }
 
         internal fun lower(

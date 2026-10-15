@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
@@ -319,6 +320,39 @@ class PreparedSearchRegistrationTest {
                 assertEquals(0L, usage.clauseConsultations)
                 assertEquals(0L, usage.indexesAdmitted)
                 assertNull(usage.rawLedgerDebits)
+            }
+        }
+    }
+
+    @Test
+    fun `default graph guidance uses source cardinalities retained by their finite owner`() {
+        for (minimum in listOf(0, 1)) {
+            val source = Problem(
+                numBoolVars = 3,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+                factors = arrayOf(
+                    Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), minimum, 1),
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ),
+            )
+            val stats = SmtStatsSink()
+            val plan = source.componentPlan()
+            assertEquals(FactorOwner.CP, plan.factorOwner(0))
+            plan.search(source, emptyMap(), Long.MAX_VALUE, Cancellation.Never,
+                SearchLearnedDbParams(), stats).use { planned ->
+                assertIs<ComponentResult.Consistent>(planned.session.initialize())
+
+                assertEquals(true, planned.candidateHints.preferredBool(0))
+                assertEquals(0L, stats.snapshot().defaultGraphHintReleases)
+                assertNull(planned.session.boolValue(0))
+                val result = assertIs<SearchResult.Satisfied>(planned.session.solve(3,
+                    SearchSolveParams(maxDecisions = 3), candidateHints = planned.candidateHints))
+                assertEquals(true, result.model.valueOf(SearchBoolValue(0)))
+                assertEquals(false, result.model.valueOf(SearchBoolValue(1)))
+                assertEquals(false, result.model.valueOf(SearchBoolValue(2)))
+                assertEquals(BigFraction.ZERO, result.model.valueOf(SearchExactRealValue(SourceRealId(0))))
             }
         }
     }

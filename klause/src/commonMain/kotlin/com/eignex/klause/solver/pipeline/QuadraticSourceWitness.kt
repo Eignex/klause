@@ -64,7 +64,7 @@ private fun checkQuadraticIrWitness(
     arithmetic: PolynomialArithmetic,
     limits: PolynomialLimits,
 ): SourceEvidenceCheck {
-    val model = plan.polynomialModel
+    val model = plan.execution.polynomial?.completion
         ?: return SourceEvidenceCheck.Unavailable("quadratic source has no retained polynomial completion")
     if (point.exactInts?.any { !it.fitsLong() } == true) {
         return SourceEvidenceCheck.Rejected("quadratic finite source integer is outside its declared range")

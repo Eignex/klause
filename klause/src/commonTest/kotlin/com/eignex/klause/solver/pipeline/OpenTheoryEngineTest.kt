@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.smtlib.SmtLib
@@ -11,19 +12,110 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class OpenTheoryEngineTest {
 
     private fun sourceRoute(model: Problem): ProblemPipeline = model.sourceRoute()
+
+    @Test
+    fun `difference openings retain their component owned model payload`() {
+        val open = Bits.full(2)
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 1),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
+                ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
+        )
+        model.componentPlan().search(model, emptyMap()).use { planned ->
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+
+            val result = assertIs<SearchRunEvent.Satisfied>(planned.session.openRun(model.numBoolVars).next())
+
+            assertNotNull(result.model.valueOf<Sample>(assertNotNull(planned.theory)))
+        }
+    }
+
+    @Test
+    fun `settled Boolean sources complete relative graphs without arithmetic decisions`() {
+        for (width in listOf(1L, 256L)) {
+            val open = Bits.full(2)
+            val model = Problem(
+                numBoolVars = 0,
+                intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+                factors = arrayOf(
+                    Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, width),
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
+                ),
+            )
+
+            val result = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model)).solve(TheoryParams(maxDecisions = 0))
+
+            val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+            val difference = assignment.intValue(0).toLong() - assignment.intValue(1).toLong()
+            assertTrue(difference in 0L..width)
+        }
+    }
+
+    @Test
+    fun `relative integer choices retain guarded source equalities and disequalities`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_IDL)
+                (declare-const x Int) (declare-const y Int) (declare-const z Int) (declare-const r Int)
+                (assert (and (>= (- x r) 0) (<= (- x r) 1)))
+                (assert (and (>= (- y r) 0) (<= (- y r) 1)))
+                (assert (and (>= (- z r) 0) (<= (- z r) 1)))
+                (assert (not (= (- x y) 0)))
+                (assert (not (= (- y z) 0)))
+                (assert (= (- x z) 0))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val result = OpenTheoryPipeline.engineFor(OpenTheoryRequest(parsed.model)).solve()
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+        val values = LongArray(4) { assignment.intValue(it).toLong() }
+        assertTrue((0..2).all { values[it] - values[3] in 0L..1L })
+        assertTrue(values[0] != values[1] && values[1] != values[2] && values[0] == values[2])
+    }
+
+    @Test
+    fun `relative integer traversal refutes incompatible source disequalities`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_IDL)
+                (declare-const x Int) (declare-const y Int) (declare-const z Int) (declare-const r Int)
+                (assert (and (>= (- x r) 0) (<= (- x r) 1)))
+                (assert (and (>= (- y r) 0) (<= (- y r) 1)))
+                (assert (and (>= (- z r) 0) (<= (- z r) 1)))
+                (assert (not (= (- x y) 0)))
+                (assert (not (= (- y z) 0)))
+                (assert (not (= (- x z) 0)))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val result = OpenTheoryPipeline.engineFor(OpenTheoryRequest(parsed.model)).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
 
     @Test
     fun `a spent presolve phase leaves signed difference witnesses searchable`() {

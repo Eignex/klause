@@ -132,8 +132,13 @@ constructs no source-clause index and draws no Boolean proposal. Custom register
 providers retain precedence, and primitive preferences retain their dirty,
 retraction, containing-stop and close lifetime.
 If initialization has already admitted the complete pure-real difference graph under
-the production certification policy, a live default consultation releases the optional
-primitive hint state and supplies no preference. Registration and all completed
+the production certification policy, a source at-most-one or exactly-one cardinality
+over three or more Boolean literals retains direct comparison preferences.
+The opening classifies the full source under its existing token, with at most
+65,536 factor visits and no source-clause index. The cardinality retains finite
+ownership even when excluded from the arithmetic fragment. Other graph sources
+release the optional primitive hint state at a
+live default consultation and supply no preference. Registration and all completed
 capture work retain their spent debit; later checks do not recapture released hints in that
 opening. An unavailable point or a caller preference that bypasses the component does
 not trigger this release. Source checks and graph or LP fallback retain their owners.
@@ -148,6 +153,14 @@ observations, without pretending that a source index was admitted.
 Custom registered providers retain their own existing admission and lifetime.
 The default integer difference opening installs no point hint provider; its ordinary
 Boolean polarity selection is independent of optional internal adapter composition.
+For an entirely theory-owned integer difference graph, source-proved relative
+interval proposals precede Boolean choices through arithmetic category priority.
+They register exact complementary difference predicates in the ordinary shared
+trail; their graph, retraction and source-check obligations belong to
+[difference logic](../theories/difference.md). This changes variable selection,
+without granting a partial potential any polarity or witness authority.
+The opening registers that proposal separately from its arithmetic component,
+retaining component identity, contribution ownership and existing model keys.
 An opt-in live-point provider first completes a sparse incidence index over all
 original source clauses. The opening owns the index and borrows those clauses
 read-only. Every source literal ID is validated, including the suffix;
