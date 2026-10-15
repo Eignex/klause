@@ -31,16 +31,23 @@ internal object LinearLpShapeInspection {
         var visited = 0
         var bounded = 0
         var free = 0
+        val structuralColumns = (member(model, "getN") as? Number)?.toInt()
+            ?: return skipped(out, "live-structural-dimensions-unavailable", stop)
+        val boundedRows = HashSet<Int>()
         for (column in definitions.values) {
             if (stop()) break
             require(column is Int)
             if (activeSide.invoke(state, column, false) != null || activeSide.invoke(state, column, true) != null) {
                 bounded++
+                boundedRows += column - structuralColumns
             } else {
                 free++
             }
             visited++
         }
+        val sourceColumns = inspectSourceColumns(
+            state, model, structuralColumns, boundedRows, activeSide, stop,
+        )
         val stopped = stop()
         write(out, buildJsonObject {
             put("mode", "live-lp-shape")
@@ -57,6 +64,8 @@ internal object LinearLpShapeInspection {
             put("theoryReals", source.numRealVars)
             put("theoryFactors", source.factors.size)
             put("sourceStructuralColumns", source.numRealVars + source.numIntVars)
+            put("declaredFixedSourceColumns", (field(system, "declaredFixed") as? Map<*, *>)?.size)
+            put("sourceColumnInspection", sourceColumns)
             put("lpStructuralColumns", member(model, "getN") as? Number)
             put("lpRows", member(model, "getM") as? Number)
             put("lpTotalColumns", member(model, "getNumVars") as? Number)
@@ -74,6 +83,72 @@ internal object LinearLpShapeInspection {
             put("stoppedAtReturn", stopped)
             put("elapsedNs", System.nanoTime() - started)
         })
+    }
+
+    private fun inspectSourceColumns(
+        state: Any,
+        model: Any,
+        structuralColumns: Int,
+        boundedRows: Set<Int>,
+        activeSide: java.lang.reflect.Method,
+        stop: Cancellation,
+    ): JsonObject {
+        val matrix = field(model, "matrix") as? List<*>
+            ?: return buildJsonObject { put("status", "matrix-metadata-unavailable") }
+        require(matrix.size == structuralColumns)
+        val getters = HashMap<Pair<Class<*>, String>, java.lang.reflect.Method?>()
+        fun get(owner: Any?, name: String): Any? {
+            if (owner == null) return null
+            val method = getters.getOrPut(owner.javaClass to name) {
+                owner.javaClass.methods.singleOrNull {
+                    it.name.substringBefore('$') == name && it.parameterCount == 0
+                }
+            }
+            return method?.invoke(owner)
+        }
+        var visited = 0
+        var rootFixed = 0
+        var anyDefinition = 0
+        var boundedDefinition = 0
+        var unfixedBoundedDefinition = 0
+        var freeWithoutBoundedDefinition = 0
+        for (column in matrix.indices) {
+            if (stop()) break
+            val entries = matrix[column] as? List<*> ?: error("missing exact column metadata")
+            val lower = activeSide.invoke(state, column, false)
+            val upper = activeSide.invoke(state, column, true)
+            val lowerSide = get(lower, "getSide")
+            val upperSide = get(upper, "getSide")
+            val lowerValue = get(get(lowerSide, "getNumber"), "getValue")
+            val upperValue = get(get(upperSide, "getNumber"), "getValue")
+            val fixed = get(lower, "getDepth") == 0 && get(upper, "getDepth") == 0 &&
+                get(lowerSide, "getStrict") == false && get(upperSide, "getStrict") == false &&
+                lowerValue != null && lowerValue == upperValue &&
+                get(lowerSide, "getPremises") == null && get(upperSide, "getPremises") == null
+            var used = false
+            for (entry in entries) {
+                if (stop()) break
+                val row = (get(entry, "getRow") as? Number)?.toInt() ?: error("missing exact row metadata")
+                if (row in boundedRows) used = true
+            }
+            if (stop()) break
+            if (fixed) rootFixed++
+            if (entries.isNotEmpty()) anyDefinition++
+            if (used) boundedDefinition++
+            if (used && !fixed) unfixedBoundedDefinition++
+            if (lower == null && upper == null && !used) freeWithoutBoundedDefinition++
+            visited++
+        }
+        return buildJsonObject {
+            put("status", "measured")
+            put("visited", visited)
+            put("complete", visited == structuralColumns && !stop())
+            put("rootFixed", rootFixed)
+            put("withAnyDefinition", anyDefinition)
+            put("withBoundedDefinition", boundedDefinition)
+            put("unfixedWithBoundedDefinition", unfixedBoundedDefinition)
+            put("freeWithoutBoundedDefinition", freeWithoutBoundedDefinition)
+        }
     }
 
     private fun skipped(out: File, reason: String, stop: Cancellation) = write(out, buildJsonObject {

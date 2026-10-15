@@ -325,6 +325,9 @@ and counts installed expression definitions with and without active bounds. It n
 forces lazy owners nor starts numerical work or traversal. An unavailable or stopped
 opening is explicit; interrupted definition counts are partial. These observations do
 not identify the cause of a later CLI continuation decline.
+Source-column counts additionally distinguish exact root fixings, references from
+bounded expression definitions and free columns without such references. These are
+stored-state observations under the same deadline, without projecting or deleting columns.
 
 `bench.profile.SourceAgreementProfile` compares one combined exact linear owner with
 explicit registered linear peers over original real, wide-integer, strict and guarded
