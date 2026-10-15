@@ -478,7 +478,21 @@ def source_query_solver(constraints, variables, is_smt, objective):
     return solver, 'finite binary' if binary else 'general', query
 
 
-def check(cases, source_root=None, progress=None, witness_only=False):
+def check_mps_root_bound(text, bound, maximize, problem):
+    value = float(bound)
+    assert math.isfinite(value), "nonfinite MPS root bound"
+    constraints, objective, _, source_maximize = mps(text)
+    assert source_maximize == maximize, "objective orientation differs from source"
+    exact = fractions.Fraction.from_float(value)
+    solver = z3.Solver()
+    solver.set(timeout=120000)
+    solver.add(*constraints, objective < rational(exact))
+    require_verdict(solver, z3.unsat, problem, 'source root bound exclusion')
+    return {"value": str(exact), "sense": "minimized", "scope": "original MPS constraints",
+            "check": "strictly better source objective unsat", "nativeCertificateChecked": False}
+
+
+def check(cases, source_root=None, progress=None, witness_only=False, root_bounds=False):
     archive, results, cache, sources = [], [], {}, {}
     for case in cases:
         assert case["status"] == "DONE" and case.get("record"), "incomplete case"
@@ -502,7 +516,8 @@ def check(cases, source_root=None, progress=None, witness_only=False):
         text = sources[source_key]
         key = (record["sourceHashes"]["model"], record["kind"], record["feasible"], str(reported_objective),
                record.get("exactObjective") is not None, record["proven"], record.get("maximize"),
-               record.get("finalWitness"), exact, tolerance_optimum)
+               record.get("finalWitness"), exact, tolerance_optimum,
+               record.get("stats", {}).get("lpRootBound") if root_bounds else None)
         if key in cache:
             results.append({"index": case["index"], "check": cache[key]})
             if progress is not None:
@@ -510,6 +525,11 @@ def check(cases, source_root=None, progress=None, witness_only=False):
             continue
         result = {"sourceHashVerified": True, "reportedFeasible": record["feasible"],
                   "reportedProven": record["proven"], "witness": "absent"}
+        if root_bounds:
+            assert case["problem"]["suite"] not in SMT_SUITES, "root-bound checking requires MPS"
+            bound = record.get("stats", {}).get("lpRootBound")
+            result["rootBoundCheck"] = check_mps_root_bound(text, bound, record["maximize"], record["problem"]) \
+                if bound is not None else {"check": "unavailable: no recorded root bound"}
         if witness_only:
             result["verificationScope"] = "witness-only"
             result["proofCertificateChecked"] = False
@@ -615,6 +635,7 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=pathlib.Path)
     parser.add_argument('--progress', type=pathlib.Path, help='Flush completed per-record checks as JSON lines, preserving the checked prefix if a later record fails.')
     parser.add_argument('--witness-only', action='store_true', help='Check actual feasible witnesses and objectives, preserving reported proof claims without checking them.')
+    parser.add_argument('--root-bounds', action='store_true', help='Independently exclude values below saved minimized MPS root bounds against the original exact constraints; this does not verify a native certificate.')
     args = parser.parse_args()
     opener = gzip.open if args.cases.suffix == '.gz' else lzma.open if args.cases.suffix == '.xz' else open
     with opener(args.cases, 'rt') as stream:
@@ -629,9 +650,9 @@ if __name__ == '__main__':
             def progress(entry):
                 stream.write(json.dumps(entry, sort_keys=True) + '\n')
                 stream.flush()
-            checks = check(cases, args.source_root, progress, witness_only=args.witness_only)
+            checks = check(cases, args.source_root, progress, witness_only=args.witness_only, root_bounds=args.root_bounds)
     else:
-        checks = check(cases, args.source_root, witness_only=args.witness_only)
+        checks = check(cases, args.source_root, witness_only=args.witness_only, root_bounds=args.root_bounds)
     result = json.dumps(checks, indent=2, sort_keys=True) + '\n'
     if args.output:
         args.output.write_text(result)

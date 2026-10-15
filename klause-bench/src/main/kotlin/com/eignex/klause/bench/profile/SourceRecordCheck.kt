@@ -32,7 +32,7 @@ object SourceRecordCheck {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        val bundleOptions = options.keys - setOf("checker", "witnessOnly", "catalog", "captureSources")
+        val bundleOptions = options.keys - setOf("checker", "witnessOnly", "catalog", "captureSources", "rootBounds")
         require(
             bundleOptions == setOf("bundle", "sha256") || bundleOptions == setOf("input64", "sha256"),
         ) {
@@ -41,6 +41,8 @@ object SourceRecordCheck {
         }
         require(options["captureSources"] in listOf(null, "true", "false")) { "captureSources must be true or false" }
         require(options["witnessOnly"] in listOf(null, "true", "false")) { "witnessOnly must be true or false" }
+        require(options["rootBounds"] in listOf(null, "true", "false")) { "rootBounds must be true or false" }
+        val rootBounds = options["rootBounds"] == "true"
         val witnessOnly = options["witnessOnly"] == "true"
         require(options["catalog"] == null || options["catalog"] == "true")
         val checker = when (options["checker"] ?: "source") {
@@ -49,6 +51,7 @@ object SourceRecordCheck {
             "minizinc" -> null
             else -> error("checker must be source, boolean or minizinc")
         }
+        require(!rootBounds || checker == "verify_source_results.py") { "rootBounds requires the source checker" }
         require(!witnessOnly || checker == "verify_source_results.py") { "witnessOnly requires the source checker" }
 
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
@@ -148,6 +151,7 @@ object SourceRecordCheck {
             if (checker == "verify_source_results.py") {
                 addAll(listOf("--progress", out.resolve("checked-prefix.jsonl").absolutePath))
                 if (witnessOnly) add("--witness-only")
+                if (rootBounds) add("--root-bounds")
             }
             addAll(listOf("--output", out.resolve("source-checks.json").absolutePath))
         }

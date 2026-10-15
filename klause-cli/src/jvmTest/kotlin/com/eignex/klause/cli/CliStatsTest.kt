@@ -406,6 +406,18 @@ class CliStatsTest {
     }
 
     @Test
+    fun `continuous root statistics preserve the complete floating bound`() {
+        for (bound in listOf(0.123456789, -0.123456789, 9007199254740994.0, Double.MAX_VALUE)) {
+            val stats = SolveStats(run = RunStats(backend = "backtrack"),
+                lp = LpStats(solves = SumResult(1.0), rootBound = bound))
+
+            val published = lpStatPairs(stats).toMap().getValue("lpRootBound")
+
+            assertEquals(bound, published.toDouble())
+        }
+    }
+
+    @Test
     fun `uncalled certifier has no fabricated decline rate`() {
         val stats = SolveStats(
             run = RunStats(backend = "backtrack"),
