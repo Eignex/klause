@@ -121,6 +121,11 @@ configuration directories. Run configurations separately to compare them.
 `param=source-validation=true` opts MiniZinc integer and XCSP3 runs into independent
 source-witness checking and is consumed by the bench before CLI launch.
 
+The `divmod` suite retains self-authored scalar, affine wide, equivalent linear and
+joint-conflict sources, plus signed MiniZinc and XCSP3 inputs. The adjacent FlatZinc
+fixture supports direct CLI captures. MiniZinc and
+XCSP3 runs use `param=source-validation=true` for original-source witness checking.
+
 ## Klause-lab
 
 [Klause-lab](https://github.com/Eignex/klause-lab) owns remote experiment execution,
