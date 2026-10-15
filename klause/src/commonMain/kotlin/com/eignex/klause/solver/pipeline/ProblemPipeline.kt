@@ -197,7 +197,8 @@ private fun Problem.pipelineRouteObserved(
     val preferExact = routeLinearToTheory &&
         (arithmeticRoute == ProblemPipeline.EXACT_LRA || arithmeticRoute == ProblemPipeline.EXACT_LIRA)
     val preferFinite = finiteIntegerRanges && !preferExact &&
-        (!routePureRealToTheory || arithmeticRoute != ProblemPipeline.EXACT_LRA)
+        (!routePureRealToTheory || arithmeticRoute != ProblemPipeline.EXACT_LRA) &&
+        routed.finiteRealCompletionSupported(projections)
     val prepared = if (preferFinite) routed.prepareExecutionPlan(this, objective, maximize,
         preferFinite = true, providers, projections, boundCancellation) else arithmetic
     if (prepared.kind == PreparedExecutionKind.DECLINED) {
