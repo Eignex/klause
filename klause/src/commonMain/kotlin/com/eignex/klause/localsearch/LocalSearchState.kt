@@ -209,8 +209,6 @@ class LocalSearchState private constructor(
     var bestCostSeen: Long = Long.MAX_VALUE
         internal set
 
-    internal var booleanRepairs: BooleanRepairClosure? = null
-
     /** Soft cap for `compressViolation`: residuals at or below it
      *  keep exact unit resolution, above it a log tail bounds how much one large-magnitude factor
      *  dominates the cost sum. Set by the engine from [LocalSearchParams.violationSoftCap] once per
