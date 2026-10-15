@@ -59,7 +59,8 @@ internal class PolynomialExactNeighborhood(
     fun search(adaptive: Boolean, seed: Long, maximumMoves: Long, maximumInstructions: Long,
         maximumImprovementMoves: Long?, nodeBudget: NodeBudget?): ExactNeighborhood = ExactNeighborhood(
         0, List(coordinates.size) { BigFraction.ZERO }, this, objective,
-        coordinateValues = { sample -> centers(sample) }, adaptive = adaptive, seed = seed, nodeBudget = nodeBudget?.allowance,
+        coordinateValues = { sample -> centers(sample) }, adaptive = adaptive, seed = seed,
+        nodeBudget = nodeBudget?.allowance,
         maximumMoves = maximumMoves, maximumInstructions = maximumInstructions,
         maximumImprovementMoves = maximumImprovementMoves, nativeWork = { invocation.stats.workSpent },
     )
