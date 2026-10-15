@@ -28,8 +28,8 @@ remain implementation limits. [Sessions](sessions.md) owns assumptions;
 [LP certification](../lp/certification.md) owns numerical proof checks.
 
 Optimization exhaustion without an incumbent is an original-source refutation only
-when the complete arm used no finite shared cutoff. The scheduler retains observed
-cutoffs for proof admission: a callback that returned only positive infinity leaves
+when its installed complete worker routes objective cutoffs through the scheduler
+and used no finite shared cutoff. The scheduler retains observed cutoffs for proof admission: a callback that returned only positive infinity leaves
 the source space unrestricted; a finite cutoff supports its conditional bound.
 Heuristic and improvement-only arms do not gain refutation authority from exhaustion.
 
