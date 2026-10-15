@@ -14,6 +14,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.EngineParams
+import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
@@ -631,7 +632,7 @@ internal object SolveCore {
                 solutionSetSensitive = solutionSetSensitive,
                 presolveBudget = presolveBudget,
                 cores = 1,
-                engineParams = common.engineParams,
+                executionOptions = ExecutionOptions.parse(common.engineParams),
                 randomSeed = common.randomSeed,
                 defaultArms = 1,
                 lpConfig = lpConfig,
@@ -868,7 +869,7 @@ internal object SolveCore {
                 solutionSetSensitive = solutionSetSensitive,
                 presolveBudget = presolveBudget,
                 cores = cores,
-                engineParams = engineParams,
+                executionOptions = ExecutionOptions.parse(engineParams),
                 randomSeed = common.randomSeed,
                 defaultArms = defaultArms,
                 lpConfig = lpCeiling,

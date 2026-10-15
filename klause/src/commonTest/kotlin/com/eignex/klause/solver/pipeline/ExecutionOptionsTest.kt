@@ -1,0 +1,162 @@
+package com.eignex.klause.solver.pipeline
+
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.localsearch.scoring.MoveScoring
+import com.eignex.klause.localsearch.strategy.AxisToken
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.util.Cancellation
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNotSame
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+
+class ExecutionOptionsTest {
+    @Test
+    fun `typed portfolio settings preserve parsed settings and seed precedence`() {
+        val typed = ExecutionOptions(
+            ExecutionOption.Seed(7L), ExecutionOption.Arms(3), ExecutionOption.Lambda(0.75),
+            ExecutionOption.SliceWork(1_000L), ExecutionOption.SliceMaxWork(2_000L),
+            ExecutionOption.SliceGrowth(1.25), ExecutionOption.PhaseRetention(0.5),
+        )
+        val parsed = ExecutionOptions.parse(listOf(
+            "seed=2", "seed=7", "arms=3", "lambda=0.75", "slice-work=1000", "slice-max-work=2000",
+            "slice-growth=1.25", "phase-retention=0.5",
+        ))
+        val controls = listOf(typed, parsed)
+
+        val scenarios = controls.map {
+            buildPortfolioScenario(it.reader(), 99L, 4, Kind.COP, EngineMix.MIXED, 6)
+        }
+
+        assertEquals(scenarios.first(), scenarios.last())
+        assertEquals(7L, scenarios.first().seed)
+        assertEquals(4, scenarios.first().cores)
+        assertEquals(4, scenarios.first().arms)
+    }
+
+    @Test
+    fun `typed selector overrides create independent workers with one allowance`() {
+        val budget = NodeBudget(20)
+        val options = ExecutionOptions(
+            ExecutionOption.VariableSelector(VarSelectorKind.VSIDS),
+            ExecutionOption.ValueSelector(ValSelectorKind.SOLUTION_GUIDED),
+            ExecutionOption.MaxDecisions(11L),
+        )
+        val edit = resolveBtRecipes(options.reader(), Kind.CSP).edit!!
+        val base = BacktrackParams(randomSeed = 17L, nodeBudget = budget)
+
+        val first = edit(base)
+        val second = edit(base)
+
+        assertNotSame(first.variableSelector, second.variableSelector)
+        assertNotSame(first.valueSelector, second.valueSelector)
+        assertSame(budget, first.nodeBudget)
+        assertSame(budget, second.nodeBudget)
+        assertEquals(17L, first.randomSeed)
+        assertEquals(11L, first.maxDecisions)
+    }
+
+    @Test
+    fun `captured frontend options can resolve repeatedly after caller mutation`() {
+        val pairs = mutableListOf("seed=7", "arms=2")
+        val options = ExecutionOptions.parse(pairs)
+        pairs.clear()
+
+        val scenarios = List(2) {
+            buildPortfolioScenario(options.reader(), null, 1, Kind.CSP, EngineMix.BACKTRACK, 6)
+        }
+
+        assertEquals(scenarios.first(), scenarios.last())
+        assertEquals(7L, scenarios.first().seed)
+        assertTrue(options.explicitArms)
+    }
+
+    @Test
+    fun `typed axis settings capture caller lists before recipe resolution`() {
+        val scoring = mutableListOf(AxisToken(null, AxisToken.Op.SET, "raw"))
+        val options = ExecutionOptions(ExecutionOption.Strategy("cbls"), ExecutionOption.Scoring(scoring))
+        scoring.clear()
+        val parsed = ExecutionOptions.parse(listOf("strategy=cbls", "scoring=raw"))
+
+        val actual = resolveLocalSearchRecipes(options.reader()).pool!!.single()()
+        val expected = resolveLocalSearchRecipes(parsed.reader()).pool!!.single()()
+
+        assertEquals(MoveScoring.Raw, actual.strategy.scoring)
+        assertEquals(expected.strategy.scoring, actual.strategy.scoring)
+    }
+
+    @Test
+    fun `frontend values retain route diagnostic precedence`() {
+        val controls = listOf(
+            listOf("seed=bad", "arms=bad"),
+            listOf("arms=bad", "seed=bad"),
+            listOf("seed=bad", "seed=7", "unrecognized=1"),
+            listOf("slice-work=0", "unrecognized=1"),
+            listOf("arms=2", "bt=1"),
+        )
+        for (pairs in controls) {
+            val legacy = assertFailsWith<PipelineConfigException> {
+                buildPortfolioScenario(EngineParams(pairs), null, 1, Kind.CSP, EngineMix.BACKTRACK, 6)
+            }
+            val typed = assertFailsWith<PipelineConfigException> {
+                buildPortfolioScenario(ExecutionOptions.parse(pairs).reader(), null, 1, Kind.CSP, EngineMix.BACKTRACK, 6)
+            }
+            assertEquals(legacy.message, typed.message)
+        }
+    }
+
+    @Test
+    fun `fixed annotated search rejects selector overrides without decoding them`() {
+        for (pairs in listOf(listOf("var-selector=invalid"), listOf("var-selector=vsids"))) {
+            val legacy = assertFailsWith<PipelineConfigException> {
+                applyBacktrackParams(BacktrackParams(), EngineParams(pairs))
+            }
+            val typed = assertFailsWith<PipelineConfigException> {
+                applyFixedBacktrackParams(BacktrackParams(), ExecutionOptions.parse(pairs).reader(), false)
+            }
+            assertEquals(legacy.message, typed.message)
+        }
+    }
+
+    @Test
+    fun `local search dry run retains unconsumed invalid portfolio options`() {
+        val request = PortfolioPlanRequest(
+            engine = FiniteEngine.LOCAL_SEARCH, optimize = false, cores = 2,
+            executionOptions = ExecutionOptions.parse(listOf("dry-run-solver=on", "seed=bad", "unknown=1")),
+            randomSeed = null, defaultArms = 6, lpCeiling = LpConfig.OFF,
+            zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null, annotationArm = null,
+        )
+
+        val plan = FinitePipeline.planPortfolio(request)
+
+        assertIs<PortfolioPlan.LocalSearchDryRun>(plan)
+    }
+
+    @Test
+    fun `typed fixed requests apply seed overrides before heuristic construction`() {
+        val request = FixedBacktrackPlanRequest(
+            annotatedParams = null,
+            executionOptions = ExecutionOptions(
+                ExecutionOption.Seed(7L), ExecutionOption.Luby(17L), ExecutionOption.DryRunSolver(true),
+                ExecutionOption.VariableSelector(VarSelectorKind.LINUCB),
+            ),
+            randomSeed = 99L, cancellation = Cancellation.Never, nodeBudget = null, solveBudgetMillis = null,
+            lpConfig = LpConfig.OFF, zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, onEvent = null,
+        )
+
+        val first = FinitePipeline.planFixedBacktrack(request)
+        val second = FinitePipeline.planFixedBacktrack(request)
+
+        assertEquals(7L, first.params.randomSeed)
+        assertEquals(17L, first.params.lubyRestartBase)
+        assertTrue(first.dryRun)
+        assertNotSame(first.params.variableSelector, second.params.variableSelector)
+    }
+}
