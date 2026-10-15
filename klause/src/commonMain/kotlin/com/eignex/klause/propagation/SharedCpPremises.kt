@@ -7,6 +7,30 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
 
+private const val SHARED_PREMISE_VISIT_LIMIT = 4096
+
+internal class CpPublicationPremises(
+    private val session: PropagationSession,
+    private val context: SearchContext,
+    private val sourceIntId: (Int) -> Int,
+    private val rootLevel: Int,
+) {
+    private val memo = MutableIntObjectMap<SearchAtomPremise>()
+    private var nativePosition = session.explanationState.undo.size
+    private var sharedLevel = context.decisionLevel
+
+    fun bound(variable: Int, upper: Boolean): SearchAtomPremise {
+        val state = session.explanationState
+        val position = state.undo.size
+        val level = context.decisionLevel
+        if (!state.undoLogging || position != nativePosition || level != sharedLevel) memo.clear()
+        nativePosition = position
+        sharedLevel = level
+        return state.sharedBoundPremise(variable, upper, context, sourceIntId, rootLevel,
+            if (state.undoLogging) memo else null)
+    }
+}
+
 internal fun PropagationSession.sharedBoundPremise(
     variable: Int,
     upper: Boolean,
@@ -35,10 +59,12 @@ private fun PropagationState.sharedBoundPremise(
     context: SearchContext,
     sourceIntId: (Int) -> Int,
     rootLevel: Int,
+    memo: MutableIntObjectMap<SearchAtomPremise>? = null,
 ): SearchAtomPremise {
     if (endpointLevel(variable, upper) <= rootLevel) return SearchAtomPremise.All(emptyList())
     endpointReason(variable, upper)?.let { antecedents ->
-        return sharedPremise(IntArray(antecedents.size) { antecedents[it] xor 1 }, context, sourceIntId, rootLevel)
+        return sharedPremise(IntArray(antecedents.size) { antecedents[it] xor 1 }, context, sourceIntId, rootLevel,
+            memo)
     }
     val domain = intDomains[variable]
     val source = sourceIntId(variable)
@@ -56,12 +82,13 @@ private fun PropagationState.sharedPremise(
     context: SearchContext,
     sourceIntId: (Int) -> Int,
     rootLevel: Int,
+    memo: MutableIntObjectMap<SearchAtomPremise>? = null,
 ): SearchAtomPremise {
     val proofs = MutableIntObjectMap<SearchAtomPremise>()
     val visiting = IntHashSet()
     val pending = ArrayDeque<NativePremiseFrame>()
     for (literal in asserted) pending.addLast(NativePremiseFrame(literal))
-    var remaining = 4096
+    var remaining = SHARED_PREMISE_VISIT_LIMIT
     while (pending.isNotEmpty()) {
         if (remaining-- <= 0) return SearchAtomPremise.Unavailable
         val frame = pending.removeLast()
@@ -70,24 +97,36 @@ private fun PropagationState.sharedPremise(
         val children = frame.children
         if (children != null) {
             val leaves = children.map { proofs[it] ?: return SearchAtomPremise.Unavailable }
-            proofs.put(literal, SearchAtomPremise.All(leaves))
+            val premise = SearchAtomPremise.All(leaves)
+            proofs.put(literal, premise)
+            if (memo != null && children.all { memo.containsKey(it) }) memo.retain(literal, premise)
             visiting.remove(literal)
             continue
         }
         if (litTruth(literal) != true) return SearchAtomPremise.Unavailable
+        val retained = memo?.get(literal)
+        if (retained != null) {
+            proofs.put(literal, retained)
+            continue
+        }
         val variable = Lit.variable(literal)
         if (variable < problem.numBoolVars) {
             if (context.boolValue(variable) != Lit.isPositive(literal)) return SearchAtomPremise.Unavailable
-            proofs.put(literal, SearchAtomPremise.Asserted(SearchDecision.Bool(literal)))
+            val premise = SearchAtomPremise.Asserted(SearchDecision.Bool(literal))
+            proofs.put(literal, premise)
+            memo?.retain(literal, premise)
             continue
         }
         val atom = atomIdOf(variable)
         if (atomLevelForConflict(atom) <= rootLevel) {
-            proofs.put(literal, SearchAtomPremise.All(emptyList()))
+            val premise = SearchAtomPremise.All(emptyList())
+            proofs.put(literal, premise)
+            memo?.retain(literal, premise)
             continue
         }
         val antecedents = atomAntecedentsDerived(atom)
         if (antecedents == null) {
+            // Inherited integer proofs can contain Unavailable below a conjunction.
             val premise = sharedIntegerLeaf(atom, Lit.isPositive(literal), context, sourceIntId)
             if (premise === SearchAtomPremise.Unavailable) return premise
             proofs.put(literal, premise)
@@ -99,6 +138,10 @@ private fun PropagationState.sharedPremise(
         for (child in next) pending.addLast(NativePremiseFrame(child))
     }
     return SearchAtomPremise.All(asserted.map { proofs[it] ?: return SearchAtomPremise.Unavailable })
+}
+
+private fun MutableIntObjectMap<SearchAtomPremise>.retain(literal: Int, premise: SearchAtomPremise) {
+    if (size < SHARED_PREMISE_VISIT_LIMIT) put(literal, premise)
 }
 
 private fun PropagationState.sharedIntegerLeaf(

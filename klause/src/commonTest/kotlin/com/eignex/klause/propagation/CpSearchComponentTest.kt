@@ -36,6 +36,77 @@ import kotlin.test.assertSame
 
 class CpSearchComponentTest {
     @Test
+    fun `shared native bound chains preserve source coordinates and their Boolean premise`() {
+        val mapping = intArrayOf(4, 7, 9, 12, 14)
+        val native = PropagationSession(
+            Problem(
+                1,
+                5,
+                Array(5) { IntDomain(0, 10) },
+                arrayOf(
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                    Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.LE, 0),
+                    Linear(intArrayOf(1, -1), intArrayOf(3, 4), LinearOp.LE, 0),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(4), LinearOp.LE, 3),
+                ),
+            ),
+        )
+        val cp = CpSearchComponent(native, mapping)
+        cp.rebase()
+        val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(1))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+        for (source in mapping) {
+            assertEquals(3L, session.intUpperBound(source))
+            assertContentEquals(
+                intArrayOf(Lit.make(0, false)),
+                session.explainAtoms(session.intUpperBoundPremise(source))?.literals,
+            )
+        }
+    }
+
+    @Test
+    fun `a repeated native bound explains through the new sibling Boolean premise`() {
+        val cp = CpSearchComponent(
+            PropagationSession(
+                Problem(
+                    2,
+                    4,
+                    Array(4) { IntDomain(0, 10) },
+                    arrayOf(
+                        Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                        Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.LE, 0),
+                        Linear(intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.LE, 0),
+                        ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.LE, 5),
+                        ReifiedLinear(1, intArrayOf(1), intArrayOf(3), LinearOp.LE, 5),
+                    ),
+                ),
+            ),
+            intArrayOf(4, 7, 9, 12),
+        )
+        cp.rebase()
+        val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(2))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        assertContentEquals(
+            intArrayOf(Lit.make(0, false)),
+            session.explainAtoms(session.intUpperBoundPremise(4))?.literals,
+        )
+        session.popTo(0)
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+        assertEquals(5L, session.intUpperBound(4))
+        assertContentEquals(
+            intArrayOf(Lit.make(1, false)),
+            session.explainAtoms(session.intUpperBoundPremise(4))?.literals,
+        )
+    }
+
+    @Test
     fun `a learned assertion reports its cascading native conflict`() {
         for (nativeSat in listOf(false, true)) {
             val problem = Problem(4, 0, emptyArray(), arrayOf(
