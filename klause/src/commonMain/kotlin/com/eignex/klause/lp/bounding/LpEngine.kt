@@ -107,6 +107,7 @@ internal class LpEngine(
     private val deferred: Boolean = false,
     internal val projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
     private val nodeWorkAllowance: () -> Long? = { null },
+    private val containingWork: (Long) -> Unit = {},
 ) : AutoCloseable {
     init { projections?.requireSource(problem) }
 
@@ -157,7 +158,11 @@ internal class LpEngine(
         }
     }
 
-    internal fun forObjective(next: LinearObjective, token: Cancellation): LpEngine {
+    internal fun forObjective(
+        next: LinearObjective,
+        token: Cancellation,
+        rootProbe: Boolean = false,
+    ): LpEngine {
         requireOpen()
         return LpEngine(
             problem,
@@ -173,7 +178,12 @@ internal class LpEngine(
             sink,
             solveContext,
             projections = projections,
-            nodeWorkAllowance = nodeWorkAllowance,
+            nodeWorkAllowance = if (rootProbe) {
+                { rootPrimalWorkBudget(sink.lp.standaloneWork).takeIf { it > 0L }?.let { root ->
+                    nodeQueryWorkBudget()?.let { minOf(root, it) } ?: root
+                } ?: nodeQueryWorkBudget() }
+            } else nodeWorkAllowance,
+            containingWork = if (rootProbe) ::chargeWork else {},
         ).also { it.structuralCutSupport = structuralCutSupport }
     }
 
@@ -431,11 +441,11 @@ internal class LpEngine(
         return if (containing == 0L) offered else minOf(containing, offered)
     }
 
-    internal fun rootPrimalWorkBudget(): Long {
+    internal fun rootPrimalWorkBudget(additionalWork: Long = 0L): Long {
         val root = params.lpPlan.rootMaxWork.takeIf {
             it > 0L && params.lpPlan.rootBudgetFraction > 0.0
-        }?.let { (it - totalSolveOps).coerceAtLeast(1L) }
-        val remaining = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L)
+        }?.let { (it - minOf(it, totalSolveOps) - minOf(it, additionalWork)).coerceAtLeast(1L) }
+        val remaining = lpEffortGovernor.remainingWork()?.let { (it - additionalWork).coerceAtLeast(1L) }
         return when {
             root == null -> remaining ?: 0L
             remaining == null -> root
@@ -453,6 +463,7 @@ internal class LpEngine(
     }
 
     private fun chargeWork(ops: Long) {
+        containingWork(ops)
         totalSolveOps = saturatingAdd(totalSolveOps, ops)
         lpEffortGovernor.chargeWork(ops)
         if (lpEffortGovernor.allowanceSpent) sink.lp.observeWorkAllowanceSpent()
@@ -489,7 +500,8 @@ internal class LpEngine(
      * work instead makes the harvest a property of the model, so the run that follows is comparable to
      * itself. The deadline stays as a backstop for cost this meter cannot see.
      */
-    internal fun workSpentExceeds(budgetOps: Long): Boolean = budgetOps > 0L && totalSolveOps >= budgetOps
+    internal fun workSpentExceeds(budgetOps: Long, additionalWork: Long = 0L): Boolean =
+        budgetOps > 0L && totalSolveOps >= budgetOps - minOf(budgetOps, additionalWork)
 
     /** Feed one solve's outcome back into the work budget. */
     internal fun observeNodeWork(reachedOptimum: Boolean, degenerateColumns: Int, columns: Int, rows: Int) {
@@ -524,7 +536,8 @@ internal class LpEngine(
     /** Whether root and node LP work have together spent the work allowance. The one-shot root work stops
      *  on it, so it competes with the per-node solves for one allowance rather than the looser
      *  [LpPlan.rootBudgetFraction] cap alone letting it consume the whole slice. */
-    internal fun lpWorkAllowanceSpent(): Boolean = lpEffortGovernor.allowanceSpent
+    internal fun lpWorkAllowanceSpent(additionalWork: Long = 0L): Boolean =
+        lpEffortGovernor.allowanceSpent || lpEffortGovernor.remainingWork()?.let { it <= additionalWork } == true
 
     // Adaptive LP effort ladder: the emphasis sets the ceiling
     // rung (cuts when enabled, else the bare bound), and a rolling prune-rate window descends one rung

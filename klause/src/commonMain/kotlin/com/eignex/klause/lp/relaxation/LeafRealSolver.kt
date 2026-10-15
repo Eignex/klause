@@ -37,6 +37,7 @@ internal class LeafRealSolver(
         sample: Sample,
         cancellation: Cancellation = Cancellation.Never,
         toleranceCheck: ((Sample) -> Boolean)? = null,
+        workLimit: Long = 0L,
     ): LeafRealResult {
         check(!closed) { "real leaf solver is closed" }
         require(sample.numIntVars == problem.numIntVars && sample.numBoolVars == problem.numBoolVars)
@@ -51,6 +52,7 @@ internal class LeafRealSolver(
         val certified = solvers.solve(
             relaxation.model,
             cancellation = cancellation,
+            workLimit = workLimit,
             observer = sink?.certificationObserver(LpRoute.STANDALONE),
             floatAccept = toleranceCheck?.let { check ->
                 { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem))) }

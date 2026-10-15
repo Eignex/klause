@@ -245,7 +245,11 @@ internal class ResumableMinimize(
     private var leafSolver: LeafRealSolver? = null
     private val rootLpDutyCycle = RootLpDutyCycle()
 
-    private fun completeLeaf(sample: Sample, cancellation: Cancellation): LeafRealResult {
+    private fun completeLeaf(
+        sample: Sample,
+        cancellation: Cancellation,
+        workLimit: Long = 0L,
+    ): LeafRealResult {
         val owner = leafSolver ?: LeafRealSolver(
             problem, objective, params.lpPlan.componentSplit, sink.lp, solver.lpSolveContext,
             LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L),
@@ -253,7 +257,7 @@ internal class ResumableMinimize(
             resources.own(it)
             leafSolver = it
         }
-        val result = owner.solve(sample, cancellation, params.toleranceCheck)
+        val result = owner.solve(sample, cancellation, params.toleranceCheck, workLimit)
         if (problem.factorProjections?.requiresRealSourceCheck != true || result.verdict !in setOf(
                 LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM, LpVerdict.UNBOUNDED,
             )
@@ -1007,17 +1011,11 @@ internal class ResumableMinimize(
                     accept = ::accept)
             if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
         }
-        if (problem.numRealVars == 0) {
-            // Best-first incumbent search runs only if rounding and feasibility pumping yield no incumbent.
-            if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null) {
-                lpEngine.lbTreeSearch(objective, rootToken, params.assumptions)?.let { seed ->
-                    val ray = seed.direction
-                    if (ray != null && verifiedLpProposal(seed.sample) != null) {
-                        unboundedLeaf = seed.sample to ray
-                        return null
-                    }
-                    publishLpProposal(seed.sample)?.let { return it }
-                }
+        if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null && params.componentFactory == null) {
+            lpEngine.lbTreeSearch(objective, rootToken, params.assumptions, params.toleranceCheck,
+                complete = ::completeLeaf,
+                accept = { verifiedLpProposal(it, rootToken)?.assignment })?.let { seed ->
+                if (!rootToken()) recordIfImproving(seed.sample, objective.evaluate(seed.sample))?.let { return it }
             }
         }
         return null
@@ -1065,7 +1063,8 @@ internal class ResumableMinimize(
         // The shared LP work allowance caps it too, so an expensive-but-useless root relaxation cannot spend
         // more than the whole LP subsystem is allotted before search starts.
         return params.cancellation or
-            Cancellation { lpEngine.workSpentExceeds(opsBudget) || lpEngine.lpWorkAllowanceSpent() } or
+            Cancellation { lpEngine.workSpentExceeds(opsBudget, sink.lp.standaloneWork) ||
+                lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork) } or
             Cancellation.after(budgetMillis.coerceAtLeast(0).milliseconds)
     }
 

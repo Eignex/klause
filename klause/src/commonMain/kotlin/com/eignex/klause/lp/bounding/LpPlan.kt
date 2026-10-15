@@ -380,9 +380,9 @@ data class LpPlan(
      */
     val variableShaving: Boolean = false,
     /**
-     * Best-bound tree-search primal subsolver: before search, explore the branch-and-bound tree
-     * best-first (lowest LP bound first) to dive for good incumbents fast. Pure heuristic — returns only
-     * propagation-feasible incumbents (re-checked), so it never changes the optimum. Requires [bounding];
+     * LP-guided tree-search primal subsolver over finite discrete domains. Mixed leaves use the same
+     * numerical completion and configured source acceptance as ordinary search. Returns checked
+     * incumbents only; exhaustion and unbounded leaves supply no terminal proof. Requires [bounding];
      * off by default.
      */
     val lbTreeSearch: Boolean = false,

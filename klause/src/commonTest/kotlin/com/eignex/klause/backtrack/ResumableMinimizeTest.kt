@@ -655,6 +655,65 @@ class ResumableMinimizeTest {
     }
 
     @Test
+    fun `explicit mixed tree probing finds a completed incumbent before ordinary decisions`() {
+        for ((coefficient, expectedInteger, expectedReal) in listOf(Triple(1.0, 1L, 0.5), Triple(-1.0, 0L, 1.0))) {
+            for (enabled in listOf(false, true)) {
+                val fixture = UnresolvedRealLeafFixture(true)
+                fixture.acceptProof = { _, _ -> true }
+                val objective = LinearObjective(realCoefficients = doubleArrayOf(coefficient))
+                val offered = ArrayList<Sample>()
+                val params = fixture.params.copy(maxDecisions = 0L,
+                    lpPlan = fixture.params.lpPlan.copy(bounding = true, lbTreeSearch = enabled,
+                        probe = false, rootCutHarvest = false))
+
+                fixture.solver.resumable(objective, params).use { search ->
+                    val result = search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
+                    assertEquals(0.0, search.stats.search.nodes.sum)
+                    assertTrue(result !is MinimizeResult.Optimal)
+                }
+
+                assertEquals(if (enabled) 1 else 0, offered.size)
+                if (enabled) {
+                    val sample = offered.single()
+                    assertEquals(expectedInteger, sample.ints.single())
+                    assertEquals(expectedReal, sample.reals.single())
+                    assertEquals(BigFraction.ofDouble(expectedReal), sample.exactReals?.single())
+                }
+                assertEquals(fixture.opened, fixture.closed)
+            }
+        }
+    }
+
+    @Test
+    fun `mixed tree probing keeps tolerance witnesses separate from exact certification`() {
+        for (tolerated in listOf(false, true)) {
+            val fixture = UnresolvedRealLeafFixture(true)
+            fixture.acceptProof = { _, _ -> false }
+            val offered = ArrayList<Sample>()
+            val check: ((Sample) -> Boolean)? = if (tolerated) {
+                { sample -> sample.ints.single() + 2.0 * sample.reals.single() == 2.0 &&
+                    sample.reals.single() in 0.0..1.0 }
+            } else null
+            val params = fixture.params.copy(maxDecisions = 0L, toleranceCheck = check,
+                lpPlan = fixture.params.lpPlan.copy(bounding = true, lbTreeSearch = true,
+                    probe = false, rootCutHarvest = false))
+
+            fixture.solver.resumable(fixture.objective, params).use { search ->
+                val result = search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
+                assertTrue(result !is MinimizeResult.Optimal)
+            }
+
+            assertEquals(if (tolerated) 1 else 0, offered.size)
+            if (tolerated) {
+                assertEquals(1L, offered.single().ints.single())
+                assertEquals(0.5, offered.single().reals.single())
+                assertNull(offered.single().exactReals)
+            }
+            assertEquals(fixture.opened, fixture.closed)
+        }
+    }
+
+    @Test
     fun `mixed rounding publishes completed reals without tree decisions`() {
         val fixture = UnresolvedRealLeafFixture(true)
         fixture.acceptProof = { _, _ -> true }
