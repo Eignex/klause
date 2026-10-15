@@ -57,7 +57,8 @@ internal class AbsRealCompletion(private val source: Problem) {
         val metered = object : SearchExecutionControls by containing {
             override val cancellation: Cancellation = counted
         }
-        return Completed(completeWith(sample, counted, metered, solveContext), work)
+        val result = completeWith(sample, counted, metered, solveContext)
+        return Completed(if (counted()) Result.Undecided else result, work)
     }
 
     private fun completeWith(
