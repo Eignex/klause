@@ -122,7 +122,8 @@ internal fun LpEngine.lbTreeSearch(
                         split = null
                         targets = emptyMap()
                         if (expansions++ >= LB_TREE_BUDGET) return SearchNodeDisposition.Indeterminate
-                        val relaxation = dive.nodeRelaxation(relaxer, session) ?: return SearchNodeDisposition.Indeterminate
+                        val relaxation = dive.nodeRelaxation(relaxer, session)
+                            ?: return SearchNodeDisposition.Indeterminate
                         val node = dive.solveRootNode(dive, relaxation.model, token, expansions == 1)
                         val model = node.model
                         val result = node.float
@@ -162,21 +163,25 @@ internal fun LpEngine.lbTreeSearch(
                             val value = point[column]
                             if (variable < 0 || value.den == BIG_ONE) continue
                             if (relaxation.colIsBool[column]) {
-                                if (session.boolValue(variable) != null || value <= BigFraction.ZERO || value >= BigFraction.ONE) continue
+                                if (session.boolValue(variable) != null || value <= BigFraction.ZERO ||
+                                    value >= BigFraction.ONE
+                                ) continue
                             } else {
                                 val upper = value.ceilLong() ?: continue
                                 val domain = session.intDomain(variable)
                                 if (upper <= domain.min || upper > domain.max) continue
                             }
-                            split = LpFractionalBranch(variable, value, relaxation.colIsBool[column], registered = false)
+                            split = LpFractionalBranch(variable, value,
+                                relaxation.colIsBool[column], registered = false)
                             break
                         }
                         return SearchNodeDisposition.Expand
                     }
                 }
+                val decisions = minOf(LB_TREE_BUDGET, nodeBudget?.decisionsLeft() ?: Long.MAX_VALUE)
                 val run = shared.openRun(
                     problem.numBoolVars,
-                    SearchSolveParams(maxDecisions = minOf(LB_TREE_BUDGET, nodeBudget?.decisionsLeft() ?: Long.MAX_VALUE)),
+                    SearchSolveParams(maxDecisions = decisions),
                     decisionBudget = SearchDecisionBudget {
                         primalSearchWork++
                         nodeBudget?.spend()
@@ -193,7 +198,11 @@ internal fun LpEngine.lbTreeSearch(
                     if (problem.numRealVars > 0) {
                         val rootWork = rootPrimalWorkBudget(sink.lp.standaloneWork)
                         val offered = nodeQueryWorkBudget()
-                        val work = if (rootWork == 0L) offered ?: 0L else offered?.let { minOf(it, rootWork) } ?: rootWork
+                        val work = when {
+                            rootWork == 0L -> offered ?: 0L
+                            offered == null -> rootWork
+                            else -> minOf(offered, rootWork)
+                        }
                         val leaf = complete?.invoke(sample, token, work)
                             ?: requireNotNull(leafSolver).solve(sample, token, toleranceCheck, work)
                         when (leaf.verdict) {
@@ -206,8 +215,8 @@ internal fun LpEngine.lbTreeSearch(
                     }
                     if (token()) break
                     val accepted = if (accept != null) accept(sample) else {
-                        (verifier.verify(Candidate(sample, objective.evaluate(sample))) as? Verification.Accepted<Sample, Double>)?.candidate
-                            ?.assignment
+                        val checked = verifier.verify(Candidate(sample, objective.evaluate(sample)))
+                        if (checked is Verification.Accepted) checked.candidate.assignment else null
                     } ?: continue
                     if (token()) break
                     val value = exactSourceObjective(objective, accepted, toleranceCheck) ?: continue
