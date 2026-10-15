@@ -1118,6 +1118,25 @@ public final class com/eignex/klause/factor/ReifiedFactor$DefaultImpls {
 	public static fun substituteAffine (Lcom/eignex/klause/factor/ReifiedFactor;IIII)Lcom/eignex/klause/ir/Factor;
 }
 
+public final class com/eignex/klause/factor/arithmetic/Abs : com/eignex/klause/ir/Factor {
+	public fun <init> (II)V
+	public fun canSubstituteAffine (IIII)Z
+	public fun getBoolVars ()[I
+	public fun getIntVars ()[I
+	public fun getLinearForm ()Lcom/eignex/klause/ir/LinearForm;
+	public final fun getOperand ()I
+	public final fun getResult ()I
+	public fun getStructuralKeyWeight ()I
+	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
+	public fun isValueAnonymous ()Z
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
+	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
+	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
+}
+
 public final class com/eignex/klause/factor/arithmetic/ArrayMinMax : com/eignex/klause/ir/Factor {
 	public fun <init> (I[IZ)V
 	public fun canSubstituteAffine (IIII)Z

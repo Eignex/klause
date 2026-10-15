@@ -18,9 +18,14 @@ internal object AbsEncoding {
     val polynomial = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
         factor as Abs
         val formulas = absoluteValueRows(factor.operand, factor.result).map { form ->
-            val rows = form.rows.map { polynomialRow(it,
-                { id -> encoding.integer(SourceIntId(id)) },
-                { id -> encoding.real(SourceRealId(id)) }, encoding::conditional) }
+            val rows = form.rows.map {
+                polynomialRow(
+                    it,
+                    { id -> encoding.integer(SourceIntId(id)) },
+                    { id -> encoding.real(SourceRealId(id)) },
+                    encoding::conditional,
+                )
+            }
             if (form is LinearForm.Disjunction) PolynomialRealFormula.Or(rows) else PolynomialRealFormula.And(rows)
         }
         encoding.polynomial(PolynomialRealFormula.And(formulas))

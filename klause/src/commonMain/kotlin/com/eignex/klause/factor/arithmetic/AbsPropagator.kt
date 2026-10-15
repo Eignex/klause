@@ -11,7 +11,10 @@ internal class AbsPropagator(private val operand: Int, private val result: Int) 
         if (operand == result) return state.tightenIntMin(operand, 0L)
         if (!state.tightenIntMin(result, 0L)) return false
         if (!state.tightenIntMin(operand, -state.intDomains[result].max) ||
-            !state.tightenIntMax(operand, state.intDomains[result].max)) return false
+            !state.tightenIntMax(operand, state.intDomains[result].max)
+        ) {
+                return false
+            }
         val input = state.intDomains[operand]
         val closestPositive = input.ceilingOrNull(0L)
         val closestNegative = input.floorOrNull(0L)

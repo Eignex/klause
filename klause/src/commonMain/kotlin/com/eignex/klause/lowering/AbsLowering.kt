@@ -6,8 +6,10 @@ import com.eignex.klause.ir.LinearOp
 
 internal fun absoluteValueRows(operand: Int, result: Int): List<LinearForm> = listOf(
     LinearForm.Conjunction(listOf(Linear(intArrayOf(1), intArrayOf(result), LinearOp.GE, 0))),
-    LinearForm.Disjunction(listOf(
+    LinearForm.Disjunction(
+        listOf(
         Linear(intArrayOf(1, -1), intArrayOf(result, operand), LinearOp.EQ, 0),
         Linear(intArrayOf(1, 1), intArrayOf(result, operand), LinearOp.EQ, 0),
-    )),
+    )
+    ),
 )

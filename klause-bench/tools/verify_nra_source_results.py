@@ -121,6 +121,8 @@ def source_formula(text):
         elif kind == z3.Z3_OP_DIV:
             denominator = z3.simplify(node.arg(1))
             assert z3.is_rational_value(denominator) and denominator.as_fraction() != 0, 'nonconstant source division'
+        elif kind == z3.Z3_OP_ABS:
+            assert node.num_args() == 1 and (z3.is_int(node) or z3.is_real(node)), 'invalid source absolute value'
         elif kind == z3.Z3_OP_POWER:
             exponent = z3.simplify(node.arg(1))
             assert z3.is_int_value(exponent) or z3.is_rational_value(exponent), 'nonconstant source exponent'
