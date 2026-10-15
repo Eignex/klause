@@ -2,6 +2,7 @@ package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -10,6 +11,73 @@ import kotlin.test.assertTrue
 class AlgebraicArithmeticTest {
     private val polynomial = PolynomialArithmetic()
     private val arithmetic = AlgebraicArithmetic(polynomial)
+
+    @Test
+    fun `completed point powers fit the remaining caller work`() {
+        val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val source = polynomial.add(
+            polynomial.power(Polynomial.variable(0), 4), polynomial.power(Polynomial.variable(0), 2),
+        )
+        var spent = 0L
+        var limit = Long.MAX_VALUE
+        val meter = WorkMeter { spent += it }
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= limit
+            override fun workMeter(): WorkMeter = meter
+        }
+        val counted = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
+        val point = counted.pointEvaluation(mapOf(0 to root))
+        point.evaluate(source)
+        limit = spent + 64
+
+        val result = point.evaluate(source)
+
+        assertEquals(BigFraction.ofLong(6), result.rational)
+    }
+
+    @Test
+    fun `point capture owns its original algebraic coordinates`() {
+        val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val other = arithmetic.roots(RationalPolynomial.of(-3, 0, 1)).last()
+        val coordinates = mutableMapOf(0 to root)
+        val point = arithmetic.pointEvaluation(coordinates)
+        val source = polynomial.power(Polynomial.variable(0), 2)
+        coordinates[0] = other
+
+        val result = point.evaluate(source)
+
+        assertEquals(BigFraction.ofLong(2), result.rational)
+        assertEquals(0, arithmetic.compare(root, point.coordinate(0)))
+    }
+
+    @Test
+    fun `separate point evaluations retain their own exact powers`() {
+        val source = polynomial.power(Polynomial.variable(0), 2)
+        val first = arithmetic.pointEvaluation(
+            mapOf(0 to arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()),
+        )
+        val second = arithmetic.pointEvaluation(
+            mapOf(0 to arithmetic.roots(RationalPolynomial.of(-3, 0, 1)).last()),
+        )
+        first.evaluate(source)
+
+        val result = second.evaluate(source)
+
+        assertEquals(BigFraction.ofLong(3), result.rational)
+    }
+
+    @Test
+    fun `completed point powers still obey caller cancellation`() {
+        val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        var cancelled = false
+        val counted = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
+        val point = counted.pointEvaluation(mapOf(0 to root))
+        val source = polynomial.power(Polynomial.variable(0), 2)
+        point.evaluate(source)
+        cancelled = true
+
+        assertFailsWith<PolynomialInterrupted> { point.evaluate(source) }
+    }
 
     @Test
     fun `distinct irrational roots have exact order and polynomial signs`() {
