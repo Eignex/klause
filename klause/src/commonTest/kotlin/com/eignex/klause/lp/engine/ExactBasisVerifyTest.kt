@@ -55,7 +55,8 @@ class ExactBasisVerifyTest {
         val cache = ExactBasisCache()
         val cases = listOf(
             Triple(RationalBasisLimits(dimension = 0, work = 0L), Cancellation.Never, ExactBasisDecline.WORK),
-            Triple(RationalBasisLimits(dimension = 0, time = Duration.ZERO), Cancellation.Never, ExactBasisDecline.TIME),
+            Triple(RationalBasisLimits(dimension = 0, time = Duration.ZERO),
+                Cancellation.Never, ExactBasisDecline.TIME),
             Triple(RationalBasisLimits(dimension = 0), Cancellation { true }, ExactBasisDecline.CANCELLED),
         )
         for ((limit, cancellation, reason) in cases) {

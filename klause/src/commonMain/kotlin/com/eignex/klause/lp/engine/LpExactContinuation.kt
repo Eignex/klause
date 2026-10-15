@@ -82,7 +82,9 @@ internal fun captureContinuationTarget(
             // The hook validates current authority and returns owned target arrays.
             budget.step(bytes = (model.m.toLong() + model.numVars) * 64L)
             basis = solver.continuationBasis(model) ?: if (model.exactState == null) {
-                (result?.basis ?: solver.infeasibleBasis)?.let { Basis(it.basicVars.copyOf(), it.status.copyOf(), false) }
+                (result?.basis ?: solver.infeasibleBasis)?.let {
+                    Basis(it.basicVars.copyOf(), it.status.copyOf(), false)
+                }
             } else {
                 null
             }
