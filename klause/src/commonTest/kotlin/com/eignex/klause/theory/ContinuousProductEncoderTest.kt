@@ -49,7 +49,7 @@ class ContinuousProductEncoderTest {
                 val restored = owner.solve(Sample(booleanArrayOf(true, false), longArrayOf()))
 
                 assertEquals(BigFraction.ofLong(16).reciprocal(), assertNotNull(first.exactReals)[2])
-                assertEquals(BigFraction.ofLong(3) / BigFraction.ofLong(16), assertNotNull(second.exactReals)[2])
+                assertEquals(BigFraction.ofLong(3) * BigFraction.ofLong(16).reciprocal(), assertNotNull(second.exactReals)[2])
                 assertEquals(first.exactReals, restored.exactReals)
             }
         }
