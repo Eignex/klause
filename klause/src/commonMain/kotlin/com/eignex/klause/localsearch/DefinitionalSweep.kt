@@ -689,6 +689,8 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
 
     internal fun unaryPredicate(v: Int): UnaryPredicateDefinition? = unaryPredicates[v]
 
+    internal val hasBooleanLiterals: Boolean get() = booleanLiterals.size > 0
+
     internal fun booleanLiteral(v: Int): Int? = booleanLiterals.getOrDefault(v, -1).takeIf { it >= 0 }
 
     internal fun elementResultDefinition(v: Int): ElementResultDefinition? = elementResults[v]
