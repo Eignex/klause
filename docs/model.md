@@ -471,3 +471,20 @@ frontend tuple tables. Each filtering pass handles at most 4096 input combinatio
 private linear/polynomial encodings admit at most 4096 combinations and charge the
 containing cancellation/work allowance. Larger encoding requests decline while
 native finite filtering and scoring remain available.
+
+## Finite execution options
+
+`ExecutionOptions` captures immutable typed settings independently of source models,
+workers and invocation allowances. Library callers bind `ExecutionOption` keys to
+values directly. Axis settings capture their input lists. Frontends parse remaining
+finite `key=value` parameters once after consuming invocation controls. Duplicate
+keys retain the last value and the original key ordering for usage diagnostics.
+Malformed values retain their diagnostic until the selected route consumes them;
+annotation and dry-run rules retain their existing precedence.
+
+Finite requests and planning carry the same captured options. Resolution owns a
+fresh consumption view per plan, checks model-dependent catalog and annotation
+restrictions, and produces worker factories. Every worker constructs its own mutable
+selectors and strategy state; options never contain those instances. Node allowances,
+cancellation and lane counts remain invocation arguments, shared or partitioned by
+the existing [resource](solver/resources.md) and [portfolio](solver/portfolio.md) owners.
