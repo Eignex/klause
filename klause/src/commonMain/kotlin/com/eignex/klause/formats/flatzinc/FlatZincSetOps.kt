@@ -1,7 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.LinearOp
@@ -11,135 +10,8 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.binarySearchInt
 
-/** Emit `array_set_element` and `array_var_set_element`. */
-internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Boolean) {
-    expectArity(c, 3)
-    val x = resolveIntVar(c.args[0])
-    val z = resolveSetVar(c.args[2])
-    val xDom = intDomains[x]
-    if (varArray) {
-        val ys = resolveSetVarArray(c.args[1])
-        for (vi in xDom.min.toInt()..xDom.max.toInt()) {
-            val yIdx = vi - xDom.min.toInt()
-            if (yIdx !in ys.indices) {
-                // vi is not a valid index into the array, so x cannot take it; forbid just that
-                // value rather than posting an empty clause that would falsely kill the whole model.
-                val xOob = allocBool("__arraysetelem_oob_${vi}_${factors.size}")
-                factors.add(ReifiedLinear(xOob, intArrayOf(1), intArrayOf(x), LinearOp.EQ, vi))
-                factors.add(Clause(intArrayOf(Lit.make(xOob, false))))
-                continue
-            }
-            val ySet = ys[yIdx]
-            val xEqAux = allocBool("__arraysetelem_xeq_${vi}_${factors.size}")
-            factors.add(
-                ReifiedLinear(
-                    xEqAux,
-                    intArrayOf(1),
-                    intArrayOf(x),
-                    LinearOp.EQ,
-                    vi,
-                ),
-            )
-            for (zi in z.elements.indices) {
-                val k = z.elements[zi]
-                val zBit = z.indicatorBoolIds[zi]
-                val yIdxInSet = ySet.layout.indexOf(k)
-                if (yIdxInSet < 0) {
-                    factors.add(
-                        Clause(
-                            intArrayOf(
-                                Lit.make(xEqAux, false),
-                                Lit.make(zBit, false),
-                            ),
-                        ),
-                    )
-                } else {
-                    val yBit = ySet.indicatorBoolIds[yIdxInSet]
-                    factors.add(
-                        Clause(
-                            intArrayOf(
-                                Lit.make(xEqAux, false),
-                                Lit.make(zBit, false),
-                                Lit.make(yBit, true),
-                            ),
-                        ),
-                    )
-                    factors.add(
-                        Clause(
-                            intArrayOf(
-                                Lit.make(xEqAux, false),
-                                Lit.make(zBit, true),
-                                Lit.make(yBit, false),
-                            ),
-                        ),
-                    )
-                }
-            }
-        }
-        return
-    }
-    val arrName = (c.args[1] as? FznExpr.Ident)?.name
-        ?: failHere("array_set_element: second arg must be an array identifier")
-    val arr = arrays[arrName] ?: failHere("array_set_element: unknown array `$arrName`")
-    val rows: List<IntArray> = when (arr) {
-        is FlatZincArray.IntSetParam -> arr.values
-        else -> failHere("array_set_element: expected array of set-of-int param, got ${arr::class.simpleName}")
-    }
-    for (zi in z.elements.indices) {
-        val k = z.elements[zi]
-        val zBit = z.indicatorBoolIds[zi]
-        val pick = IntArrayList()
-        for ((rowIdx, row) in rows.withIndex()) {
-            if (row.binarySearchInt(k) >= 0) pick.add(rowIdx + 1)
-        }
-        when {
-            pick.isEmpty() -> {
-                factors.add(
-                    Clause(
-                        intArrayOf(
-                            Lit.make(zBit, false),
-                        ),
-                    ),
-                )
-            }
-
-            pick.size == rows.size -> {
-                factors.add(
-                    Clause(
-                        intArrayOf(
-                            Lit.make(zBit, true),
-                        ),
-                    ),
-                )
-            }
-
-            else -> {
-                val orLits = IntArray(pick.size)
-                for (idx in 0 until pick.size) {
-                    val v = pick[idx]
-                    val aux = allocBool("__aseelem_${arrName}_${k}_x${v}_${factors.size}")
-                    factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(x), LinearOp.EQ, v))
-                    orLits[idx] = Lit.make(aux, true)
-                }
-                factors.add(
-                    Clause(
-                        intArrayOf(Lit.make(zBit, false)) + orLits,
-                    ),
-                )
-                for (orLit in orLits) {
-                    factors.add(
-                        Clause(
-                            intArrayOf(
-                                Lit.make(zBit, true),
-                                Lit.negate(orLit),
-                            ),
-                        ),
-                    )
-                }
-            }
-        }
-    }
-}
+internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Boolean) =
+    emitSetSelection(c, varArray)
 
 internal fun FlatZincCompiler.emitAllDisjoint(c: FznConstraint) {
     expectArity(c, 1)

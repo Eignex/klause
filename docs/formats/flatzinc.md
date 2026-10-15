@@ -18,6 +18,11 @@ retain every operand role. MiniZinc's existing predicate wrappers use these same
 FlatZinc paths. Finite projections use native filtering and scoring; selected
 arithmetic projections install complete private guarded relations.
 
+Set-array selection retains one shared one-based index across native `Element`
+relations for its membership indicators. The union of all operand and result
+universes includes implicit false indicators, so a selected member outside the
+result universe remains forbidden. Empty universes still retain the index range.
+
 ## Integer division
 
 `int_div` and `int_mod`, including MiniZinc-generated calls, retain truncating
