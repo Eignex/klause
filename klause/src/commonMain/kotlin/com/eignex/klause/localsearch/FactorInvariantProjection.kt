@@ -114,6 +114,9 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
 
     is Product -> ProductInvariant(a, b, result)
 
+    is Power -> PowerInvariant((base as Power.Coordinate.Integer).id.index, exponent,
+        (result as Power.Coordinate.Integer).id.index)
+
     is PseudoBoolean -> PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
 
     is RealProduct -> RealProductInvariant(intOperand, realOperand, result)

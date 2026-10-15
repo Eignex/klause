@@ -809,6 +809,8 @@ internal object Compiler {
 
                 "mod" -> divModTerm(e.args, mod = true)
 
+                "pow" -> powerTerm(e.args)
+
                 "mul" -> {
                     val parts = e.args.map { linear(it) }
                     val nonConst = parts.filter { !it.isConstant() }

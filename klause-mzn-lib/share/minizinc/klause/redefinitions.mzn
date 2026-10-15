@@ -73,6 +73,7 @@ predicate float_lin_ne_reif(array[int] of float: as,
 
 % Multiplication.
 predicate int_times(var int: a, var int: b, var int: c);
+predicate klause_int_pow(var int: a, int: b, var int: c);
 
 % int → float coercion. klause's FlatZincCompiler emits a Linear factor
 % binding x's int value to y's bucket index.

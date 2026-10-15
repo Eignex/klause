@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealProduct
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -83,10 +84,11 @@ class SmtLibProductsTest {
     }
 
     @Test
-    fun `bounded powers share squared intermediates`() {
+    fun `bounded powers retain one native relation`() {
         val parsed = SmtLib.parse("(declare-const x Int) (assert (and (<= 0 x 2) (= (^ x 4) 16)))")
 
-        assertTrue(parsed.model.factors.count { it is Product } <= 3)
+        assertEquals(4, parsed.model.factors.filterIsInstance<Power>().single().exponent)
+        assertTrue(parsed.model.factors.none { it is Product })
     }
 
     @Test

@@ -119,6 +119,10 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     }
     is Abs -> domainRelaxation
     is Inverse, is ValuePrecede -> finiteDomains
+    is Power -> if (base is Power.Coordinate.Integer) finiteDomains else FactorExecutionCapabilities(
+        PropagationCapability.UNSUPPORTED, AssignmentCheckCapability.UNSUPPORTED,
+        AssignmentCheckCapability.UNSUPPORTED, ScoringCapability.UNSUPPORTED, RelaxationCapability.NONE,
+    )
     is ArrayMinMax, is Product, is Increasing, is ReifiedLinear -> boundRelaxation
     is Linear -> if (constants is RealConstants) realArithmetic else boundRelaxation
     is Clause, is Cardinality, is PseudoBoolean, is ReifiedCardinality, is ReifiedPseudoBoolean,

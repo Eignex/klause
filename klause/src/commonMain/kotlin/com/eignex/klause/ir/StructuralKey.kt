@@ -85,6 +85,7 @@ internal enum class FactorKind {
     DISJUNCTIVE,
     ARRAY_MIN_MAX,
     PRODUCT,
+    POWER,
     REAL_PRODUCT,
     REIFIED_REAL_LINEAR,
     GAUSSIAN_XOR,

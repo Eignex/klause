@@ -35,6 +35,7 @@ internal fun schemaFloatRepresentations(def: SchemaDef<SchemaEntry>): Map<String
     }
     fun continuousNames(expression: ContinuousRealExpr): List<String> = when (expression) {
         is ContinuousRealExpr.Affine -> expression.coefficients.filterValues { it != 0.0 }.keys.toList()
+        is ContinuousRealExpr.Power -> continuousNames(expression.base)
         is ContinuousRealExpr.Multiply -> continuousNames(expression.left) + continuousNames(expression.right)
     }
     for (product in products) {

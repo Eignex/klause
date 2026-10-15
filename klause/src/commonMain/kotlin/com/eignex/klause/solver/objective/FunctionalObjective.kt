@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.objective
 
+import com.eignex.klause.factor.arithmetic.saturatedIntegerPower
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Assignment
@@ -77,6 +78,9 @@ internal class FunctionalObjective internal constructor(
             }
             return acc
         }
+    }
+    class Power(override val out: Int, val base: Operand, val exponent: Int) : Node {
+        override fun compute(valOf: (Int) -> Long): Long = saturatedIntegerPower(base.value(valOf), exponent)
     }
     class Times(override val out: Int, val a: Operand, val b: Operand) : Node {
         override fun compute(valOf: (Int) -> Long): Long = a.value(valOf) * b.value(valOf)

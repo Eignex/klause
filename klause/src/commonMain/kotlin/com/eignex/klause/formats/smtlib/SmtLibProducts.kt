@@ -12,7 +12,6 @@ import com.eignex.klause.lowering.scaleByConst
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
-import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
@@ -43,7 +42,7 @@ internal fun Compiler.Builder.integerProduct(parts: List<IntComb>): IntComb {
     return result
 }
 
-private fun Compiler.Builder.finiteProductRange(term: LinComb): Pair<Long, Long> {
+internal fun Compiler.Builder.finiteProductRange(term: LinComb): Pair<Long, Long> {
     var lo = bigIntOf(term.constant)
     var hi = lo
     for ((id, coefficient) in term.coeffs) {
@@ -67,7 +66,7 @@ private fun Compiler.Builder.finiteProductRange(term: LinComb): Pair<Long, Long>
     return lo.toLongExact() to hi.toLongExact()
 }
 
-private fun Compiler.Builder.productIntColumn(term: LinComb): Int {
+internal fun Compiler.Builder.productIntColumn(term: LinComb): Int {
     val (lo, hi) = finiteProductRange(term)
     term.asSimpleVar()?.let { return it }
     val value = newInt(lo, hi)
@@ -116,7 +115,7 @@ private fun Compiler.Builder.mixedProductIntColumn(term: LinComb): Int {
     return productIntColumn(term)
 }
 
-private fun Compiler.Builder.productRealColumn(term: RealComb): Int {
+internal fun Compiler.Builder.productRealColumn(term: RealComb): Int {
     if (term.intCoeffs.isEmpty() && term.constant.isZero && term.realCoeffs.size == 1) {
         val (id, coefficient) = term.realCoeffs.entries.single()
         if (coefficient == BigFraction.ONE) return id
@@ -125,51 +124,4 @@ private fun Compiler.Builder.productRealColumn(term: RealComb): Int {
     val column = RealComb(emptyMap(), mapOf(value to BigFraction.ONE), BigFraction.ZERO)
     factors.add(Clause(intArrayOf(reifyRealRel("=", column, term))))
     return value
-}
-
-private fun exponent(term: IntComb): Int {
-    val value = when (term) {
-        is IntComb.Narrow -> {
-            if (!term.isConstant()) smtUnsupported("power requires a fixed nonnegative integer exponent")
-            bigIntOf(term.lin.constant)
-        }
-        is IntComb.Wide -> {
-            if (!term.isConstant()) smtUnsupported("power requires a fixed nonnegative integer exponent")
-            term.lin.constant
-        }
-    }
-    if (value < bigIntOf(0) || value > bigIntOf(Int.MAX_VALUE)) smtUnsupported("power exponent exceeds representation")
-    return value.toLongExact().toInt()
-}
-
-internal fun Compiler.Builder.integerPower(base: IntComb, power: IntComb): IntComb {
-    if (macros.isNotEmpty()) smtUnsupported("power helpers require lexical source lowering")
-    var remaining = exponent(power)
-    var result: IntComb = IntComb.Narrow(LinComb(emptyMap(), 1L))
-    var factor = base
-    while (remaining > 0) {
-        if (remaining and 1 != 0) {
-            result = integerProduct(listOf(result, factor))
-            if (result is IntComb.Wide) smtUnsupported("constant power requires exact source lowering")
-        }
-        remaining = remaining ushr 1
-        if (remaining > 0) {
-            factor = integerProduct(listOf(factor, factor))
-            if (factor is IntComb.Wide) smtUnsupported("constant power requires exact source lowering")
-        }
-    }
-    return result
-}
-
-internal fun Compiler.Builder.realPower(base: RealComb, power: IntComb): Res.R {
-    if (macros.isNotEmpty()) smtUnsupported("power helpers require lexical source lowering")
-    var remaining = exponent(power)
-    var result = RealComb(emptyMap(), emptyMap(), BigFraction.ONE)
-    var factor = base
-    while (remaining > 0) {
-        if (remaining and 1 != 0) result = realProduct(listOf(result, factor)).comb
-        remaining = remaining ushr 1
-        if (remaining > 0) factor = realProduct(listOf(factor, factor)).comb
-    }
-    return Res.R(result)
 }

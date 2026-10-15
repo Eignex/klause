@@ -1,6 +1,8 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Power
+import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.model.ContinuousRealEquality
 import com.eignex.klause.model.ContinuousRealExpr
@@ -31,6 +33,13 @@ internal fun Lowering.assertContinuousEquality(equality: ContinuousRealEquality)
                     )
                     result
                 }
+            }
+            is ContinuousRealExpr.Power -> {
+                val base = lift(expression.base)
+                val result = newRealVar(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)
+                factors += Power(Power.Coordinate.Real(SourceRealId(base)), expression.exponent,
+                    Power.Coordinate.Real(SourceRealId(result)))
+                result
             }
             is ContinuousRealExpr.Multiply -> {
                 val a = lift(expression.left)

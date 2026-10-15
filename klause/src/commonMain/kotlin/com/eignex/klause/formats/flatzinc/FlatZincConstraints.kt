@@ -86,6 +86,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "float_times" -> emitFloatTimes(c)
 
+    "float_pow", "klause_float_pow" -> emitFloatPower(c)
+
     "float_abs" -> emitFloatAbs(c)
 
     "array_float_element" -> emitArrayFloatElement(c)
@@ -149,6 +151,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     -> emitDisjunctive(c)
 
     "int_times" -> emitIntTimes(c)
+
+    "int_pow", "int_pow_fixed", "klause_int_pow" -> emitIntPower(c)
 
     "int_plus" -> emitIntPlus(c)
 

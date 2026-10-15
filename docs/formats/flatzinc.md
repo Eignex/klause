@@ -32,6 +32,16 @@ estimates the total clause expansion of eligible rows. If it exceeds 32,768
 clauses, all these rows retain arithmetic propagation. This model-wide limit
 bounds expansion without making constraint order select a partial encoding.
 
+## Fixed powers
+
+`int_pow`, `int_pow_fixed` and `klause_int_pow` retain `Power` for fixed
+nonnegative integer exponents. The MiniZinc library routes fixed nonnegative
+`pow` through `klause_int_pow`; its negative and variable-exponent decompositions
+retain their standard source semantics. Raw variable or negative exponent predicates
+decline. Exact `float_pow` accepts fixed nonnegative integral exponents and retains
+real coordinates for polynomial completion. Grid coordinates, negative/fractional
+exponents and variable real exponents decline.
+
 ## FlatZinc floats
 
 FlatZinc first preserves finite float choices from constant-array selection and

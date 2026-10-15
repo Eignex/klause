@@ -113,6 +113,9 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is Product -> ProductPropagator(a, b, result, boolVars, intVars)
 
+    is Power -> PowerPropagator((base as Power.Coordinate.Integer).id.index, exponent,
+        (result as Power.Coordinate.Integer).id.index)
+
     is PseudoBoolean -> PseudoBooleanPropagator(boolVars, intVars, weights, literals, op, bound)
 
     is RealProduct -> NoPropagator

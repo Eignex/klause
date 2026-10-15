@@ -14,6 +14,7 @@ import com.eignex.klause.model.IntLit
 import com.eignex.klause.model.IntMax
 import com.eignex.klause.model.IntMin
 import com.eignex.klause.model.IntMod
+import com.eignex.klause.model.IntPower
 import com.eignex.klause.model.IntMul
 import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntScale
@@ -39,6 +40,7 @@ internal fun Lowering.lift(expr: IntExpr): IntExpr = when (expr) {
     is IntIfThenElse -> liftIfThenElse(expr.cond, expr.thenE, expr.elseE)
     is IntElement -> liftElement(expr.index, expr.items)
     is IntMul -> liftMul(expr.left, expr.right)
+    is IntPower -> liftPower(expr.base, expr.exponent)
     is IntDiv -> liftDivMod(expr.num, expr.den, returnRemainder = false)
     is IntMod -> liftDivMod(expr.num, expr.den, returnRemainder = true)
     is SetCard -> liftSetCard(expr)
