@@ -93,6 +93,30 @@ class ExecutionOptionsTest {
     }
 
     @Test
+    fun `typed backtrack labels capture order without a frontend list grammar`() {
+        val labels = mutableListOf("free", "conflictDriven")
+        val options = ExecutionOptions(ExecutionOption.BacktrackArmsByLabel(labels))
+        labels.reverse()
+
+        val resolved = resolveBtRecipes(options.reader(), Kind.COP)
+
+        assertEquals(listOf("free", "conflictDriven"), resolved.pool!!.map { it().label })
+    }
+
+    @Test
+    fun `typed scalar axes reject set edits with the frontend diagnostic`() {
+        val typed = assertFailsWith<PipelineConfigException> {
+            ExecutionOption.Scoring(listOf(AxisToken(null, AxisToken.Op.ADD, "raw")))
+        }
+        val parsed = assertFailsWith<PipelineConfigException> {
+            resolveLocalSearchRecipes(ExecutionOptions.parse(listOf("scoring=+raw")).reader())
+        }
+
+        assertEquals("ls: scoring is single-valued and takes no +/- edit (got `raw`)", typed.message)
+        assertEquals(typed.message, parsed.message)
+    }
+
+    @Test
     fun `frontend values retain route diagnostic precedence`() {
         val controls = listOf(
             listOf("seed=bad", "arms=bad"),
