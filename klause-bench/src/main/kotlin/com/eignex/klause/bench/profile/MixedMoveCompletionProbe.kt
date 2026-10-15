@@ -18,6 +18,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import java.io.File
+import java.lang.management.ManagementFactory
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.Base64
@@ -25,6 +26,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -44,6 +46,10 @@ internal object MixedMoveCompletionProbe {
         })
         require((options["input"] != null) != (options["text64"] != null))
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        if (Runtime.getRuntime().availableProcessors() != 1) {
+            launchWithOneProcessor(args, out)
+            return
+        }
         val bytes = options["input"]?.let { CorpusFiles.open(File(it)).use { input -> input.readBytes() } }
             ?: Base64.getDecoder().decode(options.getValue("text64"))
         val initialBytes = Base64.getDecoder().decode(options.getValue("initial64"))
@@ -77,9 +83,20 @@ internal object MixedMoveCompletionProbe {
                 ints[column.id] = value.num.longValueExact()
             }
         }
+        val objectiveSpec = requireNotNull(compiled.objective)
+        val mappedReals = compiled.columns.filter { it.real }.map { it.id }.toSet()
+        val auxiliaries = reals.indices.filter { it !in mappedReals }
+        if (auxiliaries.isNotEmpty()) {
+            require(auxiliaries.size == 1 && compiled.objectiveScale == 1L && objectiveSpec.constant == 0L &&
+                objectiveSpec.intCoefficients.all { it == 0L } && objectiveSpec.boolWeights.all { it == 0L } &&
+                objectiveSpec.realCoefficients.indices.all {
+                    objectiveSpec.realCoefficients[it] == if (it == auxiliaries.single()) 1.0 else 0.0
+                }) { "Unmapped coordinates must be the source objective definition" }
+            reals[auxiliaries.single()] = checkedInitial.objective
+        }
         val initial = Sample(BooleanArray(compiled.model.numBoolVars), ints,
             DoubleArray(reals.size) { reals[it].toDouble() }, exactReals = reals)
-        val objective = requireNotNull(compiled.objective).toLinearObjective().let {
+        val objective = objectiveSpec.toLinearObjective().let {
             if (compiled.maximize) it.negated() else it
         }
         val cases = mutableListOf<JsonObject>()
@@ -95,12 +112,14 @@ internal object MixedMoveCompletionProbe {
             put("repeats", repeats)
             put("timeoutMs", timeout)
             put("processors", Runtime.getRuntime().availableProcessors())
+            put("runtimeArguments", JsonArray(ManagementFactory.getRuntimeMXBean().inputArguments.map(::JsonPrimitive)))
+            put("objectiveAuxiliaries", auxiliaries.size)
             put("role", "seeded numerical LS incumbent comparison; no proof or whole-CLI timing")
         }.toString())
         repeat(repeats) { round ->
             val adapter = Class.forName("com.eignex.klause.portfolio.LeafRealCompletion")
             val tolerant = adapter.declaredConstructors.singleOrNull {
-                it.parameterCount == 3 && it.parameterTypes.last().name == "kotlin.jvm.functions.Function1"
+                it.parameterCount == 4 && it.parameterTypes[2].name == "kotlin.jvm.functions.Function1"
             }
             val constructor = (tolerant ?: adapter.declaredConstructors.single { it.parameterCount == 2 }).apply {
                 isAccessible = true
@@ -110,7 +129,12 @@ internal object MixedMoveCompletionProbe {
             }
             val completion = if (tolerant == null) {
                 constructor.newInstance(compiled.model, objective)
-            } else constructor.newInstance(compiled.model, objective, callback)
+            } else {
+                val context = tolerant.parameterTypes.last()
+                val companion = context.getField("Companion").get(null)
+                val production = companion.javaClass.getMethod("getProduction").invoke(companion)
+                constructor.newInstance(compiled.model, objective, callback, production)
+            }
             val attempts = mutableListOf<JsonObject>()
             val observed = CandidateCompletion { candidate, cancellation ->
                 val result = (completion as CandidateCompletion).complete(candidate, cancellation)
@@ -166,6 +190,11 @@ internal object MixedMoveCompletionProbe {
                 put("round", round)
                 put("elapsedNs", System.nanoTime() - begun)
                 put("terminal", terminal::class.simpleName)
+                put("reason", when (terminal) {
+                    is MinimizeResult.BestFound -> terminal.reason.name
+                    is MinimizeResult.Unknown -> terminal.reason.name
+                    else -> null
+                })
                 put("moves", terminal.stats.ls.moves.sum)
                 put("restarts", terminal.stats.search.restarts.sum)
                 put("completions", terminal.stats.ls.completions.sum)
@@ -176,6 +205,22 @@ internal object MixedMoveCompletionProbe {
             out.resolve("cases.json").writeText(JsonArray(cases).toString())
             out.resolve("runs.json").writeText(JsonArray(runs).toString())
         }
+    }
+
+    private fun launchWithOneProcessor(args: Array<String>, out: File) {
+        val jvm = ManagementFactory.getRuntimeMXBean().inputArguments.filterNot {
+            it.startsWith("-XX:ActiveProcessorCount=") || it.startsWith("-XX:StartFlightRecording=")
+        }
+        val command = listOf(File(System.getProperty("java.home"), "bin/java").absolutePath) + jvm + listOf(
+            "-XX:ActiveProcessorCount=1",
+            "-XX:StartFlightRecording=filename=${out.resolve("mixed-move-probe.jfr").absolutePath},settings=profile",
+            "-cp", System.getProperty("java.class.path"), MixedMoveCompletionProbe::class.java.name,
+        ) + args
+        out.resolve("child-command.json").writeText(JsonArray(command.map(::JsonPrimitive)).toString())
+        val child = ProcessBuilder(command).inheritIO().start()
+        val exit = child.waitFor()
+        out.resolve("child-exit.json").writeText(buildJsonObject { put("exit", exit) }.toString())
+        check(exit == 0) { "Mixed move probe JVM failed" }
     }
 
     private fun fraction(text: String): BigFraction {
