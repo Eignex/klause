@@ -97,6 +97,8 @@ withhold this capture rather than relabel their source.
 coefficients into original-premise combinations. Structural coordinates retain their
 source declarations and shifts; slack coordinates retain exact row images. Every
 selected endpoint must have a compatible original premise or invocation citation.
+Integer premise eligibility uses the containing original scope and capture allowance;
+an unestablished conditional row cannot hide a later unconditional citation.
 Certified LP values use minimized objective units; maximization capture negates the
 reported value into the original source upper bound.
 Missing cut/lowering justifications, foreign integer certificates, unsupported
@@ -111,6 +113,7 @@ integral images of target integers. Objective adjustments additionally require
 positive scale, matching direction and checked source equalities. A verified affine
 projection transfers only a proof using its covered premises; source-specific target
 semantic extensions remain unavailable without their own projection justification.
+Integer target guards supply no additional source assumptions during projection.
 Projection obligations and terminal checks share one containing verification allowance.
 
 Completed mapping capture retains the reduced package, including worker imports, and

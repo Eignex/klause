@@ -33,6 +33,39 @@ class LpSourceEvidenceCaptureTest {
     }
 
     @Test
+    fun `an unestablished integer guard cannot hide an unconditional LP citation`() {
+        val guard = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val original = context(3)
+        val model = LpBuilder().apply { addVar(3, 9, cost = 1) }.build(Sense.MINIMIZE)
+        val bound = CertifiedLpBound(BigFraction.ofLong(3), assertNotNull(integerCertify(model, doubleArrayOf())))
+        val rows = mapOf("conditional" to SourcePremise(original.premises.getValue("lower").inequality,
+            emptyMap(), mapOf(guard to BigFraction.ONE))) + original.premises
+        val context = SourceProofContext(scope, setOf(x, guard), rows, mapOf(x to BigFraction.ONE))
+
+        val evidence = LpSourceEvidenceCapture(context, listOf(x)).bound(model, bound)
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
+    }
+
+    @Test
+    fun `a conditional LP citation retains its established integer invocation pin`() {
+        val guard = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val condition = SourceCondition(lower = mapOf(guard to BigFraction.ONE),
+            upper = mapOf(guard to BigFraction.ONE))
+        val scoped = scope.copy(condition = condition)
+        val model = LpBuilder().apply { addVar(3, 9, cost = 1) }.build(Sense.MINIMIZE)
+        val bound = CertifiedLpBound(BigFraction.ofLong(3), assertNotNull(integerCertify(model, doubleArrayOf())))
+        val rows = mapOf("conditional" to SourcePremise(context(3).premises.getValue("lower").inequality,
+            emptyMap(), mapOf(guard to BigFraction.ONE)))
+        val context = SourceProofContext(scoped, setOf(x, guard), rows, mapOf(x to BigFraction.ONE))
+
+        val evidence = LpSourceEvidenceCapture(context, listOf(x)).bound(model, bound)
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
+        assertEquals(condition, evidence.scope.condition)
+    }
+
+    @Test
     fun `mixed multipliers capture a fractional bound in original objective units`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val quarter = assertNotNull(BigFraction.ofDouble(0.25))
