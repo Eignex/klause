@@ -763,6 +763,7 @@ private fun executePortfolio(
         onFault = request.onPortfolioFault,
         preparedPlan = request.preparedPlan,
         cancellation = request.cancellation,
+        numericalCompletion = request.executionOptions.numericalCompletion,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

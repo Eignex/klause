@@ -53,12 +53,26 @@ internal fun FinitePipeline.portfolioExecutor(
     onFault: ((ArmFault) -> Unit)?,
     preparedPlan: PreparedSourcePlan,
     cancellation: Cancellation,
+): PortfolioExecutor = portfolioExecutor(problem, scenario, objective, lsObjective, definitionalSweep,
+    onEvent, onFault, preparedPlan, cancellation, false)
+
+internal fun FinitePipeline.portfolioExecutor(
+    problem: BakedProblem,
+    scenario: PortfolioScenario,
+    objective: LinearObjective?,
+    lsObjective: IncrementalObjective?,
+    definitionalSweep: DefinitionalSweep?,
+    onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+    onFault: ((ArmFault) -> Unit)?,
+    preparedPlan: PreparedSourcePlan,
+    cancellation: Cancellation,
+    numericalCompletion: Boolean,
 ): PortfolioExecutor {
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
     val factories = PortfolioBuilder.factories(problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
-        profile).map { factory ->
+        profile, numericalCompletion).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
             SourceWorkerBinding(EngineInvocation(preparedPlan, identity, objective,
                 executionAssumptions = worker.executionAssumptions ?: Assumptions.None),

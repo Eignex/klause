@@ -102,7 +102,9 @@ Optimal output includes `optimizationStatus=attained-optimum` or
 MPS selects numerical execution independently of certification policy. Default
 purely continuous sources use the finite LP lane and its tolerance guarantee.
 Supported bounded integer sources retain the existing finite search and numerical
-completion. Open integer declarations retain their missing sides and use numerical
+completion. An immutable execution policy also keeps finite LS and ALNS workers on
+numerical leaf completion when presolve fixes their discrete coordinates; it cannot
+materialize exact-theory neighborhood workers. Open integer declarations retain their missing sides and use numerical
 LP relaxations with exhaustive integer splits; no finite window changes source scope.
 Explicit `--exact` changes source correspondence and certificate requirements without
 selecting arithmetic theory or theory portfolio workers.

@@ -158,6 +158,12 @@ their own lifetimes even when there is no clause peer.
 
 ### Theory-backed workers
 
+MPS finite invocations restrict continuous completion through an immutable numerical
+execution policy. LS and ALNS retain their finite recipes and numerical residual LP
+completion even when every discrete root coordinate is fixed. Other source routes
+retain their existing exact-neighborhood admission. The policy changes neither
+worker binding/source permissions nor invocation allowances.
+
 Workers that need arithmetic completion share the same source scope and require
 that check before publishing a witness. A neighbourhood refutation or failed
 candidate check cannot establish global infeasibility. Complete workers retain
@@ -612,7 +618,7 @@ Boolean or continuous linear objectives use strict-improvement theory rounds whe
 the integral descent does not apply. These rounds admit completed source proofs but
 do not guarantee terminating optimization for every admitted source.
 
-Finite real models with fixed discrete coordinates use the same repair driver. Mixed
+Finite real models with fixed discrete coordinates ordinarily use the same repair driver. Mixed
 products become exact linear rows under those fixed coordinates and are checked
 against their original relation before publication. Their exchanges order exact
 objective values and project scalar cutoffs outward. Finite portfolios, including

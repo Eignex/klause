@@ -269,11 +269,15 @@ class ExecutionOptions private constructor(
     private val values: Map<String, OptionValue>,
     private val malformed: String?,
     internal val originalPairs: List<String>,
+    internal val numericalCompletion: Boolean,
 ) {
     /** Capture typed settings. Library callers need no frontend strings or consumption ordering. */
     constructor(vararg settings: ExecutionSetting<*>) : this(
-        settings.associate { it.option.id to it.value }, null, emptyList(),
+        settings.associate { it.option.id to it.value }, null, emptyList(), false,
     )
+
+    /** Restrict finite workers to numerical continuous completion without changing tuning or allowances. */
+    fun withNumericalCompletion(): ExecutionOptions = ExecutionOptions(values, malformed, originalPairs, true)
 
     /** Whether an arm count or engine-mix count was supplied explicitly. */
     val explicitArms: Boolean get() = listOf("arms", "ls", "bt").any { it in values }
@@ -295,7 +299,7 @@ class ExecutionOptions private constructor(
             for (pair in captured) {
                 val eq = pair.indexOf('=')
                 if (eq <= 0) return ExecutionOptions(
-                    emptyMap(), "malformed engine param `$pair`; expected key=value", captured,
+                    emptyMap(), "malformed engine param `$pair`; expected key=value", captured, false,
                 )
                 raw[pair.take(eq)] = pair.substring(eq + 1)
             }
@@ -309,7 +313,7 @@ class ExecutionOptions private constructor(
                     OptionValue.Invalid(requireNotNull(failure.message), configuration = false)
                 }
             }
-            return ExecutionOptions(values, null, captured)
+            return ExecutionOptions(values, null, captured, false)
         }
     }
 }

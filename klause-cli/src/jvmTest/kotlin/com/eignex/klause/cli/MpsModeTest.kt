@@ -20,6 +20,28 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `continuous MPS heuristic workers retain numerical completion under either policy`() {
+        val source = File.createTempFile("mps-finite-numerical", ".mps").apply {
+            writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n UP B X 1\nENDATA\n")
+            deleteOnExit()
+        }
+        for ((engine, flags) in listOf("ls" to emptyArray(), "alns" to arrayOf("--exact"))) {
+            val loaded = MpsMode.newSession().load(source.absolutePath,
+                CommonOptions().apply { exact = flags.isNotEmpty() })
+            val text = capture {
+                assertEquals(0, runCli(arrayOf("-s", "-e", engine, "-p", "1", "--param",
+                    "node-limit=100", *flags, source.absolutePath)))
+            }
+
+            assertTrue(loaded.numericalCompletion)
+            assertTrue("s SATISFIABLE" in text.lines(), text)
+            assertTrue("v X=0" in text.lines(), text)
+            assertFalse("exact-neighborhood" in text, text)
+            assertFalse("declaredTheoryRoute=" in text, text)
+        }
+    }
+
+    @Test
     fun `open MPS optimization executes numerical relaxations under default and exact policy`() {
         val source = File.createTempFile("mps-open-numerical", ".mps").apply {
             writeText("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +

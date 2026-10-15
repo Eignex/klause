@@ -41,6 +41,7 @@ internal class Solvable(
     val routingElapsedMs: Long = 0L,
     /** Tolerance semantics for continuous leaves: a check of a source-space sample; `null` keeps exact semantics. */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
+    val numericalCompletion: Boolean = false,
 ) {
     /** This instance solved under tolerance semantics with [check]. */
     fun withToleranceCheck(check: (Sample) -> Boolean): Solvable = Solvable(
@@ -52,7 +53,11 @@ internal class Solvable(
         routingLpStats,
         routingElapsedMs,
         check,
+        numericalCompletion,
     )
+
+    fun withNumericalCompletion(): Solvable = Solvable(finite, render, objectiveValue,
+        continuousObjectiveValue, pipeline, routingLpStats, routingElapsedMs, toleranceCheck, true)
 
     constructor(
         /** Finite CP problem. */

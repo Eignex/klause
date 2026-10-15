@@ -30,19 +30,24 @@ internal class LocalSearchWorkerConfig(
     private val reportResiduals: Boolean = false,
     private val reportPhaseTimes: Boolean = false,
     private val seedOffset: Int = 0,
+    private val numericalCompletion: Boolean = false,
 ) :
     WorkerConfig {
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        LocalSearchWorkerConfig(recipe, budget, reportResiduals, reportPhaseTimes)
+        LocalSearchWorkerConfig(recipe, budget, reportResiduals, reportPhaseTimes,
+            numericalCompletion = numericalCompletion)
+
+    fun withNumericalCompletion(): LocalSearchWorkerConfig =
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, true)
 
     override val label: String get() = recipe.label
 
     override fun withLsResiduals(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes, seedOffset)
+        LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes, seedOffset, numericalCompletion)
 
     override fun withLsPhaseTimes(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true, seedOffset)
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true, seedOffset, numericalCompletion)
 
     /** Build an LS worker: its [LocalSearchSolver] session (with the per-move invariant network when
      *  a [definitionalSweep] is present and the recipe enables it) + λ-shaped params, exposing the
@@ -60,7 +65,7 @@ internal class LocalSearchWorkerConfig(
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?, // solutions only: local search neither learns nor consumes clauses or cuts
     ): PortfolioWorker {
-        if (problem.numRealVars > 0) problem.fixedDiscreteSample()?.let { fixed ->
+        if (!numericalCompletion && problem.numRealVars > 0) problem.fixedDiscreteSample()?.let { fixed ->
             return finiteExactNeighborhoodWorker(problem, fixed, objective, nodeBudget, false, seed + index, armId)
         }
         val evidenceModel = ModelIdentity.of(problem, objective)
