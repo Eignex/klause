@@ -4,6 +4,9 @@ import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialRelation
+import com.eignex.klause.lowering.powerAsProducts
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntegralConstants
@@ -73,6 +76,39 @@ class PowerEncodersTest {
 
                 assertIs<QfNraResult.Unsatisfiable>(conflict)
                 assertIs<QfNraResult.Satisfiable>(sibling)
+            }
+        }
+    }
+
+    @Test
+    fun `selected multiplication fallback preserves joint conflicts and source attribution`() {
+        val source = parseFlatZinc("var -3.0..3.0: x; var -27.0..27.0: y; " +
+            "constraint float_pow(x, 3.0, y); constraint float_eq(y, 8.0); solve satisfy;",
+            exactFloats = true).problem
+        val fallback = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            if (factor !is Power || target != EncodingTarget.POLYNOMIAL) BuiltInEncoderProvider.select(factor, target)
+            else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                view as Power
+                val base = encoding.real((view.base as Power.Coordinate.Real).id)
+                val output = encoding.real((view.result as Power.Coordinate.Real).id)
+                encoding.polynomial(PolynomialRealFormula.Atom(powerAsProducts(base, view.exponent),
+                    PolynomialRelation.EQ, output))
+                null
+            }
+        })
+        for (providers in listOf(FactorProjectionProviders.Default, fallback)) {
+            val model = assertNotNull(source.prepareExecutionPlan(providers).polynomialModel)
+            val attribution = model.encodingAttributions.first()
+            assertEquals(0, attribution.sourceFactorIndex)
+            assertEquals(listOf(SourceRealId(0), SourceRealId(1)), attribution.reals)
+            assertEquals(emptyList(), attribution.auxiliaries)
+            model.service.invocation().use { invocation ->
+                assertIs<QfNraResult.Unsatisfiable>(invocation.check(PolynomialCondition(
+                    lower = mapOf(0 to BigFraction.ZERO), upper = mapOf(0 to BigFraction.ZERO))))
+                val result = invocation.check(PolynomialCondition(lower = mapOf(0 to BigFraction.ofLong(2)),
+                    upper = mapOf(0 to BigFraction.ofLong(2))))
+
+                assertIs<QfNraResult.Satisfiable>(result)
             }
         }
     }

@@ -22,9 +22,15 @@ class Power(
     /** A numeric coordinate whose namespace remains explicit through projection and remapping. */
     sealed interface Coordinate {
         /** Integer source coordinate, independent of finite or arithmetic ownership. */
-        data class Integer(val id: SourceIntId) : Coordinate
+        data class Integer(
+            /** Source integer location. */
+            val id: SourceIntId,
+        ) : Coordinate
         /** Continuous source coordinate. */
-        data class Real(val id: SourceRealId) : Coordinate
+        data class Real(
+            /** Source real location. */
+            val id: SourceRealId,
+        ) : Coordinate
     }
 
     /** Finite or open integer source power. */

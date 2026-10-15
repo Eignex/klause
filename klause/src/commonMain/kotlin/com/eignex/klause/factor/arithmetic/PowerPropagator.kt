@@ -32,7 +32,7 @@ internal class PowerPropagator(private val base: Int, private val exponent: Int,
             val image = integerPowerOrNull(value, exponent)
             if (image == null || image !in state.intDomains[result] || (base == result && image != value)) {
                 val reason = if (image != null && image !in state.intDomains[result])
-                    premises.orEmpty() + absentLiteral(state, result, image) else premises
+                    (premises ?: intArrayOf()) + absentLiteral(state, result, image) else premises
                 if (!state.excludeIntValue(base, value, reason)) return false
             }
         }
@@ -47,7 +47,7 @@ internal class PowerPropagator(private val base: Int, private val exponent: Int,
                 powerPreimage(0L, Long.MAX_VALUE, exponent, value, value)?.first,
             )
             if (roots.any { it in state.intDomains[base] && (base != result || it == value) }) continue
-            val reason = state.composeIntVarAtomAntecedents(variables).orEmpty() +
+            val reason = (state.composeIntVarAtomAntecedents(variables) ?: intArrayOf()) +
                 roots.filter { it !in state.intDomains[base] }.flatMap { absentLiteral(state, base, it).toList() }
             if (!state.excludeIntValue(result, value, reason)) return false
         }
