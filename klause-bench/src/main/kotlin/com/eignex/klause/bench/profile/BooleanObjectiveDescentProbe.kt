@@ -63,7 +63,7 @@ internal object BooleanObjectiveDescentProbe {
         }
         require(options.keys - setOf(
             "prepareMs", "timeout", "conditional", "conditionalClosure", "conditionalRecipe",
-            "conditionalNary", "conditionalBound", "unseededEngine",
+            "conditionalNary", "conditionalBound", "unseededEngine", "suppliedEngine",
         ) ==
             setOf("suite", "problem", "sha256", "witness64", "work"))
         val suite = requireNotNull(options["suite"])
@@ -77,10 +77,13 @@ internal object BooleanObjectiveDescentProbe {
         require(conditional in 0..32)
         require(closureMode == "false" || conditional > 0)
         val unseededEngine = options["unseededEngine"]?.toBooleanStrict() ?: false
-        require(!unseededEngine || conditional == 0)
+        val suppliedEngine = options["suppliedEngine"]?.toBooleanStrict() ?: false
+        require(!(unseededEngine && suppliedEngine))
+        val engineProbe = unseededEngine || suppliedEngine
+        require(!engineProbe || conditional == 0)
         val bounded = options["conditionalBound"]?.toBooleanStrict() ?: false
         require(!bounded || conditional > 0)
-        require(!unseededEngine || closureMode == "false")
+        require(!engineProbe || closureMode == "false")
         val includeNary = options["conditionalNary"]?.toBooleanStrict() ?: false
         require(!includeNary || closureMode != "false")
         val recipeLabel = options["conditionalRecipe"] ?: "cbls/fixed"
@@ -133,9 +136,10 @@ internal object BooleanObjectiveDescentProbe {
         out.resolve("sources").mkdirs()
         out.resolve("sources/$digest.txt").writeBytes(bytes)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        if (unseededEngine) {
-            val rows = unseededEngines(problem, objective, guide, sweep, work, timeout, suite, name,
-                digest, parsed.numOriginalBoolVars, sourceObjective, prepared.reconstruct)
+        if (engineProbe) {
+            val rows = nativeEngines(problem, objective, guide, sweep, work, timeout, suite, name,
+                digest, parsed.numOriginalBoolVars, sourceObjective, prepared.reconstruct,
+                if (suppliedEngine) initial else null)
             out.resolve("cases.json").writeText(rows.toString() + "\n")
             return
         }
@@ -410,7 +414,7 @@ internal object BooleanObjectiveDescentProbe {
         println("conditional targets=${targets.size} requested=$count sharedSetupNanos=$sharedSetupNanos")
     }
 
-    private fun unseededEngines(
+    private fun nativeEngines(
         problem: Problem,
         objective: LinearObjective,
         guide: IncrementalObjective,
@@ -423,6 +427,7 @@ internal object BooleanObjectiveDescentProbe {
         originalBools: Int,
         sourceObjective: LinearObjective,
         reconstruct: (Sample) -> Sample,
+        initial: Sample?,
     ) = buildJsonArray {
         val pins = requireNotNull(LocalSearchModel.of(problem.bake()).pinsUnder(Assumptions.None))
         val identity = preparedIdentity(problem, objective, pins)
@@ -455,13 +460,14 @@ internal object BooleanObjectiveDescentProbe {
                 ).single()
                 var best: Sample? = null
                 var bestValue: BigFraction? = null
+                var strictImprovements = 0
                 var nativeWitnesses = 0
                 var moves = 0.0
                 var restarts = 0.0
                 cancellation = Cancellation.after(timeout.milliseconds)
                 val started = System.nanoTime()
                 worker.use {
-                    for (result in it.improvements({ Double.POSITIVE_INFINITY }, cancellation, null, work)) {
+                    for (result in it.improvements({ Double.POSITIVE_INFINITY }, cancellation, initial, work)) {
                         moves = maxOf(moves, result.stats.ls.moves.sum)
                         restarts = maxOf(restarts, result.stats.search.restarts.sum)
                         if (result !is MinimizeResult.WithSample) continue
@@ -470,6 +476,7 @@ internal object BooleanObjectiveDescentProbe {
                         if (bestValue == null || value < checkNotNull(bestValue)) {
                             best = result.sample
                             bestValue = value
+                            if (initial != null && value < objective.evaluateExact(initial)) strictImprovements++
                         }
                     }
                 }
@@ -477,7 +484,7 @@ internal object BooleanObjectiveDescentProbe {
                 val sample = best?.let(reconstruct)
                 add(buildJsonObject {
                     put("index", index++); put("status", "DONE"); put("seed", 3)
-                    put("arm", "unseeded-$label-${if (closed) "closed" else "raw"}")
+                    put("arm", "${if (initial == null) "unseeded" else "supplied"}-$label-${if (closed) "closed" else "raw"}")
                     put("problem", buildJsonObject {
                         put("suite", suite); put("problem", name); put("format", "WCNF")
                     })
@@ -491,7 +498,12 @@ internal object BooleanObjectiveDescentProbe {
                             })
                         }
                         put("sourceHashes", buildJsonObject { put("model", digest) })
-                        put("preparedModelSha256", identity); put("initialAssignmentProvided", false)
+                        put("preparedModelSha256", identity); put("initialAssignmentProvided", initial != null)
+                        put("initialObjective", initial?.let {
+                            JsonPrimitive(sourceObjective.evaluateExact(it).toString())
+                        } ?: JsonNull)
+                        put("strictImprovements", strictImprovements)
+                        put("retainedInitialCost", initial != null && bestValue == objective.evaluateExact(initial))
                         put("recipe", label); put("closedRepairs", closed)
                         put("nativeWitnesses", nativeWitnesses); put("elapsedNanos", elapsed)
                         put("closureCalls", closures.sumOf { it.candidateCalls })
@@ -500,7 +512,7 @@ internal object BooleanObjectiveDescentProbe {
                         put("stats", buildJsonObject { put("lsMoves", moves); put("lsRestarts", restarts) })
                     })
                 })
-                println("unseeded recipe=$label closed=$closed value=$bestValue " +
+                println("native-engine supplied=${initial != null} recipe=$label closed=$closed value=$bestValue " +
                     "witnesses=$nativeWitnesses moves=$moves restarts=$restarts elapsed=$elapsed")
             }
         }

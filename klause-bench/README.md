@@ -1499,6 +1499,10 @@ The encoded witness only establishes the input reference; it is never passed to 
 workers. Each variant receives the same move/time limits and graph/root pins. Rows
 without native witnesses stay unknown, and feasible rows require independent source
 checking. This isolates fresh-start native behavior; it is not a default portfolio run.
+`suppliedEngine=true` selects the same comparison with the supplied reference as an
+explicit warm start. These options are exclusive. Supplied runs report their initial
+cost and strict improvements separately; retaining the supplied point is not native
+search progress. Neither option changes default portfolio initialization.
 
 ### Objective representation probe
 
