@@ -43,6 +43,8 @@ class RealElement private constructor(
     override val variables: VarList = MixedVars(boundInts = intArrayOf(idx),
         reals = (intArrayOf(result) + entries).distinct().toIntArray())
 
+    override val structuralKeyWeight: Int get() = (size.toLong() + 3).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+
     internal fun position(index: Long): Int? {
         val first = indexOffset.toLong()
         if (index < first || index > first + size - 1) return null
