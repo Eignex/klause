@@ -946,6 +946,41 @@ The lab's executed revision and setup identity belong with these results;
 Acceptance certifies source feasibility and objective values, not optimality or
 infeasibility proofs.
 
+`com.eignex.klause.bench.profile.XcspArchiveReplay` diagnoses archived JVM CLI
+distributions on an owned AWS profile. It takes one canonical JSON request,
+gzip-compressed and base64-encoded, with these fields:
+
+- `bucket` and `region` identify the lab's existing S3 build cache.
+- `archives` contains up to four objects with unique `id`, revision-addressed
+  `key`, exact quoted `etag`, and optional `sha256`. Conditional downloads retain
+  the original archive, metadata, SHA-256 and every installed regular-file hash.
+- `sources` contains up to twelve objects with unique `id`, original XCSP `text`,
+  `sha256` and a complete `witness`. The current guarded source checker must
+  accept each satisfaction witness before an archived solver runs.
+- `cases` contains up to twelve objects with unique `id`, `archive` and `source`
+  identities. Optional `args` accepts engine and parameter pairs, `seed` defaults
+  to 3, and `timeoutMillis` defaults to 60000 and cannot exceed it.
+
+For a class ablation, a case's optional `overlay` names an `archive` and a list
+of `classes`, restricted to Klause class paths. Only those classes precede the
+baseline distribution on the classpath. Optional `wallMillis` replaces the sole
+`2000L` constant in each of the archived `Portfolio` and `Portfolio$Companion`
+classes with a value from 2000 through 60000. Use this diagnostic intervention
+only after auditing those classes' default slice policy. Class hashes and edited
+byte offsets are retained; these cases are explicitly instrumented executions.
+
+The request is capped at 60 KiB compressed and 2 MiB expanded. Each archive is
+capped at 64 MiB compressed and 96 MiB expanded, and traversal, links, duplicate
+files and members outside installed distributions are rejected. Each child has
+bounded output and a watchdog. CLI JVMs use one active processor, a 3 GiB heap
+and SerialGC; source checkers use 512 MiB and twelve seconds. The containing
+profile owns process-group cleanup through the source-capture lifecycle.
+Retain the full profile output: source controls, current harness/runtime hashes,
+archived bytes, intervention classes, raw streams, process exits and results.
+An archived UNSAT claim contradicting an accepted source witness identifies a
+defect; it supplies no independently checked refutation. Storage timestamps and
+requested revisions do not establish the historical process's runtime identity.
+
 ### Offline source verifier
 
 `com.eignex.klause.bench.profile.MpsLinearProof` accepts original MPS paths and captures the
