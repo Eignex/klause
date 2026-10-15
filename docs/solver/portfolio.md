@@ -275,6 +275,21 @@ arm selection also follows that policy. Initial admission, preparation revisits 
 explicit minimum time shares retain precedence. A segment reporting no charged work uses
 its slice allowance for coverage accounting.
 
+Before the first accepted witness or completed refutation, ordinary complete workers
+also retain an elapsed coverage floor. Each live complete worker is owed an equal
+part of one neutral family share of active segment time, with one base time allowance
+of aggregate lag. Heuristic bootstrap and local search share the other feasibility
+family; additional heuristic variants do not enlarge it. The floor uses elapsed time
+including construction and checking, plus currently running segments on other lanes.
+It does not weight family rewards or change charged work. Below-floor complete workers
+run before ordinary family selection, choosing the least elapsed available sibling.
+Initial admission, preparation revisits and explicit minimum shares retain precedence.
+Retired, deferred and auxiliary proof workers supply no coverage debt; paused handles
+retain their elapsed credit. A first accepted incumbent ends this floor. Dedicated
+lanes, segment deadlines and containing work/native allowances retain their controls.
+The lag and cooperative segment overspend bound the opportunity guarantee; no fixed
+number of milliseconds or result is promised to an individual worker.
+
 Slices yield before consuming an alternative or after a completed node. A pending
 sibling cannot be skipped when yielding, and reset discards a pending alternative.
 Constructor refutations return immediately. A rejected last root leaf can finish
