@@ -48,10 +48,10 @@ class NumericalLinearRequest(
         if (!routed.finiteRealCompletionSupported()) return null
         val prepared = routed.prepareExecutionPlan(model, objective, maximize, preferFinite = true,
             cancellation = cancellation)
-        if (prepared.kind == PreparedExecutionKind.DECLINED) return null
-        val ownership = prepared.componentPlan ?: return null
+        val finite = prepared.execution as? PreparedExecution.FiniteLinear ?: return null
+        val ownership = finite.ownership
         return if (ownership.theoryPipeline == ProblemPipeline.FINITE_CP)
-            SourceProblemRoute.Finite(routed, ownership, prepared) else null
+            SourceProblemRoute.Finite(finite.model, ownership, prepared) else null
     }
 
     /**
