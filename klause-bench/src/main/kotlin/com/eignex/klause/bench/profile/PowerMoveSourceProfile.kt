@@ -56,7 +56,7 @@ object PowerMoveSourceProfile {
                     for ((variable, id) in program.boolVarsByName) append("$variable = ${bools[id]};\n")
                 }
                 val source = named.getValue(name).jsonObject.getValue("text").jsonPrimitive.content
-                val checked = ExactFlatZincValidation.inspect(source, coordinates, null)
+                val checked = ExactFlatZincValidation.inspect(source, coordinates.trimEnd(), null)
                 val sourceValid = checked.status == "valid"
                 val complete = checked.status == "valid" || checked.status == "invalid"
                 val agrees = complete && sourceValid == (move.getValue("fresh").jsonPrimitive.long == 0L)
