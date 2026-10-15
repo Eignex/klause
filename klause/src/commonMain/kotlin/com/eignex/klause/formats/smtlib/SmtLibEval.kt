@@ -443,6 +443,7 @@ private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
     if (a is IntComb.Narrow && b is IntComb.Narrow) {
         val thenTerm = branchUnder(a.lin, cond)
         val elseTerm = branchUnder(b.lin, Lit.negate(cond))
+        if (thenTerm == elseTerm) return narrowRes(thenTerm)
         // A chain of equality tests on one selector defines the same quantity, and defers its lowering
         // until the chain's extent is known.
         chainIte(cond, thenTerm, elseTerm)?.let { return narrowRes(it) }

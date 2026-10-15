@@ -26,6 +26,48 @@ import kotlin.test.assertTrue
 
 class SmtLibSelectionTest {
     @Test
+    fun `identical finite conditional values do not require a choice`() {
+        for (term in listOf(
+            "(ite b x x)",
+            "(ite b (ite b x 9) x)",
+            "(ite b x (ite b 9 x))",
+            "(ite b (ite (not b) 9 x) x)",
+        )) {
+            val parsed = SmtLib.parse("""
+                (declare-const b Bool) (declare-const x Int) (declare-const y Int)
+                (assert (and (<= 0 x 2) (= y (+ $term 1))))
+            """.trimIndent())
+
+            val result = BacktrackSolver.source(parsed.model)
+                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+            assertTrue(parsed.model.factors.none { it is Element }, term)
+            val sample = assertIs<OpenTheoryResult.Sat>(result, term).assignment
+            assertEquals(sample.intValue(parsed.intVarNames.getValue("x")).toLong() + 1L,
+                sample.intValue(parsed.intVarNames.getValue("y")).toLong(), term)
+        }
+    }
+
+    @Test
+    fun `eliminating an identical selection preserves a shared guard consumer`() {
+        for (branch in listOf(false, true)) {
+            val parsed = SmtLib.parse("""
+                (declare-const b Bool) (declare-const c Bool)
+                (declare-const x Int) (declare-const y Int) (declare-const z Int)
+                (assert (and (<= 0 x 2) b ${if (branch) "c" else "(not c)"}))
+                (assert (let ((g (and b c))) (and
+                    (= y (+ (ite g x x) 1)) (= z (ite g 5 7)))))
+            """.trimIndent())
+
+            val result = BacktrackSolver.source(parsed.model)
+                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+            val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+            assertEquals(if (branch) "5" else "7", sample.intValue(parsed.intVarNames.getValue("z")))
+        }
+    }
+
+    @Test
     fun `affine integer conditionals retain native selection`() {
         val parsed = SmtLib.parse("""
             (declare-const b Bool) (declare-const x Int) (declare-const y Int)
