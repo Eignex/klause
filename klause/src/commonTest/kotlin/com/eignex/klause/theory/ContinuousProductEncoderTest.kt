@@ -7,6 +7,7 @@ import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.hasCompleteGuardedLpCompletion
 import com.eignex.klause.lp.relaxation.LeafRealSolver
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.portfolio.LeafRealCompletion
@@ -29,7 +30,8 @@ import kotlin.test.assertTrue
 class ContinuousProductEncoderTest {
     @Test
     fun `retained product completions retract each finite choice guard`() {
-        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375), intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375),
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val source = Problem(2, 0, emptyArray(), arrayOf(factor), numRealVars = 3,
             realLower = doubleArrayOf(0.0, 0.5, 0.0), realUpper = doubleArrayOf(1.0, 0.5, 1.0))
         val replacement = FactorProjectionProviders(encoder = EncoderProvider { view, target ->
@@ -52,7 +54,8 @@ class ContinuousProductEncoderTest {
 
     @Test
     fun `finite product guards enforce the complete operand choice relation`() {
-        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375), intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375),
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val source = Problem(2, 0, emptyArray(), arrayOf(factor), numRealVars = 3,
             realLower = doubleArrayOf(0.0, 0.5, 0.0), realUpper = doubleArrayOf(1.0, 0.5, 1.0))
         for (guards in listOf(booleanArrayOf(false, false), booleanArrayOf(true, true))) {
@@ -66,7 +69,8 @@ class ContinuousProductEncoderTest {
 
     @Test
     fun `zero numerical product violation still requires exact choice completion`() {
-        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375), intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375),
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val source = Problem(2, 0, emptyArray(), arrayOf(factor), numRealVars = 3,
             realLower = doubleArrayOf(0.0, 0.5, 0.0), realUpper = doubleArrayOf(1.0, 0.5, 1.0))
         val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
@@ -93,8 +97,23 @@ class ContinuousProductEncoderTest {
     }
 
     @Test
+    fun `aliased product coefficients require an exact representable completion`() {
+        for ((value, complete) in listOf(0.125 to true, 0.1 to false)) {
+            val factor = ContinuousProduct(0, 1, 1, 0, doubleArrayOf(value), intArrayOf(Lit.make(0, true)))
+            val source = Problem(1, 0, emptyArray(), arrayOf(factor), numRealVars = 2,
+                realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+
+            val selected = FactorProjectionProviders.Default.prepare(source)
+
+            assertEquals(complete, factor.hasCompleteGuardedLpCompletion())
+            assertNotNull(selected.linearTheoryModel(EncodingTarget.LINEAR))
+        }
+    }
+
+    @Test
     fun `cancelled product installation does not retain a partial choice cover`() {
-        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375), intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375),
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val source = Problem(2, 0, emptyArray(), arrayOf(factor), numRealVars = 3,
             realLower = DoubleArray(3), realUpper = DoubleArray(3) { 1.0 })
         val selected = FactorProjectionProviders.Default.prepare(source)

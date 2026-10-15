@@ -422,6 +422,25 @@ selected arithmetic consumers install a valid-input cover and guarded image
 relations. The finite relation preserves the existing nearest-bucket policy.
 Original float witness checks and grid result qualifications remain required.
 
+## Finite real product choices
+
+`ContinuousProduct` retains an exact real product and may also capture a declared
+finite operand domain with source Boolean literals equivalent to each operand
+value. The immutable metadata uses the source real and Boolean namespaces;
+remapping preserves aliases and literal polarity. Frontends retain the finite
+domain cover, while product expansion belongs to selected consumers.
+
+The selected linear encoder installs an exact value cover, guarded product rows
+and complete guard equivalences. The polynomial encoder enforces the same domain,
+guards and product equality. Encodings charge the containing work/cancellation
+allowance, and each invocation owns its rows. A guarded LP projection supplies
+sound rows under live source literal premises; finite completion is admitted only
+when every required aliased coefficient is exactly representable. Exact original
+witness checks include the product, finite domain and guard equivalences. Rays
+also keep the finite operand fixed and verify the product polynomial along the
+whole direction. Unguarded or unrestricted products receive no LP completion
+authority from numerical scoring.
+
 ## Grid arithmetic relations
 
 Internal `GridProduct` and `GridPower` retain an operation and each integer index's

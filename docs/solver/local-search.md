@@ -845,6 +845,9 @@ Nonfinite arithmetic cannot receive zero violation. These scores and repairs are
 heuristic: zero violation requires the selected exact encoder and original-source
 completion, and supplies no feasibility or proof authority on its own. Each search
 opening owns its assignment and invariant state; the source factors remain immutable.
+Finite-choice continuous products also grade operand membership and source guard
+truth, and propose the nearest declared operand value. Tolerance-level membership
+and product agreement still require exact completion of the entire source relation.
 
 `GridProduct` and `GridPower` instead grade their declared rounded index relation
 with integer move deltas, respecting aliases, domain holes and channel ownership.

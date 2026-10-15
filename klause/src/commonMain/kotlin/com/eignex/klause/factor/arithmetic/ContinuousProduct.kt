@@ -34,7 +34,6 @@ class ContinuousProduct private constructor(
     init {
         require(a >= 0 && b >= 0 && result >= 0) { "Continuous product IDs must be nonnegative" }
         require(finiteChoices == null || finiteChoices.operand == a || finiteChoices.operand == b)
-
     }
 
     override val variables: VarList = finiteChoices?.takeIf { it.hasGuards }?.let { choices ->

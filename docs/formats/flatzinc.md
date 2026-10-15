@@ -50,6 +50,7 @@ bounds expansion without making constraint order select a partial encoding.
 `int_pow`, `int_pow_fixed` and `klause_int_pow` retain `Power` for fixed
 nonnegative integer exponents. The MiniZinc library routes fixed nonnegative
 `pow` through `klause_int_pow`; its negative fixed powers retain the standard integer-division decomposition.
+The MiniZinc float predicate retains `float_pow` for the same fixed exponent surface.
 Variable powers remain outside the native advertised surface. Raw variable or negative exponent predicates
 decline. Exact `float_pow` accepts fixed nonnegative integral exponents and retains
 real coordinates for polynomial completion. Default grid components retain
@@ -83,6 +84,12 @@ values, minimum/maximum, constant-array selection, multiplication/division by
 constants, and products with a finite selected operand. Exact absolute values retain
 `RealAbs` in the source model; the selected consumer installs its complete equality
 alternatives privately. Implied inequalities alone do not enforce this relation.
+Finite-choice products retain `ContinuousProduct` with their declared values and
+source Boolean equality literals, including constant results and operand aliases.
+Private selected linear consumers install the complete product alternatives;
+frontends do not expand those products into guarded rows. Literal-only exact
+products retain fixed real operands so binary64 multiplication cannot round away
+a failed exact source equality.
 
 Finite integer float images retain affine maps to source integer values. Fixed
 integer selections and products can be eliminated while preserving source values

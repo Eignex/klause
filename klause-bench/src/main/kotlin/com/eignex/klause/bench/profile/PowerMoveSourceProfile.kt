@@ -80,7 +80,7 @@ object PowerMoveSourceProfile {
     private fun captureCompilation(options: Map<String, String>) {
         require(options.keys.all { it in setOf("suite", "problem", "factorKind", "exact") })
         val kind = options["factorKind"] ?: "Power"
-        require(kind in setOf("Power", "Abs", "RealAbs", "GridAbs"))
+        require(kind in setOf("Power", "Abs", "RealAbs", "GridAbs", "GridPower", "GridProduct", "ContinuousProduct"))
         val exact = options["exact"]?.toBooleanStrict() ?: false
         val ref = Catalog.uncapped(options.getValue("suite")).problems.single {
             it.name == options.getValue("problem")
