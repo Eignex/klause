@@ -12,6 +12,9 @@ import native_vm_entry_decoder as decoder
 
 LIBRARY_SHA256 = '5e0fb6e83a5676090f28ff0b453e9199df06af1ff90d473c1b9837e41096114c'
 MAX_INPUT_BYTES = 32 * 1024 * 1024
+LEGACY_PRODUCER_SHA256 = '22c11b59d656a11ad2df4736ff808cf929c2b1997c0dc5f598cfe8af13555300'
+LEGACY_QUERIES = ('invoke_compiler_on_method', 'post_compiled_method', 'total_size',
+                  'CompileQueue', 'CompileTaskWrapper')
 RETURNS = {'ret', 'retq', 'retf', 'retfq', 'lret', 'iret', 'iretd', 'iretq'}
 LOOPS = {'loop', 'loope', 'loopne', 'loopz', 'loopnz'}
 CONDITIONALS = {'ja', 'jae', 'jb', 'jbe', 'jc', 'jcxz', 'jecxz', 'jrcxz', 'je', 'jg',
@@ -125,7 +128,12 @@ def classify(rows, symbol, retained_bytes, definitions):
 
 
 def inventory(data):
-    queries = entries.symbols.query_names(tuple(data['queries']))
+    if 'queries' in data:
+        queries = entries.symbols.query_names(tuple(data['queries']))
+    elif data.get('sourceSha256') == LEGACY_PRODUCER_SHA256:
+        queries = entries.symbols.query_names(LEGACY_QUERIES)
+    else:
+        raise ValueError('Missing query contract for an unsupported producer version')
     if set(data['entries']) != set(queries) or set(data['symbols']['candidates']) != set(queries):
         raise ValueError('Saved query groups differ')
     if any(not isinstance(data['entries'][query], list) for query in queries) or \
@@ -160,7 +168,8 @@ def inspect(library, expected, data, report):
         if hashlib.file_digest(stream, 'sha256').hexdigest() != expected or \
                 entries.symbols.identity(before) != entries.symbols.identity(library.stat()):
             raise ValueError('Pinned library identity differs before byte recheck')
-        report.update(queries=queries, decoderCopiedVerbatim=data['decoder'], entries={})
+        report.update(queries=queries, decoderCopiedVerbatim=data['decoder'], entries={},
+                      queryContract='explicit saved queries' if 'queries' in data else 'pinned original producer defaults')
         for query in queries:
             output = report['entries'][query] = []
             for index, entry in enumerate(data['entries'][query]):
