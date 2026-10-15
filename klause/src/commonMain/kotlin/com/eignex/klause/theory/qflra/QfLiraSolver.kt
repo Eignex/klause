@@ -1027,7 +1027,8 @@ class ExactLiraSearchComponent private constructor(
                     null -> "NO_FLOAT"
                 },
                 if (result.exactPrimal == null) "NO_POINT" else "EXACT_POINT",
-                result.reconstruction?.let { "RECONSTRUCTION_${it.decline?.name ?: "NO_DECLINE"}" } ?: "NO_RECONSTRUCTION",
+                result.reconstruction?.let { "RECONSTRUCTION_${it.decline?.name ?: "NO_DECLINE"}" }
+                    ?: "NO_RECONSTRUCTION",
                 result.exactPoint?.let { "RECOVERY_${it.decline?.name ?: "NO_DECLINE"}" } ?: "NO_RECOVERY",
                 result.refinement?.let { "REFINEMENT_${it.decline?.name ?: "NO_DECLINE"}" } ?: "NO_REFINEMENT",
                 result.continuation?.let { "CONTINUATION_${it.decline?.name ?: "NO_DECLINE"}" } ?: "NO_CONTINUATION",
