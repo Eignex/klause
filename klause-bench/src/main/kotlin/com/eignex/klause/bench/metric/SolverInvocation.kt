@@ -451,8 +451,8 @@ internal object SolverInvocation {
             }
             // Unsupported models yield labelled undecided results.
             if (refusal != null) stats["unsupported"] = refusal else stats["killed"] = "hard-timeout"
-            stats["exit"] = process.exitValue().toString()
         }
+        stats["exit"] = process.exitValue().toString()
         drain.join(STDERR_DRAIN_WAIT_MS)
         quarantines(stderr.toString())?.let { stats[QUARANTINED] = it }
         if (cmd.first().substringAfterLast('/') == "klause-cli") {
