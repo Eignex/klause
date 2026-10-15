@@ -1091,6 +1091,10 @@ lab profile com.eignex.klause.bench.profile.MpsLinearProof <ref> "check exact MP
 The profile output retains original bytes/hashes, claim captures, checker results, installed
 jar hashes and runtime/options. Keep the lab's executed commit and setup provenance with
 those files. A failed checker or incomplete profile supplies no validated terminal claim.
+`--route=numerical` invokes the direct numerical LP/MIP request without theory
+fallback; the default `--route=theory` retains the ordinary exact-source strategy.
+The capture records numerical source operations and floating work separately from
+the route label. CLI stream captures establish frontend selection independently.
 Leading options select the real public route: `--engine=cp|fixed|mixed|ls|alns`,
 `--cores=N`, `--checks=N`, `--work=N` and `--timeout=MS`. Defaults are cp, one core,
 1000 checks, 2000000 work and 3000 ms per input. Complete routes must return typed

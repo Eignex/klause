@@ -17,6 +17,7 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.NumericalLinearRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
@@ -45,7 +46,7 @@ object MpsLinearProof {
             require(pair.size == 2) { "Use --name=value" }
             pair[0] to pair[1]
         }
-        require(options.keys.all { it in setOf("engine", "cores", "checks", "work", "timeout") })
+        require(options.keys.all { it in setOf("engine", "cores", "checks", "work", "timeout", "route") })
         val engine = when (options["engine"] ?: "cp") {
             "cp" -> FiniteEngine.BACKTRACK
             "fixed" -> FiniteEngine.FIXED
@@ -55,6 +56,11 @@ object MpsLinearProof {
             else -> error("Unknown engine")
         }
         val cores = (options["cores"] ?: "1").toInt().also { require(it > 0) }
+        val numerical = when (options["route"] ?: "theory") {
+            "theory" -> false
+            "numerical" -> true
+            else -> error("Unknown route")
+        }
         val inputs = args.dropWhile { it.startsWith("--") }
         require(inputs.isNotEmpty()) { "Pass original MPS paths" }
         val root = File(System.getProperty("klause.workspace.root", "."))
@@ -72,19 +78,21 @@ object MpsLinearProof {
             val capture = requireNotNull(compiled.model.sourceProofContext(SourceScope(
                 SourceRevision(sha(bytes), "klause-ir-exact-v1"), objective = SourceObjective("cost", sense)),
                 objective))
-            val execution = OpenTheoryPipeline.execute(OpenTheoryRequest(compiled.model, objective,
-                maximize = compiled.maximize), params, engine, cores) as OpenTheoryExecution.Optimize
             val witnessOnly = engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS
-            val result = execution.result.linearResult
+            val execution = if (numerical) null else OpenTheoryPipeline.execute(
+                OpenTheoryRequest(compiled.model, objective, maximize = compiled.maximize),
+                params, engine, cores) as OpenTheoryExecution.Optimize
+            val result = if (numerical) NumericalLinearRequest(compiled.model, objective,
+                compiled.maximize).solve(params, complete = !witnessOnly) else execution?.result?.linearResult
             require(witnessOnly || result != null) { "Complete route omitted typed linear authority" }
-            if (witnessOnly) require(execution.result is OpenTheoryOptimum.Bounded)
+            if (witnessOnly && execution != null) require(execution.result is OpenTheoryOptimum.Bounded)
             val terminal = result?.terminal
             require(!witnessOnly || terminal == null) { "Witness-only route published a terminal" }
             val claim = terminal?.claim
-            val incumbent = result?.incumbent ?: (execution.result as? OpenTheoryOptimum.Bounded)?.incumbent?.let {
+            val incumbent = result?.incumbent ?: (execution?.result as? OpenTheoryOptimum.Bounded)?.incumbent?.let {
                 (it as? OpenTheoryAssignment.Sampled)?.sample
             }
-            val value = result?.value ?: (execution.result as? OpenTheoryOptimum.Bounded)?.value?.let {
+            val value = result?.value ?: (execution?.result as? OpenTheoryOptimum.Bounded)?.value?.let {
                 if (compiled.maximize) it.negated() else it
             }
             val point = when (claim) {
@@ -95,8 +103,11 @@ object MpsLinearProof {
             val record = buildJsonObject {
                 put("sourceSHA256", sha(bytes))
                 put("maximize", compiled.maximize)
-                put("reason", (result?.reason ?: (execution.result as? OpenTheoryOptimum.Bounded)?.reason).toString())
+                put("reason", (result?.reason ?: (execution?.result as? OpenTheoryOptimum.Bounded)?.reason).toString())
                 put("engine", engine.id)
+                put("route", if (numerical) "numerical-mip" else "theory")
+                put("sourceLpOperations", result?.stats?.smt?.sourceLp?.operations ?: 0L)
+                put("sourceLpFloatWork", result?.stats?.smt?.sourceLp?.floatWork ?: 0L)
                 put("cores", cores)
                 put("kind", when (claim) {
                     is SourceClaim.Optimal -> "optimal"
