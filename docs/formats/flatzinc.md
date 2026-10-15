@@ -61,7 +61,6 @@ A source-fixed float-array index also pins its finite value literal, preserving
 Boolean propagation across the shared finite choices.
 Continuous `float_min` and `float_max` retain `RealArrayMinMax`, including constant
 operands and aliases. Complete arithmetic consumers own the equality alternatives.
-Scaled grid comparisons retain their component's numerical conversion policy.
 
 Grid `float_min` and `float_max` retain `GridArrayMinMax`. Each coordinate keeps
 its grid step, origin and scaling policy, so comparisons retain their signed
