@@ -57,7 +57,7 @@ class CompilerSelectionLiftTest {
                 assumptions = Assumptions(bools = mapOf(presence to present))))
 
             val sample = assertIs<SolveResult.Sat>(result).assignment
-            assertEquals(if (present) 2 else null, compiled.decode(schema.x, sample))
+            assertEquals(if (present) 2L else null, compiled.decode(schema.x, sample))
         }
         assertEquals(1, compiled.problem.factors.filterIsInstance<Element>().size)
         assertEquals(1, compiled.problem.factors.filterIsInstance<ArrayMinMax>().size)
