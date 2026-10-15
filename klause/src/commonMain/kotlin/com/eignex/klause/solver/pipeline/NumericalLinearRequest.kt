@@ -1,7 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.finiteRelaxationSupported
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.simplex.exact.BigFraction
@@ -29,12 +32,28 @@ class NumericalLinearRequest(
     val maximize: Boolean = false,
     private val cancellation: Cancellation = Cancellation.Never,
 ) {
+    /** Whether native exact rows admit finite working coefficients without losing a nonzero source term. */
+    fun numericalRowsSupported(stop: Cancellation = Cancellation.Never): Boolean {
+        val token = cancellation or stop
+        if (token()) return false
+        for (factor in model.factors) {
+            if (token()) return false
+            val supported = when (factor) {
+                is ExactLinear -> factor.finiteRelaxationSupported()
+                is LinearIndicator -> factor.row.finiteRelaxationSupported()
+                else -> true
+            }
+            if (!supported) return false
+        }
+        return true
+    }
+
     /**
      * Finite numerical execution or a source refutation from numerical bound closure.
      * Null retains numerical traversal over the original open sides.
      */
     fun finiteRoute(onLpStats: (LpStats) -> Unit = {}): SourceProblemRoute? {
-        if (cancellation()) return null
+        if (!numericalRowsSupported()) return null
         var routed = model
         if (!routed.hasFiniteIntegerRanges()) {
             val sink = LpStatsSink(LpRoute.STANDALONE)
@@ -65,8 +84,8 @@ class NumericalLinearRequest(
         onIncumbent: (Sample, BigFraction) -> Unit = { _, _ -> },
     ): LinearOptimizationResult {
         val stop = cancellation or params.timeout or params.cancellation
-        val context = model.linearAuthorityContext(objective ?: LinearObjective(),
-            if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE, stop)
+        val context = if (numericalRowsSupported(stop)) model.linearAuthorityContext(objective ?: LinearObjective(),
+            if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE, stop) else null
         if (context == null) {
             val identity = Uuid.random().toString()
             val scope = SourceScope(SourceRevision(identity, "klause-ir-exact-v1"),

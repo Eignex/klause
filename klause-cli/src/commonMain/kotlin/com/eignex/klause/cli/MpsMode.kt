@@ -50,14 +50,17 @@ internal object MpsMode : CliMode {
             } catch (_: MpsLoweringException) {
                 source.toExactSourceProblem(settings)
             }
-            var compiled = if (common.exact && !lowered.sourceExact) source.toExactSourceProblem(settings) else lowered
+            val exactSource = source.toExactSourceProblem(settings)
+            val sourceAdmission = NumericalLinearRequest(exactSource.model,
+                cancellation = common.routingCancellation()).numericalRowsSupported()
+            var compiled = if (!sourceAdmission || (common.exact && !lowered.sourceExact)) exactSource else lowered
             var routingLpStats = LpStats()
             val routingStart = TimeSource.Monotonic.markNow()
             var numerical = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective(),
                 compiled.maximize, common.routingCancellation())
             var route = numerical.finiteRoute { routingLpStats = it }
             if ((route == null || route == SourceProblemRoute.Refuted) && !compiled.sourceExact) {
-                compiled = source.toExactSourceProblem(settings)
+                compiled = exactSource
                 numerical = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective(),
                     compiled.maximize, common.routingCancellation())
                 route = numerical.finiteRoute { routingLpStats = it }
