@@ -30,8 +30,7 @@ internal class PolynomialRealLowering(
     ): PolynomialExpression {
         if (condition is PolynomialRealFormula.Constant) return if (condition.value) whenTrue else whenFalse
         val value = opaqueReal()
-        definitions.add(or(listOf(not(condition), relation(value, PolynomialRelation.EQ, whenTrue))))
-        definitions.add(or(listOf(condition, relation(value, PolynomialRelation.EQ, whenFalse))))
+        definitions.add(PolynomialRealFormula.Selection(value.id, condition, whenTrue, whenFalse))
         captureConditional?.invoke(PolynomialConditional(value.id.index, condition, whenTrue, whenFalse))
         return value
     }

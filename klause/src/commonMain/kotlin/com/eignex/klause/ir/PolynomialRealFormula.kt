@@ -42,6 +42,18 @@ sealed interface PolynomialRealFormula {
         override fun equals(other: Any?): Boolean = other is Atom && polynomialFormulasEqual(this, other)
     }
 
+    internal class Selection(
+        val result: SourceRealId,
+        val condition: PolynomialRealFormula,
+        val whenTrue: PolynomialExpression,
+        val whenFalse: PolynomialExpression,
+    ) : PolynomialRealFormula {
+        private val hash = ((31 * result.hashCode() + condition.hashCode()) * 31 + whenTrue.hashCode()) *
+            31 + whenFalse.hashCode()
+        override fun hashCode(): Int = hash
+        override fun equals(other: Any?): Boolean = other is Selection && polynomialFormulasEqual(this, other)
+    }
+
     /** Logical complement of the complete operand. */
     class Not(
         /** Captured operand. */
@@ -95,6 +107,15 @@ internal fun PolynomialRealFormula.remap(remap: VarRemap): PolynomialRealFormula
             is PolynomialRealFormula.Atom -> values.addLast(
                 PolynomialRealFormula.Atom(node.left.remap(remap), node.relation, node.right.remap(remap)),
             )
+            is PolynomialRealFormula.Selection -> if (combine) {
+                values.addLast(PolynomialRealFormula.Selection(
+                    requireNotNull(remap.real(node.result)) { "removed polynomial selection result" },
+                    values.removeLast(), node.whenTrue.remap(remap), node.whenFalse.remap(remap),
+                ))
+            } else {
+                work.addLast(node to true)
+                work.addLast(node.condition to false)
+            }
             is PolynomialRealFormula.Not -> if (combine) {
                 values.addLast(PolynomialRealFormula.Not(values.removeLast()))
             } else {
@@ -152,6 +173,12 @@ internal fun PolynomialRealFormula.requireVariableCounts(
                 expressions.addLast(node.left)
                 expressions.addLast(node.right)
             }
+            is PolynomialRealFormula.Selection -> {
+                require(node.result.index < realCount) { "polynomial selection result out of range" }
+                formulas.addLast(node.condition)
+                expressions.addLast(node.whenTrue)
+                expressions.addLast(node.whenFalse)
+            }
             is PolynomialRealFormula.Not -> formulas.addLast(node.operand)
             is PolynomialRealFormula.And -> formulas.addAll(node.operands)
             is PolynomialRealFormula.Or -> formulas.addAll(node.operands)
@@ -190,6 +217,13 @@ private fun polynomialFormulasEqual(left: PolynomialRealFormula, right: Polynomi
                     !polynomialExpressionsEqual(first.left, second.left) ||
                     !polynomialExpressionsEqual(first.right, second.right)
                 ) return false
+            }
+            is PolynomialRealFormula.Selection -> {
+                if (second !is PolynomialRealFormula.Selection || first.result != second.result ||
+                    !polynomialExpressionsEqual(first.whenTrue, second.whenTrue) ||
+                    !polynomialExpressionsEqual(first.whenFalse, second.whenFalse)
+                ) return false
+                work.addLast(first.condition to second.condition)
             }
             is PolynomialRealFormula.Not -> {
                 if (second !is PolynomialRealFormula.Not) return false

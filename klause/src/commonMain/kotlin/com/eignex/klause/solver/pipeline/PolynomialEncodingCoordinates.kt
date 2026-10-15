@@ -30,6 +30,12 @@ internal fun validatePolynomialEncodingCoordinates(
                 pending.addLast(node.left)
                 pending.addLast(node.right)
             }
+            is PolynomialRealFormula.Selection -> {
+                require(node.result.index in realIds) { "unattributed polynomial selection result" }
+                pending.addLast(node.condition)
+                pending.addLast(node.whenTrue)
+                pending.addLast(node.whenFalse)
+            }
             is PolynomialRealFormula.Not -> pending.addLast(node.operand)
             is PolynomialExpression.Power -> pending.addLast(node.base)
             is PolynomialRealFormula.And -> node.operands.forEach(pending::addLast)

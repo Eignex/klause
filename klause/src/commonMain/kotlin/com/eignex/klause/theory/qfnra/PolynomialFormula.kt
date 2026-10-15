@@ -5,6 +5,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
+import com.eignex.klause.lowering.polynomialSelectionEncoding
 import com.eignex.klause.simplex.exact.BigFraction
 
 internal data class PolynomialAtom(val polynomial: Polynomial, val relation: PolynomialRelation) {
@@ -128,6 +129,7 @@ internal class PolynomialFormula private constructor(
             val nodes = mutableListOf<FormulaNode>()
             val atoms = mutableListOf<PolynomialAtom>()
             val booleans = LinkedHashSet<Int>()
+            val selections = HashMap<PolynomialRealFormula.Selection, PolynomialRealFormula>()
             val pending = ArrayDeque<Pair<PolynomialRealFormula, Boolean>>()
             pending.addLast(formula to false)
             while (pending.isNotEmpty()) {
@@ -138,6 +140,9 @@ internal class PolynomialFormula private constructor(
                     is PolynomialRealFormula.Not -> listOf(node.operand)
                     is PolynomialRealFormula.And -> node.operands
                     is PolynomialRealFormula.Or -> node.operands
+                    is PolynomialRealFormula.Selection -> listOf(selections.getOrPut(node) {
+                        polynomialSelectionEncoding(node, arithmetic::step)
+                    })
                     else -> emptyList()
                 }
                 if (!combine && children.isNotEmpty()) {
@@ -159,6 +164,9 @@ internal class PolynomialFormula private constructor(
                         FormulaNode.Atom(atoms.lastIndex)
                     }
                     is PolynomialRealFormula.Not -> FormulaNode.Not(indices.getValue(node.operand))
+                    is PolynomialRealFormula.Selection -> FormulaNode.Junction(
+                        intArrayOf(indices.getValue(children.single())), true,
+                    )
                     is PolynomialRealFormula.And -> FormulaNode.Junction(
                         children.map {
                             arithmetic.step()

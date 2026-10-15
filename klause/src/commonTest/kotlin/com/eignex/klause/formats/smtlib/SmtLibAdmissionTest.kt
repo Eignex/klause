@@ -1,5 +1,9 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.ir.PolynomialExpression
+import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.SourceBoolId
+import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
@@ -17,6 +21,27 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SmtLibAdmissionTest {
+    @Test
+    fun `polynomial fallback retains numeric selection guards and ordered branches`() {
+        for (sort in listOf("Real", "Int")) {
+            val input = SmtLibAdmission.parse("""
+                (declare-const x $sort) (declare-const b Bool)
+                (define-fun selected () $sort (ite b (* x x) 3))
+                (assert (= selected 4)) (check-sat)
+            """.trimIndent())
+            val formula = if (sort == "Real") assertIs<SmtLibInput.Polynomial>(input).problem.formula
+                else assertIs<SmtLibInput.NonlinearInteger>(input).problem.formula
+
+            val selection = assertIs<PolynomialRealFormula.And>(formula).operands
+                .filterIsInstance<PolynomialRealFormula.Selection>().single()
+
+            assertEquals(SourceRealId(1), selection.result)
+            assertEquals(PolynomialRealFormula.BooleanVariable(SourceBoolId(0)), selection.condition)
+            val x = PolynomialExpression.Variable(SourceRealId(0))
+            assertEquals(PolynomialExpression.Product(listOf(x, x)), selection.whenTrue)
+        }
+    }
+
     @Test
     fun `unused helper arguments retain their log domains`() {
         val input = SmtLibAdmission.parse(

@@ -35,8 +35,10 @@ candidate. A real-relaxation representation decline permits fixed integer candid
 the same work and allocation controls. It supplies no proof. Wide exponents use
 compact squaring DAGs; values such as zero and signed units can remain exactly
 checkable without materializing the unconditioned polynomial degree.
-Numeric conditional auxiliaries remain private to the formula and are
-completed under their guarded source definitions.
+Numeric conditional result coordinates remain private to the source formula.
+Retained selection nodes preserve their guards and ordered branch expressions;
+complete arithmetic consumers install guarded definitions privately. Original-source
+checking evaluates the selected branch exactly.
 
 The heuristic strategies start with an integer candidate, then release one
 coordinate for local repair or two for a block repair. Conditioned real completion

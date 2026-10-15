@@ -1,6 +1,8 @@
 package com.eignex.klause.theory.qfnra
 
+import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.lowering.PolynomialRealLowering
 
 internal object PolynomialBooleanCondition {
@@ -21,6 +23,7 @@ internal object PolynomialBooleanCondition {
                 is PolynomialRealFormula.And -> node.operands
                 is PolynomialRealFormula.Or -> node.operands
                 is PolynomialRealFormula.Not -> listOf(node.operand)
+                is PolynomialRealFormula.Selection -> listOf(node.condition)
                 else -> emptyList()
             }
             if (!combine && children.isNotEmpty()) {
@@ -34,6 +37,13 @@ internal object PolynomialBooleanCondition {
                 is PolynomialRealFormula.Not -> PolynomialRealLowering.not(values.getValue(node.operand))
                 is PolynomialRealFormula.And -> PolynomialRealLowering.and(children.map(values::getValue))
                 is PolynomialRealFormula.Or -> PolynomialRealLowering.or(children.map(values::getValue))
+                is PolynomialRealFormula.Selection -> {
+                    val condition = values.getValue(node.condition)
+                    if (condition is PolynomialRealFormula.Constant) PolynomialRealFormula.Atom(
+                        PolynomialExpression.Variable(node.result), PolynomialRelation.EQ,
+                        if (condition.value) node.whenTrue else node.whenFalse,
+                    ) else PolynomialRealFormula.Selection(node.result, condition, node.whenTrue, node.whenFalse)
+                }
                 else -> node
             }
         }

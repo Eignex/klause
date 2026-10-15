@@ -132,6 +132,9 @@ internal class FunctionSourceLowering(
             listOf(it.condition, it.whenTrue, it.whenFalse)
         } ?: emptyList()
         is PolynomialRealFormula.Atom -> listOf(node.left, node.right)
+        is PolynomialRealFormula.Selection -> listOf(
+            PolynomialExpression.Variable(node.result), node.condition, node.whenTrue, node.whenFalse,
+        )
         is PolynomialRealFormula.Not -> listOf(node.operand)
         is PolynomialRealFormula.And -> node.operands
         is PolynomialRealFormula.Or -> node.operands
@@ -179,6 +182,12 @@ internal class FunctionSourceLowering(
         }
         is PolynomialRealFormula.Atom -> TranscendentalFormula.Atom(
             expressions.getValue(node.left), node.relation, expressions.getValue(node.right),
+        )
+        is PolynomialRealFormula.Selection -> TranscendentalFormula.Atom(
+            expressions.getValue(PolynomialExpression.Variable(node.result)),
+            com.eignex.klause.ir.PolynomialRelation.EQ,
+            TranscendentalExpression.Conditional(formulas.getValue(node.condition),
+                expressions.getValue(node.whenTrue), expressions.getValue(node.whenFalse)),
         )
         is PolynomialRealFormula.Not -> TranscendentalFormula.Not(formulas.getValue(node.operand))
         is PolynomialRealFormula.And -> TranscendentalFormula.And(node.operands.map(formulas::getValue))

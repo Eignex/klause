@@ -59,6 +59,7 @@ internal fun checkNonlinearSource(
             is PolynomialRealFormula.And -> node.operands
             is PolynomialRealFormula.Or -> node.operands
             is PolynomialRealFormula.Not -> listOf(node.operand)
+            is PolynomialRealFormula.Selection -> listOf(node.condition)
             else -> emptyList()
         }
         if (!combine && children.isNotEmpty()) {
@@ -72,6 +73,8 @@ internal fun checkNonlinearSource(
             is PolynomialRealFormula.Not -> !truth.getValue(node.operand)
             is PolynomialRealFormula.And -> children.all { truth.getValue(it) }
             is PolynomialRealFormula.Or -> children.any { truth.getValue(it) }
+            is PolynomialRealFormula.Selection -> algebraic.compare(assignment.realValue(node.result.index),
+                evaluate(if (truth.getValue(node.condition)) node.whenTrue else node.whenFalse)) == 0
             is PolynomialRealFormula.Atom -> {
                 val comparison = algebraic.compare(evaluate(node.left), evaluate(node.right))
                 when (node.relation) {

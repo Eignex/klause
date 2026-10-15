@@ -287,6 +287,13 @@ retain the prior bounds for every operand, including the bounds that exclude
 other equality alternatives. This relation does not establish exact physical source
 arithmetic outside the declared grid policy.
 
+Polynomial source snapshots retain numeric conditionals as neutral selection
+relations in their existing formula, preserving the result identity, guard and
+ordered expression branches. Remapping and scope validation visit every role.
+Arithmetic normalization owns equivalent guarded expansion; exact source checking
+reads the retained selected branch. Conditioning builds a private view and does
+not replace the captured relation.
+
 `RealElement` retains an integer index and ordered binary64 constants or real-column
 entries. Its finite propagation restricts the index range; exact arithmetic checks
 certify the selected real equality. A fixed index emits that equality into the LP
