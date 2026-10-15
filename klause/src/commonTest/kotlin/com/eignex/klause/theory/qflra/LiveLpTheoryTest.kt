@@ -161,16 +161,16 @@ class LiveLpTheoryTest {
         val source = Problem(
             numBoolVars = 3,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-            numRealVars = 1,
-            realLower = doubleArrayOf(-2.0),
-            realUpper = doubleArrayOf(2.0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, -2.0),
+            realUpper = doubleArrayOf(2.0, 2.0),
             factors = arrayOf(
                 ReifiedRealLinear(
                     0,
                     intArrayOf(),
                     doubleArrayOf(),
-                    intArrayOf(0),
-                    doubleArrayOf(2.0),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0),
                     LinearOp.LE,
                     1.0,
                 ),
