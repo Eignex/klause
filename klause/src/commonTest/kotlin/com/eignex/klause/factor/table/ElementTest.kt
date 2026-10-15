@@ -26,13 +26,13 @@ class ElementTest {
 
     @Test
     fun `remapping preserves ordered repeated and aliased roles`() {
-        val factor = Element(0, 1, longArrayOf(2, 1, 2), true, -2)
+        val factor = Element(0, 1, longArrayOf(2, 1, 0, 2), true, -2)
 
         val remapped = assertIs<Element>(factor.remap(VarRemap(intArrayOf(), intArrayOf(1, 0, 0))))
 
         assertEquals(1, remapped.idx)
         assertEquals(0, remapped.result)
-        assertEquals(listOf(0L, 0L, 0L), remapped.arr.toList())
+        assertEquals(listOf(0L, 0L, 1L, 0L), remapped.arr.toList())
         assertEquals(-2, remapped.indexOffset)
     }
 }
