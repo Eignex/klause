@@ -1,7 +1,7 @@
 package com.eignex.klause.theory
 
-import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.Abs
+import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.GridAbs
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.ir.LinearForm

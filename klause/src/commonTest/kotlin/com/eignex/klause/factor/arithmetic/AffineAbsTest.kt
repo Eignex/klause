@@ -9,9 +9,9 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
-import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.toSample
@@ -19,8 +19,8 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.unaryMinus
 import kotlin.random.Random
 import kotlin.test.Test
