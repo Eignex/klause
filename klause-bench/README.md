@@ -2019,3 +2019,8 @@ and timing probes do not run as part of ordinary repository checks; follow the
 product controls, including an unrelated finite distinctness constraint and an
 excluded integer value. Run CP/LS with default and exact modes; the harness records
 the original MiniZinc source check separately from compiled FlatZinc semantics.
+
+`SourceRecordCheck` also accepts `checker=minizinc` for saved MiniZinc records. It
+checks source hashes and pins the retained DZN assignments into the original model
+using the recorded compiler configuration. It records this original-source result
+separately from checking exact-coordinate comments against compiled FlatZinc.
