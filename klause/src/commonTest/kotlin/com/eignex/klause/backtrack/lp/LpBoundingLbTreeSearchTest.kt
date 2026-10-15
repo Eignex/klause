@@ -9,6 +9,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -292,6 +294,34 @@ class LpBoundingLbTreeSearchTest {
             assertTrue(sample.ints[0] + sample.ints[2] >= 1L)
             if (assumptions != Assumptions.None) assertEquals(0L, sample.ints[0])
         }
+    }
+
+    @Test
+    fun `uncertified numerical targets order mixed choices without accepting a leaf`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf(
+            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 2.5)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1), realCoefficients = doubleArrayOf(1.0))
+        var pointDeclines = 0
+        var cancelled = false
+        val visited = ArrayList<Long>()
+        val policy = LpCertificationPolicy { certifier, successful ->
+            if (certifier == LpCertifier.EXACT_POINT) pointDeclines++
+            successful && certifier != LpCertifier.EXACT_POINT
+        }
+        val parent = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "mixed-ordering"), LpSolveContext(certificationPolicy = policy))
+
+        parent.use {
+            assertNull(it.lbTreeSearch(objective, Cancellation { cancelled }, complete = { candidate, _, _ ->
+                visited += candidate.ints.single()
+                cancelled = true
+                LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf())
+            }))
+        }
+
+        assertEquals(listOf(3L), visited)
+        assertTrue(pointDeclines > 0)
     }
 
 }

@@ -136,19 +136,33 @@ internal fun LpEngine.lbTreeSearch(
                                 LpCertifier.EXACT_POINT,
                                 exactPointWitness(model, candidate.primal, rootCertificationObserver()),
                             )
-                        } ?: return SearchNodeDisposition.Expand
+                        }
+                        // A numerical point may order exhaustive choices without certifying a source witness.
+                        val point = witness?.primal ?: if (problem.numRealVars > 0) {
+                            result?.primal?.takeIf { it.size == model.n && it.all(Double::isFinite) }
+                                ?.map { requireNotNull(BigFraction.ofDouble(it)) }
+                        } else null
+                        if (point == null) return SearchNodeDisposition.Expand
+                        dive.noteNodeOverhead(point.size.toLong())
                         targets = relaxation.colVarId.indices.mapNotNull { column ->
                             val variable = relaxation.colVarId[column]
                             if (variable < 0 || relaxation.colIsBool[column]) {
                                 null
                             } else {
-                                ExactLpNumber.of(witness.primal[column]).legacyLong()?.let { variable to it }
+                                ExactLpNumber.of(point[column]).legacyLong()?.let { variable to it }
                             }
                         }.toMap()
                         for (column in relaxation.colVarId.indices) {
                             val variable = relaxation.colVarId[column]
-                            val value = witness.primal[column]
+                            val value = point[column]
                             if (variable < 0 || value.den == BIG_ONE) continue
+                            if (relaxation.colIsBool[column]) {
+                                if (session.boolValue(variable) != null || value <= BigFraction.ZERO || value >= BigFraction.ONE) continue
+                            } else {
+                                val upper = value.ceilLong() ?: continue
+                                val domain = session.intDomain(variable)
+                                if (upper <= domain.min || upper > domain.max) continue
+                            }
                             split = LpFractionalBranch(variable, value, relaxation.colIsBool[column], registered = false)
                             break
                         }
@@ -214,7 +228,6 @@ internal fun LpEngine.solveRootNode(
 ): LpRootNodeResult {
     val parentWork = dive.nodeQueryWorkBudget() ?: dive.nodeWorkBudget()
     val model = original
-    var crashWork = 0L
     var sourceMetrics = LpSolveMetrics()
     var sourceReturned = false
     val attempt = solveRootNodeWithCrash(
@@ -225,7 +238,7 @@ internal fun LpEngine.solveRootNode(
             if (root) {
                 if (parentWork != 0L && parentWork <= 1L) return@solveRootNodeWithCrash null
                 val crash = rootCrashBasis(model, token, parentWork)
-                crashWork = crash.metrics.workOps
+                dive.noteNodeOverhead(crash.metrics.workOps)
                 basis = crash.basis
             }
             val previousMetrics = dive.propagator.lastMetrics
@@ -250,8 +263,7 @@ internal fun LpEngine.solveRootNode(
         },
         solveMetrics = { sourceMetrics },
         additionalMetrics = {
-            LpSolveMetrics(workOps = crashWork) +
-                if (sourceReturned) LpSolveMetrics() else sourceMetrics
+            if (sourceReturned) LpSolveMetrics() else sourceMetrics
         },
     )
     return LpRootNodeResult(model, attempt?.second)

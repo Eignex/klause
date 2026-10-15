@@ -677,7 +677,10 @@ changes the relaxation nor installs a source bound. This permits a rounded
 capacity proposal to retain the continuous flow that nearest rounding can remove.
 The explicitly enabled `lbTreeSearch` incumbent probe also admits finite mixed
 models. Its private finite trail starts under the caller's assumptions and retains
-exhaustive fractional and value alternatives. Real leaves use the caller's retained
+exhaustive fractional and value alternatives. A finite numerical point can order
+mixed choices when exact point certification declines; a fractional split must be
+strictly inside the live discrete domain. This hint supplies no witness or bound
+permission. Real leaves use the caller's retained
 numerical `LeafRealSolver` and the same configured source tolerance callback and
 composed verifier as ordinary CP leaves. Unavailable or interrupted completion
 returns no candidate; it cannot invoke an open theory or establish infeasibility.
@@ -688,7 +691,7 @@ the invocation remains active; publication performs no fresh completion or verif
 Only exact completed incumbents support its internal accepted-bound pruning;
 tolerance witnesses retain witness-only authority. The flag stays off by default.
 
-Private probe LP assembly, edits and solves charge the containing root ledger;
+Private probe LP assembly, crash construction, edits and solves charge the containing root ledger;
 propagation work is visible while the probe runs. Residual completion keeps its
 standalone accounting and spends the remaining root and invocation allowance.
 Its private numerical owners close on return, interruption and exception; caller
