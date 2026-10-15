@@ -8,6 +8,28 @@ import native_compiler_observer as observer
 
 
 class NativeCompilerObserverSetupTest(unittest.TestCase):
+    def test_observer_launch_reserves_header_space_for_the_bounded_identity_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = root / 'observer'
+            library = root / 'library'
+            binary.write_bytes(b'tool')
+            library.write_bytes(b'library')
+            destination = root / 'out'
+            with patch.object(observer.os, 'pipe', return_value=(10, 11)), \
+                    patch.object(observer.os, 'fork', return_value=77), \
+                    patch.object(observer.os, 'close'), patch.object(observer.os, 'write') as release, \
+                    patch.object(observer.os, 'killpg'), \
+                    patch.object(observer.os, 'waitpid', return_value=(77, 0)), \
+                    patch.object(observer.subprocess, 'Popen', side_effect=OSError('launch unavailable')) as tracer, \
+                    self.assertRaisesRegex(OSError, 'launch unavailable'):
+                observer.observe(destination, library, binary, ['java', '-version'], 1)
+
+            command = tracer.call_args.args[0]
+            self.assertIn('BPFTRACE_MAX_STRLEN=132', command)
+            self.assertIn('arg1 < 128 ? arg1 : 128', (destination / 'observer.bt').read_text())
+            release.assert_not_called()
+
     def test_script_failure_reaps_the_unreleased_child_without_starting_an_observer(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

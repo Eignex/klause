@@ -1482,6 +1482,8 @@ unaccepted. Captures lacking final counters cannot pass this guard. Its scope is
 sequenced native/USDT callbacks; unsequenced EXEC/FORK records and the global kernel
 event-loss counter remain outside that proof. This guard does not erase unfinished
 invocations or relax any existing read, lifetime or independent identity checks.
+The pinned tracer's buffer limit includes a four-byte length header. The observer
+reserves that header in addition to the 128-byte identity payload bound.
 Per-record association supplies no complete calling convention, queue/root census,
 loss-free capture, return-size semantics, clock alignment or compiler-saving proof.
 
