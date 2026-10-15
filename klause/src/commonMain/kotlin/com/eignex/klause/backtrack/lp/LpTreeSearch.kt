@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.ComposedSampleVerifier
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.exactSourceObjective
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpFractionalBranch
@@ -35,6 +36,7 @@ import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchDecisionBudget
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRunEvent
@@ -52,6 +54,7 @@ internal fun LpEngine.lbTreeSearch(
     toleranceCheck: ((Sample) -> Boolean)? = null,
     complete: ((Sample, Cancellation, Long) -> LeafRealResult)? = null,
     accept: ((Sample) -> Sample?)? = null,
+    nodeBudget: NodeBudget? = null,
 ): LpTreeSeed? {
     if (lpRelaxer == null || cancellation() || params.cancellation()) return null
     for (variable in 0 until problem.numIntVars) {
@@ -172,7 +175,12 @@ internal fun LpEngine.lbTreeSearch(
                 }
                 val run = shared.openRun(
                     problem.numBoolVars,
-                    SearchSolveParams(maxDecisions = LB_TREE_BUDGET),
+                    SearchSolveParams(maxDecisions = minOf(LB_TREE_BUDGET, nodeBudget?.decisionsLeft() ?: Long.MAX_VALUE)),
+                    decisionBudget = SearchDecisionBudget {
+                        primalSearchWork++
+                        nodeBudget?.spend()
+                        !token() && nodeBudget?.exhausted() != true
+                    },
                     booleanBranching = BooleanBranching.SourceOrder(problem.numBoolVars),
                     nodePolicy = policy,
                 )

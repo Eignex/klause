@@ -689,10 +689,14 @@ unbounded leaf, and exports no optimum, refutation, bound or recession claim.
 A witness accepted before the root allowance expires can still be published while
 the invocation remains active; publication performs no fresh completion or verification.
 Only exact completed incumbents support its internal accepted-bound pruning;
-tolerance witnesses retain witness-only authority. The flag stays off by default.
+tolerance witnesses retain witness-only authority. The flag stays off by default;
+the existing `lp-lbtree` catalog recipe can enable it when admitted by the existing
+pool policy. Probe admission changes neither that recipe's position nor scheduling.
 
 Private probe LP assembly, crash construction, edits and solves charge the containing root ledger;
-propagation work is visible while the probe runs. Residual completion keeps its
+propagation and private decision work are visible while the probe runs. Decisions
+spend the caller's existing solve-wide `NodeBudget` and the containing slice,
+without entering ordinary DFS node telemetry. Residual completion keeps its
 standalone accounting and spends the remaining root and invocation allowance.
 Its private numerical owners close on return, interruption and exception; caller
 completion ownership remains with the resumable invocation.

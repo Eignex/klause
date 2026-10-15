@@ -723,6 +723,30 @@ class ResumableMinimizeTest {
     }
 
     @Test
+    fun `mixed tree decisions spend the containing solve allowance`() {
+        for (limit in listOf(0L, 1L)) {
+            val fixture = UnresolvedRealLeafFixture(true)
+            fixture.acceptProof = { _, _ -> true }
+            val budget = NodeBudget(limit)
+            val offered = ArrayList<Sample>()
+            val params = fixture.params.copy(nodeBudget = budget, maxDecisions = 0L,
+                lpPlan = fixture.params.lpPlan.copy(bounding = true, lbTreeSearch = true,
+                    probe = false, rootCutHarvest = false))
+
+            fixture.solver.resumable(fixture.objective, params).use { search ->
+                val result = search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
+                assertIs<MinimizeResult.Unknown>(result)
+                assertEquals(0.0, search.stats.search.nodes.sum)
+                assertTrue(search.work >= limit)
+            }
+
+            assertEquals(limit, budget.spent)
+            assertTrue(offered.isEmpty())
+            assertEquals(fixture.opened, fixture.closed)
+        }
+    }
+
+    @Test
     fun `mixed tree probing keeps tolerance witnesses separate from exact certification`() {
         for (acceptance in listOf(null, false, true)) {
             val tolerated = acceptance == true
