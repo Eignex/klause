@@ -44,9 +44,33 @@ internal fun gridArithmeticEncoder(factor: GridArithmetic, target: EncodingTarge
                     )))
                 }
             } else {
-                encoding.linearFormula(LinearEncodingFormula.Or(alternatives.map { rows ->
-                    LinearEncodingFormula.Relation(LinearForm.Conjunction(rows))
+                val first = inputs[0]
+                val second = inputs[1]
+                val firstPosition = view.intVars.indexOf(first)
+                val secondPosition = view.intVars.indexOf(second)
+                val groups = tuples.groupBy { it[firstPosition] }
+                encoding.linear(LinearForm.Disjunction(groups.keys.map { value ->
+                    Linear(longArrayOf(1L), intArrayOf(first), LinearOp.EQ, value)
                 }))
+                for ((value, group) in groups) {
+                    if (encoding.cancellation()) return@Encoder EncoderDecline.RESOURCE
+                    encoding.cancellation.charge(group.size.toLong())
+                    val absent = Linear(longArrayOf(1L), intArrayOf(first), LinearOp.NE, value)
+                    val cover = group.map { it[secondPosition] }.distinct().map {
+                        Linear(longArrayOf(1L), intArrayOf(second), LinearOp.EQ, it)
+                    }
+                    encoding.linear(LinearForm.Disjunction(listOf(absent) + cover))
+                    for (tuple in group) {
+                        if (encoding.cancellation()) return@Encoder EncoderDecline.RESOURCE
+                        encoding.cancellation.charge(1)
+                        val outputPosition = view.intVars.indexOf(view.output.variable)
+                        encoding.linear(LinearForm.Disjunction(listOf(absent,
+                            Linear(longArrayOf(1L), intArrayOf(second), LinearOp.NE, tuple[secondPosition]),
+                            Linear(longArrayOf(1L), intArrayOf(view.output.variable),
+                                LinearOp.EQ, tuple[outputPosition]),
+                        )))
+                    }
+                }
             }
         } else {
             val formula = PolynomialRealFormula.Or(alternatives.map { rows ->

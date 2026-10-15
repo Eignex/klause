@@ -86,6 +86,37 @@ class GridArithmeticEncoderTest {
     }
 
     @Test
+    fun `binary private linear grids enforce the rounded product`() {
+        val relation = GridProduct(GridCoordinate(0, 0.0, 1.0, 2), GridCoordinate(1, 0.0, 1.0, 2),
+            GridCoordinate(2, 0.0, 1.0, 2))
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf<Factor>(relation))
+        val encoded = assertNotNull(FactorProjectionProviders.Default.prepare(source)
+            .linearTheoryModel(EncodingTarget.LINEAR))
+        OpenExactNeighborhood(encoded, TheoryParams(), preparedSource = encoded.prepareExecutionPlan()).use { owner ->
+            for (a in 0L..1L) for (b in 0L..1L) for (result in 0L..1L) {
+                val fixed = mapOf(0 to BigFraction.ofLong(a), 1 to BigFraction.ofLong(b),
+                    2 to BigFraction.ofLong(result))
+
+                val checked = owner.check(ExactNeighborhoodCondition(emptyMap(), fixed, fixed), Cancellation.Never)
+
+                if (a * b == result) assertIs<ExactNeighborhoodResult.Witness>(checked)
+                else assertIs<ExactNeighborhoodResult.Refuted>(checked)
+            }
+        }
+    }
+
+    @Test
+    fun `binary grid installation keeps a compact complete relation`() {
+        val relation = GridProduct(GridCoordinate(0, 0.0, 1.0, 16), GridCoordinate(1, 0.0, 1.0, 16),
+            GridCoordinate(2, 0.0, 1.0, 16))
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 15) }, arrayOf<Factor>(relation))
+
+        val encoded = FactorProjectionProviders.Default.prepare(source).linearTheoryModel(EncodingTarget.LINEAR)
+
+        assertNotNull(encoded)
+    }
+
+    @Test
     fun `oversized private encodings decline without dropping native finite support`() {
         val relation = GridPower(GridCoordinate(0, -1.0, 1.0, 10000), 2,
             GridCoordinate(1, 0.0, 1.0, 10000))
