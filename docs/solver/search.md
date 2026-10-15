@@ -677,7 +677,7 @@ changes the relaxation nor installs a source bound. This permits a rounded
 capacity proposal to retain the continuous flow that nearest rounding can remove.
 The explicitly enabled `lbTreeSearch` incumbent probe also admits finite mixed
 models. Its private finite trail starts under the caller's assumptions and retains
-exhaustive fractional and value alternatives. A finite numerical point can order
+exhaustive fractional and value alternatives. A completed finite numerical point can order
 mixed choices when exact point certification declines; a fractional split must be
 strictly inside the live discrete domain. This hint supplies no witness or bound
 permission. Real leaves use the caller's retained

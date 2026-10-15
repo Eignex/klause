@@ -143,7 +143,8 @@ internal fun LpEngine.lbTreeSearch(
                         }
                         // A numerical point may order exhaustive choices without certifying a source witness.
                         val point = witness?.primal ?: if (problem.numRealVars > 0) {
-                            result?.primal?.takeIf { it.size == model.n && it.all(Double::isFinite) }
+                            result?.takeIf { it.optimal }?.primal
+                                ?.takeIf { it.size == model.n && it.all(Double::isFinite) }
                                 ?.map { requireNotNull(BigFraction.ofDouble(it)) }
                         } else null
                         if (point == null) return SearchNodeDisposition.Expand
