@@ -275,7 +275,8 @@ alongside arithmetic participation.
 `RealArrayMinMax` retains ordered continuous operands and a result in the real
 namespace. Its implied inequalities form a sound relaxation; complete selected
 linear or polynomial encoders also require equality to an operand. Native scores
-are heuristic and exact source-coordinate checking remains authoritative.
+are heuristic and exact source-coordinate checking remains authoritative. Direct
+finite propagation is unavailable until a complete arithmetic consumer is selected.
 
 `RealElement` retains an integer index and ordered binary64 constants or real-column
 entries. Its finite propagation restricts the index range; exact arithmetic checks
