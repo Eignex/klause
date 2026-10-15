@@ -926,6 +926,11 @@ and diagnostics remain in case artifacts. Frozen baseline runs use `reference=an
 a ten-second budget, one processor, no result-cache replay and explicit repetition.
 Preserve every planned identity and unsuccessful outcome in external evidence.
 
+The subprocess `stats.exit` records the actual child exit on every completed invocation,
+including a nonzero exit after a verdict. Lab command exits belong to the containing
+harness process. Older records without this field leave the child exit unavailable;
+a witness or proof marker does not establish a zero process exit.
+
 ## Source validation
 
 ### Exact source probes
