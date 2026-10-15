@@ -1682,6 +1682,26 @@ loss-counter results are preserved unchanged. Complementary log metadata does
 not establish argument binding, calling convention, root completeness, clock
 alignment, total code size or compiler savings.
 
+With `review=return-sizes`, the same saved-archive review also pairs recorded
+`total-size` entries and returns by thread and observed call nesting. The complete
+original and complementary log reviews remain in the output. A size comparison
+requires one call inside a completed publication callback and public compilation
+pair, matching broker-task and nmethod receiver metadata, a unique independently
+matched successful JFR compilation, and the original read, sequence-delivery and
+owned-counter guards. Ambiguous calls are rejected before comparing their values.
+The captured low 32 return bits must agree with the recorded unsigned value and
+represent a supported nonnegative source `int`, then equal JFR's task code size.
+High register bits are retained without assigning them source `int` meaning.
+
+This comparison concerns the section sum returned by `nmethod::total_size()` and
+cached for JFR publication. Allocation size, immutable-data size and XML `nmsize`
+do not replace that value. Missing, outside-publication, duplicate, failed and
+unfinished calls remain in the report. A matching value supplies complementary
+return metadata; it does not establish the full calling convention, complete
+code-size/root coverage, clocks or compiler savings, and never changes original
+argument-binding or capture-wide acceptance flags. The review performs no new
+field reads, observer attachment or captured JVM replay.
+
 ### Table profiling
 
 ```sh

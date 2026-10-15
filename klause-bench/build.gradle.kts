@@ -195,13 +195,23 @@ val checkNativeVmLogIdentities = tasks.register<Exec>("checkNativeVmLogIdentitie
         "tools/review_native_vm_live_arguments.py", "tools/native_vm_event_loss.py")
 }
 
+val checkNativeVmReturnSizes = tasks.register<Exec>("checkNativeVmReturnSizes") {
+    group = "verification"
+    description = "Test saved total-size return and independent JFR metadata corroboration."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_native_vm_return_sizes.py")
+    inputs.files("tools/review_native_vm_return_sizes.py", "tools/test_review_native_vm_return_sizes.py",
+        "tools/review_native_vm_log_identities.py", "tools/review_native_vm_live_arguments.py",
+        "tools/native_vm_event_loss.py")
+}
+
 tasks.named("check") {
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,
         checkNativeVmLiveArgumentReview, checkNativeVmEventLoss, checkNativeVmEventLossReview,
         checkNativeVmBoundaryEntries, checkNativeVmBoundaryLifecycle, checkNativeVmBoundaryLifecycleReview,
-        checkNativeVmLogIdentities)
+        checkNativeVmLogIdentities, checkNativeVmReturnSizes)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
