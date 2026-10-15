@@ -107,6 +107,31 @@ val checkNativeVmBoundaryEntries = tasks.register<Exec>("checkNativeVmBoundaryEn
         "tools/native_vm_demangler.py", "tools/native_vm_loaded_module.py", "tools/read_native_vm_metadata.py")
 }
 
+val checkNativeVmBoundaryLifecycle = tasks.register<Exec>("checkNativeVmBoundaryLifecycle") {
+    group = "verification"
+    description = "Test source-bound lifecycle probe identities and process scope."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_native_vm_boundary_lifecycle.py")
+    inputs.files("tools/native_vm_boundary_lifecycle.py", "tools/test_native_vm_boundary_lifecycle.py",
+        "tools/bind_native_vm_boundary_entries.py", "tools/read_native_vm_entries.py", "tools/read_native_vm_symbols.py",
+        "tools/read_native_vm_signatures.py", "tools/native_vm_demangler.py", "tools/native_vm_live_arguments.py",
+        "tools/native_compiler_observer.py", "tools/native_vm_event_loss.py", "tools/native_vm_loaded_module.py",
+        "tools/read_native_vm_metadata.py")
+}
+
+val checkNativeVmBoundaryLifecycleReview = tasks.register<Exec>("checkNativeVmBoundaryLifecycleReview") {
+    group = "verification"
+    description = "Test lifecycle nesting, delivery gaps and public compilation identity candidates."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_native_vm_boundary_lifecycle.py")
+    inputs.files("tools/review_native_vm_boundary_lifecycle.py", "tools/test_review_native_vm_boundary_lifecycle.py",
+        "tools/native_vm_boundary_lifecycle.py", "tools/review_native_vm_live_arguments.py",
+        "tools/native_vm_live_arguments.py", "tools/native_compiler_observer.py", "tools/native_vm_event_loss.py",
+        "tools/bind_native_vm_boundary_entries.py", "tools/read_native_vm_entries.py", "tools/read_native_vm_symbols.py",
+        "tools/read_native_vm_signatures.py", "tools/native_vm_demangler.py", "tools/native_vm_loaded_module.py",
+        "tools/read_native_vm_metadata.py")
+}
+
 val checkNativeCompilerObserver = tasks.register<Exec>("checkNativeCompilerObserver") {
     group = "verification"
     description = "Test observer extraction, process scope and identity byte capture."
@@ -166,7 +191,7 @@ tasks.named("check") {
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,
         checkNativeVmLiveArgumentReview, checkNativeVmEventLoss, checkNativeVmEventLossReview,
-        checkNativeVmBoundaryEntries)
+        checkNativeVmBoundaryEntries, checkNativeVmBoundaryLifecycle, checkNativeVmBoundaryLifecycleReview)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
