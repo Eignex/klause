@@ -1077,6 +1077,42 @@ class LocalSearchEngineTest {
     }
 
     @Test
+    fun `completion work leaves search steps between numerical move probes`() {
+        val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
+        var picks = 0
+        val queriedAt = mutableListOf<Int>()
+        val source = object : MoveSource {
+            override val id = MoveSourceId("supplied")
+            override val phase = Phase.Feasible
+            override val pool = Pool.ScoreOnly
+            override fun generate(state: LocalSearchState, sink: MoveSink) {
+                sink.addIntSet(0, (++picks % 2).toLong())
+            }
+        }
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(mixedProblem()), greedyRepairOnRestart = false,
+            strategy = SourceDrivenStrategy(
+                sources = listOf(ConfiguredSource(source)), feasibleDescent = FeasibleDescent.SelfOwned,
+                feasibleAcceptance = AcceptanceRule.GreedyDescent, feasibleResampleCap = 20,
+            ), completion = { candidate, _ ->
+                if (candidate.intValue(0) == 2L) Completion.Witness(candidate) else {
+                    queriedAt += picks
+                    Completion.Refuted(work = 4)
+                }
+            },
+        )
+
+        val result = search.improvements(
+            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+            LocalSearchParams(maxInstructions = 20, initialAssignment = initial), null,
+        ).last()
+
+        assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
+        assertTrue(queriedAt.size >= 2)
+        assertTrue(queriedAt.zipWithNext().all { (first, second) -> second - first >= 4 })
+    }
+
+    @Test
     fun `continuous move exploration preserves finite invocation pins`() {
         val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
         val candidates = mutableListOf<Long>()

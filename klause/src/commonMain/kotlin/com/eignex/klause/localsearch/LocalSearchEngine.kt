@@ -777,18 +777,21 @@ internal class LocalSearchEngine(
         val roundFeedback = RoundFeedback.of(satisfyStrategy, configuredRestart)
         var cancelCountdown = 0
         var lastCheckMs = 0L
+        var nextMoveCompletion = 0L
         val completedMoves = if (completion != null && problem.numRealVars > 0 && objective is LinearObjective &&
             objective.realCoefficientValues.any { it != 0.0 } && problem.numBoolVars + problem.numIntVars > 0 &&
             feasibleMode == FeasibleDescent.SelfOwned
         ) CompletedMoveEvaluation(
             state, objective, params.cancellation,
             mayAttempt = {
-                totalFlips < maxFlips && params.nodeBudget?.allowance?.movesLeft() != 0L &&
+                totalFlips >= nextMoveCompletion && totalFlips < maxFlips &&
+                    params.nodeBudget?.allowance?.movesLeft() != 0L &&
                     checkpoint?.shouldPause(totalFlips) != true
             },
             complete = { candidate ->
                 decide(state, candidate, params.cancellation, sink.ls) { work ->
                     totalFlips += work
+                    nextMoveCompletion = totalFlips + minOf(work, Long.MAX_VALUE - totalFlips)
                     progress.charge(totalFlips)
                 }
             },

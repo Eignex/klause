@@ -17,7 +17,8 @@ checks every required source constraint, including arithmetic completion. A low
 score guides the walk; it does not prove feasibility, optimality or infeasibility.
 Propagation-only custom factors use the shared [source validation](validation.md)
 service for a private full-coordinate check before
-caller completion or publication; see [custom factor checks](search.md#custom-factor-publication-checks).
+publication. Finite-only checks precede caller completion; checks needing real
+coordinates read its completed sample. See [custom factor checks](search.md#custom-factor-publication-checks).
 
 The sections follow preparation, move mechanics and run lifetime, then diagnostics.
 [Search](search.md) owns complete traversal; [sessions](sessions.md) owns caller
@@ -669,7 +670,11 @@ an exact assignment check declines the pinned proposal before numerical completi
 continuous changes cannot repair that source violation. Heuristic and unsupported
 finite checks retain their ordinary completion/publication checks.
 The existing instruction, solve-wide move and containing native/query allowances
-bound attempts; every completed attempt is charged once, including failures.
+bound attempts; every completed attempt is charged once, including failures. After
+a move probe charges work, that many further search instructions must accrue before
+another new move-completion query is admitted. Successful cached proposals remain
+usable without another numerical query. This pacing leaves time for the recipe to
+resample, repair and restart instead of spending every instruction on completion.
 
 Only accepted completions enter the recipe's noise/score pools. Their scores compare
 the original objective on completed samples, and improving tabu aspiration uses that
