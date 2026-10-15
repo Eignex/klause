@@ -31,7 +31,9 @@ existing specialized owners; a finite checker does not reinterpret those values.
 
 `finiteWitnessVerifier` combines the finite point check with exact real checking or
 the caller's explicit source tolerance policy and retains objective/certificate
-admission. A tolerance callback does not change exact source evidence semantics.
+admission. Its assumption-aware overload checks exact pins and deduced restrictions
+in the same private fixpoint and requires complete finite real coordinates before
+calling a source tolerance policy. A tolerance callback does not change exact source evidence semantics.
 See [model ownership](../model.md#published-assignments-and-objectives) for immutable
 coordinate lifetimes and [resource allowances](resources.md) for containing work
 and cancellation scopes.

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.validation
 
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
@@ -17,6 +18,16 @@ internal fun finiteWitnessVerifier(
     objective: LinearObjective?,
     cancellation: Cancellation = Cancellation.Never,
     toleranceCheck: ((Sample) -> Boolean)? = null,
+): CandidateVerifier<Sample, Double?> = finiteWitnessVerifier(
+    problem, objective, Assumptions.None, cancellation, toleranceCheck,
+)
+
+internal fun finiteWitnessVerifier(
+    problem: BakedProblem,
+    objective: LinearObjective?,
+    assumptions: Assumptions,
+    cancellation: Cancellation = Cancellation.Never,
+    toleranceCheck: ((Sample) -> Boolean)? = null,
 ): CandidateVerifier<Sample, Double?> = CandidateVerifier { candidate ->
     val sample = candidate.assignment
     val claimed = candidate.objective
@@ -32,7 +43,12 @@ internal fun finiteWitnessVerifier(
     if (sample.exactInts != null && sample.exactInts.any { !it.fitsLong() }) {
         return@CandidateVerifier Verification.Indeterminate("a finite checker cannot verify wide integer coordinates")
     }
-    when (val verdict = composedFixpoint(problem, Candidate(sample, Unit), cancellation)) {
+    if (sample.numRealVars != problem.numRealVars ||
+        (0 until sample.numRealVars).any { !sample.approximateRealValue(it).isFinite() }
+    ) {
+        return@CandidateVerifier Verification.Rejected("assignment does not cover finite real coordinates")
+    }
+    when (val verdict = composedFixpoint(problem, Candidate(sample, Unit), cancellation, assumptions)) {
         is Verification.Rejected -> return@CandidateVerifier verdict
         is Verification.Indeterminate -> return@CandidateVerifier verdict
         is Verification.Accepted -> Unit
