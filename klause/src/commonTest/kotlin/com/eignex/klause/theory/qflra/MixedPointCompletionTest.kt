@@ -15,6 +15,35 @@ import kotlin.test.assertTrue
 
 class MixedPointCompletionTest {
     @Test
+    fun `source prefixes can satisfy rows outside the difference fragment`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ONE.negated()), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE.negated(), BigFraction.ONE.negated(), BigFraction.ONE), BigFraction.ZERO),
+        )
+
+        val point = assertNotNull(completeMixedPoint(3, 1, doubleArrayOf(0.5, 0.5, 1.0, 1.0),
+            rows, Cancellation.Never))
+
+        assertTrue(point.satisfiesSourceRows(rows))
+    }
+
+    @Test
+    fun `rational reconstruction of source reals requires exact full row agreement`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                List(3) { BigFraction.ONE.negated() }, BigFraction.ONE.negated()),
+        )
+
+        val point = assertNotNull(completeMixedPoint(3, 1, doubleArrayOf(1.0 / 3, 1.0 / 3, 1.0 / 3, 1.0),
+            rows, Cancellation.Never))
+
+        assertTrue(point.satisfiesSourceRows(rows))
+    }
+
+    @Test
     fun `integer guesses admit exact strict real completion only after full row checking`() {
         val rows = listOf(
             exactColumnLower(0, BigFraction.ZERO),
@@ -25,7 +54,7 @@ class MixedPointCompletionTest {
                 listOf(BigFraction.ONE, BigFraction.ONE.negated(), BigFraction.ONE), BigFraction.ZERO, strict = true),
         )
 
-        val point = assertNotNull(completeMixedDifferencePoint(2, 1, doubleArrayOf(0.0, 0.0, 1.0),
+        val point = assertNotNull(completeMixedPoint(2, 1, doubleArrayOf(0.0, 0.0, 1.0),
             rows, Cancellation.Never))
 
         assertEquals(BigFraction.ONE, point[2])
@@ -36,18 +65,18 @@ class MixedPointCompletionTest {
     fun `rounded integers cannot escape current branch bounds`() {
         val rows = listOf(exactColumnLower(1, BigFraction.ONE), exactColumnUpper(1, BigFraction.ONE))
         for (value in listOf(1.6, -0.6)) {
-            val point = completeMixedDifferencePoint(1, 1, doubleArrayOf(0.0, value), rows, Cancellation.Never)
+            val point = completeMixedPoint(1, 1, doubleArrayOf(0.0, value), rows, Cancellation.Never)
 
             assertNull(point)
         }
     }
 
     @Test
-    fun `non difference residuals decline the integer guess`() {
+    fun `invalid non difference residuals decline the integer guess`() {
         val rows = listOf(ExactRationalInequality(intArrayOf(0, 1),
             listOf(BigFraction.ONE, BigFraction.ONE), BigFraction.ONE))
 
-        val point = completeMixedDifferencePoint(2, 1, doubleArrayOf(0.0, 0.0, 1.0), rows, Cancellation.Never)
+        val point = completeMixedPoint(2, 1, doubleArrayOf(2.0, 2.0, 1.0), rows, Cancellation.Never)
 
         assertNull(point)
     }
@@ -56,7 +85,7 @@ class MixedPointCompletionTest {
     fun `inconsistent real residuals do not produce a witness`() {
         val rows = listOf(exactColumnLower(0, BigFraction.ONE), exactColumnUpper(0, BigFraction.ZERO))
 
-        val point = completeMixedDifferencePoint(1, 1, doubleArrayOf(0.0, 1.0), rows, Cancellation.Never)
+        val point = completeMixedPoint(1, 1, doubleArrayOf(0.0, 1.0), rows, Cancellation.Never)
 
         assertNull(point)
     }
@@ -69,7 +98,7 @@ class MixedPointCompletionTest {
             override fun workMeter(): WorkMeter = WorkMeter { charged += it }
         }
 
-        val point = completeMixedDifferencePoint(1, 1, doubleArrayOf(0.0, 1.0), emptyList(), stop)
+        val point = completeMixedPoint(1, 1, doubleArrayOf(0.0, 1.0), emptyList(), stop)
 
         assertNull(point)
         assertTrue(charged > 0L)

@@ -197,7 +197,7 @@ class ExactLiraSearchComponent private constructor(
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private var unassignedBooleans = model.numBoolVars
     private var completeTraversalObserved = false
-    private var mixedDifferenceCompletion = false
+    private var mixedPointCompletion = false
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
     private val root = SearchNode()
     private val disjunctionAtoms = HashMap<Int, List<DisjunctAtom>>()
@@ -290,9 +290,9 @@ class ExactLiraSearchComponent private constructor(
         smtStats = stats
     }
 
-    internal fun useMixedDifferenceCompletion() {
+    internal fun useMixedPointCompletion() {
         check(context == null)
-        mixedDifferenceCompletion = true
+        mixedPointCompletion = true
     }
 
     internal fun observeCompleteTraversal() {
@@ -1059,7 +1059,7 @@ class ExactLiraSearchComponent private constructor(
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
         if (bools.any { it == UNASSIGNED }) {
             candidate?.let { capturePointHints(it, context) }
-        } else if (candidate == null && mixedDifferenceCompletion && result.float?.optimal == true &&
+        } else if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
             model.numIntVars > 0 && model.numRealVars > 0 &&
             solveContext.certificationPolicy === ProductionLpCertificationPolicy
         ) {
@@ -1123,7 +1123,7 @@ class ExactLiraSearchComponent private constructor(
             floatCandidate = null
             if (retained != null) {
                 val rows = agreementSourceRows(context)
-                if (rows != null) candidate = completeMixedDifferencePoint(
+                if (rows != null) candidate = completeMixedPoint(
                     model.numRealVars, model.numIntVars, retained, rows, lpStop,
                 )
                 if (!operationStop()) captureCompleteWitness(candidate)
