@@ -50,6 +50,15 @@ can declare a target and implement the same installation scope. Selection contai
 no mutable solving state. Prepared relations are combined within one arithmetic
 owner before its checks, rather than checked as independent factor witnesses.
 
+A linear consumer can complete an integer-conditioned encoder by covering every
+value of its required finite declarations. It retains source integer guards on
+each installed relation, combines all factors in the same arithmetic owner, and
+keeps finite globals and domain holes with their CP owner. The captured encoder
+remains conditioned. This consumer caps the Cartesian cover at 4096 cases and
+declines open conditions, Boolean-only conditions and oversized covers. A failed
+or interrupted case discards the entire receiving relation. Explicit leaf pins
+continue to install only their scoped relation.
+
 Linear and difference participation uses selected complete relations and retains
 existing exact coefficient, strictness and combined graph safety gates. Finite
 coordinate ownership stays independent of that participation. Propagation and encoding

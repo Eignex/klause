@@ -12,6 +12,7 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.theory.conditionedLinearSupported
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.Cancellation
@@ -319,12 +320,16 @@ internal fun Problem.prepareExecutionPlan(
 internal fun Problem.requiresPolynomialCompletion(
     projections: PreparedFactorProjections,
     preferFinite: Boolean = false,
-): Boolean = factors.indices.any { index ->
-    !projections.encoder(index, EncodingTarget.LINEAR).enforcesSource &&
+): Boolean {
+    val openInteger = (0 until numIntVars).any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) }
+    return factors.indices.any { index ->
+        !projections.encoder(index, EncodingTarget.LINEAR).enforcesSource &&
+        !(openInteger && projections.conditionedLinearSupported(index)) &&
         projections.encoder(index, EncodingTarget.POLYNOMIAL).enforcesSource &&
         (factors[index].variables.reals.isNotEmpty() ||
             projections.capabilities(index).propagation == PropagationCapability.UNSUPPORTED) &&
         (!preferFinite || !finiteRealFactorSupported(index, projections))
+    }
 }
 
 internal fun Problem.preparedWithComponents(

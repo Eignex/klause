@@ -25,7 +25,7 @@ internal class EncodedTheoryFactor(
     val attribution: EncodingAttribution,
 ) : Factor by source {
     override val variables = MixedVars(
-        boundInts = source.intVars,
+        boundInts = (source.intVars.toList() + attribution.integers.map { it.index }).distinct().toIntArray(),
         boolVars = source.boolVars,
         reals = (source.variables.reals.toList() + attribution.auxiliaries.map { it.index }).distinct().toIntArray(),
     )
@@ -66,6 +66,10 @@ internal fun PreparedFactorProjections.installLinearFactor(
     allocator: EncodingRealAllocator = EncodingRealAllocator(problem.numRealVars),
     onDecline: (EncoderDecline) -> Unit = {},
 ): List<EncodedTheoryFactor>? {
+    val selected = encoder(index, target)
+    if (target == EncodingTarget.LINEAR && selected.support == EncoderSupport.CONDITIONED &&
+        selected.requiredIntegers.any { it !in integerPins }
+    ) return installConditionedLinearFactor(index, integerPins, booleanPins, cancellation, allocator, onDecline)
     val source = problem.factors[index]
     val sourceIndex = (source as? EncodedTheoryFactor)?.attribution?.sourceFactorIndex ?: index
     val booleans = source.boolVars.toMutableSet()

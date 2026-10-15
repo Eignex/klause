@@ -16,6 +16,7 @@ import com.eignex.klause.solver.supportsCompleteDifferenceTheory
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.conditionedLinearSupported
 import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.theory.qflra.supportsExactLira
 import com.eignex.klause.theory.qflra.supportsExactLra
@@ -394,6 +395,8 @@ fun Problem.componentPlan(
     val target = if (completeTheory == ProblemPipeline.DIFFERENCE_THEORY || requiresDifference) {
         EncodingTarget.DIFFERENCE
     } else EncodingTarget.LINEAR
+    fun enforcesSource(index: Int): Boolean = projections.encoder(index, target).enforcesSource ||
+        (target == EncodingTarget.LINEAR && projections.conditionedLinearSupported(index))
     val factorOwners = Array(factors.size) { index ->
         val factor = factors[index]
         when {
@@ -401,7 +404,7 @@ fun Problem.componentPlan(
             factor.variables.reals.isEmpty() && factor.intVars.all { intOwners[it] == IntVariableOwner.CP } &&
                 projections.capabilities(index).propagation != PropagationCapability.UNSUPPORTED ->
                 FactorOwner.CP
-            projections.encoder(index, target).enforcesSource -> FactorOwner.THEORY
+            enforcesSource(index) -> FactorOwner.THEORY
             else -> FactorOwner.CP
         }
     }
@@ -414,7 +417,7 @@ fun Problem.componentPlan(
     while (changed) {
         changed = false
         for ((index, factor) in factors.withIndex()) {
-            if (!projections.encoder(index, target).enforcesSource ||
+            if (!enforcesSource(index) ||
                 (!encoded[index] && factor.intVars.none { relevantIntegers[it] } &&
                     factor.variables.reals.none { relevantReals[it] })
             ) continue
