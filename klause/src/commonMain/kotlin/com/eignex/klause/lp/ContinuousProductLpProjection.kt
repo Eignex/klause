@@ -33,3 +33,13 @@ internal fun ContinuousProduct.emitLpRelaxation(builder: RelaxationBuilder) {
         }
     }
 }
+
+internal fun ContinuousProduct.hasCompleteGuardedLpCompletion(): Boolean {
+    val choices = finiteChoices?.takeIf { it.hasGuards } ?: return false
+    val other = if (choices.operand == a) b else a
+    if (other != result) return true
+    return (0 until choices.size).all { index ->
+        val coefficient = BigFraction.ONE - requireNotNull(BigFraction.ofDouble(choices.valueAt(index)))
+        BigFraction.ofDouble(coefficient.toDouble()) == coefficient
+    }
+}

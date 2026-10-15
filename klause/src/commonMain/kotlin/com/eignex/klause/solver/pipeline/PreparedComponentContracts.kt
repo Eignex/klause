@@ -7,6 +7,7 @@ import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.hasCompleteGuardedLpCompletion
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
@@ -67,7 +68,7 @@ internal fun Problem.finiteRealFactorSupported(index: Int, projections: Prepared
     if (factor.variables.reals.isEmpty()) return true
     if (!encoder.enforcesSource && encoder.support != EncoderSupport.CONDITIONED) return false
     return factor is RealProduct || factor is RealAbs || factor is RealElement ||
-        (factor is ContinuousProduct && factor.finiteChoices?.hasGuards == true) ||
+        (factor is ContinuousProduct && factor.hasCompleteGuardedLpCompletion()) ||
         ((factor.linearForm is LinearForm.Conjunction || factor.linearForm is LinearForm.Disjunction) &&
             factor.linearForm!!.rows.none { it.strict })
 }

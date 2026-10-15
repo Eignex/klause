@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -7,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.simplex.exact.BigFraction
@@ -73,6 +75,27 @@ private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): 
                 factor.vars, RealConsts(factor.intCoeffs), factor.realVars, RealConsts(factor.realCoeffs),
                 op, factor.bound, if (holds) factor.strict else !factor.strict, point, direction,
             )
+        }
+
+        is ContinuousProduct -> {
+            val choices = factor.finiteChoices
+            if (choices != null) {
+                if (!direction[choices.operand].isZero) return false
+                var admitted = false
+                for (index in 0 until choices.size) {
+                    val matches = reals[choices.operand] == BigFraction.ofDouble(choices.valueAt(index))
+                    admitted = admitted || matches
+                    if (choices.hasGuards) {
+                        val literal = choices.literalAt(index)
+                        if (Lit.evaluate(literal, point.boolValue(Lit.variable(literal))) != matches) return false
+                    }
+                }
+                if (!admitted) return false
+            }
+            reals[factor.a] * reals[factor.b] == reals[factor.result] &&
+                (direction[factor.a] * direction[factor.b]).isZero &&
+                direction[factor.result] == direction[factor.a] * reals[factor.b] +
+                    reals[factor.a] * direction[factor.b]
         }
 
         // With the integer operand fixed at k, the product is the row `result − k·operand = 0`.
