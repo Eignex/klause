@@ -729,10 +729,9 @@ class EncoderTest {
             else BuiltInEncoderProvider.select(factor, target)
         })
 
-        val plan = source.prepareExecutionPlan(providers)
+        val route = assertIs<SourceProblemRoute.UnsupportedOpen>(source.pipelineRoute(providers))
 
-        assertEquals(PreparedExecutionKind.DECLINED, plan.kind)
-        assertFalse(plan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
+        assertFalse(route.preparedPlan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
     }
     @Test
     fun `guarded provider installation retracts a refuted query before its sibling`() {
