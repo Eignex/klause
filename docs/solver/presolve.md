@@ -231,3 +231,9 @@ containing stop before reuse; an observed stop keeps an explicit resource declin
 A changed model prepares ownership against the proved declarations, and finite-lane
 selection still prepares its finite ownership separately. Reuse retains only completed
 immutable preparation, with no renewed allowance or mutable invocation state.
+
+A declined polynomial composition retains its available finite owners and compact
+CP projection, including native globals and declared holes. Open integer columns
+remain unplaced arithmetic owners and do not enter that projection. The missing
+completion still withholds whole-query admission. Interrupted installation retains
+its resource decline and publishes no partial prepared relation.
