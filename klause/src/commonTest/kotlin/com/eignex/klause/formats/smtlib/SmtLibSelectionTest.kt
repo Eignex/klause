@@ -8,6 +8,7 @@ import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.search.ComponentResult
@@ -76,11 +77,15 @@ class SmtLibSelectionTest {
         for (positive in listOf(false, true)) {
             val parsed = SmtLib.parse("""
                 (declare-const b Bool) (declare-const x Int) (declare-const y Int)
+                (assert (and (<= (- 4) x 4) (<= (- 4) y 4)))
                 (assert (= x y))
                 (assert (= (+ x y) (ite ${if (positive) "b" else "(not b)"} (+ x 1) (- y 1))))
             """.trimIndent())
             val variable = parsed.boolVarNames.getValue("b")
-            parsed.model.componentPlan().search(parsed.model, emptyMap()).use { planned ->
+            assertEquals(1, parsed.model.factors.filterIsInstance<Element>().size)
+            val plan = parsed.model.componentPlan()
+            assertEquals(ProblemPipeline.EXACT_LIRA, plan.theoryPipeline)
+            plan.search(parsed.model, emptyMap()).use { planned ->
                 assertNull(planned.candidateHints.preferredBool(variable))
                 assertIs<ComponentResult.Consistent>(planned.session.initialize())
                 assertNull(planned.session.boolValue(variable))
@@ -111,6 +116,7 @@ class SmtLibSelectionTest {
                 (declare-const b Bool) (declare-const c Bool)
                 (declare-const x Int) (declare-const y Int)
                 (declare-const z Int) (declare-const w Int)
+                (assert (and (<= (- 4) x 4) (<= (- 4) y 4) (<= (- 4) z 4) (<= (- 4) w 4)))
                 (assert (let ((g (and b c))) (and
                     (= x y) (= z w)
                     (= (+ x y) (ite g (+ x 1) (- y 1)))
@@ -137,6 +143,31 @@ class SmtLibSelectionTest {
             assertEquals(if (branch) "-2" else "2", sample.intValue(parsed.intVarNames.getValue("z")))
             assertEquals(sample.intValue(parsed.intVarNames.getValue("z")),
                 sample.intValue(parsed.intVarNames.getValue("w")))
+        }
+    }
+
+    @Test
+    fun `open conditional values preserve selected signed branches`() {
+        for (positive in listOf(false, true)) {
+            for (branch in listOf(false, true)) {
+                val parsed = SmtLib.parse("""
+                    (declare-const b Bool) (declare-const x Int) (declare-const y Int)
+                    (assert (= x y))
+                    (assert (= (+ x y) (ite ${if (positive) "b" else "(not b)"} (+ x 1) (- y 1))))
+                    (assert ${if (branch) "b" else "(not b)"})
+                """.trimIndent())
+
+                val result = BacktrackSolver.source(parsed.model)
+                    .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+                assertTrue(parsed.model.factors.none { it is Element })
+                val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+                assertEquals(branch, sample.boolValue(parsed.boolVarNames.getValue("b")))
+                assertEquals(if (branch == positive) "1" else "-1",
+                    sample.intValue(parsed.intVarNames.getValue("x")))
+                assertEquals(sample.intValue(parsed.intVarNames.getValue("x")),
+                    sample.intValue(parsed.intVarNames.getValue("y")))
+            }
         }
     }
 

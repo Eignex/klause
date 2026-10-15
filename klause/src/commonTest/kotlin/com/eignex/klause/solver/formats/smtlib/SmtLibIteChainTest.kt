@@ -83,8 +83,7 @@ class SmtLibIteChainTest {
 
         assertFalse(parsed.model.intBounds.hasLower(selector))
         assertFalse(parsed.model.intBounds.hasUpper(selector))
-        assertTrue(selections.isNotEmpty())
-        assertTrue(selections.all { it.idx != selector })
+        assertTrue(selections.isEmpty())
     }
 
     @Test
