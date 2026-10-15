@@ -59,6 +59,10 @@ exponents and variable real exponents decline.
 
 A source-fixed float-array index also pins its finite value literal, preserving
 Boolean propagation across the shared finite choices.
+Continuous `float_min` and `float_max` retain `RealArrayMinMax`, including constant
+operands and aliases. Complete arithmetic consumers own the equality alternatives.
+Scaled grid comparisons retain their component's numerical conversion policy.
+
 Constant float-array selection retains `RealElement` over continuous result
 columns and integer `Element` over grid bucket coordinates. Both retain the
 one-based source index and repeated entries. Grid entries use the result's existing

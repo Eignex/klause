@@ -272,6 +272,11 @@ retains source attribution and uses the receiving cancellation/work allowance;
 an interrupted relation is discarded. Native finite projections remain available
 alongside arithmetic participation.
 
+`RealArrayMinMax` retains ordered continuous operands and a result in the real
+namespace. Its implied inequalities form a sound relaxation; complete selected
+linear or polynomial encoders also require equality to an operand. Native scores
+are heuristic and exact source-coordinate checking remains authoritative.
+
 `RealElement` retains an integer index and ordered binary64 constants or real-column
 entries. Its finite propagation restricts the index range; exact arithmetic checks
 certify the selected real equality. A fixed index emits that equality into the LP

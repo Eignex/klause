@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.Factor
@@ -65,6 +66,8 @@ class SourceRecessionTest {
         val cases = listOf(
             Case("open row", listOf(open), listOf(1L, 0L), listOf(1L, 0L)),
             Case("equality moving both reals", listOf(sum), listOf(0L, 0L), listOf(1L, -1L)),
+            Case("maximum retaining its selected operand",
+                listOf(RealArrayMinMax(0, intArrayOf(0, 1), max = true)), listOf(0L, 0L), listOf(1L, 0L)),
             Case("product at the fixed integer", listOf(product), listOf(1L, 2L), listOf(1L, 2L)),
             Case("complement of a false atom", listOf(atom), listOf(6L, 0L), listOf(1L, 0L), aux = false),
         )
@@ -80,6 +83,8 @@ class SourceRecessionTest {
             Case("objective does not descend", listOf(open), listOf(1L, 0L), listOf(1L, 0L), costs = ascending),
             Case("zero ray", listOf(open), listOf(1L, 0L), listOf(0L, 0L)),
             Case("point violates a row", listOf(open), listOf(0L, 0L), listOf(1L, 0L)),
+            Case("minimum crosses its other operand",
+                listOf(RealArrayMinMax(0, intArrayOf(0, 1), max = false)), listOf(0L, 0L), listOf(1L, 0L)),
             Case("product off the fixed integer", listOf(product), listOf(1L, 2L), listOf(1L, 1L)),
             Case("true atom bounds the ray", listOf(atom), listOf(1L, 0L), listOf(1L, 0L)),
         )

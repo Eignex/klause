@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.AffineAbs
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.table.RealElement
@@ -65,6 +66,11 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             if (integer * reals[factor.realOperand] != reals[factor.result]) {
                 return Verification.Rejected("real factor $id refutes the assignment")
             }
+            continue
+        }
+        if (factor is RealArrayMinMax) {
+            val selected = if (factor.max) factor.xs.maxOf { reals[it] } else factor.xs.minOf { reals[it] }
+            if (selected != reals[factor.result]) return Verification.Rejected("real factor $id refutes the assignment")
             continue
         }
         if (factor is RealElement) {

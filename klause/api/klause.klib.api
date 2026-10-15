@@ -6002,6 +6002,27 @@ final class com.eignex.klause.factor.arithmetic/RealAbs : com.eignex.klause.ir/F
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/RealAbs.structuralKey|structuralKey(){}[0]
 }
 
+final class com.eignex.klause.factor.arithmetic/RealArrayMinMax : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.arithmetic/RealArrayMinMax|null[0]
+    constructor <init>(kotlin/Int, kotlin/IntArray, kotlin/Boolean) // com.eignex.klause.factor.arithmetic/RealArrayMinMax.<init>|<init>(kotlin.Int;kotlin.IntArray;kotlin.Boolean){}[0]
+
+    final val linearForm // com.eignex.klause.factor.arithmetic/RealArrayMinMax.linearForm|{}linearForm[0]
+        final fun <get-linearForm>(): com.eignex.klause.ir/LinearForm // com.eignex.klause.factor.arithmetic/RealArrayMinMax.linearForm.<get-linearForm>|<get-linearForm>(){}[0]
+    final val max // com.eignex.klause.factor.arithmetic/RealArrayMinMax.max|{}max[0]
+        final fun <get-max>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/RealArrayMinMax.max.<get-max>|<get-max>(){}[0]
+    final val result // com.eignex.klause.factor.arithmetic/RealArrayMinMax.result|{}result[0]
+        final fun <get-result>(): kotlin/Int // com.eignex.klause.factor.arithmetic/RealArrayMinMax.result.<get-result>|<get-result>(){}[0]
+    final val structuralKeyWeight // com.eignex.klause.factor.arithmetic/RealArrayMinMax.structuralKeyWeight|{}structuralKeyWeight[0]
+        final fun <get-structuralKeyWeight>(): kotlin/Int // com.eignex.klause.factor.arithmetic/RealArrayMinMax.structuralKeyWeight.<get-structuralKeyWeight>|<get-structuralKeyWeight>(){}[0]
+    final val variables // com.eignex.klause.factor.arithmetic/RealArrayMinMax.variables|{}variables[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/RealArrayMinMax.variables.<get-variables>|<get-variables>(){}[0]
+    final val xs // com.eignex.klause.factor.arithmetic/RealArrayMinMax.xs|{}xs[0]
+        final fun <get-xs>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/RealArrayMinMax.xs.<get-xs>|<get-xs>(){}[0]
+
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.arithmetic/RealArrayMinMax.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/RealArrayMinMax.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/RealArrayMinMax.structuralKey|structuralKey(){}[0]
+}
+
 final class com.eignex.klause.factor.arithmetic/RealProduct : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.arithmetic/RealProduct|null[0]
     constructor <init>(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Double, kotlin/Double) // com.eignex.klause.factor.arithmetic/RealProduct.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Double;kotlin.Double){}[0]
 

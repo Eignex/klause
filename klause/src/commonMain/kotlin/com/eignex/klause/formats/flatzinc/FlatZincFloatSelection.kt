@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
@@ -52,4 +53,12 @@ internal fun FlatZincCompiler.emitFloatSelection(c: FznConstraint) {
     }
     if (reachable == 0) failHere("array_float_element: no valid index value in the domain")
     factors.add(Element(idx, x.varId, buckets, arrIsVars = false))
+}
+
+internal fun FlatZincCompiler.emitRealMinMax(c: FznConstraint, max: Boolean): Boolean {
+    val variables = c.args.map(::resolveFloatVarOrConst).filterIsInstance<FloatRef.Var>()
+    if (variables.any { !it.bk.lpOnly }) return false
+    val operands = c.args.map { resolveFloatElement(it, "__real_extremum_${floatVars.size}", lpOnly = true).varId }
+    factors.add(RealArrayMinMax(operands[2], intArrayOf(operands[0], operands[1]), max))
+    return true
 }
