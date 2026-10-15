@@ -204,7 +204,18 @@ Node bounding uses the strongest completed certificate for pruning and can use
 weaker certificates for independent conditional fixings. Exact rational cutoff
 gaps and endpoint movements remain in minimized source units. A directly integral
 source objective supplies its native lattice for mixed models; pure integer CP
-models retain their separate Long objective-range guard. Continuous coordinates
+models retain their separate Long objective-range guard.
+
+Policy-accepted safe objective bounds also support continuous-objective node and
+recovery pruning when a richer mixed certificate is unavailable or withheld.
+Their cutoff encloses the floating incumbent with its upper neighbor; equality
+at the floating incumbent alone cannot prune. They retain minimized source units,
+including source scaling and external constants, without integer lattice rounding
+or a Long objective-range requirement. Root publication retains the same accepted
+continuous bound, composed with the relaxation constant exactly and projected
+downward. Declined certification supplies no bound, and a bound supplies neither
+a witness nor attainment authority. Pure integer objectives retain the Long
+source-range and enclosing-cutoff guards. Continuous coordinates
 remain outside CP fixing targets. Objective certification and fixing precede row
 projection under the shared allowance. Feasibility queries without an objective
 operation can still apply row bounds. Root row projection considers all mixed
