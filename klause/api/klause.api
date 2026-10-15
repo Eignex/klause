@@ -10988,6 +10988,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOptions {
 	public static final field Companion Lcom/eignex/klause/solver/pipeline/ExecutionOptions$Companion;
 	public fun <init> ([Lcom/eignex/klause/solver/pipeline/ExecutionSetting;)V
 	public final fun getExplicitArms ()Z
+	public final fun withNumericalCompletion ()Lcom/eignex/klause/solver/pipeline/ExecutionOptions;
 }
 
 public final class com/eignex/klause/solver/pipeline/ExecutionOptions$Companion {
@@ -11255,6 +11256,19 @@ public final class com/eignex/klause/solver/pipeline/NonlinearIntegerTheoryReque
 	public static final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;I)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
 	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
 	public static final fun pipelineRequest (Lcom/eignex/klause/ir/NonlinearIntegerProblem;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;
+}
+
+public final class com/eignex/klause/solver/pipeline/NumericalLinearRequest {
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZLcom/eignex/klause/util/Cancellation;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZLcom/eignex/klause/util/Cancellation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun finiteRoute (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
+	public static synthetic fun finiteRoute$default (Lcom/eignex/klause/solver/pipeline/NumericalLinearRequest;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
+	public final fun getMaximize ()Z
+	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun numericalRowsSupported (Lcom/eignex/klause/util/Cancellation;)Z
+	public static synthetic fun numericalRowsSupported$default (Lcom/eignex/klause/solver/pipeline/NumericalLinearRequest;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Z
+	public final fun solve (Lcom/eignex/klause/solver/pipeline/TheoryParams;ZLkotlin/jvm/functions/Function2;)Lcom/eignex/klause/solver/result/LinearOptimizationResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/solver/pipeline/NumericalLinearRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;ZLkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenBranching : java/lang/Enum {
