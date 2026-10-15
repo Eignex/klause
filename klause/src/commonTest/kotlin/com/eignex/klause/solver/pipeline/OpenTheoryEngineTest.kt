@@ -56,7 +56,8 @@ class OpenTheoryEngineTest {
             var pause = true
             val policy = object : SearchNodePolicy {
                 override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
-                    if (pause && context.decisionLevel > 0) SearchNodeDisposition.Pause else SearchNodeDisposition.Expand
+                    if (pause && context.decisionLevel > 0) SearchNodeDisposition.Pause
+                    else SearchNodeDisposition.Expand
             }
             val started = assertIs<OpenTheoryStart.Running>(engine.begin(params, OpenTheorySolveState(params), policy))
             started.run.use { run ->
