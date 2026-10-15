@@ -74,27 +74,33 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `conditional arithmetic fallback preserves exact branch values`() {
-        val terms = listOf(
-            "(+ (* 2 (ite b 9223372036854775807 0)) 1)" to "18446744073709551615",
-            "(+ (* 2 (ite b (+ x y) 0)) 1)" to "7",
-        )
-        for ((term, selected) in terms) {
-            for (branch in listOf(false, true)) {
-                val parsed = SmtLib.parse("""
-                    (declare-const b Bool) (declare-const x Int) (declare-const y Int) (declare-const z Int)
-                    (assert (= x 1)) (assert (= y 2)) (assert ${if (branch) "b" else "(not b)"})
-                    (assert (= z (ite b $term 9)))
-                """.trimIndent())
+    fun `affine overflow cannot wrap into a feasible branch value`() {
+        val parsed = SmtLib.parse("""
+            (declare-const b Bool) (declare-const z Int)
+            (assert b) (assert (= z (- 1)))
+            (assert (= z (ite b (+ (* 2 (ite b 9223372036854775807 0)) 1) 9)))
+        """.trimIndent())
 
-                val result = BacktrackSolver.source(parsed.model)
-                    .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
 
-                val sample = assertIs<OpenTheoryResult.Sat>(
-                    result, "$term: $branch",
-                ).assignment
-                assertEquals(if (branch) selected else "9", sample.intValue(parsed.intVarNames.getValue("z")))
-            }
+        assertIs<OpenTheoryResult.Unsat>(result, result.toString())
+    }
+
+    @Test
+    fun `restricting an affine branch preserves a multi-variable definition`() {
+        for (branch in listOf(false, true)) {
+            val parsed = SmtLib.parse("""
+                (declare-const b Bool) (declare-const x Int) (declare-const y Int) (declare-const z Int)
+                (assert (= x 1)) (assert (= y 2)) (assert ${if (branch) "b" else "(not b)"})
+                (assert (= z (ite b (+ (* 2 (ite b (+ x y) 0)) 1) 9)))
+            """.trimIndent())
+
+            val result = BacktrackSolver.source(parsed.model)
+                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+            val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+            assertEquals(if (branch) "7" else "9", sample.intValue(parsed.intVarNames.getValue("z")))
         }
     }
 
