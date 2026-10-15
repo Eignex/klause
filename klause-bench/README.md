@@ -447,6 +447,13 @@ keep generated output outside the repository.
 
 ## Catalog and corpus
 
+The `continuous-arithmetic` suite contains synthetic MiniZinc square, independent
+product and product-chain controls with objectives attained at exactly representable
+endpoints. Use repeated matched default-grid runs with original MiniZinc witness
+validation for execution comparisons. Native grid exhaustion or an attained grid
+objective supplies no original-source proof. Record compiler/build identities and
+unchecked or declined runs separately before interpreting costs.
+
 [Suites.kt](src/main/kotlin/com/eignex/klause/bench/catalog/Suites.kt) declares
 vendored, generated, workspace and fetched inputs. Collection declarations own
 license and redistribution policy. Legacy family sampling precedes resolution;
