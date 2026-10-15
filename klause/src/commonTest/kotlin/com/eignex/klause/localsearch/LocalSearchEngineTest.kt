@@ -1079,6 +1079,44 @@ class LocalSearchEngineTest {
     }
 
     @Test
+    fun `residual repairs with higher finite cost complete before rejection`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(ExactLinear.of(
+                intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ONE,
+            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val source = object : MoveSource {
+            override val id = MoveSourceId("supplied")
+            override val phase = Phase.Infeasible
+            override val pool = Pool.ScoreOnly
+            override fun generate(state: LocalSearchState, sink: MoveSink) = sink.addIntSet(0, 1)
+        }
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), greedyRepairOnRestart = false,
+            strategy = SourceDrivenStrategy(
+                sources = listOf(ConfiguredSource(source)), feasibleDescent = FeasibleDescent.SelfOwned,
+                feasibleAcceptance = AcceptanceRule.GreedyDescent,
+            ), completion = { candidate, _ ->
+                Completion.Witness(candidate.copy(reals = doubleArrayOf(
+                    if (candidate.intValue(0) == 0L) 1.0 - 1e-12 else 0.0,
+                )))
+            },
+        )
+
+        val result = search.improvements(
+            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+            LocalSearchParams(maxInstructions = 3,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))), null,
+        ).last()
+
+        val best = assertIs<MinimizeResult.BestFound>(result)
+        assertEquals(1.0, best.objective)
+        assertEquals(1L, best.sample.intValue(0))
+        assertEquals(0.0, best.sample.approximateRealValue(0))
+    }
+
+    @Test
     fun `worse restart states retain ordinary completion admission`() {
         val problem = Problem(
             0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(Linear(

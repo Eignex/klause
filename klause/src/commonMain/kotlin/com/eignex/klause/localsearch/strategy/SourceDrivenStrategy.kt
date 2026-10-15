@@ -180,11 +180,10 @@ class SourceDrivenStrategy(
         val greedyFallback = evaluation != null && feasibleAcceptance == AcceptanceRule.GreedyDescent
         var completionSeed = collectMoves(state, cancellation, stalled,
             if (evaluation == null || greedyFallback) state.cost else 0L, completionSeeds = evaluation != null)
-        var ordinary: Move? = null
         if (evaluation != null) {
             if (greedyFallback) {
-                ordinary = selectMove(state, stall, stalled, null)
-                if (ordinary != null && score(state, ordinary) < 0.0) {
+                val ordinary = selectMove(state, stall, stalled, null)
+                if (ordinary != null && !evaluation.increasesObjective(ordinary)) {
                     evaluation.retainOrdinary(ordinary)
                     return ordinary
                 }
@@ -202,10 +201,7 @@ class SourceDrivenStrategy(
             }
             completionSeed?.let { evaluation.seed(it.sink, it.remaining) }
         }
-        val completed = selectMove(state, stall, stalled, evaluation)
-        if (completed != null) return completed
-        if (ordinary != null) evaluation?.retainOrdinary(ordinary)
-        return ordinary
+        return selectMove(state, stall, stalled, evaluation)
     }
 
     private fun collectMoves(

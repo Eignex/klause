@@ -14,6 +14,8 @@ internal class CompletedMoveEvaluation(
     private val complete: (Sample) -> Completion,
     private val current: () -> Sample,
 ) {
+    private val finiteObjective = objective !is LinearObjective ||
+        objective.intCoefficientValues.any { it != 0L } || objective.boolWeightValues.any { it != 0L }
     private val witnesses = mutableMapOf<Move, Sample>()
     private val grades = mutableMapOf<Move, Double>()
     private var base: Sample? = null
@@ -44,6 +46,13 @@ internal class CompletedMoveEvaluation(
 
     fun retainOrdinary(move: Move) {
         ordinaryMove = move
+    }
+
+    fun increasesObjective(move: Move): Boolean {
+        if (!changesFinite(move)) return false
+        val realGuess = move is Move.RealSet || move is Move.Compound && move.parts.any { it is Move.RealSet }
+        if (!finiteObjective && !realGuess) return false
+        return (state.objectiveDelta(objective, move) ?: 0.0) > 0.0
     }
 
     fun seed(destination: MoveSink, limit: Int = Int.MAX_VALUE) {
