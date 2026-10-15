@@ -54,13 +54,19 @@ internal class AbsAffineValue(coefficients: Map<Int, BigInt>, val constant: BigI
         return Linear(kept.keys.toIntArray(), kept.values.toTypedArray(), op, sign * other.constant - constant)
     }
 
+    private val constantDigits = constant.toString().map { it.code }.toIntArray()
+    private val coefficientDigits = this.coefficients.values.map { value ->
+        value.toString().map { it.code }.toIntArray()
+    }
+    val keyWeight: Int = constantDigits.size + coefficientDigits.sumOf { it.size + 1 }
+
     fun buildKey(sink: KeySink) {
         sink.int(coefficients.size)
-        for ((variable, coefficient) in coefficients) {
+        for ((index, variable) in coefficients.keys.withIndex()) {
             sink.intVar(variable)
-            sink.constInts(coefficient.toString().map { it.code }.toIntArray())
+            sink.constInts(coefficientDigits[index])
         }
-        sink.constInts(constant.toString().map { it.code }.toIntArray())
+        sink.constInts(constantDigits)
     }
 }
 
@@ -77,7 +83,7 @@ internal class AffineAbs(val operand: AbsAffineValue, val result: AbsAffineValue
 
     fun isSatisfied(at: (Int) -> BigInt): Boolean = operand.exactValue(at).abs() == result.exactValue(at)
 
-    override val structuralKeyWeight: Int get() = operand.coefficients.size + result.coefficients.size + 2
+    override val structuralKeyWeight: Int get() = operand.keyWeight + result.keyWeight + 2
 
     override val linearForm: LinearForm = LinearForm.Relaxation(listOf(
         result.comparedTo(operand, BIG_ONE, LinearOp.GE),
