@@ -90,6 +90,7 @@ class ExactLiraSearchComponentTest {
                 assertEquals(complete, (observed.completeSearchLinearChecks ?: 0L) > 0L)
                 assertEquals(complete, (observed.completeSearchLinearPoints ?: 0L) > 0L)
                 assertEquals(observed.completeSearchLinearChecks, observed.completeSearchLinearOutcomes?.values?.sum())
+                assertEquals(complete, observed.completeSearchStages != null)
             }
         }
     }
