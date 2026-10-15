@@ -57,9 +57,15 @@ exponents and variable real exponents decline.
 
 ## FlatZinc floats
 
+Constant float-array selection retains `RealElement` over continuous result
+columns and integer `Element` over grid bucket coordinates. Both retain the
+one-based source index and repeated entries. Grid entries use the result's existing
+bucket conversion and representability checks. Lowering visits array positions
+inside the index domain, including domains wider than a signed integer.
+
 FlatZinc first preserves finite float choices from constant-array selection and
 singleton domains. Supported connected operations retain exact relations with
-Boolean structure. This includes comparisons, strict/reified comparisons, absolute
+Boolean structure or native real selection. This includes comparisons, strict/reified comparisons, absolute
 values, minimum/maximum, constant-array selection, multiplication/division by
 constants, and products with a finite selected operand. Exact absolute values retain
 `RealAbs` in the source model; the selected consumer installs its complete equality

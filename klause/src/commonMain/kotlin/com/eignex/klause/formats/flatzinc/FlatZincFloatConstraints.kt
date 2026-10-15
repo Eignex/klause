@@ -433,60 +433,7 @@ internal fun FlatZincCompiler.emitFloatAbs(c: FznConstraint) {
     factors.add(relation)
 }
 
-/** Lower `array_float_element(idx, arr, x)` (`x = arr[idx]`, 1-based, `arr` a float-constant array)
- *  to a table pairing each valid index value with the bucket of its constant. An index value whose
- *  constant is unrepresentable in the result's bucketing rejects, so a dropped row never silently
- *  forbids a feasible index. */
-internal fun FlatZincCompiler.emitArrayFloatElement(c: FznConstraint) {
-    expectArity(c, 3)
-    val idx = resolveIntVar(c.args[0])
-    val arr = evalFloatConstArray(c.args[1])
-    val xRef = resolveFloatVarOrConst(c.args[2])
-    val x = when (xRef) {
-        is FloatRef.Var -> xRef.bk
-        is FloatRef.Const -> resolveFloatElement(c.args[2], "__float_element_${floatVars.size}", exactFloats)
-    }
-    if (x.lpOnly) {
-        factors.add(Linear(longArrayOf(1L), intArrayOf(idx), LinearOp.GE, 1L))
-        factors.add(Linear(longArrayOf(1L), intArrayOf(idx), LinearOp.LE, arr.size.toLong()))
-        for (i in arr.indices) {
-            val selected = reifyLinear(longArrayOf(1L), intArrayOf(idx), LinearOp.EQ, (i + 1).toLong())
-            val value = exactFloatValueLiteral(x.varId, arr[i])
-            factors.add(Clause(intArrayOf(Lit.negate(selected), value)))
-        }
-        return
-    }
-    val stepX = if (x.buckets > 1) (x.hi - x.lo) / (x.buckets - 1) else 0.0
-    val dom = intDomains[idx]
-    val tolerance = 0.5
-    val rows = LongArrayList()
-    for (vi in dom.min.toInt()..dom.max.toInt()) {
-        val ai = vi - 1 // FlatZinc arrays are 1-based.
-        if (ai < 0 || ai >= arr.size) continue // Out-of-range index value: the table forbids it.
-        val cv = arr[ai]
-        if (cv < x.lo - stepX * tolerance || cv > x.hi + stepX * tolerance) {
-            failHere("array_float_element: value $cv not representable under the current float bucketing")
-        }
-        val ix = if (stepX == 0.0) {
-            0
-        } else {
-            ((cv - x.lo) / stepX).let {
-                val rounded = round(it).toInt()
-                if (abs(it - rounded) > tolerance) {
-                    failHere("array_float_element: value $cv not representable under the current float bucketing")
-                }
-                rounded
-            }
-        }
-        if (ix < 0 || ix >= x.buckets) {
-            failHere("array_float_element: value $cv not representable under the current float bucketing")
-        }
-        rows.add(vi.toLong())
-        rows.add(ix.toLong())
-    }
-    if (rows.isEmpty()) failHere("array_float_element: no valid index value in the domain")
-    factors.add(Table(intArrayOf(idx, x.varId), rows.toLongArray()))
-}
+internal fun FlatZincCompiler.emitArrayFloatElement(c: FznConstraint) = emitFloatSelection(c)
 
 internal fun FlatZincCompiler.evalFloatVarArray(e: FznExpr): List<FloatBucketing> = when (e) {
     is FznExpr.ArrayLit -> {

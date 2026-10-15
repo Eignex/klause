@@ -364,21 +364,7 @@ private fun Compiler.Builder.reifyRealAtom(d: RealComb, linOp: LinearOp, strict:
     return Lit.make(w, true)
 }
 
-/**
- * A real `ite`: a fresh real variable pinned to each branch by the condition through conditional
- * equality atoms (`c ⇒ v = a`, `¬c ⇒ v = b`), each equality being its two reified inequality atoms.
- */
-internal fun Compiler.Builder.realIte(cond: Int, a: RealComb, b: RealComb): RealComb {
-    val v = RealComb(emptyMap(), mapOf(nextReal++ to BigFraction.ONE), BigFraction.ZERO)
-    val negCond = Lit.negate(cond)
-    val dA = v.plus(a.scaled(BigFraction.MINUS_ONE))
-    val dB = v.plus(b.scaled(BigFraction.MINUS_ONE))
-    forceClause(negCond, reifyRealAtom(dA, LinearOp.LE, strict = false))
-    forceClause(negCond, reifyRealAtom(dA, LinearOp.GE, strict = false))
-    forceClause(cond, reifyRealAtom(dB, LinearOp.LE, strict = false))
-    forceClause(cond, reifyRealAtom(dB, LinearOp.GE, strict = false))
-    return v
-}
+internal fun Compiler.Builder.realIte(cond: Int, a: RealComb, b: RealComb): RealComb = realSelection(cond, a, b)
 
 /**
  * `to_int` of a fractional real term: a fresh unbounded integer `n` with the floor definition

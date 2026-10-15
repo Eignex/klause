@@ -111,6 +111,11 @@ canonical digit columns with one shared choice index across every digit. Constan
 branches retain constant digit arrays, including signed leading digits. Open
 values retain arithmetic ownership and exact equality links.
 
+Affine real conditionals retain `RealElement` over materialized branch columns.
+Their choice index shares the source Boolean guard. Affine branch definitions keep
+exact rational coefficients, including mixed integer/real terms, and source real
+declarations remain arithmetic-owned.
+
 The exact real component can certify supported difference fragments with a graph,
 retaining the LP route for other states and conflict explanations. Its admission,
 strict-edge encoding and lifecycle belong to the

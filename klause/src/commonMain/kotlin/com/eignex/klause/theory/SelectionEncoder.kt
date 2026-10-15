@@ -2,6 +2,7 @@ package com.eignex.klause.theory
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.PolynomialRealFormula
@@ -11,6 +12,7 @@ import com.eignex.klause.lowering.SelectionEncodingInterrupted
 import com.eignex.klause.lowering.elementEncoding
 import com.eignex.klause.lowering.minMaxEncoding
 import com.eignex.klause.lowering.polynomialRow
+import com.eignex.klause.lowering.realElementEncoding
 
 internal val selectionEncoder = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
     try {
@@ -22,6 +24,8 @@ internal val selectionEncoder = Encoder(EncoderSupport.EQUIVALENT) { factor, enc
                     { PolynomialRealFormula.And(it) }, { PolynomialRealFormula.Or(it) })
                 is Element -> elementEncoding(factor, encoding.cancellation, row,
                     { PolynomialRealFormula.And(it) }, { PolynomialRealFormula.Or(it) }, affineBinary = true)
+                is RealElement -> realElementEncoding(factor, encoding.cancellation, row,
+                    { PolynomialRealFormula.And(it) }, { PolynomialRealFormula.Or(it) })
                 else -> error("selection encoder requires a selection factor")
             }
             encoding.polynomial(formula)
@@ -33,6 +37,8 @@ internal val selectionEncoder = Encoder(EncoderSupport.EQUIVALENT) { factor, enc
                 is Element -> elementEncoding<LinearEncodingFormula>(factor, encoding.cancellation, row,
                     { LinearEncodingFormula.And(it) }, { LinearEncodingFormula.Or(it) },
                     affineBinary = encoding.target != EncodingTarget.DIFFERENCE)
+                is RealElement -> realElementEncoding<LinearEncodingFormula>(factor, encoding.cancellation, row,
+                    { LinearEncodingFormula.And(it) }, { LinearEncodingFormula.Or(it) })
                 else -> error("selection encoder requires a selection factor")
             }
             encoding.linearFormula(formula)

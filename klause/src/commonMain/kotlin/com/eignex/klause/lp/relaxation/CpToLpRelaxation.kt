@@ -16,6 +16,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.GlobalCardinality
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -862,7 +863,7 @@ internal class CpToLpRelaxation(
     private fun touchesReals(factor: Factor): Boolean = when (factor) {
         is Linear -> factor.realConstants != null
         is ReifiedRealLinear -> true
-        is RealAbs, is RealProduct -> true
+        is RealAbs, is RealProduct, is RealElement -> true
         is Power -> factor.base is Power.Coordinate.Real
         else -> false
     }

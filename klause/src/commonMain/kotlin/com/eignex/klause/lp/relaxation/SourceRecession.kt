@@ -3,6 +3,7 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -78,6 +79,14 @@ private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): 
             val k = BigFraction.ofLong(point.intValue(factor.intOperand))
             reals[factor.result] == k * reals[factor.realOperand] &&
                 direction[factor.result] == k * direction[factor.realOperand]
+        }
+
+        is RealElement -> {
+            val position = factor.position(point.intValue(factor.idx)) ?: return false
+            val selected = if (factor.arrIsVars) reals[factor.entries[position]]
+                else BigFraction.ofDouble(factor.constants[position]) ?: return false
+            val slope = if (factor.arrIsVars) direction[factor.entries[position]] else BigFraction.ZERO
+            reals[factor.result] == selected && direction[factor.result] == slope
         }
 
         else -> false

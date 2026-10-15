@@ -3,6 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -10,6 +11,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.toWide
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.bigIntOf
@@ -35,6 +37,29 @@ internal fun Compiler.Builder.exclusiveIntegerSelection(
     val relation = Element(index, result, entries, arrIsVars = true, indexOffset = 0)
     factors.add(relation)
     return listOf(relation)
+}
+
+internal fun Compiler.Builder.realSelection(condition: Int, whenTrue: RealComb, whenFalse: RealComb): RealComb {
+    if (trueLitCache >= 0) {
+        if (condition == trueLitCache) return whenTrue
+        if (condition == Lit.negate(trueLitCache)) return whenFalse
+    }
+    val entries = intArrayOf(selectionRealColumn(whenFalse), selectionRealColumn(whenTrue))
+    val index = selectionIndex(listOf(condition))
+    val result = nextReal++
+    factors.add(RealElement(index, result, entries, indexOffset = 0))
+    return RealComb(emptyMap(), mapOf(result to BigFraction.ONE), BigFraction.ZERO)
+}
+
+private fun Compiler.Builder.selectionRealColumn(term: RealComb): Int {
+    if (term.intCoeffs.isEmpty() && term.realCoeffs.size == 1 && term.constant.isZero) {
+        val entry = term.realCoeffs.entries.single()
+        if (entry.value == BigFraction.ONE) return entry.key
+    }
+    val column = nextReal++
+    val result = RealComb(emptyMap(), mapOf(column to BigFraction.ONE), BigFraction.ZERO)
+    factors.add(realRow(result.plus(term.scaled(BigFraction.MINUS_ONE)), LinearOp.EQ))
+    return column
 }
 
 internal fun Compiler.Builder.wideIntegerSelection(

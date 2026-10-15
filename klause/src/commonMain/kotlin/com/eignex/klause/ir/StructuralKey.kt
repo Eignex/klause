@@ -105,6 +105,7 @@ internal enum class FactorKind {
     MPS_SOURCE_INDICATOR,
     DIV_MOD,
     WIDE_DIV_MOD,
+    REAL_ELEMENT,
 }
 
 // Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments into a

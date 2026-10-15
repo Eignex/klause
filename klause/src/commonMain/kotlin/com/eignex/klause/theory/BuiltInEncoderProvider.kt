@@ -11,6 +11,7 @@ import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.WideDivMod
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearForm
@@ -67,7 +68,6 @@ object BuiltInEncoderProvider : EncoderProvider {
         factor is Abs && target == EncodingTarget.LINEAR -> AbsEncoding.linear
         factor is Abs && target == EncodingTarget.POLYNOMIAL -> AbsEncoding.polynomial
         factor is Power -> PowerEncoders.select(factor, target)
-
         factor is WideDivMod -> wideDivModEncoder(target)
         factor is DivMod -> divModEncoder(factor, target)
         factor is AffineAbs && target == EncodingTarget.LINEAR -> AbsEncoding.affineLinear
@@ -76,6 +76,7 @@ object BuiltInEncoderProvider : EncoderProvider {
         factor is RealAbs && target == EncodingTarget.POLYNOMIAL -> AbsEncoding.realPolynomial
         factor is GridAbs && target == EncodingTarget.LINEAR -> AbsEncoding.gridLinear
         factor is GridAbs && target == EncodingTarget.POLYNOMIAL -> AbsEncoding.gridPolynomial
+        factor is RealElement && target != EncodingTarget.DIFFERENCE -> selectionEncoder
         target == EncodingTarget.POLYNOMIAL && factor is ContinuousProduct -> continuousProduct
         target == EncodingTarget.POLYNOMIAL && factor is RealProduct -> mixedProduct
         target == EncodingTarget.LINEAR && factor is RealProduct -> conditionedProduct(factor)
