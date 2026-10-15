@@ -32,6 +32,8 @@ internal class RealArrayMinMaxInvariant(private val factor: RealArrayMinMax) : I
         val selected = extreme(state)
         if (!selected.isFinite()) return
         val value = selected.coerceIn(state.problem.realLower[factor.result], state.problem.realUpper[factor.result])
-        if (value.isFinite() && value != state.assignment.realValue(factor.result)) sink.addRealSet(factor.result, value)
+        if (value.isFinite() && value != state.assignment.realValue(factor.result)) {
+            sink.addRealSet(factor.result, value)
+        }
     }
 }
