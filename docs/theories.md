@@ -74,8 +74,11 @@ or difference installation can also supply that target's participating fragment
 when its ordered original factor indices retain the entire source. The source,
 captured projections and empty condition scope are identical within this call.
 The two targets retain separate private coordinate allocators and installed models.
-Subsets, including difference fragments excluding shared clauses, install separately;
-null or incomplete installations cannot supply a retained fragment. This reuse
+Shared Boolean clauses may remain in a reused full difference installation; the
+shared clause component retains their ownership, and complete difference checks
+also validate their installed Boolean relations. Omitting a nonparticipating finite
+factor requires a separate subset installation. Null or incomplete installations
+cannot supply a retained fragment. This reuse
 retains immutable relations, never mutable theory state or a cross-call cache.
 
 Participation and completeness are separate. A batch service can be sound and incomplete;

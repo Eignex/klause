@@ -26,6 +26,10 @@ import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchBoolValue
+import com.eignex.klause.solver.search.SearchIntValue
+import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.Encoder
@@ -220,7 +224,7 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `component subsets and shared clause exclusions install their own ordered scope`() {
+    fun `shared clauses retain full encodings while omitted finite factors install their selected scope`() {
         for (sharedClause in listOf(false, true)) {
             val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
             val excluded: Factor = if (sharedClause) Clause(intArrayOf(0))
@@ -243,12 +247,61 @@ class PreparedSourcePlanTest {
             assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
             assertEquals(if (sharedClause) FactorOwner.SHARED else FactorOwner.CP, plan.factorOwner(1))
             assertEquals(if (sharedClause) 1 else 2, installations[EncodingTarget.LINEAR to 0])
-            assertEquals(2, installations[EncodingTarget.DIFFERENCE to 0])
+            assertEquals(if (sharedClause) 1 else 2, installations[EncodingTarget.DIFFERENCE to 0])
             assertEquals(1, installations[EncodingTarget.LINEAR to 1])
             assertEquals(1, installations[EncodingTarget.DIFFERENCE to 1])
             val fragment = assertNotNull(plan.encodedTheoryFragment(source))
-            assertEquals(1, fragment.numFactors)
-            assertSame(row, assertIs<EncodedTheoryFactor>(fragment.factors.single()).source)
+            assertFalse(plan.factorEncoded(1))
+            assertEquals(if (sharedClause) 2 else 1, fragment.numFactors)
+            assertSame(row, assertIs<EncodedTheoryFactor>(fragment.factors.first()).source)
+            assertEquals(if (sharedClause) listOf(0, 1) else listOf(0), fragment.factors.map {
+                assertIs<EncodedTheoryFactor>(it).attribution.sourceFactorIndex
+            })
+        }
+    }
+
+    @Test
+    fun `reused shared clause encodings preserve private definitions and source witnesses`() {
+        for (positive in listOf(false, true)) {
+            val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
+            val clause = Clause(intArrayOf(if (positive) 0 else 1))
+            val source = Problem(1, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(row, clause),
+                openIntHi = booleanArrayOf(true))
+            var clauseInstallations = 0
+            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (factor !== clause || target != EncodingTarget.DIFFERENCE) selected
+                else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                    clauseInstallations++
+                    val guard = encoding.guard()
+                    encoding.define(guard, LinearEncodingFormula.Relation(assertNotNull(view.linearForm)))
+                    encoding.linearFormula(LinearEncodingFormula.Guard(guard))
+                    null
+                }
+            })
+
+            val plan = source.componentPlan(providers.prepare(source))
+            val fragment = assertNotNull(plan.encodedTheoryFragment(source))
+            val retained = assertIs<EncodedTheoryFactor>(fragment.factors[1])
+            val result = plan.search(source, emptyMap()).use {
+                assertIs<ComponentResult.Consistent>(it.session.initialize())
+                it.session.solve(source.numBoolVars)
+            }
+
+            assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
+            assertEquals(1, clauseInstallations)
+            assertEquals(FactorOwner.SHARED, plan.factorOwner(1))
+            assertFalse(plan.factorEncoded(1))
+            assertSame(clause, retained.source)
+            assertEquals(1, retained.attribution.sourceFactorIndex)
+            assertEquals(1, retained.attribution.linearGuards.size)
+            assertTrue(retained.attribution.auxiliaries.isEmpty())
+            assertEquals(source.numBoolVars, fragment.numBoolVars)
+            assertEquals(source.numIntVars, fragment.numIntVars)
+            assertEquals(source.numRealVars, fragment.numRealVars)
+            val witness = assertIs<SearchResult.Satisfied>(result).model
+            assertEquals(positive, witness.valueOf<Boolean>(SearchBoolValue(0)))
+            assertTrue(assertNotNull(witness.valueOf<Long>(SearchIntValue(0))) >= 1L)
         }
     }
 
@@ -284,44 +337,48 @@ class PreparedSourcePlanTest {
 
     @Test
     fun `a transient containing stop cannot reuse an earlier completed component encoding`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
-            openIntHi = booleanArrayOf(true))
-        var installations = 0
-        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-            val selected = BuiltInEncoderProvider.select(factor, target)
-            if (target == EncodingTarget.POLYNOMIAL) selected
-            else Encoder(selected.support) { view, encoding ->
-                installations++
-                encoding.cancellation.charge(1000)
-                selected.install(view, encoding)
-            }
-        })
-        val projections = providers.prepare(source)
-        var completedWork = 0L
-        for (limited in listOf(false, true)) {
-            var charged = 0L
-            var pendingStop = false
-            val stop = object : Cancellation {
-                override fun isCancelled(): Boolean = pendingStop.also { pendingStop = false }
-                override fun workMeter(): WorkMeter = WorkMeter {
-                    charged += it
-                    if (limited && charged >= completedWork - 1) pendingStop = true
+        for (sharedClause in listOf(false, true)) {
+            val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
+            val factors = if (sharedClause) arrayOf<Factor>(row, Clause(intArrayOf(0))) else arrayOf<Factor>(row)
+            val source = Problem(if (sharedClause) 1 else 0, 1, arrayOf(IntDomain(0, 2)), factors,
+                openIntHi = booleanArrayOf(true))
+            var installations = 0
+            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (target == EncodingTarget.POLYNOMIAL) selected
+                else Encoder(selected.support) { view, encoding ->
+                    installations++
+                    encoding.cancellation.charge(1000)
+                    selected.install(view, encoding)
                 }
-            }
+            })
+            val projections = providers.prepare(source)
+            var completedWork = 0L
+            for (limited in listOf(false, true)) {
+                var charged = 0L
+                var pendingStop = false
+                val stopAt = if (sharedClause) completedWork else completedWork - 1
+                val stop = object : Cancellation {
+                    override fun isCancelled(): Boolean = pendingStop.also { pendingStop = false }
+                    override fun workMeter(): WorkMeter = WorkMeter {
+                        charged += it
+                        if (limited && charged >= stopAt) pendingStop = true
+                    }
+                }
 
-            val plan = source.componentPlan(projections, cancellation = stop)
+                val plan = source.componentPlan(projections, cancellation = stop)
 
-            assertEquals(if (limited) 4 else 2, installations)
-            assertTrue(charged >= 2000L)
-            if (limited) {
-                assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, plan.theoryPipeline)
-                assertEquals(EncoderDecline.RESOURCE, plan.encodingDecline)
-                assertNull(plan.encodedTheoryFragment(source))
-                assertFalse(stop())
-            } else {
-                assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
-                completedWork = charged
+                assertEquals(if (limited) factors.size * 4 else factors.size * 2, installations)
+                assertTrue(charged >= factors.size * 2000L)
+                if (limited) {
+                    assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, plan.theoryPipeline)
+                    assertEquals(EncoderDecline.RESOURCE, plan.encodingDecline)
+                    assertNull(plan.encodedTheoryFragment(source))
+                    assertFalse(stop())
+                } else {
+                    assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
+                    completedWork = charged
+                }
             }
         }
     }
