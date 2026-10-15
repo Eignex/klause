@@ -9,14 +9,14 @@ import native_vm_event_loss as loss
 
 class NativeVmEventLossTest(unittest.TestCase):
     def test_counter_snapshot_includes_the_highest_cpu_slot(self):
-        for slots in (1, 2, 8):
-            with self.subTest(slots=slots):
-                raw = b'\0' * ((slots - 1) * 8) + (7).to_bytes(8, 'little')
+        for slots, value in ((1, 7), (2, 7), (8, 7), (8, 1 << 63), (8, (1 << 64) - 1)):
+            with self.subTest(slots=slots, value=value):
+                raw = b'\0' * ((slots - 1) * 8) + value.to_bytes(8, 'little')
 
                 result = loss.snapshot(raw, slots)
 
-                self.assertEqual(7, result['sum'])
-                self.assertEqual(7, result['slots'][-1]['value'])
+                self.assertEqual(value, result['sum'])
+                self.assertEqual(value, result['slots'][-1]['value'])
                 self.assertEqual(slots - 1, result['slots'][-1]['index'])
                 self.assertEqual(raw.hex(), result['rawHex'])
 
@@ -35,15 +35,18 @@ class NativeVmEventLossTest(unittest.TestCase):
             with self.subTest(text=text), self.assertRaises(ValueError):
                 loss.cpu_slots(text)
 
-    def test_btf_binding_requires_the_named_complete_unsigned_cpu_array(self):
-        variants = [(True, 8, 0, 64, 0, 1, 5), (False, 7, 0, 64, 0, 1, 5),
-                    (False, 8, 0, 64, 4, 1, 5), (False, 8, 1, 64, 0, 1, 5),
-                    (False, 8, 0, 32, 0, 1, 5), (False, 8, 0, 64, 0, 2, 5),
-                    (False, 8, 0, 64, 0, 1, 4)]
-        for accepted, cpus, signed, bits, offset, variables, section_id in variants:
+    def test_btf_binding_requires_the_named_complete_cpu_array_and_supported_integer_metadata(self):
+        variants = [(True, 8, 0, 64, 0, 1, 5, 'uint64_t'), (True, 8, 1, 64, 0, 1, 5, 'int64'),
+                    (False, 7, 0, 64, 0, 1, 5, 'uint64_t'), (False, 8, 0, 64, 4, 1, 5, 'uint64_t'),
+                    (False, 8, 1, 64, 0, 1, 5, 'int64_t'), (False, 8, 2, 64, 0, 1, 5, 'int64'),
+                    (False, 8, 4, 64, 0, 1, 5, 'int64'), (False, 8, 0, 32, 0, 1, 5, 'uint64_t'),
+                    (False, 8, 1, 1 << 16 | 64, 0, 1, 5, 'int64'),
+                    (False, 8, 1, 32, 0, 1, 5, 'int64'), (False, 8, 0, 64, 0, 2, 5, 'uint64_t'),
+                    (False, 8, 0, 64, 0, 1, 4, 'uint64_t')]
+        for accepted, cpus, signed, bits, offset, variables, section_id, name in variants:
             with self.subTest(cpus=cpus, signed=signed, bits=bits, offset=offset,
-                              variables=variables, section_id=section_id):
-                strings = b'\0uint64_t\0__bt__event_loss_counter\0.data.event_loss_counter\0'
+                              variables=variables, section_id=section_id, name=name):
+                strings = b'\0' + name.encode('ascii') + b'\0__bt__event_loss_counter\0.data.event_loss_counter\0'
                 types = struct.pack('<IIII', 1, 1 << 24, 8, signed << 24 | bits)
                 types += struct.pack('<IIIIII', 0, 3 << 24, 0, 1, 1, 1)
                 types += struct.pack('<IIIIII', 0, 3 << 24, 0, 2, 1, cpus)
@@ -59,6 +62,9 @@ class NativeVmEventLossTest(unittest.TestCase):
                     self.assertEqual('__bt__event_loss_counter', result['variable'])
                     self.assertEqual(64, result['storageBytes'])
                     self.assertEqual(0, result['offset'])
+                    self.assertEqual(name, result['integerDebugName'])
+                    self.assertEqual(signed << 24 | bits, result['integerDebugEncoding'])
+                    self.assertEqual('uint64', result['counterInterpretation'])
                 else:
                     with self.assertRaises(ValueError):
                         loss.btf_counter(raw, section_id, 8)
