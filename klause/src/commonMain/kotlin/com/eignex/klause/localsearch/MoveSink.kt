@@ -210,6 +210,10 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
      */
     fun addChannelingIntSet(state: LocalSearchState, varId: Int, newValue: Long) {
         if (invariants?.isDefinedInt(varId) == true) {
+            if (invariants?.intDefinition(varId) is FunctionalObjective.Abs) {
+                AbsResultRepair(state, this).propose(varId, newValue)
+                return
+            }
             val element = invariants?.elementResultDefinition(varId)
             if (element != null) {
                 ElementResultRepair(state, this, element).propose(newValue)
