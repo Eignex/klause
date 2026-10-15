@@ -2014,3 +2014,8 @@ checks; numerical declines and missing inputs keep their normal semantics.
 Run source-verifier regressions with its pinned requirements. Benchmarks, captures
 and timing probes do not run as part of ordinary repository checks; follow the
 [development validation policy](../docs/development.md#validation).
+
+`source-ownership` contains self-authored original MiniZinc mixed integer/real
+product controls, including an unrelated finite distinctness constraint and an
+excluded integer value. Run CP/LS with default and exact modes; the harness records
+the original MiniZinc source check separately from compiled FlatZinc semantics.

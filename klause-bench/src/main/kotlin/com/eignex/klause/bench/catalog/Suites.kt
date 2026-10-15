@@ -30,7 +30,8 @@ internal object Suites {
             handwrittenCore, slackAllDifferent, dimacsCore, wcnfCore, opbCore, schemaCore,
             smtlibCore, xcsp3Core, mpsCore, mznSmoke, satCrafted, lpComponentSplit, productAliases,
         ) + QfNraSuites.all + QfNraCanonicalSuite.suite + NonlinearIntegerSuite.suite +
-            DivModSuite.suite + AbsSuite.suite + ContinuousArithmeticSuite.suite + MpsLinearSourceSuite.suite
+            DivModSuite.suite + AbsSuite.suite + ContinuousArithmeticSuite.suite + MpsLinearSourceSuite.suite +
+            SourceOwnershipSuite.suite
     }
 
     /** Discovered-on-demand suites over fetched external corpora. The provider runs the
