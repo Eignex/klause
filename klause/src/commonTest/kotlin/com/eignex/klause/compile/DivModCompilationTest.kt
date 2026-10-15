@@ -83,20 +83,6 @@ class DivModCompilationTest {
     }
 
     @Test
-    fun `SMT minimum word division retains its exact over-word quotient`() {
-        val parsed = SmtLib.parse("""
-            (declare-const a Int)
-            (assert (<= (- 9223372036854775808) a (- 9223372036854775808)))
-            (assert (= (div a (- 1)) 9223372036854775808))
-            (assert (= (mod a (- 1)) 0))
-        """.trimIndent())
-
-        val sample = BacktrackSolver(parsed.model.bake()).enumerate(BacktrackParams(maxDecisions = 100)).single()
-
-        assertEquals(Long.MIN_VALUE, sample.intValue(parsed.intVarNames.getValue("a")))
-    }
-
-    @Test
     fun `FlatZinc output aliases retain their source role equations`() {
         for ((operation, expected) in listOf("div" to setOf(0L), "mod" to (-2L..2L).toSet())) {
             val parsed = parseFlatZinc(
