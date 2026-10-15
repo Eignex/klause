@@ -17,8 +17,8 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.AssignmentCheckCapability
-import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
