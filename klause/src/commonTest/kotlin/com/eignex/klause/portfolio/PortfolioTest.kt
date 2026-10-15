@@ -1764,6 +1764,46 @@ class PortfolioTest {
     }
 
     @Test
+    fun `cancelled heuristic initialization preserves feasibility feedback regardless of charged work`() {
+        val schedules = listOf(0L, 17L).map { initialWork ->
+            val visits = ArrayList<Int>()
+            var moves = 0
+            val source = ScriptedSearch({ false }) {
+                visits += 1
+                moves++
+            }
+            val heuristic = object : ResumableSearch by source {
+                override val stats: SolveStats
+                    get() = SolveStats(ls = LocalSearchStats(moves = SumResult(moves * 10.0)))
+            }
+            val workers = listOf(
+                trackingWorker("complete", 0, ScriptedSearch({ false }) { visits += 0 }),
+                PortfolioWorker.ofMinimize("heuristic", 1, countsInstructions = true, resumable = { heuristic }) {
+                    _, _, _, _ -> error("the retained handle must resume")
+                },
+                PortfolioWorker.ofMinimize("opening", 2, countsInstructions = true, resumable = {
+                    visits += 2
+                    throw SearchInitializationCancelled(SolveStats.EMPTY, initialWork)
+                }) { _, _, _, _ -> error("cancelled initialization must retire") },
+            )
+            val bandit = object : UnivariateBandit {
+                override val nbrArms = workers.size
+                override val random = Random(3)
+                override fun choose() = 0
+                override fun update(armIndex: Int, value: Double, weight: Double) = Unit
+                override fun reset() = Unit
+            }
+
+            Portfolio(workers, bandit).also { it.runTimeSource = TestTimeSource() }.use {
+                it.minimize(Cancellation { visits.size >= 200 })
+            }
+            visits
+        }
+
+        assertEquals(schedules.first(), schedules.last())
+    }
+
+    @Test
     fun `complete workers receive elapsed opportunity despite heterogeneous segment costs`() {
         val clock = TestTimeSource()
         val elapsed = LongArray(3)
