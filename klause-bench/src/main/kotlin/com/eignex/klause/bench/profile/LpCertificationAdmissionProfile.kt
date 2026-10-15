@@ -78,7 +78,8 @@ object LpCertificationAdmissionProfile {
                 Long::class.javaPrimitiveType, Int::class.javaPrimitiveType).invoke(builder, 0L, 1L, 0L, -1)
             val relation = type("Relation").enumConstants.single { it.toString() == "EQ" }
             val addRow = builderType.getMethod("addRow", IntArray::class.java, LongArray::class.java,
-                type("Relation"), Long::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, type("LpRowPremises"))
+                type("Relation"), Long::class.javaPrimitiveType,
+                Boolean::class.javaPrimitiveType, type("LpRowPremises"))
             repeat(rows) { addRow.invoke(builder, intArrayOf(0), longArrayOf(1L), relation, 1L, true, null) }
             val sense = type("Sense").enumConstants.single { it.toString() == "MINIMIZE" }
             model = builderType.getMethod("build", type("Sense")).invoke(builder, sense)
@@ -92,7 +93,8 @@ object LpCertificationAdmissionProfile {
 
         fun attempt(mechanism: String) {
             if (mechanism == "basis") {
-                lastBasis = verifyBasis.invoke(null, model, basis, null, basisCache, Cancellation.Never, basisLimits, null)
+                lastBasis = verifyBasis.invoke(null, model, basis, null, basisCache,
+                    Cancellation.Never, basisLimits, null)
             } else {
                 lastTarget = captureTarget.invoke(null, model, solver, null, continuationLimits, Cancellation.Never)
             }
