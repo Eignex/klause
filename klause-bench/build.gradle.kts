@@ -102,7 +102,8 @@ val checkNativeCompilerObserver = tasks.register<Exec>("checkNativeCompilerObser
     description = "Test observer extraction, process scope and identity byte capture."
     workingDir(projectDir)
     commandLine("python3", "tools/test_native_compiler_observer.py")
-    inputs.files("tools/native_compiler_observer.py", "tools/test_native_compiler_observer.py")
+    inputs.files("tools/native_compiler_observer.py", "tools/test_native_compiler_observer.py",
+        "tools/native_vm_event_loss.py")
 }
 
 val checkNativeVmLiveArguments = tasks.register<Exec>("checkNativeVmLiveArguments") {
@@ -111,7 +112,8 @@ val checkNativeVmLiveArguments = tasks.register<Exec>("checkNativeVmLiveArgument
     workingDir(projectDir)
     commandLine("python3", "tools/test_native_vm_live_arguments.py")
     inputs.files("tools/native_vm_live_arguments.py", "tools/test_native_vm_live_arguments.py",
-        "tools/native_compiler_observer.py", "tools/read_native_vm_metadata.py", "tools/native_vm_loaded_module.py")
+        "tools/native_compiler_observer.py", "tools/read_native_vm_metadata.py", "tools/native_vm_loaded_module.py",
+        "tools/native_vm_event_loss.py")
 }
 
 val checkNativeCompilerObserverSetup = tasks.register<Exec>("checkNativeCompilerObserverSetup") {
@@ -119,7 +121,8 @@ val checkNativeCompilerObserverSetup = tasks.register<Exec>("checkNativeCompiler
     description = "Test gated observer child cleanup after script failure."
     workingDir(projectDir)
     commandLine("python3", "tools/test_native_compiler_observer_setup.py")
-    inputs.files("tools/native_compiler_observer.py", "tools/test_native_compiler_observer_setup.py")
+    inputs.files("tools/native_compiler_observer.py", "tools/test_native_compiler_observer_setup.py",
+        "tools/native_vm_event_loss.py")
 }
 
 val checkNativeVmLiveArgumentReview = tasks.register<Exec>("checkNativeVmLiveArgumentReview") {
@@ -127,14 +130,23 @@ val checkNativeVmLiveArgumentReview = tasks.register<Exec>("checkNativeVmLiveArg
     description = "Test saved native argument identities, read failures and bounded archive extraction."
     workingDir(projectDir)
     commandLine("python3", "tools/test_review_native_vm_live_arguments.py")
-    inputs.files("tools/review_native_vm_live_arguments.py", "tools/test_review_native_vm_live_arguments.py")
+    inputs.files("tools/review_native_vm_live_arguments.py", "tools/test_review_native_vm_live_arguments.py",
+        "tools/native_vm_event_loss.py")
+}
+
+val checkNativeVmEventLoss = tasks.register<Exec>("checkNativeVmEventLoss") {
+    group = "verification"
+    description = "Test complete loss-counter slots and original-observer BTF ownership guards."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_native_vm_event_loss.py")
+    inputs.files("tools/native_vm_event_loss.py", "tools/test_native_vm_event_loss.py")
 }
 
 tasks.named("check") {
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,
-        checkNativeVmLiveArgumentReview)
+        checkNativeVmLiveArgumentReview, checkNativeVmEventLoss)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.

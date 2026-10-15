@@ -84,7 +84,7 @@ class NativeVmLiveArgumentReviewTest(unittest.TestCase):
         self.assertEqual('Broker lifetime or USDT pair is incomplete', result['brokerInvocations'][0]['unprovenReason'])
         self.assertEqual('unfinished native invocation', result['nativeLifetimeIssues'][0]['reason'])
 
-    def test_complete_identity_matches_require_read_and_delivery_guards_before_corroboration(self):
+    def test_complete_identity_matches_require_read_delivery_and_loss_guards_before_corroboration(self):
         values = [('_method', 8, 'Method*', '00 20 00 00 00 00 00 00'),
                   ('_compile_id', 4, 'int', '07 00 00 00'), ('_osr_bci', 4, 'int', 'ff ff ff ff'),
                   ('_comp_level', 4, 'int', '03 00 00 00'), ('_num_inlined_bytecodes', 4, 'int', '00 00 00 00')]
@@ -104,10 +104,12 @@ class NativeVmLiveArgumentReviewTest(unittest.TestCase):
                 'method': ('p.C', 'f', '()V'), 'compiler': 'c1', 'succeeded': True}]
         logs = review.log_records("<hotspot_log><task_queued compile_id='7' level='3' method='p.C f ()V'/></hotspot_log>")
 
-        for read, delivery, expected in [(True, True, True), (False, True, False), (True, False, False)]:
-            with self.subTest(read=read, delivery=delivery):
+        for read, delivery, loss, expected in [(True, True, True, True), (False, True, True, False),
+                                               (True, False, True, False), (True, True, False, False)]:
+            with self.subTest(read=read, delivery=delivery, loss=loss):
                 result = review.correlate(native, layout, jfr, logs,
-                                          {'readWarningGuardPassed': read, 'sequencedDeliveryGuardPassed': delivery})
+                                          {'readWarningGuardPassed': read, 'sequencedDeliveryGuardPassed': delivery,
+                                           'finalLossCounterZeroProven': loss})
 
                 self.assertEqual(expected, result['brokerInvocations'][0]['recordedArgumentBindingCorroborated'])
                 self.assertTrue(result['brokerInvocations'][0]['independentIdentityMatched'])
@@ -270,6 +272,27 @@ class NativeVmLiveArgumentReviewTest(unittest.TestCase):
 
                 with self.assertRaisesRegex(ValueError, 'linked, unsafe, duplicate'):
                     review.extract_inputs(path, hashlib.sha256(path.read_bytes()).hexdigest(), archive, root / 'selected', {})
+
+    def test_counter_report_without_its_raw_btf_and_source_is_not_extractable_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / 'capture.tar.gz'
+            contents = {f'profile7/{name}': b'' for name in review.INPUTS}
+            contents['profile7/live/observer/event-loss.json'] = b'{}'
+            with tarfile.open(archive, 'w:gz') as output:
+                for name, raw in contents.items():
+                    info = tarfile.TarInfo(name)
+                    info.size = len(raw)
+                    output.addfile(info, io.BytesIO(raw))
+            manifest = {'archive': {'size': archive.stat().st_size,
+                                   'sha256': hashlib.sha256(archive.read_bytes()).hexdigest()},
+                        'files': {name: {'size': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+                                  for name, raw in contents.items()}}
+            path = root / 'manifest.json'
+            path.write_text(json.dumps(manifest))
+
+            with self.assertRaisesRegex(ValueError, 'counter evidence lacks'):
+                review.extract_inputs(path, hashlib.sha256(path.read_bytes()).hexdigest(), archive, root / 'selected', {})
 
 
 if __name__ == '__main__':

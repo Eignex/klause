@@ -11,6 +11,8 @@ import subprocess
 import tempfile
 import time
 
+import native_vm_event_loss as event_loss
+
 ATTACHED = '__BPFTRACE_NOTIFY_PROBES_ATTACHED'
 MAX_BYTES = 128
 BUFFER_HEADER_BYTES = 4
@@ -38,7 +40,7 @@ def remove_extraction(directory, receipt):
     assert receipt['temporaryRemoved']
 
 
-def observe_appimage(destination, library, image, command, timeout, script_builder=None):
+def observe_appimage(destination, library, image, command, timeout, script_builder=None, capture_event_loss=False):
     destination.mkdir(parents=True, exist_ok=True)
     extraction = dict(packageSha256=file_digest(image), exit=None,
                       scope='Hash-pinned package extraction in an owned temporary directory. '
@@ -60,7 +62,11 @@ def observe_appimage(destination, library, image, command, timeout, script_build
         assert executable.is_relative_to(unpacked.resolve()) and executable.is_file()
         extraction.update(appRunSha256=file_digest(app_run), entrypoint=entrypoint,
                           executableSha256=file_digest(executable), appRun=str(app_run))
-        if script_builder is None:
+        if capture_event_loss:
+            factory = lambda path, pid, start, namespace, limit: event_loss.Monitor(
+                path, pid, start, extraction['executableSha256'], namespace, limit)
+            observe(destination, library, app_run, command, timeout, script_builder, factory)
+        elif script_builder is None:
             observe(destination, library, app_run, command, timeout)
         else:
             observe(destination, library, app_run, command, timeout, script_builder)
@@ -97,7 +103,7 @@ def program(library, root_pid):
     return '\n'.join(blocks) + '\n'
 
 
-def observe(destination, library, observer_binary, command, timeout, script_builder=None):
+def observe(destination, library, observer_binary, command, timeout, script_builder=None, loss_monitor_factory=None):
     destination.mkdir(parents=True, exist_ok=True)
     assert command and timeout > 0
     expected_uid, expected_gid = os.getuid(), os.getgid()
@@ -136,12 +142,15 @@ def observe(destination, library, observer_binary, command, timeout, script_buil
                    expectedMountNamespace=expected_mount_namespace, observerMountNamespace=None,
                    observerBinarySha256=binary_digest, librarySha256=library_digest,
                    childExit=None, observerExit=None, timedOut=False,
+                   lossMonitorRequested=loss_monitor_factory is not None, lossMonitorReady=False,
+                   lossMonitorCompleted=False,
                    clockAnchors=[],
                    scope='Native invocation diagnostic only; no JFR metric substitution or savings credit. '
                    'Raw events/lengths/errors retained. Compile ID/OSR/root/clock/loss association unproved.')
     tracer = None
     tracer_identity = None
     child_reaped = False
+    loss_monitor = None
     try:
         script.write_text((script_builder or program)(library, child))
         with (destination / 'observer.stdout').open('wb') as output, \
@@ -173,6 +182,10 @@ def observe(destination, library, observer_binary, command, timeout, script_buil
             receipt['observerMountNamespace'] = subprocess.check_output(
                 ['sudo', '-n', 'readlink', f'/proc/{actual_tracer}/ns/mnt'], text=True).strip()
             assert receipt['observerMountNamespace'] != expected_mount_namespace
+            if loss_monitor_factory is not None:
+                loss_monitor = loss_monitor_factory(destination, actual_tracer, tracer_identity,
+                                                    receipt['observerMountNamespace'], timeout)
+                receipt['lossMonitorReady'] = True
             receipt['clockAnchors'].append(clock_anchor('before-child-release'))
             os.write(write_gate, b'R')
             os.close(write_gate)
@@ -194,7 +207,15 @@ def observe(destination, library, observer_binary, command, timeout, script_buil
             subprocess.run(['sudo', '-n', 'kill', '-INT', str(actual_tracer)], check=True)
             receipt['observerExit'] = tracer.wait(timeout=30)
             receipt['clockAnchors'].append(clock_anchor('after-observer-drain'))
+            if loss_monitor is not None:
+                loss_monitor.finish()
+                receipt['lossMonitorCompleted'] = True
     finally:
+        if loss_monitor is not None:
+            try:
+                loss_monitor.close()
+            except Exception as error:
+                receipt['lossMonitorCleanupError'] = {'type': type(error).__name__, 'message': str(error)}
         if write_gate is not None:
             os.close(write_gate)
         if not child_reaped:
@@ -220,6 +241,8 @@ def observe(destination, library, observer_binary, command, timeout, script_buil
         receipt['scriptSha256'] = hashlib.sha256(script.read_bytes()).hexdigest() if script.is_file() else None
         (destination / 'observer-launch.json').write_text(json.dumps(receipt, indent=2) + '\n')
     assert receipt['childExit'] == 0 and receipt['observerExit'] == 0 and not receipt['timedOut']
+    assert not receipt.get('lossMonitorCleanupError')
+    assert not receipt['lossMonitorRequested'] or receipt['lossMonitorCompleted']
 
 
 def clock_anchor(stage):
