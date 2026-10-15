@@ -256,6 +256,15 @@ Proposal generation must leave the incumbent unchanged. Scoring and incumbent ac
 outside proposal timing. This probes the neighborhood at a captured feasible point;
 it does not measure portfolio reachability, independent source validity or end-to-end gains.
 
+`bench.profile.PreparedPlanProfile` measures immutable preparation and objective binding
+separately for finite, open-linear, shared/native polynomial and nonlinear-integer
+sources. Use `iterations=N repeats=N warmups=N`; defaults are 1000 operations,
+seven measured rounds and three warmups. The profile saves each batch's elapsed
+nanoseconds and current-thread allocated bytes, source descriptions, admission and
+coordinate observations, actual JVM facade descriptors and runtime/classpath hashes.
+Run the identical committed profile at both revisions with matching JVM/core settings.
+These are in-process preparation costs under JFR, not solver verdicts or proof checks.
+
 `bench.profile.CompletionInitializationProfile` measures actual internal repair consumers
 without adding a published library debug API. It generates a hybrid finite-domain and
 scaled dense-linear source, alternates fresh/retained owners, cancels root installation,
