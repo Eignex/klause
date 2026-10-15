@@ -302,3 +302,9 @@ extension provide complete polynomial satisfaction through the existing
 cause beside that common result; it does not reinterpret legacy open-work units.
 `PolynomialTheoryParams` captures one invocation's work, allocation and stop controls.
 The source snapshot can be reused for fresh invocations; no traversal state escapes.
+
+A genuine open linear integer beside a bounded mixed product does not by itself
+replace the factor model with a nonlinear source snapshot. Admission reads the
+shared captured encoder support: a complete guarded finite linear cover retains
+the bounded source owner and the open linear fragment. Genuine uncovered nonlinear
+integer composition retains the exact nonlinear snapshot and its original names.
