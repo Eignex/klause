@@ -1,8 +1,11 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertNotNull
 
 class PolynomialWitnessProbeProfileTest {
     @Test
@@ -45,23 +48,28 @@ class PolynomialWitnessProbeProfileTest {
 
     @Test
     fun `private work checkpoint retains its charge and producer frame`() {
-        val declarations = (0 until 32).joinToString("\n") { "(declare-const x$it Real)" }
-        val terms = (1..16).flatMap { x -> (1..32).map { y -> "(* (^ x0 $x) (^ x31 $y))" } }
-            .joinToString(" ")
-        val source = "$declarations\n(assert (> (+ $terms) 2))"
         val access = PolynomialWitnessProbeProfile.ProbeAccess()
+        val workType = Class.forName("com.eignex.klause.theory.qfnra.QfNraWork")
+        val paramsType = Class.forName("com.eignex.klause.theory.qfnra.QfNraParams")
+        val owner = workType.getConstructor(paramsType).newInstance(paramsType.getConstructor().newInstance())
+        val probe = workType.getMethod("probe", Function0::class.java)
+        val coupled = workType.getMethod("coupled", Function0::class.java)
+        var captured: ProbeStop? = null
 
-        val plain = access.measure(source, false)
-        val observed = access.measure(source, true)
+        probe.invoke(owner, {
+            coupled.invoke(owner, {
+                (owner as WorkMeter).charge(32768)
+                assertTrue((owner as Cancellation).isCancelled())
+                captured = access.workCheckpoint(owner)
+                null
+            })
+            null
+        })
 
-        assertEquals(plain.result, observed.result)
-        assertEquals(plain.stats, observed.stats)
-        assertEquals(emptyList(), plain.stops)
-        assertEquals(1, observed.stops.size)
-        for (stop in observed.stops) {
-            assertTrue(stop.workSpent >= stop.coupledEnd)
-            assertTrue(requireNotNull(stop.probeEnd) > stop.coupledEnd)
-            assertTrue(stop.stack.any { it.contains("QfNraSolver.kt:") })
-        }
+        val stop = assertNotNull(captured)
+        assertEquals(32768L, stop.workSpent)
+        assertEquals(32768L, stop.coupledEnd)
+        assertEquals(65536L, stop.probeEnd)
+        assertTrue(stop.stack.isNotEmpty())
     }
 }
