@@ -17,6 +17,9 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
+import com.eignex.klause.theory.qfnra.PolynomialCondition
+import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
@@ -94,6 +97,20 @@ class ContinuousProductEncoderTest {
         val values = assertNotNull(checked.exactReals)
         assertEquals(BigFraction.ofLong(8).reciprocal(), values[0])
         assertEquals(BigFraction.ofLong(16).reciprocal(), values[2])
+    }
+
+    @Test
+    fun `polynomial choices preserve source guard equivalence across queries`() {
+        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375),
+            intArrayOf(Lit.make(0, true), Lit.make(0, false)))
+        val source = Problem(1, 0, emptyArray(), arrayOf(factor), numRealVars = 3,
+            realLower = doubleArrayOf(0.125, 0.5, 0.0625), realUpper = doubleArrayOf(0.125, 0.5, 0.0625))
+        val model = assertNotNull(source.prepareExecutionPlan().polynomialModel)
+        model.service.invocation().use { owner ->
+            assertIs<QfNraResult.Satisfiable>(owner.check(PolynomialCondition(bools = mapOf(0 to true))))
+            assertIs<QfNraResult.Unsatisfiable>(owner.check(PolynomialCondition(bools = mapOf(0 to false))))
+            assertIs<QfNraResult.Satisfiable>(owner.check(PolynomialCondition(bools = mapOf(0 to true))))
+        }
     }
 
     @Test
