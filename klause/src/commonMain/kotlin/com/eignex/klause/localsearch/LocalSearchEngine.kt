@@ -959,7 +959,7 @@ internal class LocalSearchEngine(
                             feasibleMisses = 0
                             if (moveEvaluation != null && moveEvaluation.ordinaryMove != m) {
                                 val solution = moveEvaluation.sample(m) ?: moveEvaluation.attempt(m)
-                                if (solution != null) {
+                                if (solution != null && !params.cancellation()) {
                                     timing.inPhase("application") {
                                         moveEvaluation.commitMove(m, solution)?.let(state::apply)
                                     }
