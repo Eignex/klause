@@ -9,6 +9,7 @@ import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -93,7 +94,7 @@ class LinearPortfolioTerminalTest {
                     LinearPortfolioSearch(RationalTheoryDescent(model, objective,
                         TheoryParams(cancellation = slot.cancellation), source), binding)
                 }) { _, _, _, _ -> error("linear search is retained") }
-                    .bindEvidence(identity).bindInvocation(binding)
+                    .bindSource(SourceWorkerBinding(binding))
             }
             val terminal = LinearPortfolioTerminal(binding, source, Cancellation.Never) { accepted += it }
             val invocation = PortfolioInvocation(request.preparedPlan, listOf(factory),
@@ -126,7 +127,7 @@ class LinearPortfolioTerminalTest {
             PortfolioWorker.ofMinimize("linear", 0, resumable = {
                 LinearPortfolioSearch(RationalTheoryDescent(mixed, cost,
                     TheoryParams(cancellation = slot.cancellation), original), runtime)
-            }) { _, _, _, _ -> error("linear search is retained") }.bindEvidence(modelIdentity).bindInvocation(runtime)
+            }) { _, _, _, _ -> error("linear search is retained") }.bindSource(SourceWorkerBinding(runtime))
         }
         val terminal = LinearPortfolioTerminal(runtime, original, Cancellation.Never) { accepted += it }
         val invocation = PortfolioInvocation(mixedRequest.preparedPlan, listOf(factory),
@@ -159,7 +160,7 @@ class LinearPortfolioTerminalTest {
             PortfolioWorker.ofMinimize("linear", 0, resumable = {
                 LinearPortfolioSearch(RationalTheoryDescent(upper, minimized,
                     TheoryParams(cancellation = slot.cancellation), original), runtime)
-            }) { _, _, _, _ -> error("linear search is retained") }.bindEvidence(modelIdentity).bindInvocation(runtime)
+            }) { _, _, _, _ -> error("linear search is retained") }.bindSource(SourceWorkerBinding(runtime))
         }
         val terminal = LinearPortfolioTerminal(runtime, original, Cancellation.Never) { accepted += it }
         val invocation = PortfolioInvocation(maximized.preparedPlan, listOf(factory), PortfolioInvocationControls(),
@@ -201,7 +202,7 @@ class LinearPortfolioTerminalTest {
             PortfolioWorker.ofMinimize("linear", 0, resumable = {
                 LinearPortfolioSearch(RationalTheoryDescent(exactModel, cost,
                     TheoryParams(cancellation = slot.cancellation), original), runtime)
-            }) { _, _, _, _ -> error("linear search is retained") }.bindEvidence(modelIdentity).bindInvocation(runtime)
+            }) { _, _, _, _ -> error("linear search is retained") }.bindSource(SourceWorkerBinding(runtime))
         }
         val terminal = LinearPortfolioTerminal(runtime, original, Cancellation.Never) { accepted += it }
         val invocation = PortfolioInvocation(exactRequest.preparedPlan, listOf(factory), PortfolioInvocationControls(),
@@ -223,7 +224,7 @@ class LinearPortfolioTerminalTest {
                 LinearPortfolioSearch(RationalTheoryDescent(model, objective,
                     TheoryParams(cancellation = slot.cancellation), source), binding)
             }) { _, _, _, _ -> error("linear search is retained") }
-                .bindEvidence(identity, provesResults = false).bindInvocation(binding)
+                .bindSource(SourceWorkerBinding(binding, provesResults = false))
         }
         val terminal = LinearPortfolioTerminal(binding, source, Cancellation.Never) { accepted += it }
         val invocation = PortfolioInvocation(request.preparedPlan, listOf(factory), PortfolioInvocationControls(),
@@ -246,7 +247,7 @@ class LinearPortfolioTerminalTest {
             PortfolioWorker.ofMinimize("foreign", 0, resumable = {
                 LinearPortfolioSearch(RationalTheoryDescent(model, objective,
                     TheoryParams(cancellation = slot.cancellation), source), foreign)
-            }) { _, _, _, _ -> error("linear search is retained") }.bindEvidence(identity).bindInvocation(foreign)
+            }) { _, _, _, _ -> error("linear search is retained") }.bindSource(SourceWorkerBinding(foreign))
         }
         val terminal = LinearPortfolioTerminal(binding, source, Cancellation.Never) { accepted += it }
         val invocation = PortfolioInvocation(request.preparedPlan, listOf(factory), PortfolioInvocationControls(),

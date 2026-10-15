@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -31,7 +32,9 @@ internal class NonlinearIntegerPortfolio(
                 ExecutionStrategy.MIXED -> error("admission supplies participating arms")
             }
             val family = when (arm) { 0 -> ArmFamily.Backtrack; 1 -> ArmFamily.LocalSearch; else -> ArmFamily.Lns }
-            PortfolioArmFactory(plan, arm, family) { slot ->
+            PortfolioArmFactory(plan, arm, family, binding = {
+                SourceWorkerBinding(binding, provesResults = it.permitsSourceProofs)
+            }) { slot ->
                 val native = scope.worker(slot.index, polynomial.maximumWork?.let(slot::nativeAllowance))
                 val strategy = polynomial.strategy
                 val controls = params.copy(
@@ -55,7 +58,7 @@ internal class NonlinearIntegerPortfolio(
                 val worker = NonlinearIntegerInvocation(request, controls, selected, binding)
                 workers += worker
                 slot.own(AutoCloseable { native.observe(worker.nativeStats) })
-                worker.worker(arm, slot).bindInvocation(binding)
+                worker.worker(arm, slot)
             }
         }
         val strategy = polynomial.strategy

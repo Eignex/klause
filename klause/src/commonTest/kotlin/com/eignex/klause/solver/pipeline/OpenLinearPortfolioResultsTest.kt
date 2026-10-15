@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -131,7 +132,7 @@ class OpenLinearPortfolioResultsTest {
             incumbents.exchange.current()?.let { it.assignment to it.objective.execution }
         }, binding)
         val worker = PortfolioWorker.ofMinimize("linear", 0) { _, _, _, _ -> error("retained only") }
-            .bindEvidence(identity).bindInvocation(binding)
+            .bindSource(SourceWorkerBinding(binding))
         val results = OpenLinearPortfolioResults(binding, context, values, incumbents, Cancellation.Never)
         results.retain(worker, AtomicReference<LinearPortfolioSearch?>(search))
 

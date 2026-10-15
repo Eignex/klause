@@ -16,6 +16,7 @@ import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.kind
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.ResumableSearch
@@ -121,7 +122,7 @@ internal class OpenPortfolio(
                 preparedPlan,
                 factory.armId,
                 factory.family,
-                bind = { it.bindInvocation(binding) },
+                binding = { SourceWorkerBinding(binding, provesResults = it.permitsSourceProofs) },
             ) { slot -> factory.materialize(preparedPlan, slot) }
         }
         val portfolio = PortfolioInvocation(
@@ -242,7 +243,7 @@ internal class OpenPortfolio(
                 preparedPlan,
                 factory.armId,
                 factory.family,
-                bind = { it.bindInvocation(binding) },
+                binding = { SourceWorkerBinding(binding, provesResults = it.permitsSourceProofs) },
             ) { slot -> factory.materialize(preparedPlan, slot) }
         }
         val verifier = openWitnessVerifier(sourceModel, objective, context, stop)

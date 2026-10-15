@@ -1,15 +1,17 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.Session
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.SourceWorkerBinding
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -18,6 +20,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 
 class PortfolioInvocationTest {
     @Test
@@ -26,7 +30,8 @@ class PortfolioInvocationTest {
         val plan = source.prepareExecutionPlan()
         val seeds = mutableListOf<Long>()
         val closed = mutableListOf<Int>()
-        val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack) { slot ->
+        val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack,
+            binding = { SourceWorkerBinding(EngineInvocation(plan, ModelIdentity.of(source))) }) { slot ->
             seeds += slot.seed
             slot.own(AutoCloseable { closed += slot.index })
             PortfolioWorker.ofSolve("source", 0) { _, _ -> SolveResult.Unknown(TerminationReason.BudgetExhausted) }
@@ -49,7 +54,8 @@ class PortfolioInvocationTest {
         val plan = source.prepareExecutionPlan()
         val foreign = Problem(0, 0, emptyArray(), emptyArray()).prepareExecutionPlan()
         var closed = 0
-        val first = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack) { slot ->
+        val first = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack,
+            binding = { SourceWorkerBinding(EngineInvocation(plan, ModelIdentity.of(source))) }) { slot ->
             slot.own(AutoCloseable { closed++ })
             PortfolioWorker.ofSolve("source", 0) { _, _ -> SolveResult.Unknown(TerminationReason.BudgetExhausted) }
         }
@@ -70,7 +76,8 @@ class PortfolioInvocationTest {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val plan = source.prepareExecutionPlan()
         var entered = false
-        val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack) {
+        val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack,
+            binding = { SourceWorkerBinding(EngineInvocation(plan, ModelIdentity.of(source))) }) {
             PortfolioWorker.ofSolve("source", 0) { _, _ ->
                 entered = true
                 SolveResult.Unknown(TerminationReason.BudgetExhausted)
@@ -98,18 +105,68 @@ class PortfolioInvocationTest {
                 delegate.close()
             }
         }
+        val foreign = Problem(0, 0, emptyArray(), emptyArray())
+        val foreignBinding = EngineInvocation(foreign.prepareExecutionPlan(), ModelIdentity.of(foreign))
         val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack,
-            bind = { error("invalid runtime binding") }) { slot ->
+            binding = { SourceWorkerBinding(foreignBinding) }) { slot ->
             slot.own(AutoCloseable { closed += "source" })
             PortfolioWorker.of("source", 0, session, BacktrackParams())
         }
 
-        val failure = assertFailsWith<IllegalStateException> {
+        val failure = assertFailsWith<IllegalArgumentException> {
             PortfolioInvocation(plan, listOf(factory), PortfolioInvocationControls(),
                 PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()))
         }
 
-        assertEquals("invalid runtime binding", failure.message)
+        assertEquals("worker binding belongs to another source plan", failure.message)
         assertEquals(listOf("worker", "source"), closed)
     }
+
+    @Test
+    fun `parallel replicas install complete bindings before policy admission`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val plan = source.prepareExecutionPlan()
+        val runtime = EngineInvocation(plan, ModelIdentity.of(source))
+        val bindings = mutableListOf<SourceWorkerBinding>()
+        val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack,
+            binding = { SourceWorkerBinding(runtime, sharingInvocation = runtime) }) {
+            PortfolioWorker.ofSolve("replica", 0) { _, _ -> SolveResult.Unsat() }
+        }
+
+        PortfolioInvocation(plan, listOf(factory), PortfolioInvocationControls(parallelism = 3),
+            PortfolioEvidence(runtime.model, CandidateVerifier.trusting())) { workers ->
+            for (worker in workers) {
+                val binding = assertNotNull(worker.sourceBinding)
+                assertSame(runtime, binding.invocation)
+                assertSame(runtime, binding.sharingInvocation)
+                bindings += binding
+            }
+            PortfolioInvocationPolicy()
+        }.close()
+
+        assertEquals(3, bindings.size)
+        assertEquals(3, bindings.toSet().size)
+    }
+
+    @Test
+    fun `source scheduling rejects model only worker metadata before policy admission`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val plan = source.prepareExecutionPlan()
+        var admitted = false
+        val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack) {
+            PortfolioWorker.ofSolve("incomplete", 0) { _, _ -> SolveResult.Unsat() }
+                .bindEvidence(ModelIdentity.of(source))
+        }
+
+        assertFailsWith<IllegalArgumentException> {
+            PortfolioInvocation(plan, listOf(factory), PortfolioInvocationControls(),
+                PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting())) {
+                admitted = true
+                PortfolioInvocationPolicy()
+            }
+        }
+
+        assertFalse(admitted)
+    }
+
 }

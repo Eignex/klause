@@ -13,6 +13,7 @@ import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.portfolio.continuousMajority
 import com.eignex.klause.propagation.Assumptions
@@ -58,9 +59,10 @@ internal fun FinitePipeline.portfolioExecutor(
     val binding = EngineInvocation(preparedPlan, identity, objective)
     val factories = PortfolioBuilder.factories(problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
         profile).map { factory ->
-        PortfolioArmFactory(preparedPlan, factory.armId, factory.family, bind = { worker ->
-            worker.bindSharingInvocation(binding).bindInvocation(EngineInvocation(preparedPlan, identity, objective,
-                executionAssumptions = worker.executionAssumptions ?: Assumptions.None))
+        PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
+            SourceWorkerBinding(EngineInvocation(preparedPlan, identity, objective,
+                executionAssumptions = worker.executionAssumptions ?: Assumptions.None),
+                sharingInvocation = binding, provesResults = worker.permitsSourceProofs)
         }) { slot -> factory.materialize(slot.index, slot.baseSeed, slot.nodeBudget) }
     }
     return PortfolioInvocation(
