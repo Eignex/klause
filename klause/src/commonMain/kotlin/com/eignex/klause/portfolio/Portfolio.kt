@@ -34,6 +34,7 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 /**
@@ -684,6 +685,7 @@ class Portfolio(
 
         // Segment time each arm has run, and all arms together, for the shares [minShares] owes.
         private val armNanos = LongArray(workers.size)
+        private val activeSince = arrayOfNulls<TimeMark>(workers.size)
         private val armWork = DoubleArray(workers.size)
         private val siblingWork = LongArray(workers.size)
         private var proofStarted = false
@@ -731,13 +733,13 @@ class Portfolio(
             try {
                 while (!token()) {
                     val claim = claim(index) ?: break
-                    val started = TimeSource.Monotonic.markNow()
                     try {
                         segment(claim)
                     } finally {
-                        val spent = started.elapsedNow().inWholeNanoseconds
                         locked {
+                            val spent = checkNotNull(activeSince[claim.arm]).elapsedNow().inWholeNanoseconds
                             busy[claim.arm] = false
+                            activeSince[claim.arm] = null
                             armNanos[claim.arm] += spent
                             totalNanos += spent
                         }
@@ -790,6 +792,7 @@ class Portfolio(
                 preparationTimeLimit - trialPreparationTime[arm]
             } else trialTimeLimit - trialSearchTime[arm]
             busy[arm] = true
+            activeSince[arm] = runTimeSource.markNow()
             Claim(
                 arm,
                 probing,
@@ -819,6 +822,7 @@ class Portfolio(
         // within local search's feasibility share; a neighborhood needs an incumbent unless it is all that is left.
         private fun policyPick(eligibleArms: List<Int>): Int {
             owedArm(eligibleArms)?.let { return it }
+            owedCompleteArm(eligibleArms)?.let { return it }
             eligibleArms.firstOrNull {
                 workers[it].auxiliaryProof && !busy[it] && !retired[it]
             }?.let { return it }
@@ -844,6 +848,24 @@ class Portfolio(
             // establish which search will reach the first witness.
             if (!improving && !family.observable) return candidates.minBy { armWork[it] }
             return armAmong(candidates)
+        }
+
+        private fun owedCompleteArm(eligibleArms: List<Int>): Int? {
+            if (improving) return null
+            val active = eligibleArms.filter { !retired[it] && !workers[it].auxiliaryProof }
+            val complete = active.filter { workers[it].family == ArmFamily.Backtrack }
+            val free = complete.filter { !busy[it] }
+            if (free.isEmpty()) return null
+            val elapsed = active.associateWith {
+                armNanos[it].toDouble() + (activeSince[it]?.elapsedNow()?.inWholeNanoseconds ?: 0L)
+            }
+            // A bootstrap and its local-search peers share one feasibility family.
+            val families = active.map {
+                if (workers[it].family.observable) ArmFamily.LocalSearch else ArmFamily.Backtrack
+            }.distinct().size
+            val covered = (elapsed.values.sum() - baseSliceMillis.milliseconds.inWholeNanoseconds).coerceAtLeast(0.0)
+            val owed = covered / families / complete.size
+            return free.minBy { elapsed.getValue(it) }.takeIf { elapsed.getValue(it) < owed }
         }
 
         private fun policyFamily(arm: Int): ArmFamily {
