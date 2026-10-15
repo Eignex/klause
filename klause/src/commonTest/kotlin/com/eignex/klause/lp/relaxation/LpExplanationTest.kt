@@ -46,6 +46,41 @@ import kotlin.test.assertTrue
 
 class LpExplanationTest {
     @Test
+    fun `paired row reasons require both scoped row premises`() {
+        for (unbacked in listOf(-1, 0, 1)) {
+            val problem = Problem(2, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+            val session = PropagationSession(problem)
+            session.pinBool(0, true)
+            session.pinBool(1, true)
+            val source = LpBuilder().apply {
+                val x = addVar(0L, 1L)
+                val r = addRealVar(0.0, null)
+                addRealRow(intArrayOf(x, r), doubleArrayOf(1.0, 1.0), Relation.GE, 1.25)
+                addRealRow(intArrayOf(r), doubleArrayOf(1.0), Relation.LE, 0.25)
+            }.build(Sense.MINIMIZE)
+            for (row in 0..1) {
+                source.rowGlobal[row] = false
+                if (row != unbacked) source.rowPremises[row] = LpRowPremises(
+                    intArrayOf(), booleanArrayOf(), longArrayOf(), intArrayOf(Lit.make(row, true)),
+                )
+            }
+            val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+            val relaxation = LpRelaxation(model, intArrayOf(0, -1), booleanArrayOf(false, false), 0L,
+                intArrayOf(0), intArrayOf(), colRealId = intArrayOf(-1, 0))
+            val bound = mixedRowBounds(model).first { it.column == 0 && !it.upper && it.integerBound() == 1L }
+
+            val reason = LpExplanation.rowBoundReason(relaxation, bound, session)
+
+            if (unbacked < 0) {
+                assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)), assertNotNull(reason).toSet())
+            } else {
+                assertNull(reason)
+            }
+        }
+    }
+
+    @Test
     fun `objective reasons withhold separately scoped logical endpoint support`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
             arrayOf(Linear(intArrayOf(0), doubleArrayOf(-2.0), intArrayOf(0), doubleArrayOf(1.0),
