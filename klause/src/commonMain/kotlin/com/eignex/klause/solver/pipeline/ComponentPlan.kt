@@ -473,7 +473,8 @@ fun Problem.componentPlan(
             } else difference
         }
         else -> projections.linearTheoryModel(EncodingTarget.DIFFERENCE,
-            differenceKept, cancellation = cancellation, onDecline = { differenceDecline = it }, completeFiniteConditions = true)
+            differenceKept, cancellation = cancellation, onDecline = { differenceDecline = it },
+            completeFiniteConditions = true)
     }
     val needsArithmetic = intOwners.any { it == IntVariableOwner.THEORY } || encoded.any { it } || numRealVars != 0
     val route = when {
