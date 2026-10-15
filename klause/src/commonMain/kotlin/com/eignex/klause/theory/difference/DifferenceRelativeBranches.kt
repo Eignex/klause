@@ -30,6 +30,7 @@ internal class DifferenceRelativeBranches private constructor(
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
         if (closed) return null
         val stop = context.executionControls.cancellation
+        if (!hasOpenBoolean(context, stop)) return null
         for (index in intervals.indices) {
             stop.charge(1)
             if (stopped(context)) return null
@@ -48,7 +49,7 @@ internal class DifferenceRelativeBranches private constructor(
             if (lower >= upper) continue
             val threshold = lower + (upper - lower) / 2
             val prior = splits[index].firstOrNull { it.threshold == threshold }
-            if (prior != null) return prior.atom.alternatives()
+            if (prior != null) return alternatives(prior.atom, threshold, interval.preferred)
             if (graph.edges.size > MAX_EDGES - 2) return null
             val forward = Bound(interval.from, interval.to, threshold)
             val reverse = Bound(interval.to, interval.from, -threshold - 1)
@@ -64,7 +65,7 @@ internal class DifferenceRelativeBranches private constructor(
             graph = extended
             numBools = maxOf(numBools, Lit.variable(atom.positive.literal) + 1)
             splits[index] += Split(threshold, atom)
-            return atom.alternatives()
+            return alternatives(atom, threshold, interval.preferred)
         }
         return null
     }
@@ -82,13 +83,32 @@ internal class DifferenceRelativeBranches private constructor(
         return stopped
     }
 
+    private fun hasOpenBoolean(context: SearchContext, stop: Cancellation): Boolean {
+        for (variable in 0 until sourceBools) {
+            stop.charge(1)
+            if (stopped(context)) return false
+            if (context.boolValue(variable) == null) return true
+        }
+        return false
+    }
+
+    private fun alternatives(atom: SearchTheoryAtom, threshold: Long, preferred: Long): List<SearchDecision> =
+        atom.alternatives().let { if (preferred <= threshold) it else it.asReversed() }
+
     private data class Bound(val from: Int, val to: Int, val bound: Long) : SearchTheoryDecision
     private class Split(val threshold: Long, val atom: SearchTheoryAtom)
-    private class Interval(val from: Int, val to: Int, val lower: Long, val upper: Long)
+    private class Interval(
+        val from: Int,
+        val to: Int,
+        val lower: Long,
+        val upper: Long,
+        val preferred: Long = lower,
+    )
 
     companion object {
         private const val MAX_EDGES = 65_536
         private const val GRAPH_NODE_UNITS = 32L
+        private const val MAX_INTERVAL_WIDTH = 255L
 
         fun create(source: DifferenceFragment, sourceBools: Int, stop: Cancellation): DifferenceRelativeBranches? {
             if (source.edges.size > MAX_EDGES || !source.carriesAPotential() || stop()) return null
@@ -110,13 +130,33 @@ internal class DifferenceRelativeBranches private constructor(
                 if (from >= to) continue
                 val opposite = bounds[to to from] ?: continue
                 val width = checkedDifferenceSum(upper, opposite) ?: continue
-                if (width <= 0 || opposite == Long.MIN_VALUE) continue
+                if (width !in 1..MAX_INTERVAL_WIDTH || opposite == Long.MIN_VALUE) continue
                 intervals += Interval(from, to, -opposite, upper)
             }
-            stop.charge(intervals.size.toLong() * (Int.SIZE_BITS - intervals.size.countLeadingZeroBits()).coerceAtLeast(1))
+            val orderingVisits = (Int.SIZE_BITS - intervals.size.countLeadingZeroBits()).coerceAtLeast(1)
+            stop.charge(intervals.size.toLong() * orderingVisits)
             if (stop() || intervals.isEmpty()) return null
             intervals.sortWith(compareBy<Interval> { it.upper - it.lower }.thenBy { it.from }.thenBy { it.to })
-            return if (stop()) null else DifferenceRelativeBranches(intervals, source, sourceBools)
+            stop.charge(intervals.size * 2L)
+            if (stop()) return null
+            val ordered = intervals.mapIndexed { index, interval ->
+                val preferred = preferredValue(index, interval, stop) ?: return null
+                Interval(interval.from, interval.to, interval.lower, interval.upper, preferred)
+            }
+            return if (stop()) null else DifferenceRelativeBranches(ordered, source, sourceBools)
+        }
+
+        private fun preferredValue(index: Int, interval: Interval, stop: Cancellation): Long? {
+            val cardinality = interval.upper - interval.lower + 1
+            var ordinal = index.toLong()
+            var offset = 0L
+            while (ordinal > 0) {
+                stop.charge(1)
+                if (stop()) return null
+                offset = (offset + ordinal % cardinality) % cardinality
+                ordinal /= cardinality
+            }
+            return interval.lower + offset
         }
     }
 }

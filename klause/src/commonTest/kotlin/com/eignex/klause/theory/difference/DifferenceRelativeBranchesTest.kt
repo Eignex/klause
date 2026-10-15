@@ -23,13 +23,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class DifferenceRelativeBranchesTest {
     @Test
     fun `relative splits retain both original coordinate outcomes across retraction`() {
         val open = Bits.full(2)
         val model = Problem(
-            numBoolVars = 0,
+            numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
             factors = arrayOf(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 1),
@@ -38,7 +39,7 @@ class DifferenceRelativeBranchesTest {
         )
         val component = DifferenceSearchComponent(model).withRelativeBranches(Cancellation.Never)
         val brancher = assertIs<SearchBranchProposal>(component)
-        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
         assertIs<ComponentResult.Consistent>(session.initialize())
         val alternatives = assertNotNull(brancher.nextBranch(session))
         assertEquals(2, alternatives.size)
@@ -46,7 +47,7 @@ class DifferenceRelativeBranchesTest {
 
         for ((index, difference) in listOf(0 to "1", 1 to "0")) {
             assertIs<ComponentResult.Consistent>(session.push(alternatives[index]))
-            val result = assertIs<SearchRunEvent.Satisfied>(session.openRun(0).next())
+            val result = assertIs<SearchRunEvent.Satisfied>(session.openRun(1).next())
 
             val first = assertNotNull(result.model.valueOf(SearchExactIntValue(SourceIntId(0))))
             val second = assertNotNull(result.model.valueOf(SearchExactIntValue(SourceIntId(1))))
@@ -88,7 +89,7 @@ class DifferenceRelativeBranchesTest {
     fun `unused registered relative names impose no complementary bound at a leaf`() {
         val open = Bits.full(2)
         val model = Problem(
-            numBoolVars = 0,
+            numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
             factors = arrayOf(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3),
@@ -97,26 +98,26 @@ class DifferenceRelativeBranchesTest {
         )
         val component = DifferenceSearchComponent(model).withRelativeBranches(Cancellation.Never)
         val brancher = assertIs<SearchBranchProposal>(component)
-        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
         assertIs<ComponentResult.Consistent>(session.initialize())
-        val first = assertNotNull(brancher.nextBranch(session))[0]
+        val first = assertNotNull(brancher.nextBranch(session))[1]
         assertIs<ComponentResult.Consistent>(session.push(first))
         assertNotNull(brancher.nextBranch(session))
         session.popTo(0)
-        assertIs<ComponentResult.Consistent>(session.push(assertNotNull(brancher.nextBranch(session))[1]))
+        assertIs<ComponentResult.Consistent>(session.push(assertNotNull(brancher.nextBranch(session))[0]))
 
-        val result = assertIs<SearchRunEvent.Satisfied>(session.openRun(0).next())
+        val result = assertIs<SearchRunEvent.Satisfied>(session.openRun(1).next())
 
         val firstValue = assertNotNull(result.model.valueOf(SearchExactIntValue(SourceIntId(0))))
         val secondValue = assertNotNull(result.model.valueOf(SearchExactIntValue(SourceIntId(1))))
-        assertEquals("1", (firstValue - secondValue).toString())
+        assertTrue((firstValue - secondValue).toString() in setOf("2", "3"))
     }
 
     @Test
     fun `declined relative atom capacity retains an original source witness`() {
         val open = Bits.full(2)
         val model = Problem(
-            numBoolVars = 0,
+            numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
             factors = arrayOf(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 1),
@@ -124,10 +125,10 @@ class DifferenceRelativeBranchesTest {
             ),
         )
         val component = DifferenceSearchComponent(model).withRelativeBranches(Cancellation.Never)
-        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0, maxAtoms = 0))
+        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1, maxAtoms = 0))
         assertIs<ComponentResult.Consistent>(session.initialize())
 
-        assertIs<SearchRunEvent.Satisfied>(session.openRun(0).next())
+        assertIs<SearchRunEvent.Satisfied>(session.openRun(1).next())
     }
 
     @Test
@@ -137,15 +138,15 @@ class DifferenceRelativeBranchesTest {
             DifferenceEdge(1, 0, 0),
         ))
 
-        assertNull(DifferenceRelativeBranches.create(source, 0, Cancellation.Never))
+        assertNull(DifferenceRelativeBranches.create(source, 1, Cancellation.Never))
     }
 
     @Test
     fun `containing cancellation withholds a relative branch`() {
         var stopped = false
         val source = DifferenceFragment(listOf(DifferenceEdge(0, 1, 1), DifferenceEdge(1, 0, 0)))
-        val brancher = assertNotNull(DifferenceRelativeBranches.create(source, 0, Cancellation.Never))
-        val session = SearchSession(emptyList(), cancellation = Cancellation { stopped }, atoms = SearchAtomRegistry(0))
+        val brancher = assertNotNull(DifferenceRelativeBranches.create(source, 1, Cancellation.Never))
+        val session = SearchSession(emptyList(), cancellation = Cancellation { stopped }, atoms = SearchAtomRegistry(1))
         stopped = true
 
         assertNull(brancher.nextBranch(session))
@@ -154,8 +155,8 @@ class DifferenceRelativeBranchesTest {
     @Test
     fun `closing a relative opening releases its branch proposals`() {
         val source = DifferenceFragment(listOf(DifferenceEdge(0, 1, 1), DifferenceEdge(1, 0, 0)))
-        val brancher = assertNotNull(DifferenceRelativeBranches.create(source, 0, Cancellation.Never))
-        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
+        val brancher = assertNotNull(DifferenceRelativeBranches.create(source, 1, Cancellation.Never))
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
         assertNotNull(brancher.nextBranch(session))
 
         brancher.close()

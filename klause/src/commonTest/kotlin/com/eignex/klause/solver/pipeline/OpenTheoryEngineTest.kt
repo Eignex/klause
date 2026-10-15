@@ -26,6 +26,27 @@ class OpenTheoryEngineTest {
     private fun sourceRoute(model: Problem): ProblemPipeline = model.sourceRoute()
 
     @Test
+    fun `settled Boolean sources complete relative graphs without arithmetic decisions`() {
+        for (width in listOf(1L, 256L)) {
+            val open = Bits.full(2)
+            val model = Problem(
+                numBoolVars = 0,
+                intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+                factors = arrayOf(
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, width),
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
+                ),
+            )
+
+            val result = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model)).solve(TheoryParams(maxDecisions = 0))
+
+            val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+            val difference = assignment.intValue(0).toLong() - assignment.intValue(1).toLong()
+            assertTrue(difference in 0L..width)
+        }
+    }
+
+    @Test
     fun `relative integer choices retain guarded source equalities and disequalities`() {
         val parsed = SmtLib.parse(
             """
