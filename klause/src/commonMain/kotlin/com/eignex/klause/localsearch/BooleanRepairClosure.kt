@@ -25,8 +25,11 @@ internal class BooleanRepairClosure private constructor(
     private var end = 0
     private var supportHead = 0
     private var supportTail = 0
+    private var operationsBeforePoll = 0
 
     companion object {
+        private const val CANCELLATION_BATCH = 256
+
         fun preparation(state: LocalSearchState): Sequence<PreparedBooleanRepairs?> = sequence {
             val problem = state.problem
             if (problem.numIntVars != 0 || problem.numRealVars != 0 ||
@@ -163,6 +166,8 @@ internal class BooleanRepairClosure private constructor(
 
     fun close(state: LocalSearchState, move: Move, cancellation: Cancellation): Move? {
         if (inconsistent) return null
+        operationsBeforePoll = 0
+        if (interrupted(cancellation)) return null
         if (epoch == Int.MAX_VALUE) {
             stamps.fill(0)
             seedStamps.fill(0)
@@ -174,8 +179,8 @@ internal class BooleanRepairClosure private constructor(
         supportTail = 0
         var seedCount = 0
         val parts = if (move is Move.Compound) move.parts else listOf(move)
-        for ((index, part) in parts.withIndex()) {
-            if (index % 256 == 0 && cancellation.isCancelled()) return null
+        for (part in parts) {
+            if (interrupted(cancellation)) return null
             if (part !is Move.BoolFlip) return move
             val variable = part.varId
             if (seedStamps[variable] != epoch) {
@@ -184,12 +189,12 @@ internal class BooleanRepairClosure private constructor(
                 seeds[seedCount++] = variable
             } else seedParity[variable] = !seedParity[variable]
         }
-        for ((index, literal) in units.withIndex()) {
-            if (index % 256 == 0 && cancellation.isCancelled()) return null
+        for (literal in units) {
+            if (interrupted(cancellation)) return null
             if (!force(literal)) return null
         }
         for (index in 0 until seedCount) {
-            if (index % 256 == 0 && cancellation.isCancelled()) return null
+            if (interrupted(cancellation)) return null
             val variable = seeds[index]
             if (seedParity[variable] && !force(Lit.make(variable, !state.assignment.boolValue(variable)))) return null
         }
@@ -197,7 +202,7 @@ internal class BooleanRepairClosure private constructor(
         if (!expand(cancellation, supportState)) return null
         val closed = ArrayList<Move>()
         for (index in 0 until end) {
-            if (index % 256 == 0 && cancellation.isCancelled()) return null
+            if (interrupted(cancellation)) return null
             val literal = queue[index]
             val variable = Lit.variable(literal)
             if (state.assignment.boolValue(variable) != Lit.isPositive(literal) &&
@@ -209,8 +214,18 @@ internal class BooleanRepairClosure private constructor(
             1 -> closed.single()
             else -> Move.Compound(closed)
         }
-        if (supportState != null && result != null && state.netDelta(result) != 0L) return null
+        if (supportState != null && result != null) {
+            if (cancellation.isCancelled()) return null
+            if (state.netDelta(result) != 0L) return null
+        }
         return result.takeUnless { cancellation.isCancelled() }
+    }
+
+    private fun interrupted(cancellation: Cancellation): Boolean {
+        // Nested short clauses share the same bounded graph-visit window.
+        if (operationsBeforePoll-- > 0) return false
+        operationsBeforePoll = CANCELLATION_BATCH - 1
+        return cancellation.isCancelled()
     }
 
     private fun force(literal: Int): Boolean {
@@ -227,18 +242,17 @@ internal class BooleanRepairClosure private constructor(
 
     private fun expand(cancellation: Cancellation, supportState: LocalSearchState?): Boolean {
         var cursor = 0
-        var visits = 0
         val scratch = support
         while (cursor < end || supportHead != supportTail) {
             while (cursor < end) {
-                if (cursor % 256 == 0 && cancellation.isCancelled()) return false
+                if (interrupted(cancellation)) return false
                 val literal = queue[cursor++]
                 for (forced in edges[literal]) {
-                    if (visits++ % 256 == 0 && cancellation.isCancelled()) return false
+                    if (interrupted(cancellation)) return false
                     if (!force(forced)) return false
                 }
                 for (row in occurrences[literal]) {
-                    if (visits++ % 256 == 0 && cancellation.isCancelled()) return false
+                    if (interrupted(cancellation)) return false
                     if (!expandClause(clauses[row], cancellation, null)) return false
                     if (supportState != null && scratch != null && scratch.clauseStamps[row] != epoch) {
                         scratch.clauseStamps[row] = epoch
@@ -249,6 +263,7 @@ internal class BooleanRepairClosure private constructor(
                 }
             }
             if (supportHead != supportTail && scratch != null) {
+                if (interrupted(cancellation)) return false
                 val row = scratch.rows[supportHead]
                 supportHead++
                 if (supportHead == scratch.rows.size) supportHead = 0
@@ -266,8 +281,8 @@ internal class BooleanRepairClosure private constructor(
         var unknown = 0
         var last = Lit.NONE
         var supported = false
-        for ((index, literal) in literals.withIndex()) {
-            if (index % 256 == 0 && cancellation.isCancelled()) return false
+        for (literal in literals) {
+            if (interrupted(cancellation)) return false
             val variable = Lit.variable(literal)
             val value = if (stamps[variable] == epoch) {
                 if (values[variable]) 2 else 1
@@ -287,14 +302,16 @@ internal class BooleanRepairClosure private constructor(
         var chosen = Lit.NONE
         var bestBreak = Int.MAX_VALUE
         var bestObjective = Double.POSITIVE_INFINITY
-        for ((index, literal) in literals.withIndex()) {
-            if (index % 256 == 0 && cancellation.isCancelled()) return false
+        for (literal in literals) {
+            if (interrupted(cancellation)) return false
             val variable = Lit.variable(literal)
             if (stamps[variable] == epoch || frozen[variable].toInt() != 0 ||
                 supportState.invariants?.isDefinedBool(variable) == true
             ) continue
+            if (cancellation.isCancelled()) return false
             val score = scratch.breakScore(supportState, variable)
             if (score > bestBreak) continue
+            if (cancellation.isCancelled()) return false
             val objectiveDelta = scratch.objectiveDelta(supportState, variable)
             if (chosen == Lit.NONE || score < bestBreak || objectiveDelta < bestObjective) {
                 chosen = literal
