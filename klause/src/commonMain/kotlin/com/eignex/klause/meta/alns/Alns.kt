@@ -189,24 +189,29 @@ internal class Alns(
             val fresh = exchange?.current()
             if (fresh != null && fresh.version > seenVersion) {
                 if (fresh.assignment !== current && fresh.objective.isFinite() &&
-                    accepts(fresh.assignment, best, cancellation) &&
-                    objective.evaluate(fresh.assignment) == fresh.objective
+                    accepts(fresh.assignment, best, cancellation, fresh.objective)
                 ) best = fresh.assignment
                 if (!cancellation()) seenVersion = fresh.version
             }
             return best.takeUnless { it === current }
         }
 
-        private fun accepts(sample: Sample, current: Sample?, cancellation: Cancellation): Boolean {
+        private fun accepts(
+            sample: Sample,
+            current: Sample?,
+            cancellation: Cancellation,
+            claimed: Double? = null,
+        ): Boolean {
             val checked = finiteWitnessVerifier(problem, objective, assumptions, cancellation, toleranceCheck)
-                .verify(Candidate(sample, null))
+                .verify(Candidate(sample, claimed))
             if (checked !is Verification.Accepted || cancellation()) return false
             if (!objective.evaluate(sample).isFinite()) return false
             return current == null || objective.evaluateExact(sample) < objective.evaluateExact(current)
         }
 
         fun publish(sample: Sample, value: Double) {
-            exchange?.offer(sample, value)
+            val target = exchange ?: return
+            if (target.current()?.assignment !== sample) target.offer(sample, value)
         }
     }
 
