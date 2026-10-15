@@ -123,7 +123,7 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     is Inverse, is ValuePrecede -> finiteDomains
     is Power -> if (base is Power.Coordinate.Integer) finiteDomains else
         realArithmetic.copy(relaxation = if (exponent <= 1) RelaxationCapability.SOUND else RelaxationCapability.NONE)
-    is ArrayMinMax, is Product, is Increasing, is ReifiedLinear -> boundRelaxation
+    is AffineAbs, is ArrayMinMax, is Product, is Increasing, is ReifiedLinear -> boundRelaxation
     is Linear -> if (constants is RealConstants) realArithmetic else boundRelaxation
     is Clause, is Cardinality, is PseudoBoolean, is ReifiedCardinality, is ReifiedPseudoBoolean,
     is Circuit, is Cumulative, is Diffn,

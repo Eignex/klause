@@ -47,6 +47,8 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is Abs -> AbsPropagator(operand, result)
 
+    is AffineAbs -> AffineAbsPropagator(this)
+
     is GridAbs -> gridAbsoluteValueTable(this).buildPropagatorProjection(preparation)
 
     is ArrayMinMax -> ArrayMinMaxPropagator(result, xs, max, boolVars, intVars)

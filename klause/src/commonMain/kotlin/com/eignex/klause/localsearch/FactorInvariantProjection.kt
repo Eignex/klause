@@ -42,6 +42,8 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
 
     is Abs -> AbsInvariant(operand, result)
 
+    is AffineAbs -> AffineAbsInvariant(this)
+
     is GridAbs -> gridAbsoluteValueTable(this).buildInvariantProjection(domains)
 
     is ArrayMinMax -> ArrayMinMaxInvariant(result, xs, max)
