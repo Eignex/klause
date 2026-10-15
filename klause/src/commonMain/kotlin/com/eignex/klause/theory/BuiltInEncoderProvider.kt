@@ -8,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.DivMod
 import com.eignex.klause.factor.arithmetic.GridAbs
 import com.eignex.klause.factor.arithmetic.GridArrayMinMax
 import com.eignex.klause.factor.arithmetic.GridArithmetic
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
@@ -59,6 +60,11 @@ object BuiltInEncoderProvider : EncoderProvider {
 
     override fun select(factor: Factor, target: EncodingTarget): Encoder = when {
         target !in EncodingTarget.entries -> unsupported
+        factor is LinearIndicator -> when (target) {
+            EncodingTarget.LINEAR -> LinearIndicatorEncoder.linear
+            EncodingTarget.POLYNOMIAL -> LinearIndicatorEncoder.polynomial
+            else -> unsupported
+        }
         factor is ArrayMinMax || factor is Element -> selectionEncoder
         factor is Abs && target == EncodingTarget.LINEAR -> AbsEncoding.linear
         factor is Abs && target == EncodingTarget.POLYNOMIAL -> AbsEncoding.polynomial

@@ -114,9 +114,10 @@ routing proof for MPS, SMT-LIB and exact FlatZinc, allowing a supported source t
 be measured through its open route. Unsupported syntax or a declined exact
 operation remains undecided.
 
-MPS mixed models whose hybrid lowering differs from source decimals prepare exact
-original rows and objective definitions before routing. Their complete and heuristic
-arms operate on the same source-equivalent model; the default purely continuous LP
+MPS mixed models whose hybrid projection differs from source decimals retain native
+exact rows, indicators and objective definitions. Source correspondence does not
+select their execution policy: bounded integer choices retain CP ownership, and
+selected numerical projections remain available. The default purely continuous LP
 lane retains its separately identified tolerance guarantee. See
 [MPS source semantics](formats/mps.md).
 

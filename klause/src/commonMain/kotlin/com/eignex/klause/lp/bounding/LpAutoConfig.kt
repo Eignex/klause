@@ -4,6 +4,8 @@ import com.eignex.klause.bound.CumulativeEnergeticBound
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -144,7 +146,7 @@ object LpAutoConfig {
         for (f in problem.factors) {
             if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             when (f) {
-                is Linear -> {
+                is Linear, is ExactLinear, is LinearIndicator -> {
                     lpEmittable = true
                     rows += 1
                 }

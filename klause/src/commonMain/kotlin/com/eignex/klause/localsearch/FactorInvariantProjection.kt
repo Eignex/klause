@@ -88,6 +88,10 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
 
     is LexLess -> LexLessInvariant(xs, ys, strict)
 
+    is ExactLinear -> scoringView()
+
+    is LinearIndicator -> scoringView()
+
     is Linear -> integralConstants?.let { integral ->
         val integer = integerConstants
         if (integer != null && (domains == null || !needsExactSum(integer, vars, domains))) {

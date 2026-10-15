@@ -253,8 +253,11 @@ class MpsCompiledTest {
             emptyList(),
         ).toProblem()
 
-        assertFalse(compiled.sourceExact)
-        assertEquals("column bound 'X'", compiled.sourceDifference)
+        assertTrue(compiled.sourceExact)
+        assertNull(compiled.sourceDifference)
+        assertFailsWith<MpsLoweringException> {
+            compiled.sourceWitness(listOf(BigFraction.of(parseBigInt("-10000000000000000001"), BIG_ONE)))
+        }
     }
 
     @Test
@@ -267,22 +270,26 @@ class MpsCompiledTest {
             emptyList(),
         ).toProblem()
 
-        assertFalse(compiled.sourceExact)
-        assertEquals("column bound 'X'", compiled.sourceDifference)
+        assertTrue(compiled.sourceExact)
+        assertNull(compiled.sourceDifference)
+        assertFailsWith<MpsLoweringException> {
+            compiled.sourceWitness(listOf(BigFraction.of(parseBigInt("10000000000000000001"), BIG_ONE)))
+        }
     }
 
     @Test
-    fun `a mixed objective keeps integer scaling independent of real cost`() {
+    fun `a mixed objective retains exact decimal source units`() {
         val compiled = Mps.parse(
             "ROWS\n N COST\nCOLUMNS\n MARK0 'MARKER' 'INTORG'\n X COST 1\n" +
                 " MARK1 'MARKER' 'INTEND'\n Y COST 0.333333333333333\n" +
                 "BOUNDS\n UP BND X 10000\n UP BND Y 1\nENDATA",
         ).toProblem()
 
+        val witness = compiled.sourceWitness(longArrayOf(1), listOf(BigFraction.ONE))
+
         assertEquals(1L, compiled.objectiveScale)
-        assertEquals(1L, assertNotNull(compiled.objective).intCoefficients.single())
-        assertFalse(compiled.sourceExact)
-        assertEquals("objective coefficient 'Y'", compiled.sourceDifference)
+        assertTrue(compiled.sourceExact)
+        assertEquals("1333333333333333/1000000000000000", witness.objective.toString())
     }
 
     @Test
