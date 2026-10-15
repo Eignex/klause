@@ -96,7 +96,7 @@ optimization-status authority.
 point is not an exact witness. Optimum publication requires no
 `toleranceDifference`; infeasibility and unboundedness require `sourceExact`.
 `--exact` requires exact source certificates. A hybrid lowering that differs from
-the source is replaced by the exact source adapter for arithmetic execution.
+the source is replaced by the exact source adapter for numerical execution.
 Exact adapter witnesses require original decimal feasibility. Working-model
 witnesses on the default finite LP lane retain the separate tolerance guarantee.
 Output comments identify an exact original-source witness or a source-tolerance
