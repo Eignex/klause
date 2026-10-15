@@ -4,8 +4,8 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class PolynomialWitnessProbeProfileTest {
     @Test
@@ -70,6 +70,8 @@ class PolynomialWitnessProbeProfileTest {
         assertEquals(32768L, stop.workSpent)
         assertEquals(32768L, stop.coupledEnd)
         assertEquals(65536L, stop.probeEnd)
-        assertTrue(stop.stack.isNotEmpty())
+        assertTrue(stop.stack.any { it.contains("QfNraWork.coupled(QfNraSolver.kt:") })
+        val snapshot = workType.getMethod("snapshot").invoke(owner)
+        assertEquals(32768L, snapshot.javaClass.getMethod("getWorkSpent").invoke(snapshot))
     }
 }
