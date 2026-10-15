@@ -262,7 +262,7 @@ class AlnsTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val approximate = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
-        val exact = approximate.copy(reals = doubleArrayOf(0.5), exactReals = listOf(BigFraction.ofLong(1) / BigFraction.ofLong(2)))
+        val exact = approximate.copy(reals = doubleArrayOf(0.5), exactReals = listOf(BigFraction.ofLong(2).reciprocal()))
         for (tolerance in listOf(false, true)) for (seed in listOf(approximate, exact,
             Sample(BooleanArray(0), LongArray(0)),
             Sample(BooleanArray(0), LongArray(0), doubleArrayOf(Double.NaN)))) {
