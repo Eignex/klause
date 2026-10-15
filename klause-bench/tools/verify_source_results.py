@@ -17,7 +17,8 @@ import z3
 SMT_CORPUS_SUITES = frozenset(("smtlib-qfidl", "smtlib-qflia", "smtlib-qflira", "smtlib-qflra", "smtlib-qfrdl"))
 SMT_SUITES = SMT_CORPUS_SUITES | {"smtlib-core"}
 MPS_CORPUS_SUITES = frozenset(("miplib2003", "miplib2010", "miplib2017", "orlib"))
-SOURCE_SUITES = SMT_SUITES | MPS_CORPUS_SUITES | {"mps-core", "miplib3"}
+MPS_FIXTURE_SUITES = frozenset(("mps-linear-source-v1",))
+SOURCE_SUITES = SMT_SUITES | MPS_CORPUS_SUITES | MPS_FIXTURE_SUITES | {"mps-core", "miplib3"}
 
 
 def expressions(text):
@@ -302,7 +303,7 @@ def source(case, archive, source_root=None):
     suite, name = case["problem"]["suite"], case["record"]["problem"]
     if suite not in SOURCE_SUITES:
         raise ValueError(f"unsupported source suite {suite}")
-    if suite in (SMT_CORPUS_SUITES | MPS_CORPUS_SUITES) and source_root is None:
+    if suite in (SMT_CORPUS_SUITES | MPS_CORPUS_SUITES | MPS_FIXTURE_SUITES) and source_root is None:
         raise ValueError(f"source suite {suite} requires --source-root with hash-named original bytes")
     if source_root is not None:
         digest = case["record"]["sourceHashes"]["model"]
