@@ -51,7 +51,7 @@ class SmtLibAdmissionTest {
         val input = SmtLibAdmission.parse(
             "(declare-const n Int) (declare-const m Int) (declare-const k Int) " +
                 "(declare-const x Real) (declare-const y Real) " +
-                "(assert (and (>= m 0) (<= m 1) (or (= k 0) (= k 2)) (= n (+ m 1)))) " +
+                "(assert (and (>= m 0) (<= m 1) (>= k 0) (<= k 2) (or (= k 0) (= k 2)) (= n (+ m 1)))) " +
                 "(assert (distinct n m k)) (assert (= x 2)) (assert (= y 4)) " +
                 "(assert (= (* (to_real n) x) y)) (check-sat)",
         )
