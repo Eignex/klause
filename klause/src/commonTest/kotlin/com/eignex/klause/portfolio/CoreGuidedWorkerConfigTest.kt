@@ -72,7 +72,7 @@ class CoreGuidedWorkerConfigTest {
         val worker = BacktrackWorkerConfig.byLabel("core-guided").materialize(
             problem, 0, 0, 3L, 1.0, objective, null, null, null, null,
         ).let { it.bindSource(SourceWorkerBinding(invocation, provesResults = it.permitsSourceProofs)) }
-        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).let { it.bindSource(SourceWorkerBinding(invocation, provesResults = it.permitsSourceProofs)) }
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(invocation)
         val handle = requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY }, Cancellation.Never))
         val result = assertIs<MinimizeResult.Optimal>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
 
@@ -94,7 +94,7 @@ class CoreGuidedWorkerConfigTest {
         val worker = CoreGuidedWorkerConfig().materialize(
             problem, 0, 0, 3L, 1.0, objective, null, null, null, null,
         ).let { it.bindSource(SourceWorkerBinding(invocation, provesResults = it.permitsSourceProofs)) }
-        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).let { it.bindSource(SourceWorkerBinding(invocation, provesResults = it.permitsSourceProofs)) }
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(invocation)
         val handle = requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY }, Cancellation.Never))
         val result = assertIs<MinimizeResult.Optimal>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
 

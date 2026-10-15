@@ -24,16 +24,18 @@ internal class SourceWorkerBinding(
     ) : this(invocation.model, invocation, sharingInvocation, provesResults = provesResults)
 
     init {
-        require(invocation == null || quadraticInvocation == null) { "worker has incompatible execution bindings" }
-        require(quadraticInvocation?.matchesModel(model) != false) { "quadratic producer differs from the worker model" }
-        require(quadraticInvocation == null || (preparedPlan != null && quadraticInvocation.matchesModel(
-            ModelIdentity.of(preparedPlan.originalSource, quadraticInvocation.objective)))) {
-            "quadratic producer has another source plan"
-        }
-        require(quadraticInvocation == null || preparedPlan?.quadraticObjective == null ||
-            (preparedPlan.quadraticObjective === quadraticInvocation.objective &&
-                preparedPlan.maximize == (quadraticInvocation.sense == ObjectiveSense.MAXIMIZE))) {
-            "quadratic producer has another source objective or direction"
+        val quadratic = quadraticInvocation
+        if (quadratic != null) {
+            require(invocation == null) { "worker has incompatible execution bindings" }
+            require(quadratic.matchesModel(model)) { "quadratic producer differs from the worker model" }
+            val plan = requireNotNull(preparedPlan) { "quadratic producer has another source plan" }
+            require(quadratic.matchesModel(ModelIdentity.of(plan.originalSource, quadratic.objective))) {
+                "quadratic producer has another source plan"
+            }
+            require(plan.quadraticObjective == null || (plan.quadraticObjective === quadratic.objective &&
+                plan.maximize == (quadratic.sense == ObjectiveSense.MAXIMIZE))) {
+                "quadratic producer has another source objective or direction"
+            }
         }
         require(sharingInvocation == null || invocation != null) { "sharing requires an actual producer invocation" }
         require(invocation == null || model.matches(invocation.model)) { "producer differs from the worker model" }
