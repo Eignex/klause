@@ -72,6 +72,12 @@ polling boundaries. Partial propagation is sound but can forgo deductions. Cance
 is cooperative: propagation-state construction and work between polls can exceed a
 deadline. Probe-call caps do not establish a wall-clock bound.
 
+Source routing attempts bound closing before rejecting a polynomial composition
+on open integer declarations. Proved bounds retain declared domain holes and
+original factor identities; unrelated finite globals keep their finite owner.
+A surviving open side remains arithmetic-owned and can still decline polynomial
+admission.
+
 Open satisfaction separates optional source passes and bound closing from required
 component installation. The passes and bound closing retain the presolve phase token
 and ledger. Planning the resulting source uses the containing invocation token and

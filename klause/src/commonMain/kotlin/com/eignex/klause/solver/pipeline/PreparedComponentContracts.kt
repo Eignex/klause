@@ -55,12 +55,16 @@ internal fun checkedCompletionContract(
 internal fun Problem.finiteRealCompletionSupported(
     projections: PreparedFactorProjections = selectedFactorProjections(),
 ): Boolean = realLower.none { it.isNaN() } && realUpper.none { it.isNaN() } && factors.indices.all { index ->
+    finiteRealFactorSupported(index, projections)
+}
+
+internal fun Problem.finiteRealFactorSupported(index: Int, projections: PreparedFactorProjections): Boolean {
     val factor = factors[index]
     val encoder = projections.encoder(index, EncodingTarget.LINEAR)
-    if (factor.variables.reals.isNotEmpty() && !encoder.enforcesSource &&
-        encoder.support != EncoderSupport.CONDITIONED
-    ) return@all false
-    factor.variables.reals.isEmpty() || factor is RealProduct || factor is RealAbs ||
+    if (projections.capabilities(index).propagation == PropagationCapability.UNSUPPORTED) return false
+    if (factor.variables.reals.isEmpty()) return true
+    if (!encoder.enforcesSource && encoder.support != EncoderSupport.CONDITIONED) return false
+    return factor is RealProduct || factor is RealAbs ||
         ((factor.linearForm is LinearForm.Conjunction || factor.linearForm is LinearForm.Disjunction) &&
             factor.linearForm!!.rows.none { it.strict })
 }

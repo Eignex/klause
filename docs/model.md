@@ -151,7 +151,11 @@ contract separates variable ownership from concurrent factor mechanisms.
 The preparation and ownership rules below describe the implemented system.
 
 `Problem.prepareExecutionPlan()` selects immutable model-facing ownership and
-completion data before search. `PreparedSourcePlan` retains the original source
+completion data before search. Shared source routing attempts sound open-bound closure before final
+nonlinear admission. A relation's captured linear and polynomial encoder support,
+together with its available finite completion, selects the arithmetic language.
+A bounded mixed product can retain finite choices and conditioned linear completion;
+its factor class alone does not require polynomial traversal. `PreparedSourcePlan` retains the original source
 object, canonical execution model, source declaration counts, coordinate mappings,
 component descriptors and objective direction. Its descriptors use extensible
 semantic identifiers and retain original factor indices. `ComponentPlan` supplies
