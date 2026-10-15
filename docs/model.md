@@ -259,6 +259,9 @@ equivalent relation construction in `lowering`. An extremum bounds every operand
 and equals at least one of them. An element constrains the index range and guards
 each selected equality by its exact index value. This linear-size encoding retains
 ordered entries, offsets, aliases and full-width integer constants. Installation
+uses exact affine interpolation for two-entry constant elements in the linear
+and polynomial targets; the integer index range makes that relation complete.
+The difference target keeps guarded equalities. Installation
 retains source attribution and uses the receiving cancellation/work allowance;
 an interrupted relation is discarded. Native finite projections remain available
 alongside arithmetic participation.

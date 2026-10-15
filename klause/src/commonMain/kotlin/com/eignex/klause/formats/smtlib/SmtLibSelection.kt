@@ -18,9 +18,9 @@ import com.eignex.klause.util.div
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
-import com.eignex.klause.util.rem as truncatedRemainder
 import com.eignex.klause.util.signum
 import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.rem as truncatedRemainder
 
 internal fun Compiler.Builder.exclusiveIntegerSelection(
     result: Int,
@@ -44,20 +44,35 @@ internal fun Compiler.Builder.wideIntegerSelection(
     whenFalse: IntComb,
     magnitude: BigInt?,
 ) {
+    val trueTerm = whenTrue.toWide()
+    val falseTerm = whenFalse.toWide()
+    if (trueTerm.coeffs.isEmpty() && falseTerm.coeffs.isEmpty()) {
+        val columns = selectionColumns(result)
+        val trueDigits = selectionDigits(trueTerm.constant, columns)
+        val falseDigits = selectionDigits(falseTerm.constant, columns)
+        val index = selectionIndex(listOf(condition))
+        for ((position, column) in columns.withIndex()) {
+            factors.add(Element(index, column, longArrayOf(falseDigits[position], trueDigits[position]),
+                arrIsVars = false, indexOffset = 0))
+        }
+        return
+    }
     val trueValue = selectionWideValue(whenTrue, magnitude)
     val falseValue = selectionWideValue(whenFalse, magnitude)
     val index = selectionIndex(listOf(condition))
     when (result) {
-        is IntComb.Narrow -> factors.add(Element(index, checkNotNull(result.lin.asSimpleVar()), longArrayOf(
-            checkNotNull((falseValue as IntComb.Narrow).lin.asSimpleVar()).toLong(),
-            checkNotNull((trueValue as IntComb.Narrow).lin.asSimpleVar()).toLong(),
-        ), arrIsVars = true, indexOffset = 0))
+        is IntComb.Narrow -> {
+            val column = checkNotNull(result.lin.asSimpleVar())
+            val entries = longArrayOf(checkNotNull((falseValue as IntComb.Narrow).lin.asSimpleVar()).toLong(),
+                checkNotNull((trueValue as IntComb.Narrow).lin.asSimpleVar()).toLong())
+            factors.add(Element(index, column, entries, arrIsVars = true, indexOffset = 0))
+        }
         is IntComb.Wide -> {
             val trueColumns = (trueValue as IntComb.Wide).lin.coeffs.entries.associate { it.value to it.key }
             val falseColumns = (falseValue as IntComb.Wide).lin.coeffs.entries.associate { it.value to it.key }
             for ((column, weight) in result.lin.coeffs) {
-                factors.add(Element(index, column, longArrayOf(falseColumns.getValue(weight).toLong(),
-                    trueColumns.getValue(weight).toLong()), arrIsVars = true, indexOffset = 0))
+                val entries = longArrayOf(falseColumns.getValue(weight).toLong(), trueColumns.getValue(weight).toLong())
+                factors.add(Element(index, column, entries, arrIsVars = true, indexOffset = 0))
             }
         }
     }
@@ -66,17 +81,28 @@ internal fun Compiler.Builder.wideIntegerSelection(
 private fun Compiler.Builder.selectionWideValue(term: IntComb, magnitude: BigInt?): IntComb {
     val value = freshWideInt(magnitude)
     val source = term.toWide()
-    if (source.coeffs.isNotEmpty() || value is IntComb.Narrow && !source.constant.fitsLong()) {
+    if (source.coeffs.isNotEmpty() || (value is IntComb.Narrow && !source.constant.fitsLong())) {
         assertRelation("=", value, term)
         return value
     }
-    var remaining = source.constant
-    val columns = when (value) {
-        is IntComb.Narrow -> listOf(checkNotNull(value.lin.asSimpleVar()))
-        is IntComb.Wide -> value.lin.coeffs.entries.sortedWith { a, b -> a.value.compareTo(b.value) }.map { it.key }
-    }
+    val columns = selectionColumns(value)
+    val digits = selectionDigits(source.constant, columns)
     for ((position, column) in columns.withIndex()) {
-        val digit = if (position == columns.lastIndex) remaining.toLongExact() else {
+        intDomains[column] = PresolveDomain.Finite(IntDomain(digits[position], digits[position]))
+    }
+    return value
+}
+
+private fun selectionColumns(value: IntComb): List<Int> = when (value) {
+    is IntComb.Narrow -> listOf(checkNotNull(value.lin.asSimpleVar()))
+    is IntComb.Wide -> value.lin.coeffs.entries.sortedWith { a, b -> a.value.compareTo(b.value) }.map { it.key }
+}
+
+private fun Compiler.Builder.selectionDigits(constant: BigInt, columns: List<Int>): LongArray {
+    var remaining = constant
+    return LongArray(columns.size) { position ->
+        if (position == columns.lastIndex) remaining.toLongExact() else {
+            val column = columns[position]
             val domain = (intDomains[column] as PresolveDomain.Finite).domain
             val radix = bigIntOf(domain.max) + BIG_ONE
             val remainder = remaining.truncatedRemainder(radix)
@@ -84,9 +110,7 @@ private fun Compiler.Builder.selectionWideValue(term: IntComb, magnitude: BigInt
             remaining = (remaining - normalized) / radix
             normalized.toLongExact()
         }
-        intDomains[column] = PresolveDomain.Finite(IntDomain(digit, digit))
     }
-    return value
 }
 
 private fun Compiler.Builder.selectionIndex(conditions: List<Int>): Int {

@@ -102,7 +102,8 @@ normalization can remove their unused private state. A Boolean-expanded selector
 uses those guarded choices without requiring its removed numeric placeholder;
 dense direct numeric selector tests remain eligible for table recovery over the
 selector's whole declared domain. Wide finite conditionals use the existing
-canonical digit columns with one shared choice index across every digit. Open
+canonical digit columns with one shared choice index across every digit. Constant
+branches retain constant digit arrays, including signed leading digits. Open
 values retain arithmetic ownership and exact equality links.
 
 The exact real component can certify supported difference fragments with a graph,
