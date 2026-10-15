@@ -228,7 +228,11 @@ branch-order guesses. Evaluation of its existing completed point charges that
 check's existing operation token. This direct primitive path creates no source-clause
 index or Boolean draw.
 For a default opening with an established complete pure-real difference graph,
-the first live primitive consultation releases only optional hint rows and values.
+an at-most-one or exactly-one source Boolean cardinality over three or more
+literals retains direct comparison guidance under the existing operation token.
+Graph preparation captures this constant metadata during its existing factor pass.
+Other graph sources release only optional hint rows and values at the first live
+primitive consultation.
 The opening registration and all capture work already spent remain charged without refund; subsequent
 checks skip released hint capture. No live consultation means this release has not
 occurred, including when caller preferences bypass the component. Required source,

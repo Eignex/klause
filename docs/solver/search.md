@@ -127,8 +127,11 @@ constructs no source-clause index and draws no Boolean proposal. Custom register
 providers retain precedence, and primitive preferences retain their dirty,
 retraction, containing-stop and close lifetime.
 If initialization has already admitted the complete pure-real difference graph under
-the production certification policy, a live default consultation releases the optional
-primitive hint state and supplies no preference. Registration and all completed
+the production certification policy, a source at-most-one or exactly-one cardinality
+over three or more Boolean literals retains direct comparison preferences.
+The complete graph admission pass retains that immutable source shape without
+another scan. Other graph sources release the optional primitive hint state at a
+live default consultation and supply no preference. Registration and all completed
 capture work retain their spent debit; later checks do not recapture released hints in that
 opening. An unavailable point or a caller preference that bypasses the component does
 not trigger this release. Source checks and graph or LP fallback retain their owners.

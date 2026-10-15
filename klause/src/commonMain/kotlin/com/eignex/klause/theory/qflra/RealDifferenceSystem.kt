@@ -25,6 +25,7 @@ internal class RealDifferenceSystem private constructor(
     private val graph: DifferenceGraph,
     private val guards: IntArray,
     private val scale: Long,
+    val hasSelectionCardinality: Boolean,
 ) {
     private var potentials: LongArray? = null
 
@@ -77,6 +78,7 @@ internal class RealDifferenceSystem private constructor(
             if (model.numIntVars != 0 || model.numRealVars == 0 || model.numRealVars > 10000) return null
             val zero = model.numRealVars
             val edges = ArrayList<Edge>()
+            var hasSelectionCardinality = false
             for (real in 0 until model.numRealVars) {
                 if (stop()) return null
                 if (model.realLower[real].isFinite() &&
@@ -90,7 +92,11 @@ internal class RealDifferenceSystem private constructor(
                 val source = (factor as? EncodedTheoryFactor)?.takeIf {
                     it.linearForm === it.source.linearForm
                 }?.source ?: factor
-                if (source is Clause || source is Cardinality) continue
+                if (source is Clause) continue
+                if (source is Cardinality) {
+                    if (source.max == 1 && source.literals.size > 2) hasSelectionCardinality = true
+                    continue
+                }
                 if (factor.linearForm is LinearForm.Disjunction) return null
                 for ((rowIndex, row) in factor.linearRows.withIndex()) {
                     if (stop()) return null
@@ -140,7 +146,8 @@ internal class RealDifferenceSystem private constructor(
                 graph.addEdge(edge.source, edge.target, edge.bound * multiplier - if (edge.strict) 1L else 0L)
             }
             if (stop()) return null
-            return RealDifferenceSystem(graph, edges.map { it.guard }.toIntArray(), scale)
+            return RealDifferenceSystem(graph, edges.map { it.guard }.toIntArray(), scale,
+                hasSelectionCardinality)
         }
 
         private fun exactBound(column: Int, value: Double, upper: Boolean): ExactRationalInequality =

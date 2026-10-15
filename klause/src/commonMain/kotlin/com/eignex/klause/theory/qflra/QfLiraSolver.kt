@@ -312,7 +312,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintStop = stop
         return variables.toIntArray() to SearchCandidateHints { variable ->
             if (!partialPointHintAvailable()) null
-            else if (defaultOpening && graphFirst) {
+            else if (defaultOpening && graphFirst && realDifference?.hasSelectionCardinality != true) {
                 smtStats?.observeDefaultGraphHintRelease()
                 releasePartialPointHints()
                 null

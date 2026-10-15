@@ -56,8 +56,12 @@ retain the existing numerical operation owner. No extra LP,
 graph check, Boolean draw or source-clause index is created. A custom registered
 provider retains precedence, even when it declines a selected Boolean.
 When initialization establishes complete pure-real difference-graph admission under
-the production certification policy, the first live default primitive consultation
-supplies no preference and releases optional hint state for that opening. This applies
+the production certification policy, direct default preferences remain enabled beside
+an at-most-one or exactly-one Boolean cardinality over three or more literals.
+Graph preparation retains this source shape during its existing factor pass; it
+adds no index, numerical invocation or allowance. Other admitted graph sources
+release optional hint state at the first live default primitive consultation and
+supply no preference. This applies
 to the admitted source even if a later private branch uses LP fallback; it does not
 classify individual point origins. Explicit allowances retain graph-point guidance.
 Compound source-clause preferences remain opt-in through the existing allowance.
