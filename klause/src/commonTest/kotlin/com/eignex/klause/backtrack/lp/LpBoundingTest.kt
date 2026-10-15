@@ -60,7 +60,8 @@ class LpBoundingTest {
             val session = PropagationSession(problem)
             session.pinInt(1, 0)
             val sink = SolveStatsSink(backend = "row-learning")
-            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, learn = learn)), sink).use { engine ->
+            val params = LpParams(lpPlan = LpPlan(bounding = true, learn = learn))
+            LpEngine(problem, objective, params, sink).use { engine ->
                 engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, 100.0,
                     sink, Cancellation.Never, -1, true, learn = learn)
                 val clauses = engine.lpNogoods?.drain().orEmpty()
