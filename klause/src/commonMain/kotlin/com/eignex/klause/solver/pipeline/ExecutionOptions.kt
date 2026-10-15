@@ -9,8 +9,13 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
     @Suppress("UNCHECKED_CAST")
     operator fun invoke(value: T): ExecutionSetting<T> {
         val captured = if (value is List<*>) value.toList() else value
-        if (kind == ValueKind.SCALAR_AXIS) scalarTokens(captured as List<AxisToken>, id)
-        return ExecutionSetting(this, captured as T)
+        val entry = try {
+            if (kind == ValueKind.SCALAR_AXIS) scalarTokens(captured as List<AxisToken>, id)
+            OptionValue.Valid(captured)
+        } catch (failure: PipelineConfigException) {
+            OptionValue.Invalid(requireNotNull(failure.message), configuration = true)
+        }
+        return ExecutionSetting(this, entry)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -246,7 +251,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 }
 
 /** One immutable typed execution setting, created by invoking an [ExecutionOption]. */
-class ExecutionSetting<T> internal constructor(internal val option: ExecutionOption<T>, internal val value: T)
+class ExecutionSetting<T> internal constructor(
+    internal val option: ExecutionOption<T>,
+    internal val value: OptionValue,
+)
 
 /**
  * Immutable finite execution configuration. Repeated settings use the last value. The same options
@@ -260,7 +268,7 @@ class ExecutionOptions private constructor(
 ) {
     /** Capture typed settings. Library callers need no frontend strings or consumption ordering. */
     constructor(vararg settings: ExecutionSetting<*>) : this(
-        settings.associate { it.option.id to OptionValue.Valid(it.value) }, null, emptyList(),
+        settings.associate { it.option.id to it.value }, null, emptyList(),
     )
 
     /** Whether an arm count or engine-mix count was supplied explicitly. */

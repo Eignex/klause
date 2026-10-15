@@ -106,7 +106,9 @@ class ExecutionOptionsTest {
     @Test
     fun `typed scalar axes reject set edits with the frontend diagnostic`() {
         val typed = assertFailsWith<PipelineConfigException> {
-            ExecutionOption.scoring(listOf(AxisToken(null, AxisToken.Op.ADD, "raw")))
+            resolveLocalSearchRecipes(ExecutionOptions(
+                ExecutionOption.scoring(listOf(AxisToken(null, AxisToken.Op.ADD, "raw"))),
+            ).reader())
         }
         val parsed = assertFailsWith<PipelineConfigException> {
             resolveLocalSearchRecipes(ExecutionOptions.parse(listOf("scoring=+raw")).reader())
@@ -114,6 +116,22 @@ class ExecutionOptionsTest {
 
         assertEquals("ls: scoring is single-valued and takes no +/- edit (got `raw`)", typed.message)
         assertEquals(typed.message, parsed.message)
+    }
+
+    @Test
+    fun `unconsumed typed scalar errors retain the selected route diagnostic`() {
+        val options = ExecutionOptions(
+            ExecutionOption.scoring(listOf(AxisToken(null, AxisToken.Op.ADD, "raw"))),
+        )
+        val legacy = assertFailsWith<PipelineConfigException> {
+            applyBacktrackParams(BacktrackParams(), EngineParams(listOf("scoring=+raw")))
+        }
+
+        val typed = assertFailsWith<PipelineConfigException> {
+            applyFixedBacktrackParams(BacktrackParams(), options.reader(), false)
+        }
+
+        assertEquals(legacy.message, typed.message)
     }
 
     @Test
