@@ -3,6 +3,7 @@ package com.eignex.klause.solver.evidence
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -11,11 +12,11 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.parseBigInt
@@ -31,6 +32,20 @@ class ProblemSourceEvidenceTest {
     private val model = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf(
         Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
     ))
+
+    @Test
+    fun `nonaffine source evidence checks the entire original point`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 9) }, arrayOf(Product(0, 1, 2)))
+        val context = assertNotNull(source.sourceProofContext(scope))
+        val verifier = SourceEvidenceVerifier(context)
+        val accepted = SourceEvidence(scope,
+            SourceClaim.Witness(Sample(booleanArrayOf(), longArrayOf(2, 3, 6))), SourceDerivation.SourceWitness)
+        val rejected = SourceEvidence(scope,
+            SourceClaim.Witness(Sample(booleanArrayOf(), longArrayOf(2, 3, 5))), SourceDerivation.SourceWitness)
+
+        assertEquals(SourceEvidenceCheck.Checked, verifier.verify(accepted))
+        assertIs<SourceEvidenceCheck.Rejected>(verifier.verify(rejected))
+    }
 
     @Test
     fun `source witness checking reads the original factor constraints`() {
@@ -88,7 +103,6 @@ class ProblemSourceEvidenceTest {
 
         assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(evidence))
     }
-
 
     @Test
     fun `an original affine source admits exact algebraic coordinates`() {

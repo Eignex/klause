@@ -95,6 +95,10 @@ scope without an objective. Finite factories bind shared root channels to the co
 invocation and publications to the worker's actual post-edit execution assumptions.
 A conditional root floor or integer window cannot prune siblings with weaker conditions.
 
+Reusable finite/open point and exact real-coordinate checks belong to
+[source validation](validation.md). The portfolio supplies publication scope and
+source tolerance policy without owning a second checker.
+
 Verification preserves three outcomes. Accepted witnesses may become incumbents;
 rejected proposals quarantine their producer without proving the model infeasible;
 indeterminate checks publish nothing and do not count as a fault. Finite fixpoint

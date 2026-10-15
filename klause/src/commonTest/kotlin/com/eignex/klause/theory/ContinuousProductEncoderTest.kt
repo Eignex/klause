@@ -11,13 +11,13 @@ import com.eignex.klause.lp.hasCompleteGuardedLpCompletion
 import com.eignex.klause.lp.relaxation.LeafRealSolver
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.portfolio.LeafRealCompletion
-import com.eignex.klause.portfolio.verifyRealCoordinates
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
+import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.util.Cancellation

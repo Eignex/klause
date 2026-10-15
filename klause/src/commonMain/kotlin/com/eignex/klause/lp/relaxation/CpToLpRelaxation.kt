@@ -55,7 +55,6 @@ import com.eignex.klause.lp.statesBinary
 import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.lp.statesUpperBound
-import com.eignex.klause.portfolio.verifyRealCoordinates
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.propagation.PropagationSession
@@ -67,6 +66,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.encodingSourceRealCount
 import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.theory.privateLinearCompletion
@@ -707,7 +707,6 @@ internal class CpToLpRelaxation(
             if ((fid + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
         }
     }.iterator()
-
 
     /**
      * Objective-cone membership, structural (depends only on `Problem.factors` and the

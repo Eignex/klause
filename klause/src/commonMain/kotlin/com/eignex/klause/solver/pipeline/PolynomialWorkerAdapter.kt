@@ -2,7 +2,6 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -28,6 +27,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.FiniteFactorEnforcement
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
+import com.eignex.klause.solver.validation.composedFixpoint
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialSearchComponent
 import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation

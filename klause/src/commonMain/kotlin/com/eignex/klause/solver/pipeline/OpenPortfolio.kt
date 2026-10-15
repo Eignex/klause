@@ -34,6 +34,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation

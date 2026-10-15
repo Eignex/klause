@@ -18,7 +18,6 @@ import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LeafRealSolver
-import com.eignex.klause.portfolio.verifyRealCoordinates
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedConstraint
@@ -71,6 +70,8 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.completedSearchSample
+import com.eignex.klause.solver.validation.composedFixpoint
+import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
 import kotlin.coroutines.cancellation.CancellationException

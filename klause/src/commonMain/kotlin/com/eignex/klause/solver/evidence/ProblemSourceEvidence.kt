@@ -16,7 +16,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.pipeline.verifyOpenWitness
+import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact

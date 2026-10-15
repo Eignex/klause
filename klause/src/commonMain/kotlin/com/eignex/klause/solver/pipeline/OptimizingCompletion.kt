@@ -6,6 +6,7 @@ import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.validation.refuteOpenWitness
 import com.eignex.klause.util.Cancellation
 
 /**

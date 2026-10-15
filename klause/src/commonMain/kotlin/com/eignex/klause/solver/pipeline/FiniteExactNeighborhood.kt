@@ -13,6 +13,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.theory.rebindEncoding
 import com.eignex.klause.util.Cancellation

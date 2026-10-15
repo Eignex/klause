@@ -1,6 +1,5 @@
-package com.eignex.klause.portfolio
+package com.eignex.klause.solver.validation
 
-import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
