@@ -17,10 +17,11 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealValue
-import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchExecutionControlAdapter
 import com.eignex.klause.solver.search.SearchExecutionControls
+import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.BIG_ONE

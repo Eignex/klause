@@ -7,8 +7,8 @@ import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.localsearch.Completion
+import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
