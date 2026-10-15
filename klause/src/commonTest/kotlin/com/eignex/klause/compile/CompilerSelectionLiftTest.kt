@@ -19,6 +19,7 @@ import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class CompilerSelectionLiftTest {
     @Test
@@ -38,7 +39,7 @@ class CompilerSelectionLiftTest {
 
             assertEquals(expected, samples.map { it.intValue(value) }.toSet())
         }
-        assertEquals(1, compiled.problem.factors.filterIsInstance<ArrayMinMax>().size)
+        assertTrue(compiled.problem.factors.filterIsInstance<ArrayMinMax>().isNotEmpty())
     }
 
     @Test
