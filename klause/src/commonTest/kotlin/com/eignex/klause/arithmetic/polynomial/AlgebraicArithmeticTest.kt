@@ -13,6 +13,29 @@ class AlgebraicArithmeticTest {
     private val arithmetic = AlgebraicArithmetic(polynomial)
 
     @Test
+    fun `rational coefficient lifting returns only actual real roots`() {
+        val source = RationalPolynomial.of(-2, 0, -1, 0, 1)
+        val lifted = arithmetic.polynomial(source.coefficients.map(arithmetic::rational))
+
+        val roots = arithmetic.roots(lifted)
+
+        assertEquals(2, roots.size)
+        assertEquals(-1, arithmetic.sign(roots[0]))
+        assertEquals(1, arithmetic.sign(roots[1]))
+        for (root in roots) assertEquals(0, arithmetic.signAt(RationalPolynomial.of(-2, 0, 1), root))
+    }
+
+    @Test
+    fun `rational coefficient lifting retains the caller dense limit`() {
+        val source = arithmetic.polynomial(RationalPolynomial.of(-2, 0, 1).coefficients.map(arithmetic::rational))
+        val counted = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxDenseCoefficients = 2)))
+
+        val failure = assertFailsWith<PolynomialResourceLimit> { counted.roots(source) }
+
+        assertEquals(PolynomialResource.DENSE_COEFFICIENTS, failure.resource)
+    }
+
+    @Test
     fun `known rational point images evaluate mixed source monomials exactly`() {
         val source = polynomial.add(
             polynomial.multiply(Polynomial.variable(0), Polynomial.variable(1)),
@@ -251,13 +274,15 @@ class AlgebraicArithmeticTest {
 
     @Test
     fun `repeated specialized roots appear once`() {
-        val x = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
-        val linear = polynomial.subtract(Polynomial.variable(1), Polynomial.variable(0))
+        val irrational = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        for (x in listOf(irrational, arithmetic.rational(BigFraction.ofLong(2)))) {
+            val linear = polynomial.subtract(Polynomial.variable(1), Polynomial.variable(0))
 
-        val roots = arithmetic.roots(arithmetic.specialize(polynomial.power(linear, 2), 1, mapOf(0 to x)))
+            val roots = arithmetic.roots(arithmetic.specialize(polynomial.power(linear, 2), 1, mapOf(0 to x)))
 
-        assertEquals(1, roots.size)
-        assertEquals(0, arithmetic.compare(roots.single(), x))
+            assertEquals(1, roots.size)
+            assertEquals(0, arithmetic.compare(roots.single(), x))
+        }
     }
 
     @Test

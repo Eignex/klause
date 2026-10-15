@@ -314,6 +314,16 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         // Independent coefficient conjugates give a superset of roots. The leading coefficient's
         // annihilator excludes zero, ensuring every conjugate polynomial retains positive degree.
         val coefficients = polynomial.coefficients
+        val rational = ArrayList<BigFraction>()
+        for (coefficient in coefficients) {
+            arithmetic.step()
+            val value = coefficient.rational ?: break
+            rational.add(value)
+        }
+        if (rational.size == coefficients.size) {
+            arithmetic.denseSize(polynomial.degree)
+            return roots(RationalPolynomial(rational))
+        }
         val variable = coefficients.size
         var relation = Polynomial.ZERO
         for ((index, coefficient) in coefficients.withIndex()) {

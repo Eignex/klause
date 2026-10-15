@@ -114,13 +114,15 @@ callers retain full source-formula and publication obligations.
 
 Specialization evaluates coefficients at exact earlier coordinates and trims
 vanished leading coefficients by exact sign. `AlgebraicPolynomial.isZero` retains
-nullification as a separate state. Lifting forms a rational annihilator by
-eliminating algebraic coefficient variables against their defining polynomials.
-Independent coefficient conjugates produce a superset of the specialized roots.
-The nonzero leading coefficient's annihilator excludes a zero conjugate, ensuring
-the elimination cannot become identically zero through a conjugate degree drop.
-Every candidate root is then checked against the actual specialized polynomial
-with exact algebraic arithmetic. The retained ordered roots are all and only its
+nullification as a separate state. When every captured coefficient is known rational,
+lifting copies those exact values under the current token, checks the same dense
+limit and isolates the actual rational polynomial directly. Otherwise lifting forms
+a rational annihilator by eliminating algebraic coefficient variables against their
+defining polynomials. Independent coefficient conjugates produce a superset of the
+specialized roots. The nonzero leading coefficient's annihilator excludes a zero
+conjugate, ensuring the elimination cannot become identically zero through a
+conjugate degree drop. Every conjugate candidate root is then checked against the
+actual specialized polynomial with exact algebraic arithmetic. The retained ordered roots are all and only its
 distinct real roots, including repeated/common roots and nested irrational
 coordinates. Cross-coordinate polynomial evaluation retains exact equality and
 sign authority even for correlated coordinates.
