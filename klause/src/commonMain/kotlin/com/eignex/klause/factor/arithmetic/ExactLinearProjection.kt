@@ -52,8 +52,15 @@ private class ExactLinearScore(
     private val indicator: Int = -1,
     private val whenOne: Boolean = true,
 ) : Invariant {
-    private val scale = (0 until row.size).fold(maxOf(bigIntOf(1), row.constants.exactBound.abs())) { scale, index ->
-        maxOf(scale, row.constants.exactCoeff(index).abs())
+    private val scale = run {
+        var maximum = bigIntOf(1)
+        val bound = row.constants.exactBound.abs()
+        if (bound > maximum) maximum = bound
+        for (index in 0 until row.size) {
+            val magnitude = row.constants.exactCoeff(index).abs()
+            if (magnitude > maximum) maximum = magnitude
+        }
+        maximum
     }
     private val coefficients = DoubleArray(row.size) { BigFraction.of(row.constants.exactCoeff(it), scale).toDouble() }
     private val bound = BigFraction.of(row.constants.exactBound, scale).toDouble()
@@ -66,7 +73,8 @@ private class ExactLinearScore(
             var activity = BIG_ZERO
             for (k in 0 until row.size) activity += row.constants.exactCoeff(k) * bigIntOf(intValue(Term.intVar(row.ref(k))))
             val residual = exactLinearResidual(activity - row.constants.exactBound, row.relation)
-            val capped = minOf(residual, bigIntOf(Long.MAX_VALUE)).toLongExact()
+            val largest = bigIntOf(Long.MAX_VALUE)
+            val capped = if (residual > largest) Long.MAX_VALUE else residual.toLongExact()
             return compressViolation(capped, state.violationSoftCap)
         }
         var activity = 0.0
@@ -100,8 +108,8 @@ private class ExactLinearScore(
 }
 
 private fun exactLinearResidual(difference: BigInt, relation: LinearOp): BigInt = when (relation) {
-    LinearOp.LE -> maxOf(BIG_ZERO, difference)
-    LinearOp.GE -> maxOf(BIG_ZERO, -difference)
+    LinearOp.LE -> if (difference > BIG_ZERO) difference else BIG_ZERO
+    LinearOp.GE -> if (difference < BIG_ZERO) -difference else BIG_ZERO
     LinearOp.EQ -> difference.abs()
     LinearOp.NE -> if (difference == BIG_ZERO) bigIntOf(1) else BIG_ZERO
 }
