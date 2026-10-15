@@ -69,139 +69,137 @@ internal fun LpEngine.lbTreeSearch(
     val token = object : Cancellation {
         override fun isCancelled(): Boolean {
             accountPropagation()
-            return stop() || workSpentExceeds(params.lpPlan.rootMaxWork, sink.lp.standaloneWork) ||
+            return stop() || (params.lpPlan.rootBudgetFraction > 0.0 &&
+                workSpentExceeds(params.lpPlan.rootMaxWork, sink.lp.standaloneWork)) ||
                 lpWorkAllowanceSpent(sink.lp.standaloneWork)
         }
         override fun deadline() = stop.deadline()
         override fun workMeter() = stop.workMeter()
     }
     val dive = forObjective(objective, token, rootProbe = true)
-    var leafSolver: LeafRealSolver? = null
     val verifier = ComposedSampleVerifier(problem, objective, token, assumptions,
         { primalPropagationWork += it }, toleranceCheck)
     try {
         return dive.use {
-            val relaxer = dive.lpRelaxer ?: return@use null
-            val cp = CpSearchComponent(PropagationSession(problem, token), branching = CpBranching.None)
-            val session = cp.session
-            native = session
-            if (session.seed(assumptions) is PropagationResult.Unsat || session.isUnsatAtRoot) return@use null
-            cp.rebase()
-            var split: LpFractionalBranch? = null
-            var targets = emptyMap<Int, Long>()
-            var bestExact: BigFraction? = null
-            var bestValue: BigFraction? = null
-            var expansions = 0
-            dive.cpAdapter.attach(session, feasibility = false)
-            dive.cpAdapter.fractional = { split }
-            dive.cpAdapter.branching = {
-                val variable = (0 until problem.numIntVars).firstOrNull { session.intDomain(it).valueCount > 1 }
-                if (variable == null) {
-                    null
-                } else {
-                    val domain = session.intDomain(variable)
-                    val target = targets[variable]?.takeIf { domain.contains(it) } ?: domain.min
-                    buildList {
-                        add(SearchDecision.IntEqual(variable, target))
-                        if (target > domain.min) add(SearchDecision.IntAtMost(variable, target - 1L))
-                        if (target < domain.max) add(SearchDecision.IntAtLeast(variable, target + 1L))
-                    }
-                }
-            }
-            val shared = SearchComponentSet(listOf(cp, dive.propagator)).session(cancellation = token)
-            val policy = object : SearchNodePolicy {
-                override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
-                    split = null
-                    targets = emptyMap()
-                    if (expansions++ >= LB_TREE_BUDGET) return SearchNodeDisposition.Indeterminate
-                    val relaxation = dive.nodeRelaxation(relaxer, session) ?: return SearchNodeDisposition.Indeterminate
-                    val node = dive.solveRootNode(dive, relaxation.model, token, expansions == 1)
-                    val model = node.model
-                    val result = node.float
-                    val lower = result?.let { candidate ->
-                        certifiedTightObjectiveLowerBound(
-                            model,
-                            candidate.duals,
-                            rootCertificationObserver(),
-                            solveContext.certificationPolicy,
-                        )?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
-                    }
-                    if (lower != null && bestExact?.let { lower >= it } == true) return SearchNodeDisposition.Prune
-                    val witness = result?.let { candidate ->
-                        solveContext.certificationPolicy.acceptNullable(
-                            LpCertifier.EXACT_POINT,
-                            exactPointWitness(model, candidate.primal, rootCertificationObserver()),
-                        )
-                    } ?: return SearchNodeDisposition.Expand
-                    targets = relaxation.colVarId.indices.mapNotNull { column ->
-                        val variable = relaxation.colVarId[column]
-                        if (variable < 0 || relaxation.colIsBool[column]) {
-                            null
-                        } else {
-                            ExactLpNumber.of(witness.primal[column]).legacyLong()?.let { variable to it }
+            val leafSolver = if (problem.numRealVars > 0 && complete == null) {
+                LeafRealSolver(problem, objective, params.lpPlan.componentSplit, sink.lp, solveContext, pricingOptions)
+            } else null
+            leafSolver.use {
+                val relaxer = dive.lpRelaxer ?: return null
+                val cp = CpSearchComponent(PropagationSession(problem, token), branching = CpBranching.None)
+                val session = cp.session
+                native = session
+                if (session.seed(assumptions) is PropagationResult.Unsat || session.isUnsatAtRoot) return null
+                cp.rebase()
+                var split: LpFractionalBranch? = null
+                var targets = emptyMap<Int, Long>()
+                var bestExact: BigFraction? = null
+                var bestValue: BigFraction? = null
+                var expansions = 0
+                dive.cpAdapter.attach(session, feasibility = false)
+                dive.cpAdapter.fractional = { split }
+                dive.cpAdapter.branching = {
+                    val variable = (0 until problem.numIntVars).firstOrNull { session.intDomain(it).valueCount > 1 }
+                    if (variable == null) {
+                        null
+                    } else {
+                        val domain = session.intDomain(variable)
+                        val target = targets[variable]?.takeIf { domain.contains(it) } ?: domain.min
+                        buildList {
+                            add(SearchDecision.IntEqual(variable, target))
+                            if (target > domain.min) add(SearchDecision.IntAtMost(variable, target - 1L))
+                            if (target < domain.max) add(SearchDecision.IntAtLeast(variable, target + 1L))
                         }
-                    }.toMap()
-                    for (column in relaxation.colVarId.indices) {
-                        val variable = relaxation.colVarId[column]
-                        val value = witness.primal[column]
-                        if (variable < 0 || value.den == BIG_ONE) continue
-                        split = LpFractionalBranch(variable, value, relaxation.colIsBool[column], registered = false)
-                        break
                     }
-                    return SearchNodeDisposition.Expand
                 }
+                val shared = SearchComponentSet(listOf(cp, dive.propagator)).session(cancellation = token)
+                val policy = object : SearchNodePolicy {
+                    override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
+                        split = null
+                        targets = emptyMap()
+                        if (expansions++ >= LB_TREE_BUDGET) return SearchNodeDisposition.Indeterminate
+                        val relaxation = dive.nodeRelaxation(relaxer, session) ?: return SearchNodeDisposition.Indeterminate
+                        val node = dive.solveRootNode(dive, relaxation.model, token, expansions == 1)
+                        val model = node.model
+                        val result = node.float
+                        val lower = result?.let { candidate ->
+                            certifiedTightObjectiveLowerBound(
+                                model,
+                                candidate.duals,
+                                rootCertificationObserver(),
+                                solveContext.certificationPolicy,
+                            )?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
+                        }
+                        if (lower != null && bestExact?.let { lower >= it } == true) return SearchNodeDisposition.Prune
+                        val witness = result?.let { candidate ->
+                            solveContext.certificationPolicy.acceptNullable(
+                                LpCertifier.EXACT_POINT,
+                                exactPointWitness(model, candidate.primal, rootCertificationObserver()),
+                            )
+                        } ?: return SearchNodeDisposition.Expand
+                        targets = relaxation.colVarId.indices.mapNotNull { column ->
+                            val variable = relaxation.colVarId[column]
+                            if (variable < 0 || relaxation.colIsBool[column]) {
+                                null
+                            } else {
+                                ExactLpNumber.of(witness.primal[column]).legacyLong()?.let { variable to it }
+                            }
+                        }.toMap()
+                        for (column in relaxation.colVarId.indices) {
+                            val variable = relaxation.colVarId[column]
+                            val value = witness.primal[column]
+                            if (variable < 0 || value.den == BIG_ONE) continue
+                            split = LpFractionalBranch(variable, value, relaxation.colIsBool[column], registered = false)
+                            break
+                        }
+                        return SearchNodeDisposition.Expand
+                    }
+                }
+                val run = shared.openRun(
+                    problem.numBoolVars,
+                    SearchSolveParams(maxDecisions = LB_TREE_BUDGET),
+                    booleanBranching = BooleanBranching.SourceOrder(problem.numBoolVars),
+                    nodePolicy = policy,
+                )
+                var best: Sample? = null
+                while (!token()) {
+                    val next = run.next()
+                    if (next !is SearchRunEvent.Satisfied) break
+                    var sample = requireNotNull(next.model.valueOf<Sample>(cp))
+                    if (problem.numRealVars > 0) {
+                        val rootWork = rootPrimalWorkBudget(sink.lp.standaloneWork)
+                        val offered = nodeQueryWorkBudget()
+                        val work = if (rootWork == 0L) offered ?: 0L else offered?.let { minOf(it, rootWork) } ?: rootWork
+                        val leaf = complete?.invoke(sample, token, work)
+                            ?: requireNotNull(leafSolver).solve(sample, token, toleranceCheck, work)
+                        when (leaf.verdict) {
+                            LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED,
+                            LpVerdict.TOLERANCE_OPTIMUM -> Unit
+                            else -> continue
+                        }
+                        if (leaf.verdict == LpVerdict.TOLERANCE_OPTIMUM && toleranceCheck == null) continue
+                        sample = sample.copy(reals = leaf.reals, exactReals = leaf.exactReals)
+                    }
+                    if (token()) break
+                    val accepted = if (accept != null) accept(sample) else {
+                        (verifier.verify(Candidate(sample, objective.evaluate(sample))) as? Verification.Accepted<Sample, Double>)?.candidate
+                            ?.assignment
+                    } ?: continue
+                    if (token()) break
+                    val value = exactSourceObjective(objective, accepted, toleranceCheck) ?: continue
+                    if (bestValue?.let { value < it } != false) {
+                        bestValue = value
+                        best = accepted
+                    }
+                    if (problem.numRealVars == 0 || accepted.exactReals != null) {
+                        if (bestExact?.let { value < it } != false) bestExact = value
+                    }
+                }
+                best?.let(::LpTreeSeed)
             }
-            val run = shared.openRun(
-                problem.numBoolVars,
-                SearchSolveParams(maxDecisions = LB_TREE_BUDGET),
-                booleanBranching = BooleanBranching.SourceOrder(problem.numBoolVars),
-                nodePolicy = policy,
-            )
-            var best: Sample? = null
-            while (!token()) {
-                val next = run.next()
-                if (next !is SearchRunEvent.Satisfied) break
-                var sample = requireNotNull(next.model.valueOf<Sample>(cp))
-                if (problem.numRealVars > 0) {
-                    val rootWork = rootPrimalWorkBudget(sink.lp.standaloneWork)
-                    val offered = nodeQueryWorkBudget()
-                    val work = if (rootWork == 0L) offered ?: 0L else offered?.let { minOf(it, rootWork) } ?: rootWork
-                    val leaf = complete?.invoke(sample, token, work) ?: run {
-                        val owner = leafSolver ?: LeafRealSolver(problem, objective, params.lpPlan.componentSplit,
-                            sink.lp, solveContext, pricingOptions).also { leafSolver = it }
-                        owner.solve(sample, token, toleranceCheck, work)
-                    }
-                    when (leaf.verdict) {
-                        LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED,
-                        LpVerdict.TOLERANCE_OPTIMUM -> Unit
-                        else -> continue
-                    }
-                    if (leaf.verdict == LpVerdict.TOLERANCE_OPTIMUM && toleranceCheck == null) continue
-                    sample = sample.copy(reals = leaf.reals, exactReals = leaf.exactReals)
-                }
-                if (token()) break
-                val accepted = if (accept != null) accept(sample) else {
-                    (verifier.verify(Candidate(sample, objective.evaluate(sample))) as? Verification.Accepted<Sample, Double>)?.candidate
-                        ?.assignment
-                } ?: continue
-                if (token()) break
-                val value = exactSourceObjective(objective, accepted, toleranceCheck) ?: continue
-                if (bestValue?.let { value < it } != false) {
-                    bestValue = value
-                    best = accepted
-                }
-                if (problem.numRealVars == 0 || accepted.exactReals != null) {
-                    if (bestExact?.let { value < it } != false) bestExact = value
-                }
-            }
-            best?.let(::LpTreeSeed)
         }
     } finally {
-        try {
-            leafSolver?.close()
-        } finally {
-            accountPropagation()
-        }
+        accountPropagation()
     }
 }
 

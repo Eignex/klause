@@ -183,7 +183,7 @@ internal class LpEngine(
                     nodeQueryWorkBudget()?.let { minOf(root, it) } ?: root
                 } ?: nodeQueryWorkBudget() }
             } else nodeWorkAllowance,
-            containingWork = if (rootProbe) ::chargeWork else {},
+            containingWork = { work -> if (rootProbe) chargeWork(work) },
         ).also { it.structuralCutSupport = structuralCutSupport }
     }
 
