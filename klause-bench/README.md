@@ -2268,6 +2268,29 @@ export is not captured. Provisioning uses pinned source-check requirements in an
 output-local environment and retains checker/package/runtime identities before
 disposing that environment. Keep generated outputs and recordings externally.
 
+### Seeded mixed MPS completion
+
+`com.eignex.klause.bench.profile.MixedMoveCompletionProbe` runs numerical local
+search from a source-checked supplied MPS point. Pass `input=<original MPS path>`
+or `text64=<base64 original bytes>`, with `initial64=<base64 JSON>` mapping every
+original column name to an exact integer, decimal or rational string. Optional
+`exact=false`, `instructions=20`, `seed=3`, `repeats=3` and `timeout=3000` retain
+bounded deterministic controls. The original source must admit the supplied point;
+no bounds or rows are added to it. The ordinary finite mixed projection and numerical
+leaf completion own execution. An unavailable numerical completion remains undecided.
+
+Run this committed profile through the lab client on AWS at an immutable revision.
+It retains original bytes/hash, supplied point/hash, installed CLI/harness/runtime
+identities, settings, every completion verdict/work charge and published named points.
+`cases.json` uses the maintained offline source-verifier record format; `sources/`
+contains its hash-named original bytes. Independently check it with
+`verify_source_results.py --source-root <sources> --witness-only` on the analysis host.
+The diagnostic requires exact original-source feasible returned points in both modes;
+a tolerance-only witness can remain valid for ordinary execution while this stricter
+diagnostic declines it. It exports no optimum proof. Its elapsed time is an in-process
+seeded diagnostic under JFR, not whole-CLI performance evidence. Keep raw files externally
+and pair incumbent gains with repeated alternating unchanged-source CLI controls.
+
 ### Diffn candidate inspection
 
 `com.eignex.klause.bench.profile.DiffnNeighborhoodProbe` loads a saved integer
