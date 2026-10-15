@@ -344,6 +344,13 @@ premise into a single immutable domain replacement. The mutation retains individ
 hole reasons and all changed bound, value and fixed-variable wakeups; one trail record
 restores the complete prior domain. Index exclusions retain position-specific reasons.
 
+One completed CP fixpoint's integer publication callback shares Boolean- and root-grounded
+native subproofs. Assertion delivery follows the callback, so its native point stays fixed.
+The memo holds at most 4,096 literal entries and each export retains its 4,096-frame visit
+guard. Inherited shared integer proofs remain uncached because they can contain unavailable
+evidence. No memo survives a callback, iterator suspension or retraction; published premise
+conjunctions own their lists and outlive the scratch state.
+
 Prepared capability summaries read the selected projection descriptors. Built-in
 providers declare their existing execution routes; replacements supply their own
 filtering, scoring and check roles.

@@ -271,13 +271,16 @@ class CpSearchComponent(
                 if (publication !is ComponentResult.Consistent) published = publication
             }
         }
+        if (session.problem.numIntVars == 0) return published
+        // Queued assertions are delivered after this callback, keeping the native point fixed.
+        val premises = CpPublicationPremises(session, context, ::sourceIntId, sharedRootLevel)
         result.forEachInt { variable, value ->
             val publication = publish(
                 SearchDecision.IntEqual(sourceIntId(variable), value),
                 SearchAtomPremise.All(
                     listOf(
-                        session.sharedBoundPremise(variable, false, context, ::sourceIntId, sharedRootLevel),
-                        session.sharedBoundPremise(variable, true, context, ::sourceIntId, sharedRootLevel),
+                        premises.bound(variable, false),
+                        premises.bound(variable, true),
                     ),
                 ),
             )
@@ -286,14 +289,14 @@ class CpSearchComponent(
         result.forEachIntMin { variable, value ->
             val publication = publish(
                 SearchDecision.IntAtLeast(sourceIntId(variable), value),
-                session.sharedBoundPremise(variable, false, context, ::sourceIntId, sharedRootLevel),
+                premises.bound(variable, false),
             )
             if (publication !is ComponentResult.Consistent) published = publication
         }
         result.forEachIntMax { variable, value ->
             val publication = publish(
                 SearchDecision.IntAtMost(sourceIntId(variable), value),
-                session.sharedBoundPremise(variable, true, context, ::sourceIntId, sharedRootLevel),
+                premises.bound(variable, true),
             )
             if (publication !is ComponentResult.Consistent) published = publication
         }
