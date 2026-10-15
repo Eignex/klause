@@ -60,6 +60,25 @@ class ContinuousProductInvariantTest {
     }
 
     @Test
+    fun `nearby declared values keep distinct source guard truth`() {
+        val values = doubleArrayOf(0.125, 0.125 + 1e-12)
+        val factor = ContinuousProduct(0, 0, 1, 0, values,
+            intArrayOf(Lit.make(0, true), Lit.make(0, false)))
+        val source = Problem(1, 0, emptyArray(), arrayOf(factor), numRealVars = 2,
+            realLower = DoubleArray(2), realUpper = DoubleArray(2) { 1.0 })
+        val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
+        for (index in values.indices) {
+            state.assignment.setReal(0, values[index])
+            state.assignment.setReal(1, values[index] * values[index])
+            state.assignment.setBool(0, index == 0)
+
+            state.recompute()
+
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
     fun `square inverse repairs retain both signs within declared bounds`() {
         val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
             realLower = doubleArrayOf(-3.0, 4.0), realUpper = doubleArrayOf(3.0, 4.0))
