@@ -1,5 +1,7 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.backtrack.LP_WORK_PER_NODE
 import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.ir.Problem
@@ -8,6 +10,7 @@ import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
@@ -27,8 +30,31 @@ import kotlin.math.ceil
 internal class LeafRealCompletion(private val problem: Problem, private val objective: LinearObjective?) :
     CandidateCompletion {
     private val encoders = problem.selectedFactorProjections()
+    private val absCompletion = if (problem.factors.any { it is RealAbs }) AbsRealCompletion(problem) else null
 
     override fun complete(candidate: Sample, cancellation: Cancellation): Completion {
+        if (objective == null || objective.realCoefficientValues.all { it == 0.0 }) {
+            absCompletion?.let { completion ->
+                val checked = completion.complete(candidate, cancellation)
+                val work = movesFor(checked.work.toDouble())
+                return when (val result = checked.result) {
+                    is AbsRealCompletion.Result.Witness -> {
+                        val coordinates = DoubleArray(result.reals.size) { result.reals[it].toDouble() }
+                        val sample = candidate.copy(reals = coordinates, exactReals = result.reals)
+                        if (verifyRealCoordinates(problem, sample) is Verification.Accepted) {
+                            Completion.Witness(sample, work)
+                        } else Completion.Undecided(work)
+                    }
+                    AbsRealCompletion.Result.Refuted -> Completion.Refuted(
+                        problem.factors.indices.filter { factor ->
+                            problem.factors[factor].variables.reals.isNotEmpty()
+                        }.toIntArray(),
+                        work,
+                    )
+                    AbsRealCompletion.Result.Undecided -> Completion.Undecided(work)
+                }
+            }
+        }
         val sink = LpStatsSink(LpRoute.STANDALONE)
         val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink, encoders = encoders)
         val work = movesFor(sink.snapshot().standaloneWorkOps.sum)

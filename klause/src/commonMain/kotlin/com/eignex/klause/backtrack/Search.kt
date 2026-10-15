@@ -1,5 +1,7 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.ir.Lit
@@ -768,6 +770,9 @@ private class ResidualRealComponent(
 ) : SearchComponent,
     LpSearchResource {
     private val toleranceCheck = params.toleranceCheck
+    private val absCompletion = if (problem.factors.any { it is RealAbs }) AbsRealCompletion(problem) else null
+    private val solveContext = solveContext
+    private var absWork = 0L
     private val engine = LpEngine(
         problem,
         LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
@@ -787,6 +792,23 @@ private class ResidualRealComponent(
     override fun check(context: SearchContext): ComponentCheck {
         completed = null
         if (context.cancelled()) return ComponentCheck.Indeterminate
+        absCompletion?.let { completion ->
+            val discrete = Sample(BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
+                LongArray(problem.numIntVars) { cp.session.intDomain(it).min })
+            val stop = context.executionControls.cancellation
+            val checked = completion.complete(discrete, stop, context.executionControls, solveContext)
+            absWork += checked.work
+            return when (val result = checked.result) {
+                is AbsRealCompletion.Result.Witness -> {
+                    val sample = discrete.copy(reals = DoubleArray(result.reals.size) { result.reals[it].toDouble() },
+                        exactReals = result.reals)
+                    if (verifyRealCoordinates(problem, sample) !is Verification.Accepted) ComponentCheck.Indeterminate
+                    else ComponentCheck.Feasible.also { completed = sample }
+                }
+                AbsRealCompletion.Result.Refuted -> ComponentCheck.Infeasible()
+                AbsRealCompletion.Result.Undecided -> ComponentCheck.Indeterminate
+            }
+        }
         val result = engine.leafCertify(cp.session, toleranceCheck)
         return when (result.verdict) {
             LpVerdict.FEASIBLE,
@@ -820,7 +842,7 @@ private class ResidualRealComponent(
 
     override fun releasePersistentSolvers() = engine.releasePersistentSolvers()
 
-    override fun totalSolveWork(): Long = engine.totalSolveWork()
+    override fun totalSolveWork(): Long = engine.totalSolveWork() + absWork
 
     override fun close() = engine.close()
 }
