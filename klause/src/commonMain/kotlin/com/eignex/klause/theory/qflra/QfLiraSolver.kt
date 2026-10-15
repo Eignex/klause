@@ -1015,8 +1015,8 @@ class ExactLiraSearchComponent private constructor(
             return ComponentResult.Indeterminate
         }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
-        val partial = bools.any { it == UNASSIGNED }
-        if (completeTraversalObserved && !partial) smtStats?.observeCompleteSearchLinearCheck()
+        val complete = completeTraversalObserved && unassignedBooleans == 0
+        if (complete) smtStats?.observeCompleteSearchLinearCheck()
         val result = lp.solve(sparsePointRecovery = true)
             ?: return ComponentResult.Indeterminate
         if (operationStop()) return ComponentResult.Indeterminate
@@ -1028,8 +1028,8 @@ class ExactLiraSearchComponent private constructor(
             outcome = ComponentCheck.Infeasible(explanation)
             return ComponentResult.Conflict(explanation)
         }
-        if (completeTraversalObserved && !partial && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
-        if (partial) candidate?.let { capturePointHints(it, context) }
+        if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
+        if (bools.any { it == UNASSIGNED }) candidate?.let { capturePointHints(it, context) }
         if (operationStop()) return ComponentResult.Indeterminate
         captureCompleteWitness(candidate)
         // Source integer branching requires an independently checked continuous witness.
