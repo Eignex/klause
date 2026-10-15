@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
@@ -9,6 +10,27 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TabuBookTest {
+
+    @Test
+    fun `all compound parts share the accepted move tabu window`() {
+        val problem = Problem(5, 0, emptyArray(), emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+
+        state.apply(Move.Compound((0 until 5).map { Move.BoolFlip(it) }))
+
+        for (variable in 0 until 5) assertTrue(state.tabu.isTaboo(Move.BoolFlip(variable), tenure = 1))
+    }
+
+    @Test
+    fun `an unchanged integer set does not consume tabu tenure`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.apply(Move.BoolFlip(0))
+
+        state.apply(Move.IntSet(0, state.assignment.intValue(0)))
+
+        assertTrue(state.tabu.isTaboo(Move.BoolFlip(0), tenure = 1))
+    }
 
     @Test
     fun `fresh move is not taboo`() {

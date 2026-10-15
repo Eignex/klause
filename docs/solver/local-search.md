@@ -172,6 +172,13 @@ retain their tabu restriction. This permits monotone envelope descent after a
 recent coordinate write; tabu cannot trap a feasible improving compound behind
 unrelated zero-objective candidates.
 
+The tabu and stall clock advances once per committed move that changes a coordinate.
+Compound parts and maintained output writes share that clock value. Per-coordinate
+activity still records every actual write; no-op sets and scoring probes consume no
+tabu tenure. The best observed cost includes complete committed assignments after
+definition maintenance, excluding intermediate compound and definition states.
+Engine instruction and move allowances retain their independent accounting.
+
 Discrete linear objective deltas accumulate in a retained per-state integer sum,
 using checked 64-bit arithmetic and arbitrary precision on overflow. Compound and
 definition probes round that complete discrete sum once, preserving cancellation
@@ -492,8 +499,8 @@ incremental delta; repeated-coordinate linear deltas use a probe of the final va
 Probes apply compound inputs together before one definition pass, save affected
 input/output values, and restore those values directly. Each probe reuses its definition
 cone for saving and propagation. An inverse definition that cannot write does not strand
-a derived output. Probe activity is suppressed and its best-cost observation is
-discarded. Real moves in probes and restoration do not advance the committed row-refresh
+a derived output. Probe activity and best-cost observations are suppressed.
+Real moves in probes and restoration do not advance the committed row-refresh
 cadence. Weighted probes snapshot and scan only factors whose degrees change, in
 factor-id order to retain the full-scan floating-point accumulation order. Committed
 moves reconcile cost and violated membership from exact post-move degrees. Factor data
