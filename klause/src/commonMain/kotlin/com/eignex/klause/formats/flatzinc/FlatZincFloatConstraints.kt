@@ -305,6 +305,10 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     val cRef = resolveFloatVarOrConst(c.args[2])
     emitIntegerImageProduct(c, cRef)
     if (aRef is FloatRef.Const && bRef is FloatRef.Const) {
+        if (cRef !is FloatRef.Var || cRef.bk.lpOnly) {
+            emitFiniteFloatProduct(aRef, bRef, cRef)
+            return
+        }
         emitFloatBinaryCmp(
             FznConstraint("float_eq", listOf(c.args[2], FznExpr.FloatLit(aRef.value * bRef.value)), emptyList()),
             LinearOp.EQ,
@@ -313,9 +317,6 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
         )
         return
     }
-    // A constant operand makes the product linear (`c = k·x`), so lower it as a float linear equality
-    // rather than a var·var product table. Handles the common `x·k` / `k·x` with a variable result; the
-    // genuinely non-linear var·var case keeps the table.
     if ((aRef is FloatRef.Const) != (bRef is FloatRef.Const)) {
         val k = (aRef as? FloatRef.Const)?.value ?: (bRef as FloatRef.Const).value
         val xArg = if (aRef is FloatRef.Const) c.args[1] else c.args[0]

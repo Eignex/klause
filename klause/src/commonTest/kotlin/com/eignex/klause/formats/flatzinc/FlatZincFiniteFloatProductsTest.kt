@@ -2,6 +2,7 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
@@ -13,6 +14,41 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FlatZincFiniteFloatProductsTest {
+    @Test
+    fun `finite products retain source operand order and declared choices`() {
+        for (operands in listOf("x, y", "y, x")) {
+            val program = parseFlatZinc("""
+                var 1..2: i;
+                var float: x;
+                var float: y;
+                var float: z;
+                constraint array_float_element(i, [0.125, 0.375], x);
+                constraint float_times($operands, z);
+                solve satisfy;
+            """.trimIndent(), exactFloats = true)
+
+            val product = program.problem.factors.filterIsInstance<ContinuousProduct>().single()
+
+            val names = operands.split(", ")
+            assertEquals(program.floatVarsByName.getValue(names[0]).varId, product.a)
+            assertEquals(program.floatVarsByName.getValue(names[1]).varId, product.b)
+            assertEquals(2, product.finiteChoices?.size)
+            assertTrue(product.finiteChoices?.hasGuards == true)
+        }
+    }
+
+    @Test
+    fun `literal products do not round exact source equalities`() {
+        for ((a, output, valid) in listOf(Triple(0.5, 0.25, true), Triple(0.1, 0.010000000000000002, false))) {
+            val program = parseFlatZinc("constraint float_times($a, $a, $output); solve satisfy;",
+                exactFloats = true)
+
+            val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+
+            if (valid) assertIs<SolveResult.Sat>(result) else assertIs<SolveResult.Unsat>(result)
+        }
+    }
+
     @Test
     fun `finite integer denominators keep quotients continuous`() {
         for (exact in listOf(false, true)) {

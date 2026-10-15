@@ -447,7 +447,7 @@ keep generated output outside the repository.
 
 ## Catalog and corpus
 
-The `continuous-arithmetic` suite contains synthetic MiniZinc square, independent
+The `continuous-arithmetic` suite contains synthetic MiniZinc fixed power, square, independent
 product and product-chain controls with objectives attained at exactly representable
 endpoints. Use repeated matched default-grid runs with original MiniZinc witness
 validation for execution comparisons. Native grid exhaustion or an attained grid

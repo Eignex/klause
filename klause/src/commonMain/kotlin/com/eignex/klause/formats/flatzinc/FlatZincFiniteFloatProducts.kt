@@ -41,8 +41,17 @@ internal fun FlatZincCompiler.recordFiniteFloatChoices(domain: FiniteFloatDomain
 }
 
 internal fun FlatZincCompiler.emitFiniteFloatProduct(a: FloatRef, b: FloatRef, result: FloatRef) {
-    val aValues = finiteChoices(a)
-    val bValues = finiteChoices(b)
+    fun coordinate(ref: FloatRef): FloatBucketing = when (ref) {
+        is FloatRef.Var -> ref.bk.takeIf { it.lpOnly }
+            ?: unsupportedHere("`float_times` cannot mix exact real and grid coordinates")
+        is FloatRef.Const -> resolveFloatElement(FznExpr.FloatLit(ref.value),
+            "__finite_product_${floatVars.size}", lpOnly = true)
+    }
+    val first = FloatRef.Var(coordinate(a))
+    val second = FloatRef.Var(coordinate(b))
+    val output = coordinate(result).varId
+    val aValues = finiteChoices(first)
+    val bValues = finiteChoices(second)
     val selectA = aValues != null && (bValues == null || aValues.size <= bValues.size)
     val values = (if (selectA) aValues else bValues)
         ?: unsupportedHere(
@@ -52,15 +61,10 @@ internal fun FlatZincCompiler.emitFiniteFloatProduct(a: FloatRef, b: FloatRef, r
         postFalseFactor()
         return
     }
-    val selected = (if (selectA) a else b) as FloatRef.Var
-    val other = (if (selectA) b else a) as FloatRef.Var
-    val output = when (result) {
-        is FloatRef.Var -> result.bk.varId
-        is FloatRef.Const -> resolveFloatElement(FznExpr.FloatLit(result.value),
-            "__finite_product_${floatVars.size}", lpOnly = true).varId
-    }
+    val selected = if (selectA) first else second
     val guards = IntArray(values.size) { exactFloatValueLiteral(selected.bk.varId, values[it]) }
-    factors.add(ContinuousProduct(selected.bk.varId, other.bk.varId, output, selected.bk.varId, values, guards))
+    factors.add(Clause(guards))
+    factors.add(ContinuousProduct(first.bk.varId, second.bk.varId, output, selected.bk.varId, values, guards))
 }
 
 internal fun FlatZincCompiler.exactFloatValueLiteral(variable: Int, value: Double): Int {
