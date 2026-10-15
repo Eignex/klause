@@ -42,6 +42,36 @@ import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
     @Test
+    fun `native objective descent replaces support around maintained unit definitions`() {
+        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
+        ))
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(ObjectiveSeed())),
+            feasibleAcceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned,
+        )
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
+            perMoveInvariants = true,
+            definitionalSweep = DefinitionalSweep.infer(problem, boolFolds = listOf(
+                BoolFoldDefinition(3, intArrayOf(Lit.make(0, false)), true),
+            )),
+        )
+        val objective = LinearObjective(boolWeights = longArrayOf(0, 5, 1, 100))
+        val params = LocalSearchParams(
+            maxFlips = 2L, randomSeed = 0L,
+            initialAssignment = Sample(booleanArrayOf(false, false, false, true), longArrayOf()),
+        )
+
+        val result = search.improvements(objective, params, warm = null)
+            .filterIsInstance<MinimizeResult.WithSample>().last()
+
+        assertEquals(1.0, objective.evaluate(result.sample))
+    }
+
+    @Test
     fun `self owned descent follows feasibility first objectives`() {
         val problem = Problem(1, 0, emptyArray(), emptyArray())
         val objective = LinearObjective(boolWeights = longArrayOf(1))
