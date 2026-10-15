@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -7,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -60,6 +62,27 @@ class SourceRecessionTest {
     private val product = RealProduct(0, 0, 1, 0.0, Double.POSITIVE_INFINITY)
     private val atom =
         ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 5.0)
+
+    @Test
+    fun `finite real product rays retain the chosen operand and exact product`() {
+        val factor = ContinuousProduct(0, 2, 1, 2, doubleArrayOf(0.5), intArrayOf(Lit.make(0, true)))
+        val problem = Problem(1, 0, emptyArray(), arrayOf<Factor>(factor), numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 0.0, 0.0),
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0, 0.0, 0.0))
+        val exact = listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.ofLong(2).reciprocal())
+        val point = Sample(booleanArrayOf(true), longArrayOf(), doubleArrayOf(2.0, 1.0, 0.5), exact)
+        val valid = listOf(2L, 1L, 0L).map(BigFraction::ofLong)
+        val cases = listOf(
+            valid to true,
+            listOf(1L, 1L, 0L).map(BigFraction::ofLong) to false,
+            listOf(2L, 1L, 1L).map(BigFraction::ofLong) to false,
+        )
+        for ((direction, expected) in cases) {
+            assertEquals(expected, problem.provesUnbounded(objective, point, direction))
+        }
+        assertEquals(false, problem.provesUnbounded(objective, point.copy(bools = booleanArrayOf(false)), valid))
+    }
 
     @Test
     fun `a ray every factor keeps and the objective descends along proves unboundedness`() {
