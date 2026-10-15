@@ -44,7 +44,8 @@ internal fun finiteWitnessVerifier(
         return@CandidateVerifier Verification.Indeterminate("a finite checker cannot verify wide integer coordinates")
     }
     if (sample.numRealVars != problem.numRealVars ||
-        (0 until sample.numRealVars).any { !sample.approximateRealValue(it).isFinite() }
+        (sample.exactReals == null &&
+            (0 until sample.numRealVars).any { !sample.approximateRealValue(it).isFinite() })
     ) {
         return@CandidateVerifier Verification.Rejected("assignment does not cover finite real coordinates")
     }
