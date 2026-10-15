@@ -90,7 +90,7 @@ class DefinitionalSweep internal constructor(
         ): DefinitionalSweep? {
             val base = infer(problem.factors, problem.numIntVars, definedHints, boolFolds)
             val nodes = base?.nodes.orEmpty() + elementResultDefinitions(problem, definedHints) +
-                divModDefinitions(problem)
+                divModDefinitions(problem) + wideDivModDefinitions(problem)
             val ordered = literalDefinitions(problem, definedHints, nodes)
             return if (ordered.isEmpty()) null else DefinitionalSweep(ordered)
         }

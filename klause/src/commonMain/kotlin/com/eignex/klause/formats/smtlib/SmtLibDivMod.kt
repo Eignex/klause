@@ -1,7 +1,9 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.DivMod
+import com.eignex.klause.factor.arithmetic.DivModExpression
 import com.eignex.klause.factor.arithmetic.DivisionConvention
+import com.eignex.klause.factor.arithmetic.WideDivMod
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.toWide
@@ -24,7 +26,16 @@ internal fun Compiler.Builder.retainedEuclideanDivMod(a: IntComb, b: IntComb, qu
         val magnitude = divisor.abs()
         val q = freshWideInt(intCombMagnitude(a)?.div(magnitude)?.plus(BIG_ONE))
         val r = freshWideInt(magnitude - BIG_ONE)
-        factors += DivMod(divModColumn(a), divisor, divModColumn(q), divModColumn(r), DivisionConvention.EUCLIDEAN)
+        val range = wideRange(a.toWide())
+        val affine = a is IntComb.Wide || q is IntComb.Wide || r is IntComb.Wide ||
+            (range != null && (!range.first.fitsLong() || !range.second.fitsLong()))
+        factors += if (affine) {
+            fun expression(value: IntComb): DivModExpression {
+                val wide = value.toWide()
+                return DivModExpression(wide.coeffs, wide.constant)
+            }
+            WideDivMod(expression(a), divisor, expression(q), expression(r))
+        } else DivMod(divModColumn(a), divisor, divModColumn(q), divModColumn(r), DivisionConvention.EUCLIDEAN)
         q to r
     }
     return if (quotient) outputs.first else outputs.second

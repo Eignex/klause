@@ -52,9 +52,10 @@ representation limits produce explicit UNKNOWN without truncating the source.
 
 Constant-divisor `div` and `mod` retain a shared Euclidean `DivMod` factor, with
 `0 <= remainder < abs(divisor)`, including negative divisors and arbitrary-width
-constants. Existing wide digit expressions retain exact equality links to the
-relation's arithmetic-owned scalar coordinates. Open sides remain open; no finite
-bound is guessed. Variable and zero divisors remain unsupported in this frontend.
+constants. Wide digit expressions remain on the retained affine `WideDivMod` relation; selected
+consumers install equivalent exact rows without introducing open scalar coordinates.
+Finite digits retain their finite ownership. Open sides remain open; no finite bound
+is guessed. Variable and zero divisors remain unsupported in this frontend.
 The [selected linear encoding](../model.md#integer-division-relations) installs the
 complete relation beside other constraints before theory checks.
 

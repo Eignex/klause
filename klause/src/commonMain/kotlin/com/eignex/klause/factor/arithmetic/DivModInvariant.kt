@@ -7,9 +7,15 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.div
 import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.negate
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
@@ -77,10 +83,18 @@ internal class DivModInvariant(private val relation: DivMod) : Invariant {
                 }
             }
         }
-        candidate(relation.dividend, b * bigIntOf(state.assignment.intValue(relation.quotient)) +
-            bigIntOf(state.assignment.intValue(relation.remainder)))
+        val quotient = bigIntOf(state.assignment.intValue(relation.quotient))
+        val remainder = bigIntOf(state.assignment.intValue(relation.remainder))
+        candidate(relation.dividend, b * quotient + remainder)
         relation.divisor?.let { variable ->
-            for (value in listOf(-1L, 1L)) candidate(variable, bigIntOf(value))
+            if (!quotient.isZero()) {
+                val numerator = bigIntOf(a) - remainder
+                val target = numerator / quotient
+                if (target * quotient == numerator) candidate(variable, target)
+            }
+            val magnitude = remainder.abs() + BIG_ONE
+            candidate(variable, magnitude)
+            candidate(variable, magnitude.negate())
         }
     }
 }

@@ -112,6 +112,8 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
             FloatObjectiveBoundInvariant(boolVars, boolWeights, intVars, intCoeffs, realVars, realCoeffs, bound)
         }
 
+    is WideDivMod -> WideDivModInvariant(this)
+
     is DivMod -> DivModInvariant(this)
 
     is Product -> ProductInvariant(a, b, result)

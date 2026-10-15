@@ -244,7 +244,8 @@ sentinel remain searched. Zero divisors leave outputs untouched and the factor
 violated. Definition clamping supplies candidates only; the exact relation still
 checks every output and pin. Direct repairs offer quotient/remainder updates together
 and reconstruct a dividend from the current pair, subject to domains and whole-factor
-grading. [Source semantics](../model.md#integer-division-relations) retain the declared
+grading. A nonzero quotient also gives an exact divisor repair when the
+dividend-minus-remainder is divisible by it. [Source semantics](../model.md#integer-division-relations) retain the declared
 rounding convention and wide arithmetic.
 
 ### Element results
