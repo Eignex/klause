@@ -131,7 +131,9 @@ cutoffs and assumptions; source publication validation precedes admission.
 Real array selection emits index-range rows at every build. Its selected equality
 changes with the live index, so its root relaxation cannot use a fixed layout
 whose only updates are column bounds. A source-justified
-fixed integer index additionally selects one exact real equality, so finite leaf
+fixed integer index additionally selects one exact real equality. Both index-bound
+premises accompany that row, so learning cannot treat one branch equality as
+globally valid. Finite leaf
 completion solves the selected relation directly. An unfixed index contributes
 only the range relaxation; complete arithmetic consumers install its equivalent
 guarded formula. The original real coordinates remain the witness authority.

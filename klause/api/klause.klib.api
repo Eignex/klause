@@ -1398,6 +1398,7 @@ abstract interface com.eignex.klause.lp/RelaxationBuilder { // com.eignex.klause
     open fun liveBool(kotlin/Int): kotlin/Boolean? // com.eignex.klause.lp/RelaxationBuilder.liveBool|liveBool(kotlin.Int){}[0]
     open fun realColumn(kotlin/Int): kotlin/Int // com.eignex.klause.lp/RelaxationBuilder.realColumn|realColumn(kotlin.Int){}[0]
     open fun realRow(kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.ir/LinearOp, kotlin/Double, kotlin/Boolean = ..., kotlin/IntArray = ...) // com.eignex.klause.lp/RelaxationBuilder.realRow|realRow(kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.ir.LinearOp;kotlin.Double;kotlin.Boolean;kotlin.IntArray){}[0]
+    open fun realRowForIntValue(kotlin/Int, kotlin/Long, kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.ir/LinearOp, kotlin/Double) // com.eignex.klause.lp/RelaxationBuilder.realRowForIntValue|realRowForIntValue(kotlin.Int;kotlin.Long;kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.ir.LinearOp;kotlin.Double){}[0]
     open fun statesBothBounds(kotlin/Int): kotlin/Boolean // com.eignex.klause.lp/RelaxationBuilder.statesBothBounds|statesBothBounds(kotlin.Int){}[0]
     open fun statesBothBounds(kotlin/IntArray): kotlin/Boolean // com.eignex.klause.lp/RelaxationBuilder.statesBothBounds|statesBothBounds(kotlin.IntArray){}[0]
 }

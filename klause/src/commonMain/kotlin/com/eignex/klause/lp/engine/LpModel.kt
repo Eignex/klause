@@ -635,6 +635,7 @@ internal class LpBuilder {
         rhs: Double,
         strict: Boolean = false,
         premiseLits: IntArray = EmptyIntArray,
+        validity: LpRowPremises? = null,
     ) {
         require(cols.size == vals.size) { "cols/vals length mismatch: ${cols.size} vs ${vals.size}" }
         anyRealRow = true
@@ -644,8 +645,10 @@ internal class LpBuilder {
                 LongArray(cols.size),
                 rel,
                 0L,
-                global = premiseLits.isEmpty(),
-                premises = if (premiseLits.isEmpty()) {
+                global = premiseLits.isEmpty() && validity == null,
+                premises = if (validity != null) {
+                    LpRowPremises(validity.vars, validity.isUpper, validity.thresholds, validity.boolLits + premiseLits)
+                } else if (premiseLits.isEmpty()) {
                     null
                 } else {
                     LpRowPremises(EmptyIntArray, BooleanArray(0), EmptyLongArray, premiseLits.copyOf())

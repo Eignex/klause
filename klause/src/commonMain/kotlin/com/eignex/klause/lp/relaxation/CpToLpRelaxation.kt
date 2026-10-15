@@ -1576,10 +1576,35 @@ internal class CpToLpRelaxation(
             rhs: Double,
             strict: Boolean,
             premiseLits: IntArray,
+        ) = emitRealRow(columns, coeffs, op, rhs, strict, premiseLits)
+
+        override fun realRowForIntValue(
+            intVar: Int,
+            value: Long,
+            columns: IntArray,
+            coeffs: DoubleArray,
+            op: LinearOp,
+            rhs: Double,
+        ) {
+            val domain = liveDomain(intVar)
+            if (domain.min != value || domain.max != value) return
+            val validity = LpRowPremises(intArrayOf(intVar, intVar), booleanArrayOf(false, true),
+                longArrayOf(value, value))
+            emitRealRow(columns, coeffs, op, rhs, false, EmptyIntArray, validity)
+        }
+
+        private fun emitRealRow(
+            columns: IntArray,
+            coeffs: DoubleArray,
+            op: LinearOp,
+            rhs: Double,
+            strict: Boolean,
+            premiseLits: IntArray,
+            validity: LpRowPremises? = null,
         ) {
             val rel = relationOf(op) ?: return
             if (realNegOf.isEmpty() || columns.none { realNegOf.containsKey(it) }) {
-                builder.addRealRow(columns, coeffs, rel, rhs, strict, premiseLits)
+                builder.addRealRow(columns, coeffs, rel, rhs, strict, premiseLits, validity)
                 return
             }
             // Mirror each split column's negative part with the negated coefficient.
@@ -1595,7 +1620,7 @@ internal class CpToLpRelaxation(
                 vals[w] = -coeffs[k]
                 w++
             }
-            builder.addRealRow(cols, vals, rel, rhs, strict, premiseLits)
+            builder.addRealRow(cols, vals, rel, rhs, strict, premiseLits, validity)
         }
 
         override fun bigMRow(
