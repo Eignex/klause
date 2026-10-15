@@ -63,6 +63,25 @@ import kotlin.test.assertTrue
 
 class SourceStrategyTest {
     @Test
+    fun `source optimization closes integer bounds before exact continuous preparation`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2).excludeValue(1)),
+            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                AllDifferent(intArrayOf(0, 1), 0, 3)),
+            openIntHi = booleanArrayOf(true, false), numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0))
+
+        val result = BacktrackSolver.source(source).optimize(objective).result
+
+        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result)
+        assertEquals(BigFraction.ZERO, optimum.incumbent.value.rational)
+        assertEquals(0L, optimum.incumbent.sample.intValue(0))
+        assertEquals(2L, optimum.incumbent.sample.intValue(1))
+        assertTrue(source.intBounds.isOpenUpper(0))
+    }
+
+    @Test
     fun `mixed products outside binary integer precision retain exact completion`() {
         val integer = 9007199254740993L
         val source = Problem(0, 1, arrayOf(IntDomain(integer, integer)),

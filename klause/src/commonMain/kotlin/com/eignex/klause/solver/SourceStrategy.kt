@@ -9,6 +9,8 @@ import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.portfolio.LeafRealCompletion
+import com.eignex.klause.presolve.OpenPresolveResult
+import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
@@ -25,6 +27,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
 import com.eignex.klause.solver.pipeline.PreparedExecutionKind
+import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
@@ -149,8 +152,7 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
-        val plan = source.preparePolynomialExecutionPlan(providers = projectionProviders,
-            cancellation = scope.polynomialPreparation())
+        val plan = preparePolynomialOptimization(scope.stop, scope.polynomialPreparation())
             .withObjective(objective, maximize = sense == ObjectiveSense.MAXIMIZE)
         if (plan.kind != PreparedExecutionKind.POLYNOMIAL ||
             !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
@@ -191,8 +193,7 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
-        val plan = source.preparePolynomialExecutionPlan(providers = projectionProviders,
-            cancellation = scope.polynomialPreparation())
+        val plan = preparePolynomialOptimization(scope.stop, scope.polynomialPreparation())
             .withObjective(objective, sense)
         if (plan.kind != PreparedExecutionKind.POLYNOMIAL ||
             !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
@@ -237,6 +238,22 @@ class SourceStrategy internal constructor(
             SourceProblemRoute.Refuted -> OpenTheoryExecution.Optimize(OpenTheoryOptimum.Infeasible(SolveStats.EMPTY))
             else -> incomplete(TerminationReason.Unsupported)
         }
+    }
+
+    private fun preparePolynomialOptimization(
+        boundCancellation: Cancellation,
+        polynomialCancellation: Cancellation,
+    ): PreparedSourcePlan {
+        val selected = projectionProviders.prepare(source)
+        val bounded = if (source.hasFiniteIntegerRanges()) source else {
+            when (val outcome = source.closeOpenBounds(boundCancellation)) {
+                is OpenPresolveResult.Tightened -> outcome.spec
+                // The quadratic result requires its producing engine's completion certificate.
+                OpenPresolveResult.Refuted -> source
+            }
+        }
+        return bounded.preparePolynomialExecutionPlan(original = source, providers = projectionProviders,
+            projections = selected.forEngineView(bounded), cancellation = polynomialCancellation)
     }
 
     private fun unsupportedQuadratic(
