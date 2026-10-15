@@ -14,9 +14,7 @@ import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.isZero
-import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
-import com.eignex.klause.util.negate
 import com.eignex.klause.util.signum
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact

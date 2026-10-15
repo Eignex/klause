@@ -11,6 +11,8 @@ import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.maxOf
+import com.eignex.klause.util.minOf
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
