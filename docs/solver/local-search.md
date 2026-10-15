@@ -167,9 +167,9 @@ a fixpoint before any newly broken longer clause receives a replacement supporte
 Supporters rank by current-point break score, raw objective delta and literal order.
 Each coordinate receives at most one proposed value; conflicts and cancellation reject
 the complete proposal. Replacement choices are heuristic, not logical deductions.
-Complete propagated grading must retain zero hard cost before a feasible proposal
-reaches selection. Only changed decision coordinates enter the returned move;
-maintained outputs follow the committed inputs.
+Feasible support construction checks complete propagated hard cost before selection.
+Only changed decision coordinates enter the returned move; maintained outputs follow
+the committed inputs. Every returned move retains the ordinary complete scorer.
 
 Each source closes its candidates through the ordinary move sink, retaining source
 order and its primitive-before-compound lanes. Supplemental pools and perturbations
@@ -189,8 +189,9 @@ completed move boundaries poll directly; a short clause does not reset the windo
 Support queues and primitive grading buffers are retained alongside the graph.
 Break and objective grades are reused only within one source's proposal batch at an
 unchanged live assignment; every source and perturbation begins a fresh batch.
-Strategies allocate their raw proposal sinks on first use of clause closure. These
-scratch owners do not enter warm captures or cross invocations.
+The state-owned graph and support scratch do not enter warm captures. Strategies
+allocate raw proposal sinks on first use, retain them between calls, and clear and
+rebind them before each source generation.
 An interrupted pick returning no move reaches the existing cancellation pause before
 local-optimum handling. It retains the live assignment and consumes no restart,
 resample or search instruction.
