@@ -88,7 +88,6 @@ internal fun mixedRowBounds(
                 }
             }
             expandPairedRows(state, continuousCounts, mixed, meter)
-            expandDefinedRowSupports(state, continuousCounts, mixed, meter)
             for (column in 0 until model.n) {
                 meter.step()
                 for (entry in state.model.columnEntries(column)) {
@@ -133,7 +132,7 @@ internal fun mixedRowBounds(
                 completed.addAll(rowLatticeBounds(state, row, terms, bounds, meter))
             }
             pairedRowBounds(state, rows, continuousCounts, meter, completed)
-            definedRowBounds(state, rows, continuousCounts, meter, completed)
+            definedRowBounds(state, rows, continuousCounts, mixed, meter, completed)
             completed
         }
     } catch (_: LpProjectionStop) {
