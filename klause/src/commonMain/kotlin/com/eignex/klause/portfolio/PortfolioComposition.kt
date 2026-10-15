@@ -3,8 +3,9 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.TierVarSelect
+import com.eignex.klause.backtrack.TieredVariableSelector
 import com.eignex.klause.backtrack.selector.IndomainMin
-import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
@@ -434,7 +435,13 @@ internal object PortfolioComposition {
         ) {
             return null
         }
-        if (annotation.variableSelector == SmallestDomain && annotation.valueSelector == IndomainMin) return null
+        val first = (annotation.variableSelector as? TieredVariableSelector)?.tiers
+            ?.firstOrNull { it.intVars.isNotEmpty() || it.boolVars.isNotEmpty() } ?: return null
+        if (first.intVars.isEmpty() || first.boolVars.isNotEmpty() ||
+            first.varSelect != TierVarSelect.SmallestDomain || first.valueSelector != IndomainMin
+        ) {
+            return null
+        }
         // Source tiers restrict branching even when every tier names first-fail.
         return BacktrackWorkerConfig(
             BacktrackCatalog.byLabel(BacktrackArm.FirstFail.label)

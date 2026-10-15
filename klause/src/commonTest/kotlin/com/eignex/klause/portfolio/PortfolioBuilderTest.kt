@@ -1,6 +1,6 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
@@ -10,6 +10,9 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SearchGroup
+import com.eignex.klause.ir.SearchHints
+import com.eignex.klause.ir.VariableSelection
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.propagation.Assumptions
@@ -31,10 +34,14 @@ class PortfolioBuilderTest {
 
     @Test
     fun `annotated circuit diversity has initial admission and complete source authority`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = BacktrackParams())
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L))
+        val annotation = SearchHints(listOf(
+            SearchGroup(intArrayOf(), intArrayOf(0, 1, 2)),
+            SearchGroup(intArrayOf(), intArrayOf(3), VariableSelection.InputOrder),
+        )).toBacktrackParams(0, 4)
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
+        val objective = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
         for (subcircuit in listOf(false, true)) {
-            val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) },
+            val problem = Problem(0, 4, Array(4) { IntDomain(0, if (it == 3) 1 else 2) },
                 arrayOf(Circuit(intArrayOf(0, 1, 2), subcircuit = subcircuit))).bake()
 
             val workers = PortfolioBuilder.build(problem, scenario, objective)

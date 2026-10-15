@@ -456,8 +456,10 @@ parallel pools and non-scheduling models retain their selected recipes.
 
 A curated single-core mixed optimization pool with at least six configured arms
 retains unrestricted first-fail search beside a source annotation on nonbinary
-finite-CP models containing a circuit or subcircuit constraint. The annotation keeps
-its selected slot and branch preferences.
+finite-CP models containing a circuit or subcircuit constraint, when the first
+nonempty source tier selects integer first-fail with minimum values. Boolean-first
+tiers and other primary branching preferences retain their selected pool. The
+annotation keeps its selected slot and branch preferences.
 If the selected pool lacks `first-fail`, composition appends that existing recipe
 after the incumbent workers; all existing worker positions and seeds are preserved.
 The appended worker joins the initial executable pool, including in expanded pools,

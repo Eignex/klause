@@ -3,12 +3,12 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.toBacktrackParams
-import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
-import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
+import com.eignex.klause.ir.ValueSelection
+import com.eignex.klause.ir.VariableSelection
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.solver.ProblemClass
@@ -22,7 +22,10 @@ class PortfolioCompositionTest {
 
     @Test
     fun `annotated finite optimization admits unrestricted first fail beside source search`() {
-        val annotation = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax)
+        val annotation = SearchHints(listOf(
+            SearchGroup(intArrayOf(), intArrayOf(0, 1)),
+            SearchGroup(intArrayOf(), intArrayOf(2), VariableSelection.InputOrder, ValueSelection.Maximum),
+        )).toBacktrackParams(0, 3)
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
 
@@ -53,6 +56,41 @@ class PortfolioCompositionTest {
     }
 
     @Test
+    fun `annotation diversity preserves other primary branching preferences`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
+        val primaryTiers = listOf(
+            SearchGroup(intArrayOf(0), intArrayOf(), VariableSelection.InputOrder),
+            SearchGroup(intArrayOf(0), intArrayOf()),
+            SearchGroup(intArrayOf(), intArrayOf(0), VariableSelection.InputOrder),
+            SearchGroup(intArrayOf(), intArrayOf(0), valueSelector = ValueSelection.Maximum),
+        )
+        for (primary in primaryTiers) {
+            val annotation = SearchHints(listOf(primary, SearchGroup(intArrayOf(), intArrayOf(1, 2))))
+                .toBacktrackParams(1, 3)
+
+            val composed = PortfolioComposition.compose(scenario.copy(annotationArm = annotation), facts)
+
+            assertEquals(0, composed.count { it.label == "first-fail" })
+            assertEquals(1, composed.count { it.label == "annotation" })
+        }
+    }
+
+    @Test
+    fun `empty source tiers do not hide the leading integer first fail preference`() {
+        val annotation = SearchHints(listOf(
+            SearchGroup(intArrayOf(), intArrayOf(), VariableSelection.InputOrder),
+            SearchGroup(intArrayOf(), intArrayOf(0, 1)),
+        )).toBacktrackParams(0, 3)
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
+
+        val composed = PortfolioComposition.compose(scenario, facts)
+
+        assertEquals(1, composed.count { it.label == "first-fail" })
+    }
+
+    @Test
     fun `unrestricted annotation already supplies first fail branching`() {
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(
             annotationArm = BacktrackParams(variableSelector = SmallestDomain, valueSelector = IndomainMin),
@@ -67,7 +105,10 @@ class PortfolioCompositionTest {
 
     @Test
     fun `annotation diversity preserves explicit pools small counts and parallel composition`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = BacktrackParams())
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(
+            annotationArm = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(0, 1))))
+                .toBacktrackParams(0, 3),
+        )
         val controls = (1..5).map { scenario.copy(arms = it) } + listOf(
             scenario.copy(cores = 2),
             scenario.copy(kind = Kind.CSP),
@@ -90,7 +131,10 @@ class PortfolioCompositionTest {
 
     @Test
     fun `annotation diversity requires nonbinary finite circuit domains`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = BacktrackParams())
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(
+            annotationArm = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(0, 1))))
+                .toBacktrackParams(0, 3),
+        )
         val profile = ProblemFacts.assumed(Kind.COP).profile
         val controls = ProblemClass.entries.filter { it != ProblemClass.FiniteCp }
             .map { ProblemFacts(profile.copy(problemClass = it), circuit = true) { true } } +
@@ -108,7 +152,10 @@ class PortfolioCompositionTest {
 
     @Test
     fun `expanded annotated pools admit first fail before any incumbent without duplicating it`() {
-        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = BacktrackParams())
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(
+            annotationArm = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(0, 1))))
+                .toBacktrackParams(0, 3),
+        )
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
         val small = PortfolioComposition.plan(scenario, facts)
 
@@ -125,7 +172,9 @@ class PortfolioCompositionTest {
     fun `annotation diversity spends the containing node allowance`() {
         val budget = NodeBudget(limit = 100)
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(
-            annotationArm = BacktrackParams(), nodeBudget = budget, lpCeiling = LpConfig.OFF,
+            annotationArm = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(0, 1))))
+                .toBacktrackParams(0, 3),
+            nodeBudget = budget, lpCeiling = LpConfig.OFF,
         )
 
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { true }
