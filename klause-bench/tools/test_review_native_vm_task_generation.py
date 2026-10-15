@@ -114,10 +114,11 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
         result = review.initialization_candidates(review.parse_records(text, 10, selected))
 
         entry = next(row for row in result['taskEntries'] if row['role'] == 'broker')
-        self.assertEqual([40, 41], [row['compileId'] for row in entry['initializationCandidates']])
-        self.assertEqual(['before', 'after'], [row['reportedTimestampRelation'] for row in entry['initializationCandidates']])
-        self.assertTrue(all(not row['crossThreadOrderProven'] and not row['actualTaskGenerationProven']
-                            for row in entry['initializationCandidates']))
+        candidates = list(review.eligible_initializations(result, entry))
+        self.assertEqual([40, 41], [row['compileId'] for _, row in candidates])
+        self.assertEqual([True, False], [row['timestamp'] < entry['timestamp'] for _, row in candidates])
+        self.assertFalse(result['crossThreadOrderProven'])
+        self.assertTrue(all(not row['actualTaskGenerationProven'] for _, row in candidates))
         self.assertFalse(result['actualTaskGenerationProven'])
 
     def test_same_thread_sequence_excludes_later_initialization_but_free_does_not_prove_hidden_reuse_absent(self):
@@ -129,8 +130,9 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
         result = review.initialization_candidates(review.parse_records(text, 10, selected))
 
         broker = next(row for row in result['taskEntries'] if row['role'] == 'broker')
-        self.assertEqual([40], [row['compileId'] for row in broker['initializationCandidates']])
-        self.assertTrue(broker['initializationCandidates'][0]['sameThreadEarlierSequence'])
+        candidates = list(review.eligible_initializations(result, broker))
+        self.assertEqual([40], [row['compileId'] for _, row in candidates])
+        self.assertEqual([10, 11, 1], candidates[0][1]['event'])
         self.assertFalse(broker['actualTaskGenerationProven'])
 
     def test_null_and_orphan_free_observations_remain_unresolved(self):
@@ -142,7 +144,7 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
 
         self.assertEqual(['null task pointer', 'no eligible observed initialization'],
                          [row['unresolvedReason'] for row in result['taskEntries']])
-        self.assertTrue(all(not row['initializationCandidates'] and not row['actualTaskGenerationProven']
+        self.assertTrue(all(not list(review.eligible_initializations(result, row)) and not row['actualTaskGenerationProven']
                             for row in result['taskEntries']))
 
     def test_candidate_graph_resource_limits_fail_without_choosing_an_initialization(self):
@@ -178,7 +180,52 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
 
         self.assertEqual('Task callback after observed thread exit', native['threads'][0][1]['errors'][0])
         self.assertEqual([], contexts['observedWrappers'])
-        self.assertEqual(native['threads'][0][1], contexts['invalidGroups'][0]['group'])
+        self.assertEqual((10, 11, 2), tuple(contexts['invalidGroups'][0]['event']))
+        self.assertEqual(native['threads'][0][1]['errors'], contexts['invalidGroups'][0]['groupErrors'])
+        self.assertEqual(text.splitlines()[1], native['threads'][0][1]['primary'][0]['raw'])
+
+    def test_shared_initialization_tables_reconstruct_every_callback_and_candidate_after_json_roundtrip(self):
+        selected = {role: [{'name': names[0]}] for role, (names, _) in review.capture.HOOKS.items()}
+        lines = [f'TASK_ENTRY\tinitialize\t{selected["initialize"][0]["name"]}\t{seq}\t10\t12\t{seq}\tff\t{identity}\t0'
+                 for seq, identity in enumerate([40, 41], 1)]
+        lines += [f'TASK_ENTRY\t{role}\t{selected[role][0]["name"]}\t{seq + 10}\t10\t11\t{seq}\tff\t-1\t0'
+                  for seq, role in enumerate(['broker', 'broker', 'free'], 1)]
+        native = review.parse_records('\n'.join(lines), 10, selected)
+        graph = review.initialization_candidates(native)
+
+        restored = json.loads(review.report_bytes({'nativeRecords': native, 'graph': graph}))
+
+        groups = {(group['pid'], group['tid'], group['sequence']): group
+                  for thread in restored['nativeRecords']['threads'] for group in thread}
+        actual = restored['graph']
+        self.assertEqual(lines, [groups[tuple(row['event'])]['primary'][row['primaryIndex']]['raw']
+                                 for row in actual['taskEntries']])
+        self.assertEqual([0, 1], actual['initializationEntries'])
+        self.assertEqual([0, 1], actual['pointerInitializationSets'][0]['initializationEntries'])
+        for entry in actual['taskEntries'][2:]:
+            self.assertEqual([40, 41], [row['compileId'] for _, row in review.eligible_initializations(actual, entry)])
+        self.assertFalse(actual['crossThreadOrderProven'])
+        self.assertFalse(actual['actualTaskGenerationProven'])
+
+    def test_jfr_identity_references_preserve_original_phase_and_inlining_records(self):
+        document = {'recording': {'events': [
+            {'type': 'jdk.CompilerPhase', 'values': {'phase': 'parse', 'compileId': 42}},
+            {'type': 'jdk.Compilation', 'values': {
+                'method': {'type': {'name': 'Example'}, 'name': 'f', 'descriptor': '()V'},
+                'compileId': 42, 'compileLevel': 3, 'isOsr': False, 'eventThread': {'osThreadId': 11},
+                'succeded': True, 'compiler': 'c1'}},
+            {'type': 'jdk.CompilerInlining', 'values': {'compileId': 42, 'succeeded': False, 'message': 'retained'}}]}}
+        original = copy.deepcopy(document)
+
+        identities = review.jfr_identities(document)
+        restored = json.loads(review.report_bytes({'document': document, 'identities': identities}))
+
+        self.assertEqual(original, restored['document'])
+        self.assertEqual(1, restored['identities'][0]['recordingEventIndex'])
+        self.assertEqual(original['recording']['events'][1],
+                         restored['document']['recording']['events'][restored['identities'][0]['recordingEventIndex']])
+        self.assertEqual(42, restored['identities'][0]['compileId'])
+        self.assertNotIn('raw', restored['identities'][0])
 
     def test_unique_public_identity_candidate_never_establishes_a_generation_or_lifetime(self):
         selected = {role: [{'name': names[0]}] for role, (names, _) in review.capture.HOOKS.items()}
@@ -378,6 +425,30 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
             self.assertEqual(b'original archive', archive.read_bytes())
             self.assertEqual(b'original manifest', manifest.read_bytes())
             self.assertLess(output.stat().st_size, 4096)
+
+
+    def test_compact_output_keeps_complete_records_within_the_same_output_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            manifest, archive, output = out / 'manifest', out / 'archive', out / 'review.json'
+            manifest.write_bytes(b'original manifest')
+            archive.write_bytes(b'original archive')
+            records = {'retained': list(range(300))}
+            def inspect(directory, library, destination, report):
+                report.update(completed=True, nativeRecords=records, observedTaskEntryRecordsValidated=True)
+            arguments = ['review', str(manifest), '0' * 64, str(archive), '/library', str(output)]
+
+            with patch('sys.argv', arguments), patch.object(review, 'MAX_OUTPUT_BYTES', 3000), \
+                    patch.object(review.previous, 'extract_inputs', return_value={}), \
+                    patch.object(review, 'inspect', side_effect=inspect):
+                review.main()
+
+            report = json.loads(output.read_text())
+            self.assertTrue(report['completed'])
+            self.assertTrue(report['observedTaskEntryRecordsValidated'])
+            self.assertEqual(records, report['nativeRecords'])
+            self.assertLess(output.stat().st_size, 3000)
+            self.assertTrue(all(report[key] is False for key in review.DENIED))
 
 
 if __name__ == '__main__':
