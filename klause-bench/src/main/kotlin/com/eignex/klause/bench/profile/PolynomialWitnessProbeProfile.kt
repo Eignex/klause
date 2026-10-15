@@ -5,6 +5,7 @@ import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64
@@ -41,7 +42,7 @@ internal object PolynomialWitnessProbeProfile {
             File(directory, "source.smt2").writeBytes(bytes)
             val records = (0..1).flatMap { round ->
                 (if (round == 0) listOf(false, true) else listOf(true, false)).map { observed ->
-                    access.measure(bytes.toString(Charsets.UTF_8), observed).copy(round = round)
+                    access.measure(bytes.toString(Charsets.UTF_8), observed, chargeStacks = observed).copy(round = round)
                 }
             }
             File(directory, "probe.json").writeText(Json.encodeToString(records))
@@ -79,25 +80,38 @@ internal object PolynomialWitnessProbeProfile {
             it.name == "polynomialPointFixings"
         }
 
-        fun measure(text: String, observed: Boolean): ProbeRecord {
+        fun measure(text: String, observed: Boolean, chargeStacks: Boolean = false): ProbeRecord {
             val source = parse.invoke(parser.getField("INSTANCE").get(null), text, Cancellation.Never, false, false)
             val sourceFormula = formula.invoke(source)
             val fixed = fixings.invoke(null, sourceFormula, {})
             val stops = ArrayList<ProbeStop>()
             var owner: Any? = null
             var captured = false
-            val observer = Cancellation {
-                val current = owner
-                if (observed && current != null && !captured) {
-                    val boundary = coupledEnd.get(current) as? Long
-                    val charged = spent.getLong(current)
-                    if (boundary != null && charged >= boundary) {
-                        captured = true
-                        stops += ProbeStop(charged, boundary, probeEnd.get(current) as? Long,
-                            Thread.currentThread().stackTrace.map { it.toString() })
+            val charges = LinkedHashMap<String, Long>()
+            val meter = if (observed && chargeStacks) WorkMeter { units ->
+                val frames = Thread.currentThread().stackTrace.filter {
+                    it.className.startsWith("com.eignex.klause.") &&
+                        !it.className.startsWith("com.eignex.klause.bench.") &&
+                        !it.className.startsWith("com.eignex.klause.util.") &&
+                        it.className != prefix + "QfNraWork"
+                }.joinToString("\n") { it.toString() }
+                charges[frames] = (charges[frames] ?: 0L) + units
+            } else null
+            val observer = object : Cancellation {
+                override fun workMeter(): WorkMeter? = meter
+                override fun isCancelled(): Boolean {
+                    val current = owner
+                    if (observed && current != null && !captured) {
+                        val boundary = coupledEnd.get(current) as? Long
+                        val charged = spent.getLong(current)
+                        if (boundary != null && charged >= boundary) {
+                            captured = true
+                            stops += ProbeStop(charged, boundary, probeEnd.get(current) as? Long,
+                                Thread.currentThread().stackTrace.map { it.toString() })
+                        }
                     }
+                    return false
                 }
-                false
             }
             val settings = params.newInstance(observer or Cancellation.after(60.seconds), null,
                 limitsType.getConstructor().newInstance())
@@ -106,8 +120,11 @@ internal object PolynomialWitnessProbeProfile {
             owner = work.get(check)
             val normalized = next.invoke(check)
             val result = normalized ?: next.invoke(check)
+            val snapshot = stats.invoke(check)
+            val nativeWork = snapshot.javaClass.getMethod("getWorkSpent").invoke(snapshot) as Long
+            if (meter != null) check(charges.values.sum() == nativeWork) { "Native charge attribution is incomplete" }
             return ProbeRecord(0, observed, result?.javaClass?.simpleName ?: "PendingAfterProbe",
-                stats.invoke(check).toString(), stops.toList())
+                snapshot.toString(), nativeWork, stops.toList(), charges.toMap())
         }
     }
 }
@@ -121,7 +138,9 @@ internal data class ProbeRecord(
     val observed: Boolean,
     val result: String,
     val stats: String,
+    val nativeWork: Long,
     val stops: List<ProbeStop>,
+    val charges: Map<String, Long>,
 )
 
 @Serializable
