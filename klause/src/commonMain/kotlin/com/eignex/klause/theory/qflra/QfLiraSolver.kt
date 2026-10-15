@@ -809,6 +809,11 @@ class ExactLiraSearchComponent private constructor(
 
     private fun assertSource(context: SearchContext): Boolean {
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
+        when (assertPublishedBounds(context)) {
+            is LpBoundBatchResult.Declined -> return false
+            is LpBoundBatchResult.Conflict -> return true
+            is LpBoundBatchResult.Applied -> Unit
+        }
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((index, prepared) in preparedRows.withIndex()) {
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
@@ -834,11 +839,6 @@ class ExactLiraSearchComponent private constructor(
         for (atom in node.sourceBranches) {
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)
             if (!system.assertAtom(atom, premise)) return false
-        }
-        when (assertPublishedBounds(context)) {
-            is LpBoundBatchResult.Declined -> return false
-            is LpBoundBatchResult.Conflict -> return true
-            is LpBoundBatchResult.Applied -> Unit
         }
         if (!assertDisequalities(disequalities)) return false
         nodesByLevel.put(context.decisionLevel, node)

@@ -76,6 +76,10 @@ it. That definition persists across retraction; its bound assertions and source
 premises follow the numerical scopes. The source-coordinate prefix stays stable,
 and complete witness publication still checks the original source. Numerical
 dimension and work guards apply to the installed model without a larger allowance.
+Published integer bounds enter before source comparisons so root fixings can simplify
+their expressions. A fixing is reusable in child scopes only when both active sides
+were established at numerical depth zero. Substitution retains both source premises;
+child-scoped fixings do not determine permanent expression identities.
 
 A numerical row enabled by an integer indicator equality records both source bound
 premises. Its emission depends on that live pin and is retired when the pin retracts.

@@ -77,6 +77,31 @@ class LiveQfLraSystemTest {
     }
 
     @Test
+    fun `root fixings preserve their premises when a child has no row capacity`() {
+        val factor = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 1.0), LinearOp.LE, 3.0)
+        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 0) }).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(arrayOf(factor)), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            session.publish(SearchDecision.Bool(Lit.make(0, true)))
+            session.publish(SearchDecision.Bool(Lit.make(1, true)))
+            assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2)), premise(0)))
+            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(2)), premise(1)))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+
+            assertTrue(system.assertComparison(factor.linearRows.single().exactForm(2)
+                .comparison(true) { false }, null, premise(2)))
+
+            val upper = assertNotNull(lp.state?.activeSide(1, true))
+            assertEquals(BigFraction.ONE, upper.side.number.value)
+            assertEquals((0..2).map { Lit.make(it, false) },
+                assertNotNull(session.explainAtoms(lp.boundPremise(upper.witness))).literals.sorted())
+        }
+    }
+
+    @Test
     fun `a false constant row refutes an empty source layout`() {
         val source = Problem(0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),

@@ -296,13 +296,13 @@ internal class LiveQfLraSystem(
 
     private fun rootFixedColumns(columns: IntArray): Map<Int, FixedSmtColumn> {
         val state = lp.state ?: return emptyMap()
-        if (state.depth != 0) return emptyMap()
         val fixed = columns.filter { column ->
             if (column in declaredFixed) return@filter false
-            val lower = state.activeSide(column, false)?.side ?: return@filter false
-            val upper = state.activeSide(column, true)?.side ?: return@filter false
-            !lower.strict && !upper.strict && lower.number.value == upper.number.value &&
-                lower.premises == null && upper.premises == null
+            val lower = state.activeSide(column, false) ?: return@filter false
+            val upper = state.activeSide(column, true) ?: return@filter false
+            lower.depth == 0 && upper.depth == 0 && !lower.side.strict && !upper.side.strict &&
+                lower.side.number.value == upper.side.number.value &&
+                lower.side.premises == null && upper.side.premises == null
         }
         if (fixed.isEmpty()) return emptyMap()
         // Capture both immutable witnesses before asserting a bound that can depend on them.
