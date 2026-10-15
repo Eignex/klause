@@ -6,6 +6,8 @@ import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.toLongExact
@@ -30,3 +32,10 @@ internal fun OpenTheoryAssignment.toSample(model: Problem, invocation: EngineInv
         }
     }
 }
+
+internal fun refuteOpenWitness(model: Problem, sample: Sample): String? =
+    com.eignex.klause.solver.validation.refuteOpenWitness(model, sample)
+
+internal fun verifyOpenWitness(
+    model: Problem, sample: Sample, cancellation: Cancellation = Cancellation.Never,
+): Verification<Sample, Unit> = com.eignex.klause.solver.validation.verifyOpenWitness(model, sample, cancellation)
