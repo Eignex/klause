@@ -314,10 +314,16 @@ def btf_counter(raw, section_id, slots):
             raise ValueError('BTF counter array does not cover the expected CPU slots')
         value = resolve(element)
     if not value or value['kind'] != 1 or value['value'] != 8 or \
-            struct.unpack('<I', value['payload'])[0] != 64 or variable_size != slots * 8 or section['value'] != slots * 8:
-        raise ValueError('BTF loss-counter storage is not a complete unsigned 64-bit CPU array')
+            variable_size != slots * 8 or section['value'] != slots * 8:
+        raise ValueError('BTF loss-counter storage is not a complete supported 64-bit CPU array')
+    encoded = struct.unpack('<I', value['payload'])[0]
+    # bpftrace 0.27.0 emits signed int64 debug metadata for its UInt64 globals.
+    if encoded != 64 and not (encoded == (1 << 24 | 64) and value['name'] == 'int64'):
+        raise ValueError('BTF loss-counter storage is not a complete supported 64-bit CPU array')
     return {'sectionId': section_id, 'section': SECTION, 'variableId': variable_id,
             'variable': VARIABLE, 'offset': variable_offset, 'slotBytes': 8, 'storageBytes': variable_size,
+            'integerDebugName': value['name'], 'integerDebugEncoding': encoded,
+            'counterInterpretation': 'uint64',
             'btfSha256': hashlib.sha256(raw).hexdigest()}
 
 

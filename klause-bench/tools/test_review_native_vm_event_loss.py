@@ -5,7 +5,7 @@ import native_vm_event_loss as loss
 
 
 class ReviewNativeVmEventLossTest(unittest.TestCase):
-    def test_type_graph_preserves_signed_integer_metadata_without_relaxing_the_counter_guard(self):
+    def test_type_graph_preserves_unsupported_signed_integer_metadata_without_accepting_the_counter(self):
         strings = b'\0int64_t\0__bt__event_loss_counter\0.data.event_loss_counter\0'
         types = struct.pack('<IIII', 1, 1 << 24, 8, 1 << 24 | 64)
         types += struct.pack('<IIIIII', 0, 3 << 24, 0, 1, 1, 1)
@@ -20,7 +20,7 @@ class ReviewNativeVmEventLossTest(unittest.TestCase):
         self.assertEqual(64, graph[0]['members'][0]['bytes'])
         self.assertIn({'encoded': 1 << 24 | 64, 'encoding': 1, 'offset': 0, 'bits': 64},
                       [row['integer'] for row in graph if 'integer' in row])
-        with self.assertRaisesRegex(ValueError, 'unsigned'):
+        with self.assertRaisesRegex(ValueError, '64-bit'):
             loss.btf_counter(raw, 5, 8)
 
     def test_type_graph_retains_missing_references_and_stops_at_visited_types(self):
