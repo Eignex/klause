@@ -58,7 +58,7 @@ internal fun SourceProofContext.integerPinBounds(
         if (row.coefficients.size != 1) continue
         val (id, coefficient) = row.coefficients.entries.single()
         if (id.kind == SourceCoordinate.Kind.Integer && !coefficient.isZero) {
-            bound(id, row.rhs / coefficient, coefficient > BigFraction.ZERO, row.strict)
+            bound(id, row.rhs * coefficient.reciprocal(), coefficient > BigFraction.ZERO, row.strict)
         }
     }
     return if (cancellation()) null else SourceIntegerBounds(lower, upper)

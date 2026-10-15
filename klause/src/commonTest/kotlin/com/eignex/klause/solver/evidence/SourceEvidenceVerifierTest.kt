@@ -34,7 +34,7 @@ class SourceEvidenceVerifierTest {
     fun `integer premise pins require integral declared integer coordinates`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val invalid = listOf(mapOf(x to BigFraction.ONE),
-            mapOf(integer to BigFraction.ONE / BigFraction.ofLong(2)),
+            mapOf(integer to BigFraction.ofLong(2).reciprocal()),
             mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 99) to BigFraction.ONE))
 
         for (pins in invalid) {
@@ -80,7 +80,7 @@ class SourceEvidenceVerifierTest {
     @Test
     fun `singleton integer bounds establish a guard after exact integer rounding`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        for ((rhs, strict) in listOf(BigFraction.ONE / BigFraction.ofLong(2) to false, BigFraction.ONE to true)) {
+        for ((rhs, strict) in listOf(BigFraction.ofLong(2).reciprocal() to false, BigFraction.ONE to true)) {
             val rows = mapOf(
                 "guarded" to SourcePremise(lower, emptyMap(), mapOf(integer to BigFraction.ZERO)),
                 "low" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
