@@ -318,14 +318,13 @@ internal class LiveQfLraSystem(
         }
         if (fixed.isEmpty()) return emptyMap()
         // Capture both immutable witnesses before asserting a bound that can depend on them.
-        val premises = lp.rootBoundPremises() ?: return emptyMap()
         return fixed.associateWith { column ->
             FixedSmtColumn(
                 checkNotNull(state.activeSide(column, false)).side.number.value,
                 SearchAtomPremise.All(
                     listOf(
-                        premises[column to false] ?: SearchAtomPremise.Unavailable,
-                        premises[column to true] ?: SearchAtomPremise.Unavailable,
+                        lp.activeBoundPremise(column, false) ?: SearchAtomPremise.Unavailable,
+                        lp.activeBoundPremise(column, true) ?: SearchAtomPremise.Unavailable,
                     ),
                 ),
             )
