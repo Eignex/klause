@@ -150,12 +150,12 @@ internal object LinearDisjunctionInspection {
             is RealConstants -> {
                 put("boundBits", constants.bound.toRawBits())
                 put("discreteCoefficientBits", buildJsonArray {
-                    for (i in constants.intCoefficients.indices) {
+                    for (i in 0 until constants.intCoefficients.size) {
                         add(JsonPrimitive(constants.intCoefficients.at(i).toRawBits()))
                     }
                 })
                 put("realCoefficientBits", buildJsonArray {
-                    for (i in constants.realCoefficients.indices) {
+                    for (i in 0 until constants.realCoefficients.size) {
                         add(JsonPrimitive(constants.realCoefficients.at(i).toRawBits()))
                     }
                 })
