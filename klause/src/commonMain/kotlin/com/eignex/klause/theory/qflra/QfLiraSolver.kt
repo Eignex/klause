@@ -22,9 +22,13 @@ import com.eignex.klause.lp.SourceLp
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.admittedSourcePoint
 import com.eignex.klause.lp.asFraction
+import com.eignex.klause.lp.bounding.LpPremisedBound
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.closeSourceLpOwners
+import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
@@ -827,25 +831,10 @@ class ExactLiraSearchComponent private constructor(
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)
             if (!system.assertAtom(atom, premise)) return false
         }
-        for (integer in 0 until model.numIntVars) {
-            context.intLowerBound(integer)?.let { value ->
-                if (!system.assertRow(
-                        exactColumnLower(model.numRealVars + integer, BigFraction.ofLong(value)),
-                        context.intLowerBoundPremise(integer),
-                    )
-                ) {
-                    return false
-                }
-            }
-            context.intUpperBound(integer)?.let { value ->
-                if (!system.assertRow(
-                        exactColumnUpper(model.numRealVars + integer, BigFraction.ofLong(value)),
-                        context.intUpperBoundPremise(integer),
-                    )
-                ) {
-                    return false
-                }
-            }
+        when (assertPublishedBounds(context)) {
+            is LpBoundBatchResult.Declined -> return false
+            is LpBoundBatchResult.Conflict -> return true
+            is LpBoundBatchResult.Applied -> Unit
         }
         for ((address, comparison, premise) in disequalities) {
             val side = if (comparison.terms.isEmpty()) {
@@ -869,6 +858,25 @@ class ExactLiraSearchComponent private constructor(
         }
         nodesByLevel.put(context.decisionLevel, node)
         return true
+    }
+
+    private fun assertPublishedBounds(context: SearchContext): LpBoundBatchResult {
+        val bounds = ArrayList<LpPremisedBound>()
+        for (integer in 0 until model.numIntVars) {
+            if (operationStop()) return LpBoundBatchResult.Declined(0)
+            val column = model.numRealVars + integer
+            context.intLowerBound(integer)?.let { value ->
+                bounds += LpPremisedBound(
+                    column, false, ExactLpSide(ExactLpNumber.of(value)), context.intLowerBoundPremise(integer),
+                )
+            }
+            context.intUpperBound(integer)?.let { value ->
+                bounds += LpPremisedBound(
+                    column, true, ExactLpSide(ExactLpNumber.of(value)), context.intUpperBoundPremise(integer),
+                )
+            }
+        }
+        return lp.assertBounds(bounds)
     }
 
     private fun relax(context: SearchContext): ComponentResult {

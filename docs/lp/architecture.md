@@ -10,6 +10,12 @@ The flow is to assemble a source-aware linear model, solve its floating working
 representation, certify the requested result, then let the consumer reconstruct
 or apply it. Bound changes and retraction update that same numerical scope.
 
+Model-facing sparse bound batches retain an independent source premise for each
+accepted side and publish witnesses only for a committed prefix. The numerical
+engine receives its existing exact bound assertions; it acquires no search types.
+Contradiction stops the batch at its first conflicting prefix, and a decline retains
+the previous state and witness map. Callers retain spent per-bound edit accounting.
+
 This page covers engine boundaries, exact authority and consumer integration before
 private basis mechanics. [Certification](certification.md) defines accepted proof
 packages; [dependency integration](dependencies.md) defines kernel interfaces.

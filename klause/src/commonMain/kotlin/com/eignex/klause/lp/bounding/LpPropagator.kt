@@ -42,6 +42,7 @@ import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.MutableIntObjectMap
 
 internal data class LpEffortProfile(
     val iterations: Int = 0,
@@ -71,6 +72,13 @@ internal data class LpFractionalBranch(
     val value: BigFraction,
     val boolean: Boolean = false,
     val registered: Boolean = true,
+)
+
+internal data class LpPremisedBound(
+    val column: Int,
+    val upper: Boolean,
+    val side: ExactLpSide,
+    val premise: SearchAtomPremise,
 )
 
 internal class LpPropagator(
@@ -229,6 +237,46 @@ internal class LpPropagator(
         lastMetrics = LpSolveMetrics()
         return true
     }
+
+    fun assertBounds(bounds: List<LpPremisedBound>): LpBoundBatchResult = withOwner { current ->
+        current.state.conflict?.let { return@withOwner LpBoundBatchResult.Conflict(0, it) }
+        val lower = MutableIntObjectMap<ExactLpSide>()
+        val upper = MutableIntObjectMap<ExactLpSide>()
+        val assertions = ArrayList<LpBoundAssertion>()
+        val premises = ArrayList<SearchAtomPremise>()
+        for (bound in bounds) {
+            if (cancellation()) return@withOwner LpBoundBatchResult.Declined(assertions.size)
+            if (bound.column !in 0 until current.state.model.numVars) {
+                return@withOwner LpBoundBatchResult.Declined(assertions.size + 1)
+            }
+            val sides = if (bound.upper) upper else lower
+            val previous = sides[bound.column] ?: current.state.activeSide(bound.column, bound.upper)?.side
+            if (previous != null && !bound.side.strongerThan(previous, bound.upper)) continue
+            if (nextWitness > Long.MAX_VALUE - assertions.size - 1L) {
+                return@withOwner LpBoundBatchResult.Declined(assertions.size + 1)
+            }
+            assertions.add(LpBoundAssertion(
+                bound.column, bound.upper, bound.side, nextWitness + assertions.size, current.state.depth,
+            ))
+            premises.add(bound.premise)
+            sides.put(bound.column, bound.side)
+            if (!ExactLpBounds(
+                    lower[bound.column] ?: current.state.activeSide(bound.column, false)?.side,
+                    upper[bound.column] ?: current.state.activeSide(bound.column, true)?.side,
+                ).consistent
+            ) break
+        }
+        if (assertions.isEmpty()) return@withOwner LpBoundBatchResult.Applied(0)
+        // Retain the caller's per-bound allowance debit even when the numerical snapshot is shared.
+        onEdit(current.state.model.numVars.toLong() * assertions.size)
+        val result = current.assertBounds(assertions)
+        if (result !is LpBoundBatchResult.Declined) {
+            for (index in 0 until result.count) witnesses[assertions[index].witness] = premises[index]
+            nextWitness += result.count
+            if (result.count > 0) lastMetrics = LpSolveMetrics()
+        }
+        result
+    } ?: LpBoundBatchResult.Declined(0)
 
     fun assertBounds(lower: List<ExactLpSide>, upper: List<ExactLpSide>): LpBoundBatchResult {
         val current = owner ?: return LpBoundBatchResult.Declined(0)
