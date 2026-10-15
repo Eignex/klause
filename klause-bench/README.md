@@ -319,6 +319,13 @@ complementary names under the unchanged registry limit. This is isolated naming
 demand: it neither captures the actual rebound fragment nor reproduces earlier
 component registrations, initializes a solver, or proves the opening's refusal cause.
 
+With `inspect=lp-shape`, the tool instead observes the returned running root's live
+linear owner before close, within the same remaining deadline. It records LP dimensions
+and counts installed expression definitions with and without active bounds. It neither
+forces lazy owners nor starts numerical work or traversal. An unavailable or stopped
+opening is explicit; interrupted definition counts are partial. These observations do
+not identify the cause of a later CLI continuation decline.
+
 `bench.profile.SourceAgreementProfile` compares one combined exact linear owner with
 explicit registered linear peers over original real, wide-integer, strict and guarded
 sources. Pass `repeats=N warmups=N cases=<comma-separated names>`; defaults are three
