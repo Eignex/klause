@@ -3,15 +3,19 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
+import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -52,7 +56,9 @@ class PortfolioWorkerTest {
         worker.sharedPools = SharedPools(null, null, bounds = SharedObjectiveBound(identity = model), identity = model)
         worker.bindSource(SourceWorkerBinding(containing, sharingInvocation = containing))
 
-        assertFailsWith<IllegalArgumentException> { worker.bindSource(SourceWorkerBinding(containing, sharingInvocation = stronger)) }
+        assertFailsWith<IllegalArgumentException> {
+            worker.bindSource(SourceWorkerBinding(containing, sharingInvocation = stronger))
+        }
     }
 
     @Test
@@ -125,6 +131,33 @@ class PortfolioWorkerTest {
 
         assertTrue(result is SolveResult.Sat)
         assertNull(worker.sourceBinding)
+    }
+
+    @Test
+    fun `quadratic binding rejects a foreign source behind matching producer labels`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val foreign = Problem(0, 0, emptyArray(), emptyArray())
+        val objective = QuadraticObjectiveSpec(emptyList())
+        val plan = source.preparePolynomialExecutionPlan().withObjective(objective)
+        val producer = requireNotNull(foreign.preparePolynomialExecutionPlan().quadraticEngineInvocation(
+            objective, ObjectiveSense.MINIMIZE, Assumptions.None))
+
+        assertFailsWith<IllegalArgumentException> {
+            SourceWorkerBinding(ModelIdentity.of(foreign, objective), preparedPlan = plan, quadraticInvocation = producer)
+        }
+    }
+
+    @Test
+    fun `quadratic binding rejects a changed source objective direction`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val objective = QuadraticObjectiveSpec(emptyList())
+        val plan = source.preparePolynomialExecutionPlan().withObjective(objective)
+        val producer = requireNotNull(plan.quadraticEngineInvocation(
+            objective, ObjectiveSense.MAXIMIZE, Assumptions.None))
+
+        assertFailsWith<IllegalArgumentException> {
+            SourceWorkerBinding(ModelIdentity.of(source, objective), preparedPlan = plan, quadraticInvocation = producer)
+        }
     }
 
 }

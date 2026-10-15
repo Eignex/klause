@@ -198,4 +198,31 @@ class PortfolioInvocationTest {
         assertEquals(listOf("worker1", "worker0", "source1", "source0"), closed)
     }
 
+    @Test
+    fun `binding failure remains primary when worker close throws the same failure`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val plan = source.prepareExecutionPlan()
+        val primary = IllegalArgumentException("invalid binding")
+        var sourceClosed = false
+        val delegate = BacktrackSolver(source.bake()).session()
+        val session = object : Session<BacktrackParams> by delegate {
+            override fun close() {
+                delegate.close()
+                throw primary
+            }
+        }
+        val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack, binding = { throw primary }) { slot ->
+            slot.own(AutoCloseable { sourceClosed = true })
+            PortfolioWorker.of("failure", 0, session, BacktrackParams())
+        }
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            PortfolioInvocation(plan, listOf(factory), PortfolioInvocationControls(),
+                PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()))
+        }
+
+        assertSame(primary, failure)
+        assertEquals(true, sourceClosed)
+    }
+
 }

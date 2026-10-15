@@ -29,7 +29,7 @@ internal class PortfolioArmFactory(
             }
             return worker
         } catch (failure: Throwable) {
-            runCatching { worker.close() }.exceptionOrNull()?.let(failure::addSuppressed)
+            runCatching { worker.close() }.exceptionOrNull()?.takeUnless { it === failure }?.let(failure::addSuppressed)
             throw failure
         }
     }
