@@ -120,6 +120,7 @@ internal object MpsMode : CliMode {
                     render,
                     routingLpStats = routingLpStats,
                     routingElapsedMs = routingElapsedMs,
+                    preparedRoute = finite,
                 )).withNumericalCompletion()
             } else {
                 Solvable(finite = null, render = render, objectiveValue = null,

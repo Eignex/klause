@@ -111,7 +111,9 @@ purely continuous sources use the finite LP lane and its tolerance guarantee.
 Supported bounded integer sources retain the existing finite search and numerical
 completion. Numerical bound closure can also prove every missing integer side,
 including rows enabled by a source-fixed indicator. The prepared plan retains
-original declarations independently of those derived bounds. An immutable execution policy also keeps finite LS and ALNS workers on
+original declarations independently of those derived bounds. Finite CLI execution
+uses that same prepared plan and component ownership. Its original objective and
+direction remain separate from the engine's minimized objective. An immutable execution policy also keeps finite LS and ALNS workers on
 numerical leaf completion when presolve fixes their discrete coordinates; it cannot
 materialize exact-theory neighborhood workers. Open integer declarations retain their missing sides and use numerical
 LP relaxations with exhaustive integer splits; no finite window changes source scope.
