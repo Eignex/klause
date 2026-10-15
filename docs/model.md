@@ -275,8 +275,9 @@ alongside arithmetic participation.
 `RealArrayMinMax` retains ordered continuous operands and a result in the real
 namespace. Its implied inequalities form a sound relaxation; complete selected
 linear or polynomial encoders also require equality to an operand. Native scores
-are heuristic and exact source-coordinate checking remains authoritative. Direct
-finite propagation is unavailable until a complete arithmetic consumer is selected.
+are heuristic and exact source-coordinate checking remains authoritative. Source
+preparation requires complete arithmetic enforcement; the bounds-only relaxation
+cannot authorize finite completion.
 
 `GridArrayMinMax` retains per-coordinate grid steps, origins and the component's
 scaling policy. Its finite projection filters envelope rows and remaining

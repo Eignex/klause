@@ -1,8 +1,8 @@
 package com.eignex.klause.theory
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
-import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.GridArrayMinMax
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.LinearForm
