@@ -36,7 +36,8 @@ object SourceRecordCheck {
         require(
             bundleOptions == setOf("bundle", "sha256") || bundleOptions == setOf("input64", "sha256"),
         ) {
-            "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest> and checker=source|boolean|minizinc"
+            "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest> " +
+                "and checker=source|boolean|minizinc"
         }
         require(options["captureSources"] in listOf(null, "true", "false")) { "captureSources must be true or false" }
         require(options["witnessOnly"] in listOf(null, "true", "false")) { "witnessOnly must be true or false" }
