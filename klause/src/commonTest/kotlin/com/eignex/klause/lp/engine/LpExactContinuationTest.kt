@@ -17,6 +17,75 @@ import kotlin.test.assertTrue
 
 class LpExactContinuationTest {
     @Test
+    fun `structural target declines skip basis export and current limits can admit a retry`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE)
+        var exports = 0
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel): Basis {
+                exports++
+                return Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
+            }
+        }
+        val limits = listOf(
+            ExactContinuationLimits(maxRows = 0),
+            ExactContinuationLimits(maxColumns = 1),
+            ExactContinuationLimits(maxCells = 3),
+        )
+        for (limit in limits) {
+            repeat(2) {
+                val declined = captureContinuationTarget(model, solver, null, limit, Cancellation.Never)
+                assertEquals(ContinuationDecline.DIMENSION, declined.metrics.decline)
+                assertEquals(1L, declined.metrics.work)
+                assertEquals(0L, declined.metrics.allocation)
+                assertNull(declined.basis)
+            }
+        }
+        assertEquals(0, exports)
+
+        val admitted = captureContinuationTarget(model, solver, null, ExactContinuationLimits(), Cancellation.Never)
+
+        assertNotNull(admitted.basis)
+        assertNull(admitted.metrics.decline)
+        assertEquals(1, exports)
+    }
+
+    @Test
+    fun `cancelled and exhausted structural target attempts do not survive a fresh invocation`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE)
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel) =
+                Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
+        }
+        val cases = listOf(
+            Triple(ExactContinuationLimits(maxRows = 0, maxWork = 0L), Cancellation.Never, ContinuationDecline.WORK),
+            Triple(ExactContinuationLimits(maxRows = 0, maxTimeNs = 0L), Cancellation.Never, ContinuationDecline.TIME),
+            Triple(ExactContinuationLimits(maxRows = 0), Cancellation { true }, ContinuationDecline.CANCELLED),
+        )
+        for ((limit, cancellation, reason) in cases) {
+            val stopped = captureContinuationTarget(model, solver, null, limit, cancellation)
+            val target = captureContinuationTarget(model, solver, null, ExactContinuationLimits(), Cancellation.Never)
+            val retried = continueExactLp(model, target.basis, targetMetrics = target.metrics)
+
+            assertEquals(reason, stopped.metrics.decline)
+            assertNull(stopped.basis)
+            assertNotNull(retried.witness)
+            assertNull(retried.metrics.decline)
+        }
+    }
+
+    @Test
     fun `repeated continuation cannot replenish exhausted feasibility pivots`() {
         val source = assertNotNull(
             LpBuilder().apply {
