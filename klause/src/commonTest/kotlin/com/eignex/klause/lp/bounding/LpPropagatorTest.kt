@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.ExactLpBounds
@@ -16,6 +17,7 @@ import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
@@ -47,9 +49,11 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -63,6 +67,121 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorTest {
+    @Test
+    fun `premised bound batches explain the first conflicting prefix`() {
+        val problem = Problem(3, 2, Array(2) { IntDomain(0, 10) }, emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)))
+            .build(PropagationSession(problem))
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            for (variable in 0..2) session.publish(SearchDecision.Bool(Lit.make(variable, true)))
+            val first = base.intColOf[0]
+            val second = base.intColOf[1]
+
+            val result = lp.assertBounds(listOf(
+                LpPremisedBound(first, false, ExactLpSide(ExactLpNumber.of(4L)),
+                    SearchAtomPremise.Asserted(SearchDecision.Bool(0))),
+                LpPremisedBound(first, true, ExactLpSide(ExactLpNumber.of(3L)),
+                    SearchAtomPremise.Asserted(SearchDecision.Bool(2))),
+                LpPremisedBound(second, false, ExactLpSide(ExactLpNumber.of(7L)),
+                    SearchAtomPremise.Asserted(SearchDecision.Bool(4))),
+            ))
+
+            assertEquals(2, assertIs<LpBoundBatchResult.Conflict>(result).count)
+            val conflict = assertIs<ComponentResult.Conflict>(lp.propagate(session))
+            assertEquals(listOf(1, 3), assertNotNull(conflict.explanation).literals.sorted())
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.state?.activeSide(second, false)).side.number.value)
+        }
+    }
+
+    @Test
+    fun `premised bound batches retract before a sibling explanation`() {
+        val problem = Problem(4, 1, arrayOf(IntDomain(0, 10)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+            .build(PropagationSession(problem))
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            for (variable in 0..3) session.publish(SearchDecision.Bool(Lit.make(variable, true)))
+            val column = base.intColOf[0]
+            assertTrue(lp.atLevel(1))
+            assertIs<LpBoundBatchResult.Applied>(lp.assertBounds(listOf(
+                LpPremisedBound(column, false, ExactLpSide(ExactLpNumber.of(5L)),
+                    SearchAtomPremise.Asserted(SearchDecision.Bool(0))),
+                LpPremisedBound(column, true, ExactLpSide(ExactLpNumber.of(5L)),
+                    SearchAtomPremise.Asserted(SearchDecision.Bool(2))),
+            )))
+            assertTrue(lp.atLevel(0))
+            assertTrue(lp.atLevel(1))
+
+            assertIs<LpBoundBatchResult.Conflict>(lp.assertBounds(listOf(
+                LpPremisedBound(column, false, ExactLpSide(ExactLpNumber.of(7L)),
+                    SearchAtomPremise.Asserted(SearchDecision.Bool(4))),
+                LpPremisedBound(column, true, ExactLpSide(ExactLpNumber.of(6L)),
+                    SearchAtomPremise.Asserted(SearchDecision.Bool(6))),
+            )))
+
+            val conflict = assertIs<ComponentResult.Conflict>(lp.propagate(session))
+            assertEquals(listOf(5, 7), assertNotNull(conflict.explanation).literals.sorted())
+        }
+    }
+
+    @Test
+    fun `an unavailable batched bound premise withholds the whole conflict`() {
+        for (upperUnavailable in listOf(false, true)) {
+            val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), emptyArray())
+            val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+                .build(PropagationSession(problem))
+            LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+                val session = SearchSession(listOf(lp))
+                session.initialize()
+                session.publish(SearchDecision.Bool(0))
+                val premise = SearchAtomPremise.Asserted(SearchDecision.Bool(0))
+                val column = base.intColOf[0]
+
+                assertIs<LpBoundBatchResult.Conflict>(lp.assertBounds(listOf(
+                    LpPremisedBound(column, false, ExactLpSide(ExactLpNumber.of(4L)),
+                        if (upperUnavailable) premise else SearchAtomPremise.Unavailable),
+                    LpPremisedBound(column, true, ExactLpSide(ExactLpNumber.of(3L)),
+                        if (upperUnavailable) SearchAtomPremise.Unavailable else premise),
+                )))
+
+                assertNull(assertIs<ComponentResult.Conflict>(lp.propagate(session)).explanation)
+            }
+        }
+    }
+
+    @Test
+    fun `a stopped premised batch retains spent work and publishes no bounds`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+            .build(PropagationSession(problem))
+        var stopped = false
+        var spent = 0L
+        LpPropagator(object : LpSearchPolicy {}, cancellation = Cancellation { stopped }, onEdit = {
+            spent += it
+            stopped = true
+        }).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            val before = assertNotNull(lp.state)
+            val column = base.intColOf[0]
+            val premise = SearchAtomPremise.All(emptyList())
+
+            val result = lp.assertBounds(listOf(
+                LpPremisedBound(column, false, ExactLpSide(ExactLpNumber.of(2L)), premise),
+                LpPremisedBound(column, true, ExactLpSide(ExactLpNumber.of(8L)), premise),
+            ))
+
+            assertIs<LpBoundBatchResult.Declined>(result)
+            assertSame(before, lp.state)
+            assertEquals(before.model.numVars.toLong() * 2L, spent)
+        }
+    }
+
     @Test
     fun `owner and distinct call stops both withhold LP proofs`() {
         for (stopOwner in listOf(false, true)) {
