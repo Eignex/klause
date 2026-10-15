@@ -1210,6 +1210,56 @@ class LocalSearchEngineTest {
     }
 
     @Test
+    fun `cancellation after completed selection keeps the live assignment private`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(Linear(
+                intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0,
+            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))
+        var live: LocalSearchState? = null
+        var expired = false
+        var interrupted = false
+        var probes = 0
+        val source = object : MoveSource {
+            override val id = MoveSourceId("supplied")
+            override val phase = Phase.Feasible
+            override val pool = Pool.ScoreOnly
+            override fun generate(state: LocalSearchState, sink: MoveSink) {
+                live = state
+                sink.addIntSet(0, 1)
+            }
+        }
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), greedyRepairOnRestart = false,
+            strategy = SourceDrivenStrategy(
+                sources = listOf(ConfiguredSource(source)), feasibleDescent = FeasibleDescent.SelfOwned,
+                feasibleAcceptance = AcceptanceRule.GreedyDescent,
+                tabu = TabuFilter(dynamicTenure = {
+                    if (probes > 0 && !interrupted) { expired = true; interrupted = true }
+                    0
+                }),
+            ), completion = { candidate, _ ->
+                if (candidate.intValue(0) == 0L) Completion.Witness(candidate) else {
+                    probes++
+                    Completion.Witness(candidate.copy(reals = doubleArrayOf(0.0)))
+                }
+            },
+        )
+        search.resumable(LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+            LocalSearchParams(maxInstructions = 5, initialAssignment = initial)).use { handle ->
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) {})
+            assertEquals(initial, checkNotNull(live).assignment.snapshot())
+            expired = false
+
+            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+
+            assertEquals(1.0, assertIs<MinimizeResult.BestFound>(result).objective)
+            assertEquals(1, probes)
+        }
+    }
+
+    @Test
     fun `cancelled continuous move probing resumes from the unchanged incumbent`() {
         val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
         var expired = false
