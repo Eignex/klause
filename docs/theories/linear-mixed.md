@@ -75,10 +75,10 @@ Before primitive preferences or ordinary Boolean gates, a default mixed opening
 can try a current finite coordinate. The shared CP owner receives an integral
 coordinate's equality and remaining lower/upper alternatives, or a fractional
 coordinate's adjacent floor/ceiling split. The point adds no fact or proof authority.
-Unselected disjunctions still require their ordinary
-source checks; a residual point can only order the finite alternatives. Missing,
-stopped, oversized or out-of-interval point coordinates retain ordinary selection. Complete Boolean leaves retain their
-existing arithmetic and finite priority. This partial-point choice charges owner
+Unselected disjunctions still require their ordinary source checks; a residual
+point can only order the finite alternatives. Missing, stopped, oversized or
+out-of-interval point coordinates retain ordinary selection. Complete Boolean
+leaves retain their existing arithmetic and finite priority. This partial-point choice charges owner
 visits and the ordinary branch check under the current operation token, with no
 new LP invocation or allowance.
 

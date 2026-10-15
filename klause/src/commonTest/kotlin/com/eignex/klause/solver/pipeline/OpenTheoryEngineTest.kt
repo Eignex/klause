@@ -90,8 +90,7 @@ class OpenTheoryEngineTest {
                         LinearOp.GE, if (positive) 1.0 else -3.0),
                     Linear(intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0), doubleArrayOf(1.0),
                         LinearOp.LE, if (positive) 3.0 else -1.0),
-                    ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                    ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.LE, 0),
                 ),
             )
             val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
@@ -112,7 +111,7 @@ class OpenTheoryEngineTest {
                 pause = false
                 val assignment = assertIs<OpenTheoryResult.Sat>(run.advance()).assignment
                 assertEquals(if (positive) 1L else -1L, assignment.intValue(0).toLong())
-                assertEquals(true, assignment.boolValue(1))
+                assertEquals(assignment.intValue(1).toLong() <= 0L, assignment.boolValue(1))
                 assertEquals("0", assignment.realValue(0))
             }
         }
