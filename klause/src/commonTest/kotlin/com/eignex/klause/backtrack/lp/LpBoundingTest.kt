@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.RandomVariable
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -45,6 +46,35 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpBoundingTest {
+    @Test
+    fun `learned mixed row implications propagate when a supporting branch is revisited`() {
+        for (learn in listOf(false, true)) {
+            val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)), arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, 1.25),
+                Linear(intArrayOf(1), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.25),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+            val session = PropagationSession(problem)
+            session.pinInt(1, 0)
+            val sink = SolveStatsSink(backend = "row-learning")
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, learn = learn)), sink).use { engine ->
+                engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+                val clauses = engine.lpNogoods?.drain().orEmpty()
+                session.popToLevel(0)
+                for (clause in clauses) session.addLearnedClause(Clause(clause), lbd = clause.size, permanent = true)
+                assertEquals(IntDomain(0, 1), session.intDomain(0))
+
+                session.pinInt(1, 0)
+
+                assertEquals(IntDomain(if (learn) 1L else 0L, 1L), session.intDomain(0))
+            }
+        }
+    }
+
     @Test
     fun `paired mixed row deductions retract with a supporting integer branch`() {
         for (learn in listOf(false, true)) {
