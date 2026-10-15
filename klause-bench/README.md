@@ -1513,6 +1513,9 @@ are heuristic choices, not deductions. Conflicts and cancellation reject the pro
 each variable receives at most one value. The probe checks the full post-move hard cost
 of every returned compound before selection and reports support decisions separately.
 The extra grading check is diagnostic work; profile times do not establish throughput.
+Replacement ranking reuses primitive break and objective grades within one source's
+proposal batch at the same live assignment. Each source and perturbation starts a
+fresh batch; records count the actual primitive grading probes separately.
 
 ### Objective representation probe
 

@@ -105,6 +105,11 @@ internal class BinaryRepairClosure(
     private val supportStamps = IntArray(graph.naryClauses.size)
     private var supportHead = 0
     private var supportTail = 0
+    private val breakStamps = IntArray(size)
+    private val breakScores = IntArray(size)
+    private val objectiveStamps = IntArray(size)
+    private val objectiveScores = DoubleArray(size)
+    private var scoreEpoch = 0
 
     var candidateCalls = 0L
         private set
@@ -122,8 +127,23 @@ internal class BinaryRepairClosure(
         private set
     var supportDecisions = 0L
         private set
+    var supportBreakProbes = 0L
+        private set
+    var supportObjectiveProbes = 0L
+        private set
+    var supportScoreRequests = 0L
+        private set
     var largestMove = 0
         private set
+
+    fun beginScoringBatch() {
+        // Source proposals share one live assignment; no cached grade crosses that batch.
+        if (scoreEpoch == Int.MAX_VALUE) {
+            breakStamps.fill(0)
+            objectiveStamps.fill(0)
+            scoreEpoch = 1
+        } else scoreEpoch++
+    }
 
     private fun begin() {
         if (epoch == Int.MAX_VALUE) {
@@ -218,11 +238,22 @@ internal class BinaryRepairClosure(
                 supportState.invariants?.isDefinedBool(variable) == true
             ) continue
             val move = Move.BoolFlip(variable)
-            val score = supportState.breakScore(move)
+            supportScoreRequests++
+            if (scoreEpoch == 0 || breakStamps[variable] != scoreEpoch) {
+                breakScores[variable] = supportState.breakScore(move)
+                breakStamps[variable] = scoreEpoch
+                supportBreakProbes++
+            }
+            val score = breakScores[variable]
             if (score > bestBreak) continue
-            val objectiveDelta = supportState.shaping.objective?.let {
-                supportState.objectiveDelta(it, move)
-            } ?: 0.0
+            if (scoreEpoch == 0 || objectiveStamps[variable] != scoreEpoch) {
+                objectiveScores[variable] = supportState.shaping.objective?.let {
+                    supportState.objectiveDelta(it, move)
+                } ?: 0.0
+                objectiveStamps[variable] = scoreEpoch
+                supportObjectiveProbes++
+            }
+            val objectiveDelta = objectiveScores[variable]
             if (chosen == Lit.NONE || score < bestBreak || objectiveDelta < bestObjective) {
                 chosen = literal
                 bestBreak = score
@@ -313,11 +344,12 @@ internal class BinaryRepairClosure(
     }
 
     fun wrap(strategy: SourceDrivenStrategy, cancellation: Cancellation): SourceDrivenStrategy =
-        wrapBooleanRepairs(strategy) { state, move -> close(state, move, cancellation) }
+        wrapBooleanRepairs(strategy, { beginScoringBatch() }) { state, move -> close(state, move, cancellation) }
 }
 
 internal fun wrapBooleanRepairs(
     strategy: SourceDrivenStrategy,
+    beginBatch: (LocalSearchState) -> Unit = {},
     close: (LocalSearchState, Move) -> Move?,
 ): SourceDrivenStrategy = strategy.copy(
     sources = strategy.sources.map { configured ->
@@ -331,6 +363,7 @@ internal fun wrapBooleanRepairs(
                 raw.setInvariants(state.invariants)
                 raw.setOwners(state.seeding.ownerInt)
                 source.generate(state, raw)
+                beginBatch(state)
                 for (move in raw.list) {
                     when (val closed = close(state, move)) {
                         is Move.BoolFlip -> sink.addBoolFlip(closed.varId)
@@ -344,6 +377,11 @@ internal fun wrapBooleanRepairs(
         ConfiguredSource(wrapped, configured.cap, configured.enabled, configured.stallGated, configured.phase)
     },
     perturbation = strategy.perturbation?.let { hook ->
-        { state -> hook(state)?.let { close(state, it) } }
+        { state ->
+            hook(state)?.let {
+                beginBatch(state)
+                close(state, it)
+            }
+        }
     },
 )

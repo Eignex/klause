@@ -446,13 +446,16 @@ internal object BooleanObjectiveDescentProbe {
                 fun decorate(strategy: SourceDrivenStrategy): SourceDrivenStrategy {
                     var seen: LocalSearchState? = null
                     var closure: BinaryRepairClosure? = null
-                    return wrapBooleanRepairs(strategy) { state, move ->
+                    fun closureFor(state: LocalSearchState): BinaryRepairClosure {
                         if (seen !== state) {
                             pins.forEachBool { id, value -> check(state.assumptions.boolValueOrNull(id) == value) }
                             seen = state
                             closure = BinaryRepairClosure(graph, state.assumptions, support).also { closures.add(it) }
                         }
-                        checkNotNull(closure).close(state, move, cancellation)
+                        return checkNotNull(closure)
+                    }
+                    return wrapBooleanRepairs(strategy, { closureFor(it).beginScoringBatch() }) { state, move ->
+                        closureFor(state).close(state, move, cancellation)
                     }
                 }
                 val recipe = if (!closed) base else LocalSearchRecipe(
@@ -517,6 +520,10 @@ internal object BooleanObjectiveDescentProbe {
                         put("closureNaryVisits", closures.sumOf { it.naryVisits })
                         put("closureRejected", closures.sumOf { it.rejected })
                         put("closureSupportDecisions", closures.sumOf { it.supportDecisions })
+                        put("closureSupportBreakProbes", closures.sumOf { it.supportBreakProbes })
+                        put("closureSupportObjectiveProbes", closures.sumOf { it.supportObjectiveProbes })
+                        put("closureSupportScoreRequests", closures.sumOf { it.supportScoreRequests })
+                        put("closureLargestMove", closures.maxOfOrNull { it.largestMove } ?: 0)
                         put("stats", buildJsonObject { put("lsMoves", moves); put("lsRestarts", restarts) })
                     })
                 })
