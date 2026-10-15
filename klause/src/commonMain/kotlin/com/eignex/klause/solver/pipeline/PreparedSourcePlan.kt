@@ -1,7 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealFormula
@@ -323,14 +321,13 @@ internal fun Problem.requiresPolynomialCompletion(
     projections: PreparedFactorProjections,
     preferFinite: Boolean = false,
     continuousObjective: Boolean = false,
-): Boolean = factors.any { it is ContinuousProduct } || (!preferFinite && !continuousObjective &&
-    factors.indices.any { index ->
-        factors[index] is RealProduct ||
-            (!projections.encoder(index, EncodingTarget.LINEAR).enforcesSource &&
-                projections.encoder(index, EncodingTarget.POLYNOMIAL).enforcesSource &&
-                (factors[index].variables.reals.isNotEmpty() ||
-                    projections.capabilities(index).propagation == PropagationCapability.UNSUPPORTED))
-    })
+): Boolean = factors.indices.any { index ->
+    !projections.encoder(index, EncodingTarget.LINEAR).enforcesSource &&
+        projections.encoder(index, EncodingTarget.POLYNOMIAL).enforcesSource &&
+        (factors[index].variables.reals.isNotEmpty() ||
+            projections.capabilities(index).propagation == PropagationCapability.UNSUPPORTED) &&
+        (!(preferFinite || continuousObjective) || !finiteRealFactorSupported(index, projections))
+}
 
 internal fun Problem.preparedWithComponents(
     ownership: ComponentPlan,

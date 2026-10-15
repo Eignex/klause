@@ -1,7 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
@@ -84,8 +82,7 @@ internal class SharedPolynomialModel private constructor(
             val relevantIntegers = BooleanArray(source.numIntVars)
             val relevantBooleans = BooleanArray(source.numBoolVars)
             for ((index, factor) in source.factors.withIndex()) {
-                val continuous = factor is ContinuousProduct || factor is RealProduct ||
-                    factor.variables.reals.isNotEmpty() ||
+                val continuous = factor.variables.reals.isNotEmpty() ||
                     factor.linearForm?.rows?.any { it.constants is RealConstants } == true
                 val required = continuous ||
                     projections.capabilities(index).propagation == PropagationCapability.UNSUPPORTED

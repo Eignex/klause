@@ -12,7 +12,9 @@ import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.ScoringProjectionProvider
@@ -54,6 +56,77 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PreparedSourcePlanTest {
+    @Test
+    fun `bound closure precedes polynomial admission beside finite globals`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 3).excludeValue(1)), arrayOf(
+            ContinuousProduct(0, 0, 0),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+            AllDifferent(intArrayOf(0, 1), 0, 4),
+        ), openIntHi = booleanArrayOf(true, false), numRealVars = 1,
+            realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
+
+        val route = assertIs<SourceProblemRoute.PolynomialTheory>(source.pipelineRoute())
+        val plan = route.preparedPlan
+        val finite = assertNotNull(plan.polynomialModel).finite
+
+        assertSame(source, plan.originalSource)
+        assertFalse(source.intBounds.hasUpper(0))
+        assertEquals(2L, finite.intBounds.upper(0))
+        assertEquals(IntDomain(0, 3).excludeValue(1), finite.intDomainOrNull(1))
+        assertSame(source.factors[2], finite.factors[1])
+        assertEquals(listOf(0, 1), plan.components.single {
+            it.responsibility == ComponentResponsibility.FINITE
+        }.integerCoordinates)
+    }
+
+    @Test
+    fun `bounded mixed products retain finite completion under default routing`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2).excludeValue(1)), arrayOf(
+            RealProduct(0, 0, 1, 1.0, 1.0),
+            AllDifferent(intArrayOf(0, 1), 0, 3),
+        ), numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
+
+        val route = assertIs<SourceProblemRoute.Finite>(source.pipelineRoute())
+        val result = BacktrackSolver(route.problem.bake()).solve()
+
+        val assignment = assertIs<com.eignex.klause.solver.SolveResult.Sat>(result).assignment
+        assertEquals(1L, assignment.intValue(0))
+        assertEquals(0, route.preparedPlan.finiteIntegerCoordinate(0))
+        assertEquals(1, route.preparedPlan.finiteIntegerCoordinate(1))
+        assertEquals(FactorOwner.CP, route.componentPlan.factorOwner(1))
+        assertEquals(PreparedExecutionKind.FINITE_LINEAR, route.preparedPlan.kind)
+    }
+
+    @Test
+    fun `selected complete linear encoding overrides a nonlinear factor representation`() {
+        for (support in listOf(EncoderSupport.DIRECT, EncoderSupport.EQUIVALENT)) {
+            val product = ContinuousProduct(0, 0, 0)
+            val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(product), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+                if (factor !== product || target != EncodingTarget.LINEAR)
+                    BuiltInEncoderProvider.select(factor, target)
+                else Encoder(support) { _, encoding ->
+                    encoding.linear(LinearForm.Disjunction(listOf(
+                        ExactSearchRow.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                            LinearOp.EQ, BigFraction.ZERO),
+                        ExactSearchRow.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                            LinearOp.EQ, BigFraction.ONE),
+                    )))
+                    null
+                }
+            })
+
+            val route = assertIs<SourceProblemRoute.OpenTheory>(source.pipelineRoute(providers,
+                routePureRealToTheory = true, routeLinearToTheory = true))
+
+            assertEquals(PreparedExecutionKind.FINITE_LINEAR, route.preparedPlan.kind)
+            assertEquals(IntVariableOwner.CP, route.request.componentPlan.intOwner(0))
+            assertEquals(FactorOwner.THEORY, route.request.componentPlan.factorOwner(0))
+            assertSame(product, route.request.model.factors.single())
+        }
+    }
+
     @Test
     fun `routing retains resource declines during encoder reinstallation after bound closure`() {
         for (interruption in listOf("none", "installer", "cancellation", "work")) {
