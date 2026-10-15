@@ -145,11 +145,12 @@ defines source coverage and numerical admission.
 ## Real graph admission and checks
 
 The real difference component uses a difference graph when every arithmetic row is a
-one-column bound or a two-column difference with an integral normalized bound. Boolean
-guards select active edges. With `n` graph vertices, scaling bounds by `n+1` and
+one-column bound or a two-column difference with a rational normalized bound. Boolean
+guards select active edges. Preparation clears denominators using a checked positive
+common denominator `d`. With `n` graph vertices, scaling bounds by `(n+1)*d` and
 subtracting one from strict edges preserves every simple cycle's sign, including
-zero-weight strict cycles. Feasible graphs supply rational potentials; witnesses still
-pass the complete source-row check. A verified negative predecessor cycle supplies a
+zero-weight strict cycles. Potentials divided by `(n+1)*d` supply rational witnesses
+that still pass the complete source-row check. A verified negative predecessor cycle supplies a
 conflict clause containing the complements of its active signed guards. Immutable
 unconditional source rows and declared bounds need no Boolean premise; assigned root
 guards remain in the clause. Cycle capture reuses the feasibility traversal rather than
@@ -178,9 +179,15 @@ integer/real completions retain source preparation. Bounded potentials from an e
 feasible graph seed relaxation, which must still settle every active edge. Fragments
 outside graph admission retain the full shared LP solve and its numerical guide.
 
+Denominator retention, common-denominator scans, Euclidean steps and weight preparation
+charge and poll the current arithmetic operation token. The original exact row
+normalization remains atomic; these charges do not meter every big-integer instruction
+or renew an allowance. A stopped preparation publishes no graph, and a stopped graph
+check remains interrupted.
+
 Graph admission is capped at 10,000 real variables and 100,000 edges. Larger models,
-fractional normalized bounds, unsafe Long magnitudes, disequalities, private
-disjunctions, Boolean arithmetic beyond shared clauses/cardinalities, and mixed
+denominators, denominator multiples or scaled weights outside the safe Long representation,
+disequalities, private disjunctions, Boolean arithmetic beyond shared clauses/cardinalities, and mixed
 integer/real models retain the exact LP route. Overridden LP certification policies
 retain the LP route because graph evidence has no LP certifier identity. No finite CP
 domains are created by this graph.

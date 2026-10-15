@@ -336,6 +336,39 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
+    fun `fractional difference completion checks source rows without an LP owner`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(3.0), LinearOp.GE, 1.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(2.0), LinearOp.LE, 1.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentCheck.Indeterminate>(component.check(session))
+            assertNull(session.model().valueOf<ExactLraAssignment>(component))
+            assertNull(component.lpMetrics)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            val witness = assertNotNull(session.model().valueOf<ExactLraAssignment>(component))
+            assertTrue(witness.reals.single() >= BigFraction.of(bigIntOf(1), bigIntOf(3)))
+            assertTrue(witness.reals.single() <= BigFraction.of(bigIntOf(1), bigIntOf(2)))
+            assertNull(component.lpMetrics)
+        }
+    }
+
+    @Test
     fun `late source validation fallback drops guarded rows in its sibling scope`() {
         val model = Problem(
             numBoolVars = 2,

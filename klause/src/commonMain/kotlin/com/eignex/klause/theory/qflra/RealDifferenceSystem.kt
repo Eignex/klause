@@ -16,7 +16,6 @@ import com.eignex.klause.lp.asFraction
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.theory.EncodedTheoryFactor
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
@@ -81,10 +80,10 @@ internal class RealDifferenceSystem private constructor(
             for (real in 0 until model.numRealVars) {
                 if (stop()) return null
                 if (model.realLower[real].isFinite() &&
-                    !append(exactBound(real, model.realLower[real], false), ALWAYS, zero, edges)
+                    !append(exactBound(real, model.realLower[real], false), ALWAYS, zero, edges, stop)
                 ) return null
                 if (model.realUpper[real].isFinite() &&
-                    !append(exactBound(real, model.realUpper[real], true), ALWAYS, zero, edges)
+                    !append(exactBound(real, model.realUpper[real], true), ALWAYS, zero, edges, stop)
                 ) return null
             }
             for ((factorIndex, factor) in model.factors.withIndex()) {
@@ -103,21 +102,44 @@ internal class RealDifferenceSystem private constructor(
                         val rows = ArrayList<ExactRationalInequality>(2)
                         comparison.rowsInto(rows)
                         val guard = if (row.activator == LinearRow.ALWAYS) ALWAYS else Lit.make(row.activator, truth)
-                        for (inequality in rows) if (!append(inequality, guard, zero, edges)) return null
+                        for (inequality in rows) if (!append(inequality, guard, zero, edges, stop)) return null
                     }
                 }
             }
             if (edges.isEmpty() || edges.size > 100000) return null
-            // Every simple cycle has at most n edges. Integral positive cycle sums remain positive
-            // after multiplying by n+1 and subtracting one per strict edge; zero strict cycles become negative.
-            val scale = zero.toLong() + 2L
+            var denominator = 1L
+            for (edge in edges) {
+                stop.charge(1)
+                if (stop()) return null
+                if (edge.denominator == 1L) continue
+                var left = denominator
+                var right = edge.denominator
+                while (right != 0L) {
+                    stop.charge(1)
+                    if (stop()) return null
+                    val remainder = left % right
+                    left = right
+                    right = remainder
+                }
+                val multiple = edge.denominator / left
+                if (denominator > Long.MAX_VALUE / multiple) return null
+                denominator *= multiple
+            }
+            // Clearing denominators makes cycle sums integral. With n vertices, multiplying by n+1
+            // preserves positive simple cycles after subtracting one per strict edge.
+            val cycleScale = zero.toLong() + 2L
+            if (denominator > Long.MAX_VALUE / cycleScale) return null
+            val scale = cycleScale * denominator
             val room = Long.MAX_VALUE / (4L * (zero + 2L) * (edges.size + 1L))
             val graph = DifferenceGraph(zero + 1)
             for (edge in edges) {
+                stop.charge(1)
                 if (stop()) return null
-                if (edge.bound < -room / scale || edge.bound > room / scale) return null
-                graph.addEdge(edge.source, edge.target, edge.bound * scale - if (edge.strict) 1L else 0L)
+                val multiplier = cycleScale * (denominator / edge.denominator)
+                if (edge.bound < -room / multiplier || edge.bound > room / multiplier) return null
+                graph.addEdge(edge.source, edge.target, edge.bound * multiplier - if (edge.strict) 1L else 0L)
             }
+            if (stop()) return null
             return RealDifferenceSystem(graph, edges.map { it.guard }.toIntArray(), scale)
         }
 
@@ -128,7 +150,15 @@ internal class RealDifferenceSystem private constructor(
                 if (upper) value.asFraction() else value.asFraction().negated(),
             )
 
-        private fun append(row: ExactRationalInequality, guard: Int, zero: Int, edges: MutableList<Edge>): Boolean {
+        private fun append(
+            row: ExactRationalInequality,
+            guard: Int,
+            zero: Int,
+            edges: MutableList<Edge>,
+            stop: Cancellation,
+        ): Boolean {
+            stop.charge(1)
+            if (stop()) return false
             if (row.columns.size > 2) return false
             if (row.columns.isEmpty()) {
                 edges += Edge(zero, zero, if (row.rhs.signum() < 0) -1L else 0L,
@@ -142,16 +172,23 @@ internal class RealDifferenceSystem private constructor(
             val positive = coefficient.signum() > 0
             val magnitude = if (positive) coefficient else coefficient.negated()
             val bound = row.rhs * magnitude.reciprocal()
-            if (bound.den != BIG_ONE || bound.num < bigIntOf(Long.MIN_VALUE) ||
+            if (bound.den > bigIntOf(Long.MAX_VALUE) || bound.num < bigIntOf(Long.MIN_VALUE) ||
                 bound.num > bigIntOf(Long.MAX_VALUE)
             ) return false
             val first = row.columns[0]
             val second = row.columns.getOrNull(1) ?: zero
             edges += Edge(if (positive) second else first, if (positive) first else second,
-                bound.num.toLong(), row.strict, guard)
+                bound.num.toLong(), row.strict, guard, bound.den.toLong())
             return true
         }
     }
 }
 
-private class Edge(val source: Int, val target: Int, val bound: Long, val strict: Boolean, val guard: Int)
+private class Edge(
+    val source: Int,
+    val target: Int,
+    val bound: Long,
+    val strict: Boolean,
+    val guard: Int,
+    val denominator: Long = 1L,
+)
