@@ -9,7 +9,7 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.MpsCompiled
-import com.eignex.klause.formats.mps.toExactSourceProblem
+import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
@@ -44,7 +44,7 @@ object MpsPrimalProbe {
         out.resolve("provenance.json").writeText(buildJsonObject {
             put("revision", revision)
             put("scope", "prepared-backtracking-api")
-            put("sourceAdapter", "original-decimal-exact")
+            put("sourceAdapter", "source-exact-finite-lowering")
             put("javaVersion", System.getProperty("java.version"))
             put("javaVmVersion", System.getProperty("java.vm.version"))
             put("kotlinVersion", KotlinVersion.CURRENT.toString())
@@ -65,7 +65,8 @@ object MpsPrimalProbe {
             val bytes = CorpusFiles.open(input).use { it.readBytes() }
             val digest = sha256(bytes)
             out.resolve("sources").apply { mkdirs() }.resolve("$digest.txt").writeBytes(bytes)
-            val compiled = Mps.parse(bytes.decodeToString()).toExactSourceProblem()
+            val compiled = Mps.parse(bytes.decodeToString()).toProblem()
+            require(compiled.sourceExact) { "The prepared API profile requires exact source lowering" }
             require((0 until compiled.model.numIntVars).all {
                 compiled.model.intBounds.hasLower(it) && compiled.model.intBounds.hasUpper(it)
             }) { "The prepared API profile requires closed source integer bounds" }
@@ -103,6 +104,10 @@ object MpsPrimalProbe {
                             put("exact", exact)
                             put("seed", 3)
                             put("budgetMs", BUDGET_MS)
+                            put("sourceExact", compiled.sourceExact)
+                            put("integerVariables", compiled.model.numIntVars)
+                            put("realVariables", compiled.model.numRealVars)
+                            put("factors", compiled.model.factors.size)
                             put("rootMaxWork", params.lpPlan.rootMaxWork)
                             put("rootBudgetFraction", params.lpPlan.rootBudgetFraction)
                             put("lpPlan", params.lpPlan.toString())
