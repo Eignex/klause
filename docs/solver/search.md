@@ -161,8 +161,12 @@ continuous point and comparison table; uncovered Boolean
 decisions change no arithmetic row. Current published finite integer bounds are
 checked before retaining that point, and the primitive cursor advances under the
 current operation token. Finite-bound updates can retain the point only when it
-satisfies the full published interval. Nonmatching Boolean or open arithmetic
-decisions, violated bounds, retraction and stops retain numerical rechecking. Forwarding supplies no complete
+satisfies the full published interval. A satisfied source-bound predicate or
+Boolean-free named disjunct can retain the same partial point after bounded exact
+comparison. Integer predicates use their registered threshold and strictness,
+including lattice rounding; original-row preference alone cannot authorize reuse.
+Nonmatching Boolean or arithmetic decisions, violated bounds, retraction and stops
+retain numerical rechecking. Forwarding supplies no complete
 verdict: pending rows are installed before source-proof queries and complete-leaf
 LP and original-source checks. Origin observations count fresh captures without
 counting forward reuse as another LP capture.

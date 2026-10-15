@@ -277,7 +277,10 @@ partial Boolean traversal. Each forward check consumes the ordinary theory-check
 allowance and charges current finite-bound comparisons and cursor visits to the
 existing operation token. Advancing never revisits earlier primitive IDs within
 that point's monotone scope. Finite-bound updates charge owner lookup and can
-retain the point only after its full interval check. Open arithmetic changes and
+retain the point only after its full interval check. Source-bound predicates and
+Boolean-free named disjuncts charge bounded exact comparison before retaining the
+point. Registered integer thresholds and strictness control that comparison,
+including lattice rounding. Unsatisfied or unavailable arithmetic comparisons and
 retraction invalidate reuse; source-proof queries and complete leaves materialize
 pending rows. No forward check renews a numerical allowance or counts as a new point capture.
 

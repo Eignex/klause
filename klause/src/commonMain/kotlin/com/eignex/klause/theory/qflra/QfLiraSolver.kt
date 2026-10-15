@@ -516,9 +516,18 @@ class ExactLiraSearchComponent private constructor(
         return !operationStop() && !pointHintStop()
     }
 
-    private fun hintTruth(comparison: ExactComparison, point: List<BigFraction>): Boolean? {
+    private fun hintTruth(comparison: ExactComparison, point: List<BigFraction>): Boolean? =
+        hintTruth(comparison.terms, comparison.bound, comparison.op, comparison.strict, point)
+
+    private fun hintTruth(
+        terms: Map<Int, BigFraction>,
+        bound: BigFraction,
+        op: LinearOp,
+        strict: Boolean,
+        point: List<BigFraction>,
+    ): Boolean? {
         var activity = BigFraction.ZERO
-        for ((column, coefficient) in comparison.terms) {
+        for ((column, coefficient) in terms) {
             val coordinate = point.getOrNull(column) ?: return null
             if (!hintPreflight(coefficient, coordinate)) return null
             val product = coefficient * coordinate
@@ -526,12 +535,12 @@ class ExactLiraSearchComponent private constructor(
             activity += product
             if (!hintScalar(activity)) return null
         }
-        if (!hintPreflight(activity, comparison.bound)) return null
-        return when (comparison.op) {
-            LinearOp.LE -> if (comparison.strict) activity < comparison.bound else activity <= comparison.bound
-            LinearOp.GE -> if (comparison.strict) activity > comparison.bound else activity >= comparison.bound
-            LinearOp.EQ -> activity == comparison.bound
-            LinearOp.NE -> activity != comparison.bound
+        if (!hintPreflight(activity, bound)) return null
+        return when (op) {
+            LinearOp.LE -> if (strict) activity < bound else activity <= bound
+            LinearOp.GE -> if (strict) activity > bound else activity >= bound
+            LinearOp.EQ -> activity == bound
+            LinearOp.NE -> activity != bound
         }
     }
 
@@ -933,6 +942,16 @@ class ExactLiraSearchComponent private constructor(
                             rowAssertions = node.rowAssertions + (disjunct.address to payload),
                             retainedReduction = null,
                         )
+                        if (canForwardArithmeticPoint(priorPoint, priorHints, wasDirty, wasForwardPending)) {
+                            val comparison = exactForms[disjunct.address.factor][disjunct.address.row]
+                                .hintComparison({ null }, ::hintScalar, ::hintPreflight)
+                            if (comparison != null && hintTruth(comparison, checkNotNull(priorPoint)) == disjunct.holds) {
+                                candidate = priorPoint
+                                pointHintValues = priorHints
+                                pendingPointForward = true
+                                deferredSourceRows = true
+                            }
+                        }
                         nodesByLevel.put(context.decisionLevel, node)
                         return ComponentResult.Consistent
                     }
@@ -958,7 +977,7 @@ class ExactLiraSearchComponent private constructor(
                         (payload.payload as? SourceBoundPredicate)?.sourceBound ?: return ComponentResult.Consistent
                     }
                     if (context.atomLiteral(decision) == null) return ComponentResult.Indeterminate
-                    if (system.sourceTerms(atom) == null) return ComponentResult.Indeterminate
+                    val expression = system.sourceTerms(atom) ?: return ComponentResult.Indeterminate
                     branchNames[atom] = decision
                     val branchRows = atom.sourceRows(model.numRealVars)
                     val retained = node.retainedReduction?.takeIf { reduced ->
@@ -975,6 +994,16 @@ class ExactLiraSearchComponent private constructor(
                     node = node.copy(sourceBranches = node.sourceBranches + atom, retainedReduction = retained)
                     if (!system.assertAtom(atom, SearchAtomPremise.Asserted(decision))) {
                         return ComponentResult.Indeterminate
+                    }
+                    if (canForwardArithmeticPoint(priorPoint, priorHints, wasDirty, wasForwardPending) &&
+                        hintScalar(atom.threshold) && expression.values.all(::hintScalar) &&
+                        hintTruth(expression, atom.threshold, if (atom.upper) LinearOp.LE else LinearOp.GE,
+                            atom.strict, checkNotNull(priorPoint)) == true
+                    ) {
+                        candidate = priorPoint
+                        pointHintValues = priorHints
+                        pendingPointForward = true
+                        deferredSourceRows = true
                     }
                 }
             }
@@ -1012,6 +1041,14 @@ class ExactLiraSearchComponent private constructor(
         return hints[variable] == bools[variable] ||
             (hints[variable] == UNASSIGNED && variable !in arithmeticVariables)
     }
+
+    private fun canForwardArithmeticPoint(
+        point: List<BigFraction>?,
+        hints: IntArray?,
+        wasDirty: Boolean,
+        wasForwardPending: Boolean,
+    ): Boolean = pointHintBooleanSelection && pointForwardBlocks != null && point != null && hints != null &&
+        (!wasDirty || wasForwardPending) && !pointHintStop() && !operationStop()
 
     private fun canForwardFinitePoint(
         variable: Int,

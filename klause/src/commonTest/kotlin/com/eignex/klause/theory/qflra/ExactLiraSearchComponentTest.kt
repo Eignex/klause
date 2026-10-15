@@ -67,6 +67,135 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `satisfied source bounds retain the point until complete checking`() {
+        val model = Problem(
+            numBoolVars = 3, intBounds = openBounds(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        var certifications = 0
+        ExactLiraSearchComponent(model).use { component ->
+            component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { _, success ->
+                certifications++
+                success
+            }))
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val rootCertifications = certifications
+            assertTrue(rootCertifications > 0)
+            val split = assertNotNull(SourceBoundAtom.integerSplit(session,
+                listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)), BigFraction.ZERO))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.positive)))
+
+            assertEquals(rootCertifications, certifications)
+            assertEquals(true, hints.preferredBool(1))
+            assertIs<ComponentCheck.Indeterminate>(component.check(session))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+            assertTrue(certifications > rootCertifications)
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+        }
+    }
+
+    @Test
+    fun `unsatisfied source bounds refresh the point before guidance`() {
+        val model = Problem(
+            numBoolVars = 2, intBounds = openBounds(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(true, hints.preferredBool(0))
+            val split = assertNotNull(SourceBoundAtom.integerSplit(session,
+                listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)), BigFraction.ZERO))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
+
+            assertEquals(false, hints.preferredBool(0))
+        }
+    }
+
+    @Test
+    fun `rounded integer predicates cannot retain a fractional point`() {
+        val model = Problem(
+            numBoolVars = 3, intBounds = openBounds(), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                Linear(intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+                Linear(intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 1.0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(false, hints.preferredBool(0))
+            assertEquals(false, hints.preferredBool(1))
+            val split = assertNotNull(SourceBoundAtom.integerSplit(session,
+                listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)), BigFraction.of(BIG_ONE, bigIntOf(2))))
+
+            val result = session.push(SearchDecision.Theory(split.positive))
+
+            assertIs<ComponentResult.Conflict>(result)
+        }
+    }
+
+    @Test
+    fun `satisfied equality disjuncts retain partial numerical guidance`() {
+        val source = Problem(
+            numBoolVars = 3, numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 0)),
+            openIntLo = booleanArrayOf(false, true), openIntHi = booleanArrayOf(false, true),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+                ComparisonClause(intArrayOf(1, 1), arrayOf(LinearOp.EQ, LinearOp.EQ), longArrayOf(0, 2)),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.LE, 0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        var certifications = 0
+        source.componentPlan().search(source, emptyMap()).use { planned ->
+            val theory = assertIs<ExactLiraSearchComponent>(planned.theory)
+            theory.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { _, success ->
+                certifications++
+                success
+            }))
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+            val rootCertifications = certifications
+            assertTrue(rootCertifications > 0)
+            val choice = assertIs<SearchDecision.Theory>(assertNotNull(theory.nextBranch(planned.session)).first())
+
+            assertIs<ComponentResult.Consistent>(planned.session.push(choice))
+
+            assertEquals(rootCertifications, certifications)
+            assertEquals(true, planned.candidateHints.preferredBool(1))
+            assertIs<ComponentCheck.Indeterminate>(theory.check(planned.session))
+        }
+    }
+
+    @Test
     fun `source disjunction choices prefer a completed point`() {
         val source = Problem(
             numBoolVars = 3, numIntVars = 2,
