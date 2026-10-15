@@ -446,6 +446,11 @@ internal class WitnessProbe(
                     if (!repaired) break
                 }
             }
+            if (nonlinear && conjunctive == null && !exhausted && queries < MAX_WITNESS_AXES) {
+                return probeInequalityWitness(
+                    formula.atoms, realCount, arithmetic, algebraic, fixed, terms, termCounts, this,
+                )
+            }
             return null
         } finally {
             admittedTerms = null

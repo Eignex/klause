@@ -426,6 +426,13 @@ repair path. Without an eligible snapshot, inequality repair starts from the pos
 rational center, retains fixed coordinates and assigns zero to unused declarations.
 Affine-only normalized queries retain their uniform point checks and complete
 projection allowance; short conditioned relaxation checks do not spend it on sector repairs.
+After the existing coordinate repairs, a nonlinear formula with disjunctions or
+unresolved Boolean structure can use remaining scalar root and proposal slots for
+boundary sectors. Its atoms supply boundary guides, not a conjunction or affine
+facts. Raw guide scores do not resolve Boolean correlations: every complete proposal
+passes the original nested formula and query pins through the same sample checker.
+This fallback shares the existing probe work, query and proposal counters. Earlier
+returns and containing stops supply no further attempt or renewed allowance.
 Acceptance still checks every source atom, strict relation, disequality, Boolean
 alternative and query pin with the same complete sample checker. Fixed coordinates
 remain fixed, and unused declarations retain complete coordinates.

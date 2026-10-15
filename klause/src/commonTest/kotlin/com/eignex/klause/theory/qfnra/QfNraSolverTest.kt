@@ -1304,6 +1304,152 @@ class QfNraSolverTest {
     }
 
     @Test
+    fun `nonconjunctive strict product sectors yield a witness before projection`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (or (and (> (* x y) 4) (> x 0) (> y 0))
+                        (and (< (* x y) (- 4)) (> x 0) (< y 0))))
+            (check-sat)
+        """.trimIndent())
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(
+            source.formula, source.boolCount, source.realCount,
+        ))
+
+        assertEquals(0L, result.stats.projectedPolynomials)
+        val x = result.assignment.realValue(0)
+        val y = result.assignment.realValue(1)
+        val product = algebraic.multiply(x, y)
+        assertEquals(1, algebraic.sign(x))
+        assertTrue((algebraic.sign(y) > 0 &&
+            algebraic.compare(product, algebraic.rational(BigFraction.ofLong(4))) > 0) ||
+            (algebraic.sign(y) < 0 &&
+                algebraic.compare(product, algebraic.rational(BigFraction.ofLong(-4))) < 0))
+    }
+
+    @Test
+    fun `nonconjunctive sectors retain nested Boolean pins and original coordinates`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const b Bool)
+            (declare-const x Real)
+            (declare-const y Real)
+            (declare-const k Real)
+            (declare-const unused Real)
+            (assert (or (and b (> (* x y) k) (> x 0) (> y 0))
+                        (and (not b) (< (* x y) (- k)) (> x 0) (< y 0))))
+            (check-sat)
+        """.trimIndent())
+        for (positive in listOf(false, true)) {
+            val condition = PolynomialCondition(bools = mapOf(0 to positive),
+                lower = mapOf(2 to BigFraction.ofLong(4)), upper = mapOf(2 to BigFraction.ofLong(4)))
+
+            val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(
+                source.formula, source.boolCount, source.realCount, condition = condition,
+            ))
+
+            assertEquals(0L, result.stats.projectedPolynomials)
+            assertEquals(positive, result.assignment.boolValue(0))
+            assertEquals(1, algebraic.sign(result.assignment.realValue(0)))
+            assertEquals(if (positive) 1 else -1, algebraic.sign(result.assignment.realValue(1)))
+            val product = algebraic.multiply(result.assignment.realValue(0), result.assignment.realValue(1))
+            assertEquals(if (positive) 1 else -1,
+                algebraic.compare(product, algebraic.rational(BigFraction.ofLong(if (positive) 4 else -4))))
+            assertEquals(BigFraction.ofLong(4), result.assignment.realValue(2).rational)
+            assertEquals(BigFraction.ZERO, result.assignment.realValue(3).rational)
+        }
+    }
+
+    @Test
+    fun `favorable boundary guides cannot accept contradictory sign branches`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (or (and (> (* x y) 4) (> x 0) (< y 0))
+                        (and (< (* x y) (- 4)) (> x 0) (> y 0))))
+            (check-sat)
+        """.trimIndent())
+        val work = QfNraWork(QfNraParams())
+        val arithmetic = PolynomialArithmetic(work)
+        val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+        val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic), work)
+
+        val assignment = work.probe { probe.probeWitness(source.realCount, emptyMap(), work::coupled) }
+
+        assertNull(assignment)
+        assertTrue(work.snapshot().workSpent > 0L)
+        assertEquals(0L, work.snapshot().projectedPolynomials)
+    }
+
+    @Test
+    fun `nonconjunctive repairs cannot renew exhausted root or proposal slots`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (or (and (> (* x y) 4) (> x 0) (> y 0))
+                        (and (< (* x y) (- 4)) (> x 0) (< y 0))))
+            (check-sat)
+        """.trimIndent())
+        for (proposals in listOf(false, true)) {
+            val arithmetic = PolynomialArithmetic()
+            val exact = AlgebraicArithmetic(arithmetic)
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+            val probe = WitnessProbe(formula, source.boolCount, arithmetic, exact)
+            val zero = mapOf(0 to exact.rational(BigFraction.ZERO), 1 to exact.rational(BigFraction.ZERO))
+            if (proposals) repeat(64) { assertNull(probe.candidate(zero)) }
+            else repeat(32) { assertEquals(emptyList(), probe.roots(Polynomial.ONE, 0, emptyMap())) }
+
+            val assignment = probe.probeWitness(source.realCount, emptyMap()) { phase -> phase() }
+
+            assertNull(assignment)
+            if (proposals) {
+                assertTrue(probe.exhausted)
+                assertNull(probe.candidate(mapOf(0 to exact.rational(BigFraction.ofLong(5)),
+                    1 to exact.rational(BigFraction.ONE))))
+            } else {
+                assertNull(probe.roots(Polynomial.ONE, 0, emptyMap()))
+                assertIs<QfNraAssignment>(probe.candidate(mapOf(0 to exact.rational(BigFraction.ofLong(5)),
+                    1 to exact.rational(BigFraction.ONE))))
+            }
+        }
+    }
+
+    @Test
+    fun `a containing stop cannot clear into a Boolean sector witness`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (or (and (> (* x y) 4) (> x 0) (> y 0))
+                        (and (< (* x y) (- 4)) (> x 0) (< y 0))))
+            (check-sat)
+        """.trimIndent())
+        for (transient in listOf(false, true)) {
+            var trigger = false
+            var observed = false
+            var spent = 0L
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean {
+                    if (!trigger || (transient && observed)) return false
+                    observed = true
+                    return true
+                }
+                override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            }
+            val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+                QfNraParams(stop), PolynomialCondition())
+            assertNull(query.next())
+            trigger = true
+
+            val result = assertIs<QfNraResult.Unknown>(query.next())
+
+            assertTrue(observed)
+            assertEquals(QfNraReason.Interrupted, result.reason)
+            assertEquals(spent, result.stats.workSpent)
+            assertEquals(0L, result.stats.projectedPolynomials)
+        }
+    }
+
+    @Test
     fun `negated inequality guides preserve their source direction`() {
         val source = SmtLibPolynomial.parse("""
             (declare-const x Real)
