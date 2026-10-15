@@ -180,39 +180,39 @@ fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackPara
     backtrackOverride(p.reader(), allowSelectors)
 
 internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean): ((BacktrackParams) -> BacktrackParams)? {
-    val maxDecisions = p[ExecutionOption.MaxDecisions]
-    val luby = p[ExecutionOption.Luby]
-    val adaptiveRestart = p[ExecutionOption.AdaptiveRestart]
-    val emaRestart = p[ExecutionOption.EmaRestart]
-    val modeSwitchingRestart = p[ExecutionOption.ModeSwitchingRestart]
-    val phaseSaving = p[ExecutionOption.PhaseSaving]
-    val targetPhasing = p[ExecutionOption.TargetPhasing]
-    val solutionPhasing = p[ExecutionOption.SolutionPhasing]
-    val rephaseInterval = p[ExecutionOption.RephaseInterval]
-    val maxLearned = p[ExecutionOption.MaxLearned]
-    val lbdGlue = p[ExecutionOption.LbdGlue]
-    val tieredDb = p[ExecutionOption.TieredDb]
-    val midLbd = p[ExecutionOption.MidLbd]
-    val vivification = p[ExecutionOption.Vivification]
-    val vivifyBatch = p[ExecutionOption.VivifyBatch]
-    val subsumption = p[ExecutionOption.Subsumption]
-    val subsumeBatch = p[ExecutionOption.SubsumeBatch]
-    val inprocessingCadence = p[ExecutionOption.InprocessingCadence]
-    val lpCone = p[ExecutionOption.LpObjectiveCone]
-    val lpAutoOff = p[ExecutionOption.LpAutoOffReprobe]
-    val lpKnapsack = p[ExecutionOption.LpKnapsackLagrangian]
-    val lpComponentSplit = p[ExecutionOption.LpComponentSplit]
-    val lpBoundMaxPivots = p[ExecutionOption.LpBoundMaxPivots]
-    val lpAdaptiveWork = p[ExecutionOption.LpAdaptiveWork]
-    val lpBranching = p[ExecutionOption.LpBranching]
-    val lpVariableShaving = p[ExecutionOption.LpVariableShaving]
-    val lpPruneHulls = p[ExecutionOption.LpPruneHulls]
-    val lpRootCuts = p[ExecutionOption.LpRootCuts]
-    val pbLearning = p[ExecutionOption.PbLearning]
-    val pbObjectiveCutoff = p[ExecutionOption.PbObjectiveCutoff]
-    val objectiveGuidedValues = p[ExecutionOption.ObjectiveGuidedValues]
-    val varKind = if (allowSelectors) p[ExecutionOption.VariableSelector] else null
-    val valKind = if (allowSelectors) p[ExecutionOption.ValueSelector] else null
+    val maxDecisions = p[ExecutionOption.maxDecisions]
+    val luby = p[ExecutionOption.luby]
+    val adaptiveRestart = p[ExecutionOption.adaptiveRestart]
+    val emaRestart = p[ExecutionOption.emaRestart]
+    val modeSwitchingRestart = p[ExecutionOption.modeSwitchingRestart]
+    val phaseSaving = p[ExecutionOption.phaseSaving]
+    val targetPhasing = p[ExecutionOption.targetPhasing]
+    val solutionPhasing = p[ExecutionOption.solutionPhasing]
+    val rephaseInterval = p[ExecutionOption.rephaseInterval]
+    val maxLearned = p[ExecutionOption.maxLearned]
+    val lbdGlue = p[ExecutionOption.lbdGlue]
+    val tieredDb = p[ExecutionOption.tieredDb]
+    val midLbd = p[ExecutionOption.midLbd]
+    val vivification = p[ExecutionOption.vivification]
+    val vivifyBatch = p[ExecutionOption.vivifyBatch]
+    val subsumption = p[ExecutionOption.subsumption]
+    val subsumeBatch = p[ExecutionOption.subsumeBatch]
+    val inprocessingCadence = p[ExecutionOption.inprocessingCadence]
+    val lpCone = p[ExecutionOption.lpObjectiveCone]
+    val lpAutoOff = p[ExecutionOption.lpAutoOffReprobe]
+    val lpKnapsack = p[ExecutionOption.lpKnapsackLagrangian]
+    val lpComponentSplit = p[ExecutionOption.lpComponentSplit]
+    val lpBoundMaxPivots = p[ExecutionOption.lpBoundMaxPivots]
+    val lpAdaptiveWork = p[ExecutionOption.lpAdaptiveWork]
+    val lpBranching = p[ExecutionOption.lpBranching]
+    val lpVariableShaving = p[ExecutionOption.lpVariableShaving]
+    val lpPruneHulls = p[ExecutionOption.lpPruneHulls]
+    val lpRootCuts = p[ExecutionOption.lpRootCuts]
+    val pbLearning = p[ExecutionOption.pbLearning]
+    val pbObjectiveCutoff = p[ExecutionOption.pbObjectiveCutoff]
+    val objectiveGuidedValues = p[ExecutionOption.objectiveGuidedValues]
+    val varKind = if (allowSelectors) p[ExecutionOption.variableSelector] else null
+    val valKind = if (allowSelectors) p[ExecutionOption.valueSelector] else null
     val scalars = listOf(
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
@@ -281,7 +281,7 @@ internal fun applyFixedBacktrackParams(
     allowSelectors: Boolean,
 ): BacktrackParams {
     var out = base
-    p[ExecutionOption.Seed]?.let { out = out.copy(randomSeed = it) }
+    p[ExecutionOption.seed]?.let { out = out.copy(randomSeed = it) }
     backtrackOverride(p, allowSelectors)?.let { out = it(out) }
     val accepted = if (allowSelectors) BACKTRACK_OVERRIDE_KEYS else BACKTRACK_OVERRIDE_KEYS - BACKTRACK_SELECTOR_KEYS
     p.finish("fixed", "seed, ${accepted.joinToString()}")
@@ -436,16 +436,16 @@ fun resolveLocalSearchRecipes(p: EngineParams): LsResolution =
     resolveLocalSearchRecipes(p.reader())
 
 internal fun resolveLocalSearchRecipes(p: ExecutionOptionReader): LsResolution {
-    val dryRunSolver = p[ExecutionOption.DryRunSolver] ?: false
-    val noiseRaw = p[ExecutionOption.Noise]
-    val cbRaw = p[ExecutionOption.Cb]
-    val skewRaw = p[ExecutionOption.SkewAlpha]
-    val initTempRaw = p[ExecutionOption.InitialTemp]
-    val coolRateRaw = p[ExecutionOption.CoolingRate]
-    val minTempRaw = p[ExecutionOption.MinTemp]
-    val smoothProbRaw = p[ExecutionOption.SmoothProb]
-    val smoothFactorRaw = p[ExecutionOption.SmoothFactor]
-    val tabuRaw = p[ExecutionOption.TabuTenure]
+    val dryRunSolver = p[ExecutionOption.dryRunSolver] ?: false
+    val noiseRaw = p[ExecutionOption.noise]
+    val cbRaw = p[ExecutionOption.cb]
+    val skewRaw = p[ExecutionOption.skewAlpha]
+    val initTempRaw = p[ExecutionOption.initialTemp]
+    val coolRateRaw = p[ExecutionOption.coolingRate]
+    val minTempRaw = p[ExecutionOption.minTemp]
+    val smoothProbRaw = p[ExecutionOption.smoothProb]
+    val smoothFactorRaw = p[ExecutionOption.smoothFactor]
+    val tabuRaw = p[ExecutionOption.tabuTenure]
     val cb = cbRaw ?: 2.06
     val skewAlpha = skewRaw ?: 0.0
     val initTemp = initTempRaw ?: 1.0
@@ -455,14 +455,14 @@ internal fun resolveLocalSearchRecipes(p: ExecutionOptionReader): LsResolution {
     val smoothFactor = smoothFactorRaw ?: 0.8
     val tabu = TabuFilter(tenure = tabuRaw ?: 10, aspiration = AspirationCriterion.OrImproving)
 
-    val sourcesSpec = p[ExecutionOption.Sources]
+    val sourcesSpec = p[ExecutionOption.sources]
     val sources = sourcesSpec.orEmpty()
-    val scoring = p[ExecutionOption.Scoring].orEmpty()
-    val acceptance = p[ExecutionOption.Acceptance].orEmpty()
-    val restart = p[ExecutionOption.Restart].orEmpty()
+    val scoring = p[ExecutionOption.scoring].orEmpty()
+    val acceptance = p[ExecutionOption.acceptance].orEmpty()
+    val restart = p[ExecutionOption.restart].orEmpty()
     val hasEdits = sources.isNotEmpty() || scoring.isNotEmpty() || acceptance.isNotEmpty() || restart.isNotEmpty()
-    val strategyRaw = p[ExecutionOption.Strategy]?.lowercase()
-    val armLabel = p[ExecutionOption.LocalSearchArm]
+    val strategyRaw = p[ExecutionOption.strategy]?.lowercase()
+    val armLabel = p[ExecutionOption.localSearchArm]
     if (armLabel != null && (strategyRaw != null || sourcesSpec != null)) {
         pipelineConfigError("ls: arm= selects one catalog arm and is mutually exclusive with strategy=/sources=")
     }
@@ -614,20 +614,20 @@ internal fun buildPortfolioScenario(
     nodeBudget: NodeBudget? = null,
     btEdit: ((BacktrackParams) -> BacktrackParams)? = null,
 ): PortfolioScenario {
-    val seed = p[ExecutionOption.Seed] ?: fallbackSeed ?: 1L
-    val lambda = p[ExecutionOption.Lambda] ?: 1.0
-    val armsParam = p[ExecutionOption.Arms]
-    val ls = p[ExecutionOption.LocalSearchArms]
-    val bt = p[ExecutionOption.BacktrackArms]
-    val clauseShareLbd = p[ExecutionOption.ClauseShareLbd]
-    val clauseShareLen = p[ExecutionOption.ClauseShareLen]
-    val sliceWork = p[ExecutionOption.SliceWork]
-    val maxSliceWork = p[ExecutionOption.SliceMaxWork]
-    val sliceGrowth = p[ExecutionOption.SliceGrowth]
-    val phaseRetention = p[ExecutionOption.PhaseRetention]
-    val reseedStaleThreshold = p[ExecutionOption.ReseedStaleThreshold]
-    val reportLsResiduals = p[ExecutionOption.LsResiduals] ?: false
-    val reportLsPhaseTimes = p[ExecutionOption.LsPhaseTimes] ?: false
+    val seed = p[ExecutionOption.seed] ?: fallbackSeed ?: 1L
+    val lambda = p[ExecutionOption.lambda] ?: 1.0
+    val armsParam = p[ExecutionOption.arms]
+    val ls = p[ExecutionOption.localSearchArms]
+    val bt = p[ExecutionOption.backtrackArms]
+    val clauseShareLbd = p[ExecutionOption.clauseShareLbd]
+    val clauseShareLen = p[ExecutionOption.clauseShareLen]
+    val sliceWork = p[ExecutionOption.sliceWork]
+    val maxSliceWork = p[ExecutionOption.sliceMaxWork]
+    val sliceGrowth = p[ExecutionOption.sliceGrowth]
+    val phaseRetention = p[ExecutionOption.phaseRetention]
+    val reseedStaleThreshold = p[ExecutionOption.reseedStaleThreshold]
+    val reportLsResiduals = p[ExecutionOption.lsResiduals] ?: false
+    val reportLsPhaseTimes = p[ExecutionOption.lsPhaseTimes] ?: false
     if (reseedStaleThreshold != null && reseedStaleThreshold < 0) {
         pipelineConfigError("reseed-stale-threshold must be >= 0")
     }
@@ -711,7 +711,7 @@ fun resolveBtRecipes(p: EngineParams, kind: Kind): BtResolution =
     resolveBtRecipes(p.reader(), kind)
 
 internal fun resolveBtRecipes(p: ExecutionOptionReader, kind: Kind): BtResolution {
-    val btArm = p[ExecutionOption.BacktrackArmsByLabel]
+    val btArm = p[ExecutionOption.backtrackArmsByLabel]
     val edit = backtrackOverride(p, allowSelectors = true)
     if (btArm == null) return BtResolution(null, edit)
     val labels = btArm

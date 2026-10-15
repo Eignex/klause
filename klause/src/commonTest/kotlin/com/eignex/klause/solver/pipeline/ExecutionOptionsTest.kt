@@ -21,9 +21,9 @@ class ExecutionOptionsTest {
     @Test
     fun `typed portfolio settings preserve parsed settings and seed precedence`() {
         val typed = ExecutionOptions(
-            ExecutionOption.Seed(2L), ExecutionOption.Seed(7L), ExecutionOption.Arms(3), ExecutionOption.Lambda(0.75),
-            ExecutionOption.SliceWork(1_000L), ExecutionOption.SliceMaxWork(2_000L),
-            ExecutionOption.SliceGrowth(1.25), ExecutionOption.PhaseRetention(0.5),
+            ExecutionOption.seed(2L), ExecutionOption.seed(7L), ExecutionOption.arms(3), ExecutionOption.lambda(0.75),
+            ExecutionOption.sliceWork(1_000L), ExecutionOption.sliceMaxWork(2_000L),
+            ExecutionOption.sliceGrowth(1.25), ExecutionOption.phaseRetention(0.5),
         )
         val parsed = ExecutionOptions.parse(listOf(
             "seed=2", "seed=7", "arms=3", "lambda=0.75", "slice-work=1000", "slice-max-work=2000",
@@ -45,9 +45,9 @@ class ExecutionOptionsTest {
     fun `typed selector overrides create independent workers with one allowance`() {
         val budget = NodeBudget(20)
         val options = ExecutionOptions(
-            ExecutionOption.VariableSelector(VarSelectorKind.VSIDS),
-            ExecutionOption.ValueSelector(ValSelectorKind.SOLUTION_GUIDED),
-            ExecutionOption.MaxDecisions(11L),
+            ExecutionOption.variableSelector(VarSelectorKind.VSIDS),
+            ExecutionOption.valueSelector(ValSelectorKind.SOLUTION_GUIDED),
+            ExecutionOption.maxDecisions(11L),
         )
         val edit = resolveBtRecipes(options.reader(), Kind.CSP).edit!!
         val base = BacktrackParams(randomSeed = 17L, nodeBudget = budget)
@@ -81,7 +81,7 @@ class ExecutionOptionsTest {
     @Test
     fun `typed axis settings capture caller lists before recipe resolution`() {
         val scoring = mutableListOf(AxisToken(null, AxisToken.Op.SET, "raw"))
-        val options = ExecutionOptions(ExecutionOption.Strategy("cbls"), ExecutionOption.Scoring(scoring))
+        val options = ExecutionOptions(ExecutionOption.strategy("cbls"), ExecutionOption.scoring(scoring))
         scoring.clear()
         val parsed = ExecutionOptions.parse(listOf("strategy=cbls", "scoring=raw"))
 
@@ -95,7 +95,7 @@ class ExecutionOptionsTest {
     @Test
     fun `typed backtrack labels capture order without a frontend list grammar`() {
         val labels = mutableListOf("free", "conflictDriven")
-        val options = ExecutionOptions(ExecutionOption.BacktrackArmsByLabel(labels))
+        val options = ExecutionOptions(ExecutionOption.backtrackArmsByLabel(labels))
         labels.reverse()
 
         val resolved = resolveBtRecipes(options.reader(), Kind.COP)
@@ -106,7 +106,7 @@ class ExecutionOptionsTest {
     @Test
     fun `typed scalar axes reject set edits with the frontend diagnostic`() {
         val typed = assertFailsWith<PipelineConfigException> {
-            ExecutionOption.Scoring(listOf(AxisToken(null, AxisToken.Op.ADD, "raw")))
+            ExecutionOption.scoring(listOf(AxisToken(null, AxisToken.Op.ADD, "raw")))
         }
         val parsed = assertFailsWith<PipelineConfigException> {
             resolveLocalSearchRecipes(ExecutionOptions.parse(listOf("scoring=+raw")).reader())
@@ -171,8 +171,8 @@ class ExecutionOptionsTest {
         val request = FixedBacktrackPlanRequest(
             annotatedParams = null,
             executionOptions = ExecutionOptions(
-                ExecutionOption.Seed(7L), ExecutionOption.Luby(17L), ExecutionOption.DryRunSolver(true),
-                ExecutionOption.VariableSelector(VarSelectorKind.LINUCB),
+                ExecutionOption.seed(7L), ExecutionOption.luby(17L), ExecutionOption.dryRunSolver(true),
+                ExecutionOption.variableSelector(VarSelectorKind.LINUCB),
             ),
             randomSeed = 99L, cancellation = Cancellation.Never, nodeBudget = null, solveBudgetMillis = null,
             lpConfig = LpConfig.OFF, zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, onEvent = null,

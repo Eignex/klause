@@ -4,362 +4,244 @@ import com.eignex.klause.localsearch.strategy.AxisEdits
 import com.eignex.klause.localsearch.strategy.AxisToken
 
 /** A typed setting accepted by finite execution. Values describe policy; workers own live heuristic state. */
-sealed class ExecutionOption<T> private constructor(internal val id: String) {
+class ExecutionOption<T> private constructor(internal val id: String, private val kind: ValueKind) {
     /** Bind this option to a value without command-line syntax. */
-    operator fun invoke(value: T): ExecutionSetting<T> = ExecutionSetting(this, capture(value))
-
-    internal open fun capture(value: T): T = value
-
-    internal abstract fun decode(params: EngineParams): T?
-
-    /** The `max-decisions` execution setting. */
-    data object MaxDecisions : ExecutionOption<Long>("max-decisions") {
-        override fun decode(params: EngineParams): Long? = params.long(id)
+    @Suppress("UNCHECKED_CAST")
+    operator fun invoke(value: T): ExecutionSetting<T> {
+        val captured = if (value is List<*>) value.toList() else value
+        if (kind == ValueKind.SCALAR_AXIS) scalarTokens(captured as List<AxisToken>, id)
+        return ExecutionSetting(this, captured as T)
     }
 
-    /** The `luby` execution setting. */
-    data object Luby : ExecutionOption<Long>("luby") {
-        override fun decode(params: EngineParams): Long? = params.long(id)
+    @Suppress("UNCHECKED_CAST")
+    internal fun decode(params: EngineParams): T? = when (kind) {
+        ValueKind.LONG -> params.long(id)
+        ValueKind.INT -> params.int(id)
+        ValueKind.DOUBLE -> params.double(id)
+        ValueKind.BOOLEAN -> params.bool(id)
+        ValueKind.STRING -> params.string(id)
+        ValueKind.VARIABLE_SELECTOR -> params.varSelectorKind(id)
+        ValueKind.VALUE_SELECTOR -> params.valSelectorKind(id)
+        ValueKind.SOURCES -> params.string(id)?.let { AxisEdits.tokens(it) }
+        ValueKind.SCALAR_AXIS -> params.string(id)?.let { scalarTokens(it, id) }
+        ValueKind.LABELS -> params.string(id)?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+    } as T?
+
+    private enum class ValueKind {
+        LONG, INT, DOUBLE, BOOLEAN, STRING, VARIABLE_SELECTOR, VALUE_SELECTOR, SOURCES, SCALAR_AXIS, LABELS,
     }
 
-    /** The `adaptive-restart` execution setting. */
-    data object AdaptiveRestart : ExecutionOption<Boolean>("adaptive-restart") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+    /** Finite tuning settings, separate from source models and invocation allowances. */
+    companion object {
+        /** The `max-decisions` execution setting. */
+        val maxDecisions: ExecutionOption<Long> = ExecutionOption("max-decisions", ValueKind.LONG)
 
-    /** The `ema-restart` execution setting. */
-    data object EmaRestart : ExecutionOption<Boolean>("ema-restart") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `luby` execution setting. */
+        val luby: ExecutionOption<Long> = ExecutionOption("luby", ValueKind.LONG)
 
-    /** The `mode-switching-restart` execution setting. */
-    data object ModeSwitchingRestart : ExecutionOption<Boolean>("mode-switching-restart") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `adaptive-restart` execution setting. */
+        val adaptiveRestart: ExecutionOption<Boolean> = ExecutionOption("adaptive-restart", ValueKind.BOOLEAN)
 
-    /** The `phase-saving` execution setting. */
-    data object PhaseSaving : ExecutionOption<Boolean>("phase-saving") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `ema-restart` execution setting. */
+        val emaRestart: ExecutionOption<Boolean> = ExecutionOption("ema-restart", ValueKind.BOOLEAN)
 
-    /** The `target-phasing` execution setting. */
-    data object TargetPhasing : ExecutionOption<Boolean>("target-phasing") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `mode-switching-restart` execution setting. */
+        val modeSwitchingRestart: ExecutionOption<Boolean> = ExecutionOption("mode-switching-restart", ValueKind.BOOLEAN)
 
-    /** The `solution-phasing` execution setting. */
-    data object SolutionPhasing : ExecutionOption<Boolean>("solution-phasing") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `phase-saving` execution setting. */
+        val phaseSaving: ExecutionOption<Boolean> = ExecutionOption("phase-saving", ValueKind.BOOLEAN)
 
-    /** The `rephase-interval` execution setting. */
-    data object RephaseInterval : ExecutionOption<Long>("rephase-interval") {
-        override fun decode(params: EngineParams): Long? = params.long(id)
-    }
+        /** The `target-phasing` execution setting. */
+        val targetPhasing: ExecutionOption<Boolean> = ExecutionOption("target-phasing", ValueKind.BOOLEAN)
 
-    /** The `max-learned` execution setting. */
-    data object MaxLearned : ExecutionOption<Int>("max-learned") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `solution-phasing` execution setting. */
+        val solutionPhasing: ExecutionOption<Boolean> = ExecutionOption("solution-phasing", ValueKind.BOOLEAN)
 
-    /** The `lbd-glue` execution setting. */
-    data object LbdGlue : ExecutionOption<Int>("lbd-glue") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `rephase-interval` execution setting. */
+        val rephaseInterval: ExecutionOption<Long> = ExecutionOption("rephase-interval", ValueKind.LONG)
 
-    /** The `tiered-db` execution setting. */
-    data object TieredDb : ExecutionOption<Boolean>("tiered-db") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `max-learned` execution setting. */
+        val maxLearned: ExecutionOption<Int> = ExecutionOption("max-learned", ValueKind.INT)
 
-    /** The `mid-lbd` execution setting. */
-    data object MidLbd : ExecutionOption<Int>("mid-lbd") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `lbd-glue` execution setting. */
+        val lbdGlue: ExecutionOption<Int> = ExecutionOption("lbd-glue", ValueKind.INT)
 
-    /** The `vivification` execution setting. */
-    data object Vivification : ExecutionOption<Boolean>("vivification") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `tiered-db` execution setting. */
+        val tieredDb: ExecutionOption<Boolean> = ExecutionOption("tiered-db", ValueKind.BOOLEAN)
 
-    /** The `vivify-batch` execution setting. */
-    data object VivifyBatch : ExecutionOption<Int>("vivify-batch") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `mid-lbd` execution setting. */
+        val midLbd: ExecutionOption<Int> = ExecutionOption("mid-lbd", ValueKind.INT)
 
-    /** The `subsumption` execution setting. */
-    data object Subsumption : ExecutionOption<Boolean>("subsumption") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `vivification` execution setting. */
+        val vivification: ExecutionOption<Boolean> = ExecutionOption("vivification", ValueKind.BOOLEAN)
 
-    /** The `subsume-batch` execution setting. */
-    data object SubsumeBatch : ExecutionOption<Int>("subsume-batch") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `vivify-batch` execution setting. */
+        val vivifyBatch: ExecutionOption<Int> = ExecutionOption("vivify-batch", ValueKind.INT)
 
-    /** The `inprocessing-cadence` execution setting. */
-    data object InprocessingCadence : ExecutionOption<Int>("inprocessing-cadence") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `subsumption` execution setting. */
+        val subsumption: ExecutionOption<Boolean> = ExecutionOption("subsumption", ValueKind.BOOLEAN)
 
-    /** The `lp-objective-cone` execution setting. */
-    data object LpObjectiveCone : ExecutionOption<Boolean>("lp-objective-cone") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `subsume-batch` execution setting. */
+        val subsumeBatch: ExecutionOption<Int> = ExecutionOption("subsume-batch", ValueKind.INT)
 
-    /** The `lp-auto-off-reprobe` execution setting. */
-    data object LpAutoOffReprobe : ExecutionOption<Boolean>("lp-auto-off-reprobe") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `inprocessing-cadence` execution setting. */
+        val inprocessingCadence: ExecutionOption<Int> = ExecutionOption("inprocessing-cadence", ValueKind.INT)
 
-    /** The `lp-knapsack-lagrangian` execution setting. */
-    data object LpKnapsackLagrangian : ExecutionOption<Boolean>("lp-knapsack-lagrangian") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `lp-objective-cone` execution setting. */
+        val lpObjectiveCone: ExecutionOption<Boolean> = ExecutionOption("lp-objective-cone", ValueKind.BOOLEAN)
 
-    /** The `lp-component-split` execution setting. */
-    data object LpComponentSplit : ExecutionOption<Boolean>("lp-component-split") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `lp-auto-off-reprobe` execution setting. */
+        val lpAutoOffReprobe: ExecutionOption<Boolean> = ExecutionOption("lp-auto-off-reprobe", ValueKind.BOOLEAN)
 
-    /** The `lp-bound-max-pivots` execution setting. */
-    data object LpBoundMaxPivots : ExecutionOption<Int>("lp-bound-max-pivots") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `lp-knapsack-lagrangian` execution setting. */
+        val lpKnapsackLagrangian: ExecutionOption<Boolean> = ExecutionOption("lp-knapsack-lagrangian", ValueKind.BOOLEAN)
 
-    /** The `lp-adaptive-work` execution setting. */
-    data object LpAdaptiveWork : ExecutionOption<Boolean>("lp-adaptive-work") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `lp-component-split` execution setting. */
+        val lpComponentSplit: ExecutionOption<Boolean> = ExecutionOption("lp-component-split", ValueKind.BOOLEAN)
 
-    /** The `lp-branching` execution setting. */
-    data object LpBranching : ExecutionOption<Boolean>("lp-branching") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `lp-bound-max-pivots` execution setting. */
+        val lpBoundMaxPivots: ExecutionOption<Int> = ExecutionOption("lp-bound-max-pivots", ValueKind.INT)
 
-    /** The `lp-variable-shaving` execution setting. */
-    data object LpVariableShaving : ExecutionOption<Boolean>("lp-variable-shaving") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `lp-adaptive-work` execution setting. */
+        val lpAdaptiveWork: ExecutionOption<Boolean> = ExecutionOption("lp-adaptive-work", ValueKind.BOOLEAN)
 
-    /** The `lp-prune-hulls` execution setting. */
-    data object LpPruneHulls : ExecutionOption<Boolean>("lp-prune-hulls") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `lp-branching` execution setting. */
+        val lpBranching: ExecutionOption<Boolean> = ExecutionOption("lp-branching", ValueKind.BOOLEAN)
 
-    /** The `lp-root-cuts` execution setting. */
-    data object LpRootCuts : ExecutionOption<Boolean>("lp-root-cuts") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `lp-variable-shaving` execution setting. */
+        val lpVariableShaving: ExecutionOption<Boolean> = ExecutionOption("lp-variable-shaving", ValueKind.BOOLEAN)
 
-    /** The `pb-learning` execution setting. */
-    data object PbLearning : ExecutionOption<Boolean>("pb-learning") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `lp-prune-hulls` execution setting. */
+        val lpPruneHulls: ExecutionOption<Boolean> = ExecutionOption("lp-prune-hulls", ValueKind.BOOLEAN)
 
-    /** The `pb-objective-cutoff` execution setting. */
-    data object PbObjectiveCutoff : ExecutionOption<Boolean>("pb-objective-cutoff") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `lp-root-cuts` execution setting. */
+        val lpRootCuts: ExecutionOption<Boolean> = ExecutionOption("lp-root-cuts", ValueKind.BOOLEAN)
 
-    /** The `objective-guided-values` execution setting. */
-    data object ObjectiveGuidedValues : ExecutionOption<Boolean>("objective-guided-values") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `pb-learning` execution setting. */
+        val pbLearning: ExecutionOption<Boolean> = ExecutionOption("pb-learning", ValueKind.BOOLEAN)
 
-    /** The `var-selector` execution setting. */
-    data object VariableSelector : ExecutionOption<VarSelectorKind>("var-selector") {
-        override fun decode(params: EngineParams): VarSelectorKind? = params.varSelectorKind(id)
-    }
+        /** The `pb-objective-cutoff` execution setting. */
+        val pbObjectiveCutoff: ExecutionOption<Boolean> = ExecutionOption("pb-objective-cutoff", ValueKind.BOOLEAN)
 
-    /** The `val-selector` execution setting. */
-    data object ValueSelector : ExecutionOption<ValSelectorKind>("val-selector") {
-        override fun decode(params: EngineParams): ValSelectorKind? = params.valSelectorKind(id)
-    }
+        /** The `objective-guided-values` execution setting. */
+        val objectiveGuidedValues: ExecutionOption<Boolean> = ExecutionOption("objective-guided-values", ValueKind.BOOLEAN)
 
-    /** The `seed` execution setting. */
-    data object Seed : ExecutionOption<Long>("seed") {
-        override fun decode(params: EngineParams): Long? = params.long(id)
-    }
+        /** The `var-selector` execution setting. */
+        val variableSelector: ExecutionOption<VarSelectorKind> = ExecutionOption("var-selector", ValueKind.VARIABLE_SELECTOR)
 
-    /** The `dry-run-solver` execution setting. */
-    data object DryRunSolver : ExecutionOption<Boolean>("dry-run-solver") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `val-selector` execution setting. */
+        val valueSelector: ExecutionOption<ValSelectorKind> = ExecutionOption("val-selector", ValueKind.VALUE_SELECTOR)
 
-    /** The `noise` execution setting. */
-    data object Noise : ExecutionOption<Double>("noise") {
-        override fun decode(params: EngineParams): Double? = params.double(id)
-    }
+        /** The `seed` execution setting. */
+        val seed: ExecutionOption<Long> = ExecutionOption("seed", ValueKind.LONG)
 
-    /** The `cb` execution setting. */
-    data object Cb : ExecutionOption<Double>("cb") {
-        override fun decode(params: EngineParams): Double? = params.double(id)
-    }
+        /** The `dry-run-solver` execution setting. */
+        val dryRunSolver: ExecutionOption<Boolean> = ExecutionOption("dry-run-solver", ValueKind.BOOLEAN)
 
-    /** The `skew-alpha` execution setting. */
-    data object SkewAlpha : ExecutionOption<Double>("skew-alpha") {
-        override fun decode(params: EngineParams): Double? = params.double(id)
-    }
+        /** The `noise` execution setting. */
+        val noise: ExecutionOption<Double> = ExecutionOption("noise", ValueKind.DOUBLE)
 
-    /** The `initial-temp` execution setting. */
-    data object InitialTemp : ExecutionOption<Double>("initial-temp") {
-        override fun decode(params: EngineParams): Double? = params.double(id)
-    }
+        /** The `cb` execution setting. */
+        val cb: ExecutionOption<Double> = ExecutionOption("cb", ValueKind.DOUBLE)
 
-    /** The `cooling-rate` execution setting. */
-    data object CoolingRate : ExecutionOption<Double>("cooling-rate") {
-        override fun decode(params: EngineParams): Double? = params.double(id)
-    }
+        /** The `skew-alpha` execution setting. */
+        val skewAlpha: ExecutionOption<Double> = ExecutionOption("skew-alpha", ValueKind.DOUBLE)
 
-    /** The `min-temp` execution setting. */
-    data object MinTemp : ExecutionOption<Double>("min-temp") {
-        override fun decode(params: EngineParams): Double? = params.double(id)
-    }
+        /** The `initial-temp` execution setting. */
+        val initialTemp: ExecutionOption<Double> = ExecutionOption("initial-temp", ValueKind.DOUBLE)
 
-    /** The `smooth-prob` execution setting. */
-    data object SmoothProb : ExecutionOption<Double>("smooth-prob") {
-        override fun decode(params: EngineParams): Double? = params.double(id)
-    }
+        /** The `cooling-rate` execution setting. */
+        val coolingRate: ExecutionOption<Double> = ExecutionOption("cooling-rate", ValueKind.DOUBLE)
 
-    /** The `smooth-factor` execution setting. */
-    data object SmoothFactor : ExecutionOption<Double>("smooth-factor") {
-        override fun decode(params: EngineParams): Double? = params.double(id)
-    }
+        /** The `min-temp` execution setting. */
+        val minTemp: ExecutionOption<Double> = ExecutionOption("min-temp", ValueKind.DOUBLE)
 
-    /** The `tabu-tenure` execution setting. */
-    data object TabuTenure : ExecutionOption<Int>("tabu-tenure") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `smooth-prob` execution setting. */
+        val smoothProb: ExecutionOption<Double> = ExecutionOption("smooth-prob", ValueKind.DOUBLE)
 
-    /** The `sources` execution setting. */
-    data object Sources : ExecutionOption<List<AxisToken>>("sources") {
-        override fun capture(value: List<AxisToken>): List<AxisToken> = value.toList()
-        override fun decode(params: EngineParams): List<AxisToken>? = params.string(id)?.let { AxisEdits.tokens(it) }
-    }
+        /** The `smooth-factor` execution setting. */
+        val smoothFactor: ExecutionOption<Double> = ExecutionOption("smooth-factor", ValueKind.DOUBLE)
 
-    /** The `scoring` execution setting. */
-    data object Scoring : ExecutionOption<List<AxisToken>>("scoring") {
-        override fun capture(value: List<AxisToken>): List<AxisToken> = scalarTokens(value.toList(), "scoring")
-        override fun decode(params: EngineParams): List<AxisToken>? =
-            params.string(id)?.let { scalarTokens(it, "scoring") }
-    }
+        /** The `tabu-tenure` execution setting. */
+        val tabuTenure: ExecutionOption<Int> = ExecutionOption("tabu-tenure", ValueKind.INT)
 
-    /** The `acceptance` execution setting. */
-    data object Acceptance : ExecutionOption<List<AxisToken>>("acceptance") {
-        override fun capture(value: List<AxisToken>): List<AxisToken> = scalarTokens(value.toList(), "acceptance")
-        override fun decode(params: EngineParams): List<AxisToken>? =
-            params.string(id)?.let { scalarTokens(it, "acceptance") }
-    }
+        /** The `sources` execution setting. */
+        val sources: ExecutionOption<List<AxisToken>> = ExecutionOption("sources", ValueKind.SOURCES)
 
-    /** The `restart` execution setting. */
-    data object Restart : ExecutionOption<List<AxisToken>>("restart") {
-        override fun capture(value: List<AxisToken>): List<AxisToken> = scalarTokens(value.toList(), "restart")
-        override fun decode(params: EngineParams): List<AxisToken>? =
-            params.string(id)?.let { scalarTokens(it, "restart") }
-    }
+        /** The `scoring` execution setting. */
+        val scoring: ExecutionOption<List<AxisToken>> = ExecutionOption("scoring", ValueKind.SCALAR_AXIS)
 
-    /** The `strategy` execution setting. */
-    data object Strategy : ExecutionOption<String>("strategy") {
-        override fun decode(params: EngineParams): String? = params.string(id)
-    }
+        /** The `acceptance` execution setting. */
+        val acceptance: ExecutionOption<List<AxisToken>> = ExecutionOption("acceptance", ValueKind.SCALAR_AXIS)
 
-    /** The `arm` execution setting. */
-    data object LocalSearchArm : ExecutionOption<String>("arm") {
-        override fun decode(params: EngineParams): String? = params.string(id)
-    }
+        /** The `restart` execution setting. */
+        val restart: ExecutionOption<List<AxisToken>> = ExecutionOption("restart", ValueKind.SCALAR_AXIS)
 
-    /** The `lambda` execution setting. */
-    data object Lambda : ExecutionOption<Double>("lambda") {
-        override fun decode(params: EngineParams): Double? = params.double(id)
-    }
+        /** The `strategy` execution setting. */
+        val strategy: ExecutionOption<String> = ExecutionOption("strategy", ValueKind.STRING)
 
-    /** The `arms` execution setting. */
-    data object Arms : ExecutionOption<Int>("arms") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `arm` execution setting. */
+        val localSearchArm: ExecutionOption<String> = ExecutionOption("arm", ValueKind.STRING)
 
-    /** The `ls` execution setting. */
-    data object LocalSearchArms : ExecutionOption<Int>("ls") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `lambda` execution setting. */
+        val lambda: ExecutionOption<Double> = ExecutionOption("lambda", ValueKind.DOUBLE)
 
-    /** The `bt` execution setting. */
-    data object BacktrackArms : ExecutionOption<Int>("bt") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `arms` execution setting. */
+        val arms: ExecutionOption<Int> = ExecutionOption("arms", ValueKind.INT)
 
-    /** The `clause-share-lbd` execution setting. */
-    data object ClauseShareLbd : ExecutionOption<Int>("clause-share-lbd") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `ls` execution setting. */
+        val localSearchArms: ExecutionOption<Int> = ExecutionOption("ls", ValueKind.INT)
 
-    /** The `clause-share-len` execution setting. */
-    data object ClauseShareLen : ExecutionOption<Int>("clause-share-len") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `bt` execution setting. */
+        val backtrackArms: ExecutionOption<Int> = ExecutionOption("bt", ValueKind.INT)
 
-    /** The `slice-work` execution setting. */
-    data object SliceWork : ExecutionOption<Long>("slice-work") {
-        override fun decode(params: EngineParams): Long? = params.long(id)
-    }
+        /** The `clause-share-lbd` execution setting. */
+        val clauseShareLbd: ExecutionOption<Int> = ExecutionOption("clause-share-lbd", ValueKind.INT)
 
-    /** The `slice-max-work` execution setting. */
-    data object SliceMaxWork : ExecutionOption<Long>("slice-max-work") {
-        override fun decode(params: EngineParams): Long? = params.long(id)
-    }
+        /** The `clause-share-len` execution setting. */
+        val clauseShareLen: ExecutionOption<Int> = ExecutionOption("clause-share-len", ValueKind.INT)
 
-    /** The `slice-growth` execution setting. */
-    data object SliceGrowth : ExecutionOption<Double>("slice-growth") {
-        override fun decode(params: EngineParams): Double? = params.double(id)
-    }
+        /** The `slice-work` execution setting. */
+        val sliceWork: ExecutionOption<Long> = ExecutionOption("slice-work", ValueKind.LONG)
 
-    /** The `phase-retention` execution setting. */
-    data object PhaseRetention : ExecutionOption<Double>("phase-retention") {
-        override fun decode(params: EngineParams): Double? = params.double(id)
-    }
+        /** The `slice-max-work` execution setting. */
+        val sliceMaxWork: ExecutionOption<Long> = ExecutionOption("slice-max-work", ValueKind.LONG)
 
-    /** The `reseed-stale-threshold` execution setting. */
-    data object ReseedStaleThreshold : ExecutionOption<Int>("reseed-stale-threshold") {
-        override fun decode(params: EngineParams): Int? = params.int(id)
-    }
+        /** The `slice-growth` execution setting. */
+        val sliceGrowth: ExecutionOption<Double> = ExecutionOption("slice-growth", ValueKind.DOUBLE)
 
-    /** The `ls-residuals` execution setting. */
-    data object LsResiduals : ExecutionOption<Boolean>("ls-residuals") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `phase-retention` execution setting. */
+        val phaseRetention: ExecutionOption<Double> = ExecutionOption("phase-retention", ValueKind.DOUBLE)
 
-    /** The `ls-phase-times` execution setting. */
-    data object LsPhaseTimes : ExecutionOption<Boolean>("ls-phase-times") {
-        override fun decode(params: EngineParams): Boolean? = params.bool(id)
-    }
+        /** The `reseed-stale-threshold` execution setting. */
+        val reseedStaleThreshold: ExecutionOption<Int> = ExecutionOption("reseed-stale-threshold", ValueKind.INT)
 
-    /** The `bt-arm` execution setting. */
-    data object BacktrackArmsByLabel : ExecutionOption<List<String>>("bt-arm") {
-        override fun capture(value: List<String>): List<String> = value.toList()
-        override fun decode(params: EngineParams): List<String>? = params.string(id)?.let { raw ->
-            raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        /** The `ls-residuals` execution setting. */
+        val lsResiduals: ExecutionOption<Boolean> = ExecutionOption("ls-residuals", ValueKind.BOOLEAN)
+
+        /** The `ls-phase-times` execution setting. */
+        val lsPhaseTimes: ExecutionOption<Boolean> = ExecutionOption("ls-phase-times", ValueKind.BOOLEAN)
+
+        /** The `bt-arm` execution setting. */
+        val backtrackArmsByLabel: ExecutionOption<List<String>> = ExecutionOption("bt-arm", ValueKind.LABELS)
+
+        internal val byId by lazy {
+            listOf(
+                maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart,
+                phaseSaving, targetPhasing, solutionPhasing, rephaseInterval, maxLearned,
+                lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
+                subsumption, subsumeBatch, inprocessingCadence, lpObjectiveCone, lpAutoOffReprobe,
+                lpKnapsackLagrangian, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork, lpBranching,
+                lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, pbObjectiveCutoff,
+                objectiveGuidedValues, variableSelector, valueSelector, seed, dryRunSolver,
+                noise, cb, skewAlpha, initialTemp, coolingRate,
+                minTemp, smoothProb, smoothFactor, tabuTenure, sources,
+                scoring, acceptance, restart, strategy, localSearchArm,
+                lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
+                clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, phaseRetention,
+                reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
+            ).associateBy { it.id }
         }
-    }
-
-    internal companion object {
-        private val all: List<ExecutionOption<*>> get() = listOf(
-            MaxDecisions, Luby, AdaptiveRestart, EmaRestart, ModeSwitchingRestart,
-            PhaseSaving, TargetPhasing, SolutionPhasing, RephaseInterval, MaxLearned,
-            LbdGlue, TieredDb, MidLbd, Vivification, VivifyBatch,
-            Subsumption, SubsumeBatch, InprocessingCadence, LpObjectiveCone, LpAutoOffReprobe,
-            LpKnapsackLagrangian, LpComponentSplit, LpBoundMaxPivots, LpAdaptiveWork, LpBranching,
-            LpVariableShaving, LpPruneHulls, LpRootCuts, PbLearning, PbObjectiveCutoff,
-            ObjectiveGuidedValues, VariableSelector, ValueSelector, Seed, DryRunSolver,
-            Noise, Cb, SkewAlpha, InitialTemp, CoolingRate,
-            MinTemp, SmoothProb, SmoothFactor, TabuTenure, Sources,
-            Scoring, Acceptance, Restart, Strategy, LocalSearchArm,
-            Lambda, Arms, LocalSearchArms, BacktrackArms, ClauseShareLbd,
-            ClauseShareLen, SliceWork, SliceMaxWork, SliceGrowth, PhaseRetention,
-            ReseedStaleThreshold, LsResiduals, LsPhaseTimes, BacktrackArmsByLabel,
-        )
-        // Typed keys can initialize before their containing catalog on the JVM.
-        val byId by lazy { all.associateBy { it.id } }
     }
 }
 
@@ -368,7 +250,7 @@ class ExecutionSetting<T> internal constructor(internal val option: ExecutionOpt
 
 /**
  * Immutable finite execution configuration. Repeated settings use the last value. The same options
- * can resolve independent plans; each plan and worker owns its mutable consumption and selectors.
+ * can resolve independent plans; each plan owns its consumption view and each worker owns its selectors.
  * Invocation-wide resource allowances remain separate request arguments.
  */
 class ExecutionOptions private constructor(

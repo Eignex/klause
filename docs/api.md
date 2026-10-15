@@ -139,12 +139,13 @@ when a supported replacement is introduced, with warning-level deprecations for
 migration rather than an immediate visibility or signature break.
 
 `FiniteSolveRequest`, `PortfolioPlanRequest` and `FixedBacktrackPlanRequest` accept
-immutable `ExecutionOptions`. For example, `ExecutionOptions(ExecutionOption.Seed(7L),
-ExecutionOption.VariableSelector(VarSelectorKind.VSIDS))` configures values without
+immutable `ExecutionOptions`. For example, `ExecutionOptions(ExecutionOption.seed(7L),
+ExecutionOption.variableSelector(VarSelectorKind.VSIDS))` configures values without
 frontend syntax. The original `List<String>` constructors, their default argument
 descriptors and `engineParams` getters remain available as compatibility adapters.
-Typed requests expose an empty legacy parameter list; resolution uses their typed
-settings directly. `EngineParams` and its consuming helper functions retain their
+Directly configured options expose an empty legacy parameter list; parsed options
+retain the captured frontend parameters. Resolution uses typed settings directly.
+`EngineParams` and its consuming helper functions retain their
 original signatures and behavior. [Model ownership](model.md#finite-execution-options)
 defines capture and worker lifetimes.
 
