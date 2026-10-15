@@ -37,11 +37,23 @@ class GridArrayMinMaxTest {
     }
 
     @Test
+    fun `constant result and operand retain the remaining envelope`() {
+        val source = Problem(0, 3, arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(1, 3)), arrayOf(
+            GridArrayMinMax(intArrayOf(0, 1, 2), doubleArrayOf(0.0, 0.0, 1.0), doubleArrayOf(2.0, 2.0, 0.0),
+                booleanArrayOf(true, true, false), 1000L, max = false),
+        ))
+
+        val assignments = BacktrackSolver(source.bake()).enumerate().map { it.ints.toList() }.toSet()
+
+        assertEquals(setOf(listOf(0L, 0L, 2L), listOf(0L, 0L, 3L)), assignments)
+    }
+
+    @Test
     fun `grid extrema share propagated bounds with distinctness conflicts`() {
         val source = Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf<Factor>(
             GridArrayMinMax(intArrayOf(0, 1, 2), DoubleArray(3) { 1.0 }, DoubleArray(3),
                 BooleanArray(3), 1000L, max = false),
-            AllDifferent(intArrayOf(0, 1, 2)),
+            AllDifferent(intArrayOf(0, 1, 2), domainMin = 0L, domainSize = 3),
         ))
 
         val result = BacktrackSolver(source.bake()).solve()

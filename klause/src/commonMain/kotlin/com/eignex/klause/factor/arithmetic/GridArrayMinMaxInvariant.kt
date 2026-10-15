@@ -19,15 +19,15 @@ internal class GridArrayMinMaxInvariant(private val factor: GridArrayMinMax) : I
     private val equalities = (1 until factor.coordinates.size).map { factor.comparison(it, equality = true) }
 
     private fun holds(row: Linear, state: LocalSearchState, changed: Int, value: Long): Boolean {
-        val constants = checkNotNull(row.integerConstants)
+        val constants = checkNotNull(row.integralConstants)
         var activity = BIG_ZERO
         for (position in row.vars.indices) {
             val variable = row.vars[position]
             val current = if (variable == changed) value else state.assignment.intValue(variable)
-            activity += bigIntOf(constants.coeff(position)) * bigIntOf(current)
+            activity += constants.exactCoeff(position) * bigIntOf(current)
         }
-        return if (row.op == LinearOp.EQ) activity == bigIntOf(constants.bound)
-            else activity <= bigIntOf(constants.bound)
+        return if (row.op == LinearOp.EQ) activity == constants.exactBound
+            else activity <= constants.exactBound
     }
 
     private fun degree(state: LocalSearchState, changed: Int = -1, value: Long = 0L): Int =
@@ -46,14 +46,14 @@ internal class GridArrayMinMaxInvariant(private val factor: GridArrayMinMax) : I
         for (row in equalities) {
             val position = row.vars.indexOf(output)
             if (position < 0) continue
-            val constants = checkNotNull(row.integerConstants)
-            val coefficient = constants.coeff(position)
-            if (coefficient == 0L) continue
-            var residual = bigIntOf(constants.bound)
+            val constants = checkNotNull(row.integralConstants)
+            val coefficient = constants.exactCoeff(position)
+            if (coefficient == BIG_ZERO) continue
+            var residual = constants.exactBound
             for (index in row.vars.indices) if (index != position) {
-                residual -= bigIntOf(constants.coeff(index)) * bigIntOf(state.assignment.intValue(row.vars[index]))
+                residual -= constants.exactCoeff(index) * bigIntOf(state.assignment.intValue(row.vars[index]))
             }
-            val target = residual / bigIntOf(coefficient)
+            val target = residual / coefficient
             if (!target.fitsLong()) continue
             val value = state.rootDomains[output].clamp(target.toLongExact())
             if (value != state.assignment.intValue(output)) sink.addChannelingIntSet(state, output, value)
