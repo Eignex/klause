@@ -43,6 +43,21 @@ import kotlin.time.Duration
 class CliStatsTest {
 
     @Test
+    fun `linear point observations retain separate graph LP and release counts`() {
+        val stats = SolveStats(smt = SmtStats(
+            realGraphOpenings = 2, graphPointHintCaptures = 3,
+            lpPointHintCaptures = 5, defaultGraphHintReleases = 7,
+        ))
+
+        val pairs = openTheoryStatPairs(stats, 1L).toMap()
+
+        assertEquals("2", pairs["smtRealGraphOpenings"])
+        assertEquals("3", pairs["smtGraphPointHintCaptures"])
+        assertEquals("5", pairs["smtLpPointHintCaptures"])
+        assertEquals("7", pairs["smtDefaultGraphHintReleases"])
+    }
+
+    @Test
     fun `construction fields are omitted independently until their stages are observed`() {
         val admitted = SolveStats(openHints = OpenHintStats(usage = OpenHintUsageStats(indexesAdmitted = 1)))
         val rawUsage = OpenHintUsageStats(

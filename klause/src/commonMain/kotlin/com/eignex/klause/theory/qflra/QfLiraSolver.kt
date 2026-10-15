@@ -313,6 +313,7 @@ class ExactLiraSearchComponent private constructor(
         return variables.toIntArray() to SearchCandidateHints { variable ->
             if (!partialPointHintAvailable()) null
             else if (defaultOpening && graphFirst) {
+                smtStats?.observeDefaultGraphHintRelease()
                 releasePartialPointHints()
                 null
             } else pointHintValues?.getOrNull(variable)?.let { value ->
@@ -337,7 +338,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintStop = Cancellation.Never
     }
 
-    private fun capturePointHints(point: List<BigFraction>, context: SearchContext) {
+    private fun capturePointHints(point: List<BigFraction>, context: SearchContext, graph: Boolean = false) {
         pointHintValues = null
         val rows = pointHintRows ?: return
         if (point.size != model.numRealVars + model.numIntVars || operationStop() || pointHintStop()) return
@@ -368,6 +369,7 @@ class ExactLiraSearchComponent private constructor(
         if (operationStop() || pointHintStop()) return
         pointHintLevel = context.decisionLevel
         pointHintValues = values
+        smtStats?.observePointHintCapture(graph)
     }
 
     private fun hintTruth(comparison: ExactComparison, point: List<BigFraction>): Boolean? {
@@ -422,6 +424,7 @@ class ExactLiraSearchComponent private constructor(
         return try {
             graphFirst = !hasPrivateReals && model.numIntVars == 0 &&
                 solveContext.certificationPolicy === ProductionLpCertificationPolicy && realDifference != null
+            if (graphFirst) smtStats?.observeRealGraphOpening()
             if (disjunctionRegistrationDeclined || (!graphFirst && !installSource()) || operationStop()) {
                 ComponentResult.Indeterminate
             } else {
@@ -946,7 +949,7 @@ class ExactLiraSearchComponent private constructor(
                     if (bools.any { it == UNASSIGNED }) {
                         if (pointHintRows != null) {
                             operationStop.charge(model.numRealVars.toLong() + 1L)
-                            if (!operationStop()) capturePointHints(result.point, context)
+                            if (!operationStop()) capturePointHints(result.point, context, graph = true)
                         }
                         if (operationStop()) return ComponentResult.Indeterminate
                         candidate = null

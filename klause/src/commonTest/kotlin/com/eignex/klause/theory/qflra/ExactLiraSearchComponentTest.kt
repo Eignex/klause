@@ -97,6 +97,8 @@ class ExactLiraSearchComponentTest {
                 override fun workMeter(): WorkMeter = WorkMeter { charged += it }
             }
             ExactLiraSearchComponent(model).use { component ->
+                val stats = SmtStatsSink()
+                component.observeWith(stats)
                 val hints = assertNotNull(component.partialPointHints(stop, defaultOpening)).second
                 val registrationWork = charged
                 assertTrue(registrationWork > 0L)
@@ -105,8 +107,13 @@ class ExactLiraSearchComponentTest {
 
                 assertIs<ComponentResult.Consistent>(session.initialize())
 
+                assertEquals(1L, stats.snapshot().realGraphOpenings)
+                assertEquals(1L, stats.snapshot().graphPointHintCaptures)
+                assertEquals(0L, stats.snapshot().lpPointHintCaptures)
+                assertEquals(0L, stats.snapshot().defaultGraphHintReleases)
                 assertTrue(component.partialPointHintAvailable())
                 assertEquals(if (defaultOpening) null else true, hints.preferredBool(0))
+                assertEquals(if (defaultOpening) 1L else 0L, stats.snapshot().defaultGraphHintReleases)
                 assertEquals(!defaultOpening, component.partialPointHintAvailable())
                 assertEquals(registrationWork, charged)
                 assertNull(session.boolValue(0))
@@ -121,6 +128,24 @@ class ExactLiraSearchComponentTest {
                 assertEquals(!defaultOpening, component.partialPointHintAvailable())
                 assertEquals(registrationWork, charged)
             }
+        }
+    }
+
+    @Test
+    fun `integer partial point capture reports its LP origin without graph admission`() {
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            component.observeWith(stats)
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertEquals(false, hints.preferredBool(0))
+            assertEquals(1L, stats.snapshot().lpPointHintCaptures)
+            assertEquals(0L, stats.snapshot().graphPointHintCaptures)
+            assertEquals(0L, stats.snapshot().realGraphOpenings)
+            assertEquals(0L, stats.snapshot().defaultGraphHintReleases)
         }
     }
 
