@@ -1832,6 +1832,34 @@ class PortfolioTest {
     }
 
     @Test
+    fun `repeated heuristic preparation preserves elapsed opportunity for silent complete search`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(2)
+        val complete = TrackingResumableSearch(null, onRun = {
+            elapsed[0] += 10L
+            clock += 10.milliseconds
+        })
+        val preparing = TrackingResumableSearch(null, onRun = {
+            elapsed[1] += 500L
+            clock += 500.milliseconds
+        }, preparationPending = true)
+        val workers = listOf(
+            trackingWorker("complete", 0, complete),
+            trackingWorker("preparing", 1, preparing).also { it.family = ArmFamily.LocalSearch },
+        )
+
+        val result = Portfolio.thompson(workers, seed = 3L).also { it.runTimeSource = clock }.use {
+            it.minimize(Cancellation { elapsed.sum() >= 6_000L })
+        }
+
+        assertIs<MinimizeResult.Unknown>(result)
+        assertTrue(elapsed[0] >= (elapsed.sum() - 2_000L) / 2 - 500L)
+        assertEquals(1, complete.closes)
+        assertEquals(1, preparing.closes)
+        assertEquals(0L, result.stats.portfolio.arms[0].work)
+    }
+
+    @Test
     fun `an accepted incumbent ends feasibility elapsed coverage`() {
         val clock = TestTimeSource()
         val elapsed = LongArray(2)
