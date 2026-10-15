@@ -25,4 +25,14 @@ class NodeBudgetCompatibilityTest {
         assertEquals(5L, spent.invokeWithArguments(budget))
         assertEquals(true, exhausted.invokeWithArguments(budget))
     }
+    @Test
+    fun `historical JVM instruction conversion field remains available`() {
+        val field = Class.forName("com.eignex.klause.backtrack.NodeBudgetKt")
+            .getField("LS_INSTRUCTIONS_PER_WORK")
+
+        assertTrue(Modifier.isStatic(field.modifiers))
+        assertTrue(Modifier.isFinal(field.modifiers))
+        assertEquals(0.8, field.getDouble(null))
+    }
+
 }
