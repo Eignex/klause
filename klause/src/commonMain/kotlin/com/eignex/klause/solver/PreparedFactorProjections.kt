@@ -67,7 +67,8 @@ class PreparedFactorProjections internal constructor(
     internal val requiresRealSourceCheck: Boolean = problem.factors.indices.any { id ->
         problem.factors[id].variables.reals.isNotEmpty() &&
             (problem.factors[id] is RealAbs || problem.factors[id] is ExactLinear ||
-                problem.factors[id] is LinearIndicator || propagation[id]?.builtIn != true || !usesBuiltInRelaxation(id))
+                problem.factors[id] is LinearIndicator || propagation[id]?.builtIn != true ||
+                !usesBuiltInRelaxation(id))
     }
 
     /** Retain selection only for the identical canonical source; rewrites select against their own factors. */

@@ -1585,7 +1585,9 @@ internal class CpToLpRelaxation(
             }
             val mirrored = columns.indices.filter { realNegOf.containsKey(columns[it]) }
             if (mirrored.any { coeffs[it] == Long.MIN_VALUE }) return
-            val expandedColumns = columns + IntArray(mirrored.size) { realNegOf.getOrDefault(columns[mirrored[it]], -1) }
+            val expandedColumns = columns + IntArray(mirrored.size) {
+                realNegOf.getOrDefault(columns[mirrored[it]], -1)
+            }
             val expandedCoefficients = coeffs + LongArray(mirrored.size) { -coeffs[mirrored[it]] }
             builder.addRow(expandedColumns, expandedCoefficients, relation, rhs, premises == null, premises)
         }
