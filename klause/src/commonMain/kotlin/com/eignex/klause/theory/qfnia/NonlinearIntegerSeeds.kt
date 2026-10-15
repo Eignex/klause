@@ -4,6 +4,7 @@ import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
+import com.eignex.klause.lowering.polynomialSelectionEncoding
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
@@ -34,6 +35,7 @@ internal fun NonlinearIntegerProblem.integerSeeds(
             is PolynomialRealFormula.And -> work.addAll(node.operands)
             is PolynomialRealFormula.Or -> work.addAll(node.operands)
             is PolynomialRealFormula.Not -> work.addLast(node.operand)
+            is PolynomialRealFormula.Selection -> work.addLast(polynomialSelectionEncoding(node, step))
             else -> Unit
         }
     }

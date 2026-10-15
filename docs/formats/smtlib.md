@@ -240,8 +240,9 @@ publication.
 The source entry point supports exact decimal/numeral coefficients, constant rational
 division, repeated-variable products, powers with exact constant nonnegative integer
 exponents (including lexical/helper-bound constants), chained comparisons, pairwise `distinct`,
-Boolean equality/xor/implication and conditionals. Numeric conditionals use fresh real
-identities with guarded defining equalities. Source declaration counts and name maps
+Boolean equality/xor/implication and conditionals. Numeric conditionals retain a selection relation with a fresh result identity,
+its original Boolean guard and ordered polynomial branch expressions. Selected
+arithmetic consumers expand guarded equalities privately. Source declaration counts and name maps
 remain separate from total auxiliary counts; unconstrained declarations stay present.
 Name-map keys use canonical unquoted symbols; rendering must quote them when needed.
 A syntactic nonlinear marker distinguishes products of multiple nonconstant operands

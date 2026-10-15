@@ -214,6 +214,7 @@ internal class QuadraticIntegerOptimization(
                 is PolynomialRealFormula.And -> booleanWork.addAll(formula.operands)
                 is PolynomialRealFormula.Or -> booleanWork.addAll(formula.operands)
                 is PolynomialRealFormula.Not -> booleanWork.addLast(formula.operand)
+                is PolynomialRealFormula.Selection -> booleanWork.addLast(formula.condition)
                 else -> Unit
             }
         }

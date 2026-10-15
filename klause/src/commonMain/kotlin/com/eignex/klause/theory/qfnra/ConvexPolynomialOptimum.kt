@@ -135,7 +135,7 @@ private fun affineRows(
                 val variable = node.operand as? PolynomialRealFormula.BooleanVariable ?: return null
                 if (bools[variable.id.index] != false) return null
             }
-            is PolynomialRealFormula.Or -> return null
+            is PolynomialRealFormula.Or, is PolynomialRealFormula.Selection -> return null
             is PolynomialRealFormula.Atom -> {
                 val relation = when (node.relation) {
                     PolynomialRelation.EQ -> QuadraticRowRelation.EQ

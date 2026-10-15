@@ -343,14 +343,13 @@ class SmtLibPolynomialTest {
         val terms = assertIs<PolynomialRealFormula.And>(parsed.formula).operands
         val assertion = assertIs<PolynomialRealFormula.Atom>(terms[0])
         assertEquals(PolynomialExpression.Variable(SourceRealId(1)), assertion.left)
-        val trueGuard = assertIs<PolynomialRealFormula.Or>(terms[1])
-        val falseGuard = assertIs<PolynomialRealFormula.Or>(terms[2])
-        assertEquals(
-            PolynomialRealFormula.Not(PolynomialRealFormula.BooleanVariable(SourceBoolId(0))), trueGuard.operands[0],
-        )
-        assertEquals(PolynomialRealFormula.BooleanVariable(SourceBoolId(0)), falseGuard.operands[0])
-        assertEquals(assertion.left, assertIs<PolynomialRealFormula.Atom>(trueGuard.operands[1]).left)
-        assertEquals(assertion.left, assertIs<PolynomialRealFormula.Atom>(falseGuard.operands[1]).left)
+        val selection = assertIs<PolynomialRealFormula.Selection>(terms[1])
+        assertEquals(SourceRealId(1), selection.result)
+        assertEquals(PolynomialRealFormula.BooleanVariable(SourceBoolId(0)), selection.condition)
+        val x = PolynomialExpression.Variable(SourceRealId(0))
+        assertEquals(PolynomialExpression.Product(listOf(x, x)), selection.whenTrue)
+        assertEquals(PolynomialExpression.Constant.of(bigIntOf(3)), selection.whenFalse)
+        assertEquals(2, terms.size)
     }
 
     @Test

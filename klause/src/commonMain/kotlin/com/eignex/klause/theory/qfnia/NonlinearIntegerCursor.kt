@@ -312,6 +312,11 @@ private fun sourceIntegerHints(formula: PolynomialRealFormula, arithmetic: Polyn
                 expressions.addLast(node.left)
                 expressions.addLast(node.right)
             }
+            is PolynomialRealFormula.Selection -> {
+                formulas.addLast(node.condition)
+                expressions.addLast(node.whenTrue)
+                expressions.addLast(node.whenFalse)
+            }
             is PolynomialRealFormula.And -> formulas.addAll(node.operands)
             is PolynomialRealFormula.Or -> formulas.addAll(node.operands)
             is PolynomialRealFormula.Not -> formulas.addLast(node.operand)
