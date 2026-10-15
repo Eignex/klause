@@ -2012,6 +2012,33 @@ public final class com/eignex/klause/factor/table/Mdd : com/eignex/klause/ir/Fac
 	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
+public final class com/eignex/klause/factor/table/RealElement : com/eignex/klause/ir/Factor {
+	public fun <init> (II[DI)V
+	public synthetic fun <init> (II[DIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (II[II)V
+	public synthetic fun <init> (II[IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun canSubstituteAffine (IIII)Z
+	public final fun getArrIsVars ()Z
+	public fun getBoolVars ()[I
+	public final fun getConstants ()[D
+	public final fun getEntries ()[I
+	public final fun getIdx ()I
+	public final fun getIndexOffset ()I
+	public fun getIntVars ()[I
+	public fun getLinearForm ()Lcom/eignex/klause/ir/LinearForm;
+	public final fun getResult ()I
+	public final fun getSize ()I
+	public fun getStructuralKeyWeight ()I
+	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
+	public fun isValueAnonymous ()Z
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
+	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
+	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
+}
+
 public final class com/eignex/klause/factor/table/Regular : com/eignex/klause/ir/Factor {
 	public fun <init> ([III[JI[I)V
 	public fun canSubstituteAffine (IIII)Z
