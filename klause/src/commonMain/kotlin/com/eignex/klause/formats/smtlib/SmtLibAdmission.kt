@@ -254,7 +254,7 @@ private fun hasSignedNumberSymbol(expression: SExpr, cancellation: Cancellation)
     return false
 }
 
-internal fun hasNonlinearSyntax(expression: SExpr, cancellation: Cancellation): Boolean {
+private fun hasNonlinearSyntax(expression: SExpr, cancellation: Cancellation): Boolean {
     val work = ArrayDeque<SExpr>()
     work.addLast(expression)
     while (work.isNotEmpty()) {

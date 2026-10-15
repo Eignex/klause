@@ -281,7 +281,7 @@ internal object Compiler {
 
         fun build(): SmtLibProblem {
             inferBounds()
-            if (asserts.any { hasNonlinearSyntax(it, sourceCancellation) }) closeProductBounds()
+            if (hasOpenProductOperand()) closeProductBounds()
             for (a in asserts) assert(a)
             lowerOpenIteChains()
             val compiledObjective = objectiveSpec?.let { (t, neg) ->
