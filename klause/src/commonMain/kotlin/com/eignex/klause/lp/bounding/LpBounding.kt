@@ -663,7 +663,7 @@ internal fun LpEngine.sparseSafePrune(
     }
     val full = checkNotNull(BigFraction.ofDouble(lower)) + BigFraction.ofLong(boundRel.objectiveConstant)
     val sourceRange = sourceObjectiveRange(boundRel)
-    val cutoff = if (canPrune) sourceObjectiveCutoff(boundRel, bound) else null
+    val cutoff = if (canPrune) sourceObjectiveCutoff(boundRel, bound, sourceRange) else null
     if (cutoff != null && full >= cutoff) {
         sink.lp.observePrune()
         return LpNodeOutcome(true, null)
@@ -1198,10 +1198,15 @@ private fun enclosingCutoff(bound: Double): BigFraction? {
     return BigFraction.ofDouble(if (abs(bound) >= EXACT_INTEGER_DOUBLE_LIMIT) bound.nextUp() else bound)
 }
 
-private fun LpEngine.sourceObjectiveCutoff(relaxation: LpRelaxation, bound: Double): BigFraction? {
+private fun LpEngine.sourceObjectiveCutoff(
+    relaxation: LpRelaxation,
+    bound: Double,
+    sourceRange: LongRange? = sourceObjectiveRange(relaxation),
+): BigFraction? {
+    if (sourceRange != null) return enclosingCutoff(bound)
     if (!bound.isFinite() || !relaxation.model.finiteExactInput()) return null
     return if (relaxation.model.hasIntegralObjective()) {
-        if (sourceObjectiveRange(relaxation) != null) enclosingCutoff(bound) else null
+        null
     } else {
         // A continuous source value can round to the cutoff from above, even in a small Double bin.
         BigFraction.ofDouble(bound.nextUp())
@@ -1315,10 +1320,11 @@ internal fun LpEngine.rootLpRelaxationBound(
         }
         val full = lower?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
         val projected = full?.lowerBoundDouble()
+        val integral = relaxation.model.hasIntegralObjective()
         when {
             projected == null -> Double.NaN
-            relaxation.model.hasIntegralObjective() && sourceObjectiveRange(relaxation) == null -> Double.NaN
-            relaxation.model.hasIntegralObjective() && abs(projected) >= EXACT_INTEGER_DOUBLE_LIMIT -> projected.nextDown()
+            integral && sourceObjectiveRange(relaxation) == null -> Double.NaN
+            integral && abs(projected) >= EXACT_INTEGER_DOUBLE_LIMIT -> projected.nextDown()
             else -> projected
         }
     }

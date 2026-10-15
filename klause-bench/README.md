@@ -1198,9 +1198,10 @@ base64 gzip bytes. Decompression preserves the original source hash and caps the
 combined uncompressed sources at 64 MiB.
 `rootBounds=true` additionally checks each recorded `lpRootBound` against the
 unchanged original MPS constraints and objective, in minimized source units.
-The checker reads the exact binary64 value from its round-trip decimal, retains
-integrality, and requires the strict better-objective query to be unsatisfiable.
-Missing bounds stay unavailable; nonfinite bounds, counterexamples and unknown
+MPS statistics retain the positive integer `lpRootBoundScale` used by lowering.
+The checker reads the exact binary64 bound from its round-trip decimal, divides
+by that scale exactly, retains integrality, and requires the strict better-objective query to be unsatisfiable.
+Missing bounds or source scales stay unavailable; nonfinite bounds, counterexamples and unknown
 queries fail. This independent source query verifies no native bound certificate
 and establishes no witness or attainment. Use records with unrounded root-bound
 statistics; older four-decimal output can overstate the bound. The standalone

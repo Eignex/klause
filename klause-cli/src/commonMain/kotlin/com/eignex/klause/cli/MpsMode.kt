@@ -14,6 +14,7 @@ import com.eignex.klause.solver.pipeline.NumericalLinearRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.bigIntOf
@@ -299,6 +300,13 @@ internal class MpsOutput(
         Verdict.UNSATISFIABLE -> if (proofExact) "s UNSATISFIABLE" else "s UNKNOWN"
 
         Verdict.UNKNOWN -> "s UNKNOWN"
+    }
+
+    override fun lpStatisticPairs(stats: SolveStats): List<Pair<String, String>> {
+        val pairs = super.lpStatisticPairs(stats)
+        return if (pairs.any { it.first == "lpRootBound" }) {
+            pairs + ("lpRootBoundScale" to "$objectiveScale")
+        } else pairs
     }
 
     override fun keepStat(key: String): Boolean = true

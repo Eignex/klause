@@ -43,6 +43,8 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     /** The incumbent's objective, for a format whose status line depends on it. */
     protected open fun onSolutionObjective(objective: Long?) = Unit
 
+    protected open fun lpStatisticPairs(stats: SolveStats): List<Pair<String, String>> = lpStatPairs(stats)
+
     protected open fun acceptsSourceWitness(): Boolean = true
 
     /** Why the run stopped; see [VerdictContext]. Set before the verdict is rendered. */
@@ -127,7 +129,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
             printStatPairs(commentPrefix, caStatPairs(stats))
             printStatPairs(commentPrefix, openTheoryStatPairs(stats, solveTimeMs).filter { (k, _) -> keepStat(k) })
         }
-        printStatPairs(commentPrefix, lpStatPairs(stats))
+        printStatPairs(commentPrefix, lpStatisticPairs(stats))
         printStatPairs(commentPrefix, lsStatPairs(stats, solveTimeMs))
         printStatPairs(commentPrefix, portfolioStatPairs(stats))
     }
