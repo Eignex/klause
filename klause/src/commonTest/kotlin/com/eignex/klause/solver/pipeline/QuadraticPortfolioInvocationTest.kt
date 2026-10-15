@@ -116,7 +116,8 @@ class QuadraticPortfolioInvocationTest {
                         return MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
                     }
                 }
-            }) { _, _, _, _ -> error("fixture runs by slice") }.bindSource(SourceWorkerBinding(identity, preparedPlan = plan,
+            }) { _, _, _, _ -> error("fixture runs by slice") }
+                .bindSource(SourceWorkerBinding(identity, preparedPlan = plan,
                 quadraticInvocation = plan.quadraticEngineInvocation(objective, ObjectiveSense.MINIMIZE,
                     Assumptions.None)))
         }
@@ -158,7 +159,8 @@ class QuadraticPortfolioInvocationTest {
                         return MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
                     }
                 }
-            }) { _, _, _, _ -> error("fixture runs by slice") }.bindSource(SourceWorkerBinding(identity, preparedPlan = plan,
+            }) { _, _, _, _ -> error("fixture runs by slice") }
+                .bindSource(SourceWorkerBinding(identity, preparedPlan = plan,
                 quadraticInvocation = plan.quadraticEngineInvocation(objective, ObjectiveSense.MINIMIZE,
                     Assumptions.None)))
         }
@@ -197,7 +199,8 @@ class QuadraticPortfolioInvocationTest {
                         return MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
                     }
                 }
-            }) { _, _, _, _ -> error("fixture runs by slice") }.bindSource(SourceWorkerBinding(identity, provesResults = false, preparedPlan = plan,
+            }) { _, _, _, _ -> error("fixture runs by slice") }
+                .bindSource(SourceWorkerBinding(identity, provesResults = false, preparedPlan = plan,
                     quadraticInvocation = plan.quadraticEngineInvocation(objective, ObjectiveSense.MINIMIZE,
                         Assumptions.None)))
         }
@@ -244,7 +247,8 @@ class QuadraticPortfolioInvocationTest {
                                 TerminationReason.BudgetExhausted)
                         }
                     }
-                }) { _, _, _, _ -> error("fixture runs by slice") }.bindSource(SourceWorkerBinding(identity, preparedPlan = plan,
+                }) { _, _, _, _ -> error("fixture runs by slice") }
+                .bindSource(SourceWorkerBinding(identity, preparedPlan = plan,
                 quadraticInvocation = plan.quadraticEngineInvocation(objective, ObjectiveSense.MINIMIZE,
                     Assumptions.None)))
             }

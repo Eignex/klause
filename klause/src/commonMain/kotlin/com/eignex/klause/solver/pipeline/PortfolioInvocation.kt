@@ -90,9 +90,11 @@ internal class PortfolioInvocation(
         }
     } catch (failure: Throwable) {
         for (worker in workers.asReversed()) {
-            runCatching { worker.close() }.exceptionOrNull()?.takeUnless { it === failure }?.let(failure::addSuppressed)
+            runCatching { worker.close() }.exceptionOrNull()
+                    ?.takeUnless { it === failure }?.let(failure::addSuppressed)
         }
-        runCatching { resources.close() }.exceptionOrNull()?.takeUnless { it === failure }?.let(failure::addSuppressed)
+        runCatching { resources.close() }.exceptionOrNull()
+                    ?.takeUnless { it === failure }?.let(failure::addSuppressed)
         throw failure
     }
     private var closed = false
@@ -128,7 +130,8 @@ internal class PortfolioInvocation(
         try {
             portfolio.close()
         } catch (failure: Throwable) {
-            runCatching { resources.close() }.exceptionOrNull()?.takeUnless { it === failure }?.let(failure::addSuppressed)
+            runCatching { resources.close() }.exceptionOrNull()
+                    ?.takeUnless { it === failure }?.let(failure::addSuppressed)
             throw failure
         }
         resources.close()

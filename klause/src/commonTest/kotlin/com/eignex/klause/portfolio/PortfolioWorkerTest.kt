@@ -143,7 +143,8 @@ class PortfolioWorkerTest {
             objective, ObjectiveSense.MINIMIZE, Assumptions.None))
 
         assertFailsWith<IllegalArgumentException> {
-            SourceWorkerBinding(ModelIdentity.of(foreign, objective), preparedPlan = plan, quadraticInvocation = producer)
+            SourceWorkerBinding(ModelIdentity.of(foreign, objective),
+                preparedPlan = plan, quadraticInvocation = producer)
         }
     }
 
@@ -156,7 +157,8 @@ class PortfolioWorkerTest {
             objective, ObjectiveSense.MAXIMIZE, Assumptions.None))
 
         assertFailsWith<IllegalArgumentException> {
-            SourceWorkerBinding(ModelIdentity.of(source, objective), preparedPlan = plan, quadraticInvocation = producer)
+            SourceWorkerBinding(ModelIdentity.of(source, objective),
+                preparedPlan = plan, quadraticInvocation = producer)
         }
     }
 

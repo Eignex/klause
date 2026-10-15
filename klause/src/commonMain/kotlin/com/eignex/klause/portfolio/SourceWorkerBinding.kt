@@ -1,6 +1,5 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.ir.ObjectiveSense
 
 import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
 import com.eignex.klause.solver.evidence.SourceScope
@@ -33,7 +32,7 @@ internal class SourceWorkerBinding(
                 "quadratic producer has another source plan"
             }
             require(plan.quadraticObjective == null || (plan.quadraticObjective === quadratic.objective &&
-                plan.maximize == (quadratic.sense == ObjectiveSense.MAXIMIZE))) {
+                plan.quadraticSense == quadratic.sense)) {
                 "quadratic producer has another source objective or direction"
             }
         }

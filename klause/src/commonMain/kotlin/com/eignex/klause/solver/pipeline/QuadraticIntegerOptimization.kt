@@ -257,8 +257,9 @@ internal class QuadraticIntegerOptimization(
 
     fun worker(arm: Int, prepared: PreparedSourcePlan = plan): PortfolioWorker {
         val model = ModelIdentity.of(source, objective)
+        val invocation = plan.quadraticEngineInvocation(objective, sense, quadraticAssumptions(controls, engine))
         val binding = SourceWorkerBinding(model, provesResults = arm == 0, preparedPlan = prepared,
-            quadraticInvocation = plan.quadraticEngineInvocation(objective, sense, quadraticAssumptions(controls, engine)))
+            quadraticInvocation = invocation)
         return if (arm == 0) PortfolioWorker.ofMinimize("bt+exact-integer-quadratic", arm,
             resumable = { completeHandle() }) { _, _, _, _ -> error("integer traversal runs by slice") }
             .bindSource(binding)
