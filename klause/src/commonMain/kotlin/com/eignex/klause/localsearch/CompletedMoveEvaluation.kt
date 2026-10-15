@@ -77,12 +77,13 @@ internal class CompletedMoveEvaluation(
     }
 
     fun prepare(moves: List<Move>, rawScore: (Move) -> Double) {
-        if (moves.isEmpty()) return
-        val distinct = moves.distinct()
+        val finiteMoves = moves.filter(::changesFinite)
+        if (finiteMoves.isEmpty()) return
+        val distinct = finiteMoves.distinct()
         val exploring = exploration?.takeIf { it in distinct }
             ?: distinct[proposal % distinct.size]
         proposal = if (proposal == Int.MAX_VALUE) 0 else proposal + 1
-        val ranked = AcceptanceRule.Greedy.choose(state.rng, moves, emptyList(), 1.0, rawScore)
+        val ranked = AcceptanceRule.Greedy.choose(state.rng, finiteMoves, emptyList(), 1.0, rawScore)
         if (ranked != null && rawScore(ranked) < 0.0) {
             attempt(ranked)
             if ((score(ranked) ?: Double.POSITIVE_INFINITY) < 0.0) {
@@ -100,13 +101,15 @@ internal class CompletedMoveEvaluation(
 
     fun attempt(move: Move): Sample? {
         witnesses[move]?.let { return it }
-        if (grades.containsKey(move) || cancellation() || !mayAttempt()) return null
+        if (grades.containsKey(move) || !changesFinite(move) || cancellation() || !mayAttempt()) return null
         grades[move] = Double.POSITIVE_INFINITY
         val candidate = state.completionCandidate(move) ?: return null
+        val before = current()
+        // Completion optimizes all real coordinates for fixed finite pins; changing only a real guess repeats that query.
+        if (candidate.hammingDistanceTo(before) == 0) return null
         val decided = complete(candidate)
         if (decided !is Completion.Witness || cancellation()) return null
         witnesses[move] = decided.sample
-        val before = current()
         grades[move] = if (objective is LinearObjective && decided.sample.symbolicReals == null &&
             decided.sample.algebraicReals == null && before.symbolicReals == null && before.algebraicReals == null
         ) {
@@ -115,6 +118,13 @@ internal class CompletedMoveEvaluation(
             objective.evaluate(decided.sample) - objective.evaluate(before)
         }
         return decided.sample
+    }
+
+    private fun changesFinite(move: Move): Boolean = when (move) {
+        is Move.BoolFlip -> true
+        is Move.IntSet -> move.newValue != state.assignment.intValue(move.varId)
+        is Move.RealSet -> false
+        is Move.Compound -> move.parts.any(::changesFinite)
     }
 
     fun commitMove(move: Move, sample: Sample): Move? {

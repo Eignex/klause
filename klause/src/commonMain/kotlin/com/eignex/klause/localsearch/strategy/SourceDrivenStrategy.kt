@@ -7,6 +7,7 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.TabuFilter
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
+import com.eignex.klause.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.localsearch.movesource.Pool
 import com.eignex.klause.localsearch.schedule.NoiseSchedule
 import com.eignex.klause.localsearch.schedule.RoundAccumulator
@@ -217,8 +218,8 @@ class SourceDrivenStrategy(
                 closure.closeInto(state, raw.list, sink, cancellation)
                 if (alternatives != null) closure.closeInto(state, alternatives.list, alternativeSink, cancellation)
             }
+            if (cs.source is ObjectiveSeed) evaluation?.seed(sink)
         }
-        evaluation?.seed(scoreSink)
         return selectMove(state, stall, stalled, evaluation)
     }
 

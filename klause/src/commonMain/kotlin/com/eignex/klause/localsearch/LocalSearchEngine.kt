@@ -869,7 +869,9 @@ internal class LocalSearchEngine(
                 } else {
                     objective.evaluate(state.assignment)
                 }
-                if ((completion != null || obj < bestObj) && state.intValuesInDomain()) {
+                if ((completedMoves != null || liveCompletion is Completion.Witness || obj < bestObj) &&
+                    state.intValuesInDomain()
+                ) {
                     val decided = liveCompletion ?: decide(
                         state,
                         state.assignment.snapshot(),
