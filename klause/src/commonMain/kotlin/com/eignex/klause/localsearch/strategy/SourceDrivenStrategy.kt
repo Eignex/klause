@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch.strategy
 
+import com.eignex.klause.localsearch.CompletedMoveEvaluation
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
@@ -138,7 +139,15 @@ class SourceDrivenStrategy(
     /** Pick the next move to apply, or `null` when no candidate is available (the engine restarts). */
     fun pickMove(state: LocalSearchState): Move? = pickMove(state, Cancellation.Never)
 
-    internal fun pickMove(state: LocalSearchState, cancellation: Cancellation): Move? {
+    internal fun pickMove(state: LocalSearchState, cancellation: Cancellation): Move? =
+        pickMove(state, cancellation, null)
+
+    internal fun pickMove(
+        state: LocalSearchState,
+        cancellation: Cancellation,
+        evaluation: CompletedMoveEvaluation?,
+    ): Move? {
+        evaluation?.begin()
         val stall = schedule.noise as? StallSchedule
         val fraction = if ((schedule.weights != null || stall != null) && scoring != MoveScoring.Break) {
             state.cumulativeRepairFraction()
@@ -209,28 +218,42 @@ class SourceDrivenStrategy(
                 if (alternatives != null) closure.closeInto(state, alternatives.list, alternativeSink, cancellation)
             }
         }
-        return selectMove(state, stall, stalled)
+        evaluation?.seed(scoreSink)
+        return selectMove(state, stall, stalled, evaluation)
     }
 
-    private fun selectMove(state: LocalSearchState, stall: StallSchedule?, stalled: Boolean): Move? {
+    private fun selectMove(
+        state: LocalSearchState,
+        stall: StallSchedule?,
+        stalled: Boolean,
+        evaluation: CompletedMoveEvaluation?,
+    ): Move? {
+        val ccNoise = ccFilter(state, noiseSink.list)
+        val ccScore = ccFilter(state, scoreSink.list)
+        val ccAlternative = ccFilter(state, alternativeSink.list)
+        evaluation?.prepare(ccNoise + ccScore + ccAlternative) { score(state, it) }
+        fun admitted(moves: List<Move>): List<Move> =
+            if (evaluation == null) moves else moves.filter { evaluation.sample(it) != null }
+        fun grade(move: Move): Double = evaluation?.score(move) ?: score(state, move)
+        val improving = evaluation?.let { completed -> { move: Move -> (completed.score(move) ?: 0.0) < 0.0 } }
         // The noise/score pool split is preserved across the CC + tabu filters. CC precedes tabu: the
         // configuration filter is the primary focus, tabu the cycle-breaker layered on what survives it.
-        val ccNoise = ccFilter(state, noiseSink.list)
-        val noiseFiltered = tabu.filter(state, ccNoise)
+        val eligibleNoise = admitted(ccNoise)
+        val noiseFiltered = tabu.filter(state, eligibleNoise, improving)
         // While stalled, never let tabu starve the noise pool into a null pick (a restart that discards
         // plateau progress): fall back to the unfiltered candidates so the search keeps walking the plateau.
-        val noiseMoves = if (noiseFiltered.isEmpty() && stalled) ccNoise else noiseFiltered
-        val primaryScoreMoves = tabu.filter(state, ccFilter(state, scoreSink.list))
-        val alternatives = tabu.filter(state, ccFilter(state, alternativeSink.list))
+        val noiseMoves = if (noiseFiltered.isEmpty() && stalled) eligibleNoise else noiseFiltered
+        val primaryScoreMoves = tabu.filter(state, admitted(ccScore), improving)
+        val alternatives = tabu.filter(state, admitted(ccAlternative), improving)
         val scoreMoves = if (alternatives.isEmpty()) {
             primaryScoreMoves
         } else {
             val bestPrimary = minOf(
-                noiseMoves.minOfOrNull { score(state, it) } ?: Double.POSITIVE_INFINITY,
-                primaryScoreMoves.minOfOrNull { score(state, it) } ?: Double.POSITIVE_INFINITY,
+                noiseMoves.minOfOrNull { grade(it) } ?: Double.POSITIVE_INFINITY,
+                primaryScoreMoves.minOfOrNull { grade(it) } ?: Double.POSITIVE_INFINITY,
             )
             if (bestPrimary < 0.0) primaryScoreMoves else {
-                primaryScoreMoves + alternatives.filter { score(state, it) < bestPrimary }
+                primaryScoreMoves + alternatives.filter { grade(it) < bestPrimary }
             }
         }
         // A NoiseSchedule retunes its level and steers the acceptance rule (WalkSAT noise / probSAT cb);
@@ -252,7 +275,7 @@ class SourceDrivenStrategy(
         // once per pick that sampled the noise pool, so acceptance stays pure. A Metropolis rule with
         // no temperature schedule falls back to a fixed conservative temperature rather than degenerating.
         val temperature = schedule.temperature?.temperature ?: DEFAULT_METROPOLIS_TEMPERATURE
-        val move = effectiveAcceptance.choose(state.rng, noiseMoves, scoreMoves, temperature) { score(state, it) }
+        val move = effectiveAcceptance.choose(state.rng, noiseMoves, scoreMoves, temperature) { grade(it) }
         if (effectiveAcceptance is AcceptanceRule.Metropolis && noiseMoves.isNotEmpty()) schedule.temperature?.step()
         return move
     }

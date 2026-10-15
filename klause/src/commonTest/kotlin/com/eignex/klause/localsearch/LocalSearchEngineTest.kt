@@ -932,6 +932,135 @@ class LocalSearchEngineTest {
         }
     }
 
+    @Test
+    fun `continuous savings admit a directly more expensive integer move`() {
+        for (relation in listOf(LinearOp.GE, LinearOp.EQ)) {
+            val problem = Problem(
+                0, 1, arrayOf(IntDomain(0, 1)),
+                arrayOf<Factor>(Linear(
+                    intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), relation, 1.0,
+                )),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            )
+            val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0))
+            val completed = mutableListOf<Long>()
+            val search = LocalSearchEngine(
+                LocalSearchModel.open(problem), greedyRepairOnRestart = false,
+                completion = { candidate, _ ->
+                    val b = candidate.intValue(0)
+                    completed += b
+                    Completion.Witness(candidate.copy(reals = doubleArrayOf(1.0 - b)))
+                },
+            )
+
+            val result = search.improvements(
+                objective, LocalSearchParams(maxInstructions = 20, randomSeed = 3, initialAssignment = initial), null,
+            ).last()
+
+            val best = assertIs<MinimizeResult.BestFound>(result)
+            assertTrue(1L in completed)
+            assertEquals(1.0, best.objective)
+            assertEquals(1L, best.sample.intValue(0))
+            assertEquals(0.0, best.sample.approximateRealValue(0))
+            assertEquals(1.0, best.sample.intValue(0) + best.sample.approximateRealValue(0))
+        }
+    }
+
+    @Test
+    fun `failed continuous move probes preserve the incumbent and spend their work`() {
+        val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
+        for (failure in listOf(Completion.Refuted(work = 2), Completion.Undecided(work = 2))) {
+            var calls = 0
+            val search = engine { candidate, _ ->
+                calls++
+                if (candidate.intValue(0) == 2L) Completion.Witness(candidate) else failure
+            }
+
+            val result = search.improvements(
+                LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+                LocalSearchParams(maxInstructions = 2, randomSeed = 3, initialAssignment = initial), null,
+            ).last()
+
+            val best = assertIs<MinimizeResult.BestFound>(result)
+            assertEquals(initial, best.sample)
+            assertEquals(7.0, best.objective)
+            assertEquals(2, calls)
+            assertEquals(2.0, best.stats.ls.moves.sum)
+        }
+    }
+
+    @Test
+    fun `continuous move probing stops at the containing move allowance`() {
+        val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
+        val budget = NodeBudget(1)
+        var calls = 0
+        val search = engine { candidate, _ ->
+            calls++
+            if (candidate.intValue(0) == 2L) Completion.Witness(candidate) else Completion.Undecided(work = 1)
+        }
+
+        val result = search.improvements(
+            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+            LocalSearchParams(maxInstructions = 20, nodeBudget = budget, initialAssignment = initial), null,
+        ).last()
+
+        assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
+        assertTrue(budget.exhausted())
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun `cancelled continuous move probing resumes from the unchanged incumbent`() {
+        val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
+        var expired = false
+        var interrupted = false
+        val search = engine { candidate, _ ->
+            if (candidate.intValue(0) != 2L && !interrupted) {
+                interrupted = true
+                expired = true
+                Completion.Undecided()
+            } else if (candidate.intValue(0) == 2L) Completion.Witness(candidate)
+            else Completion.Refuted(work = 1)
+        }
+        val found = mutableListOf<Sample>()
+
+        search.resumable(
+            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+            LocalSearchParams(maxInstructions = 3, initialAssignment = initial),
+        ).use { handle ->
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1) { found += it.sample })
+            assertEquals(listOf(initial), found)
+            expired = false
+
+            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { found += it.sample }
+
+            assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
+            assertEquals(listOf(initial), found)
+        }
+    }
+
+    @Test
+    fun `continuous completion cannot replace a move with different finite coordinates`() {
+        val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
+        var rejected = 0
+        val search = engine { candidate, _ ->
+            if (candidate.intValue(0) == 2L) Completion.Witness(candidate)
+            else {
+                rejected++
+                Completion.Witness(initial.copy(reals = doubleArrayOf(0.0)), work = 2)
+            }
+        }
+
+        val result = search.improvements(
+            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+            LocalSearchParams(maxInstructions = 2, initialAssignment = initial), null,
+        ).last()
+
+        assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
+        assertEquals(1, rejected)
+    }
+
     // x + k = 2.5 and x ≤ 1 over a continuous x in [0, 10] and an integer k in [0, 5]: k ≥ 2 and x = 2.5 - k.
     private fun mixedProblem(): Problem = Problem(
         numBoolVars = 0,

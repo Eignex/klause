@@ -5,13 +5,15 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 
 /**
- * Turns an assignment local search reached at zero violation into a solution of the model, or says why it
+ * Turns a proposed local-search assignment into a solution of the model, or says why it
  * cannot.
  *
  * Local search scores a model through its invariants, and on some models that scoring is not exact: a
  * continuous column it moves in floating point, an incremental sum past the 64-bit range, a row whose
  * coefficients outrun the invariant's width. On those models zero violation is a proposal rather than a
- * proof, and this is what decides it. It is consulted only at a candidate, never per move.
+ * proof, and this is what decides it. Optimization can also admit a bounded set of finite moves for
+ * continuous completion before scoring their completed objectives. Each attempt retains the containing
+ * cancellation and work allowance; candidates are private until the completion accepts them.
  */
 fun interface CandidateCompletion {
     /** Decide [candidate] under the search's [cancellation]: a [Completion.Witness] is a solution of the model,
