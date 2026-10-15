@@ -10,6 +10,7 @@ import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -34,6 +35,19 @@ class FlatZincFiniteFloatProductsTest {
             assertEquals(program.floatVarsByName.getValue(names[1]).varId, product.b)
             assertEquals(2, product.finiteChoices?.size)
             assertTrue(product.finiteChoices?.hasGuards == true)
+        }
+    }
+
+    @Test
+    fun `unrepresentable integer float operands decline before rounding`() {
+        for (value in listOf(9007199254740993L, Long.MAX_VALUE)) {
+            val sources = listOf(
+                "constraint float_times($value, 1.0, 0.0); solve satisfy;",
+                "int: n = $value; constraint float_times(n, 1.0, 0.0); solve satisfy;",
+            )
+            for (source in sources) {
+                assertFailsWith<UnsupportedFlatZincException> { parseFlatZinc(source, exactFloats = true) }
+            }
         }
     }
 

@@ -3,6 +3,7 @@ package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.flatzinc.FlatZincCompiler.ParamValue
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.simplex.exact.BigFraction
 
 internal fun FlatZincCompiler.evaluateParam(e: FznExpr, declaredType: FznType): ParamValue = when (e) {
     is FznExpr.BoolLit -> ParamValue.Bool(e.value)
@@ -123,11 +124,11 @@ internal fun FlatZincCompiler.evalIntConstOrNull(e: FznExpr): Long? = when (e) {
 internal fun FlatZincCompiler.evalFloatConst(e: FznExpr): Double = when (e) {
     is FznExpr.FloatLit -> e.value
 
-    is FznExpr.IntLit -> e.value.toDouble()
+    is FznExpr.IntLit -> exactFloatInteger(e.value)
 
     is FznExpr.Ident -> when (val p = params[e.name]) {
         is ParamValue.Float -> p.value
-        is ParamValue.Int -> p.value.toDouble()
+        is ParamValue.Int -> exactFloatInteger(p.value)
         null -> failHere("`${e.name}` is not a constant float")
         else -> failHere("`${e.name}` is not a float")
     }
@@ -135,7 +136,7 @@ internal fun FlatZincCompiler.evalFloatConst(e: FznExpr): Double = when (e) {
     is FznExpr.ArrayAccess -> {
         when (val arr = arrays[e.name]) {
             is FlatZincArray.FloatParam -> arr.values[arrayOffset(arr.values.size, e.index, e.name)]
-            is FlatZincArray.IntParam -> arr.values[arrayOffset(arr.values.size, e.index, e.name)].toDouble()
+            is FlatZincArray.IntParam -> exactFloatInteger(arr.values[arrayOffset(arr.values.size, e.index, e.name)])
             else -> failHere("`${e.name}` is not a numeric parameter array")
         }
     }
@@ -217,7 +218,7 @@ internal fun FlatZincCompiler.evalFloatConstArray(e: FznExpr): DoubleArray = whe
 
     is FznExpr.Ident -> when (val arr = arrays[e.name]) {
         is FlatZincArray.FloatParam -> arr.values
-        is FlatZincArray.IntParam -> DoubleArray(arr.values.size) { arr.values[it].toDouble() }
+        is FlatZincArray.IntParam -> DoubleArray(arr.values.size) { exactFloatInteger(arr.values[it]) }
         else -> failHere("`${e.name}` is not a float parameter array")
     }
 
@@ -338,4 +339,12 @@ internal fun FlatZincCompiler.resolveVarRef(e: FznExpr, declaredElement: FznType
     is FznType.SetOfInt -> unsupportedHere("set-of-int element refs not supported")
 
     is FznType.Array -> unsupportedHere("nested arrays not supported")
+}
+
+internal fun FlatZincCompiler.exactFloatInteger(value: Long): Double {
+    val converted = value.toDouble()
+    if (BigFraction.ofDouble(converted) != BigFraction.ofLong(value)) {
+        unsupportedHere("Integer literal in float arithmetic is not exactly representable in binary64")
+    }
+    return converted
 }
