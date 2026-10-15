@@ -48,7 +48,9 @@ class LpExplanationTest {
     @Test
     fun `expanded row reasons require every defining row premise`() {
         for (unbacked in listOf(-1, 0, 1, 2)) {
-            val problem = Problem(3, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 2)
+            val problem = Problem(3, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 2,
+                realLower = doubleArrayOf(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY))
             val session = PropagationSession(problem)
             for (variable in 0..2) session.pinBool(variable, true)
             val source = LpBuilder().apply {
