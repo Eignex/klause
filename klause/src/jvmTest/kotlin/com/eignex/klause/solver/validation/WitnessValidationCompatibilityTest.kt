@@ -26,8 +26,9 @@ class WitnessValidationCompatibilityTest {
                 Assumptions::class.java, Set::class.java, Function1::class.java)),
             Triple("portfolio.RealWitnessVerificationKt", "verifyRealCoordinates", Verification::class.java to listOf(
                 Problem::class.java, Sample::class.java)),
-            Triple("portfolio.FiniteWitnessVerificationKt", "finiteWitnessVerifier", CandidateVerifier::class.java to listOf(
-                BakedProblem::class.java, LinearObjective::class.java, Cancellation::class.java, Function1::class.java)),
+            Triple("portfolio.FiniteWitnessVerificationKt", "finiteWitnessVerifier",
+                CandidateVerifier::class.java to listOf(BakedProblem::class.java, LinearObjective::class.java,
+                    Cancellation::class.java, Function1::class.java)),
             Triple("solver.pipeline.OpenWitnessKt", "verifyOpenWitness", Verification::class.java to listOf(
                 Problem::class.java, Sample::class.java, Cancellation::class.java)),
             Triple("solver.pipeline.OpenWitnessKt", "refuteOpenWitness", String::class.java to listOf(
