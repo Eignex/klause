@@ -39,6 +39,8 @@ internal fun Factor.invariantProjection(
 internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invariant = when (this) {
     is AllDifferent -> allDifferentInvariantProjection()
 
+    is Abs -> AbsInvariant(operand, result)
+
     is ArrayMinMax -> ArrayMinMaxInvariant(result, xs, max)
 
     is Cardinality -> CardinalityInvariant(boolVars, literals, min, max)

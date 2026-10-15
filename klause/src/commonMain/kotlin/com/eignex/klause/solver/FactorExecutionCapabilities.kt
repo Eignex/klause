@@ -117,6 +117,7 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     } else {
         domainRelaxation
     }
+    is Abs -> domainRelaxation
     is Inverse, is ValuePrecede -> finiteDomains
     is ArrayMinMax, is Product, is Increasing, is ReifiedLinear -> boundRelaxation
     is Linear -> if (constants is RealConstants) realArithmetic else boundRelaxation

@@ -478,16 +478,14 @@ internal fun Compiler.Builder.postLinearRel(a: LinComb, b: LinComb, op: LinearOp
     assertLinearRow(coeffs, vars, op, bound)
 }
 
-/** `abs(x)` as a fresh `y ≥ 0` pinned to `|x|`: `y ≥ x`, `y ≥ −x`, and `y = x ∨ y = −x`. The fresh
- *  var is bounded by `x`'s own range so an unbounded default never enters its defining constraints. */
 private fun Compiler.Builder.absTerm(x: LinComb): LinComb {
     val (xLo, xHi) = linCombRange(x)
-    val y = LinComb(mapOf(newInt(0L, absHi(xLo, xHi)) to 1), 0)
-    val negX = x.scaled(-1L)
-    postLinearRel(y, x, LinearOp.GE)
-    postLinearRel(y, negX, LinearOp.GE)
-    factors.add(Clause(intArrayOf(reifyEq(y, x), reifyEq(y, negX))))
-    return y
+    val operand = x.asSimpleVar() ?: newInt(xLo, xHi).also { id ->
+        postLinearRel(LinComb(mapOf(id to 1L), 0L), x, LinearOp.EQ)
+    }
+    val result = newInt(0L, absHi(xLo, xHi))
+    factors.add(com.eignex.klause.factor.arithmetic.Abs(operand, result))
+    return LinComb(mapOf(result to 1L), 0L)
 }
 
 /** Euclidean `div`/`mod` by a **constant** divisor `d`: fresh `q`, `m` with `a = d·q + m` and

@@ -942,20 +942,18 @@ internal object Compiler {
             return IntComb.Narrow(LinComb(mapOf((if (mod) r else q) to 1L), 0L))
         }
 
-        /** `|expr|` as a linear term: `|v| = max(v, -v)` via [ArrayMinMax] over `v` and its negation. */
         internal fun absOf(lin: IntComb): IntComb {
             val v = materializeVar(lin)
             val d = domains[v]
-            val neg = newAuxVar(-d.max, -d.min)
-            factors.add(Linear(intArrayOf(1, 1), intArrayOf(v, neg), LinearOp.EQ, 0)) // neg = −v
-            val hi = maxOf(-d.min, d.max)
+            val hi = if (d.min == Long.MIN_VALUE) Long.MAX_VALUE else maxOf(kotlin.math.abs(d.min), kotlin.math.abs(d.max))
             val lo = when {
                 d.min <= 0L && d.max >= 0L -> 0L
                 d.min > 0L -> d.min
+                d.max == Long.MIN_VALUE -> Long.MAX_VALUE
                 else -> -d.max
             }
             val a = newAuxVar(lo, hi)
-            factors.add(ArrayMinMax(result = a, xs = intArrayOf(v, neg), max = true))
+            factors.add(com.eignex.klause.factor.arithmetic.Abs(v, a))
             return IntComb.Narrow(LinComb(mapOf(a to 1L), 0L))
         }
 

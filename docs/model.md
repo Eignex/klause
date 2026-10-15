@@ -298,3 +298,19 @@ is a separate heuristic requirement. Inert finite deduction can use the original
 point checker, while missing checks remain declined. Objective and conditioned plans
 retain the capture. Compact CP and polynomial finite views bind those descriptors to
 their own factor coordinates; source factor rewrites select against rewritten data.
+
+## Absolute-value relations
+
+`factor.arithmetic.Abs` retains the exact integer relation `result = |operand|`.
+Schema expressions, FlatZinc `int_abs`, representable SMT-LIB integer terms and
+XCSP3 `abs`/`dist` expressions produce this factor. Coordinate remapping retains
+both roles even when they alias. Signed-word finite execution excludes
+`Long.MIN_VALUE` operands because their magnitude has no representable result.
+
+Selected linear consumers receive nonnegativity and the disjunction of positive
+and negative equalities. Polynomial consumers receive the equivalent formula.
+The separately declared inequalities are a relaxation and cannot enforce the
+source relation. Finite propagation keeps sign-aware bounds and filters holes
+when each visited domain has at most 1024 values. Larger domains retain bounds
+filtering and exact complete-point checks. Local scoring checks the full relation,
+repairs either role and maintains acyclic outputs through the definition network.

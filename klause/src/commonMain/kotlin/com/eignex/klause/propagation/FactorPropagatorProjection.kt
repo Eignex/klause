@@ -44,6 +44,8 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
         { idx, state -> OptionalPresence.isDefinitelyPresent(presents, idx, state) },
     )
 
+    is Abs -> AbsPropagator(operand, result)
+
     is ArrayMinMax -> ArrayMinMaxPropagator(result, xs, max, boolVars, intVars)
 
     is Cardinality -> CardinalityPropagator(boolVars, intVars, literals, min, max)

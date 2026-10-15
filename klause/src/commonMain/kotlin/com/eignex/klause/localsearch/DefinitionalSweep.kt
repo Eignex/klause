@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
@@ -122,6 +123,7 @@ class DefinitionalSweep internal constructor(
                     defOut[v] = outIdx
                 }
             }
+            for (factor in factors) if (factor is Abs) claim(factor.result, factor, -1)
             val isProductResult = BooleanArray(numIntVars)
             for (f in factors) {
                 if (f is Product) {
@@ -192,6 +194,10 @@ class DefinitionalSweep internal constructor(
                         FunctionalObjective.Operand.v(f.b),
                     )
                     inputs = intArrayOf(f.a, f.b)
+                } else if (f is Abs) {
+                    visit(f.operand)
+                    node = FunctionalObjective.Abs(v, FunctionalObjective.Operand.v(f.operand))
+                    inputs = intArrayOf(f.operand)
                 } else if (f is ArrayMinMax) {
                     for (input in f.xs) visit(input)
                     node = FunctionalObjective.Extreme(

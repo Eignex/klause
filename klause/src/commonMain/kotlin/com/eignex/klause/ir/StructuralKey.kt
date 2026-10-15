@@ -96,6 +96,7 @@ internal enum class FactorKind {
     COMPARISON_CLAUSE,
     DIFFERENCE_SYSTEM,
     CONTINUOUS_PRODUCT,
+    ABS,
     EXACT_SEARCH_ROW,
     MPS_SOURCE_INDICATOR,
 }
