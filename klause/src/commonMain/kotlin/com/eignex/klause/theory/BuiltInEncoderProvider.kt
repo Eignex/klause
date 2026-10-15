@@ -2,6 +2,8 @@ package com.eignex.klause.theory
 
 import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
+
+import com.eignex.klause.factor.arithmetic.DivMod
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -62,6 +64,9 @@ object BuiltInEncoderProvider : EncoderProvider {
         factor is Abs && target == EncodingTarget.LINEAR -> AbsEncoding.linear
         factor is Abs && target == EncodingTarget.POLYNOMIAL -> AbsEncoding.polynomial
         factor is Power -> PowerEncoders.select(factor, target)
+
+
+        factor is DivMod -> divModEncoder(factor, target)
         target == EncodingTarget.POLYNOMIAL && factor is ContinuousProduct -> continuousProduct
         target == EncodingTarget.POLYNOMIAL && factor is RealProduct -> mixedProduct
         target == EncodingTarget.LINEAR && factor is RealProduct -> conditionedProduct(factor)

@@ -50,7 +50,7 @@ internal fun Lowering.lift(expr: IntExpr): IntExpr = when (expr) {
  * Lower `n div d` and `n mod d` with truncated-toward-zero semantics (the FlatZinc
  * `int_div`/`int_mod` convention, the same as `kotlin.Int.rem`): `|r| < |d|`
  * and `r` takes the sign of the dividend `n`, e.g. `(-7) mod 3 = -1` with `q = -2`. The
- * encoding is shared with the FlatZinc front-end via [IntFunctionLowering.truncatedDivMod];
+ * relation is shared with the FlatZinc front-end via [IntFunctionLowering.truncatedDivMod];
  * `d ≠ 0` is required up front rather than left to propagation.
  */
 internal fun Lowering.liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Boolean): IntExpr {
@@ -66,6 +66,7 @@ internal fun Lowering.liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Bo
         remainder = null,
         freshInt = { d -> intVarOf(newAuxIntVar(d)) },
         freshBool = { newBoolVar() },
+        existing = factors,
     )
     factors += res.factors
     val resultId = if (returnRemainder) res.remainder else res.quotient

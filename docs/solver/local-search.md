@@ -235,6 +235,18 @@ definition probes round that complete discrete sum once, preserving cancellation
 and the direction of wide coordinate changes. Functional objective views retain
 exact weighted cone totals and subtract them before conversion to floating point.
 
+### Integer division outputs
+
+A retained `DivMod` supplies exact graded checks and simultaneous-role move deltas.
+Unique acyclic quotient and remainder outputs follow dividend/divisor moves through
+the definition network. Outputs that can equal the reserved minimum-word no-write
+sentinel remain searched. Zero divisors leave outputs untouched and the factor
+violated. Definition clamping supplies candidates only; the exact relation still
+checks every output and pin. Direct repairs offer quotient/remainder updates together
+and reconstruct a dividend from the current pair, subject to domains and whole-factor
+grading. [Source semantics](../model.md#integer-division-relations) retain the declared
+rounding convention and wide arithmetic.
+
 ### Element results
 
 Hinted native Element results are maintained from their indexes and selected cells.

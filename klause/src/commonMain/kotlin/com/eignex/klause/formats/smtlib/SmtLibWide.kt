@@ -12,11 +12,9 @@ import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
 import com.eignex.klause.util.isZero
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.negate
 import com.eignex.klause.util.plus
+import com.eignex.klause.util.negate
 import com.eignex.klause.util.signum
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
@@ -94,24 +92,5 @@ internal fun Compiler.Builder.wideAbsTerm(x: WideLinComb): IntComb {
     return y
 }
 
-/**
- * Euclidean `div`/`mod` by a **constant** divisor at arbitrary precision: fresh `q` and `m` with
- * `a = d·q + m` and `0 ≤ m < |d|`. A non-constant divisor is genuinely non-linear, so rejected.
- */
-internal fun Compiler.Builder.wideDivModTerm(a: IntComb, b: IntComb, quotient: Boolean): IntComb {
-    val bw = b.toWide()
-    if (bw.coeffs.isNotEmpty()) smtUnsupported("non-constant divisor in div/mod")
-    val d = bw.constant
-    if (d.isZero()) smtUnsupported("division by zero in div/mod")
-    val absd = d.abs()
-    val aMagnitude = intCombMagnitude(a)
-    // |q| ≤ |a|/|d| + 1: the quotient of the widest value the dividend can reach, with a unit of slack
-    // for the remainder's sign.
-    val qMagnitude = aMagnitude?.div(absd)?.plus(BIG_ONE)
-    val q = freshWideInt(qMagnitude)
-    val m = freshWideInt(absd)
-    assertRelation(">=", m, IntComb.Wide(WideLinComb(emptyMap(), BIG_ZERO)))
-    assertRelation("<=", m, IntComb.Wide(WideLinComb(emptyMap(), absd - BIG_ONE)))
-    assertRelation("=", a, IntComb.Wide(q.toWide().scaled(d).plus(m.toWide())))
-    return if (quotient) q else m
-}
+internal fun Compiler.Builder.wideDivModTerm(a: IntComb, b: IntComb, quotient: Boolean): IntComb =
+    retainedEuclideanDivMod(a, b, quotient)

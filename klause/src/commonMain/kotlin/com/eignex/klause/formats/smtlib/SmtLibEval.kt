@@ -1,7 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -428,11 +427,7 @@ private fun Compiler.Builder.combineInt(head: String, args: List<Res>): Res = wh
 
 /** `div`/`mod` on the 64-bit path when both operands fit it, at arbitrary precision otherwise. */
 private fun Compiler.Builder.divModRes(a: IntComb, b: IntComb, quotient: Boolean): Res =
-    if (a is IntComb.Narrow && b is IntComb.Narrow) {
-        narrowRes(divModTerm(a.lin, b.lin, quotient))
-    } else {
-        Res.I(wideDivModTerm(a, b, quotient))
-    }
+    Res.I(wideDivModTerm(a, b, quotient))
 
 /**
  * `v = if cond then a else b`: a fresh quantity pinned to each branch by the condition.
@@ -486,27 +481,6 @@ private fun Compiler.Builder.absTerm(x: LinComb): LinComb {
     val result = newInt(0L, absHi(xLo, xHi))
     factors.add(com.eignex.klause.factor.arithmetic.Abs(operand, result))
     return LinComb(mapOf(result to 1L), 0L)
-}
-
-/** Euclidean `div`/`mod` by a **constant** divisor `d`: fresh `q`, `m` with `a = d·q + m` and
- *  `0 ≤ m < |d|`. `q` is bounded by `a`'s range / `d`; when `a` is open on the driving side `q` stays
- *  open (an [PresolveDomain.Open] aux var). A non-constant divisor is genuinely non-linear, so rejected. */
-private fun Compiler.Builder.divModTerm(a: LinComb, b: LinComb, quotient: Boolean): LinComb {
-    if (b.coeffs.isNotEmpty()) smtUnsupported("non-constant divisor in div/mod")
-    val d = b.constant
-    if (d == 0L) smtUnsupported("division by zero in div/mod")
-    val absd = if (d < 0) -d else d
-    val (aLo, aHi) = linCombRange(a)
-    // floorDiv is monotone in `a` (increasing for d>0, decreasing for d<0); pick the a-bound driving
-    // each side of q's range, with ±1 slack for the remainder. A null (open) driving bound leaves q open.
-    val qLoA = if (d > 0) aLo else aHi
-    val qHiA = if (d > 0) aHi else aLo
-    val qLo = qLoA?.let { addOrNull(floorDivLong(it, d), -1L) }
-    val qHi = qHiA?.let { addOrNull(floorDivLong(it, d), 1L) }
-    val m = LinComb(mapOf(newInt(0L, absd - 1) to 1), 0)
-    val q = LinComb(mapOf(newInt(qLo, qHi) to 1), 0)
-    postLinearRel(a, q.scaled(d).plus(m), LinearOp.EQ) // a = d·q + m
-    return if (quotient) q else m
 }
 
 /** Upper bound of `|x|` given `x ∈ [lo, hi]` (each null = infinite); null when unbounded either way. */

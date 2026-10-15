@@ -21,7 +21,7 @@ separately at [eignex.com/docs/klause](https://eignex.com/docs/klause/).
 
 | Page | Purpose |
 |---|---|
-| [Model representation and ownership](model.md) | Source declarations, engine views, immutable results and configuration capture |
+| [Model representation and ownership](model.md) | Source declarations, [integer division](model.md#integer-division-relations), engine views, immutable results and configuration capture |
 | [Library API](api.md) | Supported entry points, extension contracts, mappings and public value ownership |
 | [Input semantics](formats.md) | Shared routing, current coverage and a directory of source-format contracts |
 | [CLI](cli.md) | Build and run, format dispatch, engine selection and control flags |

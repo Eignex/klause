@@ -883,11 +883,6 @@ internal object Compiler {
             return IntComb.Narrow(LinComb(mapOf(v to 1L), 0L))
         }
 
-        /** Integer `div`/`mod` by a nonzero constant, matching XCSP3's truncated-toward-zero semantics:
-         *  the reference evaluator computes `a / k` and `a % k` with Java's operators, so the quotient
-         *  truncates toward zero and the remainder takes the dividend's sign. Encoded as `a = k·q + r`
-         *  with `|r| < |k|` and `r` sharing `a`'s sign. A variable or zero divisor stays unsupported —
-         *  a nonlinear/division-by-zero shape we cannot soundly linearize. */
         internal fun divModTerm(args: List<FExpr>, mod: Boolean): IntComb {
             val a = materializeVar(linear(args[0]))
             val bLin = linear(args[1])
@@ -897,51 +892,24 @@ internal object Compiler {
                 is IntComb.Wide -> throw UnsupportedXcsp3Exception("div/mod by an over-64-bit constant divisor")
             }
             if (k == 0L) throw UnsupportedXcsp3Exception("div/mod by zero divisor")
-            val da = domains[a]
-            val absK = if (k < 0) -k else k
-            // trunc(a / k) is monotonic in `a` for a fixed-sign `k`, so the domain endpoints bound `q`
-            // (Kotlin's Long `/` already truncates toward zero, matching the required convention).
-            val qa = da.min / k
-            val qb = da.max / k
-            val q = newAuxVar(minOf(qa, qb), maxOf(qa, qb))
-            val r = newAuxVar(-(absK - 1), (absK - 1))
-            factors.add(Linear(longArrayOf(1, -k, -1), intArrayOf(a, q, r), LinearOp.EQ, 0L)) // a = k·q + r
-            // Truncation ⇒ r shares the dividend's sign (or is 0). Pin it: trivially when `a` is
-            // single-signed, else gate on the reified sign of `a`.
-            when {
-                da.min >= 0L -> factors.add(Linear(intArrayOf(1), intArrayOf(r), LinearOp.GE, 0))
-
-                da.max <= 0L -> factors.add(Linear(intArrayOf(1), intArrayOf(r), LinearOp.LE, 0))
-
-                else -> {
-                    val aNonNeg = reifyLinear(intArrayOf(1), intArrayOf(a), LinearOp.GE, 0)
-                    val rNonNeg = reifyLinear(intArrayOf(1), intArrayOf(r), LinearOp.GE, 0)
-                    val rNonPos = reifyLinear(intArrayOf(1), intArrayOf(r), LinearOp.LE, 0)
-                    factors.add(Clause(intArrayOf(Lit.negate(aNonNeg), rNonNeg))) // a ≥ 0 ⟹ r ≥ 0
-                    factors.add(Clause(intArrayOf(aNonNeg, rNonPos))) // a < 0 ⟹ r ≤ 0
-                }
-            }
-            return IntComb.Narrow(LinComb(mapOf((if (mod) r else q) to 1L), 0L))
+            return retainedDivMod(a, newAuxVar(k, k), mod)
         }
 
-        /** Integer `div`/`mod` by a *variable* divisor, supported only when the divisor is provably
-         *  positive (`b ≥ 1`, so no division by zero) and the dividend provably non-negative
-         *  (`a ≥ 0`) — the range where truncated and floored division coincide: `a = b·q + r`
-         *  with `0 ≤ r < b`. Other shapes stay unsupported (sign-dependent truncation / zero divisor). */
         internal fun divModVar(a: Int, b: Int, mod: Boolean): IntComb {
             val da = domains[a]
             val db = domains[b]
             if (da.min < 0L || db.min < 1L) {
                 throw UnsupportedXcsp3Exception("div/mod by variable divisor requires b >= 1 and a >= 0")
             }
-            val q = newAuxVar(0L, da.max / db.min)
-            val r = newAuxVar(0L, db.max - 1)
-            val (plo, phi) = productBounds(b, q)
-            val p = newAuxVar(plo, phi)
-            factors.add(Product(b, q, p)) // p = b·q
-            factors.add(Linear(intArrayOf(1, -1, -1), intArrayOf(a, p, r), LinearOp.EQ, 0)) // a = b·q + r
-            factors.add(Linear(intArrayOf(1, -1), intArrayOf(r, b), LinearOp.LE, -1)) // r < b
-            return IntComb.Narrow(LinComb(mapOf((if (mod) r else q) to 1L), 0L))
+            return retainedDivMod(a, b, mod)
+        }
+
+        private fun retainedDivMod(a: Int, b: Int, mod: Boolean): IntComb {
+            val relation = com.eignex.klause.lowering.retainDivMod(a, b, domains[a], domains[b],
+                quotient = null, remainder = null, existing = factors,
+                freshInt = { domain -> newAuxVar(domain.min, domain.max) })
+            factors.addAll(relation.factors)
+            return IntComb.Narrow(LinComb(mapOf((if (mod) relation.remainder else relation.quotient) to 1L), 0L))
         }
 
         internal fun absOf(lin: IntComb): IntComb {

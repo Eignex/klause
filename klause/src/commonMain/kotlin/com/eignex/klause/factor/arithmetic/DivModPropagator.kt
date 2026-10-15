@@ -1,0 +1,103 @@
+package com.eignex.klause.factor.arithmetic
+
+import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
+import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.maxOf
+import com.eignex.klause.util.minOf
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
+
+internal class DivModPropagator(private val relation: DivMod) : Propagator {
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectHoleAndBoundAntecedents(state, relation.intVars)
+
+    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        val reason = collectHoleAndBoundAntecedents(state, relation.intVars)
+        val divisor = relation.divisor
+        if (divisor != null && !state.excludeIntValue(divisor, 0L, reason)) return false
+        val a = state.intDomains[relation.dividend]
+        val b = divisor?.let { state.intDomains[it] }
+        val constant = relation.constantDivisor ?: b?.takeIf { it.min == it.max }?.min?.let(::bigIntOf)
+        val magnitude = constant?.abs() ?: maxOf(bigIntOf(checkNotNull(b).min).abs(), bigIntOf(b.max).abs())
+        if (magnitude == BIG_ZERO) return false
+        val remainderLimit = magnitude - BIG_ONE
+        val nonnegative = relation.convention == DivisionConvention.EUCLIDEAN || a.min >= 0L
+        val nonpositive = relation.convention == DivisionConvention.TRUNCATING && a.max <= 0L
+        if (!tighten(state, relation.remainder, if (nonnegative) BIG_ZERO else BIG_ZERO - remainderLimit,
+                if (nonpositive) BIG_ZERO else remainderLimit, reason)) return false
+        if (constant != null) {
+            val first = checkNotNull(relation.outputs(bigIntOf(a.min), constant)).first
+            val last = checkNotNull(relation.outputs(bigIntOf(a.max), constant)).first
+            if (!tighten(state, relation.quotient, minOf(first, last), maxOf(first, last), reason)) return false
+            val q = state.intDomains[relation.quotient]
+            val r = state.intDomains[relation.remainder]
+            val p1 = constant * bigIntOf(q.min)
+            val p2 = constant * bigIntOf(q.max)
+            if (!tighten(state, relation.dividend, minOf(p1, p2) + bigIntOf(r.min),
+                    maxOf(p1, p2) + bigIntOf(r.max), reason)) return false
+            val currentA = state.intDomains[relation.dividend]
+            if (!tighten(state, relation.remainder, bigIntOf(currentA.min) - maxOf(p1, p2),
+                    bigIntOf(currentA.max) - minOf(p1, p2), reason)) return false
+        }
+        return filterTuples(state, constant, reason)
+    }
+
+    private fun filterTuples(state: PropagationState, constant: BigInt?, reason: IntArray?): Boolean {
+        val dividends = state.intDomains[relation.dividend].spanOrNull(MAX_PAIRS.toLong()) ?: return true
+        val divisors = relation.divisor?.let { state.intDomains[it].spanOrNull(MAX_PAIRS.toLong()) ?: return true }
+        if (dividends.size.toLong() * (divisors?.size ?: 1) > MAX_PAIRS) return true
+        val variables = relation.intVars.distinct()
+        val supports = variables.associateWith { HashSet<Long>() }
+        for (i in 0 until dividends.size) {
+            val av = dividends.valueAt(i)
+            for (j in 0 until (divisors?.size ?: 1)) {
+                val bv = divisors?.valueAt(j)
+                val outputs = relation.outputs(bigIntOf(av), bv?.let(::bigIntOf) ?: checkNotNull(constant)) ?: continue
+                if (!outputs.first.fitsLong() || !outputs.second.fitsLong()) continue
+                val tuple = linkedMapOf(relation.dividend to av)
+                fun put(v: Int, value: Long): Boolean {
+                    if (value !in state.intDomains[v]) return false
+                    val previous = tuple.put(v, value)
+                    return previous == null || previous == value
+                }
+                if (relation.divisor != null && !put(relation.divisor, checkNotNull(bv))) continue
+                if (!put(relation.quotient, outputs.first.toLongExact()) ||
+                    !put(relation.remainder, outputs.second.toLongExact())) continue
+                for ((v, value) in tuple) supports.getValue(v).add(value)
+            }
+        }
+        for (v in variables) {
+            val values = supports.getValue(v)
+            if (values.isEmpty()) return false
+            if (!state.tightenIntMin(v, values.min(), reason) || !state.tightenIntMax(v, values.max(), reason)) return false
+            val domain = state.intDomains[v].spanOrNull(MAX_PAIRS.toLong()) ?: continue
+            for (i in 0 until domain.size) {
+                val value = domain.valueAt(i)
+                if (value !in values && !state.excludeIntValue(v, value, reason)) return false
+            }
+        }
+        return true
+    }
+
+    private fun tighten(state: PropagationState, variable: Int, lower: BigInt, upper: BigInt,
+        reason: IntArray?): Boolean {
+        val domain = state.intDomains[variable]
+        if (lower > bigIntOf(domain.max) || upper < bigIntOf(domain.min)) return false
+        if (lower > bigIntOf(domain.min) && !state.tightenIntMin(variable, lower.toLongExact(), reason)) return false
+        return upper >= bigIntOf(domain.max) || state.tightenIntMax(variable, upper.toLongExact(), reason)
+    }
+
+    private companion object {
+        const val MAX_PAIRS = 4096
+    }
+}
