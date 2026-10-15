@@ -63,6 +63,13 @@ first descent before importing solution-guided peers. Importing a hint retains t
 trail and learned state and supplies no local incumbent, pruning or publication
 authority.
 
+Finite satisfaction over a native real absolute value uses selected complete linear
+completion at each fixed discrete assignment. A private exact component explores its
+arithmetic alternatives under the containing execution controls, then returns either
+source real coordinates, a refuted discrete assignment or an undecided completion.
+Its preparation and native work contribute to the containing traversal; private
+arithmetic decisions do not change source integer ownership.
+
 ### Lazy branch selection
 
 `SearchBranchProposal` supplies exhaustive, mutually exclusive alternatives without
