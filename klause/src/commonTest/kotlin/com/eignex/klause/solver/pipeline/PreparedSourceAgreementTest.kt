@@ -35,6 +35,7 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.plus
 import kotlin.test.Test
@@ -286,6 +287,52 @@ class PreparedSourceAgreementTest {
 
                 assertIs<ComponentCheck.Indeterminate>(result)
             }
+        }
+    }
+
+    @Test
+    fun `coordinate agreement rejects a point outside a published integer side`() {
+        val source = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0L), longArrayOf(2L), null, null),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchComponentSet(listOf(component)).session()
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtLeast(0, 1L)))
+            assertIs<ComponentCheck.Feasible>(session.check())
+            val point = AssembledSearchModel(mapOf(
+                SearchExactIntValue(SourceIntId(0)) to bigIntOf(0),
+                SearchExactRealValue(SourceRealId(0)) to BigFraction.ZERO,
+            ))
+
+            val result = component.checkSourceCoordinates(point, session)
+
+            assertIs<ComponentCheck.Indeterminate>(result)
+        }
+    }
+
+    @Test
+    fun `coordinate agreement releases a retracted published integer side`() {
+        val source = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0L), longArrayOf(2L), null, null),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchComponentSet(listOf(component)).session()
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtLeast(0, 1L)))
+            assertIs<ComponentCheck.Feasible>(session.check())
+            session.popTo(0)
+            assertIs<ComponentCheck.Feasible>(session.check())
+            val point = AssembledSearchModel(mapOf(
+                SearchExactIntValue(SourceIntId(0)) to bigIntOf(0),
+                SearchExactRealValue(SourceRealId(0)) to BigFraction.ZERO,
+            ))
+
+            val result = component.checkSourceCoordinates(point, session)
+
+            assertIs<ComponentCheck.Feasible>(result)
         }
     }
 
