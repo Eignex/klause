@@ -73,44 +73,35 @@ class PortfolioWorker private constructor(
 
     internal var controlsObjectiveCutoff: Boolean = false
 
-    internal var evidenceModel: ModelIdentity? = null
-        private set
+    private var configuredModel: ModelIdentity? = null
     private var provesSourceResults = true
-    internal val permitsSourceProofs: Boolean get() = provesSourceResults
-    internal var evidenceScope: SourceScope? = null
+    internal var sourceBinding: SourceWorkerBinding? = null
         private set
-    internal var evidenceInvocation: EngineInvocation? = null
-        private set
-    internal var sharingInvocation: EngineInvocation? = null
-        private set
-
-    internal fun bindSharingInvocation(invocation: EngineInvocation): PortfolioWorker = also {
-        require(evidenceModel?.matches(invocation.model) == true) { "sharing differs from the worker model" }
-        require(sharingInvocation?.matches(invocation) != false) { "worker cannot change its sharing invocation" }
-        sharedPools?.bounds?.bindInvocation(invocation)
-        sharedPools?.varBounds?.bindInvocation(invocation)
-        sharingInvocation = invocation
-    }
+    internal val evidenceModel: ModelIdentity? get() = sourceBinding?.model ?: configuredModel
+    internal val permitsSourceProofs: Boolean get() = sourceBinding?.provesResults ?: provesSourceResults
+    internal val evidenceScope: SourceScope? get() = sourceBinding?.scope
+    internal val evidenceInvocation: EngineInvocation? get() = sourceBinding?.invocation
+    internal val sharingInvocation: EngineInvocation? get() = sourceBinding?.sharingInvocation
     internal var executionAssumptions: Assumptions? = null
         private set
 
-    internal fun bindInvocation(invocation: EngineInvocation): PortfolioWorker = also {
-        require(evidenceModel?.matches(invocation.model) == true) { "invocation differs from the worker model" }
-        require(evidenceInvocation?.matches(invocation) != false) { "worker cannot change its runtime invocation" }
-        require(evidenceScope == null || evidenceScope == invocation.scope) { "worker has a different capture scope" }
-        evidenceInvocation = invocation
-        invocation.scope?.let { bindSourceScope(it) }
-    }
-
-    internal fun bindSourceScope(scope: SourceScope): PortfolioWorker = also {
-        require(evidenceScope == null || evidenceScope == scope) { "worker cannot change its source invocation" }
-        require(evidenceInvocation == null || evidenceInvocation?.scope == scope) { "worker has another runtime scope" }
-        evidenceScope = scope
+    internal fun bindSource(binding: SourceWorkerBinding): PortfolioWorker = also {
+        require(evidenceModel?.matches(binding.model) != false) { "binding differs from the worker model" }
+        require(permitsSourceProofs || !binding.provesResults) { "binding cannot promote witness authority" }
+        val existing = sourceBinding
+        require(existing == null || existing.matches(binding)) { "worker cannot change its source binding" }
+        if (existing == null) {
+            binding.sharingInvocation?.let { invocation ->
+                sharedPools?.bounds?.bindInvocation(invocation)
+                sharedPools?.varBounds?.bindInvocation(invocation)
+            }
+            sourceBinding = binding
+        }
     }
 
     internal fun certificateFor(kind: EvidenceKind, completion: CompletedEngineResult): EvidenceCertificate? {
         val model = evidenceModel ?: return null
-        if (!provesSourceResults || evidenceScope != completion.scope) return null
+        if (!permitsSourceProofs || evidenceScope != completion.scope) return null
         val runtime = evidenceInvocation
         if (runtime != null && completion.invocation?.let { runtime.matches(it) } != true) return null
         if ((evidenceInvocation == null) != (completion.invocation == null)) return null
@@ -119,7 +110,10 @@ class PortfolioWorker private constructor(
 
     internal fun bindEvidence(model: ModelIdentity, provesResults: Boolean = true): PortfolioWorker = also {
         require(evidenceModel?.matches(model) != false) { "worker cannot change its model or objective" }
-        evidenceModel = model
+        require(sourceBinding == null || permitsSourceProofs == (permitsSourceProofs && provesResults)) {
+            "worker cannot change its source authority"
+        }
+        configuredModel = model
         provesSourceResults = provesSourceResults && provesResults
     }
 

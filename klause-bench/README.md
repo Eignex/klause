@@ -316,6 +316,16 @@ the documented lab client. These component/provider measurements include prepara
 and differ from ordinary whole-CLI timings; pair them with matched source-checked CLI
 controls before claiming end-to-end parity.
 
+`bench.profile.ExecutionOptionsProfile` compares legacy request parsing, captured frontend
+options and directly typed options while repeatedly resolving the same portfolio settings.
+`rounds` (default seven) alternates mode order after one warmup round; `plans` (default
+10,000) sets the plans per measurement. The profile retains wall nanoseconds, thread
+allocation bytes, actual revision, runtime/options, classpath hashes and resolved
+seed/core/arm/slice settings under `$OUT/execution-options.json`. Run it through the
+AWS lab client at a pushed pinned revision. These planning costs exclude model
+preparation, worker execution and source checking; use matched whole-CLI controls
+for end-to-end comparisons.
+
 `bench.profile.PublishedAbiSnapshot` captures compiler-generated JVM and Kotlin/Native
 published API declarations from the profile job's pinned checkout. It runs
 `:klause:updateKotlinAbi` remotely, retains both exact dumps, the generation log and
@@ -1752,6 +1762,29 @@ return metadata; it does not establish the full calling convention, complete
 code-size/root coverage, clocks or compiler savings, and never changes original
 argument-binding or capture-wide acceptance flags. The review performs no new
 field reads, observer attachment or captured JVM replay.
+
+### Polynomial witness work checkpoints
+
+`com.eignex.klause.bench.profile.PolynomialWitnessProbeProfile` diagnoses the bounded
+root witness producer before CAD. Its single `request64=<base64>` argument encodes
+up to eight `{id, base64, sha256}` original SMT sources. The decoded request is bounded
+to 48 KiB and each unchanged source to 32 KiB. Run it through an AWS lab profile at
+a pinned revision. The output retains original bytes, request, installed provenance
+and revision, including installed harness hashes and actual JVM options/core count,
+plus alternating plain/observed producer records.
+
+The JVM-only observer reflects the existing root query and native owner. It records
+the stack and cumulative charge at the existing coupled-work stop checkpoint without
+returning cancellation or adding native charges. An observing caller meter also groups
+every existing native charge by its engine stack; the attributed sum must match the
+native snapshot. Stack collection adds diagnostic overhead, not native allowance.
+Both modes use the same source,
+fixings, default representation caps and a 60-second containing deadline. Two query
+checkpoints run normalization and bounded probing; no projection or lifting follows.
+All four native snapshots and outcome classes must agree. A pending producer supplies
+no verdict; a component witness still needs ordinary pipeline admission and independent
+original-source checking. Instrumented component timings establish no default-route
+performance gain. Field/method incompatibility fails the diagnostic explicitly.
 
 ### Table profiling
 

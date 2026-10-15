@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.EngineInvocation
@@ -74,7 +75,9 @@ internal class TranscendentalPortfolioInvocation(
                 1 -> ArmFamily.LocalSearch;
                 else -> ArmFamily.Lns
             }
-            PortfolioArmFactory(plan, arm, family) { slot ->
+            PortfolioArmFactory(plan, arm, family, binding = {
+                SourceWorkerBinding(binding, provesResults = it.permitsSourceProofs)
+            }) { slot ->
                 val strategyParams = params.strategy
                 val controls = params.copy(
                     maximumWork = params.maximumWork?.let(slot::nativeAllowance),

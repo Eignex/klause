@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.EngineInvocation
@@ -34,7 +35,7 @@ internal fun linearNeighborhoodInvocation(
         scope = context?.scope, condition = context?.scope?.condition)
     val factories = List(count) { index ->
         PortfolioArmFactory(prepared, index, if (adaptive) ArmFamily.Lns else ArmFamily.LocalSearch,
-            bind = { it.bindInvocation(binding) }) { slot ->
+            binding = { SourceWorkerBinding(binding, provesResults = it.permitsSourceProofs) }) { slot ->
             val local = params.copy(openWorkLimit = slot.nativeAllowance(params.openWorkLimit),
                 maxLeaves = slot.nativeAllowance(params.maxLeaves),
                 maxDecisions = slot.nativeAllowance(params.maxDecisions),

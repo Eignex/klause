@@ -1,16 +1,16 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
-import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.AcceptedPortfolioIncumbent
+import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioIncumbents
-import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.PortfolioTerminalCheck
+import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
@@ -67,7 +67,11 @@ internal class PortfolioInvocation(
     private val workers = ArrayList<PortfolioWorker>()
     private val portfolio: Portfolio = try {
         for (slot in resources.slots) {
-            workers += this.factories[slot.index % this.factories.size].materialize(preparedPlan, slot)
+            val worker = this.factories[slot.index % this.factories.size].materialize(preparedPlan, slot)
+            workers += worker
+            require(worker.sourceBinding?.preparedPlan === preparedPlan) {
+                "source portfolio requires a complete worker binding"
+            }
         }
         val selected = policy(workers.toList())
         Portfolio.thompson(
@@ -86,9 +90,11 @@ internal class PortfolioInvocation(
         }
     } catch (failure: Throwable) {
         for (worker in workers.asReversed()) {
-            runCatching { worker.close() }.exceptionOrNull()?.let(failure::addSuppressed)
+            runCatching { worker.close() }.exceptionOrNull()
+                    ?.takeUnless { it === failure }?.let(failure::addSuppressed)
         }
-        runCatching { resources.close() }.exceptionOrNull()?.let(failure::addSuppressed)
+        runCatching { resources.close() }.exceptionOrNull()
+                    ?.takeUnless { it === failure }?.let(failure::addSuppressed)
         throw failure
     }
     private var closed = false
@@ -124,7 +130,8 @@ internal class PortfolioInvocation(
         try {
             portfolio.close()
         } catch (failure: Throwable) {
-            runCatching { resources.close() }.exceptionOrNull()?.let(failure::addSuppressed)
+            runCatching { resources.close() }.exceptionOrNull()
+                    ?.takeUnless { it === failure }?.let(failure::addSuppressed)
             throw failure
         }
         resources.close()

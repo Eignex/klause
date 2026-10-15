@@ -9,29 +9,29 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.randomValue
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.DeducedRestrictions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.ReseedGuard
-import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.portfolio.PortfolioWorker
-import kotlin.time.Duration.Companion.milliseconds
-import com.eignex.klause.solver.incumbent.ModelIdentity
-import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.QuadraticWitnessPublication
-import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
+import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.QuadraticWitnessPublication
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticCertificate
 import com.eignex.klause.solver.result.QuadraticClaim
 import com.eignex.klause.solver.result.QuadraticIncumbent
 import com.eignex.klause.solver.result.QuadraticObjectiveBound
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.PolynomialCondition
@@ -39,6 +39,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.toLongExact
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 
 internal class QuadraticWorkerAdapter(
     private val request: PolynomialTheoryRequest,
@@ -119,15 +120,17 @@ internal class QuadraticWorkerAdapter(
         close()
     }
 
-    fun worker(arm: Int): PortfolioWorker = if (arm == 0) {
+    fun worker(arm: Int, prepared: PreparedSourcePlan = request.preparedPlan): PortfolioWorker = if (arm == 0) {
         PortfolioWorker.ofMinimize("bt+exact-quadratic", arm, resumable = { completeHandle() }) { _, _, _, _ ->
             error("quadratic traversal runs by slice")
-        }.bindEvidence(identity)
+        }.bindSource(SourceWorkerBinding(identity, preparedPlan = prepared,
+            quadraticInvocation = proofScope))
     } else {
         PortfolioWorker.ofMinimize(if (arm == 2) "alns+exact-quadratic" else "ls+exact-quadratic", arm,
             countsInstructions = true, resumable = { neighborhoodHandle(arm == 2) }) { _, _, _, _ ->
             error("quadratic neighborhood runs by slice")
-        }.bindEvidence(identity, provesResults = false)
+        }.bindSource(SourceWorkerBinding(identity, provesResults = false, preparedPlan = prepared,
+            quadraticInvocation = proofScope))
     }
 
     private fun completeHandle(): QuadraticPortfolioSearch = object : QuadraticPortfolioSearch, ReseedGuard {

@@ -97,6 +97,10 @@ class EngineParams(pairs: List<String>) {
         }
     }
 
+    internal constructor(key: String, value: String) : this(emptyList()) {
+        map[key] = value
+    }
+
     fun long(key: String): Long? = map.remove(key)?.let {
         it.toLongOrNull() ?: fail("engine param `$key` expects an integer, got `$it`")
     }
@@ -139,6 +143,11 @@ class EngineParams(pairs: List<String>) {
         }
     }
 
+    internal fun reader(): ExecutionOptionReader = object : ExecutionOptionReader() {
+        override fun <T> get(option: ExecutionOption<T>): T? = option.decode(this@EngineParams)
+        override fun finish(engine: String, valid: String) = this@EngineParams.finish(engine, valid)
+    }
+
     private fun fail(msg: String): Nothing {
         pipelineConfigError(msg)
     }
@@ -171,40 +180,43 @@ private val BACKTRACK_SELECTOR_KEYS = setOf("var-selector", "val-selector")
  *  keys: `cp`/`mixed` always pass `true` (inherently free-search); the `fixed` engine passes `false` only
  *  while a source annotation selects its heuristic, and `true` otherwise (no heuristic to preserve).
  *  Null when no override key is present. */
-fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackParams) -> BacktrackParams)? {
-    val maxDecisions = p.long("max-decisions")
-    val luby = p.long("luby")
-    val adaptiveRestart = p.bool("adaptive-restart")
-    val emaRestart = p.bool("ema-restart")
-    val modeSwitchingRestart = p.bool("mode-switching-restart")
-    val phaseSaving = p.bool("phase-saving")
-    val targetPhasing = p.bool("target-phasing")
-    val solutionPhasing = p.bool("solution-phasing")
-    val rephaseInterval = p.long("rephase-interval")
-    val maxLearned = p.int("max-learned")
-    val lbdGlue = p.int("lbd-glue")
-    val tieredDb = p.bool("tiered-db")
-    val midLbd = p.int("mid-lbd")
-    val vivification = p.bool("vivification")
-    val vivifyBatch = p.int("vivify-batch")
-    val subsumption = p.bool("subsumption")
-    val subsumeBatch = p.int("subsume-batch")
-    val inprocessingCadence = p.int("inprocessing-cadence")
-    val lpCone = p.bool("lp-objective-cone")
-    val lpAutoOff = p.bool("lp-auto-off-reprobe")
-    val lpKnapsack = p.bool("lp-knapsack-lagrangian")
-    val lpComponentSplit = p.bool("lp-component-split")
-    val lpBoundMaxPivots = p.int("lp-bound-max-pivots")
-    val lpAdaptiveWork = p.bool("lp-adaptive-work")
-    val lpBranching = p.bool("lp-branching")
-    val lpVariableShaving = p.bool("lp-variable-shaving")
-    val lpPruneHulls = p.bool("lp-prune-hulls")
-    val lpRootCuts = p.bool("lp-root-cuts")
-    val pbLearning = p.bool("pb-learning")
-    val pbObjectiveCutoff = p.bool("pb-objective-cutoff")
-    val objectiveGuidedValues = p.bool("objective-guided-values")
-    val varKind = if (allowSelectors) p.varSelectorKind("var-selector") else null
-    val valKind = if (allowSelectors) p.valSelectorKind("val-selector") else null
+fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackParams) -> BacktrackParams)? =
+    backtrackOverride(p.reader(), allowSelectors)
+
+internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean): ((BacktrackParams) -> BacktrackParams)? {
+    val maxDecisions = p[ExecutionOption.maxDecisions]
+    val luby = p[ExecutionOption.luby]
+    val adaptiveRestart = p[ExecutionOption.adaptiveRestart]
+    val emaRestart = p[ExecutionOption.emaRestart]
+    val modeSwitchingRestart = p[ExecutionOption.modeSwitchingRestart]
+    val phaseSaving = p[ExecutionOption.phaseSaving]
+    val targetPhasing = p[ExecutionOption.targetPhasing]
+    val solutionPhasing = p[ExecutionOption.solutionPhasing]
+    val rephaseInterval = p[ExecutionOption.rephaseInterval]
+    val maxLearned = p[ExecutionOption.maxLearned]
+    val lbdGlue = p[ExecutionOption.lbdGlue]
+    val tieredDb = p[ExecutionOption.tieredDb]
+    val midLbd = p[ExecutionOption.midLbd]
+    val vivification = p[ExecutionOption.vivification]
+    val vivifyBatch = p[ExecutionOption.vivifyBatch]
+    val subsumption = p[ExecutionOption.subsumption]
+    val subsumeBatch = p[ExecutionOption.subsumeBatch]
+    val inprocessingCadence = p[ExecutionOption.inprocessingCadence]
+    val lpCone = p[ExecutionOption.lpObjectiveCone]
+    val lpAutoOff = p[ExecutionOption.lpAutoOffReprobe]
+    val lpKnapsack = p[ExecutionOption.lpKnapsackLagrangian]
+    val lpComponentSplit = p[ExecutionOption.lpComponentSplit]
+    val lpBoundMaxPivots = p[ExecutionOption.lpBoundMaxPivots]
+    val lpAdaptiveWork = p[ExecutionOption.lpAdaptiveWork]
+    val lpBranching = p[ExecutionOption.lpBranching]
+    val lpVariableShaving = p[ExecutionOption.lpVariableShaving]
+    val lpPruneHulls = p[ExecutionOption.lpPruneHulls]
+    val lpRootCuts = p[ExecutionOption.lpRootCuts]
+    val pbLearning = p[ExecutionOption.pbLearning]
+    val pbObjectiveCutoff = p[ExecutionOption.pbObjectiveCutoff]
+    val objectiveGuidedValues = p[ExecutionOption.objectiveGuidedValues]
+    val varKind = if (allowSelectors) p[ExecutionOption.variableSelector] else null
+    val valKind = if (allowSelectors) p[ExecutionOption.valueSelector] else null
     val scalars = listOf(
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
@@ -264,9 +276,16 @@ internal fun applyFixedBacktrackParams(
     base: BacktrackParams,
     p: EngineParams,
     allowSelectors: Boolean,
+): BacktrackParams =
+    applyFixedBacktrackParams(base, p.reader(), allowSelectors)
+
+internal fun applyFixedBacktrackParams(
+    base: BacktrackParams,
+    p: ExecutionOptionReader,
+    allowSelectors: Boolean,
 ): BacktrackParams {
     var out = base
-    p.long("seed")?.let { out = out.copy(randomSeed = it) }
+    p[ExecutionOption.seed]?.let { out = out.copy(randomSeed = it) }
     backtrackOverride(p, allowSelectors)?.let { out = it(out) }
     val accepted = if (allowSelectors) BACKTRACK_OVERRIDE_KEYS else BACKTRACK_OVERRIDE_KEYS - BACKTRACK_SELECTOR_KEYS
     p.finish("fixed", "seed, ${accepted.joinToString()}")
@@ -305,8 +324,12 @@ private fun parseRestart(s: String): RestartPolicy = when (s.lowercase()) {
 
 /** Parse a single-valued axis spec into its tokens, rejecting `+`/`-` (only the sources list axis
  *  takes set edits). */
-private fun scalarTokens(spec: String?, axis: String): List<AxisToken> {
+internal fun scalarTokens(spec: String?, axis: String): List<AxisToken> {
     val tokens = spec?.let { AxisEdits.tokens(it) } ?: return emptyList()
+    return scalarTokens(tokens, axis)
+}
+
+internal fun scalarTokens(tokens: List<AxisToken>, axis: String): List<AxisToken> {
     tokens.firstOrNull { it.op != AxisToken.Op.SET }?.let {
         pipelineConfigError("ls: $axis is single-valued and takes no +/- edit (got `${it.value}`)")
     }
@@ -413,17 +436,20 @@ private fun applyEdits(
  * `-e ls` with no overrides keeps the curated pool unchanged (a null pool). `dry-run-solver=on` lists
  * the resolved arms instead of solving.
  */
-fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
-    val dryRunSolver = p.bool("dry-run-solver") ?: false
-    val noiseRaw = p.double("noise")
-    val cbRaw = p.double("cb")
-    val skewRaw = p.double("skew-alpha")
-    val initTempRaw = p.double("initial-temp")
-    val coolRateRaw = p.double("cooling-rate")
-    val minTempRaw = p.double("min-temp")
-    val smoothProbRaw = p.double("smooth-prob")
-    val smoothFactorRaw = p.double("smooth-factor")
-    val tabuRaw = p.int("tabu-tenure")
+fun resolveLocalSearchRecipes(p: EngineParams): LsResolution =
+    resolveLocalSearchRecipes(p.reader())
+
+internal fun resolveLocalSearchRecipes(p: ExecutionOptionReader): LsResolution {
+    val dryRunSolver = p[ExecutionOption.dryRunSolver] ?: false
+    val noiseRaw = p[ExecutionOption.noise]
+    val cbRaw = p[ExecutionOption.cb]
+    val skewRaw = p[ExecutionOption.skewAlpha]
+    val initTempRaw = p[ExecutionOption.initialTemp]
+    val coolRateRaw = p[ExecutionOption.coolingRate]
+    val minTempRaw = p[ExecutionOption.minTemp]
+    val smoothProbRaw = p[ExecutionOption.smoothProb]
+    val smoothFactorRaw = p[ExecutionOption.smoothFactor]
+    val tabuRaw = p[ExecutionOption.tabuTenure]
     val cb = cbRaw ?: 2.06
     val skewAlpha = skewRaw ?: 0.0
     val initTemp = initTempRaw ?: 1.0
@@ -433,14 +459,14 @@ fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
     val smoothFactor = smoothFactorRaw ?: 0.8
     val tabu = TabuFilter(tenure = tabuRaw ?: 10, aspiration = AspirationCriterion.OrImproving)
 
-    val sourcesSpec = p.string("sources")
-    val sources = sourcesSpec?.let { AxisEdits.tokens(it) }.orEmpty()
-    val scoring = scalarTokens(p.string("scoring"), "scoring")
-    val acceptance = scalarTokens(p.string("acceptance"), "acceptance")
-    val restart = scalarTokens(p.string("restart"), "restart")
+    val sourcesSpec = p[ExecutionOption.sources]
+    val sources = sourcesSpec.orEmpty()
+    val scoring = p[ExecutionOption.scoring].orEmpty()
+    val acceptance = p[ExecutionOption.acceptance].orEmpty()
+    val restart = p[ExecutionOption.restart].orEmpty()
     val hasEdits = sources.isNotEmpty() || scoring.isNotEmpty() || acceptance.isNotEmpty() || restart.isNotEmpty()
-    val strategyRaw = p.string("strategy")?.lowercase()
-    val armLabel = p.string("arm")
+    val strategyRaw = p[ExecutionOption.strategy]?.lowercase()
+    val armLabel = p[ExecutionOption.localSearchArm]
     if (armLabel != null && (strategyRaw != null || sourcesSpec != null)) {
         pipelineConfigError("ls: arm= selects one catalog arm and is mutually exclusive with strategy=/sources=")
     }
@@ -574,21 +600,38 @@ fun buildPortfolioScenario(
     annotationArm: BacktrackParams? = null,
     nodeBudget: NodeBudget? = null,
     btEdit: ((BacktrackParams) -> BacktrackParams)? = null,
+): PortfolioScenario =
+    buildPortfolioScenario(p.reader(), fallbackSeed, cores, kind, defaultEngine, defaultArms, lpCeiling, zeroObjectivePricing, lsPool, btPool, annotationArm, nodeBudget, btEdit)
+
+internal fun buildPortfolioScenario(
+    p: ExecutionOptionReader,
+    fallbackSeed: Long?,
+    cores: Int,
+    kind: Kind,
+    defaultEngine: EngineMix,
+    defaultArms: Int,
+    lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
+    zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+    lsPool: List<() -> LocalSearchRecipe>? = null,
+    btPool: List<() -> BacktrackRecipe>? = null,
+    annotationArm: BacktrackParams? = null,
+    nodeBudget: NodeBudget? = null,
+    btEdit: ((BacktrackParams) -> BacktrackParams)? = null,
 ): PortfolioScenario {
-    val seed = p.long("seed") ?: fallbackSeed ?: 1L
-    val lambda = p.double("lambda") ?: 1.0
-    val armsParam = p.int("arms")
-    val ls = p.int("ls")
-    val bt = p.int("bt")
-    val clauseShareLbd = p.int("clause-share-lbd")
-    val clauseShareLen = p.int("clause-share-len")
-    val sliceWork = p.long("slice-work")
-    val maxSliceWork = p.long("slice-max-work")
-    val sliceGrowth = p.double("slice-growth")
-    val phaseRetention = p.double("phase-retention")
-    val reseedStaleThreshold = p.int("reseed-stale-threshold")
-    val reportLsResiduals = p.bool("ls-residuals") ?: false
-    val reportLsPhaseTimes = p.bool("ls-phase-times") ?: false
+    val seed = p[ExecutionOption.seed] ?: fallbackSeed ?: 1L
+    val lambda = p[ExecutionOption.lambda] ?: 1.0
+    val armsParam = p[ExecutionOption.arms]
+    val ls = p[ExecutionOption.localSearchArms]
+    val bt = p[ExecutionOption.backtrackArms]
+    val clauseShareLbd = p[ExecutionOption.clauseShareLbd]
+    val clauseShareLen = p[ExecutionOption.clauseShareLen]
+    val sliceWork = p[ExecutionOption.sliceWork]
+    val maxSliceWork = p[ExecutionOption.sliceMaxWork]
+    val sliceGrowth = p[ExecutionOption.sliceGrowth]
+    val phaseRetention = p[ExecutionOption.phaseRetention]
+    val reseedStaleThreshold = p[ExecutionOption.reseedStaleThreshold]
+    val reportLsResiduals = p[ExecutionOption.lsResiduals] ?: false
+    val reportLsPhaseTimes = p[ExecutionOption.lsPhaseTimes] ?: false
     if (reseedStaleThreshold != null && reseedStaleThreshold < 0) {
         pipelineConfigError("reseed-stale-threshold must be >= 0")
     }
@@ -668,11 +711,14 @@ class BtResolution(
  * A pinned pool is the *set* of arms; the worker *count* still comes from `arms=`/`bt=`/the default and wraps
  * over it, exactly as `lsPool` does.
  */
-fun resolveBtRecipes(p: EngineParams, kind: Kind): BtResolution {
-    val btArm = p.string("bt-arm")
+fun resolveBtRecipes(p: EngineParams, kind: Kind): BtResolution =
+    resolveBtRecipes(p.reader(), kind)
+
+internal fun resolveBtRecipes(p: ExecutionOptionReader, kind: Kind): BtResolution {
+    val btArm = p[ExecutionOption.backtrackArmsByLabel]
     val edit = backtrackOverride(p, allowSelectors = true)
     if (btArm == null) return BtResolution(null, edit)
-    val labels = btArm.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    val labels = btArm
     if (labels.isEmpty()) pipelineConfigError("bt-arm: expected a comma-separated list of backtrack arm labels")
     val known = BacktrackCatalog.labels(kind).toSet()
     for (label in labels) {

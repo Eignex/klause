@@ -25,8 +25,8 @@ class PortfolioPlanRequest(
     val optimize: Boolean,
     /** Worker count selected by the frontend. */
     val cores: Int,
-    /** Repeatable engine tuning parameters supplied by the frontend. */
-    val engineParams: List<String>,
+    /** Immutable engine tuning settings. */
+    val executionOptions: ExecutionOptions,
     /** Optional seed supplied by the frontend. */
     val randomSeed: Long?,
     /** Default arm-pool size when the parameters do not override it. */
@@ -41,7 +41,37 @@ class PortfolioPlanRequest(
     val annotationArm: BacktrackParams?,
     /** Tolerance semantics for every backtrack arm's continuous leaves; see [BacktrackParams.toleranceCheck]. */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
-)
+) {
+    /** Captured frontend parameters for compatibility; empty for directly typed options. */
+    val engineParams: List<String> get() = executionOptions.originalPairs.toList()
+
+    /** Compatibility constructor for repeatable frontend parameters. */
+    constructor(
+        engine: FiniteEngine,
+        optimize: Boolean,
+        cores: Int,
+        engineParams: List<String>,
+        randomSeed: Long?,
+        defaultArms: Int,
+        lpCeiling: LpConfig,
+        zeroObjectivePricing: LpZeroObjectivePricing,
+        nodeBudget: NodeBudget?,
+        annotationArm: BacktrackParams?,
+        toleranceCheck: ((Sample) -> Boolean)? = null,
+    ) : this(
+        engine = engine,
+        optimize = optimize,
+        cores = cores,
+        executionOptions = ExecutionOptions.parse(engineParams),
+        randomSeed = randomSeed,
+        defaultArms = defaultArms,
+        lpCeiling = lpCeiling,
+        zeroObjectivePricing = zeroObjectivePricing,
+        nodeBudget = nodeBudget,
+        annotationArm = annotationArm,
+        toleranceCheck = toleranceCheck,
+    )
+}
 
 /** A resolved finite portfolio route, before a problem is materialized into workers. */
 sealed class PortfolioPlan {
@@ -72,8 +102,8 @@ sealed class PortfolioPlan {
 class FixedBacktrackPlanRequest(
     /** Optional search annotation compiled from the source model. */
     val annotatedParams: BacktrackParams?,
-    /** Repeatable engine tuning parameters supplied by the frontend. */
-    val engineParams: List<String>,
+    /** Immutable engine tuning settings. */
+    val executionOptions: ExecutionOptions,
     /** Optional seed supplied by the frontend. */
     val randomSeed: Long?,
     /** Cancellation shared by the solve route. */
@@ -88,7 +118,33 @@ class FixedBacktrackPlanRequest(
     val zeroObjectivePricing: LpZeroObjectivePricing,
     /** Optional engine event sink supplied by the frontend. */
     val onEvent: ((SearchEvent) -> Unit)?,
-)
+) {
+    /** Captured frontend parameters for compatibility; empty for directly typed options. */
+    val engineParams: List<String> get() = executionOptions.originalPairs.toList()
+
+    /** Compatibility constructor for repeatable frontend parameters. */
+    constructor(
+        annotatedParams: BacktrackParams?,
+        engineParams: List<String>,
+        randomSeed: Long?,
+        cancellation: Cancellation,
+        nodeBudget: NodeBudget?,
+        solveBudgetMillis: Long?,
+        lpConfig: LpConfig,
+        zeroObjectivePricing: LpZeroObjectivePricing,
+        onEvent: ((SearchEvent) -> Unit)?,
+    ) : this(
+        annotatedParams = annotatedParams,
+        executionOptions = ExecutionOptions.parse(engineParams),
+        randomSeed = randomSeed,
+        cancellation = cancellation,
+        nodeBudget = nodeBudget,
+        solveBudgetMillis = solveBudgetMillis,
+        lpConfig = lpConfig,
+        zeroObjectivePricing = zeroObjectivePricing,
+        onEvent = onEvent,
+    )
+}
 
 /** Resolved parameters for the annotation-following finite backtrack route. */
 class FixedBacktrackPlan(
@@ -102,8 +158,8 @@ class FixedBacktrackPlan(
 fun FinitePipeline.planFixedBacktrack(request: FixedBacktrackPlanRequest): FixedBacktrackPlan {
     val annotation = request.annotatedParams
     val base = annotation ?: BacktrackPresets.conflictDriven()
-    val engineParams = EngineParams(request.engineParams)
-    val dryRun = engineParams.bool("dry-run-solver") ?: false
+    val engineParams = request.executionOptions.reader()
+    val dryRun = engineParams[ExecutionOption.dryRunSolver] ?: false
     val params = applyFixedBacktrackParams(
         base.copy(
             randomSeed = request.randomSeed ?: base.randomSeed,
@@ -132,13 +188,13 @@ fun FinitePipeline.planFixedBacktrack(request: FixedBacktrackPlanRequest): Fixed
 /** Resolve portfolio policy without constructing a problem-specific engine or rendering frontend output. */
 fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
     val mix = portfolioMix(request.engine)
-    val params = EngineParams(request.engineParams)
+    val params = request.executionOptions.reader()
     val lsResolution = if (mix != EngineMix.BACKTRACK) resolveLocalSearchRecipes(params) else LsResolution(null, false)
     if (lsResolution.dryRunSolver) return PortfolioPlan.LocalSearchDryRun(lsResolution.pool)
 
     val kind = if (request.optimize) Kind.COP else Kind.CSP
     val bt = if (mix != EngineMix.LOCAL_SEARCH) resolveBtRecipes(params, kind) else BtResolution(null, null)
-    if (mix == EngineMix.BACKTRACK && params.bool("dry-run-solver") == true) {
+    if (mix == EngineMix.BACKTRACK && params[ExecutionOption.dryRunSolver] == true) {
         // The listing renders each arm as it would be built: the pinned or curated recipes, edited and budgeted.
         val rebuilt = bt.edit != null || request.nodeBudget != null
         val listed = bt.pool ?: if (rebuilt) BacktrackCatalog.factories(kind) else null

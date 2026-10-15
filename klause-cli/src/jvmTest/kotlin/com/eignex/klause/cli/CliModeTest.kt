@@ -1961,6 +1961,27 @@ class CliModeTest {
     }
 
     @Test
+    fun `consumed allowances and duplicate overrides retain the dry run output`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        val controls = listOf(
+            arrayOf("--param", "seed=7", "--param", "node-limit=9"),
+            arrayOf("--param", "seed=invalid", "--param", "node-limit=9", "--param", "seed=7",
+                "--param", "node-limit=9"),
+        )
+
+        val outputs = controls.map { parameters ->
+            captureErr {
+                main(arrayOf("-e", "fixed", "--param", "dry-run-solver=on") + parameters + fzn.absolutePath)
+            }
+        }
+
+        assertEquals(outputs.first(), outputs.last())
+    }
+
+    @Test
     fun `a cp override edits every arm of the pool rather than collapsing to one`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")

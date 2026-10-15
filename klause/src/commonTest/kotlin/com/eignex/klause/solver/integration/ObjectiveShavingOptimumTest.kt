@@ -12,6 +12,7 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.portfolio.BacktrackWorkerConfig
 import com.eignex.klause.portfolio.SharedObjectiveBound
 import com.eignex.klause.portfolio.SharedPools
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -61,7 +62,8 @@ class ObjectiveShavingOptimumTest {
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, objectiveShaving = true))
         })
         val worker = config.materialize(executable, 0, 0, 1L, 1.0, objective, null, null, null, pools)
-            .bindInvocation(invocation).bindSharingInvocation(invocation)
+            .let { it.bindSource(SourceWorkerBinding(invocation, sharingInvocation = invocation,
+                provesResults = it.permitsSourceProofs)) }
 
         worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
 

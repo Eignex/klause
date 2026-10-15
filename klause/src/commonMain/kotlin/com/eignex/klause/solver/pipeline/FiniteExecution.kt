@@ -61,8 +61,8 @@ class FiniteSolveRequest(
     val presolveBudget: PresolveBudget?,
     /** Portfolio worker count. */
     val cores: Int,
-    /** Repeatable engine tuning parameters. */
-    val engineParams: List<String>,
+    /** Immutable engine tuning settings. */
+    val executionOptions: ExecutionOptions,
     /** Optional random seed. */
     val randomSeed: Long?,
     /** Default portfolio arm count. */
@@ -95,7 +95,63 @@ class FiniteSolveRequest(
      * check accepts it; `null` keeps exact semantics.
      */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
-)
+) {
+    /** Captured frontend parameters for compatibility; empty for directly typed options. */
+    val engineParams: List<String> get() = executionOptions.originalPairs.toList()
+
+    /** Compatibility constructor for repeatable frontend parameters. */
+    constructor(
+        shape: FiniteSolveShape,
+        engine: FiniteEngine,
+        presolveConfig: PresolveConfig,
+        explicitPresolveConfig: Boolean,
+        solutionSetSensitive: Boolean,
+        cancellation: Cancellation,
+        presolveCancellation: Cancellation = cancellation,
+        presolveBudget: PresolveBudget?,
+        cores: Int,
+        engineParams: List<String>,
+        randomSeed: Long?,
+        defaultArms: Int,
+        lpConfig: LpConfig,
+        zeroObjectivePricing: LpZeroObjectivePricing,
+        nodeBudget: NodeBudget?,
+        solveBudgetMillis: Long?,
+        allSolutions: Boolean,
+        solutionCap: Long?,
+        deadlineExceeded: () -> Boolean,
+        onEvent: ((SearchEvent) -> Unit)?,
+        onPortfolioEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+        onPortfolioFault: ((ArmFault) -> Unit)? = null,
+        prepareOnly: Boolean = false,
+        toleranceCheck: ((Sample) -> Boolean)? = null,
+    ) : this(
+        shape = shape,
+        engine = engine,
+        presolveConfig = presolveConfig,
+        explicitPresolveConfig = explicitPresolveConfig,
+        solutionSetSensitive = solutionSetSensitive,
+        cancellation = cancellation,
+        presolveCancellation = presolveCancellation,
+        presolveBudget = presolveBudget,
+        cores = cores,
+        executionOptions = ExecutionOptions.parse(engineParams),
+        randomSeed = randomSeed,
+        defaultArms = defaultArms,
+        lpConfig = lpConfig,
+        zeroObjectivePricing = zeroObjectivePricing,
+        nodeBudget = nodeBudget,
+        solveBudgetMillis = solveBudgetMillis,
+        allSolutions = allSolutions,
+        solutionCap = solutionCap,
+        deadlineExceeded = deadlineExceeded,
+        onEvent = onEvent,
+        onPortfolioEvent = onPortfolioEvent,
+        onPortfolioFault = onPortfolioFault,
+        prepareOnly = prepareOnly,
+        toleranceCheck = toleranceCheck,
+    )
+}
 
 /** The prepared model and terminal engine result of one finite solve. */
 class FiniteSolveResult(
@@ -201,7 +257,7 @@ internal class FiniteExecutionRequest(
     /** Portfolio worker count. Ignored by the fixed route. */
     val cores: Int,
     /** Repeatable engine tuning parameters. */
-    val engineParams: List<String>,
+    val executionOptions: ExecutionOptions,
     /** Optional random seed. */
     val randomSeed: Long?,
     /** Default portfolio arm count. */
@@ -372,7 +428,7 @@ internal fun FinitePipeline.solve(
             definitionalSweep = request.shape.definitionalSweep,
             searchHints = request.shape.searchHints,
             cores = request.cores,
-            engineParams = request.engineParams,
+            executionOptions = request.executionOptions,
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpConfig = request.lpConfig,
@@ -502,7 +558,7 @@ private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecu
                 request.problem.numBoolVars,
                 request.problem.numIntVars,
             ),
-            engineParams = request.engineParams,
+            executionOptions = request.executionOptions,
             randomSeed = request.randomSeed,
             cancellation = request.cancellation,
             nodeBudget = request.nodeBudget,
@@ -670,7 +726,7 @@ private fun executePortfolio(
             engine = request.engine,
             optimize = request.optimize,
             cores = request.cores,
-            engineParams = request.engineParams,
+            executionOptions = request.executionOptions,
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpCeiling = request.lpConfig,
@@ -695,7 +751,7 @@ private fun executePortfolio(
         plan.scenario,
         ProblemProfile.of(request.problem, request.optimize),
         request.defaultArms,
-        explicitArms = request.engineParams.any { it.substringBefore('=') in listOf("arms", "ls", "bt") },
+        explicitArms = request.executionOptions.explicitArms,
     )
     val executor = FinitePipeline.portfolioExecutor(
         request.problem,

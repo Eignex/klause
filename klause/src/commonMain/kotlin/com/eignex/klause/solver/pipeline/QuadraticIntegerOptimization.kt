@@ -16,6 +16,7 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.ReseedGuard
@@ -144,7 +145,7 @@ fun OpenTheoryPipeline.minimize(
                         val worker = slot.own(QuadraticIntegerOptimization(request.problem, objective, local,
                             selected, sense, scope, request.preparedPlan))
                         worker.readIncumbent = read
-                        worker.worker(arm)
+                        worker.worker(arm, operation)
                     }
             }
         }
@@ -254,15 +255,18 @@ internal class QuadraticIntegerOptimization(
         close()
     }
 
-    fun worker(arm: Int): PortfolioWorker {
+    fun worker(arm: Int, prepared: PreparedSourcePlan = plan): PortfolioWorker {
         val model = ModelIdentity.of(source, objective)
+        val invocation = plan.quadraticEngineInvocation(objective, sense, quadraticAssumptions(controls, engine))
+        val binding = SourceWorkerBinding(model, provesResults = arm == 0, preparedPlan = prepared,
+            quadraticInvocation = invocation)
         return if (arm == 0) PortfolioWorker.ofMinimize("bt+exact-integer-quadratic", arm,
             resumable = { completeHandle() }) { _, _, _, _ -> error("integer traversal runs by slice") }
-            .bindEvidence(model)
+            .bindSource(binding)
         else PortfolioWorker.ofMinimize(if (arm == 2) "alns+exact-integer-quadratic" else "ls+exact-integer-quadratic",
             arm, countsInstructions = true, resumable = { neighborhoodHandle(arm == 2) }) { _, _, _, _ ->
             error("integer neighborhood runs by slice")
-        }.bindEvidence(model, provesResults = false)
+        }.bindSource(binding)
     }
 
     private fun countedWork(): Long = native.work + minOf(sink.search.searchWork, Long.MAX_VALUE - native.work)

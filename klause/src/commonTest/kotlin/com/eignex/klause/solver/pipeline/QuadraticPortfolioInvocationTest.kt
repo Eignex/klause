@@ -1,23 +1,24 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.QuadraticObjectiveSpec
-import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.QuadraticCoefficient
+import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticObjectiveTerm
+import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.SourceWorkerBinding
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.portfolio.PortfolioWorker
-import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
-import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.QuadraticWitnessPublication
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticCertificate
@@ -77,7 +78,9 @@ class QuadraticPortfolioInvocationTest {
             .execute { arm, _, _, _ ->
                 PortfolioWorker.ofMinimize("copied", arm) { _, _, _, _ ->
                     sequenceOf(MinimizeResult.BestFound(point, 2.0, TerminationReason.BudgetExhausted))
-                }.bindEvidence(identity, provesResults = false)
+                }.bindSource(SourceWorkerBinding(identity, provesResults = false, preparedPlan = plan,
+                    quadraticInvocation = plan.quadraticEngineInvocation(objective, ObjectiveSense.MINIMIZE,
+                        Assumptions.None)))
             }
 
         assertIs<QuadraticOptimizationResult.Unknown>(result)
@@ -113,7 +116,10 @@ class QuadraticPortfolioInvocationTest {
                         return MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
                     }
                 }
-            }) { _, _, _, _ -> error("fixture runs by slice") }.bindEvidence(identity)
+            }) { _, _, _, _ -> error("fixture runs by slice") }
+                .bindSource(SourceWorkerBinding(identity, preparedPlan = plan,
+                quadraticInvocation = plan.quadraticEngineInvocation(objective, ObjectiveSense.MINIMIZE,
+                    Assumptions.None)))
         }
 
         assertIs<QuadraticOptimizationResult.Unknown>(result)
@@ -153,7 +159,10 @@ class QuadraticPortfolioInvocationTest {
                         return MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
                     }
                 }
-            }) { _, _, _, _ -> error("fixture runs by slice") }.bindEvidence(identity)
+            }) { _, _, _, _ -> error("fixture runs by slice") }
+                .bindSource(SourceWorkerBinding(identity, preparedPlan = plan,
+                quadraticInvocation = plan.quadraticEngineInvocation(objective, ObjectiveSense.MINIMIZE,
+                    Assumptions.None)))
         }
 
         assertIs<QuadraticOptimizationResult.Unknown>(result)
@@ -190,7 +199,10 @@ class QuadraticPortfolioInvocationTest {
                         return MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
                     }
                 }
-            }) { _, _, _, _ -> error("fixture runs by slice") }.bindEvidence(identity, provesResults = false)
+            }) { _, _, _, _ -> error("fixture runs by slice") }
+                .bindSource(SourceWorkerBinding(identity, provesResults = false, preparedPlan = plan,
+                    quadraticInvocation = plan.quadraticEngineInvocation(objective, ObjectiveSense.MINIMIZE,
+                        Assumptions.None)))
         }
 
         assertIs<QuadraticOptimizationResult.Unknown>(result)
@@ -235,7 +247,10 @@ class QuadraticPortfolioInvocationTest {
                                 TerminationReason.BudgetExhausted)
                         }
                     }
-                }) { _, _, _, _ -> error("fixture runs by slice") }.bindEvidence(identity)
+                }) { _, _, _, _ -> error("fixture runs by slice") }
+                .bindSource(SourceWorkerBinding(identity, preparedPlan = plan,
+                quadraticInvocation = plan.quadraticEngineInvocation(objective, ObjectiveSense.MINIMIZE,
+                    Assumptions.None)))
             }
         val execution = QuadraticOptimizationExecution(result, PolynomialTheoryStats(), 0, 0).also {
             it.retainPublication(observer.latest)

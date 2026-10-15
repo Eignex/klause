@@ -18,8 +18,8 @@ import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
-import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -242,7 +242,9 @@ internal class QuadraticPortfolioInvocation(
     private fun common(
         worker: PortfolioWorker, direction: ObjectiveSense, point: QuadraticIncumbent?,
     ): Verification<Unit, Unit>? {
-        if (!worker.permitsSourceProofs || worker.evidenceModel?.matches(identity) != true || direction != sense) {
+        if (!worker.permitsSourceProofs || worker.evidenceModel?.matches(identity) != true || direction != sense ||
+            worker.sourceBinding?.quadraticInvocation?.matches(requireNotNull(expected)) != true
+        ) {
             return Verification.Rejected("quadratic terminal has no authority for this source objective")
         }
         if (point == null) return null

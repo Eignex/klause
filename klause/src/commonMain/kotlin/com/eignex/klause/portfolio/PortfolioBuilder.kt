@@ -57,11 +57,10 @@ object PortfolioBuilder {
         val factories = factories(problem, scenario, objective, lsObjective, definitionalSweep, onEvent, profile)
         val count = maxOf(factories.size, scenario.cores)
         val quotas = if (scenario.cores > 1) scenario.nodeBudget?.quotas(count) else null
-        return List(count) { index ->
-            val worker = factories[index % factories.size].materialize(
+        return materializeBound(count, binding) { index ->
+            factories[index % factories.size].materialize(
                 index, scenario.seed, quotas?.get(index) ?: scenario.nodeBudget,
             )
-            bindRuntime(worker, binding)
         }
     }
 
@@ -136,7 +135,8 @@ object PortfolioBuilder {
         return materialize(
             problem, arms, List(arms.size) { it }, seed, lsLambda, objective, lsObjective, definitionalSweep,
             onEvent, pools = null,
-        ).map { bindRuntime(it, binding) }
+            binding = binding,
+        )
     }
 
     private fun runtimeBinding(problem: BakedProblem, objective: LinearObjective?): EngineInvocation =
@@ -144,8 +144,9 @@ object PortfolioBuilder {
             ModelIdentity.of(problem, objective), objective)
 
     private fun bindRuntime(worker: PortfolioWorker, binding: EngineInvocation): PortfolioWorker =
-        worker.bindSharingInvocation(binding).bindInvocation(EngineInvocation(binding.preparedPlan, binding.model,
-            binding.executionObjective, executionAssumptions = worker.executionAssumptions ?: Assumptions.None))
+        worker.bindSource(SourceWorkerBinding(EngineInvocation(binding.preparedPlan, binding.model,
+            binding.executionObjective, executionAssumptions = worker.executionAssumptions ?: Assumptions.None),
+            sharingInvocation = binding, provesResults = worker.permitsSourceProofs))
 
     /** Materialise each composed arm via its own [WorkerConfig.materialize] — the shared body of
      *  [build] and [buildExplicit]. The arm index offsets the seed;
@@ -163,14 +164,38 @@ object PortfolioBuilder {
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?,
+        binding: EngineInvocation,
     ): List<PortfolioWorker> {
-        val workers = arms.mapIndexed { i, config ->
-            config.materialize(
+        val workers = materializeBound(arms.size, binding) { i ->
+            arms[i].materialize(
                 problem, i, armIds[i], seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent, pools,
             ).bindEvidence(ModelIdentity.of(problem, objective))
         }
         check(workers.isNotEmpty()) { "portfolio produced no workers" }
         return workers
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun materializeBound(
+        count: Int,
+        binding: EngineInvocation,
+        create: (Int) -> PortfolioWorker,
+    ): List<PortfolioWorker> {
+        val workers = ArrayList<PortfolioWorker>(count)
+        try {
+            repeat(count) { index ->
+                val worker = create(index)
+                workers += worker
+                bindRuntime(worker, binding)
+            }
+            return workers
+        } catch (failure: Throwable) {
+            for (worker in workers.asReversed()) {
+                runCatching { worker.close() }.exceptionOrNull()
+                    ?.takeUnless { it === failure }?.let(failure::addSuppressed)
+            }
+            throw failure
+        }
     }
 
     /**

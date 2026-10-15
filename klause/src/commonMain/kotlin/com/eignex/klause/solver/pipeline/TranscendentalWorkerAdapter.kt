@@ -123,7 +123,6 @@ internal class TranscendentalWorkerAdapter(
     }
 
     fun worker(arm: Int): PortfolioWorker {
-        val identity = requireNotNull(binding).model
         val worker = if (arm == 0) {
             PortfolioWorker.ofSolve("bt+exact-transcendental", arm, resumable = { completeHandle() }) { global, _ ->
                 completeHandle().use { requireNotNull(it.runSlice(global, Long.MAX_VALUE, -1)) }
@@ -134,7 +133,7 @@ internal class TranscendentalWorkerAdapter(
             timeout = params.timeout, exhausted = { service.exhausted || nodeBudget?.allowance?.exhausted() == true },
             open = { neighborhood(arm == 2) },
         )
-        return worker.bindEvidence(identity, provesResults = arm == 0).bindInvocation(requireNotNull(binding))
+        return worker.bindEvidence(requireNotNull(binding).model, provesResults = arm == 0)
     }
 
     internal fun completeHandle(): ResumableSolve {
