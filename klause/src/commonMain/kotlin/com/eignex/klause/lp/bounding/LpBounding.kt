@@ -217,12 +217,10 @@ private fun LpEngine.observeSolveCost(sink: SolveStatsSink, solver: LpSolver) {
  *  optional learned nogood (the sparse path is reason-less, so it is null). */
 internal class LpNodeOutcome(val prune: Boolean, val basis: Basis?, val explanation: IntArray? = null)
 
-/**
- * Bounded, deduplicating buffer of LP-learned nogoods awaiting registration at the next restart.
- * Dedup is by sorted-literal key so a region pruned repeatedly is learned once; the cap bounds memory
- * between restarts. [drain] returns and clears the pending batch but keeps the seen-set so a flushed
- * clause is not re-queued. Entries record immediate registration so restart sharing does not install
- * those clauses in the same persistent CP session twice.
+/*
+ * Bound pending LP clause storage and deduplicate across restarts. Entries retain whether the
+ * persistent CP session already contains the clause so restart sharing does not register it twice.
+ * Draining clears the pending batch; retained keys prevent a later node from queuing it again.
  */
 internal class LpNogoodPool(private val cap: Int = 4096) {
     class Entry(val literals: IntArray, val registered: Boolean)
