@@ -128,7 +128,9 @@ learning cannot be retracted selectively, restore an objective-independent
 region or prepare a fresh root. Portfolio sharing requires matching objectives,
 cutoffs and assumptions; source publication validation precedes admission.
 
-Real array selection emits index-range rows at every build. A source-justified
+Real array selection emits index-range rows at every build. Its selected equality
+changes with the live index, so its root relaxation cannot use a fixed layout
+whose only updates are column bounds. A source-justified
 fixed integer index additionally selects one exact real equality, so finite leaf
 completion solves the selected relation directly. An unfixed index contributes
 only the range relaxation; complete arithmetic consumers install its equivalent

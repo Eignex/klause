@@ -57,6 +57,8 @@ exponents and variable real exponents decline.
 
 ## FlatZinc floats
 
+A source-fixed float-array index also pins its finite value literal, preserving
+Boolean propagation across the shared finite choices.
 Constant float-array selection retains `RealElement` over continuous result
 columns and integer `Element` over grid bucket coordinates. Both retain the
 one-based source index and repeated entries. Grid entries use the result's existing
