@@ -80,6 +80,13 @@ support/pin checks, definition inference performed by the caller, custom restart
 mutations, later restart reconciliation, lazy first-use scoring indexes and activity
 reset remain atomic outside the retained initial buffer/assignment/definition cursors.
 
+Maintained integer absolute-value outputs backsolve independent repair targets into
+both signs of their operand. Adjacent absolute-value definitions are followed through
+at most sixteen nodes; negative intermediate magnitudes decline. Every target must
+belong to its root domain and pass the sink's frozen and implicit-owner filters.
+Terminal operands use the existing channeling, affine, Element and extremum repairs.
+These proposals change searched inputs and let the definition network recompute outputs.
+
 ## Initialization and implicit table moves
 
 Greedy initialization polls cancellation between variables and retains only completed
