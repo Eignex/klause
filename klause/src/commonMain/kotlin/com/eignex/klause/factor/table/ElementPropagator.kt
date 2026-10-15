@@ -11,6 +11,7 @@ import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.boundLiteral
+import com.eignex.klause.propagation.excludeIntValues
 import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.inDomainAt
 import com.eignex.klause.propagation.lazyReason
@@ -260,14 +261,12 @@ internal class ElementPropagator(
                 state.undoLogging -> state.lazyReason(payload)
                 else -> Lits().apply { resultUnsupported(state, payload, state.undo.size) }.toArray()
             }
-            for (i in 0 until ex.size) {
-                if (!state.excludeIntValue(result, ex[i], ant)) {
-                    state.propagatorFailures[this] = Lits().apply {
-                        resultUnsupported(state, payload, state.undo.size)
-                        addAll(ownDomain(state, result))
-                    }.toArray()
-                    return false
-                }
+            if (!state.excludeIntValues(result, ex.toLongArray(), ant)) {
+                state.propagatorFailures[this] = Lits().apply {
+                    resultUnsupported(state, payload, state.undo.size)
+                    addAll(ownDomain(state, result))
+                }.toArray()
+                return false
             }
         }
 
@@ -295,14 +294,12 @@ internal class ElementPropagator(
                             for (k in 0 until ex.size) add(excluded(state, result, ex[k], state.undo.size))
                         }.toArray()
                     }
-                    for (i in 0 until ex.size) {
-                        if (!state.excludeIntValue(sel, ex[i], ant)) {
-                            state.propagatorFailures[this] = Lits().apply {
-                                addAll(ant)
-                                addAll(ownDomain(state, sel))
-                            }.toArray()
-                            return false
-                        }
+                    if (!state.excludeIntValues(sel, ex.toLongArray(), ant)) {
+                        state.propagatorFailures[this] = Lits().apply {
+                            addAll(ant)
+                            addAll(ownDomain(state, sel))
+                        }.toArray()
+                        return false
                     }
                 }
             }
