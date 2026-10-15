@@ -1491,7 +1491,12 @@ Live argument captures also request an explicit final ring-buffer loss-counter
 snapshot. A Linux x86-64 helper binds the original observer PID, start ticks,
 executable digest and mount namespace, then retains its map descriptor. The map's
 BTF must identify the single `__bt__event_loss_counter` variable at offset zero in
-`.data.event_loss_counter`, with complete unsigned 64-bit CPU-slot dimensions.
+`.data.event_loss_counter`, with complete 64-bit CPU-slot dimensions. The helper
+accepts unsigned integer metadata or the pinned bpftrace 0.27.0 `int64` signed
+debug annotation: that version selects integer debug types by width, while its
+counter declaration and reader use unsigned 64-bit values. Other signed type names,
+integer encodings, widths and bit offsets are rejected. The binding retains the
+debug name and encoding separately from the unsigned counter interpretation.
 Ambiguous maps, unsupported layouts and incomplete ownership prevent child release.
 The helper writes only a separately created control map, checking both zero data
 and a nonzero highest slot through the same kernel lookup path.
