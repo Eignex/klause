@@ -11,6 +11,51 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `finite cancellation prioritizes rows changed by integral bounds`() {
+        for (fresh in listOf(false, true)) {
+            val source = assertNotNull(LpBuilder().apply {
+                val z = addVar(0L, 1L)
+                val x = addVar(0L, if (fresh) 1L else 2L)
+                val first = addRealVar(0.0, 2.0, cost = 1.0)
+                val second = addRealVar(0.0, 4.0, cost = 1.0)
+                addRealRow(intArrayOf(z, first), doubleArrayOf(-0.5, 1.0), Relation.GE, 0.0)
+                addRealRow(intArrayOf(x, second), doubleArrayOf(-2.0, 1.0), Relation.GE, 0.0)
+            }.build(Sense.MINIMIZE).authoritativeModel())
+            val state = if (fresh) LpExactState(source) else {
+                val trail = LpBoundTrail(source)
+                assertTrue(trail.push())
+                assertTrue(trail.assertBound(1, true, ExactLpSide(ExactLpNumber.of(1L)), 7L))
+                trail.state
+            }
+            val model = assertNotNull(state.toWorkingModel())
+            val additional = ArrayList<LpDeductionCertificate>()
+
+            assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0, 0.0),
+                onAdditionalCertificate = { additional.add(it) },
+                preferredColumns = if (fresh) intArrayOf(-1, 1, 2, source.n) else null))
+
+            assertTrue(additional.any { it.fixSteps(1, 1L, 0L) == 0L })
+        }
+    }
+
+    @Test
+    fun `a supported continuous endpoint does not hide an integral fixing direction`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val r = addRealVar(0.0, 2.0, cost = 1.0)
+            addRow(intArrayOf(x, r), longArrayOf(-2L, 1L), Relation.GE, 0L)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val additional = ArrayList<LpDeductionCertificate>()
+
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
+            onAdditionalCertificate = { additional.add(it) }))
+
+        assertEquals(BigFraction.ZERO, certificate.exactObjectiveBound())
+        assertTrue(additional.any { it.fixSteps(0, 1L, 0L) == 0L })
+    }
+
+    @Test
     fun `completed primary certificates survive optional candidate work exhaustion`() {
         val source = LpBuilder().apply {
             addVar(0L, 10L, cost = 1L)

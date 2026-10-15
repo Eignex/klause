@@ -53,6 +53,15 @@ gap test uses lowered objective units and accounts for reduced-cost movement, ro
 residuals and objective rounding. The rendered objective uses source decimal
 coefficients at the returned point.
 
+For a source-exact model with at most 4096 coordinates, float rendering can try
+replacing residuals within `1e-12` of zero by zero when the remaining real values
+are integral and fit `Long`. Optional verification admits at most 32768 column,
+row and coefficient entries. The candidate must pass every original decimal row,
+bound and integrality check, and its source objective must equal the unchanged
+float point's source objective. A failed check retains the original float witness.
+This output-only reconstruction changes no search assignment, cutoff or
+optimization-status authority.
+
 `TOLERANCE_OPTIMUM` differs from `ATTAINED_OPTIMUM`. A tolerance-accepted float
 point is not an exact witness. Optimum publication requires no
 `toleranceDifference`; infeasibility and unboundedness require `sourceExact`.

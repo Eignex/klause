@@ -511,8 +511,37 @@ unconditional restrictions. Larger unary relations and multi-column tables retai
 deferred preparation. Search-time filtering retains STR2 explanations.
 
 LP explanations cite selected source bound witnesses and recursively expanded row,
-fixing and cutoff premises. Current CP propagation and source LP conflicts do not
-include an optional exact-theory row-propagation scanner or explanation weakening pass.
+fixing and cutoff premises. Objective-relative fixing can use a weaker completed
+certificate while pruning retains the strongest bound. Cancelling a continuous
+reduced cost through an active singleton row retains that row's scope even when
+the original certificate had a finite supporting endpoint. Node bounding supplies
+narrowed integral columns as ordering hints, including when mixed relaxations are
+rebuilt without a bound trail. Mixed-row feasibility certificates also provide
+integer domain bounds without an incumbent. Interval reasons exclude the target's own
+endpoint and retain all supporting row and bound premises. Singleton-continuous
+row pairs can cancel their shared continuous term before projection; their reasons
+include both row scopes and each supporting logical endpoint. Optional integer-residue
+checks retain both real interval sides and the prior target endpoint that delimits
+their excluded prefix or suffix. Dense rows can substitute source equalities that
+define individual real coordinates, retaining every defining row scope and logical
+endpoint in the integer consequence. These projections share the node's numerical
+allowance. Unexpressible numerical
+scope withholds a consequence. Search-time row selection follows narrowed finite
+endpoints and Boolean pins; the resulting domain bounds retract on the CP trail.
+With LP learning enabled, the existing bounded, deduplicating LP clause pool admits
+each successful row tightening's consequence literal and complete false premises.
+An admitted implication registers immediately in the persistent CP session, so it
+survives undo and can propagate in sibling branches before restart. Restart drains
+share these implications through the existing source-feasibility path without
+registering them again; other queued clauses retain restart-time registration. These clauses
+do not assume an incumbent cutoff; objective-relative fixing keeps its separate
+local reason path.
+At the end of an objective-bounding node pass, a successful row tightening can
+refresh the retained source bounds and run one additional row projection without
+another floating solve. Both projections spend the same arithmetic allowance;
+source refresh keeps ordinary assembly and edit charges. Each projection uses its
+complete current source map and endpoint premises. The bounded follow-up does not
+claim a row fixpoint or own incremental theory state. There is no explanation weakening pass.
 See [LP consumer contracts](../lp/architecture.md#consumers-explanations-and-cuts).
 
 ## Learned-clause retention

@@ -206,6 +206,30 @@ class MpsCompiled(
         sourceWitness(columns.map { column -> sourceColumnValue(column, ints, reals) })
 
     /**
+     * Attempt [sourceWitness] when columns, rows and coefficient entries fit [maxEntries]. Return `null`
+     * for oversized or rejected candidates; feasibility uses the same source correspondence and tolerance policy.
+     */
+    fun sourceWitnessOrNull(
+        ints: LongArray,
+        reals: List<BigFraction>?,
+        maxEntries: Int,
+    ): MpsSourceWitness? {
+        require(maxEntries >= 0)
+        val source = sourceModel ?: return null
+        var remaining = maxEntries.toLong() - columns.size - source.objective.indices.size
+        if (remaining < 0L) return null
+        for (row in source.constraints) {
+            remaining -= row.indices.size.toLong() + 1L
+            if (remaining < 0L) return null
+        }
+        return try {
+            sourceWitness(ints, reals)
+        } catch (_: MpsLoweringException) {
+            null
+        }
+    }
+
+    /**
      * Check exact coordinates in source [columns] order, including integer values outside `Long`.
      * Source integrality is required exactly; rows and bounds use decimal tolerance only when [sourceExact] is false.
      */

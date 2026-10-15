@@ -46,6 +46,411 @@ import kotlin.test.assertTrue
 
 class LpBoundingTest {
     @Test
+    fun `dense mixed row deductions retract with a defining integer branch`() {
+        for (learn in listOf(false, true)) {
+            val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)), arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.EQ, 0.0),
+                Linear(intArrayOf(1), doubleArrayOf(-1.0), intArrayOf(1), doubleArrayOf(1.0),
+                    LinearOp.EQ, 0.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0),
+                    LinearOp.GE, 0.75),
+            ), numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY))
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0, 1.0))
+            val session = PropagationSession(problem)
+            session.pinInt(1, 0)
+            val sink = SolveStatsSink(backend = "defined-row")
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val relaxer = assertNotNull(engine.lpRelaxer)
+                engine.sparseSafePrune(relaxer, session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+                assertEquals(IntDomain(1, 1), session.intDomain(0))
+
+                session.popToLevel(0)
+                val result = engine.sparseSafePrune(relaxer, session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+
+                assertFalse(result.prune)
+                assertEquals(IntDomain(0, 1), session.intDomain(0))
+            }
+        }
+    }
+
+    @Test
+    fun `learned mixed row implications propagate when a supporting branch is revisited`() {
+        for (learn in listOf(false, true)) {
+            val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)), arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, 1.25),
+                Linear(intArrayOf(1), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.25),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+            val session = PropagationSession(problem)
+            session.pinInt(1, 0)
+            val sink = SolveStatsSink(backend = "row-learning")
+            val params = LpParams(lpPlan = LpPlan(bounding = true, learn = learn))
+            LpEngine(problem, objective, params, sink).use { engine ->
+                engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+                session.popToLevel(0)
+                assertEquals(IntDomain(0, 1), session.intDomain(0))
+                session.pinInt(1, 1)
+                assertEquals(IntDomain(0, 1), session.intDomain(0))
+                session.popToLevel(0)
+
+                session.pinInt(1, 0)
+
+                assertEquals(IntDomain(if (learn) 1L else 0L, 1L), session.intDomain(0))
+            }
+        }
+    }
+
+    @Test
+    fun `paired mixed row deductions retract with a supporting integer branch`() {
+        for (learn in listOf(false, true)) {
+            val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)), arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, 1.25),
+                Linear(intArrayOf(1), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.25),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+            val session = PropagationSession(problem)
+            session.pinInt(1, 0)
+            val sink = SolveStatsSink(backend = "row-pair")
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val relaxer = assertNotNull(engine.lpRelaxer)
+                engine.sparseSafePrune(relaxer, session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+                assertEquals(IntDomain(1, 1), session.intDomain(0))
+
+                session.popToLevel(0)
+                val result = engine.sparseSafePrune(relaxer, session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+
+                assertFalse(result.prune)
+                assertEquals(IntDomain(0, 1), session.intDomain(0))
+            }
+        }
+    }
+
+    @Test
+    fun `mixed row deductions consume newly tightened integer endpoints in one node pass`() {
+        for (learn in listOf(false, true)) {
+            val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)), arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, 0.75),
+                Linear(intArrayOf(1, 0), doubleArrayOf(1.0, -1.0), intArrayOf(1), doubleArrayOf(1.0),
+                    LinearOp.GE, -0.25),
+            ), numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(0.25, 0.25))
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(0.5, 0.5))
+            val session = PropagationSession(problem)
+            val sink = SolveStatsSink(backend = "row-follow-up")
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+
+                assertFalse(result.prune)
+                assertEquals(IntDomain(1, 1), session.intDomain(1))
+                assertEquals(1.0, sink.lp.solves.read().sum)
+            }
+        }
+    }
+
+    @Test
+    fun `follow up mixed row deductions retract with their supporting branch`() {
+        for (learn in listOf(false, true)) {
+            val problem = Problem(0, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)), arrayOf(
+                Linear(intArrayOf(0, 2), doubleArrayOf(1.0, 1.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, 0.75),
+                Linear(intArrayOf(1, 0), doubleArrayOf(1.0, -1.0), intArrayOf(1), doubleArrayOf(1.0),
+                    LinearOp.GE, -0.25),
+            ), numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(0.25, 0.25))
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(0.5, 0.5))
+            val session = PropagationSession(problem)
+            session.pinInt(2, 0)
+            val sink = SolveStatsSink(backend = "row-follow-up")
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val relaxer = assertNotNull(engine.lpRelaxer)
+                engine.sparseSafePrune(relaxer, session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+                assertEquals(IntDomain(1, 1), session.intDomain(1))
+
+                session.popToLevel(0)
+                val result = engine.sparseSafePrune(relaxer, session, 100.0,
+                    sink, Cancellation.Never, -1, true, learn = learn)
+
+                assertFalse(result.prune)
+                assertEquals(IntDomain(0, 1), session.intDomain(1))
+            }
+        }
+    }
+
+    @Test
+    fun `mixed row feasibility fixes an integer root domain before an incumbent`() {
+        for (sign in listOf(-1.0, 1.0)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
+                arrayOf(Linear(intArrayOf(0), doubleArrayOf(sign), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, if (sign > 0.0) 0.75 else -0.25)),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.25))
+            val objective = LinearObjective(intCoefficients = longArrayOf(sign.toLong()),
+                realCoefficients = doubleArrayOf(0.5))
+            val session = PropagationSession(problem)
+            val sink = SolveStatsSink(backend = "row-feasibility")
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session,
+                    Double.POSITIVE_INFINITY, sink, Cancellation.Never, -1, true)
+
+                assertFalse(result.prune)
+                val value = if (sign > 0.0) 1L else 0L
+                assertEquals(IntDomain(value, value), session.intDomain(0))
+            }
+        }
+    }
+
+    @Test
+    fun `mixed row feasibility fixes an integer domain under a supporting branch`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf(Linear(intArrayOf(0, 1), doubleArrayOf(1.0, 1.0),
+                intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.5)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.25))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(0.5))
+        val session = PropagationSession(problem)
+        session.pinInt(1, 1)
+        val sink = SolveStatsSink(backend = "row-feasibility")
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session,
+                Double.POSITIVE_INFINITY, sink, Cancellation.Never, -1, true, learn = true)
+
+            assertFalse(result.prune)
+            assertEquals(IntDomain(0, 0), session.intDomain(0))
+        }
+    }
+
+    @Test
+    fun `mixed row deductions retract when their supporting branch is undone`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf(Linear(intArrayOf(0, 1), doubleArrayOf(1.0, 1.0),
+                intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.5)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.25))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(0.5))
+        val session = PropagationSession(problem)
+        session.pinInt(1, 1)
+        val sink = SolveStatsSink(backend = "row-feasibility")
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            engine.sparseSafePrune(relaxer, session, Double.POSITIVE_INFINITY,
+                sink, Cancellation.Never, -1, true, learn = true)
+            assertEquals(IntDomain(0, 0), session.intDomain(0))
+
+            session.popToLevel(0)
+            val result = engine.sparseSafePrune(relaxer, session, Double.POSITIVE_INFINITY,
+                sink, Cancellation.Never, -1, true, learn = true)
+
+            assertFalse(result.prune)
+            assertEquals(IntDomain(0, 1), session.intDomain(0))
+        }
+    }
+
+    @Test
+    fun `directly integral mixed fixing excludes equal incumbents when the objective range exceeds Long`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, Long.MAX_VALUE / 2L + 1L)),
+            arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0),
+                LinearOp.GE, 0.0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(2L))
+        val sink = SolveStatsSink(backend = "integral-cutoff")
+        val session = PropagationSession(problem)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, 4.0,
+                sink, Cancellation.Never, -1, true)
+
+            assertFalse(result.prune)
+            assertEquals(IntDomain(0, 1), session.intDomain(0))
+        }
+    }
+
+    @Test
+    fun `directly integral mixed bounds prune equal incumbents when the objective range exceeds Long`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(1, Long.MAX_VALUE / 2L + 1L)),
+            arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0),
+                LinearOp.GE, 0.0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(2L))
+        val sink = SolveStatsSink(backend = "integral-cutoff")
+        val session = PropagationSession(problem)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, 2.0,
+                sink, Cancellation.Never, -1, true)
+
+            assertTrue(result.prune)
+        }
+    }
+
+    @Test
+    fun `fixing retains a permitted far endpoint`() {
+        for (sign in listOf(-1L, 1L)) for (realCost in listOf(0.0, 0.5)) {
+            val maximum = if (sign > 0L) 6.0 else 0.0
+            val cutoff = maximum + realCost * 0.25 + if (realCost == 0.0) 1.0 else 0.0
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray(),
+                numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.25))
+            val objective = LinearObjective(intCoefficients = longArrayOf(2L * sign),
+                realCoefficients = doubleArrayOf(realCost))
+            val sink = SolveStatsSink(backend = "endpoint-admission")
+            val session = PropagationSession(problem)
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, cutoff,
+                    sink, Cancellation.Never, -1, true)
+
+                assertFalse(result.prune)
+                assertEquals(IntDomain(0, 3), session.intDomain(0))
+            }
+        }
+    }
+
+    @Test
+    fun `fixing removes a far endpoint beyond the cutoff`() {
+        for (sign in listOf(-1L, 1L)) for (realCost in listOf(0.0, 0.5)) {
+            val cutoff = if (sign > 0L) 6.0 else 0.0
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray(),
+                numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.25))
+            val objective = LinearObjective(intCoefficients = longArrayOf(2L * sign),
+                realCoefficients = doubleArrayOf(realCost))
+            val sink = SolveStatsSink(backend = "endpoint-admission")
+            val session = PropagationSession(problem)
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, cutoff,
+                    sink, Cancellation.Never, -1, true)
+
+                assertFalse(result.prune)
+                assertEquals(if (sign > 0L) IntDomain(0, 2) else IntDomain(1, 3), session.intDomain(0))
+            }
+        }
+    }
+
+    @Test
+    fun `objective equality fixing bounds an integral coordinate seated inside the LP face`() {
+        for (sign in listOf(-1.0, 1.0)) {
+            val problem = Problem(
+                0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+                arrayOf(Linear(intArrayOf(0, 1), doubleArrayOf(-4.0 * sign, -sign), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.EQ, 0.0)),
+                numRealVars = 1,
+                realLower = doubleArrayOf(if (sign > 0.0) 1.0 else -100.0),
+                realUpper = doubleArrayOf(if (sign > 0.0) 100.0 else -1.0),
+            )
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(sign))
+            val sink = SolveStatsSink(backend = "objective-equality-fixing")
+            val session = PropagationSession(problem)
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, 2.0,
+                    sink, Cancellation.Never, -1, true)
+
+                assertFalse(result.prune)
+                assertEquals(IntDomain(0, 0), session.intDomain(0))
+                assertEquals(IntDomain(0, 1), session.intDomain(1))
+            }
+        }
+    }
+
+    @Test
+    fun `declared continuous objective ceilings fix integral domains before an incumbent`() {
+        for (sign in listOf(-1.0, 1.0)) for (coefficient in listOf(3.0, 4.0)) {
+            val lower = if (sign > 0.0) 0.0 else -3.0
+            val upper = if (sign > 0.0) 3.0 else 0.0
+            val problem = Problem(
+                0, 1, arrayOf(IntDomain(0, 10)),
+                arrayOf(Linear(intArrayOf(0), doubleArrayOf(-sign * coefficient), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.EQ, 0.0)),
+                numRealVars = 1, realLower = doubleArrayOf(lower), realUpper = doubleArrayOf(upper),
+            )
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(sign))
+            val sink = SolveStatsSink(backend = "objective-ceiling")
+            val session = PropagationSession(problem)
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val result = engine.sparseSafePrune(
+                    assertNotNull(engine.lpRelaxer), session, Double.POSITIVE_INFINITY, sink,
+                    Cancellation.Never, -1, true,
+                )
+
+                assertFalse(result.prune)
+                assertEquals(IntDomain(0, if (coefficient == 3.0) 1 else 0), session.intDomain(0))
+            }
+        }
+    }
+
+    @Test
+    fun `an absent continuous objective ceiling cannot use a probe box for fixing`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 10)),
+            arrayOf(Linear(intArrayOf(0), doubleArrayOf(-4.0), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.EQ, 0.0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val sink = SolveStatsSink(backend = "absent-ceiling")
+        val session = PropagationSession(problem)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, Double.POSITIVE_INFINITY,
+                sink, Cancellation.Never, -1, true)
+
+            assertEquals(IntDomain(0, 10), session.intDomain(0))
+        }
+    }
+
+    @Test
+    fun `integral continuous objective definitions prune equal incumbent nodes`() {
+        for ((coefficient, minimum) in listOf(1.0 to 1.0, -1.0 to -2.0)) {
+            for (cutoff in listOf(minimum - 0.5, minimum, minimum + 0.5)) {
+                val problem = Problem(
+                    0, 1, arrayOf(IntDomain(1, 2)),
+                    arrayOf(Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(1.0),
+                        LinearOp.EQ, 0.0)),
+                    numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(10.0),
+                )
+                val objective = LinearObjective(realCoefficients = doubleArrayOf(coefficient))
+                val sink = SolveStatsSink(backend = "mixed-integral-prune")
+                val session = PropagationSession(problem)
+                LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                    val result = engine.sparseSafePrune(
+                        assertNotNull(engine.lpRelaxer), session, cutoff, sink, Cancellation.Never, -1, true,
+                    )
+
+                    assertEquals(cutoff <= minimum, result.prune)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `mixed node pruning requires an exact bound beyond the enclosing rational cutoff`() {
+        for ((coefficient, minimum) in listOf(0.5 to 3.125, -0.5 to 2.375)) {
+            for (cutoff in listOf(minimum - 0.125, minimum, minimum + 0.125)) {
+                val problem = Problem(
+                    0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+                    numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.25),
+                )
+                val objective = LinearObjective(
+                    intCoefficients = longArrayOf(1L), realCoefficients = doubleArrayOf(coefficient), constant = 3L,
+                )
+                val sink = SolveStatsSink(backend = "mixed-rational-prune")
+                val session = PropagationSession(problem)
+                LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                    val result = engine.sparseSafePrune(
+                        assertNotNull(engine.lpRelaxer), session, cutoff, sink, Cancellation.Never, -1, true,
+                    )
+
+                    assertEquals(cutoff < minimum, result.prune)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `noncanonical legacy node fallback keeps source hints and closes displaced owners`() {
         val model = LpBuilder().apply {
             addVar(0L, 10L, cost = 1L)

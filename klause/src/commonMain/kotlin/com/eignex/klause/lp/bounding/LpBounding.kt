@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.cut.CutContext
 import com.eignex.klause.lp.cut.CutPool
 import com.eignex.klause.lp.cut.CutSeparator
@@ -12,11 +14,16 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.FarkasRoute
 import com.eignex.klause.lp.engine.FloatLpResult
-import com.eignex.klause.lp.engine.IntegerCertificate
-import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertificationObserver
+import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpPhaseTimer
+import com.eignex.klause.lp.engine.LpProjectionStop
+import com.eignex.klause.lp.engine.LpRowBound
+import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.MixedCertificateMeter
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.authoritativeModel
@@ -25,6 +32,7 @@ import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.certifyLpFarkas
 import com.eignex.klause.lp.engine.checkedLpConflict
 import com.eignex.klause.lp.engine.checkedLpWitness
+import com.eignex.klause.lp.engine.exactBits
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactConstant
 import com.eignex.klause.lp.engine.exactCost
@@ -32,11 +40,12 @@ import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.finiteExactInput
 import com.eignex.klause.lp.engine.floorLong
 import com.eignex.klause.lp.engine.hasIntegralObjective
-import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.lowerBoundDouble
 import com.eignex.klause.lp.engine.lpConditioning
+import com.eignex.klause.lp.engine.mixedRowBounds
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
+import com.eignex.klause.lp.engine.nodeDualCertificate
 import com.eignex.klause.lp.engine.sourceObjective
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
@@ -208,23 +217,26 @@ private fun LpEngine.observeSolveCost(sink: SolveStatsSink, solver: LpSolver) {
  *  optional learned nogood (the sparse path is reason-less, so it is null). */
 internal class LpNodeOutcome(val prune: Boolean, val basis: Basis?, val explanation: IntArray? = null)
 
-/**
- * Bounded, deduplicating buffer of LP-learned nogoods awaiting registration at the next restart.
- * Dedup is by sorted-literal key so a region pruned repeatedly is learned once; the cap bounds memory
- * between restarts. [drain] returns and clears the pending batch but keeps the seen-set so a flushed
- * clause is not re-queued.
+/*
+ * Bound pending LP clause storage and deduplicate across restarts. Entries retain whether the
+ * persistent CP session already contains the clause so restart sharing does not register it twice.
+ * Draining clears the pending batch; retained keys prevent a later node from queuing it again.
  */
 internal class LpNogoodPool(private val cap: Int = 4096) {
-    private val seen = HashSet<String>()
-    private val pending = ArrayList<IntArray>()
+    class Entry(val literals: IntArray, val registered: Boolean)
 
-    fun add(nogood: IntArray) {
-        if (nogood.isEmpty() || seen.size >= cap) return
+    private val seen = HashSet<String>()
+    private val pending = ArrayList<Entry>()
+
+    fun add(nogood: IntArray, registered: Boolean = false): Boolean {
+        if (nogood.isEmpty() || seen.size >= cap) return false
         val key = nogood.sorted().joinToString(",")
-        if (seen.add(key)) pending.add(nogood)
+        if (!seen.add(key)) return false
+        pending.add(Entry(nogood, registered))
+        return true
     }
 
-    fun drain(): List<IntArray> {
+    fun drain(): List<Entry> {
         if (pending.isEmpty()) return emptyList()
         val out = ArrayList(pending)
         pending.clear()
@@ -511,10 +523,19 @@ internal fun LpEngine.sparseSafePrune(
     // advisory — it never changes feasibility or the optimum.
     hints?.record(relaxation, result.primal, result.duals)
     // The scoped owner carries appended-row bases itself; the hint is only for external fresh solves.
-    val optimalBasis = result.basis
+    var optimalBasis: Basis? = result.basis
+    val rowMeter = if (problem.numRealVars > 0 &&
+        (problem.numIntVars > 0 || problem.numBoolVars > 0)
+    ) MixedCertificateMeter(cancellation) else null
     val canPrune = bound.isFinite()
     val canPropagate = objectiveVar >= 0 && objectiveAscending
-    if (!canPrune && !canPropagate) {
+    val objectiveCeiling = if (canPrune) null else singleObjectiveCeiling(relaxation, cancellation)
+    val canFix = canPrune || objectiveCeiling != null
+    if (!canFix && !canPropagate) {
+        if (rowMeter != null && applyMixedRowBounds(relaxation, session, sink, learn, cancellation, rowMeter)) {
+            return LpNodeOutcome(true, null)
+        }
+        if (cancellation()) return LpNodeOutcome(false, optimalBasis)
         val constant = cutPool.constantContradiction() ?: return LpNodeOutcome(false, optimalBasis)
         return when (val outcome = solveSelectedCuts(
             session, LpCutOutcome.Solved(relaxation, result), listOf(constant), cancellation, sink, learn,
@@ -580,17 +601,26 @@ internal fun LpEngine.sparseSafePrune(
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.
     if (cancellation()) return LpNodeOutcome(false, null)
-    val cert = if ((learn && canPropagate) || canPrune) {
+    val additionalCertificates = ArrayList<LpDeductionCertificate>(2)
+    val cert = if ((learn && canPropagate) || canFix) {
         solveContext.certificationPolicy.acceptNullable(
             LpCertifier.INTEGER,
-            integerCertify(boundRel.model, boundRes.duals, observer = sink.lp.certificationObserver(LpRoute.NODE)),
+            nodeDualCertificate(
+                boundRel.model, boundRes.duals, cancellation, sink.lp.certificationObserver(LpRoute.NODE),
+                eliminateContinuousObjective = !canPrune && objectiveCeiling != null,
+                onAdditionalCertificate = if (canFix) { { additionalCertificates.add(it) } } else null,
+                sharedMeter = rowMeter,
+                preferredColumns = if (rowMeter != null && canFix && session.decisionLevel > 0) {
+                    narrowedRowColumns(boundRel, session, cancellation)
+                } else null,
+            ),
         ).also {
             // The node path is where certification actually happens; the certified wrapper is not on it.
             sink.lp.observeCertification(
                 certified = it != null,
                 continuousDecline = it == null && boundRel.model.hasContinuous,
                 numericDecline = it == null && !boundRel.model.hasContinuous,
-                rationalFallback = false,
+                rationalFallback = it?.usesRationalArithmetic() == true,
                 rows = boundRel.model.m,
             )
         }
@@ -598,6 +628,26 @@ internal fun LpEngine.sparseSafePrune(
         null
     }
     if (cancellation()) return LpNodeOutcome(false, null)
+    val rationalCutoff = if (canPrune &&
+        (cert?.let { permitsIntegralObjectiveCutoff(it) } == true || !boundRel.model.hasIntegralObjective())
+    ) {
+        BigFraction.ofDouble(bound.nextUp())
+    } else {
+        null
+    }
+    if (rationalCutoff != null && cert != null) {
+        val lower = cert.exactObjectiveBound()
+        val words = (maxOf(Long.SIZE_BITS, exactBits(listOf(lower, rationalCutoff))) + 63L) / 64L
+        noteNodeOverhead(4L * words * words)
+        val full = lower + BigFraction.ofLong(boundRel.objectiveConstant)
+        val integralCutoff = if (permitsIntegralObjectiveCutoff(cert)) enclosingCutoff(bound)?.ceilLong() else null
+        if ((integralCutoff != null && full.ceilLong()?.let { it >= integralCutoff } == true) ||
+            full >= rationalCutoff
+        ) {
+            sink.lp.observePrune()
+            return LpNodeOutcome(true, null)
+        }
+    }
     // Neither the float safe bound nor the certificate's integer-multiplier bound dominates the other,
     // so the prune decides on the tighter of the two rather than on the float bound alone.
     val lower = certifiedTightObjectiveLowerBound(
@@ -606,8 +656,11 @@ internal fun LpEngine.sparseSafePrune(
         cert,
         sink.lp.certificationObserver(LpRoute.NODE),
         solveContext.certificationPolicy,
-    )
-        ?: return LpNodeOutcome(false, optimalBasis)
+    ) ?: run {
+        val prune = rowMeter != null &&
+            applyMixedRowBounds(boundRel, session, sink, learn, cancellation, rowMeter, relaxer) { optimalBasis = null }
+        return LpNodeOutcome(prune, if (prune) null else optimalBasis)
+    }
     val full = checkNotNull(BigFraction.ofDouble(lower)) + BigFraction.ofLong(boundRel.objectiveConstant)
     val sourceRange = sourceObjectiveRange(boundRel)
     val cutoff = if (canPrune && sourceRange != null) enclosingCutoff(bound) else null
@@ -655,34 +708,192 @@ internal fun LpEngine.sparseSafePrune(
             }
         }
     }
-    // Reduced-cost fixing on the exact certified Lagrangian and reduced costs needs a finite incumbent
-    // for the improving gap, but not an attained LP optimum: the certificate inequality holds for any
-    // rounded dual vector.
-    if (canPrune && cert != null &&
+    // A certified Lagrangian bounds every point below the source cutoff without requiring
+    // an attained LP optimum. A declared objective ceiling also bounds feasible points before an incumbent.
+    if (canFix && cert != null &&
         !cancellation() &&
-        applySparseReducedCostFixing(
-            boundRel,
-            cert,
-            session,
-            bound,
-            sink,
-            objectiveVar,
-            objectiveAscending,
-            learn,
-            cancellation,
-        )
+        observeNodeFixing(sink, LpSolvePhase.NODE_PRIMARY_FIXING) {
+            applySparseReducedCostFixing(boundRel, cert, session, bound, sink, objectiveVar,
+                objectiveAscending, learn, cancellation, objectiveCeiling)
+        }
+    ) {
+        return LpNodeOutcome(true, null)
+    }
+    if (canFix && cert != null) for ((index, candidate) in additionalCertificates.withIndex()) {
+        if (cancellation()) return LpNodeOutcome(false, optimalBasis)
+        val additional = solveContext.certificationPolicy.acceptNullable(LpCertifier.INTEGER, candidate) ?: continue
+        val phase = if (index == 0) LpSolvePhase.NODE_SECONDARY_FIXING else LpSolvePhase.NODE_TERTIARY_FIXING
+        if (observeNodeFixing(sink, phase) {
+            applySparseReducedCostFixing(boundRel, additional, session, bound, sink, objectiveVar,
+                objectiveAscending, learn, cancellation, objectiveCeiling)
+        }) {
+            return LpNodeOutcome(true, null)
+        }
+    }
+    if (rowMeter != null &&
+        applyMixedRowBounds(boundRel, session, sink, learn, cancellation, rowMeter, relaxer) { optimalBasis = null }
     ) {
         return LpNodeOutcome(true, null)
     }
     return LpNodeOutcome(false, optimalBasis)
 }
 
+@Suppress("LongParameterList")
+private fun LpEngine.applyMixedRowBounds(
+    relaxation: LpRelaxation,
+    session: PropagationSession,
+    sink: SolveStatsSink,
+    learn: Boolean,
+    cancellation: Cancellation,
+    meter: MixedCertificateMeter,
+    relaxer: CpToLpRelaxation? = null,
+    onRefresh: () -> Unit = {},
+): Boolean {
+    var current = relaxation
+    val initialWork = meter.work
+    try {
+        repeat(if (relaxer == null) 1 else 2) { pass ->
+            if (cancellation()) return false
+            val affectedColumns = if (session.decisionLevel == 0) null
+                else narrowedRowColumns(current, session, cancellation)
+            val projected = solveContext.certificationPolicy.acceptNullable(
+                LpCertifier.INTEGER,
+                mixedRowBounds(
+                    current.model, cancellation, sink.lp.certificationObserver(LpRoute.NODE), meter, affectedColumns,
+                ),
+            ).orEmpty()
+            var changed = false
+            if (observeNodeFixing(sink, LpSolvePhase.NODE_ROW_FIXING) {
+                applyRowBounds(current, projected, session, sink, learn, cancellation) { changed = true }
+            }) return true
+            if (!changed || relaxer == null || pass == 1 || cancellation()) return false
+            meter.reserve(current.model.numVars.toLong() * 16L + 128L)
+            onRefresh()
+            current = nodeRelaxation(relaxer, session) ?: return false
+        }
+        return false
+    } catch (_: LpProjectionStop) {
+        return false
+    } finally {
+        noteNodeOverhead(meter.work - initialWork)
+    }
+}
+
+private fun LpEngine.narrowedRowColumns(
+    relaxation: LpRelaxation,
+    session: PropagationSession,
+    cancellation: Cancellation,
+): IntArray {
+    val columns = IntArrayList()
+    noteNodeOverhead(relaxation.colVarId.size.toLong())
+    for (column in relaxation.colVarId.indices) {
+        if (cancellation()) return intArrayOf()
+        val variable = relaxation.colVarId[column]
+        if (variable < 0 || relaxation.model.colContinuous[column]) continue
+        val narrowed = if (relaxation.colIsBool[column]) {
+            session.boolValue(variable) != null
+        } else {
+            val domain = session.intDomain(variable)
+            val declared = problem.intBounds
+            !declared.hasLower(variable) || !declared.hasUpper(variable) ||
+                domain.min != declared.lower(variable) || domain.max != declared.upper(variable)
+        }
+        if (narrowed) columns.add(column)
+    }
+    return columns.toIntArray()
+}
+
+@Suppress("CyclomaticComplexMethod")
+private fun LpEngine.applyRowBounds(
+    relaxation: LpRelaxation,
+    bounds: List<LpRowBound>,
+    session: PropagationSession,
+    sink: SolveStatsSink,
+    learn: Boolean,
+    cancellation: Cancellation,
+    onFix: () -> Unit,
+): Boolean {
+    for (certificate in bounds) {
+        if (cancellation()) return false
+        if (!certificate.belongsTo(relaxation.model)) continue
+        val column = certificate.column
+        val variable = relaxation.colVarId.getOrNull(column) ?: continue
+        if (variable < 0 || relaxation.model.colContinuous[column]) continue
+        val threshold = certificate.integerBound() ?: continue
+        noteNodeOverhead(48L)
+        val bool = relaxation.colIsBool[column]
+        val pinned = if (bool) session.boolValue(variable) else null
+        val minimum = if (bool) { if (pinned == true) 1L else 0L } else session.intDomain(variable).min
+        val maximum = if (bool) { if (pinned == false) 0L else 1L } else session.intDomain(variable).max
+        if ((certificate.upper && threshold >= maximum) || (!certificate.upper && threshold <= minimum)) continue
+        noteNodeOverhead(certificate.supportCount.toLong() * LpNodeOverhead.FIXING)
+        val support = LpExplanation.rowBoundReason(relaxation, certificate, session) ?: continue
+        val reason = support.takeIf { learn && !bool }
+        val result = when {
+            bool && ((threshold < minimum && certificate.upper) ||
+                (threshold > maximum && !certificate.upper)) -> {
+                sink.lp.observePrune()
+                return true
+            }
+            bool -> session.implyBool(variable, !certificate.upper)
+            certificate.upper && reason != null -> session.implyIntAtMostWithReason(variable, threshold, reason)
+            certificate.upper -> session.implyIntAtMost(variable, threshold)
+            reason != null -> session.implyIntAtLeastWithReason(variable, threshold, reason)
+            else -> session.implyIntAtLeast(variable, threshold)
+        }
+        if (result is PropagationResult.Unsat) {
+            sink.lp.observePrune()
+            return true
+        }
+        if (learn) lpNogoods?.let { pool ->
+            val conclusion = when {
+                bool -> Lit.make(variable, !certificate.upper)
+                certificate.upper -> session.boundLeLit(variable, threshold, positive = true)
+                else -> session.boundGeLit(variable, threshold, positive = true)
+            }
+            noteNodeOverhead(support.size.toLong() + 1L)
+            val clause = intArrayOf(conclusion) + support
+            if (pool.add(clause, registered = true) &&
+                session.addLearnedClause(Clause(clause), lbd = clause.size, permanent = true) is PropagationResult.Unsat
+            ) {
+                sink.lp.observePrune()
+                return true
+            }
+        }
+        sink.lp.observeFix()
+        onFix()
+    }
+    return false
+}
+
+private inline fun observeNodeFixing(sink: SolveStatsSink, phase: LpSolvePhase, body: () -> Boolean): Boolean {
+    val timer = LpPhaseTimer(sink.lp.certificationObserver(LpRoute.NODE), phase)
+    val before = sink.lp.fixed.read().sum
+    var returned = false
+    var conflict = false
+    try {
+        conflict = body()
+        returned = true
+        return conflict
+    } finally {
+        val fixes = (sink.lp.fixed.read().sum - before).toInt()
+        val outcome = when {
+            !returned -> "FAILED"
+            conflict -> "CONFLICT"
+            fixes > 0 -> "FIXED"
+            else -> "NONE"
+        }
+        timer.finish(outcome, steps = fixes)
+    }
+}
+
 /**
- * Reduced-cost fixing from one [IntegerCertificate], over exact scaled integers. For any column with
- * nonzero reduced cost, moving Δ integer steps from that certificate term's minimizing endpoint raises
- * its Lagrangian by `|reducedCost|·Δ`. Any incumbent-beating solution has source objective
- * `≤ ⌈bound⌉ − 1`, so the column can move at most the exact unrounded certificate gap divided by
- * `|reducedCost|`. With [learn] each integer fixing carries the LP dual-decomposition reason (the other
+ * Reduced-cost fixing from one [LpDeductionCertificate] in minimized source objective units. Moving
+ * an integral column Δ steps from its minimizing endpoint raises the Lagrangian by `|reducedCost|·Δ`.
+ * A verified integral objective uses `ceil(bound) - 1`; other objectives retain an enclosing rational
+ * cutoff. A finite single-coordinate objective ceiling supplies a closed feasibility cutoff,
+ * including before an incumbent exists. The allowed movement uses the unrounded gap divided by `|reducedCost|`.
+ * With [learn] each integer fixing carries the LP dual-decomposition reason (the other
  * support columns' seated bounds + the incumbent bound + any dual-weighted non-global row's premises);
  * when the reason is inexpressible the fixing falls back to a reason-less level-local tightening (a
  * conflict-analysis leaf). Returns true if a reduction empties a domain (the node is then pruned).
@@ -690,7 +901,7 @@ internal fun LpEngine.sparseSafePrune(
 @Suppress("LongParameterList", "CyclomaticComplexMethod")
 internal fun LpEngine.applySparseReducedCostFixing(
     relaxation: LpRelaxation,
-    cert: IntegerCertificate,
+    cert: LpDeductionCertificate,
     session: PropagationSession,
     bound: Double,
     sink: SolveStatsSink,
@@ -698,16 +909,40 @@ internal fun LpEngine.applySparseReducedCostFixing(
     objectiveAscending: Boolean = true,
     learn: Boolean = false,
     cancellation: Cancellation = Cancellation.Never,
+    objectiveCeiling: BigFraction? = null,
 ): Boolean {
     if (cancellation() || !cert.belongsTo(relaxation.model, sink.lp.certificationObserver(LpRoute.NODE))) return false
-    if (sourceObjectiveRange(relaxation) == null) return false
-    val ceiling = enclosingCutoff(bound)?.ceilLong() ?: return false
-    if (ceiling == Long.MIN_VALUE) return false
-    val improvingMax = ceiling - 1L
+    val sourceRange = sourceObjectiveRange(relaxation)
+    val incumbentMax = if (!bound.isFinite()) {
+        objectiveCeiling ?: return false
+    } else if (sourceRange != null || permitsIntegralObjectiveCutoff(cert)) {
+        val ceiling = enclosingCutoff(bound)?.ceilLong() ?: return false
+        if (ceiling == Long.MIN_VALUE) return false
+        BigFraction.ofLong(ceiling - 1L)
+    } else {
+        BigFraction.ofDouble(bound.nextUp()) ?: return false
+    }
+    val improvingMax = objectiveCeiling?.let { if (it < incumbentMax) it else incumbentMax } ?: incumbentMax
     val sourceConstant = relaxation.objectiveConstant
-    if (!cert.improvingGapNonNegative(improvingMax, sourceConstant)) return false
-    val reasonSupport = if (learn && objectiveVar >= 0 && objectiveAscending) {
-        reducedCostFixingReasons(relaxation, cert, session, objectiveVar, improvingMax,
+    val integralCutoff = ExactLpNumber.of(improvingMax).exactLong()
+    if (integralCutoff != null) {
+        if (!cert.improvingGapNonNegative(integralCutoff, sourceConstant)) return false
+    } else {
+        val lower = cert.exactObjectiveBound()
+        val words = (maxOf(Long.SIZE_BITS, exactBits(listOf(improvingMax, lower))) + 63L) / 64L
+        noteNodeOverhead(4L * words * words)
+        if (improvingMax < lower + BigFraction.ofLong(sourceConstant)) return false
+    }
+    val rationalGap = if (cert.usesRationalArithmetic() || integralCutoff == null) {
+        val lower = cert.exactObjectiveBound()
+        val words = (maxOf(Long.SIZE_BITS, exactBits(listOf(improvingMax, lower))) + 63L) / 64L
+        noteNodeOverhead(4L * words * words)
+        improvingMax - BigFraction.ofLong(sourceConstant) - lower
+    } else {
+        null
+    }
+    val reasonSupport = if (learn && objectiveVar >= 0 && objectiveAscending && sourceRange != null) {
+        reducedCostFixingReasons(relaxation, cert, session, objectiveVar, checkNotNull(improvingMax.floorLong()),
             sink.lp.certificationObserver(LpRoute.NODE))
     } else {
         null
@@ -717,7 +952,9 @@ internal fun LpEngine.applySparseReducedCostFixing(
     for (col in relaxation.colVarId.indices) {
         if (cancellation()) return false
         val varId = relaxation.colVarId[col]
-        if (varId < 0) continue // auxiliary column — no CP variable to fix
+        if (varId < 0 || relaxation.model.colContinuous[col] ||
+            relaxation.model.exactState?.model?.column(col)?.integral == false
+        ) continue
         val isBool = relaxation.colIsBool[col]
         if (isBool && session.boolValue(varId) != null) continue
         val liveMin: Long
@@ -732,13 +969,36 @@ internal fun LpEngine.applySparseReducedCostFixing(
         }
         if (liveMin == liveMax) continue
         val sign = cert.reducedCostSign(col)
-        val dMax = cert.fixSteps(col, improvingMax, sourceConstant) ?: continue
+        if (sign == 0) continue
+        val bounds = relaxation.model.exactBounds(col)
+        val side = (if (sign > 0) bounds.lower else bounds.upper) ?: continue
+        val endpoint = ExactLpNumber.of(relaxation.model.exactShift(col) + side.number.value).exactLong() ?: continue
+        noteNodeOverhead(cert.rationalFixingWork(col, improvingMax))
+        val distance = try {
+            if (sign > 0) subExact(liveMax, endpoint) else subExact(endpoint, liveMin)
+        } catch (_: CheckedLongOverflowException) {
+            null
+        }
+        if (distance != null && distance >= 0L) {
+            val permitted = if (rationalGap != null) {
+                val reduced = cert.exactReducedCost(col)
+                val cost = if (sign < 0) reduced.negated() else reduced
+                cost * BigFraction.ofLong(distance) <= rationalGap
+            } else {
+                cert.permitsMovement(col, distance, checkNotNull(integralCutoff), sourceConstant)
+            }
+            if (permitted) continue
+        }
+        val dMax = if (rationalGap != null) {
+            noteNodeOverhead(cert.rationalFixingWork(col, improvingMax))
+            cert.fixStepsForGap(col, rationalGap)
+        } else {
+            cert.fixStepsAtCutoff(col, improvingMax, sourceConstant)
+        }
+        if (dMax == null) continue
         val res = when {
             // A positive reduced cost is minimized at the certificate model's lower endpoint.
             sign > 0 -> {
-                val side = relaxation.model.exactBounds(col).lower ?: continue
-                val endpoint = ExactLpNumber.of(relaxation.model.exactShift(col) + side.number.value).exactLong()
-                    ?: continue
                 val hi = try {
                     addExact(endpoint, dMax)
                 } catch (_: CheckedLongOverflowException) {
@@ -754,9 +1014,6 @@ internal fun LpEngine.applySparseReducedCostFixing(
 
             // A negative reduced cost is minimized at the certificate model's upper endpoint.
             sign < 0 -> {
-                val side = relaxation.model.exactBounds(col).upper ?: continue
-                val endpoint = ExactLpNumber.of(relaxation.model.exactShift(col) + side.number.value).exactLong()
-                    ?: continue
                 val lo = try {
                     subExact(endpoint, dMax)
                 } catch (_: CheckedLongOverflowException) {
@@ -780,6 +1037,39 @@ internal fun LpEngine.applySparseReducedCostFixing(
         if (session.decisionLevel == 0) sink.lp.observeRootReducedCostFixes(1)
     }
     return false
+}
+
+private fun LpEngine.singleObjectiveCeiling(
+    relaxation: LpRelaxation,
+    cancellation: Cancellation,
+): BigFraction? {
+    val model = relaxation.model
+    if (!model.finiteExactInput()) return null
+    noteNodeOverhead(model.numVars.toLong() * LpNodeOverhead.FIXING)
+    var column = -1
+    var coefficient = BigFraction.ZERO
+    for (j in 0 until model.numVars) {
+        if (cancellation()) return null
+        val cost = model.exactCost(j)
+        if (cost.isZero) continue
+        if (column >= 0 || j >= model.n) return null
+        column = j
+        coefficient = cost
+    }
+    if (column < 0) return null
+    val bounds = model.exactBounds(column)
+    val side = (if (coefficient.signum() > 0) bounds.upper else bounds.lower) ?: return null
+    val objective = model.exactState?.model?.objective
+    val scale = objective?.scale?.value ?: BigFraction.ONE
+    val external = objective?.externalConstant?.value ?: BigFraction.ZERO
+    val constant = model.exactConstant()
+    val bits = exactBits(listOf(coefficient, side.number.value, constant, scale, external))
+    if (bits > 128) return null
+    val words = (maxOf(Long.SIZE_BITS, bits) + 63L) / 64L
+    noteNodeOverhead(12L * words * words)
+    val ceiling = (constant + coefficient * side.number.value) * scale.reciprocal() + external +
+        BigFraction.ofLong(relaxation.objectiveConstant)
+    return ceiling.takeIf { exactBits(listOf(it)) <= 128 }
 }
 
 /** One certificate's reusable support for local reduced-cost deductions under a named cutoff. */
@@ -806,7 +1096,7 @@ internal class ReducedCostFixingReasons(
  */
 internal fun reducedCostFixingReasons(
     relaxation: LpRelaxation,
-    cert: IntegerCertificate,
+    cert: LpDeductionCertificate,
     session: PropagationSession,
     objectiveVar: Int,
     improvingMax: Long,
@@ -840,6 +1130,11 @@ internal fun reducedCostFixingReasons(
         supportLits.toIntArray(),
         session.boundLeLit(objectiveVar, objectiveVarMax, positive = false),
     )
+}
+
+private fun LpEngine.permitsIntegralObjectiveCutoff(cert: LpDeductionCertificate): Boolean {
+    val rows = cert.integralObjectiveRows() ?: return false
+    return rows.isNotEmpty() || problem.numRealVars > 0
 }
 
 private fun LpEngine.sourceObjectiveRange(relaxation: LpRelaxation): LongRange? {
