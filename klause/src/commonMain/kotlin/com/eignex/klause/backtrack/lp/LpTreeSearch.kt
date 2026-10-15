@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.ComposedSampleVerifier
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.backtrack.exactSourceObjective
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpFractionalBranch
@@ -22,6 +23,7 @@ import com.eignex.klause.lp.engine.exactPointWitness
 import com.eignex.klause.lp.engine.triangularCrashBasis
 import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LeafRealSolver
+import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
@@ -99,6 +101,50 @@ internal fun LpEngine.lbTreeSearch(
                 var targets = emptyMap<Int, Long>()
                 var bestExact: BigFraction? = null
                 var bestValue: BigFraction? = null
+                var best: Sample? = null
+                val tried = HashSet<String>()
+                fun offer(discrete: Sample, discreteChecked: Boolean): Boolean {
+                    if (token()) return false
+                    var sample = discrete
+                    if (problem.numRealVars > 0) {
+                        primalPropagationWork += problem.numIntVars.toLong() + problem.numBoolVars
+                        val key = discrete.ints.joinToString(",") + ";" + discrete.bools.joinToString(",")
+                        if (!tried.add(key) || token()) return false
+                        if (!discreteChecked && composedFixpoint(problem, Candidate(sample, Unit), token,
+                                assumptions, { primalPropagationWork += it }) !is Verification.Accepted
+                        ) return false
+                        val rootWork = rootPrimalWorkBudget(sink.lp.standaloneWork)
+                        val offered = nodeQueryWorkBudget()
+                        val work = when {
+                            rootWork == 0L -> offered ?: 0L
+                            offered == null -> rootWork
+                            else -> minOf(offered, rootWork)
+                        }
+                        val leaf = complete?.invoke(sample, token, work)
+                            ?: requireNotNull(leafSolver).solve(sample, token, toleranceCheck, work)
+                        when (leaf.verdict) {
+                            LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED,
+                            LpVerdict.TOLERANCE_OPTIMUM -> Unit
+                            else -> return false
+                        }
+                        if (leaf.verdict == LpVerdict.TOLERANCE_OPTIMUM && toleranceCheck == null) return false
+                        sample = sample.copy(reals = leaf.reals, exactReals = leaf.exactReals)
+                    }
+                    if (token()) return false
+                    val accepted = if (accept != null) accept(sample) else {
+                        val checked = verifier.verify(Candidate(sample, objective.evaluate(sample)))
+                        if (checked is Verification.Accepted) checked.candidate.assignment else null
+                    } ?: return false
+                    if (token()) return false
+                    val value = exactSourceObjective(objective, accepted, toleranceCheck) ?: return false
+                    if (problem.numRealVars == 0 || accepted.exactReals != null) {
+                        if (bestExact?.let { value < it } != false) bestExact = value
+                    }
+                    if (bestValue?.let { value < it } == false) return false
+                    bestValue = value
+                    best = accepted
+                    return true
+                }
                 var expansions = 0
                 dive.cpAdapter.attach(session, feasibility = false)
                 dive.cpAdapter.fractional = { split }
@@ -150,6 +196,13 @@ internal fun LpEngine.lbTreeSearch(
                         } else null
                         if (point == null) return SearchNodeDisposition.Expand
                         dive.noteNodeOverhead(point.size.toLong())
+                        if (problem.numRealVars > 0) {
+                            primalPropagationWork += problem.numIntVars.toLong() + problem.numBoolVars
+                            val candidate = relaxation.treeDiscretePoint(point, session)
+                            if (candidate != null && offer(candidate, discreteChecked = false)) {
+                                return SearchNodeDisposition.Indeterminate
+                            }
+                        }
                         targets = relaxation.colVarId.indices.mapNotNull { column ->
                             val variable = relaxation.colVarId[column]
                             if (variable < 0 || relaxation.colIsBool[column]) {
@@ -190,43 +243,10 @@ internal fun LpEngine.lbTreeSearch(
                     booleanBranching = BooleanBranching.SourceOrder(problem.numBoolVars),
                     nodePolicy = policy,
                 )
-                var best: Sample? = null
                 while (!token()) {
                     val next = run.next()
                     if (next !is SearchRunEvent.Satisfied) break
-                    var sample = requireNotNull(next.model.valueOf<Sample>(cp))
-                    if (problem.numRealVars > 0) {
-                        val rootWork = rootPrimalWorkBudget(sink.lp.standaloneWork)
-                        val offered = nodeQueryWorkBudget()
-                        val work = when {
-                            rootWork == 0L -> offered ?: 0L
-                            offered == null -> rootWork
-                            else -> minOf(offered, rootWork)
-                        }
-                        val leaf = complete?.invoke(sample, token, work)
-                            ?: requireNotNull(leafSolver).solve(sample, token, toleranceCheck, work)
-                        when (leaf.verdict) {
-                            LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED,
-                            LpVerdict.TOLERANCE_OPTIMUM -> Unit
-                            else -> continue
-                        }
-                        if (leaf.verdict == LpVerdict.TOLERANCE_OPTIMUM && toleranceCheck == null) continue
-                        sample = sample.copy(reals = leaf.reals, exactReals = leaf.exactReals)
-                    }
-                    if (token()) break
-                    val accepted = if (accept != null) accept(sample) else {
-                        val checked = verifier.verify(Candidate(sample, objective.evaluate(sample)))
-                        if (checked is Verification.Accepted) checked.candidate.assignment else null
-                    } ?: continue
-                    if (token()) break
-                    val value = exactSourceObjective(objective, accepted, toleranceCheck) ?: continue
-                    if (bestValue?.let { value < it } != false) {
-                        bestValue = value
-                        best = accepted
-                    }
-                    if (problem.numRealVars == 0 || accepted.exactReals != null) {
-                        if (bestExact?.let { value < it } != false) bestExact = value
-                    }
+                    offer(requireNotNull(next.model.valueOf<Sample>(cp)), discreteChecked = true)
                 }
                 best?.let(::LpTreeSeed)
             }
@@ -234,6 +254,35 @@ internal fun LpEngine.lbTreeSearch(
     } finally {
         accountPropagation()
     }
+}
+
+private fun LpRelaxation.treeDiscretePoint(point: List<BigFraction>, session: PropagationSession): Sample? {
+    val problem = session.problem
+    val bools = BooleanArray(problem.numBoolVars)
+    for (variable in bools.indices) {
+        val fixed = session.boolValue(variable)
+        if (fixed != null) {
+            bools[variable] = fixed
+            continue
+        }
+        val column = boolColOf.getOrElse(variable) { -1 }
+        if (column < 0) continue
+        bools[variable] = when (point[column]) {
+            BigFraction.ZERO -> false
+            BigFraction.ONE -> true
+            else -> return null
+        }
+    }
+    val ints = LongArray(problem.numIntVars)
+    for (variable in ints.indices) {
+        val domain = session.intDomain(variable)
+        val column = intColOf.getOrElse(variable) { -1 }
+        val value = if (domain.valueCount == 1L || column < 0) domain.min
+        else ExactLpNumber.of(point[column]).legacyLong() ?: return null
+        if (!domain.contains(value)) return null
+        ints[variable] = value
+    }
+    return Sample(bools, ints)
 }
 
 internal class LpRootNodeResult(val model: LpModel, val float: FloatLpResult?)
