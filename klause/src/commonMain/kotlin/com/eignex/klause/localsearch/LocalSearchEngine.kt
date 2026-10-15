@@ -878,7 +878,7 @@ internal class LocalSearchEngine(
                         params.cancellation,
                         sink.ls,
                     ) { work -> totalFlips += work }
-                    if (completion != null) liveCompletion = decided
+                    if (completedMoves != null) liveCompletion = decided
                     if (decided !is Completion.Witness) {
                         if (checkpoint != null && decided is Completion.Undecided && params.cancellation()) {
                             liveCompletion = null
