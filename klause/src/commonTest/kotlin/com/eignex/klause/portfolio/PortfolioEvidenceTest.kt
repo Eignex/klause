@@ -36,7 +36,7 @@ class PortfolioEvidenceTest {
     @Test
     fun `unrestricted exhaustion retains refutation only for a complete bound worker`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 0)), arrayOf(
-            Linear(intArrayOf(0), intArrayOf(1), LinearOp.EQ, 1),
+            Linear(coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, bound = 1),
         ))
         val objective = LinearObjective()
         val identity = ModelIdentity.of(source, objective)
