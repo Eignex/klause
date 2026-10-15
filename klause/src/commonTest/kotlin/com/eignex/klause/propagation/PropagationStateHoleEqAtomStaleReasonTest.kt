@@ -48,20 +48,46 @@ class PropagationStateHoleEqAtomStaleReasonTest {
 
     @Test
     fun `an untrailed root hole keeps its history when a later bound precedes its eq atom`() {
-        val s = freshState(numVars = 1, hi = 5)
+        for (prepared in listOf(false, true)) {
+            val direct = freshState(numVars = 1, hi = 5)
+            val s = if (prepared) {
+                PropagationState.preparation(direct.projection, pbLearning = false)
+                    .asSequence().filterNotNull().last()
+            } else direct
+            s.undoLogging = false
+            assertTrue(s.excludeIntValue(0, 3, null))
+            s.undoLogging = true
+            s.beginLevel(0, fid = -1)
+            assertTrue(s.tightenIntMax(0, 2, null))
+
+            val atom = s.atomVarEq(0, 3)
+
+            assertEquals(false, s.atomCurrentTruth(atom))
+            assertEquals(0, s.atomLevelForConflict(atom))
+            assertNull(s.atomAntecedentsDerived(atom))
+            assertEquals(0, s.carvedAt(0, 3))
+            assertFalse(s.inDomainAt(0, 3, 0))
+        }
+    }
+
+    @Test
+    fun `adjacent unconditional root holes retain an earlier conditional carve reason`() {
+        val s = freshState(numVars = 2, hi = 9)
         s.undoLogging = false
-        assertTrue(s.excludeIntValue(0, 3, null))
+        assertTrue(s.tightenIntMax(1, 1, null))
+        val reason = intArrayOf(Lit.make(s.atomVarLe(1, 1), false))
+        assertTrue(s.excludeIntValue(0, 3, reason))
+        assertTrue(s.excludeIntValues(0, longArrayOf(2, 4, 5), null))
         s.undoLogging = true
         s.beginLevel(0, fid = -1)
-        assertTrue(s.tightenIntMax(0, 2, null))
+        assertTrue(s.tightenIntMax(0, 1, null))
 
         val atom = s.atomVarEq(0, 3)
 
-        assertEquals(false, s.atomCurrentTruth(atom))
+        assertEquals(reason.toList(), s.atomAntecedentsDerived(atom)?.toList())
         assertEquals(0, s.atomLevelForConflict(atom))
-        assertNull(s.atomAntecedentsDerived(atom))
         assertEquals(0, s.carvedAt(0, 3))
-        assertFalse(s.inDomainAt(0, 3, 0))
+        assertNull(s.holeReasonFor(0, 4))
     }
 
     @Test
