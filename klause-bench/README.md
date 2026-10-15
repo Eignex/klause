@@ -1552,7 +1552,8 @@ contract described under [live argument candidates](#live-native-argument-candid
 It retains all malformed records, gaps, unmatched returns and unfinished frames.
 A thread exit does not replace a missing return. Public compilation events retain
 their observed boundary contexts and every JFR identity/thread candidate;
-ambiguity supplies no compile-ID or clock association. Raw JFR and compilation
+compiler labels compare without case and retain their raw values. Ambiguity
+supplies no compile-ID or clock association. Raw JFR and compilation
 logs remain independent inputs. Termination gives the capture process time to
 clean up its managed child/observer before forced termination, and both successful
 and failed captures retain their raw outputs in the compressed archive.

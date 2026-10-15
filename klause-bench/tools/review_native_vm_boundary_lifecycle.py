@@ -127,7 +127,7 @@ def terminal_delivery(native, root_pid, warning_guard):
 def contexts(native, jfr):
     index = {}
     for position, row in enumerate(jfr):
-        key = row['tid'], tuple(row['method']), row['compiler'], row['succeeded']
+        key = row['tid'], tuple(row['method']), row['compiler'].casefold(), row['succeeded']
         index.setdefault(key, []).append(position)
     result = []
     for rows in native['threads']:
@@ -163,7 +163,8 @@ def contexts(native, jfr):
                     identity = previous.decode_identity(group)
                     item['identity'] = identity
                     if row['kind'] == 'end':
-                        key = group['tid'], previous.method_name(identity), identity['compiler'], bool(int(row['values'][0]))
+                        key = (group['tid'], previous.method_name(identity), identity['compiler'].casefold(),
+                               bool(int(row['values'][0])))
                         item['jfrCandidates'] = index.get(key, [])
                 except (ValueError, KeyError, IndexError, UnicodeError) as error:
                     item['identityError'] = str(error)
