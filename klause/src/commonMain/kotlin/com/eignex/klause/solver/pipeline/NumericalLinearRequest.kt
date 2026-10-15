@@ -2,6 +2,8 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.OpenPresolveResult
+import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceObjective
@@ -10,7 +12,9 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.hasFiniteIntegerRanges
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LinearOptimizationResult
+import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -25,11 +29,25 @@ class NumericalLinearRequest(
     val maximize: Boolean = false,
     private val cancellation: Cancellation = Cancellation.Never,
 ) {
-    /** Existing finite execution when every integer range and numerical completion is supported. */
+    /** Finite numerical execution over declared or numerically proved integer bounds. */
     fun finiteRoute(onLpStats: (LpStats) -> Unit = {}): SourceProblemRoute.Finite? {
-        if (cancellation() || !model.hasFiniteIntegerRanges() || !model.finiteRealCompletionSupported()) return null
-        return model.pipelineRoute(objective, maximize, boundCancellation = cancellation,
-            onLpStats = onLpStats) as? SourceProblemRoute.Finite
+        if (cancellation()) return null
+        var routed = model
+        if (!routed.hasFiniteIntegerRanges()) {
+            val sink = LpStatsSink(LpRoute.STANDALONE)
+            val closed = routed.closeOpenBounds(cancellation, sink)
+            onLpStats(sink.snapshot())
+            routed = (closed as? OpenPresolveResult.Tightened)?.spec ?: return null
+            if (!routed.hasFiniteIntegerRanges()) return null
+            routed = routed.withIntDomains(routed.finiteIntDomains())
+        }
+        if (!routed.finiteRealCompletionSupported()) return null
+        val prepared = routed.prepareExecutionPlan(model, objective, maximize, preferFinite = true,
+            cancellation = cancellation)
+        if (prepared.kind == PreparedExecutionKind.DECLINED) return null
+        val ownership = prepared.componentPlan ?: return null
+        return if (ownership.theoryPipeline == ProblemPipeline.FINITE_CP)
+            SourceProblemRoute.Finite(routed, ownership, prepared) else null
     }
 
     /**

@@ -20,6 +20,27 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `fixed MPS indicators retain numerical bound closure under either certification policy`() {
+        val source = File.createTempFile("mps-fixed-indicator", ".mps").apply {
+            writeText("ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 0\n X COST 1 R 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 2\n" +
+                "BOUNDS\n FX B I 1\n LI B X 0\nINDICATORS\n IF R I 1\nENDATA\n")
+            deleteOnExit()
+        }
+        for (exact in listOf(false, true)) {
+            val loaded = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { this.exact = exact })
+            val flags = if (exact) arrayOf("--exact") else emptyArray()
+            val text = capture {
+                assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, source.absolutePath)))
+            }
+
+            assertIs<SolvablePipeline.FiniteCp>(loaded.pipeline)
+            assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+            assertTrue("o 0" in text.lines(), text)
+        }
+    }
+
+    @Test
     fun `continuous MPS heuristic workers retain numerical completion under either policy`() {
         val source = File.createTempFile("mps-finite-numerical", ".mps").apply {
             writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n UP B X 1\nENDATA\n")
