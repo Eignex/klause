@@ -24,6 +24,58 @@ import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `repeated conditional guards exclude unreachable values without equality expansion`() {
+        val terms = listOf(
+            "(ite c 5 (ite c 3 41))",
+            "(ite c (ite c 5 3) 41)",
+            "(ite c 5 (ite (not c) 41 3))",
+            "(ite c (ite (not c) 3 5) 41)",
+        )
+        for (guard in listOf("b", "(= x 0)")) {
+            for (term in terms) {
+                val builder = Compiler.Builder(
+                    Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+                )
+                val reader = SExprReader(StringCharSource(
+                    "(declare-const b Bool) (declare-const x Int) (assert (let ((c $guard)) (= $term 3)))",
+                ))
+                while (true) builder.command(reader.readCommandOrNull() ?: break)
+                val parsed = builder.build()
+                val session = SearchSession(
+                    listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                    atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+                )
+
+                assertIs<ComponentResult.Conflict>(session.initialize(), "$guard: $term")
+            }
+        }
+    }
+
+    @Test
+    fun `restricting one conditional use preserves an independent consumer of its inner definition`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const x Int)
+            (assert (not b)) (assert (= x 5))
+            (assert (let ((inner (ite b x 7)))
+                (and (= (ite b inner 9) 9) (= inner 7))))
+            """.trimIndent(),
+        )
+        ExactLiraSearchComponent(parsed.model).use { component ->
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
+
+            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertEquals(bigIntOf(5), assignment.ints[parsed.intVarNames.getValue("x")])
+        }
+    }
+
+    @Test
     fun `an expanded conditional equality releases its arithmetic placeholder`() {
         val parsed = SmtLib.parse(
             "(declare-const b Bool) (assert (= (ite b 1 2) 1))",
