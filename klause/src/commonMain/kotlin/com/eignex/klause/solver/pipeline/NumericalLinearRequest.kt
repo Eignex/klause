@@ -59,7 +59,8 @@ class NumericalLinearRequest(
         }
         return LinearAuthorityInvocation(context, params.copy(cancellation = stop)).use { invocation ->
             val result = requireNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1, onIncumbent))
-            LinearOptimizationResult(context.scope, result.terminal.takeIf { complete }, result.bound.takeIf { complete }, result.incumbent,
+            LinearOptimizationResult(context.scope, result.terminal.takeIf { complete }, result.bound.takeIf { complete },
+                result.incumbent,
                 result.value, result.reason, result.stats.copy(run = result.stats.run.copy(backend = "numerical-mip")))
         }
     }
