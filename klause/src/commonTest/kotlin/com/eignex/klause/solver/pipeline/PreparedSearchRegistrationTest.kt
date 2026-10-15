@@ -339,7 +339,7 @@ class PreparedSearchRegistrationTest {
             )
             val stats = SmtStatsSink()
             val plan = source.componentPlan()
-            assertEquals(FactorOwner.CP, plan.factorOwners[0])
+            assertEquals(FactorOwner.CP, plan.factorOwner(0))
             plan.search(source, emptyMap(), Long.MAX_VALUE, Cancellation.Never,
                 SearchLearnedDbParams(), stats).use { planned ->
                 assertIs<ComponentResult.Consistent>(planned.session.initialize())
