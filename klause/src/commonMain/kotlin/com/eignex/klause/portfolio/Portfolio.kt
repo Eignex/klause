@@ -34,13 +34,14 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 /**
  * Bandit-scheduled portfolio of [PortfolioWorker] arms built by [PortfolioBuilder], mixing local
  * search, backtrack and ALNS. Each lane claims an arm selected by [UnivariateBandit], runs one
- * segment and settles its reward. An arm runs on at most one lane at a time. Single-lane
- * scheduling balances complete-search work until a witness is accepted, then favors progress.
+ * segment and settles its reward. An arm runs on at most one lane at a time. Scheduled
+ * lanes protect complete-search elapsed opportunity until a witness is accepted, then favor progress.
  * With a lane per arm, each arm runs for the whole solve.
  *
  * The shared incumbent cutoff prunes backtrack arms and its assignment warm-starts local-search
@@ -89,10 +90,11 @@ class Portfolio(
      *
      * A counted segment ends at its work or at its time slice, whichever comes first. A segment bounded by time
      * pauses somewhere different on every run, and since the search resumes from wherever it stopped, every counter
-     * a solve reports inherits that; a segment bounded by work pauses at the same point every time, which on one
-     * lane makes a run reproducible. Work binds first wherever [lsInstructionsPerWork] prices an arm's steps about
-     * right; the time slice is there for the models where it does not, on which one segment of a few thousand
-     * units can otherwise run for seconds and hold the core past every later choice the policy would make.
+     * a solve reports inherits that. A work-bound segment pauses at the same point for the same incoming state;
+     * elapsed coverage can still change later arm choices on one lane. Work binds first wherever
+     * [lsInstructionsPerWork] prices an arm's steps about right; the time slice is there for models where it does
+     * not, on which one segment of a few thousand units can otherwise run for seconds and hold the core past every
+     * later choice the policy would make.
      */
     private val baseSliceWork: Long = 5_000,
     /** Cap on a single counted segment's work. */
@@ -311,6 +313,7 @@ class Portfolio(
     ): MinimizeResult {
         val run = Schedule(cancellation, arrayOfNulls<ResumableSearch>(workers.size))
         val incumbent = incumbents.exchange
+        if (incumbent.current() != null) run.endFeasibilityCoverage()
         val pending = MutableList<Candidate<MinimizeResult.WithSample, V>?>(workers.size) { null }
         val start = TimeSource.Monotonic.markNow()
         val readBound = { incumbents.bound() }
@@ -331,6 +334,7 @@ class Portfolio(
             if (!incumbents.isImproving(candidate.objective)) return
             val worker = workers[claim.arm]
             if (incumbent.offer(r.sample, candidate.objective) !is Publication.Installed) return
+            run.endFeasibilityCoverage()
             try {
                 acceptedVersion++
                 onAccepted?.invoke(AcceptedPortfolioIncumbent(acceptedVersion, r.sample, candidate.objective))
@@ -684,6 +688,7 @@ class Portfolio(
 
         // Segment time each arm has run, and all arms together, for the shares [minShares] owes.
         private val armNanos = LongArray(workers.size)
+        private val activeSince = arrayOfNulls<TimeMark>(workers.size)
         private val armWork = DoubleArray(workers.size)
         private val siblingWork = LongArray(workers.size)
         private var proofStarted = false
@@ -692,6 +697,11 @@ class Portfolio(
         private var sliceWork = baseSliceWork
         private val families = FamilyPolicy(bandit.random, profile?.let(FamilyPrior::of) ?: FamilyPrior.UNIFORM)
         private var improving = false
+        private var feasibilityComplete = false
+
+        fun endFeasibilityCoverage() {
+            feasibilityComplete = true
+        }
 
         /** Whether every arm has retired. */
         val allRetired: Boolean get() = remaining == 0
@@ -731,13 +741,14 @@ class Portfolio(
             try {
                 while (!token()) {
                     val claim = claim(index) ?: break
-                    val started = TimeSource.Monotonic.markNow()
+                    val started = runTimeSource.markNow()
                     try {
                         segment(claim)
                     } finally {
                         val spent = started.elapsedNow().inWholeNanoseconds
                         locked {
                             busy[claim.arm] = false
+                            activeSince[claim.arm] = null
                             armNanos[claim.arm] += spent
                             totalNanos += spent
                         }
@@ -768,28 +779,34 @@ class Portfolio(
                 eligible.filter { preparationRevisits[it] && !busy[it] && !retired[it] }
                     .minByOrNull { (it - nextPreparationArm + workers.size) % workers.size }
             }
+            val owed = if (dedicated || probe != null) null else owedArm(eligible) ?: owedCompleteArm(eligible)
             val arm = when {
                 dedicated -> lane
 
                 probe != null -> probe.also { probed[it] = true }
 
-                revisit != null -> revisit.also {
-                    preparationRevisits[it] = false
-                    nextPreparationArm = (it + 1) % workers.size
-                }
+                owed != null -> owed
+
+                revisit != null -> revisit
 
                 else -> policyPick(eligible)
             }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
+            val revisiting = !dedicated && !improving && probe == null && preparationRevisits[arm]
+            if (revisiting) {
+                preparationRevisits[arm] = false
+                nextPreparationArm = (arm + 1) % workers.size
+            }
             val auxiliary = improving && arm in incumbentProbeArms && !productive[arm]
             val probing = probe != null || (auxiliary && !trialStarted[arm])
-            val baseAllowance = probing || revisit != null || workers[arm].auxiliaryProof
+            val baseAllowance = probing || revisiting || workers[arm].auxiliaryProof
             val allowance = if (baseAllowance) baseSliceWork else sliceWork
             val time = if (baseAllowance) baseSliceMillis else slice
             val remainingTime = if ((handles[arm] as? ResumableSearch)?.preparationPending != false) {
                 preparationTimeLimit - trialPreparationTime[arm]
             } else trialTimeLimit - trialSearchTime[arm]
             busy[arm] = true
+            activeSince[arm] = runTimeSource.markNow()
             Claim(
                 arm,
                 probing,
@@ -797,7 +814,7 @@ class Portfolio(
                 if (auxiliary) minOf(allowance, trialWorkLimit - trialSearchWork[arm]) else allowance,
                 whole = dedicated,
                 probeCount = eligible.count { !workers[it].auxiliaryProof }.coerceAtLeast(1),
-                preparationRevisit = revisit != null,
+                preparationRevisit = revisiting,
             )
         }
 
@@ -819,6 +836,7 @@ class Portfolio(
         // within local search's feasibility share; a neighborhood needs an incumbent unless it is all that is left.
         private fun policyPick(eligibleArms: List<Int>): Int {
             owedArm(eligibleArms)?.let { return it }
+            owedCompleteArm(eligibleArms)?.let { return it }
             eligibleArms.firstOrNull {
                 workers[it].auxiliaryProof && !busy[it] && !retired[it]
             }?.let { return it }
@@ -844,6 +862,24 @@ class Portfolio(
             // establish which search will reach the first witness.
             if (!improving && !family.observable) return candidates.minBy { armWork[it] }
             return armAmong(candidates)
+        }
+
+        private fun owedCompleteArm(eligibleArms: List<Int>): Int? {
+            if (feasibilityComplete) return null
+            val active = eligibleArms.filter { !retired[it] && !workers[it].auxiliaryProof }
+            val complete = active.filter { workers[it].family == ArmFamily.Backtrack }
+            val free = complete.filter { !busy[it] }
+            if (free.isEmpty()) return null
+            val elapsed = active.associateWith {
+                armNanos[it].toDouble() + (activeSince[it]?.elapsedNow()?.inWholeNanoseconds ?: 0L)
+            }
+            // A bootstrap and its local-search peers share one feasibility family.
+            val activeFamilyCount = active.map {
+                if (workers[it].family.observable) ArmFamily.LocalSearch else ArmFamily.Backtrack
+            }.distinct().size
+            val covered = (elapsed.values.sum() - baseSliceMillis.milliseconds.inWholeNanoseconds).coerceAtLeast(0.0)
+            val owed = covered / activeFamilyCount / complete.size
+            return free.minBy { elapsed.getValue(it) }.takeIf { elapsed.getValue(it) < owed }
         }
 
         private fun policyFamily(arm: Int): ArmFamily {
