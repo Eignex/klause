@@ -123,6 +123,10 @@ def source_formula(text):
             assert z3.is_rational_value(denominator) and denominator.as_fraction() != 0, 'nonconstant source division'
         elif kind == z3.Z3_OP_ABS:
             assert node.num_args() == 1 and (z3.is_int(node) or z3.is_real(node)), 'invalid source absolute value'
+        elif kind in (z3.Z3_OP_IDIV, z3.Z3_OP_MOD):
+            denominator = z3.simplify(node.arg(1))
+            assert z3.is_int_value(denominator) and denominator.as_long() != 0, \
+                'nonconstant or zero source integer divisor'
         elif kind == z3.Z3_OP_POWER:
             exponent = z3.simplify(node.arg(1))
             assert z3.is_int_value(exponent) or z3.is_rational_value(exponent), 'nonconstant source exponent'

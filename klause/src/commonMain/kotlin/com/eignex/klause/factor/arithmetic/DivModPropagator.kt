@@ -35,20 +35,31 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
         val nonpositive = relation.convention == DivisionConvention.TRUNCATING && a.max <= 0L
         if (!tighten(state, relation.remainder, if (nonnegative) BIG_ZERO else BIG_ZERO - remainderLimit,
                 if (nonpositive) BIG_ZERO else remainderLimit, reason)) return false
-        if (constant != null) {
-            val first = checkNotNull(relation.outputs(bigIntOf(a.min), constant)).first
-            val last = checkNotNull(relation.outputs(bigIntOf(a.max), constant)).first
-            if (!tighten(state, relation.quotient, minOf(first, last), maxOf(first, last), reason)) return false
-            val q = state.intDomains[relation.quotient]
-            val r = state.intDomains[relation.remainder]
-            val p1 = constant * bigIntOf(q.min)
-            val p2 = constant * bigIntOf(q.max)
-            if (!tighten(state, relation.dividend, minOf(p1, p2) + bigIntOf(r.min),
-                    maxOf(p1, p2) + bigIntOf(r.max), reason)) return false
-            val currentA = state.intDomains[relation.dividend]
-            if (!tighten(state, relation.remainder, bigIntOf(currentA.min) - maxOf(p1, p2),
-                    bigIntOf(currentA.max) - minOf(p1, p2), reason)) return false
+        // Within each nonzero divisor sign, quotient extrema lie at operand interval endpoints.
+        val divisors = if (constant != null) listOf(constant) else {
+            val domain = checkNotNull(b)
+            val endpoints = arrayListOf(domain.min, domain.max)
+            if (domain.min <= -1L) endpoints += kotlin.math.min(domain.max, -1L)
+            if (domain.max >= 1L) endpoints += kotlin.math.max(domain.min, 1L)
+            endpoints.filter { it != 0L }.distinct().map(::bigIntOf)
         }
+        val quotients = divisors.flatMap { value ->
+            listOf(checkNotNull(relation.outputs(bigIntOf(a.min), value)).first,
+                checkNotNull(relation.outputs(bigIntOf(a.max), value)).first)
+        }
+        val lowerQ = quotients.reduce { first, second -> minOf(first, second) }
+        val upperQ = quotients.reduce { first, second -> maxOf(first, second) }
+        if (!tighten(state, relation.quotient, lowerQ, upperQ, reason)) return false
+        val q = state.intDomains[relation.quotient]
+        val r = state.intDomains[relation.remainder]
+        val products = divisors.flatMap { value -> listOf(value * bigIntOf(q.min), value * bigIntOf(q.max)) }
+        val lowerProduct = products.reduce { first, second -> minOf(first, second) }
+        val upperProduct = products.reduce { first, second -> maxOf(first, second) }
+        if (!tighten(state, relation.dividend, lowerProduct + bigIntOf(r.min),
+                upperProduct + bigIntOf(r.max), reason)) return false
+        val currentA = state.intDomains[relation.dividend]
+        if (!tighten(state, relation.remainder, bigIntOf(currentA.min) - upperProduct,
+                bigIntOf(currentA.max) - lowerProduct, reason)) return false
         return filterTuples(state, constant, reason)
     }
 

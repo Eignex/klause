@@ -1,0 +1,6 @@
+(set-logic QF_LIA)
+(declare-const a Int)
+(assert (= (div a 3) 2))
+(assert (= (mod a 3) 2))
+(assert (= a 7))
+(check-sat)

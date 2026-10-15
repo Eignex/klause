@@ -101,6 +101,7 @@ internal object Compiler {
         internal val varIds = LinkedHashMap<String, Int>() // resolved name (incl. array cells) -> int var id
         internal val arrayDims = HashMap<String, IntArray>() // array id -> declared dimension sizes
         internal val domains = ArrayList<IntDomain>()
+        private val divModOperands = HashMap<FExpr, Int>()
         override val factors = ArrayList<Factor>()
         internal var nextBool = 0
         internal var objective: LinearObjectiveSpec? = null
@@ -884,15 +885,16 @@ internal object Compiler {
         }
 
         internal fun divModTerm(args: List<FExpr>, mod: Boolean): IntComb {
-            val a = materializeVar(linear(args[0]))
+            val a = divModOperands.getOrPut(args[0]) { materializeVar(linear(args[0])) }
             val bLin = linear(args[1])
-            if (!bLin.isConstant()) return divModVar(a, materializeVar(bLin), mod)
+            if (!bLin.isConstant()) return divModVar(a,
+                divModOperands.getOrPut(args[1]) { materializeVar(bLin) }, mod)
             val k = when (bLin) {
                 is IntComb.Narrow -> bLin.lin.constant
                 is IntComb.Wide -> throw UnsupportedXcsp3Exception("div/mod by an over-64-bit constant divisor")
             }
             if (k == 0L) throw UnsupportedXcsp3Exception("div/mod by zero divisor")
-            return retainedDivMod(a, newAuxVar(k, k), mod)
+            return retainedDivMod(a, constVar(k), mod)
         }
 
         internal fun divModVar(a: Int, b: Int, mod: Boolean): IntComb {

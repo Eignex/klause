@@ -44,6 +44,7 @@ import com.eignex.klause.model.Implies
 import com.eignex.klause.model.IncreasingExpr
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.IntCompare
+import com.eignex.klause.model.IntExpr
 import com.eignex.klause.model.IntLit
 import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntSpec
@@ -100,6 +101,7 @@ internal class Lowering(val pinAbsentOptVars: Boolean, settings: ProblemSettings
     val idToIntName = MutableIntObjectMap<String>()
     val idToBoolName = MutableIntObjectMap<String>()
     val intDomains get() = problemBuilder.intDomains
+    internal val divModOperands = HashMap<IntExpr, Int>()
     val nominalIndicators = mutableMapOf<String, Map<String, Int>>()
 
     // Schema-layer float bookkeeping. `floatDecoders` records bucket parameters per float-var

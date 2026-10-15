@@ -1,0 +1,7 @@
+(set-logic QF_LIA)
+(declare-const a Int)
+(assert (<= (- 8) a 8))
+(assert (= (div a (- 3)) 3))
+(assert (= (mod a (- 3)) 2))
+(check-sat)
+(get-model)

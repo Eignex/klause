@@ -121,6 +121,27 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
+    fun `integer division checks truncation and rejects zero divisors`() {
+        for ((divisor, quotient) in listOf(3 to -2, -3 to 2)) {
+            val source = "var -8..8: a; constraint int_div(a,$divisor,$quotient); " +
+                "constraint int_mod(a,$divisor,-1); solve satisfy;"
+
+            assertEquals("valid", ExactFlatZincValidation.inspect(source, "a = -7;", null).status)
+            assertEquals("invalid", ExactFlatZincValidation.inspect(source, "a = 7;", null).status)
+        }
+        val zero = "var -8..8: a; constraint int_div(a,0,0); solve satisfy;"
+        assertEquals("invalid", ExactFlatZincValidation.inspect(zero, "a = 0;", null).status)
+    }
+
+    @Test
+    fun `integer division source checks retain over-word arithmetic`() {
+        val source = "var -9223372036854775808..-9223372036854775808: a; " +
+            "constraint int_div(a,-1,9223372036854775808); solve satisfy;"
+
+        assertEquals("valid", ExactFlatZincValidation.inspect(source, "a = -9223372036854775808;", null).status)
+    }
+
+    @Test
     fun `mixed finite float choices are checked from the original constant array`() {
         val source = "var 1..1: i; var 0.0..1.0: exact; var 0.0..1.0: grid; " +
             "constraint array_float_element(i, [0.125], exact); constraint float_le(grid, 0.5); solve satisfy;"

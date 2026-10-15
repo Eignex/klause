@@ -1,0 +1,7 @@
+<instance format="XCSP3" type="CSP">
+  <variables><var id="a">0..8</var><var id="b">2..4</var></variables>
+  <constraints>
+    <intension>eq(div(a,b),2)</intension>
+    <intension>eq(mod(a,b),1)</intension>
+  </constraints>
+</instance>

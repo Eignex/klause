@@ -279,7 +279,9 @@ through normal source routing with default and private equivalent linear encoder
 Pass `inputs=<comma-separated repository-relative or absolute paths> repeats=N warmups=N seed=N`.
 `parser=admission` requires linear factor admission; `parser=factor` exercises the
 existing library SMT factor facade, including representable bounded mixed products.
-The original source bytes remain the checking authority. Each input also interrupts
+The original source bytes remain the checking authority. Constant nonzero integer
+`div`/`mod` are checked with their original Euclidean SMT semantics; variable and zero
+divisors decline independent checking. Each input also interrupts
 a real selected installation through its caller token and records the resource decline;
 inputs with no applicable installer record that control as inapplicable.
 The private mode constrains scoped real auxiliaries with exact affine definitions and
