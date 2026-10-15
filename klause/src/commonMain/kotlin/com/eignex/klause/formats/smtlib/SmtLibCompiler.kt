@@ -9,6 +9,7 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
+import com.eignex.klause.util.Cancellation
 
 /** Reject an unsupported construct with a clean [UnsupportedSmtException]. */
 internal fun smtUnsupported(msg: String): Nothing = throw UnsupportedSmtException(msg)
@@ -28,8 +29,9 @@ internal object Compiler {
         val unboundedIntLo: Long,
         val unboundedIntHi: Long,
         val strictBounds: Boolean,
-        private val settings: ProblemSettings = ProblemSettings(),
+        internal val settings: ProblemSettings = ProblemSettings(),
         internal val conditionalEqualities: SmtLibConditionalEquality = SmtLibConditionalEquality(),
+        internal val sourceCancellation: Cancellation = Cancellation.Never,
     ) :
         CnfLowering {
         internal val boolNames = HashMap<String, Int>()
@@ -39,6 +41,8 @@ internal object Compiler {
         internal var nextInt = 0
         internal var nextReal = 0
         internal var inferringBounds = false
+        internal val boundPremises = ArrayList<Rel>()
+        internal var productBoundsClosed = false
 
         /** Chain variables of the wide-coefficient row encoding, keyed `(varId shl 3) or (k shl 1) or isInt`:
          *  chain k stands for `B^k · var` (see [wideRealRow]). */
@@ -277,6 +281,7 @@ internal object Compiler {
 
         fun build(): SmtLibProblem {
             inferBounds()
+            if (asserts.any { hasNonlinearSyntax(it, sourceCancellation) }) closeProductBounds()
             for (a in asserts) assert(a)
             lowerOpenIteChains()
             val compiledObjective = objectiveSpec?.let { (t, neg) ->
