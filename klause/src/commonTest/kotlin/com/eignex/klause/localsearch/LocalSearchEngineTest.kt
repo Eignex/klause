@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
@@ -15,6 +16,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.movesource.MoveSource
@@ -1074,6 +1076,45 @@ class LocalSearchEngineTest {
         assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
         assertTrue(budget.exhausted())
         assertEquals(2, calls)
+    }
+
+    @Test
+    fun `unproductive completion descent returns residual rows to repair`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
+                ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ONE),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        var repairs = 0
+        val source = object : MoveSource {
+            override val id = MoveSourceId("supplied")
+            override val phase = Phase.Infeasible
+            override val pool = Pool.ScoreOnly
+            override fun generate(state: LocalSearchState, sink: MoveSink) {
+                repairs++
+                sink.addRealSet(0, 1.0)
+            }
+        }
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), greedyRepairOnRestart = false,
+            strategy = SourceDrivenStrategy(
+                sources = listOf(ConfiguredSource(source), ConfiguredSource(ObjectiveSeed())),
+                feasibleDescent = FeasibleDescent.SelfOwned, feasibleAcceptance = AcceptanceRule.GreedyDescent,
+            ), completion = { candidate, _ ->
+                Completion.Witness(candidate.copy(reals = doubleArrayOf(1.0 - 1e-12)))
+            },
+        )
+
+        val result = search.improvements(
+            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+            LocalSearchParams(maxInstructions = 3,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))), null,
+        ).last()
+
+        assertTrue(repairs > 0)
+        assertEquals(0L, assertIs<MinimizeResult.BestFound>(result).sample.intValue(0))
     }
 
     @Test

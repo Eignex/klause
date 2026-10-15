@@ -686,6 +686,8 @@ Sampled picks at the same completed incumbent retain up to two successful propos
 changing that incumbent invalidates the cache. Undecided attempts remain retryable.
 An accepted source completion supplies feasible-phase authority even when floating
 row scores retain a residual; source tolerance does not become an exact proof.
+If that descent finds no accepted move while residual rows remain, the ordinary
+repair phase resumes from the live assignment and retains the checked incumbent.
 Reverted probes preserve assignment, definitions, costs, configuration and activity.
 Failed, canceled or undecided attempts cannot replace an incumbent. Finite-only,
 continuous-only, discrete-objective and ratchet recipes add no move-completion probes.
