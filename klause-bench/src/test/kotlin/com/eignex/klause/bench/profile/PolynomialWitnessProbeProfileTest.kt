@@ -44,7 +44,7 @@ class PolynomialWitnessProbeProfileTest {
     @Test
     fun `private work checkpoint retains its charge and producer frame`() {
         val declarations = (0 until 32).joinToString("\n") { "(declare-const x$it Real)" }
-        val terms = (1..12).flatMap { x -> (1..12).map { y -> "(* (^ x0 $x) (^ x31 $y))" } }
+        val terms = (1..16).flatMap { x -> (1..32).map { y -> "(* (^ x0 $x) (^ x31 $y))" } }
             .joinToString(" ")
         val source = "$declarations\n(assert (> (+ $terms) 2))"
         val access = PolynomialWitnessProbeProfile.ProbeAccess()
@@ -55,6 +55,7 @@ class PolynomialWitnessProbeProfileTest {
         assertEquals(plain.result, observed.result)
         assertEquals(plain.stats, observed.stats)
         assertEquals(emptyList(), plain.stops)
+        assertEquals(1, observed.stops.size)
         for (stop in observed.stops) {
             assertTrue(stop.workSpent >= stop.coupledEnd)
             assertTrue(requireNotNull(stop.probeEnd) > stop.coupledEnd)
