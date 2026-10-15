@@ -99,8 +99,8 @@ the gate and its inputs.
 Source declarations and arithmetic leaves remain authoritative, including open
 defaults and sparse decision-list selectors. Shared search has no unconstrained
 predicate columns from these omitted definitions.
-Integer conditionals retain native `Element` relations over materialized branch
-values. Short and sparse decision lists use one finite choice index whose guards
+Finite integer conditionals retain native `Element` relations over materialized branch
+values. Short and sparse finite decision lists use one finite choice index whose guards
 retain the original equality meanings and default. Choices, affine branch columns
 and result definitions participate in the same dependency closure, so Boolean
 normalization can remove their unused private state. A Boolean-expanded selector
@@ -108,8 +108,11 @@ uses those guarded choices without requiring its removed numeric placeholder;
 dense direct numeric selector tests remain eligible for table recovery over the
 selector's whole declared domain. Wide finite conditionals use the existing
 canonical digit columns with one shared choice index across every digit. Constant
-branches retain constant digit arrays, including signed leading digits. Open
-values retain arithmetic ownership and exact equality links.
+branches retain constant digit arrays, including signed leading digits. A result
+with an open bound retains guarded exact arithmetic equalities to its branches,
+including the default when no guard holds. It introduces no finite choice index
+or materialized branch columns. Wide terms with no finite magnitude use the same
+guarded arithmetic relation and retain their exact source coefficients.
 
 Choice indexes reify the original signed guard directly, retaining its identity
 for arithmetic branch preferences. Guards are inputs to each conditional definition;

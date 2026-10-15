@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
@@ -30,6 +31,15 @@ internal fun Compiler.Builder.exclusiveIntegerSelection(
     default: LinComb,
 ): List<Factor> {
     require(conditions.size == arms.size)
+    if (intDomains[result] is PresolveDomain.Open) {
+        val start = factors.size
+        val value = LinComb(mapOf(result to 1L), 0)
+        for ((condition, arm) in conditions.zip(arms)) {
+            factors.add(Clause(intArrayOf(Lit.negate(condition), reifyEq(value, arm))))
+        }
+        factors.add(Clause(conditions.toIntArray() + reifyEq(value, default)))
+        return factors.subList(start, factors.size).toList()
+    }
     val entries = longArrayOf(selectionColumn(default).toLong()) +
         arms.map { selectionColumn(it).toLong() }.toLongArray()
     val index = selectionIndex(conditions)
@@ -68,6 +78,11 @@ internal fun Compiler.Builder.wideIntegerSelection(
     whenFalse: IntComb,
     magnitude: BigInt?,
 ) {
+    if (magnitude == null) {
+        factors.add(Clause(intArrayOf(Lit.negate(condition), reifyRelation("=", result, whenTrue))))
+        factors.add(Clause(intArrayOf(condition, reifyRelation("=", result, whenFalse))))
+        return
+    }
     val trueTerm = whenTrue.toWide()
     val falseTerm = whenFalse.toWide()
     if (trueTerm.coeffs.isEmpty() && falseTerm.coeffs.isEmpty()) {
