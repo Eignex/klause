@@ -6,6 +6,8 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -18,14 +20,17 @@ import com.eignex.klause.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.localsearch.scoring.MoveScoring
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
+import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LocalSearchResidualFactor
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -930,6 +935,46 @@ class LocalSearchEngineTest {
             assertTrue(found.isEmpty())
             assertEquals(1.0, result.stats.ls.incumbentViolation)
         }
+    }
+
+    @Test
+    fun `numerical completion improves the original mixed MPS objective`() {
+        val source = Mps.parse(
+            """
+            NAME FIXEDCOST
+            ROWS
+             N COST
+             G COVER
+            COLUMNS
+             M0 'MARKER' 'INTORG'
+             B COST 1 COVER 1
+             M1 'MARKER' 'INTEND'
+             X COST 10 COVER 1
+            RHS
+             RHS COVER 1
+            BOUNDS
+             BV BND B
+             LO BND X 0
+             UP BND X 1
+            ENDATA
+            """.trimIndent(),
+        ).toProblem()
+        val objective = checkNotNull(source.objective).toLinearObjective()
+        val search = LocalSearchEngine(
+            LocalSearchModel.of(source.model.bake()), greedyRepairOnRestart = false,
+            completion = LeafRealCompletion(source.model, objective),
+        )
+        val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))
+
+        val result = search.improvements(
+            objective, LocalSearchParams(maxInstructions = 20, randomSeed = 3, initialAssignment = initial), null,
+        ).last()
+
+        val best = assertIs<MinimizeResult.BestFound>(result)
+        val checked = source.sourceWitness(best.sample.ints, best.sample.exactReals)
+        assertEquals(BigFraction.ofLong(10), source.sourceWitness(initial.ints, listOf(BigFraction.ONE)).objective)
+        assertEquals(BigFraction.ONE, checked.objective)
+        assertEquals(listOf(BigFraction.ONE, BigFraction.ZERO), checked.values)
     }
 
     @Test

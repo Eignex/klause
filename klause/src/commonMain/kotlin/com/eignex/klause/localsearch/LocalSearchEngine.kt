@@ -953,7 +953,9 @@ internal class LocalSearchEngine(
                             if (completedMoves != null) {
                                 val solution = completedMoves.sample(m) ?: completedMoves.attempt(m)
                                 if (solution != null) {
-                                    timing.inPhase("application") { state.apply(completedMoves.commitMove(m, solution)) }
+                                    timing.inPhase("application") {
+                                        completedMoves.commitMove(m, solution)?.let(state::apply)
+                                    }
                                     liveCompletion = Completion.Witness(solution)
                                     pendingCompletedMove = true
                                 }
