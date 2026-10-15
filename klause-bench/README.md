@@ -1551,8 +1551,8 @@ file, invoke a decoder, run a target or read private fields. A bound external fi
 establishes no calling convention, field layout, control-flow/runtime coverage,
 root census, clock agreement, generated-code size or compiler saving.
 
-`com.eignex.klause.bench.profile.NativeVmDwarfRecords` accepts no arguments and
-repeats the external-file binding before inspecting the original bound debug-file
+`com.eignex.klause.bench.profile.NativeVmDwarfRecords` accepts no arguments or
+`context=true`. It repeats the external-file binding before inspecting the original bound debug-file
 hash. A private hash-pinned pyelftools 0.33 wheel supplies the pure-Python reader;
 package member hashes, imported module paths and license texts are retained and
 rechecked. Installation is local to temporary worker storage. Neither native file
@@ -1569,6 +1569,29 @@ children, 128 scope levels and 32 MiB of retained metadata. The parent allows
 600 seconds. Location expressions/lists are retained as attributes without
 evaluation. Selected-unit coverage establishes no unique source layout, calling
 convention, register/field read, complete root census or compiler saving.
+
+`context=true` also retains each compilation-unit root, line-table header and
+the header file/directory entries referenced by declarations and inline calls.
+DWARF 2–4 headers use one-based file/directory tables with directory zero pointing
+to the compilation directory; DWARF 5 tables use zero-based indexes. A version-5
+file index of zero retains its candidate and the
+[specification ambiguity](https://wiki.dwarfstd.org/DWARF5_Line_Table_File_Numbers.md);
+it establishes no source-path binding. Line programs are not executed, so dynamic
+file definitions and indexes outside the header remain unresolved. Raw declaration
+and call attributes, file names, directory names and failed header parses remain
+available without loading source files from debug paths.
+
+Range lists and parameter/frame/return location lists retain the pinned provider's
+decoded base, relative/absolute range and expression records, including default
+locations. The containing unit or entry accompanies every provider lookup. Location
+expressions, instruction coverage, entry registers and lifetimes are not evaluated.
+Each parse shares a 256 KiB read budget and 65536-operation budget across involved
+sections, preserving absolute section offsets. Header/list output is bounded to
+4096 entries, contexts to 8 MiB and the containing inventory to 32 MiB. Resource
+limits fail the capture; unsupported encodings and missing sections remain explicit
+per-record errors. All referenced-unit contexts are retained. This mode requires
+its own reader source identity and establishes no field layout, calling convention,
+source binding, complete root census or compiler saving.
 
 `com.eignex.klause.bench.profile.NativeVmDwarfRecordReview` accepts `records=`,
 `records-sha256=` and `producer-sha256=` for a saved inventory from the pinned
