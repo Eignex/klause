@@ -138,7 +138,7 @@ internal object ExactFlatZincValidation {
         }
 
         private fun predicate(text: String): Boolean {
-            val name = text.substringBefore('(').trim()
+            val name = text.substringBefore('(').trim().removePrefix("fzn_")
             val end = text.indexOf(')')
             require(end >= 0) { "unsupported predicate syntax" }
             val args = split(text.substringAfter('(').substringBefore(')')).map { resolve(it) }
@@ -146,7 +146,8 @@ internal object ExactFlatZincValidation {
                 require(args.size == 2)
                 return array(args[0]).any { boolean(it) } || array(args[1]).any { !boolean(it) }
             }
-            if (name == "array_float_element" || name == "array_int_element") {
+            if (name in setOf("array_float_element", "array_int_element", "array_var_int_element",
+                    "array_bool_element", "array_var_bool_element")) {
                 require(args.size == 3)
                 val index = numeric(args[0])
                 require(index.integral) { "non-integer array index" }
@@ -154,6 +155,20 @@ internal object ExactFlatZincValidation {
                 val selected = values.indices.firstOrNull { index.compareTo(number((it + 1).toString())) == 0 }
                     ?: return false
                 return equal(values[selected], args[2])
+            }
+            if (name in setOf("int_min", "int_max", "float_min", "float_max")) {
+                require(args.size == 3)
+                val a = numeric(args[0])
+                val b = numeric(args[1])
+                val extreme = if (name.endsWith("max")) maxOf(a, b) else minOf(a, b)
+                return extreme.compareTo(numeric(args[2])) == 0
+            }
+            if (name in setOf("array_int_minimum", "array_int_maximum", "minimum_int", "maximum_int")) {
+                require(args.size == 2)
+                val values = array(args[1]).map(::numeric)
+                require(values.isNotEmpty()) { "empty extremum array" }
+                val extreme = if ("maximum" in name) values.max() else values.min()
+                return extreme.compareTo(numeric(args[0])) == 0
             }
             val base = name.removeSuffix("_reif").removeSuffix("_imp")
             val arity = if ("_lin_" in base || base.endsWith("_times") ||

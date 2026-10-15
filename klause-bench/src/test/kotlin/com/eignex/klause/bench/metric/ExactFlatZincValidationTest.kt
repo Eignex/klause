@@ -5,6 +5,29 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ExactFlatZincValidationTest {
+    @Test
+    fun `original extrema reject a result beyond every operand`() {
+        for ((name, result) in listOf("int_min" to "1", "int_max" to "2")) {
+            val source = "var 0..3: x; var 0..3: y; var 0..3: r; " +
+                "constraint $name(x, y, r); solve satisfy;"
+
+            assertEquals("valid", ExactFlatZincValidation.inspect(source, "x = 1;\ny = 2;\nr = $result;", null).status)
+            assertEquals("invalid", ExactFlatZincValidation.inspect(source, "x = 1;\ny = 2;\nr = 3;", null).status)
+        }
+    }
+
+    @Test
+    fun `original variable element checks its index and selected value`() {
+        val source = "var 0..3: i; var 0..9: x; var 0..9: y; var 0..9: r; " +
+            "constraint array_var_int_element(i, [x, y, x], r); solve satisfy;"
+        val values = "x = 4;\ny = 9;\nr = 9;\n"
+
+        assertEquals("valid", ExactFlatZincValidation.inspect(source, values + "i = 2;", null).status)
+        for (index in listOf(0, 1, 3)) {
+            assertEquals("invalid", ExactFlatZincValidation.inspect(source, values + "i = $index;", null).status)
+        }
+    }
+
     private val voltage = requireNotNull(javaClass.getResource("/flatzinc/voltage_divider.fzn")).readText()
     private val coordinates = """
         X_INTRODUCED_9_ = true;
