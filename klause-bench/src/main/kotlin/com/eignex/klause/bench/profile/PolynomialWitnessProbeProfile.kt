@@ -42,7 +42,8 @@ internal object PolynomialWitnessProbeProfile {
             File(directory, "source.smt2").writeBytes(bytes)
             val records = (0..1).flatMap { round ->
                 (if (round == 0) listOf(false, true) else listOf(true, false)).map { observed ->
-                    access.measure(bytes.toString(Charsets.UTF_8), observed, chargeStacks = observed).copy(round = round)
+                    access.measure(bytes.toString(Charsets.UTF_8), observed, chargeStacks = observed)
+                        .copy(round = round)
                 }
             }
             File(directory, "probe.json").writeText(Json.encodeToString(records))
@@ -115,12 +116,12 @@ internal object PolynomialWitnessProbeProfile {
             }
             val settings = params.newInstance(observer or Cancellation.after(60.seconds), null,
                 limitsType.getConstructor().newInstance())
-            val check = query.newInstance(sourceFormula, boolCount.invoke(source), realCount.invoke(source), settings,
+            val preparedQuery = query.newInstance(sourceFormula, boolCount.invoke(source), realCount.invoke(source), settings,
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
-            owner = work.get(check)
-            val normalized = next.invoke(check)
-            val result = normalized ?: next.invoke(check)
-            val snapshot = stats.invoke(check)
+            owner = work.get(preparedQuery)
+            val normalized = next.invoke(preparedQuery)
+            val result = normalized ?: next.invoke(preparedQuery)
+            val snapshot = stats.invoke(preparedQuery)
             val nativeWork = snapshot.javaClass.getMethod("getWorkSpent").invoke(snapshot) as Long
             if (meter != null) check(charges.values.sum() == nativeWork) { "Native charge attribution is incomplete" }
             return ProbeRecord(0, observed, result?.javaClass?.simpleName ?: "PendingAfterProbe",
