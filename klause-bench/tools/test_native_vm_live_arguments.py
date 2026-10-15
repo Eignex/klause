@@ -52,7 +52,8 @@ class NativeVmLiveArgumentsTest(unittest.TestCase):
         script = live.program(Path('/opt/jdk/lib/server/libjvm.so'), 1234, [])
 
         self.assertIn('/pid == 1234/', script)
-        self.assertIn('find(@sequence, tid, $sequence)', script)
+        self.assertIn('if (has_key(@sequence, tid)) { $sequence = @sequence[tid]; }', script)
+        self.assertNotIn('find(', script)
         self.assertNotIn('@tracked[', script)
         self.assertNotIn('@sequence[tid] +', script)
         self.assertIn('DRAIN_MARKER', script)
