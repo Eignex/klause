@@ -7,7 +7,9 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 // Undo restores the carve-time slot so hole-atom antecedents cite only determined atoms.
@@ -42,6 +44,49 @@ class PropagationStateHoleEqAtomStaleReasonTest {
         check(s.tightenIntMax(0, 2, null))
 
         assertEquals(0, s.atomLevelForConflict(atom))
+    }
+
+    @Test
+    fun `an untrailed root hole keeps its history when a later bound precedes its eq atom`() {
+        val s = freshState(numVars = 1, hi = 5)
+        s.undoLogging = false
+        assertTrue(s.excludeIntValue(0, 3, null))
+        s.undoLogging = true
+        s.beginLevel(0, fid = -1)
+        assertTrue(s.tightenIntMax(0, 2, null))
+
+        val atom = s.atomVarEq(0, 3)
+
+        assertEquals(false, s.atomCurrentTruth(atom))
+        assertEquals(0, s.atomLevelForConflict(atom))
+        assertNull(s.atomAntecedentsDerived(atom))
+        assertEquals(0, s.carvedAt(0, 3))
+        assertFalse(s.inDomainAt(0, 3, 0))
+    }
+
+    @Test
+    fun `untrailed root holes survive sibling scopes while conditional holes retract`() {
+        val s = freshState(numVars = 2, hi = 9)
+        s.undoLogging = false
+        assertTrue(s.excludeIntValues(0, longArrayOf(2, 3, 4), null))
+        s.undoLogging = true
+        val root = s.mark()
+        s.beginLevel(1, fid = -1)
+        assertTrue(s.tightenIntMax(1, 1))
+        val reason = intArrayOf(Lit.make(s.atomVarLe(1, 1), false))
+        assertTrue(s.excludeIntValue(0, 6, reason))
+        assertEquals(reason.toList(), s.holeReasonFor(0, 6)?.toList())
+
+        s.undoTo(root)
+        s.beginLevel(0, fid = -1)
+        assertTrue(s.tightenIntMin(0, 5))
+        val atom = s.atomVarEq(0, 3)
+
+        assertEquals(0, s.atomLevelForConflict(atom))
+        assertEquals(0, s.carvedAt(0, 3))
+        assertNull(s.holeReasonFor(0, 3))
+        assertFalse(s.holeHistHas(0, 6))
+        assertTrue(6L in s.intDomains[0])
     }
 
     /** No determined atom's derived antecedents may cite an undetermined atom. */

@@ -14,6 +14,7 @@ import com.eignex.klause.util.LongArrayList
 /** Reason for the interior carve of `k` from `v`'s domain, as recorded (possibly lazy, see [reasonOf]); null =
  *  bake-time fact. */
 internal fun PropagationState.holeReasonFor(v: Int, k: Long): IntArray? {
+    if (rootHoleHist[v]?.contains(k) == true) return null
     val vals = holeHistVal[v] ?: return null
     for (i in 0 until vals.size) if (vals[i] == k) return requireNotNull(holeHistAnt[v])[i]
     return null
@@ -25,12 +26,17 @@ internal fun PropagationState.holeReasonFor(v: Int, k: Long): IntArray? {
  *  level. Lets the conflict derivation prefer that over the same-var complementary-bound citation
  *  that otherwise cycles for a value far from the live bound. */
 internal fun PropagationState.holeHistHas(v: Int, k: Long): Boolean {
+    if (rootHoleHist[v]?.contains(k) == true) return true
     val vals = holeHistVal[v] ?: return false
     for (i in 0 until vals.size) if (vals[i] == k) return true
     return false
 }
 
 internal fun PropagationState.pushHoleHist(v: Int, value: Long, level: Int, ant: IntArray?) {
+    if (!undoLogging && undo.size == 0 && level == 0 && ant == null && !holeHistHas(v, value)) {
+        (rootHoleHist[v] ?: RootHoleHistory().also { rootHoleHist[v] = it }).add(value)
+        return
+    }
     val vals = holeHistVal[v] ?: LongArrayList(initialCapacity = 4).also { holeHistVal[v] = it }
     val lvls = holeHistLvl[v] ?: IntArrayList(initialCapacity = 4).also { holeHistLvl[v] = it }
     val ants = holeHistAnt[v] ?: ArrayList<IntArray?>(4).also { holeHistAnt[v] = it }
@@ -47,6 +53,7 @@ internal fun PropagationState.pushHoleHist(v: Int, value: Long, level: Int, ant:
  * unconditional fact.
  */
 internal fun PropagationState.carvedAt(v: Int, k: Long): Int {
+    if (rootHoleHist[v]?.contains(k) == true) return 0
     val vals = holeHistVal[v] ?: return -1
     val poss = requireNotNull(holeHistPos[v])
     for (i in 0 until vals.size) if (vals[i] == k) return poss[i]
@@ -57,8 +64,47 @@ internal fun PropagationState.carvedAt(v: Int, k: Long): Int {
  *  search-time carve is on record — the hole then predates the search (bake-time
  *  propagation), which is a root fact. */
 internal fun PropagationState.holeLevelFor(v: Int, k: Long): Int {
+    if (rootHoleHist[v]?.contains(k) == true) return 0
     val vals = holeHistVal[v] ?: return 0
     val lvls = holeHistLvl[v] ?: error("holeHistLvl[$v] missing while holeHistVal present")
     for (i in 0 until vals.size) if (vals[i] == k) return lvls[i]
     return 0
+}
+
+internal class RootHoleHistory {
+    private class Run(var first: Long, var last: Long)
+    private val runs = ArrayList<Run>()
+
+    operator fun contains(value: Long): Boolean {
+        val before = insertionPoint(value) - 1
+        return before >= 0 && value <= runs[before].last
+    }
+
+    fun add(value: Long) {
+        val index = insertionPoint(value)
+        val before = runs.getOrNull(index - 1)
+        if (before != null && value <= before.last) return
+        val after = runs.getOrNull(index)
+        val joinsBefore = before != null && before.last != Long.MAX_VALUE && before.last + 1L == value
+        val joinsAfter = after != null && value != Long.MAX_VALUE && value + 1L == after.first
+        when {
+            joinsBefore && joinsAfter -> {
+                checkNotNull(before).last = checkNotNull(after).last
+                runs.removeAt(index)
+            }
+            joinsBefore -> checkNotNull(before).last = value
+            joinsAfter -> checkNotNull(after).first = value
+            else -> runs.add(index, Run(value, value))
+        }
+    }
+
+    private fun insertionPoint(value: Long): Int {
+        var low = 0
+        var high = runs.size
+        while (low < high) {
+            val middle = (low + high) ushr 1
+            if (runs[middle].first <= value) low = middle + 1 else high = middle
+        }
+        return low
+    }
 }
