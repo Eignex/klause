@@ -18,13 +18,14 @@ internal class ContinuousProductInvariant(
         val product = numericalEqualityDegree(read(a) * read(b), read(result), state.violationSoftCap)
         val choices = factor.finiteChoices ?: return product
         val operand = read(choices.operand)
-        val membership = numericalEqualityDegree(choices.nearest(operand), operand, state.violationSoftCap)
+        val selectedValue = choices.nearest(operand)
+        val membership = numericalEqualityDegree(selectedValue, operand, state.violationSoftCap)
         var degree = product.toLong() + membership
         if (choices.hasGuards) for (index in 0 until choices.size) {
             val literal = choices.literalAt(index)
             val variable = Lit.variable(literal)
             val boolean = state.assignment.boolValue(variable) xor (variable == flipped)
-            val selected = numericalEqualityDegree(choices.valueAt(index), operand, state.violationSoftCap) == 0
+            val selected = choices.valueAt(index) == selectedValue
             if (Lit.evaluate(literal, boolean) != selected) degree++
         }
         return degree.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
