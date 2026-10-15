@@ -198,6 +198,7 @@ class ExactLiraSearchComponent private constructor(
     private var unassignedBooleans = model.numBoolVars
     private var completeTraversalObserved = false
     private var mixedPointCompletion = false
+    private var defaultDisjunctionHints = false
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
     private val root = SearchNode()
     private val disjunctionAtoms = HashMap<Int, List<DisjunctAtom>>()
@@ -295,6 +296,11 @@ class ExactLiraSearchComponent private constructor(
         mixedPointCompletion = true
     }
 
+    internal fun useDefaultDisjunctionHints() {
+        check(context == null)
+        defaultDisjunctionHints = model.numIntVars > 0 && model.numRealVars > 0
+    }
+
     internal fun observeCompleteTraversal() {
         check(context == null && !completeTraversalObserved)
         completeTraversalObserved = true
@@ -352,6 +358,7 @@ class ExactLiraSearchComponent private constructor(
         if (partialPointHintAvailable()) context?.boolValue(variable) else null
 
     internal fun releasePartialPointHints() {
+        defaultDisjunctionHints = false
         pointHintRows = null
         pointHintValues = null
         pointHintLevel = -1
@@ -392,10 +399,13 @@ class ExactLiraSearchComponent private constructor(
         smtStats?.observePointHintCapture(graph)
     }
 
-    private fun hintTruth(comparison: ExactComparison, point: List<BigFraction>): Boolean? {
+    private fun hintTruth(comparison: ExactComparison, point: List<BigFraction>): Boolean? =
+        hintTruth(comparison) { point.getOrNull(it) }
+
+    private inline fun hintTruth(comparison: ExactComparison, value: (Int) -> BigFraction?): Boolean? {
         var activity = BigFraction.ZERO
         for ((column, coefficient) in comparison.terms) {
-            val coordinate = point.getOrNull(column) ?: return null
+            val coordinate = value(column) ?: return null
             if (!hintPreflight(coefficient, coordinate)) return null
             val product = coefficient * coordinate
             if (!hintScalar(product) || !hintPreflight(activity, product)) return null
@@ -709,7 +719,9 @@ class ExactLiraSearchComponent private constructor(
                 created
             }
             if (disjuncts.any { context.truth(it.holds) == true }) continue
-            val open = disjuncts.firstOrNull { context.truth(it.holds) == null }
+            val first = disjuncts.firstOrNull { context.truth(it.holds) == null }
+            val open = if (first != null) preferredDisjunct(index, disjuncts, first, context) else null
+            if (outcome != null) return null
             if (open != null) return listOf(SearchDecision.Theory(open.holds), SearchDecision.Theory(open.fails))
             val reason = disjunctionReason(disjuncts, null, context)
             outcome = if (reason == null) {
@@ -722,6 +734,66 @@ class ExactLiraSearchComponent private constructor(
         }
         if (registered) captureCompleteWitness(candidate)
         return null
+    }
+
+    private fun preferredDisjunct(
+        factor: Int,
+        disjuncts: List<DisjunctAtom>,
+        first: DisjunctAtom,
+        context: SearchContext,
+    ): DisjunctAtom? {
+        if (!mixedPointCompletion || !defaultDisjunctionHints || pointHintStop()) return first
+        val exact = candidate
+        val numerical = floatCandidate
+        if (exact == null && numerical == null) return first
+        observeCompleteStage("DISJUNCTION_GUIDE_ATTEMPT")
+        for (disjunct in disjuncts) {
+            operationStop.charge(1L)
+            if (operationStop()) {
+                outcome = ComponentCheck.Indeterminate
+                return null
+            }
+            if (pointHintStop()) return first
+            if (context.truth(disjunct.holds) != null) continue
+            val comparison = disjunctHintComparison(factor, disjunct) ?: continue
+            val holds = hintTruth(comparison) { column ->
+                val value = exact?.getOrNull(column) ?: numerical?.getOrNull(column)?.let { BigFraction.ofDouble(it) }
+                value?.takeIf(::hintScalar)
+            }
+            if (operationStop()) {
+                outcome = ComponentCheck.Indeterminate
+                return null
+            }
+            if (holds == true) {
+                observeCompleteStage(if (exact == null) "DISJUNCTION_FLOAT_GUIDE" else "DISJUNCTION_EXACT_GUIDE")
+                if (disjunct !== first) observeCompleteStage("DISJUNCTION_GUIDED_ALTERNATIVE")
+                return disjunct
+            }
+        }
+        if (operationStop()) {
+            outcome = ComponentCheck.Indeterminate
+            return null
+        }
+        return first
+    }
+
+    private fun disjunctHintComparison(factor: Int, disjunct: DisjunctAtom): ExactComparison? {
+        val row = model.factors[factor].linearRows[disjunct.address.row]
+        if (row.activator != LinearRow.ALWAYS) return null
+        val atom = disjunct.row
+        if (atom != null) {
+            val width = atom.terms.size.toLong() + 1L
+            operationStop.charge(width * width + 3L * width)
+            if (operationStop() || pointHintStop()) return null
+            val terms = system.sourceTerms(atom) ?: return null
+            if (!hintScalar(atom.threshold) || terms.values.any { !hintScalar(it) }) return null
+            return ExactComparison(terms, atom.threshold, if (atom.upper) LinearOp.LE else LinearOp.GE,
+                atom.strict, terms.keys.any { it < model.numRealVars })
+        }
+        return exactForms[factor][disjunct.address.row].hintComparison(
+            { variable -> bools.getOrNull(variable)?.takeIf { it != UNASSIGNED }?.let { it == TRUE } },
+            ::hintScalar, ::hintPreflight,
+        )
     }
 
     private fun accept(decision: SearchDecision, context: SearchContext): ComponentResult {

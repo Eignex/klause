@@ -53,9 +53,24 @@ alternative. A point supplies no pin or publication authority. Missing points, u
 disjunctions and stops retain the ordinary finite fallback. Complete checks still require
 all finite coordinates to be fixed, and retraction discards the point with its LP scope.
 
+With the default null hint allowance and one registered linear completion owner,
+a complete mixed worker can prefer an unresolved row of its current source
+disjunction using an existing exact point or an optimal float point's copied model
+prefix. Frontend lowering coordinates remain present; only LP normalization
+columns are omitted. Boolean and finite choices retain their order and must already
+be complete.
+Bounded exact comparison evaluation substitutes known Boolean inputs, preserves
+strictness and skips guarded rows. Named predicates use their registered threshold
+and strictness, including integer lattice rounding. These point values only order exhaustive choices;
+a float optimum supplies no witness, implication, bound or refutation. Custom
+providers, explicit allowances, multiple completion owners, private queries and
+pure integer or real models retain their selected ordering. The comparison work
+uses the current operation and retained hint stop; it adds no index, numerical
+query, draw or allowance.
+
 A complete worker can try witness recovery when an existing LP float point lacks
 an exact primal package. After Boolean and source disjunction choices are complete
-and every finite integer is fixed, it rounds the point's integer coordinates as
+and every finite integer is fixed, it rounds the copied model prefix's integer coordinates as
 private guesses and substitutes them into all selected source rows and current
 branch bounds. It first checks the exact IEEE real prefix and rationally reconstructed
 source reals against those rows, independently of LP auxiliary columns. If neither
