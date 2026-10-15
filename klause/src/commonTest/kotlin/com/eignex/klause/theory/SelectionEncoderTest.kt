@@ -10,7 +10,12 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.NoPropagator
+import com.eignex.klause.propagation.PropagationProjection
+import com.eignex.klause.propagation.PropagationProjectionProvider
+import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
 import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
@@ -19,6 +24,7 @@ import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
@@ -32,6 +38,26 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class SelectionEncoderTest {
+    @Test
+    fun `native and encoded extrema agree when the result aliases an operand`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(2, 2)),
+            arrayOf<Factor>(ArrayMinMax(0, intArrayOf(0, 1, 0), max = true)))
+        val encoded = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "The complete arithmetic peer enforces the source relation.") { NoPropagator }
+        })
+        for (providers in listOf(FactorProjectionProviders.Default, encoded)) {
+            val plan = assertNotNull(source.prepareExecutionPlan(providers).componentPlan)
+
+            val result = plan.search(source, plan.cpSourceDomains(source)).use {
+                assertIs<ComponentResult.Consistent>(it.session.initialize())
+                it.session.solve(0)
+            }
+
+            assertEquals(2L, assertIs<SearchResult.Satisfied>(result).model.valueOf<Long>(SearchIntValue(0)))
+        }
+    }
+
     @Test
     fun `exact extrema reject values beyond every operand`() {
         for (max in listOf(false, true)) {

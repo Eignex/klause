@@ -85,7 +85,9 @@ class Element private constructor(
     // / array-variable roles read a value directly, so those decline. Requires `x` to appear solely as
     // the index (no double role) so the rewrite removes every occurrence.
     override fun substituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Factor? =
-        if (x == idx && scale == 1 && x != result && (!arrIsVars || x.toLong() !in arr)) {
+        if (x == idx && scale == 1 && x != result && (!arrIsVars || x.toLong() !in arr) &&
+            indexOffset.toLong() - offset in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()
+        ) {
             Element(replacement, result, arr, arrIsVars, indexOffset - offset)
         } else {
             null
@@ -144,9 +146,11 @@ class Element private constructor(
         }
         if (!arrIsVars && arr.all { it == arr[0] }) {
             val lo = indexOffset
-            val hi = indexOffset + arr.size - 1
+            val hi = indexOffset.toLong() + arr.size - 1
+            // Structural bound rewrites carry IntRange endpoints.
+            if (hi > Int.MAX_VALUE) return Unchanged
             if (maxOf(idxDom.min, lo.toLong()) > minOf(idxDom.max, hi.toLong())) return Unchanged
-            return Rewrite(listOf(resultEquals(arr[0])), mapOf(idx to lo..hi))
+            return Rewrite(listOf(resultEquals(arr[0])), mapOf(idx to lo..hi.toInt()))
         }
         return Unchanged
     }
