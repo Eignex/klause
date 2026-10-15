@@ -1,13 +1,15 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.lp.admittedSourcePoint
+import com.eignex.klause.lp.engine.reconstructRational
 import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
 import kotlin.math.round
 
-internal fun completeMixedDifferencePoint(
+internal fun completeMixedPoint(
     realColumns: Int,
     integerColumns: Int,
     primal: DoubleArray,
@@ -24,16 +26,43 @@ internal fun completeMixedDifferencePoint(
         if (stop()) return null
         integers += BigFraction.ofDouble(round(primal[realColumns + integer])) ?: return null
     }
+    val rowWork = rows.sumOf { it.columns.size.toLong() + 1L }
+    for (row in rows) {
+        stop.charge(row.columns.size.toLong() + 1L)
+        if (stop() || row.columns.any { it !in 0 until columns } ||
+            !row.coefficients.admittedSourcePoint() || !listOf(row.rhs).admittedSourcePoint()
+        ) return null
+    }
+    for (reconstruct in listOf(false, true)) {
+        val reals = ArrayList<BigFraction>(realColumns)
+        for (real in 0 until realColumns) {
+            stop.charge(1L)
+            if (stop()) return null
+            val value = if (reconstruct) {
+                reconstructRational(primal[real], onStep = { stop.charge(1L) })?.let {
+                    BigFraction.of(bigIntOf(it.numerator), bigIntOf(it.denominator))
+                }
+            } else {
+                BigFraction.ofDouble(primal[real])
+            }
+            if (value == null) break
+            reals += value
+        }
+        if (reals.size != realColumns) continue
+        val point = reals + integers
+        stop.charge(rowWork)
+        if (stop()) return null
+        if (point.satisfiesSourceRows(rows, stop) && !stop()) return point
+    }
     val residual = ArrayList<ExactRationalInequality>()
     for (row in rows) {
         stop.charge(row.columns.size.toLong() + 1L)
-        if (stop() || !row.coefficients.admittedSourcePoint() || !listOf(row.rhs).admittedSourcePoint()) return null
+        if (stop()) return null
         var bound = row.rhs
         val real = ArrayList<Int>()
         val coefficients = ArrayList<BigFraction>()
         for (index in row.columns.indices) {
             val column = row.columns[index]
-            if (column !in 0 until columns) return null
             if (column < realColumns) {
                 real += column
                 coefficients += row.coefficients[index]
@@ -58,6 +87,6 @@ internal fun completeMixedDifferencePoint(
         (result as? RealDifferenceSystem.Result.Feasible)?.point ?: return null
     }
     val point = reals + integers
-    stop.charge(rows.sumOf { it.columns.size.toLong() + 1L })
+    stop.charge(rowWork)
     return point.takeIf { !stop() && it.satisfiesSourceRows(rows, stop) && !stop() }
 }
