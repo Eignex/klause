@@ -240,6 +240,7 @@ internal class LpPropagator(
 
     fun assertBounds(bounds: List<LpPremisedBound>): LpBoundBatchResult = withOwner { current ->
         current.state.conflict?.let { return@withOwner LpBoundBatchResult.Conflict(0, it) }
+        if (bounds.isEmpty()) return@withOwner LpBoundBatchResult.Applied(0)
         val lower = MutableIntObjectMap<ExactLpSide>()
         val upper = MutableIntObjectMap<ExactLpSide>()
         val assertions = ArrayList<LpBoundAssertion>()

@@ -861,6 +861,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun assertPublishedBounds(context: SearchContext): LpBoundBatchResult {
+        if (model.numIntVars == 0) return lp.assertBounds(emptyList())
         val bounds = ArrayList<LpPremisedBound>()
         for (integer in 0 until model.numIntVars) {
             if (operationStop()) return LpBoundBatchResult.Declined(0)
