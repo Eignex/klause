@@ -24,6 +24,42 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `dyadic repairs refresh shared weights before returning a checked hierarchy`() {
+        for (extended in listOf(false, true)) {
+            val declarations = if (extended) "(declare-const fixed Real) (declare-const unused Real)" else ""
+            val condition = if (extended) "(= fixed 2)" else ""
+            val source = SmtLibPolynomial.parse("""
+                (declare-const x Real)
+                (declare-const y Real)
+                $declarations
+                (assert (and (> x 1) (> y x) (> (* x y) 4) $condition))
+            """.trimIndent())
+            val fixed = if (extended) mapOf(2 to BigFraction.ofLong(2)) else emptyMap()
+            val work = QfNraWork(QfNraParams())
+            val arithmetic = PolynomialArithmetic(work)
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic, fixed)
+            val guides = requireNotNull(formula.conjunctiveAtoms(arithmetic, 128))
+            val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic), work)
+
+            val assignment = assertIs<QfNraAssignment>(work.probe { work.coupled {
+                probe.coupled(guides, List(source.realCount) { fixed[it] ?: BigFraction.ZERO }, fixed,
+                    atomTermCounts = guides.map { it.polynomial.terms.size })
+            } })
+
+            assertEquals(1L, work.snapshot().dyadicBases)
+            assertTrue(work.snapshot().workSpent < 32768)
+            assertEquals(1, algebraic.compare(assignment.realValue(0), algebraic.rational(BigFraction.ONE)))
+            assertEquals(1, algebraic.compare(assignment.realValue(1), assignment.realValue(0)))
+            assertEquals(1, algebraic.compare(algebraic.multiply(assignment.realValue(0), assignment.realValue(1)),
+                algebraic.rational(BigFraction.ofLong(4))))
+            if (extended) {
+                assertEquals(BigFraction.ofLong(2), assignment.realValue(2).rational)
+                assertEquals(BigFraction.ZERO, assignment.realValue(3).rational)
+            }
+        }
+    }
+
+    @Test
     fun `successive witness proposals keep exact powers isolated`() {
         val source = SmtLibPolynomial.parse("""
             (declare-const x Real)
