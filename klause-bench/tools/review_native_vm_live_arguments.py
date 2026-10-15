@@ -21,6 +21,121 @@ INPUTS = ('live/live-layout.json', 'live/observer/observer-launch.json',
           'child-compilations.stdout', 'live/hotspot.xml')
 HOOKS = {'broker', 'post', 'total-size', 'queue-add', 'queue-remove', 'queue-stale',
          'queue-get', 'wrapper-construct', 'wrapper-destroy'}
+ENTRY_ROLES = {'broker': (('task', 'CompileTask', 0),),
+               'post': (('nmethod', 'nmethod', 0), ('task', 'CompileTask', 1)),
+               'total-size': (('nmethod', 'nmethod', 0),),
+               'queue-add': (('task', 'CompileTask', 1),),
+               'queue-remove': (('task', 'CompileTask', 1),),
+               'queue-stale': (('task', 'CompileTask', 1),),
+               'wrapper-construct': (('task', 'CompileTask', 1),)}
+
+
+def validate_fragments(group, layout):
+    if group['errors'] or len(group['primary']) != 1:
+        raise ValueError('Native primary or sequence is incomplete')
+    primary = group['primary'][0]
+    used = {id(primary)}
+    category, kind = primary['type'], primary['kind']
+    payload_kind = kind + '-return' if category == 'RETURN' else kind
+
+    def take(category, prefix, size):
+        rows = [row for row in group['records'] if row['type'] == category and row['values'][:len(prefix)] == prefix]
+        if len(rows) != 1 or len(rows[0]['values']) != size or rows[0]['kind'] != payload_kind:
+            raise ValueError('Native payload fragment is absent, duplicated or malformed')
+        used.add(id(rows[0]))
+        return rows[0]['values']
+
+    if category == 'USDT':
+        if len(primary['values']) != 1 or int(primary['values'][0]) not in ((-1,) if kind == 'begin' else (0, 1)):
+            raise ValueError('USDT primary payload is malformed')
+        for label in ('compiler', 'class', 'method', 'signature'):
+            values = take('IDENTITY', [label], 3)
+            declared = int(values[1])
+            if not 0 <= declared < 2 ** 64 or len(bytes.fromhex(values[2])) != min(declared, 128):
+                raise ValueError('USDT raw fragment length differs from its declared bounded read')
+    else:
+        expected_args = (1 if kind in ('broker', 'total-size', 'wrapper-destroy') else 2) if category == 'ENTRY' else \
+            (2 if kind == 'total-size' else 0)
+        if len(primary['values']) != expected_args:
+            raise ValueError('Native primary argument count differs from its hook')
+        for index, value in enumerate(primary['values']):
+            decimal = category == 'RETURN' and kind == 'total-size' and index == 1
+            if not 0 <= int(value, 10 if decimal else 16) < 2 ** (32 if decimal else 64):
+                raise ValueError('Native primary value exceeds its captured width')
+        roles = ENTRY_ROLES.get(kind, ()) if category == 'ENTRY' else \
+            (('task', 'CompileTask', None),) if kind == 'queue-get' else ()
+        for role, owner, argument in roles:
+            candidate = take('CANDIDATE', [role], 2)
+            pointer = int(candidate[1], 16)
+            if not 0 <= pointer < 2 ** 64 or (argument is not None and int(primary['values'][argument], 16) != pointer):
+                raise ValueError('Candidate fragment differs from its captured argument')
+            if pointer == 0:
+                continue
+            names = TASK_FIELDS if owner == 'CompileTask' else NMETHOD_FIELDS
+            for name in names:
+                field = [row for row in layout['requiredFields'] if row['typeName'] == owner and row['fieldName'] == name]
+                values = take('FIELD', [role, owner + '.' + name], 5)
+                if len(field) != 1 or int(values[2], 16) != pointer or \
+                        int(values[3]) != field[0]['targetFieldWidth'] or len(bytes.fromhex(values[4])) != field[0]['targetFieldWidth']:
+                    raise ValueError('Exported raw field fragment differs from its pointer or width')
+    if len(used) != len(group['records']) or any(row['timestamp'] < primary['timestamp'] for row in group['records']):
+        raise ValueError('Unexpected, repeated or temporally inconsistent native fragment')
+
+
+def terminal_delivery(native, layout, root_pid, diagnostics):
+    result = {'sequencedNativeDeliveryProven': False, 'globalLossFreeCaptureProven': False,
+              'snapshots': [], 'totals': [], 'drainMarkers': [], 'errors': [],
+              'scope': 'Selected sequenced native/USDT callback and fragment delivery only. Unsequenced EXEC/FORK, unobserved/inlined hooks, descendants, task/root census and global loss remain unproved.'}
+    final = {}
+    for line in native['otherLines']:
+        values = line.split('\t')
+        if values[0] not in ('FINAL_SEQUENCE', 'FINAL_SEQUENCE_TOTAL', 'DRAIN_MARKER'):
+            continue
+        try:
+            if values[0] == 'DRAIN_MARKER':
+                if len(values) != 2 or int(values[1]) < 0:
+                    raise ValueError('Malformed drain marker')
+                result['drainMarkers'].append({'timestamp': int(values[1]), 'raw': line})
+                continue
+            if len(values) != 4 or any(int(value) < 0 for value in values[1:]):
+                raise ValueError('Malformed final sequence snapshot')
+            stamp, key, count = map(int, values[1:])
+            if values[0] == 'FINAL_SEQUENCE_TOTAL':
+                result['totals'].append({'timestamp': stamp, 'threads': key, 'events': count, 'raw': line})
+            else:
+                if key <= 0 or key in final or count > MAX_RECORDS or (count == 0 and key != root_pid):
+                    raise ValueError('Duplicate or invalid final thread sequence')
+                row = {'timestamp': stamp, 'tid': key, 'sequence': count, 'raw': line}
+                final[key] = row
+                result['snapshots'].append(row)
+        except ValueError as error:
+            result['errors'].append({'raw': line, 'reason': str(error)})
+    observed = {}
+    for thread in native['threads']:
+        for group in thread:
+            try:
+                if group['pid'] != root_pid:
+                    raise ValueError('Native group belongs to a different selected process')
+                validate_fragments(group, layout)
+            except (ValueError, KeyError, IndexError, TypeError) as error:
+                result['errors'].append({'pid': group['pid'], 'tid': group['tid'], 'sequence': group['sequence'], 'reason': str(error)})
+        tid = thread[0]['tid']
+        observed[tid] = len(thread)
+        snapshot = final.get(tid)
+        if snapshot is None or snapshot['sequence'] != len(thread) or \
+                any(row['timestamp'] > snapshot['timestamp'] for group in thread for row in group['records']):
+            result['errors'].append({'tid': tid, 'reason': 'Observed callbacks do not reach the terminal thread sequence'})
+    if root_pid not in final or any(row['sequence'] != observed.get(tid, 0) for tid, row in final.items()):
+        result['errors'].append({'reason': 'Final map contains a missing or unaccounted thread'})
+    if len(result['totals']) != 1 or len(result['drainMarkers']) != 1:
+        result['errors'].append({'reason': 'Final total or drain marker is absent or duplicated'})
+    else:
+        total, drain = result['totals'][0], result['drainMarkers'][0]
+        if total['threads'] != len(final) or total['events'] != sum(row['sequence'] for row in final.values()) or \
+                total['timestamp'] > drain['timestamp'] or any(row['timestamp'] > total['timestamp'] for row in final.values()):
+            result['errors'].append({'reason': 'Final map cardinality, sequence total or drain order differs'})
+    result['sequencedNativeDeliveryProven'] = not result['errors'] and not native['errors'] and diagnostics['readWarningGuardPassed']
+    return result
 
 
 def extract_inputs(manifest_path, expected, archive_path, destination, provenance):
@@ -355,7 +470,8 @@ def correlate(native, layout, jfr, logs, diagnostics):
             frame.update(task=task, usdtIdentity=begin, jfrMatches=matches, logMatches=log_matches,
                          postCandidateMatches=posts,
                          independentIdentityMatched=True,
-                         recordedArgumentBindingCorroborated=diagnostics['readWarningGuardPassed'] and not native['errors'] and not issues)
+                         recordedArgumentBindingCorroborated=diagnostics['readWarningGuardPassed'] and
+                         diagnostics.get('sequencedDeliveryGuardPassed', False) and not native['errors'] and not issues)
         except (ValueError, KeyError, IndexError) as error:
             frame['unprovenReason'] = str(error)
     matched = {id(row) for frame in invocations for row in frame.get('jfrMatches', [])}
@@ -397,7 +513,10 @@ def inspect(directory, report):
     diagnostics = read_diagnostics(load('live/observer/observer.stderr').decode('utf-8'), script.decode(), native['otherLines'])
     if any(group['pid'] != launch['rootPid'] for thread in native['threads'] for group in thread):
         raise ValueError('Captured native record belongs to a different process')
-    report.update(nativeRecords=native, readDiagnostics=diagnostics, rawClockAnchors=launch['clockAnchors'])
+    delivery = terminal_delivery(native, layout, launch['rootPid'], diagnostics)
+    diagnostics['sequencedDeliveryGuardPassed'] = delivery['sequencedNativeDeliveryProven']
+    report.update(nativeRecords=native, readDiagnostics=diagnostics, terminalDelivery=delivery,
+                  rawClockAnchors=launch['clockAnchors'])
     jfr = jfr_records(json.loads(load('child-compilations.stdout')))
     logs = log_records(load('live/hotspot.xml').decode('utf-8'))
     report.update(independentJfrRecords=jfr, independentLogRecords=logs,

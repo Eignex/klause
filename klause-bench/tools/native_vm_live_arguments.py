@@ -129,7 +129,12 @@ def program(library, root_pid, fields):
                           f'nsecs, pid, tid, $sequence, arg{length}, '
                           f'buf(uptr(arg{pointer}), arg{length} < 128 ? arg{length} : 128)); ')
         blocks.append(statement + '}')
-    blocks.append('END { printf("DRAIN_MARKER\\t%llu\\n", nsecs); clear(@sequence); }')
+    blocks.append('END { let $threads = 0; let $events = 0; '
+                  'for ($row : @sequence) { '
+                  'printf("FINAL_SEQUENCE\\t%llu\\t%llu\\t%llu\\n", nsecs, $row.0, $row.1); '
+                  '$threads++; $events += $row.1; } '
+                  'printf("FINAL_SEQUENCE_TOTAL\\t%llu\\t%llu\\t%llu\\n", nsecs, $threads, $events); '
+                  'printf("DRAIN_MARKER\\t%llu\\n", nsecs); clear(@sequence); }')
     return '\n'.join(blocks) + '\n'
 
 

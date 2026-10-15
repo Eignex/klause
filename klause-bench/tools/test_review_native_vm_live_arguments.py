@@ -84,7 +84,7 @@ class NativeVmLiveArgumentReviewTest(unittest.TestCase):
         self.assertEqual('Broker lifetime or USDT pair is incomplete', result['brokerInvocations'][0]['unprovenReason'])
         self.assertEqual('unfinished native invocation', result['nativeLifetimeIssues'][0]['reason'])
 
-    def test_complete_identity_matches_require_the_read_guard_before_corroboration(self):
+    def test_complete_identity_matches_require_read_and_delivery_guards_before_corroboration(self):
         values = [('_method', 8, 'Method*', '00 20 00 00 00 00 00 00'),
                   ('_compile_id', 4, 'int', '07 00 00 00'), ('_osr_bci', 4, 'int', 'ff ff ff ff'),
                   ('_comp_level', 4, 'int', '03 00 00 00'), ('_num_inlined_bytecodes', 4, 'int', '00 00 00 00')]
@@ -104,15 +104,95 @@ class NativeVmLiveArgumentReviewTest(unittest.TestCase):
                 'method': ('p.C', 'f', '()V'), 'compiler': 'c1', 'succeeded': True}]
         logs = review.log_records("<hotspot_log><task_queued compile_id='7' level='3' method='p.C f ()V'/></hotspot_log>")
 
-        good = review.correlate(native, layout, jfr, logs, {'readWarningGuardPassed': True})
-        bad = review.correlate(native, layout, jfr, logs, {'readWarningGuardPassed': False})
+        for read, delivery, expected in [(True, True, True), (False, True, False), (True, False, False)]:
+            with self.subTest(read=read, delivery=delivery):
+                result = review.correlate(native, layout, jfr, logs,
+                                          {'readWarningGuardPassed': read, 'sequencedDeliveryGuardPassed': delivery})
 
-        self.assertTrue(good['brokerInvocations'][0]['recordedArgumentBindingCorroborated'])
-        self.assertFalse(bad['brokerInvocations'][0]['recordedArgumentBindingCorroborated'])
-        self.assertTrue(bad['brokerInvocations'][0]['independentIdentityMatched'])
-        self.assertEqual(1, bad['summary']['independentIdentityMatches'])
-        self.assertEqual(0, bad['summary']['recordedArgumentBindingsCorroborated'])
-        self.assertEqual(jfr, bad['brokerInvocations'][0]['jfrMatches'])
+                self.assertEqual(expected, result['brokerInvocations'][0]['recordedArgumentBindingCorroborated'])
+                self.assertTrue(result['brokerInvocations'][0]['independentIdentityMatched'])
+                self.assertEqual(1, result['summary']['independentIdentityMatches'])
+                self.assertEqual(int(expected), result['summary']['recordedArgumentBindingsCorroborated'])
+                self.assertEqual(jfr, result['brokerInvocations'][0]['jfrMatches'])
+
+    def test_complete_terminal_sequences_preserve_unfinished_callbacks_without_global_loss_credit(self):
+        text = ('ENTRY\twrapper-destroy\t1\t100\t101\t1\t1000\n'
+                'FINAL_SEQUENCE\t3\t100\t0\nFINAL_SEQUENCE\t4\t101\t1\n'
+                'FINAL_SEQUENCE_TOTAL\t5\t2\t1\nDRAIN_MARKER\t6\n')
+        native = review.parse_native(text)
+
+        for read in (True, False):
+            with self.subTest(read=read):
+                result = review.terminal_delivery(native, {}, 100, {'readWarningGuardPassed': read})
+
+                self.assertEqual(read, result['sequencedNativeDeliveryProven'])
+                self.assertFalse(result['globalLossFreeCaptureProven'])
+                self.assertEqual([], result['errors'])
+
+    def test_terminal_delivery_refuses_missing_tails_duplicate_snapshots_and_inconsistent_totals(self):
+        prefix = 'ENTRY\twrapper-destroy\t1\t100\t101\t1\t1000\n'
+        endings = [
+            'DRAIN_MARKER\t6\n',
+            'FINAL_SEQUENCE\t3\t100\t0\nFINAL_SEQUENCE\t4\t101\t2\nFINAL_SEQUENCE_TOTAL\t5\t2\t2\nDRAIN_MARKER\t6\n',
+            'FINAL_SEQUENCE\t3\t100\t0\nFINAL_SEQUENCE\t4\t101\t1\nFINAL_SEQUENCE\t4\t101\t1\nFINAL_SEQUENCE_TOTAL\t5\t2\t1\nDRAIN_MARKER\t6\n',
+            'FINAL_SEQUENCE\t3\t100\t0\nFINAL_SEQUENCE\t4\t101\t1\nFINAL_SEQUENCE_TOTAL\t5\t3\t1\nDRAIN_MARKER\t6\n',
+            'FINAL_SEQUENCE\t3\t100\t0\nFINAL_SEQUENCE\t4\t101\t1\nFINAL_SEQUENCE_TOTAL\t5\t2\t0\nDRAIN_MARKER\t6\n',
+            'FINAL_SEQUENCE\t3\t100\t0\nFINAL_SEQUENCE\t4\t101\t1\nFINAL_SEQUENCE_TOTAL\t5\t2\t1\nDRAIN_MARKER\t2\n',
+        ]
+        for ending in endings:
+            with self.subTest(ending=ending):
+                result = review.terminal_delivery(review.parse_native(prefix + ending), {}, 100,
+                                                  {'readWarningGuardPassed': True})
+
+                self.assertFalse(result['sequencedNativeDeliveryProven'])
+                self.assertTrue(result['errors'])
+
+    def test_terminal_sequences_do_not_hide_missing_or_extra_null_candidate_fragments(self):
+        lines = ['ENTRY\tqueue-get\t1\t100\t101\t1\t1000\t2000',
+                 'RETURN\tqueue-get\t2\t100\t101\t2',
+                 'CANDIDATE\tqueue-get-return\t2\t100\t101\t2\ttask\t0']
+        ending = ['FINAL_SEQUENCE\t3\t100\t0', 'FINAL_SEQUENCE\t4\t101\t2',
+                  'FINAL_SEQUENCE_TOTAL\t5\t2\t2', 'DRAIN_MARKER\t6']
+        variants = [lines, lines[:-1], lines + [lines[-1]],
+                    lines + ['FIELD\tqueue-get-return\t2\t100\t101\t2\ttask\tCompileTask._method\t0\t8\t00 00 00 00 00 00 00 00']]
+        for index, records in enumerate(variants):
+            with self.subTest(variant=index):
+                result = review.terminal_delivery(review.parse_native('\n'.join(records + ending)), {}, 100,
+                                                  {'readWarningGuardPassed': True})
+
+                self.assertEqual(index == 0, result['sequencedNativeDeliveryProven'])
+
+    def test_terminal_counters_do_not_mask_missing_or_invalid_nonnull_field_payloads(self):
+        fields = [{'typeName': 'CompileTask', 'fieldName': name,
+                   'targetFieldWidth': 8 if name == '_method' else 4} for name in review.TASK_FIELDS]
+        lines = ['ENTRY\tbroker\t1\t100\t101\t1\t1000',
+                 'CANDIDATE\tbroker\t1\t100\t101\t1\ttask\t1000']
+        lines += [f'FIELD\tbroker\t1\t100\t101\t1\ttask\tCompileTask.{row["fieldName"]}\t1000\t{row["targetFieldWidth"]}\t' +
+                  '00 ' * row['targetFieldWidth'] for row in fields]
+        ending = ['FINAL_SEQUENCE\t3\t100\t0', 'FINAL_SEQUENCE\t4\t101\t1',
+                  'FINAL_SEQUENCE_TOTAL\t5\t2\t1', 'DRAIN_MARKER\t6']
+        variants = [lines, lines[:-1], lines + [lines[-1]],
+                    lines[:-1] + [lines[-1].replace('\t4\t', '\t8\t')]]
+        for index, records in enumerate(variants):
+            with self.subTest(variant=index):
+                result = review.terminal_delivery(review.parse_native('\n'.join(records + ending)),
+                                                  {'requiredFields': fields}, 100, {'readWarningGuardPassed': True})
+
+                self.assertEqual(index == 0, result['sequencedNativeDeliveryProven'])
+
+    def test_delivered_truncated_identity_remains_complete_bytes_without_becoming_accepted_identity(self):
+        lines = ['USDT\tbegin\t1\t100\t101\t1\t-1']
+        lines += [f'IDENTITY\tbegin\t1\t100\t101\t1\t{label}\t129\t' + '61 ' * 128
+                  for label in ('compiler', 'class', 'method', 'signature')]
+        lines += ['FINAL_SEQUENCE\t3\t100\t0', 'FINAL_SEQUENCE\t4\t101\t1',
+                  'FINAL_SEQUENCE_TOTAL\t5\t2\t1', 'DRAIN_MARKER\t6']
+        native = review.parse_native('\n'.join(lines))
+
+        result = review.terminal_delivery(native, {}, 100, {'readWarningGuardPassed': True})
+
+        self.assertTrue(result['sequencedNativeDeliveryProven'])
+        with self.assertRaisesRegex(ValueError, 'truncated'):
+            review.decode_identity(native['threads'][0][0])
 
     def test_primary_clock_order_cannot_contradict_per_thread_sequence(self):
         parsed = review.parse_native('ENTRY\tbroker\t12\t100\t101\t1\t1000\nRETURN\tbroker\t10\t100\t101\t2')
