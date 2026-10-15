@@ -1,27 +1,20 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.IntBounds
-import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
-import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.Term
-import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
-import com.eignex.klause.util.div
 import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.gcd
-import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 
@@ -76,25 +69,27 @@ fun MpsModel.toExactSourceProblem(settings: ProblemSettings = KlauseConfig.curre
         fun add(bound: MpsSourceNumber?, relation: LinearOp) {
             val value = bound.finiteMps()?.fraction ?: return
             if (row.indicator == null && coefficients.all { it.isZero }) {
-                val holds = if (relation == LinearOp.GE) BigFraction.ZERO >= value else BigFraction.ZERO <= value
+                val holds = when (relation) {
+                    LinearOp.GE -> BigFraction.ZERO >= value
+                    LinearOp.LE -> BigFraction.ZERO <= value
+                    LinearOp.EQ -> BigFraction.ZERO == value
+                    LinearOp.NE -> BigFraction.ZERO != value
+                }
                 if (holds) return
             }
             val comparison = exactSourceRow(refs, coefficients, relation, value)
             val indicator = row.indicator
             factors += if (indicator == null) comparison else {
                 require(source.variables[indicator.column].integer) { "MPS indicator must be integral" }
-                val trigger = BigFraction.ofLong(if (indicator.whenOne) 1 else 0)
-                MpsSourceIndicator(listOf(
-                    exactSourceRow(intArrayOf(ref(indicator.column)), listOf(BigFraction.ONE),
-                        LinearOp.LE, trigger, strict = true),
-                    exactSourceRow(intArrayOf(ref(indicator.column)), listOf(BigFraction.ONE),
-                        LinearOp.GE, trigger, strict = true),
-                    comparison,
-                ))
+                LinearIndicator(columns[indicator.column].id, indicator.whenOne, comparison)
             }
         }
-        add(lo, LinearOp.GE)
-        add(hi, LinearOp.LE)
+        if (lo.finiteMps()?.fraction != null && lo.finiteMps()?.fraction == hi.finiteMps()?.fraction) {
+            add(lo, LinearOp.EQ)
+        } else {
+            add(lo, LinearOp.GE)
+            add(hi, LinearOp.LE)
+        }
     }
     val integralObjective = source.integralSourceObjective(columns, numbers, intCount)
     val objective = when {
@@ -121,6 +116,7 @@ fun MpsModel.toExactSourceProblem(settings: ProblemSettings = KlauseConfig.curre
     )
     return MpsCompiled(model, objective, source.sense == ObjectiveSense.MAXIMIZE, columns, 1,
         source.variables.count { !it.integer }).withSourceModel(source, null, null)
+        .withExactLpModel { source.toExactLpModel() }
 }
 
 private fun MpsModel.integralSourceObjective(
@@ -148,26 +144,4 @@ private fun exactSourceRow(
     coefficients: List<BigFraction>,
     relation: LinearOp,
     rhs: BigFraction,
-    strict: Boolean = false,
-): ExactSearchRow {
-    val denominator = coefficients.fold(rhs.den) { scale, coefficient ->
-        scale / scale.gcd(coefficient.den) * coefficient.den
-    }
-    val scale = BigFraction.of(denominator, BIG_ONE)
-    return ExactSearchRow.of(refs, coefficients.map { it * scale }, relation, rhs * scale, strict)
-}
-
-private class MpsSourceIndicator(private val alternatives: List<ExactSearchRow>) : Factor {
-    override val linearForm = LinearForm.Disjunction(alternatives)
-    override val variables = MixedVars(
-        boundInts = alternatives.flatMap { it.intVars.toList() }.distinct().toIntArray(),
-        reals = alternatives.flatMap { it.variables.reals.toList() }.distinct().toIntArray(),
-    )
-
-    override fun remap(mapping: VarRemap): Factor =
-        MpsSourceIndicator(alternatives.map { it.remap(mapping) as ExactSearchRow })
-
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.MPS_SOURCE_INDICATOR) {
-        for (row in alternatives) ints(row.structuralKey().toString().map { it.code }.toIntArray())
-    }
-}
+): ExactLinear = ExactLinear.of(refs, coefficients, relation, rhs)

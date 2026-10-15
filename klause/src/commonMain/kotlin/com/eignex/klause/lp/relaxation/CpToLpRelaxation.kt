@@ -3,7 +3,7 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.Power
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
@@ -695,7 +695,7 @@ internal class CpToLpRelaxation(
         if (structurallyPersistent) for (fid in problem.factors.indices) {
             val factor = problem.factors[fid]
             if (factor is ReifiedLinear || factor is ReifiedPseudoBoolean || factor is ReifiedCardinality ||
-                factor is ReifiedRealLinear || factor is RealElement
+                factor is ReifiedRealLinear || factor is RealElement || factor is LinearIndicator
             ) {
                 structurallyPersistent = false
                 break
@@ -861,13 +861,7 @@ internal class CpToLpRelaxation(
 
     private fun realCost(r: Int): Double = objective?.realCoefficientValues?.getOrElse(r) { 0.0 } ?: 0.0
 
-    private fun touchesReals(factor: Factor): Boolean = when (factor) {
-        is Linear -> factor.realConstants != null
-        is ReifiedRealLinear -> true
-        is RealAbs, is RealProduct, is RealElement, is RealArrayMinMax -> true
-        is Power -> factor.base is Power.Coordinate.Real
-        else -> false
-    }
+    private fun touchesReals(factor: Factor): Boolean = factor.variables.reals.isNotEmpty()
 
     /** Per-build mutable state: the builder, the column maps, and the row emitters. Implements
      *  [RelaxationBuilder] so an LP factor projection can emit into it. */
@@ -1567,7 +1561,33 @@ internal class CpToLpRelaxation(
             checkCancellation()
             if (skipRow(contribution)) return
             val rel = relationOf(op) ?: return
-            builder.addRow(columns, coeffs, rel, rhs)
+            addSourceRow(columns, coeffs, rel, rhs)
+        }
+
+        override fun conditionedRow(
+            columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, integer: Int, value: Long,
+        ) {
+            checkCancellation()
+            val domain = domains.intDomain(integer)
+            if (domain.min != value || domain.max != value) return
+            val rel = relationOf(op) ?: return
+            val premises = LpRowPremises(intArrayOf(integer, integer), booleanArrayOf(false, true),
+                longArrayOf(value, value))
+            addSourceRow(columns, coeffs, rel, rhs, premises)
+        }
+
+        private fun addSourceRow(
+            columns: IntArray, coeffs: LongArray, relation: Relation, rhs: Long, premises: LpRowPremises? = null,
+        ) {
+            if (realNegOf.isEmpty() || columns.none { realNegOf.containsKey(it) }) {
+                builder.addRow(columns, coeffs, relation, rhs, premises == null, premises)
+                return
+            }
+            val mirrored = columns.indices.filter { realNegOf.containsKey(columns[it]) }
+            if (mirrored.any { coeffs[it] == Long.MIN_VALUE }) return
+            val expandedColumns = columns + IntArray(mirrored.size) { realNegOf.getOrDefault(columns[mirrored[it]], -1) }
+            val expandedCoefficients = coeffs + LongArray(mirrored.size) { -coeffs[mirrored[it]] }
+            builder.addRow(expandedColumns, expandedCoefficients, relation, rhs, premises == null, premises)
         }
 
         override fun realRow(

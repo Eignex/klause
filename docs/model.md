@@ -69,6 +69,24 @@ sound bounds and exact pinned checks. [Local search](solver/local-search.md#defi
 maintains eligible unique outputs and offers correlated repairs. Domain restrictions,
 pins, competing definitions and cycles remain authoritative.
 
+## Exact linear source relations
+
+`factor.arithmetic.ExactLinear` captures rational comparisons over tagged integer
+and real coordinates, coalescing aliases before exact denominator clearing. Narrow
+and arbitrary-width constants retain the same mathematical relation. Its finite
+projection filters integer bounds; mixed scoring is heuristic and requires a
+complete source check. The numerical projection emits representable scaled integer
+constants without changing the source relation. Missing numerical rows weaken the
+relaxation and cannot certify an omitted source comparison.
+
+`LinearIndicator` retains one integer trigger, its zero/one polarity and an exact
+enabled row. It is a one-way implication; the disabled branch leaves the row
+unrestricted. Private selected encoders retain that Boolean structure. Finite
+checks, numerical rows and original-source verification read the same trigger.
+Source integer declarations fixed at the trigger expose the enabled row to sound
+bound closure before final ownership. Live invocation pins remain scoped premises
+and retract with their numerical rows.
+
 ## Published assignments and objectives
 
 `Sample`, exact theory assignments and reconstructed witnesses own immutable

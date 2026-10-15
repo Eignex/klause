@@ -96,6 +96,10 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is LexLess -> LexLessPropagator(boolVars, intVars, xs, ys, strict)
 
+    is ExactLinear -> propagationView()
+
+    is LinearIndicator -> propagationView()
+
     is Linear -> when (val c = constants) {
         is RealConstants -> NoPropagator
         is WideConstants -> WideLinearPropagator(intVars, vars, c.coefficients.toTypedArray(), op, c.bound)

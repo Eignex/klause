@@ -177,6 +177,13 @@ interface RelaxationBuilder {
     )
 
     /**
+     * Emit an exact integer-coefficient row under the current equality pin of [integer] to [value].
+     * The receiver retains both sides of that source condition as certificate premises. A receiver
+     * without conditional-row support omits the row, weakening its relaxation.
+     */
+    fun conditionedRow(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, integer: Int, value: Long) {}
+
+    /**
      * Emit a big-M row `Σ coeffs(k) · columns(k) ⟨op⟩ rhs` whose constants bake in the live
      * (node-current) bounds. [global] must be true exactly when the same big-M follows from the
      * declared bounds — then the row holds at every solution and is cacheable. Otherwise it holds only

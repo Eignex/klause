@@ -1,6 +1,7 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.ir.IntBounds
@@ -191,7 +192,14 @@ internal fun Problem.closeOpenBounds(
 }
 
 /** Unconditional integer rows plus the integer rows a root unit clause asserts. */
-private fun Problem.openPresolveRows(): List<Linear> = presolveLinearRows(factors.asList()).map(::roundIntegerRow)
+private fun Problem.openPresolveRows(): List<Linear> {
+    val activeIndicators = factors.filterIsInstance<LinearIndicator>().filter { indicator ->
+        val id = indicator.indicator
+        intBounds.hasLower(id) && intBounds.hasUpper(id) &&
+            intBounds.lower(id) == intBounds.upper(id) && intBounds.lower(id) == (if (indicator.whenOne) 1L else 0L)
+    }.map { it.row }
+    return presolveLinearRows(factors.asList() + activeIndicators).map(::roundIntegerRow)
+}
 
 /** Divide a whole integer inequality by its coefficient gcd, rounding its bound inward. */
 private fun roundIntegerRow(row: Linear): Linear {

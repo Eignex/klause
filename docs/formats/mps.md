@@ -24,17 +24,33 @@ pure-integer rows are rebuilt from source decimals; oversized objectives can use
 an auxiliary defining row. Integer values and lower-bound shifts keep exact
 authority beyond `2^53`.
 
-`MpsModel.toExactSourceProblem` preserves parsed decimal numbers in the existing
-exact tagged linear rows, clearing denominators by positive scaling. Real column
+`MpsModel.toProblem` retains original decimal rows for mixed sources whose binary64
+hybrid projection differs from the source. Indicated rows also retain their native
+source implication. These representations do not select an engine or transfer
+bounded integer choices to arithmetic search. The default purely continuous hybrid
+projection retains its explicit tolerance correspondence.
+
+`MpsModel.toExactSourceProblem` preserves parsed decimal numbers in native
+`ExactLinear` rows, clearing denominators without rounding. Real column
 bounds are exact rows with open real declaration arrays; integer bounds outside
-`Long` also remain rows. Declared integer columns retain integrality. Conditional
-rows are disjunctions of the indicator's exact complement and the enabled row.
+`Long` also remain rows. Declared integer columns retain integrality. `LinearIndicator` retains the source integer trigger and enabled comparison;
+selected LINEAR and POLYNOMIAL encoders install the equivalent guarded relation
+privately. Finite integer checks and numerical row emission read that same source
+implication. Numerical rows enabled by a finite pin retain both equality premises,
+so retraction removes their authority.
 Integral integer objectives retain their source coefficients directly. Other
 objectives use an auxiliary equality retaining original decimal coefficients and
 constant in source units. The returned column mapping omits this auxiliary and
 its source witness check requires exact feasibility, independently of the hybrid
-lowering's tolerance correspondence. This adapter prepares source data; callers
-select execution through the shared pipeline.
+lowering's tolerance correspondence. Both loading entry points use the same factor execution views. Integer-only rows
+have exact finite filtering and scores; continuous rows have heuristic scores and
+source-certified completion. Scaled integer constants feed the numerical LP without
+changing source numbers. A numerical representation decline leaves the selected
+arithmetic encoding available, with bounded integers retaining finite ownership.
+Named objectives without terms retain their source constant and direction.
+The shared pipeline selects execution from these capabilities after bound closure;
+`sourceExact` and exact coefficient storage alone do not request whole-model exact
+traversal. Explicit `--exact` requires certificates and disables tolerance acceptance.
 
 ## Tolerance publication
 

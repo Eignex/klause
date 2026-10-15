@@ -1063,7 +1063,7 @@ internal class LpEngine(
                         count++
                     }
                     rows++
-                } else if (factor is Linear && factor.realConstants != null) rows++
+                } else if (factor.variables.reals.isNotEmpty()) rows++
                 if ((fid + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             }
             val ids = IntArray(count)

@@ -435,6 +435,7 @@ private const val MPS_INFINITY = 1e20
 fun MpsModel.toProblem(settings: ProblemSettings = KlauseConfig.current.problemSettings()): MpsCompiled {
     val exactInput = exactAdapterSnapshot()
     val sourceNumbers = exactInput.sourceNumbers()
+    if (constraints.any { it.indicator != null }) return exactInput.toExactSourceProblem(settings)
     val integralDefinitions = integralDefinitions(sourceNumbers)
     val isFloat = BooleanArray(variables.size) { !variables[it].integer && integralDefinitions[it] == null }
     if (integralDefinitions.any { it != null }) {
@@ -456,7 +457,9 @@ fun MpsModel.toProblem(settings: ProblemSettings = KlauseConfig.current.problemS
     for (i in variables.indices) if (isFloat[i]) realVarOf[i] = numReal++ else intVarOf[i] = numInt++
 
     val objRowScale = objectiveRowScale(isFloat)
-    val objectiveRow = if (objective.indices.isNotEmpty() && objRowScale is RowScale.Unrepresentable) {
+    val objectiveRow = if ((objective.indices.isNotEmpty() || objective.name.isNotEmpty()) &&
+        objRowScale is RowScale.Unrepresentable
+    ) {
         objectiveColumnRow()
     } else {
         null
@@ -539,7 +542,7 @@ fun MpsModel.toProblem(settings: ProblemSettings = KlauseConfig.current.problemS
         )
     }
     val objective = when {
-        objective.indices.isEmpty() -> null
+        objective.indices.isEmpty() && objective.name.isEmpty() -> null
         objectiveRow != null -> columnObjective(guards.numBool, numInt, numModelReal, objectiveColumn)
         else -> buildObjective(isFloat, intVarOf, realVarOf, guards.numBool, numInt, numReal, objRowScale)
     }
@@ -556,6 +559,10 @@ fun MpsModel.toProblem(settings: ProblemSettings = KlauseConfig.current.problemS
     val columns = variables.mapIndexed { i, v ->
         MpsColumn(v.name, isFloat[i], if (isFloat[i]) realVarOf[i] else intVarOf[i])
     }
+    val mismatch = exactInput.sourceMismatch(isFloat, objRowScale, objectiveRow)
+    if (numInt > 0 && mismatch != null) {
+        return exactInput.toExactSourceProblem(settings)
+    }
     return MpsCompiled(
         model,
         objective,
@@ -564,11 +571,7 @@ fun MpsModel.toProblem(settings: ProblemSettings = KlauseConfig.current.problemS
         if (objectiveRow == null) objRowScale.multiplier else 1L,
         variables.count { !it.integer },
     ).withExactLpModel { exactInput.toExactLpModel() }
-        .withSourceModel(
-            exactInput,
-            exactInput.sourceMismatch(isFloat, objRowScale, objectiveRow),
-            exactInput.toleranceMismatch(isFloat, objRowScale, objectiveRow),
-        )
+        .withSourceModel(exactInput, mismatch, exactInput.toleranceMismatch(isFloat, objRowScale, objectiveRow))
 }
 
 // Build the authoritative source LP beside the compatible hybrid Problem lowering.

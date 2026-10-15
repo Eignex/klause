@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.LinearForm
@@ -17,6 +18,7 @@ import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
 
@@ -51,6 +53,9 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             BigFraction.of(sample.exactIntValue(column - model.numRealVars), BIG_ONE)
         }
     }
+    fun holds(row: LinearRow): Boolean = row.exactComparison(
+        model.numRealVars, row.activator == LinearRow.ALWAYS || witness.truth(row.activator), witness::truth,
+    ).holdsAt(witness)
     for ((id, factor) in model.factors.withIndex()) {
         if (factor.variables.reals.isEmpty()) continue
         if (factor is RealAbs) {
@@ -86,13 +91,17 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             if (selected != reals[factor.result]) return Verification.Rejected("real factor $id refutes the assignment")
             continue
         }
+        if (factor is LinearIndicator) {
+            val trigger = bigIntOf(if (factor.whenOne) 1L else 0L)
+            if (sample.exactIntValue(factor.indicator) == trigger && !holds(factor.row)) {
+                return Verification.Rejected("real factor $id refutes the assignment")
+            }
+            continue
+        }
         val form = factor.linearForm
         if (form == null || form is LinearForm.Relaxation) {
             return Verification.Indeterminate("real factor $id has no complete witness checker")
         }
-        fun holds(row: LinearRow): Boolean = row.exactComparison(
-            model.numRealVars, row.activator == LinearRow.ALWAYS || witness.truth(row.activator), witness::truth,
-        ).holdsAt(witness)
         val valid = when (form) {
             is LinearForm.Conjunction -> form.rows.all(::holds)
             is LinearForm.Disjunction -> form.rows.any(::holds)

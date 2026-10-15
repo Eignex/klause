@@ -52,6 +52,21 @@ The exact LP projection of `QfLraRelaxation` belongs to its theory adapter, besi
 the source declarations. Arithmetic kernels do not acquire that model-facing
 responsibility.
 
+## Exact source row projections
+
+Native exact linear rows retain their source rational meaning independently of
+finite filtering, heuristic scores and numerical LP emission. Representable scaled
+integer coefficients use the existing LP builder and exact certificate path. Tagged
+real columns preserve both parts of a split free column. An oversized numerical
+projection omits its rows and leaves source enforcement to the selected arithmetic
+encoding; it supplies no feasibility or proof authority by itself.
+
+A numerical row enabled by an integer indicator equality records both source bound
+premises. Its emission depends on that live pin and is retired when the pin retracts.
+These conditional rows cannot use a persistent unconditional layout. Complete
+witness publication checks the original implication and every original exact row.
+The numerical engine's closed package dependencies are unchanged.
+
 ## Numerical authority
 
 The exact matrix, costs, objective sense/scale/constant, bounds, absent sides,

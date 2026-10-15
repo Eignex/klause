@@ -110,6 +110,8 @@ internal enum class FactorKind {
     GRID_ARRAY_MIN_MAX,
     GRID_PRODUCT,
     GRID_POWER,
+    EXACT_LINEAR,
+    LINEAR_INDICATOR,
 }
 
 // Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments into a
