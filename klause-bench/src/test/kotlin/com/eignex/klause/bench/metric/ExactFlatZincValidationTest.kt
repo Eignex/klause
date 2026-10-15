@@ -6,6 +6,27 @@ import kotlin.test.assertTrue
 
 class ExactFlatZincValidationTest {
     @Test
+    fun `original set selection checks the selected row and full result universe`() {
+        val source = "array[1..2] of set of int: choices = [{1,3}, {2}]; " +
+            "var 0..3: i; var set of 1..3: r; constraint array_set_element(i, choices, r); solve satisfy;"
+
+        assertEquals("valid", ExactFlatZincValidation.inspect(source, "i = 1;\nr = {3,1,1};", null).status)
+        for (candidate in listOf("i = 0;\nr = {};", "i = 1;\nr = {1};", "i = 2;\nr = {4};")) {
+            assertEquals("invalid", ExactFlatZincValidation.inspect(source, candidate, null).status)
+        }
+    }
+
+    @Test
+    fun `original variable set selection preserves its one based index`() {
+        val source = "var set of int: a; var set of int: b; var set of int: r; var 1..2: i; " +
+            "constraint array_var_set_element(i, [a,b], r); solve satisfy;"
+        val values = "a = {1};\nb = 2..3;\ni = 2;\n"
+
+        assertEquals("valid", ExactFlatZincValidation.inspect(source, values + "r = {2,3};", null).status)
+        assertEquals("invalid", ExactFlatZincValidation.inspect(source, values + "r = {1};", null).status)
+    }
+
+    @Test
     fun `original extrema reject a result beyond every operand`() {
         for ((name, result) in listOf("int_min" to "1", "int_max" to "2")) {
             val source = "var 0..3: x; var 0..3: y; var 0..3: r; " +

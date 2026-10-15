@@ -9,6 +9,7 @@ internal object ExactFlatZincValidation {
         data class Number(val value: ExactObjective) : Value
         data class Bool(val value: Boolean) : Value
         data class Array(val values: List<Value>) : Value
+        data class SetValue(val intervals: List<Pair<BigInteger, BigInteger>>) : Value
     }
 
     fun inspect(source: String, coordinates: String, objective: String?): SourceValidation = runCatching {
@@ -98,6 +99,14 @@ internal object ExactFlatZincValidation {
                 val scalarType = type.substringAfterLast(" of ").removePrefix("var ").trim()
                 val elements = if (value is Value.Array) value.values else listOf(value)
                 for (element in elements) {
+                    if ("set of " in type) {
+                        require(element is Value.SetValue) { "non-set coordinate $name" }
+                        if (scalarType != "int" && !subset(element, setLiteral(scalarType))) {
+                            return SourceValidation("invalid", "source set bound rejects $name")
+                        }
+                        bounds++
+                        continue
+                    }
                     when (scalarType) {
                         "bool" -> require(element is Value.Bool) { "non-Boolean coordinate $name" }
 
@@ -149,7 +158,7 @@ internal object ExactFlatZincValidation {
                 return array(args[0]).any { boolean(it) } || array(args[1]).any { !boolean(it) }
             }
             if (name in setOf("array_float_element", "array_int_element", "array_var_int_element",
-                    "array_bool_element", "array_var_bool_element")) {
+                    "array_bool_element", "array_var_bool_element", "array_set_element", "array_var_set_element")) {
                 require(args.size == 3)
                 val index = numeric(args[0])
                 require(index.integral) { "non-integer array index" }
@@ -187,7 +196,7 @@ internal object ExactFlatZincValidation {
             val relation = when (base) {
                 "int2float" -> equal(args[0], args[1])
 
-                "float_eq", "int_eq", "bool_eq" -> equal(args[0], args[1])
+                "float_eq", "int_eq", "bool_eq", "set_eq" -> equal(args[0], args[1])
 
                 "float_ne", "int_ne" -> !equal(args[0], args[1])
 
@@ -280,14 +289,41 @@ internal object ExactFlatZincValidation {
         private fun literal(text: String): Value = when (val token = text.trim()) {
             "true" -> Value.Bool(true)
             "false" -> Value.Bool(false)
-            else -> Value.Number(number(token))
+            else -> if (token.startsWith('{') || ".." in token) setLiteral(token) else Value.Number(number(token))
         }
 
         private fun sourceLiteral(text: String): Value = when (text) {
             "true" -> Value.Bool(true)
             "false" -> Value.Bool(false)
-            else -> Value.Number(sourceNumber(text))
+            else -> if (text.startsWith('{') || ".." in text) setLiteral(text) else Value.Number(sourceNumber(text))
         }
+
+        private fun setLiteral(text: String): Value.SetValue {
+            val ranges = if (text.startsWith('{')) {
+                require(text.endsWith('}')) { "unterminated set" }
+                split(text.substring(1, text.length - 1)).map { token ->
+                    val value = token.toBigInteger()
+                    value to value
+                }
+            } else {
+                val endpoints = text.split("..")
+                require(endpoints.size == 2) { "unsupported set literal" }
+                listOf(endpoints[0].trim().toBigInteger() to endpoints[1].trim().toBigInteger())
+            }
+            val normalized = ArrayList<Pair<BigInteger, BigInteger>>()
+            for ((lower, upper) in ranges.filter { it.first <= it.second }.sortedBy { it.first }) {
+                val previous = normalized.lastOrNull()
+                if (previous != null && lower <= previous.second + BigInteger.ONE) {
+                    normalized[normalized.lastIndex] = previous.first to maxOf(previous.second, upper)
+                } else normalized.add(lower to upper)
+            }
+            return Value.SetValue(normalized)
+        }
+
+        private fun subset(candidate: Value.SetValue, domain: Value.SetValue): Boolean =
+            candidate.intervals.all { (lower, upper) ->
+                domain.intervals.any { it.first <= lower && upper <= it.second }
+            }
 
         private fun sourceNumber(text: String): ExactObjective {
             if ('.' !in text && 'e' !in text.lowercase()) return number(text)
@@ -325,9 +361,9 @@ internal object ExactFlatZincValidation {
             val result = ArrayList<String>()
             for ((i, c) in text.withIndex()) {
                 when (c) {
-                    '[' -> depth++
+                    '[', '{' -> depth++
 
-                    ']' -> depth--
+                    ']', '}' -> depth--
 
                     ',' -> if (depth == 0) {
                         result.add(text.substring(start, i).trim())
