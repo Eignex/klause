@@ -12,9 +12,11 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.schedule.Geometric
+import com.eignex.klause.localsearch.acceptance.AcceptanceRule
+import com.eignex.klause.localsearch.movesource.ConfiguredSource
+import com.eignex.klause.localsearch.movesource.ObjectiveSeed
+import com.eignex.klause.localsearch.scoring.MoveScoring
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
-import com.eignex.klause.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
@@ -40,24 +42,25 @@ import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
     @Test
-    fun `cold annealing follows the objective after reaching feasibility`() {
-        val problem = Problem(2, 0, emptyArray(), emptyArray())
-        val objective = LinearObjective(boolWeights = longArrayOf(1, 2))
-        for (seed in 0L..7L) {
-            val strategy = SimulatedAnnealing.optimizer(
-                Geometric(initialTemperature = 1e-6, minTemperature = 1e-6),
-            )
-            val search = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy)
-            val params = LocalSearchParams(
-                maxFlips = 2L, randomSeed = seed,
-                initialAssignment = Sample(booleanArrayOf(false, true), longArrayOf()),
-            )
+    fun `self owned descent follows feasibility first objectives`() {
+        val problem = Problem(1, 0, emptyArray(), emptyArray())
+        val objective = LinearObjective(boolWeights = longArrayOf(1))
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(ObjectiveSeed())), scoring = MoveScoring.Break,
+            acceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned,
+        )
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), strategy = strategy,
+            restartPolicy = AdaptivePerturbationRestart(perturbationStrength = 0),
+        )
+        val params = LocalSearchParams(
+            maxFlips = 2L, randomSeed = 0L, initialAssignment = Sample(booleanArrayOf(true), longArrayOf()),
+        )
 
-            val result = search.improvements(objective, params, warm = null)
-                .filterIsInstance<MinimizeResult.WithSample>().last()
+        val result = search.improvements(objective, params, warm = null)
+            .filterIsInstance<MinimizeResult.WithSample>().last()
 
-            assertEquals(0.0, objective.evaluate(result.sample), "seed=$seed")
-        }
+        assertEquals(0.0, objective.evaluate(result.sample))
     }
 
     @Test
