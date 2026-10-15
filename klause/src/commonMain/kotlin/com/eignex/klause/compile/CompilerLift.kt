@@ -54,8 +54,8 @@ internal fun Lowering.lift(expr: IntExpr): IntExpr = when (expr) {
  * `d ≠ 0` is required up front rather than left to propagation.
  */
 internal fun Lowering.liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Boolean): IntExpr {
-    val a = intVarOf(materializeIntVar(lift(num)).name)
-    val b = intVarOf(materializeIntVar(lift(den)).name)
+    val a = divModOperands.getOrPut(num) { intVarOf(materializeIntVar(lift(num)).name) }
+    val b = divModOperands.getOrPut(den) { intVarOf(materializeIntVar(lift(den)).name) }
     require(0 !in intDomains[b]) { "div/mod requires denominator domain to exclude 0; got ${intDomains[b]}" }
     val res = IntFunctionLowering.truncatedDivMod(
         a,

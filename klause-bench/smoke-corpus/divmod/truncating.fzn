@@ -1,0 +1,5 @@
+var -8..8: a :: output_var;
+var -4..4: b :: output_var;
+constraint int_div(a,b,2);
+constraint int_mod(a,b,-1);
+solve minimize a;

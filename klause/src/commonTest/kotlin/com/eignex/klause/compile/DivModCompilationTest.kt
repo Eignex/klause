@@ -15,6 +15,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.IntHandle
 import com.eignex.klause.schema.div
 import com.eignex.klause.schema.eq
+import com.eignex.klause.schema.plus
 import com.eignex.klause.schema.rem
 import com.eignex.skema.SchemaDef
 import kotlin.test.Test
@@ -47,6 +48,24 @@ class DivModCompilationTest {
 
             assertEquals(setOf(5L to 2L, 7L to 3L), samples, format)
         }
+    }
+
+    @Test
+    fun `affine operands retain one correlated relation across quotient and remainder uses`() {
+        val a = IntHandle("a", 0, 8)
+        val b = IntHandle("b", 2, 4)
+        val schema = SchemaDef<SchemaEntry>(mapOf(
+            "a" to IntSpec(0, 8), "b" to IntSpec(2, 4),
+            "quotient" to NamedConstraint(((a + 1) / b) eq 2),
+            "remainder" to NamedConstraint(((a + 1) % b) eq 1),
+        )).compile().problem
+        val xcsp = Xcsp3.parse("""
+            <instance><variables><var id="a">0..8</var><var id="b">2..4</var></variables>
+            <constraints><intension>eq(div(add(a,1),b),2)</intension>
+            <intension>eq(mod(add(a,1),b),1)</intension></constraints></instance>
+        """.trimIndent()).problem
+
+        for (problem in listOf(schema, xcsp)) assertEquals(1, problem.factors.filterIsInstance<DivMod>().size)
     }
 
     @Test

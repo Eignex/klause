@@ -174,7 +174,8 @@ internal object ExactFlatZincValidation {
             }
             val base = name.removeSuffix("_reif").removeSuffix("_imp")
             val arity = if ("_lin_" in base || base.endsWith("_times") ||
-                base.endsWith("_plus") || base == "float_div" || base in powerPredicates
+                base.endsWith("_plus") || base == "float_div" || base in powerPredicates ||
+                base == "int_div" || base == "int_mod"
             ) {
                 3
             } else {
@@ -224,6 +225,18 @@ internal object ExactFlatZincValidation {
                     (numeric(args[0]) + numeric(args[1])).compareTo(numeric(args[2])) == 0
 
                 "float_div" -> (numeric(args[0]) / numeric(args[1])).compareTo(numeric(args[2])) == 0
+
+                "int_div", "int_mod" -> {
+                    val integers = args.take(3).map { value ->
+                        val exact = numeric(value)
+                        require(exact.integral) { "noninteger division argument" }
+                        BigInteger(exact.toString())
+                    }
+                    if (integers[1] == BigInteger.ZERO) false else {
+                        val outputs = integers[0].divideAndRemainder(integers[1])
+                        outputs[if (base == "int_div") 0 else 1] == integers[2]
+                    }
+                }
 
                 else -> error("unsupported predicate $name")
             }
