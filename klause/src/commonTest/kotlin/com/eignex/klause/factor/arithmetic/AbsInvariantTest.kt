@@ -16,7 +16,8 @@ class AbsInvariantTest {
         for (result in listOf(0, 1)) {
             val source = Problem(0, 2, Array(2) { IntDomain(-4, 4) }, arrayOf(Abs(0, result)))
             val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
-            for (old in -3L..3L) for (target in -3L..3L) {
+            for (old in -3L..3L) {
+                for (target in -3L..3L) {
                 state.assignment.setInt(0, old)
                 state.assignment.setInt(1, 2L)
                 state.recompute()
@@ -28,6 +29,7 @@ class AbsInvariantTest {
 
                 assertEquals(state.cost - before, predicted)
                 assertEquals(predicted, applied.toLong())
+            }
             }
         }
     }

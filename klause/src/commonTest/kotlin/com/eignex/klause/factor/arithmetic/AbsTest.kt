@@ -15,13 +15,26 @@ import kotlin.test.assertTrue
 class AbsTest {
     @Test
     fun `finite solutions agree with the source absolute value over domains with holes`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(-4, 4).excludeValue(-2), IntDomain(0, 4).excludeValue(3)),
-            arrayOf(Abs(0, 1)))
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(-4, 4).excludeValue(-2), IntDomain(0, 4).excludeValue(3)),
+            arrayOf(Abs(0, 1)),
+        )
 
         val solutions = BacktrackSolver(source.bake()).enumerate().map { it.ints.toList() }.toSet()
 
-        assertEquals(setOf(listOf(-4L, 4L), listOf(-1L, 1L), listOf(0L, 0L), listOf(1L, 1L),
-            listOf(2L, 2L), listOf(4L, 4L)), solutions)
+        assertEquals(
+            setOf(
+            listOf(-4L, 4L),
+            listOf(-1L, 1L),
+            listOf(0L, 0L),
+            listOf(1L, 1L),
+            listOf(2L, 2L),
+            listOf(4L, 4L),
+        ),
+            solutions
+        )
     }
 
     @Test
@@ -34,16 +47,26 @@ class AbsTest {
 
     @Test
     fun `minimum signed operand has no finite absolute value`() {
-        val source = Problem(0, 2,
-            arrayOf(IntDomain(Long.MIN_VALUE, Long.MIN_VALUE), IntDomain(0L, Long.MAX_VALUE)), arrayOf(Abs(0, 1)))
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(Long.MIN_VALUE, Long.MIN_VALUE), IntDomain(0L, Long.MAX_VALUE)),
+            arrayOf(Abs(0, 1)),
+        )
 
         assertTrue(PropagationSession(source).isUnsatAtRoot)
     }
 
     @Test
     fun `maximum magnitude remains representable`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(-Long.MAX_VALUE, -Long.MAX_VALUE),
-            IntDomain(0L, Long.MAX_VALUE)), arrayOf(Abs(0, 1)))
+        val source = Problem(
+            0, 2,
+            arrayOf(
+            IntDomain(-Long.MAX_VALUE, -Long.MAX_VALUE),
+            IntDomain(0L, Long.MAX_VALUE),
+        ),
+            arrayOf(Abs(0, 1))
+        )
         val session = PropagationSession(source)
 
         assertFalse(session.isUnsatAtRoot)

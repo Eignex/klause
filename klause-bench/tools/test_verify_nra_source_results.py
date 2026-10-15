@@ -11,6 +11,24 @@ class NraSourceCheckTest(unittest.TestCase):
     positive_sqrt_two = '(root-obj (+ (^ x 2) (- 2)) 2)'
     negative_sqrt_two = '(root-obj (+ (^ x 2) (- 2)) 1)'
 
+    def test_absolute_value_witnesses_preserve_sign_and_arbitrary_width(self):
+        source = '(declare-const x Int) (declare-const y Int) (assert (= y (abs x)))'
+        for operand in (0, 3, -3, -9223372036854775808, -18446744073709551616):
+            with self.subTest(operand=operand), \
+                    mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')):
+                result = check.check_witness(source,
+                    f'((define-fun x () Int {operand}) (define-fun y () Int {abs(operand)}))')
+
+                self.assertEqual(1, result['assertions'])
+
+    def test_absolute_value_rejects_points_allowed_only_by_its_relaxation(self):
+        source = '(declare-const x Int) (declare-const y Int) (assert (= y (abs x)))'
+        for operand, result in ((0, 2), (-3, 4), (3, -3), (-9223372036854775808, -9223372036854775808)):
+            with self.subTest(operand=operand, result=result), \
+                    self.assertRaisesRegex(AssertionError, 'original source assertion 0 is false'):
+                check.check_witness(source,
+                    f'((define-fun x () Int {operand}) (define-fun y () Int {result}))')
+
     def test_bundle_checks_the_actual_original_witness_and_preserves_producer(self):
         source = '(declare-const n Int) (assert (= (* n n) 9))'
         case = {'source': source, 'hash': hashlib.sha256(source.encode()).hexdigest(), 'feasible': True,

@@ -738,7 +738,8 @@ with the pinned [source-check requirements](tools/requirements-source-checks.txt
 For a hard interruption, add `--interrupted --minimum-witnesses 2`; incomplete trailing
 output is retained as truncation, while a terminal optimization status is rejected.
 These checks establish witness feasibility and objective values; they do not certify
-terminal proof claims.
+terminal proof claims. Native numeric absolute-value terms are evaluated exactly
+against each published point, including arbitrary-width integer magnitudes.
 `checkSmt=true` runs this check after each captured SMT case on the same profile
 instance. `minimumWitnesses=2` requires two complete checked models. The capture tool
 creates an isolated Python environment using the pinned requirements, and retains

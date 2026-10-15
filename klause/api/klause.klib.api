@@ -5731,6 +5731,23 @@ final class com.eignex.klause.count/XorHashFamily { // com.eignex.klause.count/X
     final fun draw(kotlin/Int): kotlin.collections/List<com.eignex.klause.factor.bool/Xor> // com.eignex.klause.count/XorHashFamily.draw|draw(kotlin.Int){}[0]
 }
 
+final class com.eignex.klause.factor.arithmetic/Abs : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.arithmetic/Abs|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int) // com.eignex.klause.factor.arithmetic/Abs.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+
+    final val linearForm // com.eignex.klause.factor.arithmetic/Abs.linearForm|{}linearForm[0]
+        final fun <get-linearForm>(): com.eignex.klause.ir/LinearForm // com.eignex.klause.factor.arithmetic/Abs.linearForm.<get-linearForm>|<get-linearForm>(){}[0]
+    final val operand // com.eignex.klause.factor.arithmetic/Abs.operand|{}operand[0]
+        final fun <get-operand>(): kotlin/Int // com.eignex.klause.factor.arithmetic/Abs.operand.<get-operand>|<get-operand>(){}[0]
+    final val result // com.eignex.klause.factor.arithmetic/Abs.result|{}result[0]
+        final fun <get-result>(): kotlin/Int // com.eignex.klause.factor.arithmetic/Abs.result.<get-result>|<get-result>(){}[0]
+    final val variables // com.eignex.klause.factor.arithmetic/Abs.variables|{}variables[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/Abs.variables.<get-variables>|<get-variables>(){}[0]
+
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.arithmetic/Abs.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/Abs.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/Abs.structuralKey|structuralKey(){}[0]
+}
+
 final class com.eignex.klause.factor.arithmetic/ArrayMinMax : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.arithmetic/ArrayMinMax|null[0]
     constructor <init>(kotlin/Int, kotlin/IntArray, kotlin/Boolean) // com.eignex.klause.factor.arithmetic/ArrayMinMax.<init>|<init>(kotlin.Int;kotlin.IntArray;kotlin.Boolean){}[0]
 

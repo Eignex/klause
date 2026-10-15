@@ -95,6 +95,7 @@ class DefinitionalSweep internal constructor(
 
         /** Infer a sweep from the factor IR, so local search derives functionally-defined vars from the
          *  decision vars instead of searching them. Supported sources:
+         *  - every integer [Abs] defines its output from its operand;
          *  - every `Product(a, b, out)` defines `out = a·b` (a product always determines its output);
          *  - a `Linear` equality is oriented to define var v ONLY when v is in [definedHints] — the
          *    front-end's `defines_var` info (e.g. a `(eq, v)` sum). Orienting a bare equality without that

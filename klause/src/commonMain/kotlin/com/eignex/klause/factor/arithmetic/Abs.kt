@@ -19,7 +19,9 @@ class Abs(
     /** Integer result coordinate. */
     val result: Int,
 ) : Factor {
-    init { require(operand >= 0 && result >= 0) { "Absolute-value IDs must be nonnegative" } }
+    init {
+        require(operand >= 0 && result >= 0) { "Absolute-value IDs must be nonnegative" }
+    }
 
     override val variables: VarList = IntVars(intArrayOf(operand, result).distinct().toIntArray())
 
@@ -34,8 +36,10 @@ class Abs(
         sink.intVar(result)
     }
 
-    override val linearForm: LinearForm = LinearForm.Relaxation(listOf(
-        Linear(intArrayOf(1, -1), intArrayOf(operand, result), LinearOp.LE, 0),
-        Linear(intArrayOf(-1, -1), intArrayOf(operand, result), LinearOp.LE, 0),
-    ))
+    override val linearForm: LinearForm = LinearForm.Relaxation(
+        listOf(
+            Linear(intArrayOf(1, -1), intArrayOf(operand, result), LinearOp.LE, 0),
+            Linear(intArrayOf(-1, -1), intArrayOf(operand, result), LinearOp.LE, 0),
+        ),
+    )
 }

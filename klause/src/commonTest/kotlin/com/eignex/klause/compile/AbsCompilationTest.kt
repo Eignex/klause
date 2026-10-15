@@ -31,8 +31,10 @@ class AbsCompilationTest {
                 .compile().problem,
             parseFlatZinc("var -3..3: x; constraint int_abs(x, 2); solve satisfy;").problem,
             SmtLib.parse("(declare-const x Int) (assert (and (<= (- 3) x 3) (= (abs x) 2)))").model,
-            Xcsp3.parse("""<instance><variables><var id="x">-3..3</var></variables>
-                <constraints><intension>eq(abs(x),2)</intension></constraints></instance>""").problem,
+            Xcsp3.parse(
+                """<instance><variables><var id="x">-3..3</var></variables>
+                <constraints><intension>eq(abs(x),2)</intension></constraints></instance>"""
+            ).problem,
         )
         for (source in models) {
             val relation = source.factors.filterIsInstance<Abs>().single()

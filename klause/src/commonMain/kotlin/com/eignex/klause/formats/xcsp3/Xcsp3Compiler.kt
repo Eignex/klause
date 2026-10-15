@@ -945,7 +945,11 @@ internal object Compiler {
         internal fun absOf(lin: IntComb): IntComb {
             val v = materializeVar(lin)
             val d = domains[v]
-            val hi = if (d.min == Long.MIN_VALUE) Long.MAX_VALUE else maxOf(kotlin.math.abs(d.min), kotlin.math.abs(d.max))
+            val hi = if (d.min == Long.MIN_VALUE) {
+                Long.MAX_VALUE
+            } else {
+                maxOf(kotlin.math.abs(d.min), kotlin.math.abs(d.max))
+            }
             val lo = when {
                 d.min <= 0L && d.max >= 0L -> 0L
                 d.min > 0L -> d.min
