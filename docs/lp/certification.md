@@ -328,7 +328,11 @@ publication retain their separate admission contracts.
 
 `NumericalLinearRequest.solve` directly invokes the numerical affine authority
 traversal for MPS, without exact-theory descent or theory workers. Its unsupported
-source captures and unresolved leaves retain incomplete results. The existing finite
+source captures and unresolved leaves retain incomplete results. Native integer
+indicator rows retain exact source equality premises; numerical branch restrictions
+must establish each pin before a bound or refutation can cite its row. Unresolved
+pins use exhaustive adjacent integer alternatives in the containing traversal.
+Witness pins cannot authorize a global bound. The existing finite
 MPS path retains its separate numerical and tolerance policies.
 
 `OpenTheoryPipeline.optimizeLinear` executes a complete exact affine context with

@@ -18,6 +18,7 @@ import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchProposal
@@ -87,7 +88,7 @@ internal class LinearAuthorityTraversal(
             }
         ) return SearchNodeDisposition.Expand
         current.result?.let { return if (it.evidence != null) SearchNodeDisposition.Prune
-            else if (it.split != null) SearchNodeDisposition.Expand else SearchNodeDisposition.Indeterminate }
+            else if (current.split != null) SearchNodeDisposition.Expand else SearchNodeDisposition.Indeterminate }
         if (!context.consumeCheck()) return SearchNodeDisposition.Indeterminate
         val branch = source.atScope(source.scope.copy(condition = current.condition))
         val result = authority.check(branch, cancellation)
@@ -102,7 +103,20 @@ internal class LinearAuthorityTraversal(
             current.split = CoverageSplit.Integer(coordinate, threshold, current.condition)
             return SearchNodeDisposition.Expand
         }
-        return if (result.evidence != null) SearchNodeDisposition.Prune else SearchNodeDisposition.Indeterminate
+        if (result.evidence != null) return SearchNodeDisposition.Prune
+        val guarded = branch.premises.values.filter { it.integerPins.isNotEmpty() }
+        if (guarded.isEmpty()) return SearchNodeDisposition.Indeterminate
+        val integerBounds = branch.integerPinBounds(current.condition, cancellation)
+            ?: return SearchNodeDisposition.Indeterminate
+        for (premise in guarded) {
+            if (cancellation()) return SearchNodeDisposition.Indeterminate
+            if (premise.guards.any { (id, value) -> current.condition.bools[id] != value }) continue
+            integerBounds.split(premise.integerPins)?.let { (coordinate, threshold) ->
+                current.split = CoverageSplit.Integer(coordinate, threshold, current.condition)
+                return SearchNodeDisposition.Expand
+            }
+        }
+        return SearchNodeDisposition.Indeterminate
     }
 
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {

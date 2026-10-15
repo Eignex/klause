@@ -7,6 +7,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class SourceEvidenceVerifierTest {
@@ -17,6 +18,115 @@ class SourceEvidenceVerifierTest {
     private val lower = SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)
     private val premises = mapOf("lower" to SourcePremise(lower))
     private val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE))
+
+    @Test
+    fun `integer premise pins retain their captured source values`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val pins = mutableMapOf(integer to BigFraction.ONE)
+        val premise = SourcePremise(lower, emptyMap(), pins)
+
+        pins[integer] = BigFraction.ZERO
+
+        assertEquals(mapOf(integer to BigFraction.ONE), premise.integerPins)
+    }
+
+    @Test
+    fun `integer premise pins require integral declared integer coordinates`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val invalid = listOf(mapOf(x to BigFraction.ONE),
+            mapOf(integer to BigFraction.ONE / BigFraction.ofLong(2)),
+            mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 99) to BigFraction.ONE))
+
+        for (pins in invalid) {
+            assertFailsWith<IllegalArgumentException> {
+                SourceProofContext(scope, setOf(x, integer),
+                    mapOf("guarded" to SourcePremise(lower, emptyMap(), pins)))
+            }
+        }
+    }
+
+    @Test
+    fun `an integer guarded premise cannot establish an unconditioned bound`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val guarded = SourcePremise(lower, emptyMap(), mapOf(integer to BigFraction.ONE))
+        val context = SourceProofContext(scope, setOf(x, integer), mapOf("guarded" to guarded),
+            mapOf(x to BigFraction.ONE))
+        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("guarded"))
+
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(evidence))
+    }
+
+    @Test
+    fun `exhaustive integer branches establish only their own conditional premises`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val rows = mapOf(
+            "zero" to SourcePremise(lower, emptyMap(), mapOf(integer to BigFraction.ZERO)),
+            "one" to SourcePremise(lower, emptyMap(), mapOf(integer to BigFraction.ONE)),
+            "low" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "high" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ONE)),
+        )
+        val context = SourceProofContext(scope, setOf(x, integer), rows, mapOf(x to BigFraction.ONE))
+        val proof = SourceDerivation.IntegerSplit(integer, BigFraction.ZERO,
+            SourceDerivation.Premise("zero"), SourceDerivation.Premise("one"))
+        val wrong = SourceDerivation.IntegerSplit(integer, BigFraction.ZERO,
+            SourceDerivation.Premise("one"), SourceDerivation.Premise("zero"))
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(
+            SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), proof)))
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
+            SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), wrong)))
+    }
+
+    @Test
+    fun `singleton integer bounds establish a guard after exact integer rounding`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        for ((rhs, strict) in listOf(BigFraction.ONE / BigFraction.ofLong(2) to false, BigFraction.ONE to true)) {
+            val rows = mapOf(
+                "guarded" to SourcePremise(lower, emptyMap(), mapOf(integer to BigFraction.ZERO)),
+                "low" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "high" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), rhs, strict)),
+            )
+            val context = SourceProofContext(scope, setOf(x, integer), rows, mapOf(x to BigFraction.ONE))
+            val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE),
+                SourceDerivation.Premise("guarded"))
+
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
+        }
+    }
+
+    @Test
+    fun `conditional rows cannot establish their own integer guards`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val pin = mapOf(integer to BigFraction.ZERO)
+        val rows = mapOf(
+            "guarded" to SourcePremise(lower, emptyMap(), pin),
+            "low" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "high" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ZERO),
+                emptyMap(), pin),
+        )
+        val context = SourceProofContext(scope, setOf(x, integer), rows, mapOf(x to BigFraction.ONE))
+
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
+            SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("guarded"))))
+    }
+
+    @Test
+    fun `stopping integer guard establishment withholds proof authority`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val rows = mapOf(
+            "guarded" to SourcePremise(lower, emptyMap(), mapOf(integer to BigFraction.ZERO)),
+            "low" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "high" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ZERO)),
+        )
+        val context = SourceProofContext(scope, setOf(x, integer), rows, mapOf(x to BigFraction.ONE))
+        var polls = 0
+
+        val checked = SourceEvidenceVerifier(context).verify(
+            SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("guarded")),
+            Cancellation { ++polls > 6 })
+
+        assertIs<SourceEvidenceCheck.Unavailable>(checked)
+    }
 
     @Test
     fun `a cited original row proves a bound in original objective units`() {

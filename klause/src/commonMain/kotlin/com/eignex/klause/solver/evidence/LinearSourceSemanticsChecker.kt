@@ -28,6 +28,7 @@ class LinearSourceSemanticsChecker(
         require(this.premises.all { premise -> premise.guards.keys.all {
             SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in this.coordinates
         } })
+        require(this.premises.all { premise -> premise.integerPins.keys.all(this.coordinates::contains) })
         for (kind in SourceCoordinate.Kind.entries) {
             val ids = this.coordinates.filter { it.kind == kind }.map { it.id }.sorted()
             require(ids == ids.indices.toList()) { "source coordinate declarations must be complete" }
@@ -70,6 +71,9 @@ class LinearSourceSemanticsChecker(
             ) return@checked SourceEvidenceCheck.Rejected("ray has invalid source coordinates or integer steps")
             for (row in premises) {
                 algebraic.arithmetic.step()
+                if (row.integerPins.keys.any { !(direction[it] ?: BigFraction.ZERO).isZero }) {
+                    return@checked SourceEvidenceCheck.Unavailable("ray changes an integer source guard")
+                }
                 if (!active(row, claim.sample)) continue
                 if (dot(row.inequality.coefficients, direction) > BigFraction.ZERO) {
                     return@checked SourceEvidenceCheck.Rejected("ray violates an original-source recession condition")
@@ -117,7 +121,8 @@ class LinearSourceSemanticsChecker(
     private fun count(kind: SourceCoordinate.Kind): Int = coordinates.count { it.kind == kind }
 
     private fun active(premise: SourcePremise, sample: Sample): Boolean =
-        premise.guards.all { (id, value) -> sample.boolValue(id) == value }
+        premise.guards.all { (id, value) -> sample.boolValue(id) == value } &&
+            premise.integerPins.all { (id, value) -> sample.exactIntValue(id.id) == value.num }
 
     private fun at(
         sample: Sample, id: SourceCoordinate, algebraic: AlgebraicArithmetic,

@@ -4,6 +4,7 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.TerminationReason
@@ -18,6 +19,77 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class NumericalLinearRequestTest {
+    @Test
+    fun `source fixed integer guards retain exact tiny numerical optima`() {
+        for (trigger in listOf(0L, 1L)) {
+            val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R 1e-20\nRHS\n RHS R 1e-20\n" +
+                "BOUNDS\n FX B I $trigger\n LO B X 0\nINDICATORS\n IF R I $trigger\nENDATA\n")
+                .toExactSourceProblem()
+
+            val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve()
+
+            val optimum = assertIs<SourceClaim.Optimal>(assertNotNull(result.terminal).claim)
+            assertEquals(BigFraction.ONE, (optimum.value as SourceValue.Rational).value)
+            assertEquals(trigger, optimum.sample.intValue(0))
+        }
+    }
+
+    @Test
+    fun `open integer guards retain the inactive regions around their trigger`() {
+        for (bounds in listOf("LI B I 0", "FR B I")) {
+            val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R 1\nRHS\n RHS R 2\n" +
+                "BOUNDS\n $bounds\n LO B X 0\nINDICATORS\n IF R I 0\nENDATA\n").toExactSourceProblem()
+
+            val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve()
+
+            val optimum = assertIs<SourceClaim.Optimal>(assertNotNull(result.terminal).claim)
+            assertEquals(BigFraction.ZERO, (optimum.value as SourceValue.Rational).value)
+            assertTrue(optimum.sample.intValue(0) != 0L)
+            assertFalse(compiled.model.intBounds.hasUpper(0))
+        }
+    }
+
+    @Test
+    fun `conditional integer conflicts require exhaustive numerical coverage`() {
+        val compiled = Mps.parse("ROWS\n N COST\n G R0\n G R1\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+            " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R0 1 R1 1\nRHS\n RHS R0 1 R1 1\n" +
+            "BOUNDS\n BV B I\n FX B X 0\nINDICATORS\n IF R0 I 0\n IF R1 I 1\nENDATA\n").toExactSourceProblem()
+        val request = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective())
+
+        val complete = request.solve()
+
+        assertEquals(SourceClaim.Refutation, assertNotNull(complete.terminal).claim)
+    }
+
+    @Test
+    fun `an unvisited conditional integer branch cannot supply a refutation`() {
+        val compiled = Mps.parse("ROWS\n N COST\n G R0\n G R1\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+            " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R0 1 R1 1\nRHS\n RHS R0 1 R1 1\n" +
+            "BOUNDS\n BV B I\n FX B X 0\nINDICATORS\n IF R0 I 0\n IF R1 I 1\nENDATA\n").toExactSourceProblem()
+
+        val stopped = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective())
+            .solve(TheoryParams(maxDecisions = 0))
+
+        assertNull(stopped.terminal)
+        assertNull(stopped.incumbent)
+    }
+
+    @Test
+    fun `a numerical ray preserves a source fixed integer guard`() {
+        val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+            " I COST 0\n M1 'MARKER' 'INTEND'\n X COST -1 R 1\nRHS\n RHS R 2\n" +
+            "BOUNDS\n FX B I 1\n LO B X 0\nINDICATORS\n IF R I 1\nENDATA\n").toExactSourceProblem()
+
+        val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve()
+
+        val ray = assertIs<SourceClaim.Ray>(assertNotNull(result.terminal).claim)
+        assertEquals(1L, ray.sample.intValue(0))
+        assertEquals(BigFraction.ZERO,
+            ray.direction[SourceCoordinate(SourceCoordinate.Kind.Integer, 0)] ?: BigFraction.ZERO)
+    }
+
     @Test
     fun `an unprojectable nonzero source coefficient declines without numerical work`() {
         val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1e-400\n" +

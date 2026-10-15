@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
@@ -70,7 +71,12 @@ fun Problem.sourceProofContext(
         BigFraction.ofDouble(realUpper[id])?.let { bound("real/$id/upper", coordinate, it, true) }
     }
     for ((factorId, factor) in factors.withIndex()) {
-        for ((rowId, row) in factor.impliedLinearRows.withIndex()) {
+        val integerPins = if (factor is LinearIndicator) mapOf(
+            SourceCoordinate(SourceCoordinate.Kind.Integer, factor.indicator) to
+                if (factor.whenOne) BigFraction.ONE else BigFraction.ZERO,
+        ) else emptyMap()
+        val rows = if (factor is LinearIndicator) factor.row.impliedLinearRows else factor.impliedLinearRows
+        for ((rowId, row) in rows.withIndex()) {
             if (cancellation()) return null
             val booleans = linkedSetOf<Int>()
             if (row.activator != LinearRow.ALWAYS) booleans += row.activator
@@ -95,7 +101,7 @@ fun Problem.sourceProofContext(
                         coordinate to inequality.coefficients[position]
                     }
                     premises["factor/$factorId/row/$rowId/booleans/$bits/side/$side"] = SourcePremise(
-                        SourceInequality(coefficients, inequality.rhs, inequality.strict), guards,
+                        SourceInequality(coefficients, inequality.rhs, inequality.strict), guards, integerPins,
                     )
                 }
             }

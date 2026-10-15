@@ -10,15 +10,29 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 
-/** An original-source inequality, optionally guarded by Boolean source pins. */
+/** An original-source inequality, optionally guarded by Boolean and exact integer source pins. */
 class SourcePremise(
     /** Original-source affine inequality. */
     val inequality: SourceInequality,
-    guards: Map<Int, Boolean> = emptyMap(),
+    guards: Map<Int, Boolean>,
+    integerPins: Map<SourceCoordinate, BigFraction>,
 ) {
+    /** Capture an unconditional or Boolean-guarded source inequality. */
+    constructor(inequality: SourceInequality, guards: Map<Int, Boolean> = emptyMap()) :
+        this(inequality, guards, emptyMap())
+
     private val captured = guards.toMap()
-    /** Source pins required to use this premise. */
+    private val capturedIntegers = integerPins.toMap()
+    /** Boolean source pins required to use this premise. */
     val guards: Map<Int, Boolean> get() = captured.toMap()
+    /** Exact integer source equalities required to use this premise. */
+    val integerPins: Map<SourceCoordinate, BigFraction> get() = capturedIntegers.toMap()
+
+    init {
+        require(capturedIntegers.all { (id, value) ->
+            id.kind == SourceCoordinate.Kind.Integer && value.den == BIG_ONE
+        })
+    }
 }
 
 /** Source-specific complete assignment and recession checks; unsupported semantics must decline. */
@@ -67,7 +81,10 @@ class SourceProofContext(
         require(capturedObjective.orEmpty().keys.all { it in capturedCoordinates })
         require(capturedPremises.values.all { premise ->
             premise.inequality.coefficients.keys.all { it in capturedCoordinates } &&
-                premise.guards.keys.all { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in capturedCoordinates }
+                premise.guards.keys.all {
+                    SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in capturedCoordinates
+                } &&
+                premise.integerPins.keys.all { it in capturedCoordinates }
         })
     }
 }
@@ -100,6 +117,8 @@ class SourceEvidenceVerifier(
         private val cancellation: Cancellation,
         private val allowance: SourceProofAllowance,
     ) {
+        private val integerScopes = mutableMapOf<SourceCondition, SourceIntegerBounds>()
+
         private fun step(depth: Int) {
             if (cancellation() || !allowance.consume(depth)) {
                 throw ProofStop(SourceEvidenceCheck.Unavailable("source proof verification allowance exhausted"))
@@ -264,6 +283,14 @@ class SourceEvidenceVerifier(
                         ?: rejectProof("unknown original-source premise ${derivation.id}")
                     if (premise.guards.any { (id, value) -> scope.condition.bools[id] != value }) {
                         rejectProof("original-source premise guard is not established")
+                    }
+                    if (premise.integerPins.isNotEmpty()) {
+                        val bounds = integerScopes[scope.condition] ?: context.integerPinBounds(scope.condition,
+                            Cancellation { step(depth); cancellation() })?.also { integerScopes[scope.condition] = it }
+                            ?: throw ProofStop(SourceEvidenceCheck.Unavailable("integer premise scope check stopped"))
+                        if (bounds.status(premise.integerPins) != IntegerPinStatus.Established) {
+                            rejectProof("original-source integer premise guard is not established")
+                        }
                     }
                     premise.inequality
                 }

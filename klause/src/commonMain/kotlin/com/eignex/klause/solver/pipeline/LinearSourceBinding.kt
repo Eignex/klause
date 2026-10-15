@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
@@ -36,10 +37,12 @@ internal fun Problem.linearAuthorityContext(
     objective: LinearObjective,
     sense: ObjectiveSense,
     cancellation: Cancellation,
+    numericalIndicators: Boolean = false,
 ): SourceProofContext? {
     for (factor in factors) {
         if (cancellation()) return null
-        val form = factor.linearForm as? LinearForm.Conjunction ?: return null
+        val affine = if (numericalIndicators && factor is LinearIndicator) factor.row else factor
+        val form = affine.linearForm as? LinearForm.Conjunction ?: return null
         for (row in form.rows) {
             if (row.relation == LinearOp.NE ||
                 (row.relation == LinearOp.EQ && row.activator != LinearRow.ALWAYS)

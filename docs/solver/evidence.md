@@ -26,7 +26,11 @@ refutation cannot refute a weaker parent invocation.
 combinations, Boolean alternatives and adjacent integer alternatives. Integer
 coverage requires an integral threshold and both `x <= threshold` and
 `x >= threshold + 1`. Guarded premises are usable only in branches establishing
-their guards. Bounds retain rational or algebraic values and are checked in original objective units and direction;
+their Boolean and exact integer equality guards. Integer pins require original
+unconditional singleton bounds or explicit branch restrictions, rounded over the
+integer lattice. A conditional row cannot establish its own pin, and a witness
+value supplies no global premise authority. Guard checking spends the containing
+verification allowance. Bounds retain rational or algebraic values and are checked in original objective units and direction;
 refutations must derive an exact contradiction. A branch flag, traversal exhaustion
 or numerical engine identity supplies no derivation authority.
 
@@ -34,7 +38,10 @@ or numerical engine identity supplies no derivation authority.
 declared source language. Unsupported semantics decline explicitly.
 `LinearSourceSemanticsChecker` checks a source consisting entirely of affine
 premises and declared coordinates, including rational and algebraic real values.
-Its premises must include all declaration bounds and source constraints. The original
+Its premises must include all declaration bounds and source constraints.
+Integer indicator rows are checked exactly when enabled at the source point.
+Recession authority requires every integer guard coordinate to remain fixed;
+a direction changing one retains unavailable coverage. The original
 IR binder uses this complete checker for plain affine conjunctions, including wide
 integer and algebraic real witnesses. Declared integer value sets are checked as well;
 an open column acquires no invented finite value set. It checks
@@ -67,7 +74,8 @@ unavailable. Existing workers retain their documented engine admission contract;
 this optional capture does not convert producer identity into a derivation.
 
 `Problem.sourceProofContext` binds the exact original IR's declared bounds and
-implied rows. Guarded premises retain Boolean pins; source disequality alternatives
+implied rows. Guarded premises retain Boolean pins and native integer indicator equalities;
+source disequality alternatives
 are not invented. Open integer sides provide no finite-box premise. Other declared
 frontend semantics require their own original-source checker. Explicit invocation
 pins are captured; derived restrictions require their own justifications.

@@ -85,7 +85,8 @@ class NumericalLinearRequest(
     ): LinearOptimizationResult {
         val stop = cancellation or params.timeout or params.cancellation
         val context = if (numericalRowsSupported(stop)) model.linearAuthorityContext(objective ?: LinearObjective(),
-            if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE, stop) else null
+            if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE, stop,
+            numericalIndicators = true) else null
         if (context == null) {
             val identity = Uuid.random().toString()
             val scope = SourceScope(SourceRevision(identity, "klause-ir-exact-v1"),

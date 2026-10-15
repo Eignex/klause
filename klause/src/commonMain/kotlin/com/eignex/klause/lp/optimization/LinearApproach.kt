@@ -114,7 +114,7 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
             }
         }
         val closure = LinearSourceSemanticsChecker(source.coordinates, source.premises.values.map {
-            SourcePremise(SourceInequality(it.inequality.coefficients, it.inequality.rhs), it.guards)
+            SourcePremise(SourceInequality(it.inequality.coefficients, it.inequality.rhs), it.guards, it.integerPins)
         }, source.objective, source.objectiveConstant)
         // Positive mixtures preserve strict affine rows. Fixed discrete coordinates preserve the source lattice.
         return closure.objectiveEquals(endpoint, claim.value, scope, cancellation)
@@ -160,7 +160,7 @@ internal fun SourceProofContext.numericContext(): SourceProofContext {
         }
         SourcePremise(SourceInequality(premise.inequality.coefficients.filterKeys {
             it.kind != SourceCoordinate.Kind.Boolean
-        }, premise.inequality.rhs - offset, premise.inequality.strict), premise.guards)
+        }, premise.inequality.rhs - offset, premise.inequality.strict), premise.guards, premise.integerPins)
     }
     return SourceProofContext(scope, coordinates, rows, objective.filterKeys {
         it.kind != SourceCoordinate.Kind.Boolean
