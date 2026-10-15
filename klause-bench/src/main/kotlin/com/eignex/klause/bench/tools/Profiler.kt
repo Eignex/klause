@@ -81,6 +81,29 @@ internal object Profiler {
             methods.any { it.contains("LocalSearchEngine") } -> "local-search loop"
             methods.any { it.contains(".presolve.") } -> "presolve"
             methods.any { it.contains("BacktrackSolver") || it.contains(".backtrack.") } -> backtrackPhase(methods)
+            methods.any {
+                it.contains("PreparedSearchComponents.<init>") ||
+                    it.contains("PreparedSearchComponents.prepareSource") ||
+                    it.contains("QfLiraSolverKt.sharedExactLiraSource") ||
+                    it.contains("ComponentPlanKt.componentPlan") ||
+                    it.contains("PreparedSourcePlanKt.prepareExecutionPlan")
+            } -> "shared source preparation"
+            methods.any {
+                it.contains("ExactLiraSearchComponent.installSource") ||
+                    it.contains("ExactLiraSearchComponent.assertSource")
+            } -> "shared theory source installation"
+            methods.any {
+                it.contains("SearchSession.initialize") || it.contains("SearchSession.prepareInitialization") ||
+                    it.contains("ClauseSearchComponent.initialize") ||
+                    it.contains("ExactLiraSearchComponent.initialize")
+            } -> "shared root initialization"
+            methods.any { it.endsWith("SearchSession.check") } -> "shared model check"
+            methods.any { it.contains("SearchSession.propagate") } -> "shared propagation"
+            methods.any { it.contains("PreparedSearchRegistrations.open") } -> "shared session opening"
+            methods.any {
+                it.contains("SearchRun.next") || it.contains("SearchRun.advanceFrame") ||
+                    it.contains("SearchRun.backtrack")
+            } -> "shared search"
             else -> "other or unclassified"
         }
         val context = when {

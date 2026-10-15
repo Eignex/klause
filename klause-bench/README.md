@@ -391,6 +391,11 @@ Lab agreement and regression confirmation remain recorded-result evidence;
 [independent source validation](#source-validation) defines stronger checks.
 `profileCli` requires AWS execution and explicit `parallel: 1`; its instrumented
 timing stays separate from ordinary comparisons.
+Its whole-CLI phase tables attribute visible stack frames to shared source
+preparation, theory source installation, session opening, root initialization,
+propagation, model checks and search. Presolve and legacy backtrack callers retain their outer phase.
+Utility frames without a recognized caller remain unclassified. These sampled
+categories describe visible operations, not exact wall time or theory-check counts.
 
 `CliStreamCapture` with `checkSmt=true` checks complete satisfaction models against
 all original SMT assertions. Optimization streams also require each model's exact
