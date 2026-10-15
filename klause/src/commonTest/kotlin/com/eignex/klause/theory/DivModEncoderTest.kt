@@ -18,6 +18,7 @@ import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -26,6 +27,24 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DivModEncoderTest {
+    @Test
+    fun `SMT minimum word division retains its exact over-word quotient`() {
+        val parsed = SmtLib.parse("""
+            (declare-const a Int) (assert (= a (- 9223372036854775808)))
+            (assert (= (div a (- 1)) 9223372036854775808))
+            (assert (= (mod a (- 1)) 0))
+        """.trimIndent())
+        val source = parsed.model
+        val relation = source.factors.filterIsInstance<DivMod>().single()
+        val queries = OpenExactNeighborhood(source, TheoryParams(), preparedSource = source.prepareExecutionPlan())
+
+        val sample = queries.use { assertIs<ExactNeighborhoodResult.Witness>(it.check(
+            ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)).sample }
+
+        assertEquals(bigIntOf(Long.MIN_VALUE), sample.exactIntValue(parsed.intVarNames.getValue("a")))
+        assertEquals(parseBigInt("9223372036854775808"), sample.exactIntValue(relation.quotient))
+    }
+
     @Test
     fun `variable divisor linear installation requires and attributes its fixing`() {
         val factor = DivMod(0, 1, 2, 3)
