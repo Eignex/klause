@@ -208,3 +208,9 @@ The self-authored [weighted penalty complement fixture](../../klause-bench/smoke
 in `wcnf-core` combines nonuniform unit/nonunit costs, a hard clause with repeated
 literals, a source alias and a tautological soft clause. Its exact optimum is 5
 at `(x1, x2, x3) = (1, 0, 1)`.
+
+The synthetic `continuous-arithmetic` MiniZinc controls are authored for Klause.
+They retain square, independent product and chained product relations over declared
+real intervals, with objectives attained at exactly representable endpoints. They
+exercise the default grid path and original MiniZinc witness checks; grid objective
+and exhaustion claims retain their approximation limits.
