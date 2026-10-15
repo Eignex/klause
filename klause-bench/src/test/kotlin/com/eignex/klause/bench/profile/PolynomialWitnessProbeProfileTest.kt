@@ -16,10 +16,12 @@ class PolynomialWitnessProbeProfileTest {
         val access = PolynomialWitnessProbeProfile.ProbeAccess()
 
         val plain = access.measure(source, false)
-        val observed = access.measure(source, true)
+        val observed = access.measure(source, true, chargeStacks = true)
 
         assertEquals("Satisfiable", observed.result)
         assertEquals(plain.stats, observed.stats)
+        assertEquals(observed.nativeWork, observed.charges.values.sum())
+        assertTrue(observed.charges.isNotEmpty())
         assertEquals(emptyList(), observed.stops)
     }
 
