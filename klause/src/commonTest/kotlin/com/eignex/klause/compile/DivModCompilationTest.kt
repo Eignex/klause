@@ -83,6 +83,19 @@ class DivModCompilationTest {
     }
 
     @Test
+    fun `FlatZinc output aliases retain their source role equations`() {
+        for ((operation, expected) in listOf("div" to setOf(0L), "mod" to (-2L..2L).toSet())) {
+            val parsed = parseFlatZinc(
+                "var -4..4: a; constraint int_$operation(a,3,a); solve satisfy;",
+            )
+            val assignments = BacktrackSolver(parsed.problem.bake()).enumerate(BacktrackParams(maxDecisions = 100))
+                .map { it.intValue(parsed.intVarsByName.getValue("a")) }.toSet()
+
+            assertEquals(expected, assignments, operation)
+        }
+    }
+
+    @Test
     fun `signed FlatZinc constant division retains truncation`() {
         val parsed = parseFlatZinc("""
             var -8..8: a; constraint int_div(a,-3,2); constraint int_mod(a,-3,-1); solve satisfy;
