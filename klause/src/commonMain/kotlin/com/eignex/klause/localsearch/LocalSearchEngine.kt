@@ -266,6 +266,9 @@ internal class LocalSearchEngine(
         state.violationSoftCap = params.violationSoftCap
         state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
         installInvariants(state, params, checkpoint)
+        if (state.invariants?.hasBooleanLiterals == true) {
+            state.booleanRepairs = preparedValue(BooleanRepairClosure.preparation(state), params, checkpoint).closure
+        }
         return state
     }
 
@@ -653,7 +656,7 @@ internal class LocalSearchEngine(
                         continue
                     }
                     val costBefore = state.cost
-                    val move = timing.inPhase("selection") { strategy.pickMove(state) }
+                    val move = timing.inPhase("selection") { strategy.pickMove(state, params.cancellation) }
                     if (move == null) {
                         countedRestart()
                         roundFeedback?.endRound()
@@ -907,7 +910,9 @@ internal class LocalSearchEngine(
                     // states. Best-feasible is snapshotted above, so wandering never loses the incumbent. A
                     // feasibility-breaking pick is reverted and retried; a null pick is a local optimum.
                     FeasibleDescent.SelfOwned -> {
-                        val m = timing.inPhase("selection") { (descentStrategy ?: strategy).pickMove(state) }
+                        val m = timing.inPhase("selection") {
+                            (descentStrategy ?: strategy).pickMove(state, params.cancellation)
+                        }
                         if (m != null) {
                             feasibleMisses = 0
                             val savedSnap = state.assignment.snapshot()
@@ -952,7 +957,8 @@ internal class LocalSearchEngine(
             // satisfy-mode strategy.
             val costBefore = state.cost
             val move = timing.inPhase("selection") {
-                if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
+                if (unified) descentStrategy.pickMove(state, params.cancellation)
+                else strategy.pickMove(state, params.cancellation)
             }
             if (move == null) {
                 restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
