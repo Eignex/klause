@@ -14,11 +14,10 @@ internal class CompletedMoveEvaluation(
     private val complete: (Sample) -> Completion,
     private val current: () -> Sample,
 ) {
-    private val finiteObjective = objective !is LinearObjective ||
-        objective.intCoefficientValues.any { it != 0L } || objective.boolWeightValues.any { it != 0L }
     private val witnesses = mutableMapOf<Move, Sample>()
     private val grades = mutableMapOf<Move, Double>()
     private var base: Sample? = null
+    private var attempts = 0
     private var coordinate = 0
     private var direction = 0
     private var proposal = 0
@@ -27,6 +26,8 @@ internal class CompletedMoveEvaluation(
     var productiveMove: Move? = null
         private set
     var ordinaryMove: Move? = null
+        private set
+    var preferredMove: Move? = null
         private set
 
     fun begin() {
@@ -39,21 +40,22 @@ internal class CompletedMoveEvaluation(
             while (witnesses.size > 2) witnesses.remove(witnesses.keys.first())
             grades.keys.retainAll(witnesses.keys)
         }
+        attempts = 0
         exploration = null
         productiveMove = null
         ordinaryMove = null
+        preferredMove = null
     }
 
     fun retainOrdinary(move: Move) {
         ordinaryMove = move
     }
 
-    fun increasesObjective(move: Move): Boolean {
-        if (!changesFinite(move)) return false
-        val realGuess = move is Move.RealSet || move is Move.Compound && move.parts.any { it is Move.RealSet }
-        if (!finiteObjective && !realGuess) return false
-        return (state.objectiveDelta(objective, move) ?: 0.0) > 0.0
+    fun prefer(move: Move) {
+        preferredMove = move
     }
+
+    fun canAttempt(): Boolean = attempts < 2 && !cancellation() && mayAttempt()
 
     fun seed(destination: MoveSink, limit: Int = Int.MAX_VALUE) {
         if (limit <= 0) return
@@ -105,7 +107,7 @@ internal class CompletedMoveEvaluation(
     }
 
     fun prepare(moves: List<Move>, deterministic: Boolean = false, rawScore: (Move) -> Double) {
-        if (cancellation() || !mayAttempt()) return
+        if (preferredMove != null || !canAttempt()) return
         val finiteMoves = moves.filter(::changesFinite)
         if (finiteMoves.isEmpty()) return
         val distinct = finiteMoves.distinct()
@@ -135,12 +137,13 @@ internal class CompletedMoveEvaluation(
             witnesses[move] = it
             return it
         }
-        if (grades.containsKey(move) || !changesFinite(move) || cancellation() || !mayAttempt()) return null
+        if (grades.containsKey(move) || !changesFinite(move) || !canAttempt()) return null
         grades[move] = Double.POSITIVE_INFINITY
         val candidate = state.completionCandidate(move) ?: return null
         val before = current()
         // The real subproblem depends on finite pins; changing only a real guess repeats its query.
         if (candidate.hammingDistanceTo(before) == 0) return null
+        attempts++
         val decided = complete(candidate)
         if (decided !is Completion.Witness || cancellation()) return null
         witnesses[move] = decided.sample
@@ -154,7 +157,7 @@ internal class CompletedMoveEvaluation(
         return decided.sample
     }
 
-    private fun changesFinite(move: Move): Boolean = when (move) {
+    fun changesFinite(move: Move): Boolean = when (move) {
         is Move.BoolFlip -> true
         is Move.IntSet -> move.newValue != state.assignment.intValue(move.varId)
         is Move.RealSet -> false

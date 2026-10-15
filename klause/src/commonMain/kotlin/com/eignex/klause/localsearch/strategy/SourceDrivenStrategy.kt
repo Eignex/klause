@@ -183,11 +183,19 @@ class SourceDrivenStrategy(
         if (evaluation != null) {
             if (greedyFallback) {
                 val ordinary = selectMove(state, stall, stalled, null)
-                if (ordinary != null && !evaluation.increasesObjective(ordinary)) {
-                    evaluation.retainOrdinary(ordinary)
-                    return ordinary
+                if (ordinary != null) {
+                    if (!evaluation.changesFinite(ordinary) ||
+                        (!evaluation.canAttempt() && evaluation.sample(ordinary) == null)
+                    ) {
+                        evaluation.retainOrdinary(ordinary)
+                        return ordinary
+                    }
+                    val completed = evaluation.attempt(ordinary)
+                    if (completed != null && (state.cost != 0L || (evaluation.score(ordinary) ?: 0.0) < 0.0)) {
+                        evaluation.prefer(ordinary)
+                    }
                 }
-                if (completionSeed == null) {
+                if (evaluation.preferredMove == null && completionSeed == null) {
                     val seed = sources.firstOrNull {
                         it.source is ObjectiveSeed && it.enabled && it.cap > 0 && (!it.stallGated || stalled) &&
                             it.effectivePhase.appliesAt(0L) && !it.effectivePhase.appliesAt(state.cost)
@@ -199,7 +207,7 @@ class SourceDrivenStrategy(
                     }
                 }
             }
-            completionSeed?.let { evaluation.seed(it.sink, it.remaining) }
+            if (evaluation.preferredMove == null) completionSeed?.let { evaluation.seed(it.sink, it.remaining) }
         }
         return selectMove(state, stall, stalled, evaluation)
     }
@@ -322,6 +330,8 @@ class SourceDrivenStrategy(
         // once per pick that sampled the noise pool, so acceptance stays pure. A Metropolis rule with
         // no temperature schedule falls back to a fixed conservative temperature rather than degenerating.
         val temperature = schedule.temperature?.temperature ?: DEFAULT_METROPOLIS_TEMPERATURE
+        val preferred = evaluation?.preferredMove
+        if (preferred != null && (preferred in noiseMoves || preferred in scoreMoves)) return preferred
         val productive = evaluation?.productiveMove
         if (effectiveAcceptance == AcceptanceRule.GreedyDescent && productive != null &&
             (productive in noiseMoves || productive in scoreMoves)

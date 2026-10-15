@@ -60,7 +60,7 @@ class CompletedMoveEvaluationTest {
     }
 
     @Test
-    fun `ordinary productive picks preserve the recipe without numerical probing`() {
+    fun `ordinary finite completion preserves the selected move and random draws`() {
         val problem = Problem(
             0, 2, Array(2) { IntDomain(0, 1) }, emptyArray(),
             numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
@@ -88,8 +88,8 @@ class CompletedMoveEvaluationTest {
 
         assertEquals(expected, actual)
         assertEquals(baseline.rng.nextInt(), evaluated.rng.nextInt())
-        assertEquals(0, calls)
-        assertEquals(actual, evaluation.ordinaryMove)
+        assertEquals(1, calls)
+        assertNotNull(evaluation.sample(assertNotNull(actual)))
     }
 
     @Test
