@@ -29,6 +29,18 @@ def write(path, data):
     path.write_text(json.dumps(data, indent=2) + "\n")
 
 
+def checker_result(exit_code, log):
+    prefix = "klause-source-check: "
+    lines = log.splitlines()
+    starts = [i for i, line in enumerate(lines) if line.startswith(prefix)]
+    if exit_code == 0 and starts:
+        try:
+            return json.loads("\n".join(lines[starts[-1]:])[len(prefix):])
+        except ValueError:
+            pass
+    return {"status": "unknown", "reason": "Missing or malformed successful source checker receipt"}
+
+
 def fields(value, required, optional=()):
     if not isinstance(value, dict) or not set(required) <= value.keys() <= set(required) | set(optional):
         raise ValueError("Unexpected request fields")
@@ -258,7 +270,7 @@ def main():
         model.write_text(source["text"])
         witness.write_text(source["witness"])
         exit_code, stdout = command(java + [str(model), str(witness)], directory, "control", 12)
-        checked = json.loads(stdout.read_text())
+        checked = checker_result(exit_code, stdout.read_text())
         if exit_code or checked.get("status") != "valid":
             raise ValueError("The original-source positive control was not accepted")
         controls[identity] = model
@@ -311,7 +323,7 @@ def main():
             witness = directory / "witness.xml"
             witness.write_text(witnesses[0])
             check_exit, checked = command(java + [str(controls[case["source"]]), str(witness)], directory, "check", 12)
-            result["witnessStatus"] = json.loads(checked.read_text()).get("status") if check_exit == 0 else "error"
+            result["witnessStatus"] = checker_result(check_exit, checked.read_text()).get("status")
         write(directory / "result.json", result)
         results.append(result)
         write(root / "results.json", results)

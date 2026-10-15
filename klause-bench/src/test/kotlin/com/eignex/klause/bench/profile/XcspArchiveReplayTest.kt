@@ -13,6 +13,34 @@ import org.junit.jupiter.api.condition.OS
 class XcspArchiveReplayTest {
     @Test
     @EnabledOnOs(OS.LINUX)
+    fun `checker diagnostics admit only successful structured source receipts`() {
+        val directory = Files.createTempDirectory("archive-checker-receipt-").toFile()
+        try {
+            val worker = directory.resolve("replay.py")
+            val stream = javaClass.getResourceAsStream("/xcsp-archive-replay/replay.py")
+            worker.writeBytes(requireNotNull(stream).use { it.readBytes() })
+            val script = """
+                import runpy, sys
+                result = runpy.run_path(sys.argv[1])['checker_result']
+                valid = 'LOG: Check constraints\nOK\nklause-source-check: {\n"status":"valid"\n}'
+                assert result(0, valid)['status'] == 'valid'
+                assert result(1, valid)['status'] == 'unknown'
+                assert result(0, 'OK')['status'] == 'unknown'
+                assert result(0, 'klause-source-check: {')['status'] == 'unknown'
+                invalid = 'klause-source-check: {"status":"invalid"}'
+                assert result(0, invalid)['status'] == 'invalid'
+            """.trimIndent()
+            val process = ProcessBuilder("/usr/bin/python3", "-I", "-c", script, worker.path)
+                .redirectErrorStream(true).start()
+
+            assertEquals(0, process.waitFor(), process.inputStream.bufferedReader().readText())
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
     fun `archive extraction accepts distribution roots and refuses escaping members`() {
         val directory = Files.createTempDirectory("archive-extraction-").toFile()
         try {
