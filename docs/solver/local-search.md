@@ -160,7 +160,8 @@ longer residual clauses without querying CP during search. A proposal follows fo
 literals through both forms, rejects contradictions and cancellation, and commits
 only changed decision coordinates. Maintained outputs follow the committed inputs.
 Ordinary source pools, supplemental pools and perturbations use the same closure;
-configuration checking, tabu, complete grading and acceptance follow it. Models without
+primitive lanes precede compound side storage after closure. Configuration checking,
+tabu, complete grading and acceptance follow it. Models without
 unit definitions and models with non-clausal factors retain their ordinary neighborhoods.
 
 The graph and scratch belong to one live state and survive its restart epochs. Graph
