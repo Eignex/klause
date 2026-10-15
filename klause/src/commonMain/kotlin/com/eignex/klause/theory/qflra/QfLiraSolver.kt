@@ -219,6 +219,7 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintCursor = -1
     private var pointHintBooleanSelection = false
     private var pointForwardBlocks: Set<Int>? = null
+    private var pointDisjunctionFactors: IntArray? = null
     private var pendingPointForward = false
     private var deferredSourceRows = false
     private var pointHintLevel = -1
@@ -320,12 +321,13 @@ class ExactLiraSearchComponent private constructor(
         stop.charge(rows.size.toLong() + variables.size + 1L)
         if (stop() || rows.isEmpty()) return null
         val selectBooleans = defaultOpening && model.numIntVars > 0 && sourceRealCount > 0
-        val forwardBlocks = if (selectBooleans) preparePointForwardBlocks(stop, entries) else null
+        val forward = if (selectBooleans) preparePointForwardMetadata(stop, entries) else null
         if (selectBooleans && stop()) return null
         pointHintRows = rows.toList()
         pointHintStop = stop
         pointHintBooleanSelection = selectBooleans
-        pointForwardBlocks = forwardBlocks
+        pointForwardBlocks = forward?.blockedBooleans
+        pointDisjunctionFactors = forward?.disjunctionFactors
         val variableIds = variables.toIntArray()
         pointHintVariables = variableIds.takeIf { pointHintBooleanSelection }
         return variableIds to SearchCandidateHints { variable ->
@@ -340,13 +342,36 @@ class ExactLiraSearchComponent private constructor(
         }
     }
 
-    private fun preparePointForwardBlocks(stop: Cancellation, entries: Long): Set<Int>? {
+    private fun preparePointForwardMetadata(stop: Cancellation, entries: Long): PointForwardMetadata? {
         val blocked = HashSet<Int>()
+        val disjunctions = LinkedHashSet<Int>()
+        val dependentDisjunctions = HashSet<Int>()
+        var disjunctionIndexComplete = finiteIntVars.isNotEmpty()
+        fun releaseDisjunctionIndex() {
+            disjunctionIndexComplete = false
+            disjunctions.clear()
+            dependentDisjunctions.clear()
+        }
         var visits = 0
         for (prepared in preparedRows) {
             if (++visits > MAX_POINT_HINT_ENTRIES) return null
             stop.charge(1)
             if (stop()) return null
+            if (prepared.disjunction && disjunctionIndexComplete) {
+                val factor = prepared.address.factor
+                if (factor !in disjunctions && factor !in dependentDisjunctions &&
+                    entries + blocked.size + 2L * (disjunctions.size + dependentDisjunctions.size + 1L) >
+                    MAX_POINT_HINT_ENTRIES
+                ) releaseDisjunctionIndex()
+                if (disjunctionIndexComplete) {
+                    if (prepared.booleans.isEmpty()) {
+                        if (factor !in dependentDisjunctions) disjunctions += factor
+                    } else {
+                        disjunctions -= factor
+                        dependentDisjunctions += factor
+                    }
+                }
+            }
             // Boolean conjunctions leave numerical coordinates unchanged; complete checks install their rows.
             if (!prepared.disjunction && (!prepared.arithmetic || prepared.booleans.isEmpty() ||
                     (prepared.booleans.size == 1 && prepared.booleans[0] == prepared.row.activator))
@@ -357,13 +382,23 @@ class ExactLiraSearchComponent private constructor(
                 stop.charge(1)
                 if (stop() || variable !in bools.indices) return null
                 if (variable !in blocked) {
+                    if (entries + blocked.size + 1L +
+                        2L * (disjunctions.size + dependentDisjunctions.size) > MAX_POINT_HINT_ENTRIES
+                    ) releaseDisjunctionIndex()
                     if (entries + blocked.size + 1L > MAX_POINT_HINT_ENTRIES) return null
                     blocked += variable
                 }
             }
         }
-        return blocked
+        val index = if (disjunctionIndexComplete) {
+            stop.charge(disjunctions.size.toLong() + 1L)
+            if (stop()) return null
+            disjunctions.toIntArray()
+        } else null
+        return PointForwardMetadata(blocked, index)
     }
+
+    private class PointForwardMetadata(val blockedBooleans: Set<Int>, val disjunctionFactors: IntArray?)
 
     internal val hasDefaultPointBooleanProposal: Boolean get() = pointHintBooleanSelection
 
@@ -405,6 +440,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintCursor = -1
         pointHintBooleanSelection = false
         pointForwardBlocks = null
+        pointDisjunctionFactors = null
         pendingPointForward = false
         pointHintLevel = -1
         pointHintStop = Cancellation.Never
@@ -780,9 +816,16 @@ class ExactLiraSearchComponent private constructor(
         open?.let { SearchDecision.Theory(it.holds) },
     )
 
-    private fun disjunctionBranch(context: SearchContext): List<SearchDecision>? {
+    private fun disjunctionBranch(context: SearchContext, partialPoint: Boolean = false): List<SearchDecision>? {
+        val indices: Iterable<Int> = if (partialPoint) pointDisjunctionFactors?.asIterable() ?: return null
+            else model.factors.indices
         var registered = false
-        for ((index, factor) in model.factors.withIndex()) {
+        for (index in indices) {
+            if (partialPoint) {
+                lpStop.charge(1)
+                if (operationStop() || pointHintStop()) return null
+            }
+            val factor = model.factors[index]
             if (factor.linearForm !is LinearForm.Disjunction) continue
             val disjuncts = disjunctionAtoms[index] ?: run {
                 val created = registerDisjunction(index, context)
@@ -792,6 +835,10 @@ class ExactLiraSearchComponent private constructor(
                 }
                 registered = true
                 created
+            }
+            if (partialPoint) {
+                lpStop.charge(disjuncts.size.toLong() + 1L)
+                if (operationStop() || pointHintStop()) return null
             }
             if (disjuncts.any { context.truth(it.holds) == true }) continue
             val open = disjuncts.firstOrNull { context.truth(it.holds) == null }
@@ -805,7 +852,7 @@ class ExactLiraSearchComponent private constructor(
             }
             return null
         }
-        if (registered) captureCompleteWitness(candidate)
+        if (registered && !partialPoint) captureCompleteWitness(candidate)
         return null
     }
 
@@ -1209,7 +1256,13 @@ class ExactLiraSearchComponent private constructor(
                 context.intLowerBound(variable) != context.intUpperBound(variable)
         }
         if (finite != null) return finitePointBranch(finite, context, partialPoint)
-        if (partialPoint || bools.any { it == UNASSIGNED } || outcome != null) return null
+        if (partialPoint) {
+            if (pointDisjunctionFactors?.isEmpty() != false || operationStop() || pointHintStop() ||
+                !context.consumeCheck()
+            ) return null
+            return disjunctionBranch(context, partialPoint = true)
+        }
+        if (bools.any { it == UNASSIGNED } || outcome != null) return null
         if (operationStop() || !context.consumeCheck()) {
             outcome = ComponentCheck.Indeterminate
             return null

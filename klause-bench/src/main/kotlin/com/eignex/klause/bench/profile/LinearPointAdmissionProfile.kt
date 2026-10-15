@@ -128,6 +128,8 @@ internal object LinearPointAdmissionProfile {
                         put("pointCoordinates", (field(component, "candidate") as? List<*>)?.size)
                         put("finiteIntegerOwners", finite.size)
                         put("disjunctionGroups", (field(component, "disjunctionAtoms") as Map<*, *>).size)
+                        put("pointEligibleDisjunctionFactors",
+                            (field(component, "pointDisjunctionFactors") as? IntArray)?.size)
                         put("firstUnfixedFiniteVariable", firstFinite)
                         put("firstUnfixedFinitePoint", finiteValue?.toString())
                         put("firstUnfixedFinitePointIntegral", finiteValue?.let { it.den == BIG_ONE })

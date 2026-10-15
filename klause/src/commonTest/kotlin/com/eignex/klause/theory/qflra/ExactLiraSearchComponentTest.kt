@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
@@ -65,6 +66,44 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
+    @Test
+    fun `partial point choices defer disjunctions with Boolean coefficients`() {
+        val declaration = object : Factor by ComparisonClause(
+            intArrayOf(1, 1), arrayOf(LinearOp.GE, LinearOp.LE), longArrayOf(1, -1),
+        ) {
+            override val linearForm: LinearForm = LinearForm.Disjunction(listOf(
+                TaggedLinearRow(intArrayOf(Term.ofIntVar(1), Term.ofLit(Lit.make(0, true))),
+                    IntegerConstants(constsOf(longArrayOf(1, 1)), 1L), LinearOp.GE),
+                TaggedLinearRow(intArrayOf(Term.ofIntVar(1)),
+                    IntegerConstants(constsOf(longArrayOf(1)), -1L), LinearOp.LE),
+            ))
+        }
+        val source = Problem(
+            numBoolVars = 2, numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 0)),
+            openIntLo = booleanArrayOf(false, true), openIntHi = booleanArrayOf(false, true),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+                declaration,
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        source.componentPlan().search(source, emptyMap()).use { planned ->
+            val theory = assertIs<ExactLiraSearchComponent>(planned.theory)
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+            assertEquals(true, planned.candidateHints.preferredBool(1))
+
+            assertNull(theory.nextBranch(planned.session))
+            assertNull(planned.session.boolValue(0))
+            assertIs<ComponentResult.Consistent>(planned.session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(planned.session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertNotNull(theory.nextBranch(planned.session))
+        }
+    }
+
     @Test
     fun `Boolean coefficients retain arithmetic checking for a matching primitive`() {
         val declaration = object : Factor by Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0) {

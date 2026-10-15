@@ -39,7 +39,7 @@ class OpenTheoryEngineTest {
     private fun sourceRoute(model: Problem): ProblemPipeline = model.sourceRoute()
 
     @Test
-    fun `partial finite point choices retain source disjunction enforcement`() {
+    fun `partial finite choices select source disjunctions before Boolean gates`() {
         val model = Problem(
             numBoolVars = 2, numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 0)),
@@ -59,7 +59,7 @@ class OpenTheoryEngineTest {
         var pause = true
         val policy = object : SearchNodePolicy {
             override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
-                if (pause && context.decisionLevel > 0) SearchNodeDisposition.Pause
+                if (pause && context.decisionLevel > 1) SearchNodeDisposition.Pause
                 else SearchNodeDisposition.Expand
         }
         val started = assertIs<OpenTheoryStart.Running>(engine.begin(params, OpenTheorySolveState(params), policy))

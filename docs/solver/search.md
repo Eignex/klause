@@ -178,6 +178,14 @@ leaves retain their existing arithmetic and finite priority. This partial-point 
 visits and the ordinary branch check under the current operation token, with no
 new LP invocation or allowance.
 
+After the finite owners are fixed, that live mixed point can admit a source
+disjunction choice before Boolean preferences or gates. The complete dependency
+scan indexes only disjunctions whose rows contain no Boolean inputs. Existing lazy
+source naming supplies exhaustive holds/fails alternatives; the choice creates no
+point pin or complete verdict. Boolean-dependent groups retain complete Boolean
+selection. Missing or declined metadata retains ordinary selection and all source
+checks.
+
 Other built-in exact-linear point guidance and compound source-clause preferences
 use the existing `openHintFlips` opt-in, retaining their real-coordinate producer
 admission. Explicit zero permits bounded construction observations but supplies no

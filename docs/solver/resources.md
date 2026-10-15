@@ -293,6 +293,15 @@ This choice creates no LP invocation, proof authority, model value or new allowa
 Unselected disjunctions retain their ordinary propagation, exhaustive alternatives
 and complete-source checks.
 
+The same complete dependency scan may retain Boolean-free disjunction factor IDs
+for a default mixed opening with finite owners. Their construction sets and final
+index share the 65,536 representation envelope with primitive hints and forward
+blocks. Index admission declines independently when that envelope is full; forward
+reuse still requires its complete blocked-variable scan. Selecting a group charges
+factor and disjunct visits and consumes the ordinary branch check under the current
+operation token. Lazy source naming retains its existing registered-atom limits;
+this choice adds no numerical allowance or separate LP call.
+
 Other built-in linear guidance and compound indexed preferences remain opt-in.
 Their existing real-coordinate producer admission is unchanged.
 Explicit zero can retain construction observations but withholds component

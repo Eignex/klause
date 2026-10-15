@@ -82,6 +82,12 @@ leaves retain their existing arithmetic and finite priority. This partial-point 
 visits and the ordinary branch check under the current operation token, with no
 new LP invocation or allowance.
 
+With the finite owners fixed and a live default partial point, Boolean-free source
+disjunctions can precede Boolean choices through the existing exhaustive arithmetic
+alternatives. Their bounded source-factor index carries no point or proof authority;
+Boolean-dependent groups retain complete Boolean selection. The [search contract](../solver/search.md)
+controls admission, lazy naming and full-source completion.
+
 Open mixed traversal consults arithmetic proposals before the finite fallback. A completed
 continuous point can guide adjacent exhaustive integer splits while bounded declarations
 retain CP ownership. Integral point coordinates guide a finite equality and its remaining
