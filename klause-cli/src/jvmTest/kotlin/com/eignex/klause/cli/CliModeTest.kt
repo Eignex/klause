@@ -1686,9 +1686,7 @@ class CliModeTest {
 
     @Test
     fun `ls optimize streams improving incumbents live rather than only the final best`() {
-        // A small alldifferent COP with a weighted objective: LS reaches a feasible permutation, then
-        // improves it several times. Each strict improvement must hit the stream as its own
-        // `----------` block (the MiniZinc time-to-best contract) — not be withheld until termination.
+        // Clock-limited presolve must not change the model of the seeded search walk.
         val n = 4
         val fzn = buildString {
             // FlatZinc requires every var declaration before the constraints.
@@ -1705,7 +1703,7 @@ class CliModeTest {
             deleteOnExit()
         }
         val out = capture {
-            val flags = arrayOf("-e", "ls", "-p", "1", "-r", "17", "-a", "-s")
+            val flags = arrayOf("-e", "ls", "-p", "1", "-r", "17", "-a", "-s", "--presolve", "off")
             val allowance = arrayOf("--param", "node-limit=1000", "-t", "10000")
             main(flags + allowance + file.absolutePath)
         }
