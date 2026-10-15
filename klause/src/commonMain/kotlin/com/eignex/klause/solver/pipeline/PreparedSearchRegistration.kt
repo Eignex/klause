@@ -16,6 +16,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceCoordinateAgreement
 import com.eignex.klause.solver.search.SourceCoordinateAgreementComponent
 import com.eignex.klause.solver.search.TheoryComponent
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.Cancellation
 
 internal class SearchComponentOpening(
@@ -48,16 +49,22 @@ internal class SearchComponentOpening(
         own(AutoCloseable { release() })
     }
 
-    fun candidateHints(source: Problem): SearchCandidateHints {
+    fun candidateHints(source: Problem, defaultComponent: TheoryComponent? = null): SearchCandidateHints {
         var accounted = false
         fun outcome(value: HintIndexOutcome) {
             accounted = true
             smtStats?.hintUsage?.index(value)
         }
         try {
-            val (variables, hints) = primitiveHints ?: return SearchCandidateHints.None.also {
-                outcome(HintIndexOutcome.NO_PROVIDER)
+            val registered = primitiveHints
+            if (registered == null) {
+                val direct = if (openHintFlips == null) {
+                    (defaultComponent as? ExactLiraSearchComponent)?.partialPointHints(cancellation)?.second
+                } else null
+                if (direct == null) outcome(HintIndexOutcome.NO_PROVIDER) else accounted = true
+                return direct ?: SearchCandidateHints.None
             }
+            val (variables, hints) = registered
             if (source.factors.size > SourceConjunctionHints.MAX_INDEX_ENTRIES) {
                 outcome(HintIndexOutcome.SOURCE_LIMIT)
                 releaseHints?.invoke()
@@ -166,12 +173,16 @@ internal class PreparedSearchRegistrations(
                 }.toMap()
                 session.restrictCoordinateContributions(owners)
             }
+            val cp = components.filterIsInstance<CpSearchComponent>().firstOrNull()
+            val theory = components.filterIsInstance<TheoryComponent>().firstOrNull()
             return PlannedSearch(
                 session,
-                components.filterIsInstance<CpSearchComponent>().firstOrNull(),
-                components.filterIsInstance<TheoryComponent>().firstOrNull(),
+                cp,
+                theory,
                 resources,
-                opening.candidateHints(source),
+                opening.candidateHints(source, theory.takeIf {
+                    arithmetic.size == 1 && source.numRealVars > 0
+                }),
             )
         } catch (failure: Throwable) {
             resources.closeAfter(failure)

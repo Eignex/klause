@@ -111,12 +111,21 @@ Strictly increasing operand variable IDs establish canonical distinctness during
 the charged pair-and-copy pass; other orders retain sorting and distinctness checks.
 Missing leaves, incomplete or ambiguous definitions, cycles and cancellation supply
 no derived gate preference. The adapter performs no second Boolean or arithmetic search.
-Built-in exact-linear point guidance uses the existing `openHintFlips` opt-in.
-Its null default skips point-row registration, capture enablement and source-index
-construction. Explicit zero permits bounded construction observations but supplies
-no component preference to traversal. A positive allowance permits guidance after
-caller or deferred preferences decline. The flip ceiling still bounds only the
-Boolean draw; point and index work retain their original owners and limits.
+A default opening with source real coordinates and exactly one linear completion
+owner can reuse its completed point for direct primitive preferences. Mixed source
+integers may be fractional in that point; complete integrality checks and exhaustive
+integer branching retain their authority. Registration precedes component
+initialization; evaluation uses a point from an existing numerical check. It
+constructs no source-clause index and draws no Boolean proposal. Custom registered
+providers retain precedence, and primitive preferences retain their dirty,
+retraction, containing-stop and close lifetime.
+Other built-in exact-linear point guidance and compound source-clause preferences
+use the existing `openHintFlips` opt-in. Explicit zero permits bounded construction
+observations but supplies no component preference to traversal. A positive allowance
+permits indexed guidance after caller or deferred preferences decline. The flip
+ceiling still bounds only the Boolean draw; point and index work retain their
+original owners and limits. Direct preferences supply generic component usage
+observations, without pretending that a source index was admitted.
 Custom registered providers retain their own existing admission and lifetime.
 The default integer difference opening installs no point hint provider; its ordinary
 Boolean polarity selection is independent of optional internal adapter composition.

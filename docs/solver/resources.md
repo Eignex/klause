@@ -216,10 +216,16 @@ the caller meter, and resource exhaustion withholds an incomplete verdict.
 Exact-linear partial-point polarity hints reuse a completed arithmetic check. Source
 comparison visits and bounded rational operations charge that check's current operation
 token, including its native meter; they create no numerical invocation or allowance.
-Built-in preparation requires an explicit existing `openHintFlips` value. Null
-skips row registration and source-index work before allocation or charging. Zero
-can retain construction observations but withholds component preferences; positive
-values permit them. The local-search flip ceiling is not a new point or index budget.
+With null `openHintFlips`, one linear completion owner with source real coordinates
+can register bounded comparison rows, charging the opening token. Mixed integer
+columns use the same entry and scalar limits; their fractional point values remain
+branch-order guesses. Evaluation of its existing completed point charges that
+check's existing operation token. This direct primitive path creates no source-clause
+index or Boolean draw.
+Other built-in linear guidance and compound indexed preferences remain opt-in.
+Explicit zero can retain construction observations but withholds component
+preferences; positive values permit indexed guidance. The local-search flip ceiling
+is not a new point or index budget.
 Required encoder and exact-source preparation still uses the containing token,
 independently of the optional hint setting.
 Private representation or scalar declines supply no hint and retain ordinary traversal.

@@ -33,10 +33,16 @@ retracts assertions with their decision scope. Exact reductions can preserve
 integer structure while shrinking the system. Reconstruction recovers original
 integer and real coordinates before acceptance.
 
-Existing completed partial LP points can supply the same primitive Boolean
-preferences as the [linear-real component](linear-real.md#solving-and-composition).
-They remain guesses about branch order; a fractional source integer is not a
-model value and integrality remains a complete-check requirement.
+With the default null `openHintFlips` allowance, a source with real coordinates and
+one linear completion owner can reuse completed partial LP points for the same
+direct primitive Boolean preferences as the
+[linear-real component](linear-real.md#solving-and-composition). Custom registered
+providers retain precedence; explicit zero and positive allowances retain their
+existing opt-in behavior. No source-clause index, Boolean draw or extra LP check is
+created by the default path. Preferences remain guesses about branch order; a
+fractional source integer is not a model value and integrality remains a
+complete-check requirement. Integer branches, retraction, stops and opening close
+retain the component point lifetime and existing work owners.
 
 Complete workers and open local search can share checked incumbents under the
 same source and objective. Candidate integer windows guide heuristic search; they

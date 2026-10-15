@@ -369,8 +369,16 @@ precharge; retained payloads supply no borrowed prepayment. Effective comparison
 positive term and require its exponent weight to dominate every negative term by
 a conservative rational-coefficient and term-count margin. Checked integer updates
 adjust positive power-of-two coordinate scales over at most four construction
-sweeps. A complete recheck of the selected rows precedes bounded exact shifts and
-point construction. Exponents admit numerator or denominator magnitudes up to the
+sweeps. Weight evaluation visits the monomial's immutable sparse original-coordinate
+support in ascending order. The coupled support scan validates every coordinate
+against the original seed dimension before excluding fixed coordinates. A bounded
+atomic copy of the existing support accessor polls and charges its entering
+operation, then charges the returned entries and each checked weight operation to
+the same owner. It creates no retained support cache or full-dimension pricing proxy.
+The private exponent vector starts at zero and only admitted bounded repairs mutate
+it; unused coordinates contribute zero without a dense scan. Constant weights also
+poll before returning. A complete recheck of the selected rows precedes bounded
+exact shifts and point construction. Exponents admit numerator or denominator magnitudes up to the
 same 4,096-bit ceiling. Failed or incomplete construction retains the one center;
 unresolved positive equalities retain their affine completion and repair path.
 This sufficient sign proposal adds no center, scalar repair pass, root query or

@@ -1428,6 +1428,53 @@ suffixes and failures are retained. There is no global installation or target
 library loading. Linear decoding establishes no control-flow or argument proof;
 do not derive private field offsets, task lifetime or compiler savings from it.
 
+### Live native argument candidates
+
+`com.eignex.klause.bench.profile.NativeVmLiveArgumentVerification` captures a
+distinct original-user Java startup after the pinned observer attaches. The
+observer's package runs in its private mount namespace; the selected JVM keeps
+the original UID, GID, groups and namespace. No solver input or repeated measured
+workload is run by this diagnostic.
+
+The child validates canonical executable entries against the retained pinned
+report and reads fresh exported layouts with the same library hash. Raw broker,
+nmethod, queue and wrapper argument candidates remain unaccepted. Field reads use
+only exported owner-bounded offsets and widths, guard null candidates and retain
+their raw bytes. Return probes read task fields only for a selected task returned
+from the queue; wrapper destruction and other returns never dereference a task.
+
+One warning-enabled observer retains a labelled invalid-read case, per-TID
+sequences, USDT identity lengths/bytes, returns, fork records and a drain marker.
+Key-presence guards precede ordinary map-value reads, distinguishing fresh
+sequence keys from memory read failures. Raw boot/monotonic/realtime anchors
+surround child release, exit
+and observer drain. Threshold-zero JFR and the compilation log are independent
+identity evidence; missing warnings or a successful exit alone prove no loss-free
+capture. Descendant JVMs, unmatched or inlined hooks, truncated identities,
+unfinished tasks and failed reads remain coverage gaps. Accept no ABI, live
+pointer, task/root, return-size, clock or compiler-saving claim without the
+corresponding independent validation.
+
+`com.eignex.klause.bench.profile.NativeVmLiveArgumentReview` reviews saved captures
+on a remote worker with `manifest=<https URL>`, `manifest-sha256=<hash>` and
+`archive=<https URL>`. It verifies the manifest, archive and selected member hashes,
+then extracts only the eight layout, launch, native record, JFR JSON and compilation
+log inputs. Expansion bounds and regular-file membership reject links, duplicate
+names and traversal. It never attaches an observer or reruns the captured JVM.
+
+The review checks exported field widths and owner bounds against the original
+tables, per-thread sequences and call lifetimes, raw candidate argument slots,
+USDT identity bytes, JFR compilation/thread identities and compatible log records.
+Omitted log levels remain unknown. A separately labelled invalid read must appear;
+additional read errors or reported losses prevent argument corroboration. Every raw
+record, unmatched lifetime and independent compilation identity remains available.
+Remote summaries count retained identity matches, missing matches and lifetime
+failures without relaxing capture-wide guards. Staged compile-ID, method/level/OSR
+and native-thread matches distinguish absent JFR records from identity mismatches;
+all same-ID candidates and unmatched JFR records remain in the report.
+Per-record association supplies no complete calling convention, queue/root census,
+loss-free capture, return-size semantics, clock alignment or compiler-saving proof.
+
 ### Table profiling
 
 ```sh
