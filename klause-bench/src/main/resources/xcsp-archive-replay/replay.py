@@ -88,11 +88,18 @@ def validate(request):
             raise ValueError("Unknown archive or source")
         if "overlay" in case:
             overlay = case["overlay"]
-            fields(overlay, ("archive", "classes"))
+            fields(overlay, ("archive", "classes"), ("methods",))
             if overlay["archive"] not in archives or not 1 <= len(overlay["classes"]) <= 8:
                 raise ValueError("Invalid class overlay")
             if any(not CLASS.fullmatch(name) for name in overlay["classes"]):
                 raise ValueError("Overlay class is outside Klause")
+            if "methods" in overlay:
+                methods = overlay["methods"]
+                if len(overlay["classes"]) != 1 or not isinstance(methods, list) or not 1 <= len(methods) <= 8:
+                    raise ValueError("Method overlay needs one class and at most eight methods")
+                if len(set(methods)) != len(methods) or any(not re.fullmatch(r"[A-Za-z_$][A-Za-z0-9_$]*", m)
+                                                          for m in methods):
+                    raise ValueError("Invalid overlay method names")
         if "wallMillis" in case and not 2000 <= case["wallMillis"] <= 60000:
             raise ValueError("Invalid diagnostic wall cap")
         if not 1 <= case.get("timeoutMillis", 60000) <= 60000 or not 0 <= case.get("seed", 3) <= 2**31 - 1:
@@ -290,8 +297,28 @@ def main():
                     data = jar.read(name)
                     dest = overlay / name
                     dest.parent.mkdir(parents=True, exist_ok=True)
-                    dest.write_bytes(data)
-                    changes.append({"class": name, "archive": case["overlay"]["archive"], "sha256": sha(dest)})
+                    change = {"class": name, "archive": case["overlay"]["archive"],
+                              "donorClassSha256": hashlib.sha256(data).hexdigest()}
+                    if "methods" in case["overlay"]:
+                        donor = directory / "donor.class"
+                        donor.write_bytes(data)
+                        baseline = directory / "baseline.class"
+                        with zipfile.ZipFile(lib / "klause-jvm-SNAPSHOT.jar") as original:
+                            if original.getinfo(name).file_size > LIMIT:
+                                raise ValueError("Oversized baseline class")
+                            baseline.write_bytes(original.read(name))
+                        args = [str(java_home / "bin/java"), "-Xmx512m", "-XX:ActiveProcessorCount=1", "-cp",
+                                ":".join(str(p) for p in sorted(lib.glob("*.jar"))),
+                                str(root / "MethodOverlay.java"), str(baseline), str(donor), str(dest)]
+                        args += case["overlay"]["methods"]
+                        exit_code, _ = command(args, directory, "method-overlay", 30)
+                        if exit_code:
+                            raise ValueError("Method overlay failed verification")
+                        change.update({"methods": case["overlay"]["methods"], "baselineClassSha256": sha(baseline)})
+                    else:
+                        dest.write_bytes(data)
+                    change["sha256"] = sha(dest)
+                    changes.append(change)
         if "wallMillis" in case:
             with zipfile.ZipFile(lib / "klause-jvm-SNAPSHOT.jar") as jar:
                 for name in ("com/eignex/klause/portfolio/Portfolio.class",
@@ -318,6 +345,10 @@ def main():
         result = {"case": identity, "exit": exit_code, "instrumented": bool(changes),
                   "sourceSha256": sources[case["source"]]["sha256"], "witnessStatus": None,
                   "contradictsAcceptedWitness": exit_code == 0 and "s UNSATISFIABLE" in text.splitlines()}
+        result["workerFailures"] = sum(int(m.group(1)) for line in text.splitlines()
+                                       if line.startswith("c arm.")
+                                       for m in re.finditer(r"\bfailures=([0-9]+)", line))
+        result["eligibleForAttribution"] = exit_code == 0 and result["workerFailures"] == 0
         witnesses = [line[2:] for line in text.splitlines() if line.startswith("v <instantiation>")]
         if exit_code == 0 and len(witnesses) == 1:
             witness = directory / "witness.xml"
