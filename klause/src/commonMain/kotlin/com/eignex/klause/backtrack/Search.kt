@@ -1,9 +1,8 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.factor.arithmetic.RealAbs
-import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.boundsMidpoint
+import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
@@ -59,6 +58,7 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.completedSearchSample
+import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet

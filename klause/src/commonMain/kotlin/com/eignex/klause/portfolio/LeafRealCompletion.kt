@@ -1,9 +1,8 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.factor.arithmetic.RealAbs
-import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.backtrack.LP_WORK_PER_NODE
 import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
+import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion
@@ -11,10 +10,11 @@ import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
+import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.util.Cancellation
 import kotlin.math.ceil
 
