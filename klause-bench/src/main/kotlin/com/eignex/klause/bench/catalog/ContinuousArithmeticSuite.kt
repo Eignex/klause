@@ -7,5 +7,6 @@ internal object ContinuousArithmeticSuite {
             vendoredMzn(name, Category.OPTIMIZATION, Expected.Opt(optimum),
                 model = "continuous-arithmetic/$name.mzn")
         }
+        vendoredMzn("power-sat", Category.CSP, Expected.Sat, model = "continuous-arithmetic/power-sat.mzn")
     }
 }
