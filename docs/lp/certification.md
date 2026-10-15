@@ -213,7 +213,8 @@ at the floating incumbent alone cannot prune. They retain minimized source units
 including source scaling and external constants, without integer lattice rounding
 or a Long objective-range requirement. Root publication retains the same accepted
 continuous bound, composed with the relaxation constant exactly and projected
-downward. Declined certification supplies no bound, and a bound supplies neither
+downward. CLI root-bound statistics retain the complete round-trip Double value;
+rate formatting cannot round a bound upward. Declined certification supplies no bound, and a bound supplies neither
 a witness nor attainment authority. Pure integer objectives retain the Long
 source-range and enclosing-cutoff guards. Continuous coordinates
 remain outside CP fixing targets. Objective certification and fixing precede row
