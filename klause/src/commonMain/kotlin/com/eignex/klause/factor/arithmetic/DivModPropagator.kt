@@ -9,11 +9,13 @@ import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.maxOf
 import com.eignex.klause.util.minOf
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
+import com.eignex.klause.util.signum
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 
@@ -60,7 +62,33 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
         val currentA = state.intDomains[relation.dividend]
         if (!tighten(state, relation.remainder, bigIntOf(currentA.min) - upperProduct,
                 bigIntOf(currentA.max) - lowerProduct, reason)) return false
+        if (divisor != null && !filterDivisor(state, divisor, reason)) return false
         return filterTuples(state, constant, reason)
+    }
+
+    private fun filterDivisor(state: PropagationState, divisor: Int, reason: IntArray?): Boolean {
+        val currentR = state.intDomains[relation.remainder]
+        val minimumMagnitude = when {
+            currentR.min > 0L -> bigIntOf(currentR.min)
+            currentR.max < 0L -> BIG_ZERO - bigIntOf(currentR.max)
+            else -> BIG_ZERO
+        }
+        val currentB = state.intDomains[divisor]
+        if (currentB.min > 0L && !tighten(state, divisor, minimumMagnitude + BIG_ONE,
+                bigIntOf(currentB.max), reason)) return false
+        if (currentB.max < 0L && !tighten(state, divisor, bigIntOf(currentB.min),
+                BIG_ZERO - minimumMagnitude - BIG_ONE, reason)) return false
+        val currentQ = state.intDomains[relation.quotient]
+        if (currentQ.min == currentQ.max && currentQ.min != 0L) {
+            val dividend = state.intDomains[relation.dividend]
+            val low = bigIntOf(dividend.min) - bigIntOf(currentR.max)
+            val high = bigIntOf(dividend.max) - bigIntOf(currentR.min)
+            val denominator = bigIntOf(currentQ.min)
+            val lower = divideBound(if (currentQ.min > 0L) low else high, denominator, roundUp = true)
+            val upper = divideBound(if (currentQ.min > 0L) high else low, denominator, roundUp = false)
+            if (!tighten(state, divisor, lower, upper, reason)) return false
+        }
+        return true
     }
 
     private fun filterTuples(state: PropagationState, constant: BigInt?, reason: IntArray?): Boolean {
@@ -103,6 +131,18 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
             }
         }
         return true
+    }
+
+    private fun divideBound(numerator: BigInt, denominator: BigInt, roundUp: Boolean): BigInt {
+        val quotient = numerator / denominator
+        val remainder = numerator - quotient * denominator
+        if (remainder == BIG_ZERO) return quotient
+        val positive = numerator.signum() == denominator.signum()
+        return when {
+            roundUp && positive -> quotient + BIG_ONE
+            !roundUp && !positive -> quotient - BIG_ONE
+            else -> quotient
+        }
     }
 
     private fun tighten(state: PropagationState, variable: Int, lower: BigInt, upper: BigInt,
