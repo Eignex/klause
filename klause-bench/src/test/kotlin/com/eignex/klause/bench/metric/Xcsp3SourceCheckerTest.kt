@@ -4,8 +4,15 @@ import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.SearchSession
 import java.io.File
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.params.ParameterizedTest
@@ -33,6 +40,37 @@ class Xcsp3SourceCheckerTest {
         Xcsp3SourceChecker.inspect(source, witness, "10")
         val parsed = Xcsp3.parse(regions.readText())
         BacktrackSolver(parsed.problem.bake()).solve(BacktrackPresets.satOptimized(randomSeed = 3L))
+    }
+
+    @Test
+    fun `retracted target holes cannot refute a checked source witness`() {
+        val model = File(
+            CorpusFetcher.workspaceRoot(),
+            "klause-bench/src/test/resources/xcsp3/reified-hole-tiny.xml",
+        )
+        val witness = "<instantiation><list>x b c</list><values>1 0 0</values></instantiation>"
+        val parsed = Xcsp3.parse(model.readText())
+        val cp = CpSearchComponent(PropagationSession(parsed.problem))
+        cp.rebase()
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(parsed.problem.numBoolVars))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertEquals("valid", Xcsp3SourceChecker.inspect(model, witness, null).status)
+
+        assertIs<ComponentResult.Consistent>(
+            shared.push(SearchDecision.IntEqual(parsed.intVarNames.getValue("c"), 1L)),
+        )
+        val conflict = assertIs<ComponentResult.Conflict>(
+            shared.push(SearchDecision.IntEqual(parsed.intVarNames.getValue("b"), 0L)),
+        )
+        shared.popTo(0)
+        shared.learn(conflict.explanation)
+
+        for ((name, value) in listOf("x" to 1L, "b" to 0L, "c" to 0L)) {
+            assertIs<ComponentResult.Consistent>(
+                shared.push(SearchDecision.IntEqual(parsed.intVarNames.getValue(name), value)),
+            )
+        }
+        assertIs<SearchResult.Satisfied>(shared.solve(parsed.problem.numBoolVars))
     }
 
     @ParameterizedTest
