@@ -60,8 +60,8 @@ class ReviewNativeVmBoundaryLifecycleTest(unittest.TestCase):
                 'IDENTITY\tend\t3\t1234\t1234\t3\tsignature\t3\t282956\n'
                 'BOUNDARY\tLEAVE\tinit_compiler_runtime\t4\t1234\t1234\t4\n'
                 'BOUNDARY\tLEAVE\tcompiler_thread_loop\t5\t1234\t1234\t5\n')
-        jfr = [{'tid': 1234, 'method': ('C', 'm', '()V'), 'compiler': 'C2', 'succeeded': True,
-                'compileId': identifier} for identifier in [1, 2]]
+        jfr = [{'tid': 1234, 'method': ('C', 'm', '()V'), 'compiler': compiler, 'succeeded': True,
+                'compileId': identifier} for identifier, compiler in [(1, 'C2'), (2, 'c2')]]
 
         thread = review.contexts(review.parse_records(text, 1234), jfr)[0]
 
