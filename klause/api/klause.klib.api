@@ -12636,11 +12636,14 @@ final class com.eignex.klause.solver.evidence/SourceObjective { // com.eignex.kl
 
 final class com.eignex.klause.solver.evidence/SourcePremise { // com.eignex.klause.solver.evidence/SourcePremise|null[0]
     constructor <init>(com.eignex.klause.solver.evidence/SourceInequality, kotlin.collections/Map<kotlin/Int, kotlin/Boolean> = ...) // com.eignex.klause.solver.evidence/SourcePremise.<init>|<init>(com.eignex.klause.solver.evidence.SourceInequality;kotlin.collections.Map<kotlin.Int,kotlin.Boolean>){}[0]
+    constructor <init>(com.eignex.klause.solver.evidence/SourceInequality, kotlin.collections/Map<kotlin/Int, kotlin/Boolean>, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction>) // com.eignex.klause.solver.evidence/SourcePremise.<init>|<init>(com.eignex.klause.solver.evidence.SourceInequality;kotlin.collections.Map<kotlin.Int,kotlin.Boolean>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>){}[0]
 
     final val guards // com.eignex.klause.solver.evidence/SourcePremise.guards|{}guards[0]
         final fun <get-guards>(): kotlin.collections/Map<kotlin/Int, kotlin/Boolean> // com.eignex.klause.solver.evidence/SourcePremise.guards.<get-guards>|<get-guards>(){}[0]
     final val inequality // com.eignex.klause.solver.evidence/SourcePremise.inequality|{}inequality[0]
         final fun <get-inequality>(): com.eignex.klause.solver.evidence/SourceInequality // com.eignex.klause.solver.evidence/SourcePremise.inequality.<get-inequality>|<get-inequality>(){}[0]
+    final val integerPins // com.eignex.klause.solver.evidence/SourcePremise.integerPins|{}integerPins[0]
+        final fun <get-integerPins>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.evidence/SourcePremise.integerPins.<get-integerPins>|<get-integerPins>(){}[0]
 }
 
 final class com.eignex.klause.solver.evidence/SourceProofContext { // com.eignex.klause.solver.evidence/SourceProofContext|null[0]
