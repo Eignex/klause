@@ -840,28 +840,42 @@ class ExactLiraSearchComponent private constructor(
             is LpBoundBatchResult.Conflict -> return true
             is LpBoundBatchResult.Applied -> Unit
         }
-        for ((address, comparison, premise) in disequalities) {
-            val side = if (comparison.terms.isEmpty()) {
-                DerivedDisequalitySide(LinearOp.LE, SearchAtomPremise.All(emptyList()))
-            } else {
-                node.disequalityDirections[address]?.let {
-                    DerivedDisequalitySide(it, node.directionPremises.getValue(address))
-                } ?: system.disequalitySide(comparison) ?: continue
-            }
-            node = node.withDirection(address, side.direction).copy(
-                directionPremises = node.directionPremises + (address to side.premise),
-            )
-            if (!system.assertComparison(
-                    comparison,
-                    side.direction,
-                    SearchAtomPremise.All(listOf(premise, side.premise)),
-                )
-            ) {
-                return false
-            }
-        }
+        if (!assertDisequalities(disequalities)) return false
         nodesByLevel.put(context.decisionLevel, node)
         return true
+    }
+
+    private fun assertDisequalities(
+        disequalities: List<Triple<RowAddress, ExactComparison, SearchAtomPremise>>,
+    ): Boolean {
+        if (disequalities.isEmpty()) return true
+        val directions = node.disequalityDirections.toMutableMap()
+        val premises = node.directionPremises.toMutableMap()
+        var changed = false
+        try {
+            for ((address, comparison, premise) in disequalities) {
+                val side = if (comparison.terms.isEmpty()) {
+                    DerivedDisequalitySide(LinearOp.LE, SearchAtomPremise.All(emptyList()))
+                } else {
+                    directions[address]?.let {
+                        DerivedDisequalitySide(it, premises.getValue(address))
+                    } ?: system.disequalitySide(comparison) ?: continue
+                }
+                directions[address] = side.direction
+                premises[address] = side.premise
+                changed = true
+                if (!system.assertComparison(
+                        comparison,
+                        side.direction,
+                        SearchAtomPremise.All(listOf(premise, side.premise)),
+                    )
+                ) return false
+            }
+            return true
+        } finally {
+            // Retain the attempted prefix on interruption without mutating an ancestor's snapshot.
+            if (changed) node = node.copy(disequalityDirections = directions, directionPremises = premises)
+        }
     }
 
     private fun assertPublishedBounds(context: SearchContext): LpBoundBatchResult {

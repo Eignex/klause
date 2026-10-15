@@ -2239,6 +2239,34 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
+    fun `sibling source scopes discard derived disequality directions`() {
+        val model = Problem(
+            numBoolVars = 1, intBounds = openBounds(),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 1),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, -1),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<SearchResult.Satisfied>(session.solve(1))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            val result = session.solve(1)
+
+            val witness = assertNotNull(assertIs<SearchResult.Satisfied>(result).model
+                .valueOf<ExactLiraAssignment>(component))
+            assertEquals(bigIntOf(-1), witness.intValue(0))
+        }
+    }
+
+    @Test
     fun `each disequality in one declared form gets its own branch direction`() {
         val declaration = object : Factor by Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1) {
             override val linearForm: LinearForm = LinearForm.Conjunction(

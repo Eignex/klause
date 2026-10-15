@@ -83,6 +83,11 @@ before evidence can be reused. [TheoryParams](../../klause/src/commonMain/kotlin
 separates theory checks, open work, decisions and cancellation. Native numerical
 work retains the [LP certification](../lp/certification.md) resource contract.
 
+Source installation builds derived disequality directions and their premises in
+callback-local maps, then retains one node snapshot. Each numerical assertion keeps
+its original order and premise; interruption retains the attempted prefix. Published
+maps are not edited, so ancestor scopes keep their directions through retraction.
+
 ## Implementation
 
 [ExactLinearFragment](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qflra/ExactLinearFragment.kt)
