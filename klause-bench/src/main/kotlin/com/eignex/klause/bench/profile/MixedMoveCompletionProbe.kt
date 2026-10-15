@@ -1,8 +1,11 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
@@ -17,12 +20,6 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
-import java.io.File
-import java.lang.management.ManagementFactory
-import java.math.BigDecimal
-import java.math.BigInteger
-import java.util.Base64
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -31,6 +28,12 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import java.math.BigDecimal
+import java.math.BigInteger
+import java.util.Base64
+import kotlin.time.Duration.Companion.milliseconds
 
 internal object MixedMoveCompletionProbe {
     @JvmStatic
@@ -41,20 +44,29 @@ internal object MixedMoveCompletionProbe {
             pair[0] to pair[1]
         }
         require(options.keys.all {
-            it in setOf("input", "text64", "initial64", "exact", "instructions", "seed", "repeats", "timeout")
+            it in setOf("input", "text64", "suite", "problem", "sourceSHA256", "initial64", "exact",
+                "instructions", "seed", "repeats", "timeout")
         })
-        require((options["input"] != null) != (options["text64"] != null))
+        require(listOf(options["input"], options["text64"], options["suite"]).count { it != null } == 1)
+        require((options["suite"] == null) == (options["problem"] == null))
+        require(options["text64"] != null || options["sourceSHA256"] != null) { "Pin original input sourceSHA256" }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         if (Runtime.getRuntime().availableProcessors() != 1) {
             launchWithOneProcessor(args, out)
             return
         }
-        val bytes = options["input"]?.let { CorpusFiles.open(File(it)).use { input -> input.readBytes() } }
+        val input = options["input"]?.let(::File) ?: options["suite"]?.let { suite ->
+            val entry = Catalog.uncapped(suite).problems.single { it.name == options.getValue("problem") }
+            require(entry.format == Format.MPS) { "A mixed completion probe requires original MPS" }
+            CorpusFetcher.resolve(entry.source)
+        }
+        val bytes = input?.let { CorpusFiles.open(it).use { source -> source.readBytes() } }
             ?: Base64.getDecoder().decode(options.getValue("text64"))
         val initialBytes = Base64.getDecoder().decode(options.getValue("initial64"))
         out.resolve("input.mps").writeBytes(bytes)
         out.resolve("initial.json").writeBytes(initialBytes)
         val hash = sha256(bytes)
+        require(options["sourceSHA256"] == null || options["sourceSHA256"] == hash) { "Original source hash differs" }
         out.resolve("sources").apply { mkdirs() }.resolve("$hash.txt").writeBytes(bytes)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         val exact = options["exact"]?.toBooleanStrict() ?: false
@@ -156,8 +168,11 @@ internal object MixedMoveCompletionProbe {
                         ?: requireNotNull(BigFraction.ofDouble(point.approximateRealValue(column.id)))
                     else BigFraction.ofLong(point.intValue(column.id))
                 }
-                val checked = original.sourceWitness(sourceValues)
-                val sourceCost = checked.objective
+                val checked = runCatching { original.sourceWitness(sourceValues) }.getOrNull()
+                check(checked != null || (!exact && compiled.withinTolerance(point.ints, point.reals))) {
+                    "Published point fails its configured original source guarantee"
+                }
+                val sourceCost = checked?.objective ?: requireNotNull(compiled.sourceObjective(point.ints, point.reals))
                 val witness = "v " + compiled.columns.zip(sourceValues).joinToString(" ") { (column, value) ->
                     "${column.name}=$value"
                 }
@@ -181,7 +196,7 @@ internal object MixedMoveCompletionProbe {
                     })
                     put("round", round)
                     put("publication", publication)
-                    put("sourceGuarantee", "exact source feasible")
+                    put("sourceGuarantee", if (checked != null) "exact source feasible" else "source tolerance")
                 }
             }
             val terminal = results.last()
