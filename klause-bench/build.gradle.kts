@@ -97,9 +97,35 @@ val checkNativeVmEntries = tasks.register<Exec>("checkNativeVmEntries") {
         "tools/test_read_native_vm_entries.py", "tools/read_native_vm_symbols.py")
 }
 
+val checkNativeCompilerObserver = tasks.register<Exec>("checkNativeCompilerObserver") {
+    group = "verification"
+    description = "Test observer extraction, process scope and identity byte capture."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_native_compiler_observer.py")
+    inputs.files("tools/native_compiler_observer.py", "tools/test_native_compiler_observer.py")
+}
+
+val checkNativeVmLiveArguments = tasks.register<Exec>("checkNativeVmLiveArguments") {
+    group = "verification"
+    description = "Test live argument candidate read boundaries and failure captures."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_native_vm_live_arguments.py")
+    inputs.files("tools/native_vm_live_arguments.py", "tools/test_native_vm_live_arguments.py",
+        "tools/native_compiler_observer.py", "tools/read_native_vm_metadata.py", "tools/native_vm_loaded_module.py")
+}
+
+val checkNativeCompilerObserverSetup = tasks.register<Exec>("checkNativeCompilerObserverSetup") {
+    group = "verification"
+    description = "Test gated observer child cleanup after script failure."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_native_compiler_observer_setup.py")
+    inputs.files("tools/native_compiler_observer.py", "tools/test_native_compiler_observer_setup.py")
+}
+
 tasks.named("check") {
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
-        checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries)
+        checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
+        checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
