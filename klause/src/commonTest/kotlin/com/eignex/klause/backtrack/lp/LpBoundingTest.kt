@@ -638,6 +638,56 @@ class LpBoundingTest {
     }
 
     @Test
+    fun `finite optimization publishes a continuous source root bound in either direction`() {
+        for ((sign, minimum) in listOf(1L to 3.125, -1L to -4.625)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+                numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.25))
+            val objective = LinearObjective(intCoefficients = longArrayOf(sign), constant = 3L * sign,
+                realCoefficients = doubleArrayOf(0.5 * sign))
+            val published = ArrayList<Double>()
+
+            val result = BacktrackSolver(problem.bake()).minimize(objective, BacktrackParams(
+                randomSeed = 1L, lpPlan = LpPlan(bounding = true), objectiveLowerBoundSink = { published.add(it) },
+            ))
+
+            assertEquals(minimum, published.firstOrNull())
+            assertEquals(minimum, result.objectiveValue)
+        }
+    }
+
+    @Test
+    fun `a continuous root solver error closes its owner and remains an error`() {
+        val problem = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.25))
+        val failure = IllegalStateException("root solve")
+        var closes = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newTableauSolver(model: LpModel, cancellation: Cancellation, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions): TableauCutSolver {
+                val delegate = ProductionLpEngineFactory.newTableauSolver(model, cancellation, iterationLimit,
+                    workLimit, trackDegeneracy, pricing)
+                return object : TableauCutSolver by delegate {
+                    override fun solve(warm: Basis?): FloatLpResult? = throw failure
+                    override fun close() {
+                        closes++
+                        delegate.close()
+                    }
+                }
+            }
+        }
+        val sink = SolveStatsSink(backend = "continuous-error")
+        LpEngine(problem, LinearObjective(realCoefficients = doubleArrayOf(0.5)),
+            LpParams(lpPlan = LpPlan(bounding = true)), sink, LpSolveContext(factory)).use { engine ->
+            val caught = assertFailsWith<IllegalStateException> {
+                engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            }
+
+            assertSame(failure, caught)
+            assertEquals(1, closes)
+        }
+    }
+
+    @Test
     fun `noncanonical legacy node fallback keeps source hints and closes displaced owners`() {
         val model = LpBuilder().apply {
             addVar(0L, 10L, cost = 1L)
