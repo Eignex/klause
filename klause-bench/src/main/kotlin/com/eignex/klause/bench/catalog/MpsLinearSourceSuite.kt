@@ -31,5 +31,9 @@ internal object MpsLinearSourceSuite {
         vendored("zero-row-disabled", expected = Expected.Sat,
             relPath = "mps-linear-source-v1/zero-row-disabled.mps", tags = setOf("linear-source"),
         )
+        for (name in listOf("primal-point-min", "primal-point-max", "primal-point-wide")) {
+            vendored(name, expected = Expected.Sat,
+                relPath = "mps-linear-source-v1/$name.mps", tags = setOf("linear-source"))
+        }
     }
 }
