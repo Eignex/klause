@@ -1,5 +1,7 @@
 package com.eignex.klause.bench.metric
 
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,6 +22,16 @@ class ExactFlatZincValidationTest {
         }
     }
 
+
+    @ParameterizedTest
+    @CsvSource(value = ["0|1|valid", "1|1|invalid", "9007199254740992|9007199254740993|valid"], delimiter = '|')
+    fun `original distinctness uses exact integer coordinates`(x: String, y: String, status: String) {
+        val source = "var int: x; var int: y; constraint all_different_int([x,y]); solve satisfy;"
+
+        val checked = ExactFlatZincValidation.inspect(source, "x = $x;\ny = $y;", null)
+
+        assertEquals(status, checked.status, checked.reason)
+    }
 
     @Test
     fun `original set selection checks the selected row and full result universe`() {
