@@ -115,6 +115,34 @@ class NativeVmReturnSizesTest(unittest.TestCase):
         self.assertFalse(result['postAssessments'][0]['returnSizeMatchesJfr'])
         self.assertEqual(2, len(result['callRecords']))
 
+    def test_multiple_publications_cannot_share_one_independent_task_size_oracle(self):
+        groups = [{'pid': 100, 'tid': 101, 'sequence': sequence, 'errors': [],
+                   'primary': [{'type': category, 'kind': kind, 'values': values}]}
+                  for sequence, category, kind, values in [(1, 'ENTRY', 'broker', []), (2, 'USDT', 'begin', []),
+                       (3, 'ENTRY', 'post', []), (4, 'ENTRY', 'total-size', []),
+                       (5, 'RETURN', 'total-size', ['40', '64']), (6, 'RETURN', 'post', []),
+                       (7, 'ENTRY', 'post', []), (8, 'ENTRY', 'total-size', []),
+                       (9, 'RETURN', 'total-size', ['40', '64']), (10, 'RETURN', 'post', []),
+                       (11, 'USDT', 'end', []), (12, 'RETURN', 'broker', [])]]
+        broker = {'entry': groups[0], 'completed': True, 'independentIdentityMatched': True,
+                  'recordedArgumentBindingCorroborated': False, 'usdtBegin': [groups[1]], 'usdtEnd': [groups[10]],
+                  'posts': [{'entry': groups[2], 'return': groups[5]}, {'entry': groups[6], 'return': groups[9]}],
+                  'jfrMatches': [{'succeeded': True, 'raw': {'values': {'codeSize': 64}}}]}
+        baseline = {'nativeRecords': {'threads': [groups], 'errors': []},
+                    'correlation': {'brokerInvocations': [broker], 'summary': {}},
+                    'readDiagnostics': {'readWarningGuardPassed': True, 'sequencedDeliveryGuardPassed': True,
+                                        'finalLossCounterZeroProven': True}}
+
+        with patch.object(review.original, 'decode_candidate') as decode:
+            result = review.correlate(baseline, {})
+
+        decode.assert_not_called()
+        self.assertEqual(2, len(result['callRecords']))
+        self.assertEqual([[0], [1]], [row['callCandidates'] for row in result['postAssessments']])
+        for row in result['postAssessments']:
+            self.assertFalse(row['returnSizeMatchesJfr'])
+            self.assertIn('publication callback is absent or ambiguous', row['unprovenReason'])
+
     def test_missing_outside_post_and_unfinished_calls_remain_unproven(self):
         table = [(1, 'ENTRY', 'broker'), (2, 'USDT', 'begin'), (3, 'ENTRY', 'post'),
                  (4, 'ENTRY', 'total-size'), (5, 'RETURN', 'total-size'), (6, 'RETURN', 'post'),
