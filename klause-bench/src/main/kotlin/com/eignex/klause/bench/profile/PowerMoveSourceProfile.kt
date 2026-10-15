@@ -78,7 +78,10 @@ object PowerMoveSourceProfile {
         println("Checked ${checks.size} power moves against original FlatZinc predicates")
     }
     private fun captureCompilation(options: Map<String, String>) {
-        require(options.keys == setOf("suite", "problem"))
+        require(options.keys.all { it in setOf("suite", "problem", "factorKind", "exact") })
+        val kind = options["factorKind"] ?: "Power"
+        require(kind in setOf("Power", "Abs", "RealAbs", "GridAbs"))
+        val exact = options["exact"]?.toBooleanStrict() ?: false
         val ref = Catalog.uncapped(options.getValue("suite")).problems.single {
             it.name == options.getValue("problem")
         }
@@ -89,13 +92,15 @@ object PowerMoveSourceProfile {
         val hashes = SolveEvidence.sourceHashes(ref)
         val compiled = MiniZincRunner().compileFzn(ref, fresh = true)
         compiled.copyTo(out.resolve("compiled.fzn"), overwrite = true)
-        val program = parseFlatZinc(compiled.readText())
+        val program = parseFlatZinc(compiled.readText(), exactFloats = exact)
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         Reports.writeJson(out.resolve("compiler.json").path, MiniZincCompatibility.compiler)
         val factors = program.problem.factors
         out.resolve("retention.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha())
             put("compilerExit", 0)
+            put("factorKind", kind)
+            put("exactFloats", exact)
             put("solverInvocations", 0)
             put("sourceHashes", Reports.json.encodeToJsonElement(hashes))
             put("factors", buildJsonArray {
@@ -110,8 +115,8 @@ object PowerMoveSourceProfile {
             })
         }.toString())
         check(hashes == SolveEvidence.sourceHashes(ref)) { "source changed during compilation" }
-        check(factors.any { it is Power }) { "compiled source retains no native Power relation" }
-        println("Captured original MiniZinc, compiled FlatZinc and native power relations")
+        check(factors.any { it::class.simpleName == kind }) { "compiled source retains no native $kind relation" }
+        println("Captured original MiniZinc, compiled FlatZinc and native $kind relations")
     }
 
 }

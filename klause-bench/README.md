@@ -1893,7 +1893,11 @@ agreement separately from native grading. Run it through the same AWS lab profil
 client at a pinned revision. Alternatively, `suite=<catalog suite> problem=<name>`
 freshly compiles a MiniZinc source and retains its original files, compiled FlatZinc,
 compiler/build identity and parsed native Power factors without solving. It fails
-when compilation retains no Power relation. These diagnostics measure no throughput
+when compilation retains no Power relation. `factorKind=Abs`, `RealAbs` or `GridAbs`
+selects an absolute-value retention check; `exact=true` selects exact float parsing.
+The `abs-relations` suite supplies integer magnitudes, aliases, Boolean scopes,
+optional values and real forms for original MiniZinc compilation and source checks.
+These diagnostics measure no throughput
 and export no proofs.
 
 ### Definition probe
