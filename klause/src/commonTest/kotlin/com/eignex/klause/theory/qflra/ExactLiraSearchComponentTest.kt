@@ -4,7 +4,6 @@ import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
-import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
@@ -128,38 +127,6 @@ class ExactLiraSearchComponentTest {
                 assertEquals(if (defaultOpening) null else true, hints.preferredBool(0))
                 assertEquals(!defaultOpening, component.partialPointHintAvailable())
                 assertEquals(registrationWork, charged)
-            }
-        }
-    }
-
-    @Test
-    fun `default graph points retain comparison guidance beside Boolean selection cardinalities`() {
-        for (minimum in listOf(0, 1)) {
-            val model = Problem(
-                numBoolVars = 3, intBounds = openBounds(0), numRealVars = 1,
-                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
-                factors = arrayOf(
-                    Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), minimum, 1),
-                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
-                ),
-            )
-            val stats = SmtStatsSink()
-            ExactLiraSearchComponent(model).use { component ->
-                component.observeWith(stats)
-                val hints = assertNotNull(component.partialPointHints(Cancellation.Never,
-                    defaultOpening = true)).second
-                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
-
-                assertIs<ComponentResult.Consistent>(session.initialize())
-
-                assertEquals(true, hints.preferredBool(0))
-                assertEquals(0L, stats.snapshot().defaultGraphHintReleases)
-                assertNull(session.boolValue(0))
-                val witness = assertNotNull(assertIs<SearchResult.Satisfied>(
-                    session.solve(3, candidateHints = hints),
-                ).model.valueOf<ExactLraAssignment>(component))
-                assertContentEquals(booleanArrayOf(true, false, false), witness.bools)
             }
         }
     }

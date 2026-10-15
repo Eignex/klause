@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpSearchComponent
@@ -49,6 +50,19 @@ internal class SearchComponentOpening(
         own(AutoCloseable { release() })
     }
 
+    private fun graphSelectionGuidance(source: Problem): Boolean? {
+        if (source.numBoolVars == 0 || source.numIntVars != 0 || source.numRealVars == 0 ||
+            source.factors.size > SourceConjunctionHints.MAX_INDEX_ENTRIES
+        ) return false
+        if (cancellation()) return null
+        for (factor in source.factors) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            if (factor is Cardinality && factor.max == 1 && factor.literals.size > 2) return true
+        }
+        return false
+    }
+
     fun candidateHints(source: Problem, defaultComponent: TheoryComponent? = null): SearchCandidateHints {
         var accounted = false
         fun outcome(value: HintIndexOutcome) {
@@ -58,9 +72,15 @@ internal class SearchComponentOpening(
         try {
             val registered = primitiveHints
             if (registered == null) {
-                val direct = if (openHintFlips == null) {
-                    (defaultComponent as? ExactLiraSearchComponent)
-                        ?.partialPointHints(cancellation, defaultOpening = true)?.second
+                val component = defaultComponent as? ExactLiraSearchComponent
+                val direct = if (openHintFlips == null && component != null) {
+                    val selections = graphSelectionGuidance(source)
+                    if (selections == null) {
+                        outcome(HintIndexOutcome.STOPPED)
+                        return SearchCandidateHints.None
+                    }
+                    component.partialPointHints(cancellation, defaultOpening = true,
+                        defaultGraphSelections = selections)?.second
                 } else null
                 if (direct == null) outcome(HintIndexOutcome.NO_PROVIDER) else accounted = true
                 return direct ?: SearchCandidateHints.None

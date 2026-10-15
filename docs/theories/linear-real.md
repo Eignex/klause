@@ -58,8 +58,10 @@ provider retains precedence, even when it declines a selected Boolean.
 When initialization establishes complete pure-real difference-graph admission under
 the production certification policy, direct default preferences remain enabled beside
 an at-most-one or exactly-one Boolean cardinality over three or more literals.
-Graph preparation retains this source shape during its existing factor pass; it
-adds no index, numerical invocation or allowance. Other admitted graph sources
+The opening classifies the full source in at most 65,536 factor visits charged to
+its existing token. The cardinality retains its finite owner even when omitted from
+the arithmetic fragment. This classification adds no index, numerical invocation
+or allowance. Other admitted graph sources
 release optional hint state at the first live default primitive consultation and
 supply no preference. This applies
 to the admitted source even if a later private branch uses LP fallback; it does not
