@@ -11,9 +11,11 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.TheoryCompletion
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -66,6 +68,41 @@ class SmtLibDistinctTest {
     }
 
     @Test
+    fun `three Boolean distinct operands should refute the original pigeonhole constraint`() {
+        val source = SmtLib.parse("(declare-const a Bool) (declare-const b Bool) (declare-const c Bool) " +
+            "(assert (distinct a b c))")
+
+        val result = BacktrackSolver(source.model.bake()).solve()
+
+        assertIs<SolveResult.Unsat>(result)
+        assertEquals(0, source.model.numIntVars)
+    }
+
+    @Test
+    fun `false real distinct should retain an exact rational collision`() {
+        val source = SmtLib.parse("(declare-const x Real) (assert (not (distinct x (/ 1 3))))")
+
+        val result = BacktrackSolver.source(source.model).solve()
+
+        val point = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertEquals(BigFraction.of(BIG_ONE, bigIntOf(3)),
+            TheoryCompletion.parseRational(point.realValue(source.realVarNames.getValue("x"))))
+    }
+
+    @Test
+    fun `mixed distinct operands should keep integer and real coordinate namespaces`() {
+        val source = SmtLib.parse("(declare-const i Int) (declare-const x Real) " +
+            "(assert (= i 0)) (assert (= x 1.0)) (assert (distinct i x))")
+
+        val result = BacktrackSolver.source(source.model).solve()
+
+        val point = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertEquals("0", point.intValue(source.intVarNames.getValue("i")))
+        assertEquals(BigFraction.ONE,
+            TheoryCompletion.parseRational(point.realValue(source.realVarNames.getValue("x"))))
+    }
+
+    @Test
     fun `wide affine distinct coefficients should retain their original integer coordinates`() {
         val coefficient = "100000000000000000000000000000000000001"
         val source = SmtLib.parse("(declare-const x Int) (declare-const y Int) " +
@@ -90,6 +127,17 @@ class SmtLibDistinctTest {
     }
 
     @Test
+    fun `native polynomial Boolean distinct should preserve original truth correlation`() {
+        val source = SmtLibPolynomial.parse("(declare-const a Bool) (declare-const b Bool) " +
+            "(assert (= a b)) (assert (distinct a b))")
+
+        val result = OpenTheoryPipeline.execute(source.realSource().pipelineRequest(),
+            engine = FiniteEngine.BACKTRACK).result
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
     fun `negated function distinct should retain invalid logarithm domains`() {
         val input = SmtLib.parse("(assert (not (distinct (log 0) (log 0))))")
         val source = assertIs<TranscendentalProblem>(input.source.originalSource)
@@ -102,6 +150,16 @@ class SmtLibDistinctTest {
     @Test
     fun `a true alternative should retain all function distinct operand domains`() {
         val input = SmtLib.parse("(assert (or true (distinct (log 0) (log 0))))")
+        val source = assertIs<TranscendentalProblem>(input.source.originalSource)
+
+        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `an unused Boolean distinct binding should retain its function operand domains`() {
+        val input = SmtLib.parse("(assert (let ((d (distinct (log 0) (log 0)))) true))")
         val source = assertIs<TranscendentalProblem>(input.source.originalSource)
 
         val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result

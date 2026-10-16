@@ -179,7 +179,7 @@ internal class PolynomialFormula private constructor(
             val nodes = mutableListOf<FormulaNode>()
             val atoms = mutableListOf<PolynomialAtom>()
             val booleans = LinkedHashSet<Int>()
-            val selections = HashMap<PolynomialRealFormula, PolynomialRealFormula>()
+            val expansions = HashMap<PolynomialRealFormula, PolynomialRealFormula>()
             val pending = ArrayDeque<Pair<PolynomialRealFormula, Boolean>>()
             pending.addLast(formula to false)
             while (pending.isNotEmpty()) {
@@ -190,10 +190,10 @@ internal class PolynomialFormula private constructor(
                     is PolynomialRealFormula.Not -> listOf(node.operand)
                     is PolynomialRealFormula.And -> node.operands
                     is PolynomialRealFormula.Or -> node.operands
-                    is PolynomialDistinct -> listOf(selections.getOrPut(node) {
+                    is PolynomialDistinct -> listOf(expansions.getOrPut(node) {
                         polynomialDistinctEncoding(node, arithmetic::step)
                     })
-                    is PolynomialSelection -> listOf(selections.getOrPut(node) {
+                    is PolynomialSelection -> listOf(expansions.getOrPut(node) {
                         polynomialSelectionEncoding(node, arithmetic::step)
                     })
                     else -> emptyList()

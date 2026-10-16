@@ -68,15 +68,8 @@ internal object Compiler {
             var lit: Int? = null
             var real: RealComb? = null
 
-            /**
-             * A Bool binding's source term while it is still uncompiled.
-             *
-             * Compiling it on sight costs the reified form even where the value is only ever forced true:
-             * a `distinct` over n operands reifies to n(n-1)/2 auxiliary literals and as many reified
-             * rows, where asserting the same term posts plain disequalities and allocates nothing. So the
-             * term is kept until something asks for its literal, which lets [assert] recognise a binding
-             * it can post directly.
-             */
+            // Delay reification so asserted bindings can retain hard source relations
+            // without an auxiliary Boolean definition.
             var srcBool: SExpr? = null
             var sourceScope: BindingSnapshot? = null
         }
