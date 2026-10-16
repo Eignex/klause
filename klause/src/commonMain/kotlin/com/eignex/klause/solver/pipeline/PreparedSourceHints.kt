@@ -28,10 +28,12 @@ internal fun PreparedSourceInvocation.heuristicHints(
     require(
         problem === projection.target || (
             problem is BakedProblem &&
-        problem.numBoolVars == projection.target.numBoolVars && problem.numIntVars == projection.target.numIntVars &&
-        problem.numRealVars == projection.target.numRealVars && problem.numFactors == projection.target.numFactors &&
-        problem.factors.indices.all { problem.factors[it] === projection.target.factors[it] }
-        )
+                problem.numBoolVars == projection.target.numBoolVars &&
+                problem.numIntVars == projection.target.numIntVars &&
+                problem.numRealVars == projection.target.numRealVars &&
+                problem.numFactors == projection.target.numFactors &&
+                problem.factors.indices.all { problem.factors[it] === projection.target.factors[it] }
+            ),
     ) {
         "hint projection belongs to a different execution model"
     }

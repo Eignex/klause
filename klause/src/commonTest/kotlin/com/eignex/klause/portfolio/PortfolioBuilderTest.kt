@@ -49,17 +49,17 @@ class PortfolioBuilderTest {
             val plan = assertIs<PortfolioPlan.Execute>(
                 FinitePipeline.planPortfolio(
                     PortfolioPlanRequest(
-                engine, false, 1, params, 3, 1, LpConfig.OFF,
-                LpZeroObjectivePricing.MIN_BOUND_SUPPORT, null, null,
-            )
-                )
+                        engine, false, 1, params, 3, 1, LpConfig.OFF,
+                        LpZeroObjectivePricing.MIN_BOUND_SUPPORT, null, null,
+                    ),
+                ),
             )
             var views = 0
 
             val factories = PortfolioBuilder.factories(
                 problem, plan.scenario, null, null, null, null,
                 ProblemProfile.of(problem, false), false, sourceHints = {
-                    views++;
+                    views++
                     null
                 },
             )

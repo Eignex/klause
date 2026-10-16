@@ -775,10 +775,10 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
             }
             yield(
                 DefinitionIndex(
-                nodeArr, definedInt, definedBool, intDefinitions, literalChannels,
-                unaryPredicates, booleanLiterals, elementResults, extremumRepairs,
-                checkNotNull(intReaders), checkNotNull(boolReaders),
-            )
+                    nodeArr, definedInt, definedBool, intDefinitions, literalChannels,
+                    unaryPredicates, booleanLiterals, elementResults, extremumRepairs,
+                    checkNotNull(intReaders), checkNotNull(boolReaders),
+                ),
             )
         }
 

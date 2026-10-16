@@ -43,9 +43,9 @@ class SourceMappingTest {
             TransformationGuarantees.IDENTITY,
             SourceRebuilds(
                 listOf(
-                RebuildStep.CopyLiteral(0, 0),
-                RebuildStep.AffineValue(0, 1, intArrayOf(2), longArrayOf(1), 1),
-            )
+                    RebuildStep.CopyLiteral(0, 0),
+                    RebuildStep.AffineValue(0, 1, intArrayOf(2), longArrayOf(1), 1),
+                ),
             ),
         )
         val second = SourceMapping(
@@ -55,15 +55,15 @@ class SourceMappingTest {
             SourceRebuilds(
                 listOf(
                     RebuildStep.QuotientValue(
-                1,
-                1,
-                intArrayOf(2),
-                longArrayOf(1),
-                1,
-                true,
-                null,
-            )
-                )
+                        1,
+                        1,
+                        intArrayOf(2),
+                        longArrayOf(1),
+                        1,
+                        true,
+                        null,
+                    ),
+                ),
             ),
         )
 

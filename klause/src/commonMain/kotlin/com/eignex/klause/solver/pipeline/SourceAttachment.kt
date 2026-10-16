@@ -35,6 +35,6 @@ class SourceAttachment(
 
 private fun SearchHints.captured(): SearchHints = copy(
     tiers = tiers.map { group ->
-    group.copy(boolVars = group.boolVars.copyOf(), intVars = group.intVars.copyOf())
-}
+        group.copy(boolVars = group.boolVars.copyOf(), intVars = group.intVars.copyOf())
+    },
 )

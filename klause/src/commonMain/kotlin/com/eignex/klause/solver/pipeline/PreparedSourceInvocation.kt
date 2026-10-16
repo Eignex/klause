@@ -54,10 +54,10 @@ class PreparedSourceInvocation internal constructor(
         require(engine == request.engine) { "finite engine differs from its source operation binding" }
         require(
             this.operation in setOf(
-            ExecutionOperation.SATISFY,
-            ExecutionOperation.OPTIMIZE,
-            ExecutionOperation.ENUMERATE,
-        )
+                ExecutionOperation.SATISFY,
+                ExecutionOperation.OPTIMIZE,
+                ExecutionOperation.ENUMERATE,
+            ),
         ) {
             "operation has no finite solve execution surface"
         }

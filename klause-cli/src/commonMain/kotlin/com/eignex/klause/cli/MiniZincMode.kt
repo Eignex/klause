@@ -138,14 +138,14 @@ internal object MiniZincMode : CliMode {
             }
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(program.problem, program.definitionHints, program.searchHints?.toSearchHints()),
-                operation,
-                common.resolvedEngine(),
-                objective = sourceObjective,
-                maximize = maximize,
-                cancellation = common.routingPreparationCancellation(),
-                boundCancellation = common.routingCancellation(),
-            )
+                    SourceAttachment(program.problem, program.definitionHints, program.searchHints?.toSearchHints()),
+                    operation,
+                    common.resolvedEngine(),
+                    objective = sourceObjective,
+                    maximize = maximize,
+                    cancellation = common.routingPreparationCancellation(),
+                    boundCancellation = common.routingCancellation(),
+                ),
             )
             return when (val route = invocation.route) {
                 is SourceProblemRoute.Finite -> Solvable(

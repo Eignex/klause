@@ -249,14 +249,14 @@ private fun Problem.pipelineRouteObserved(
         requireNotNull(initial)
     } else {
         routed.prepareExecutionPlan(
-        this,
-        objective,
-        maximize,
-        preferFinite = finiteCompletion,
-        providers,
-        projections,
-        arithmeticStop,
-    )
+            this,
+            objective,
+            maximize,
+            preferFinite = finiteCompletion,
+            providers,
+            projections,
+            arithmeticStop,
+        )
     }
     val arithmeticExecution = when (val execution = arithmetic.execution) {
         is PreparedExecution.Declined -> return SourceProblemRoute.UnsupportedOpen(null, routed, arithmetic)
@@ -280,14 +280,14 @@ private fun Problem.pipelineRouteObserved(
         routed.finiteRealCompletionSupported(projections)
     val prepared = if (preferFinite) {
         routed.prepareExecutionPlan(
-        this,
-        objective,
-        maximize,
-        preferFinite = true,
-        providers,
-        projections,
-        preparationStop,
-    )
+            this,
+            objective,
+            maximize,
+            preferFinite = true,
+            providers,
+            projections,
+            preparationStop,
+        )
     } else {
         arithmetic
     }
