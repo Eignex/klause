@@ -1815,10 +1815,11 @@ public final class com/eignex/klause/factor/global/LexLess : com/eignex/klause/i
 }
 
 public final class com/eignex/klause/factor/global/NValue : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/ir/Factor {
-	public fun <init> (I[ILcom/eignex/klause/factor/global/NValue$Mode;[I)V
-	public synthetic fun <init> (I[ILcom/eignex/klause/factor/global/NValue$Mode;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (I[ILcom/eignex/klause/factor/global/NValue$Mode;[I[J)V
+	public synthetic fun <init> (I[ILcom/eignex/klause/factor/global/NValue$Mode;[I[JILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public final fun getExceptSet ()[J
 	public fun getIntVars ()[I
 	public fun getLinearForm ()Lcom/eignex/klause/ir/LinearForm;
 	public final fun getMode ()Lcom/eignex/klause/factor/global/NValue$Mode;
