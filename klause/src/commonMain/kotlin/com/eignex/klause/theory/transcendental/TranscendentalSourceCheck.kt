@@ -6,8 +6,10 @@ import com.eignex.klause.arithmetic.real.ExactRealValue
 import com.eignex.klause.arithmetic.real.RealCertificationUnavailable
 import com.eignex.klause.arithmetic.real.RealDomainInvalid
 import com.eignex.klause.ir.PolynomialRelation
+import com.eignex.klause.ir.TranscendentalDistinct
 import com.eignex.klause.ir.TranscendentalExpression
 import com.eignex.klause.ir.TranscendentalFormula
+import com.eignex.klause.lowering.transcendentalDistinctEncoding
 import com.eignex.klause.simplex.exact.BigFraction
 
 internal enum class SourceTruth { TRUE, FALSE, UNKNOWN, DOMAIN_INVALID, DOMAIN_UNKNOWN }
@@ -19,6 +21,7 @@ internal class TranscendentalSourceCheck(
 ) {
     private val expressions = HashMap<TranscendentalExpression, ExactRealValue>()
     private val formulas = HashMap<TranscendentalFormula, SourceTruth>()
+    private val distincts = HashMap<TranscendentalDistinct, TranscendentalFormula>()
 
     fun evaluate(expression: TranscendentalExpression): ExactRealValue {
         val pending = ArrayDeque<Pair<TranscendentalExpression, Boolean>>()
@@ -76,6 +79,9 @@ internal class TranscendentalSourceCheck(
             val (node, _) = pending.removeLast()
             if (node in formulas) continue
             val children = when (node) {
+                is TranscendentalDistinct -> listOf(distincts.getOrPut(node) {
+                    transcendentalDistinctEncoding(node, arithmetic.transcendental::step)
+                })
                 is TranscendentalFormula.Not -> listOf(node.operand)
                 is TranscendentalFormula.And -> node.operands
                 is TranscendentalFormula.Or -> node.operands
@@ -97,6 +103,7 @@ internal class TranscendentalSourceCheck(
                     if (bools[node.id.index]) SourceTruth.TRUE else SourceTruth.FALSE
                 }
                 is TranscendentalFormula.Atom -> atom(node)
+                is TranscendentalDistinct -> formulas.getValue(children.single())
                 is TranscendentalFormula.Not -> when (formulas.getValue(node.operand)) {
                     SourceTruth.TRUE -> SourceTruth.FALSE
                     SourceTruth.FALSE -> SourceTruth.TRUE

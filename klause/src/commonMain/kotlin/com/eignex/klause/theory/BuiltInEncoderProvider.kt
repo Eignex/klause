@@ -6,14 +6,16 @@ import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.DivMod
 import com.eignex.klause.factor.arithmetic.GridAbs
-import com.eignex.klause.factor.arithmetic.GridArrayMinMax
 import com.eignex.klause.factor.arithmetic.GridArithmetic
+import com.eignex.klause.factor.arithmetic.GridArrayMinMax
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.WideDivMod
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
@@ -60,6 +62,16 @@ object BuiltInEncoderProvider : EncoderProvider {
 
     override fun select(factor: Factor, target: EncodingTarget): Encoder = when {
         target !in EncodingTarget.entries -> unsupported
+        factor is AllDifferent -> when (target) {
+            EncodingTarget.LINEAR -> AllDifferentEncoder.linear
+            EncodingTarget.POLYNOMIAL -> AllDifferentEncoder.polynomial
+            else -> unsupported
+        }
+        factor is Distinct -> when (target) {
+            EncodingTarget.LINEAR -> DistinctEncoders.linear
+            EncodingTarget.POLYNOMIAL -> DistinctEncoders.polynomial
+            else -> unsupported
+        }
         factor is LinearIndicator -> when (target) {
             EncodingTarget.LINEAR -> LinearIndicatorEncoder.linear
             EncodingTarget.POLYNOMIAL -> LinearIndicatorEncoder.polynomial

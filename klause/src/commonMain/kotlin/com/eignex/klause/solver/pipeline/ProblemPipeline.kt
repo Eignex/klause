@@ -271,7 +271,9 @@ private fun Problem.pipelineRouteObserved(
         initial.objective === objective && initial.maximize == maximize
     val stopped = reuseInitial && preparationCancellation()
     val preparationStop = if (stopped) Cancellation { true } or preparationCancellation else preparationCancellation
-    val finiteCompletion = finiteIntegerRanges &&
+    val nativeFiniteAfterBounds = !routeLinearToTheory &&
+        routed.nativeFiniteSource(projections, preparationStop)
+    val finiteCompletion = nativeFiniteAfterBounds || finiteIntegerRanges &&
         objective?.realCoefficientValues?.any { it != 0.0 } != true &&
         routed.requiresPolynomialCompletion(projections) && routed.finiteRealCompletionSupported(projections)
     val arithmeticStop = if (routed.requiresPolynomialCompletion(projections, preferFinite = finiteCompletion)) {
@@ -314,7 +316,7 @@ private fun Problem.pipelineRouteObserved(
     val preferFinite = finiteIntegerRanges && !preferExact &&
         (!routePureRealToTheory || arithmeticRoute != ProblemPipeline.EXACT_LRA) &&
         routed.finiteRealCompletionSupported(projections)
-    val prepared = if (preferFinite) {
+    val prepared = if (preferFinite && arithmeticRoute != ProblemPipeline.FINITE_CP) {
         routed.prepareExecutionPlan(
             this,
             objective,

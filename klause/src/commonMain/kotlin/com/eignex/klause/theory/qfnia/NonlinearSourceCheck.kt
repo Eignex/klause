@@ -3,6 +3,7 @@ package com.eignex.klause.theory.qfnia
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.ir.PolynomialDistinct
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
@@ -74,6 +75,17 @@ internal fun checkNonlinearSource(
             is PolynomialRealFormula.Not -> !truth.getValue(node.operand)
             is PolynomialRealFormula.And -> children.all { truth.getValue(it) }
             is PolynomialRealFormula.Or -> children.any { truth.getValue(it) }
+            is PolynomialDistinct -> {
+                val values = node.operands.map(::evaluate)
+                var distinct = true
+                for (first in values.indices) {
+                    for (second in first + 1 until values.size) {
+                        arithmetic.step()
+                        if (algebraic.compare(values[first], values[second]) == 0) distinct = false
+                    }
+                }
+                distinct
+            }
             is PolynomialSelection -> algebraic.compare(assignment.realValue(node.result.index),
                 evaluate(if (truth.getValue(node.condition)) node.whenTrue else node.whenFalse)) == 0
             is PolynomialRealFormula.Atom -> {
