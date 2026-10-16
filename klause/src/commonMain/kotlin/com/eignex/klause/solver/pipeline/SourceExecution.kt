@@ -258,7 +258,7 @@ fun SourceSetup.execute(
 private fun executeCapturedSource(
     request: SourceExecutionRequest,
     callbacks: SourceExecutionCallbacks,
-    bindScope: ((Cancellation) -> Unit)? = null,
+    bindScope: ((Cancellation, Boolean) -> Unit)? = null,
 ): SourceExecutionResult {
     val invocation = request.invocation
     val kind = SourceSetup.executionKind(invocation)
@@ -290,7 +290,9 @@ private fun executeCapturedSource(
                 ?: throw PipelineConfigException("finite source execution requires its typed finite controls")
             require(finite.shape === shape) { "finite execution belongs to a different source invocation" }
             invocation.requireFiniteExecution(finite.shape, finite.engine, finite.operation)
-            bindScope?.invoke(finite.cancellation or Cancellation { finite.deadlineExceeded() })
+            bindScope?.invoke(
+                finite.cancellation or Cancellation { finite.deadlineExceeded() }, finite.toleranceCheck == null,
+            )
             SourceExecutionResult.Finite(invocation, FinitePipeline.solve(finite, callbacks.finite))
         }
 

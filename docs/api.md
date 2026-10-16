@@ -137,8 +137,9 @@ its producing model and proof scope; source-specific transfer qualification stil
 For a `LinearSourceProblem`, `SourceExecutionResult.linearSource` retains an immutable
 original-unit point and conclusion beside the full native payload. The optional
 `onLinearSourceIncumbent` callback receives checked declaration-order coordinates and
-exact original objective values. Native finite improvement costs remain working costs;
-`objectiveScale` records a positive integral scaling when used. Numerical payloads keep
+exact original objective values. Ordinary native callbacks and payloads retain their
+working coordinates and costs; `objectiveScale` records a positive integral scaling
+when used. Numerical payloads keep
 their own evidence scope, bounds, terminal and reason. Original accepted-set claims
 require nominal correspondence, tolerance coverage and an unrestricted native scope,
 or an independently established accepted-set bound attained by a checked point.
@@ -148,6 +149,8 @@ A checked nominal recession base and ray retain their existing unboundedness aut
 Source acceptance alone cannot promote a nominal optimum to a tolerance optimum.
 An accepted original objective must also attain the native bound after applying its
 working scale; a private cost coordinate cannot substitute for that comparison.
+An additional finite acceptance callback restricts the native scope; its exhaustion
+cannot refute or optimize the whole original source.
 The numerical route uses `TheoryParams` and its existing serial LP/MIP traversal;
 LS/ALNS requests retain witness-only native results. Common strategy controls and
 format-specific CLI registration remain separate from this library surface.
