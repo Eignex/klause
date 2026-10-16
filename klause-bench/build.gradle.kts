@@ -415,13 +415,25 @@ val checkJvmCompilationCosts = tasks.register<Exec>("checkJvmCompilationCosts") 
     workingDir(projectDir)
     commandLine("python3", "tools/test_report_jvm_compilation_cohort.py")
     inputs.files("tools/report_jvm_compilation_cohort.py", "tools/test_report_jvm_compilation_cohort.py",
-        "tools/jvm_compilation_mapping.py",
+        "tools/jvm_compilation_mapping.py", "tools/jvm_recording_context.py",
+        "tools/jvm_compilation_events.py", "tools/review_jvm_task_log_cohort.py", "tools/review_jvm_task_log.py",
+        "tools/stream_jvm_task_log.py", "tools/review_native_vm_log_identities.py",
+        "tools/review_native_vm_live_arguments.py", "tools/native_vm_event_loss.py")
+}
+
+val checkJvmRecordingContext = tasks.register<Exec>("checkJvmRecordingContext") {
+    group = "verification"
+    description = "Test original JVM contexts from authenticated complete saved JFR exports."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_jvm_recording_context.py")
+    inputs.files("tools/jvm_recording_context.py", "tools/test_jvm_recording_context.py",
         "tools/jvm_compilation_events.py", "tools/review_jvm_task_log_cohort.py", "tools/review_jvm_task_log.py",
         "tools/stream_jvm_task_log.py", "tools/review_native_vm_log_identities.py",
         "tools/review_native_vm_live_arguments.py", "tools/native_vm_event_loss.py")
 }
 
 tasks.named("check") {
+    dependsOn(checkJvmRecordingContext)
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,

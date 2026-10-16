@@ -222,6 +222,17 @@ class ReportJvmCompilationCohortTest(unittest.TestCase):
                 report = {'completed': True, 'originalMember': member, 'originalIdentity': identity,
                           'originalCaseDirectory': arm, 'compilations': [{'eventIndex': 0, 'errors': []}],
                           'families': {'f': family}}
+                export = root / f'events-{ordinal:06d}.json.gz'
+                event_raw = json.dumps({'recording': {'events': [
+                    {'type': 'jdk.JVMInformation', 'values': {'javaArguments': arm}}]}}).encode()
+                export.write_bytes(gzip.compress(event_raw))
+                selected[export.name] = export
+                report.update(exportFile=dict(path=export.name, **review.cohort.file_identity(export)),
+                    retainedExportUncompressedIdentity={'size': len(event_raw),
+                        'sha256': hashlib.sha256(event_raw).hexdigest()},
+                    eventCounts={'jdk.JVMInformation': 1},
+                    observedAllClassMetrics={'reportedElapsedNanos': elapsed},
+                    observedTierMetrics={'4': {'reportedElapsedNanos': elapsed}})
                 path = root / name
                 path.write_bytes(gzip.compress(json.dumps(report).encode()))
                 selected[name] = path
@@ -241,6 +252,13 @@ class ReportJvmCompilationCohortTest(unittest.TestCase):
             self.assertTrue(result['completed'])
             self.assertEqual([], result['metadataOnlyCaseNames'])
             self.assertEqual(2, len(result['recordingObservations']))
+            self.assertEqual([], result['unreferencedSavedExportPaths'])
+            for observation in result['recordingObservations']:
+                self.assertEqual(observation['case'], observation['arm'])
+                self.assertTrue(observation['savedJvmContext']['completeSavedExportRead'])
+                self.assertEqual([{'eventIndex': 0, 'values': {'javaArguments': observation['arm']}}],
+                                 observation['savedJvmContext']['jvmInformationEvents'])
+                self.assertEqual(observation['observedAllClassMetrics'], observation['observedTierMetrics']['4'])
             self.assertEqual(1, len(result['allOriginalContextPairs']))
             pair = result['allOriginalContextPairs'][0]
             self.assertTrue(pair['observedDeclaredPhaseAndSourceEligible'])
@@ -251,6 +269,9 @@ class ReportJvmCompilationCohortTest(unittest.TestCase):
             self.assertEqual(5, summary['metrics']['reportedElapsedNanos']['sumOfPairCandidateValues'])
             self.assertEqual([-3, -3], summary['metrics']['reportedElapsedNanos']['pairDifferenceRange'])
             self.assertFalse(result['acceptedSavingsCredit'])
+            selected['events-000099.json.gz'] = export
+            extra = review.inspect(selected, {'archive': {'sha256': 'pinned'}}, 'profile9/')
+            self.assertEqual(['events-000099.json.gz'], extra['unreferencedSavedExportPaths'])
 
     def test_observation_summaries_keep_unqualified_reported_costs_and_missing_values_without_comparison_credit(self):
         row = {'case': 'c', 'family': 'f', 'arm': 'candidate', 'engine': 'ls', 'index': 1, 'repetition': 0,

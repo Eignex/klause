@@ -2352,6 +2352,17 @@ the already computed all-tier and C2 scalar quantities for every family/recordin
 including excluded contexts. Their source/phase exclusions and missing quantities
 stay explicit. These descriptive observations do not qualify a comparison or
 establish exhaustive source work or a current source change's benefit.
+`recordingObservationSummaries` retains every recording's all-class and tier
+scalars, original context keys, census identity and `savedJvmContext`. The latter
+authenticates both compressed and expanded identities of the referenced original
+`events-*.json.gz`, then streams that complete saved export without `jfr print`.
+Every JVMInformation event retains its original event index and complete values,
+including unknown fields, commands, arguments, process identity and start time
+when recorded. Missing exports, absent events, repeated or conflicting contexts,
+incomplete original censuses and mismatched event counts remain explicit.
+No context is selected from multiple events and no target process role is inferred.
+Unreferenced saved exports remain named in `unreferencedSavedExportPaths`.
+Context availability does not change original or mapped pair eligibility.
 Missing, duplicate or unexpected arms, mismatched problem identities, invalid or
 unknown original source outcomes, incomplete cohorts, missing declared ordinary
 phases, unresolved roots, XML gaps, data-loss events and ambiguous IDs remain
@@ -2365,11 +2376,16 @@ source change's benefit. Original runtime/source outcomes retain their own scope
 current runtime, allocation, RNG/work, independent and cold controls are separate.
 All full-root, elapsed-time, code-size and saving proof flags remain false.
 Resource bounds are 2 GiB compressed archives, 16 GiB complete member expansion,
-512 MiB selected compressed metadata, 512 MiB per expanded census JSON and
+512 MiB selected compressed metadata and saved exports, 512 MiB per expanded census JSON and
 512 MiB complete compressed output. Transport staging is removed after the child
 finishes. Optional mapping inputs are bounded to 16 MiB. The observer retains its
-installed build/JDK identity, exact ten-file
+installed build/JDK identity, exact twelve-file
 Python closure, original input identities and actual child streams/exit.
+Saved exports keep the census reader's 8 GiB expanded, 8 MiB per event and four
+million event bounds. Each recording allows at most 4096 JVMInformation events
+and 16 MiB of complete context JSON; exceeding a bound declines the complete
+context review and cannot authorize a parsed prefix. Existing 512 MiB report and
+64 MiB summary limits also apply to the retained contexts.
 
 ### Polynomial witness work checkpoints
 

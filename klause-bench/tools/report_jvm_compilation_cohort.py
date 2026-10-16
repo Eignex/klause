@@ -11,6 +11,7 @@ import tarfile
 import tempfile
 
 import jvm_compilation_mapping as mapping
+import jvm_recording_context as context
 import review_jvm_task_log_cohort as cohort
 
 MAX_JSON_BYTES = 512 * 1024 * 1024
@@ -256,7 +257,7 @@ def authenticate(manifest_path, expected, archive_path, scratch):
                 raise ValueError('Complete census archive expansion differs or exceeds bounds')
             name = member.name.removeprefix(prefix) if member.name.startswith(prefix) else ''
             chosen = name == 'compilation-cohort.json' or bool(re.fullmatch(
-                r'(?:compilation-[0-9]{6}\.json|xml-[0-9]{6}-[0-9]{3}\.json|'
+                r'(?:(?:compilation|events)-[0-9]{6}\.json|xml-[0-9]{6}-[0-9]{3}\.json|'
                 r'original-(?:cases|compilation-families|study-builds|boolean-source-checks|linear-source-checks)\.json)\.gz', name))
             if chosen:
                 stored += member.size
@@ -311,6 +312,7 @@ def inspect(selected, manifest, prefix, declaration=None):
     mapped_families = mapping.bind(declaration, selected, index, manifest, load_json, MAX_JSON_BYTES) \
         if declaration is not None else None
     rows, recordings, represented, mapped_rows, represented_xml = [], [], set(), [], set()
+    represented_exports = set()
     cohort_complete = index.get('completed') is True and index.get('allCaseCensusesComplete') is True and \
         not index.get('metadataOnlyCaseNames') and not index.get('archivedCasesMissingMetadata') and \
         set(metadata) == {row['caseDirectory'] for row in index['cases']}
@@ -341,7 +343,9 @@ def inspect(selected, manifest, prefix, declaration=None):
                     report.get('originalCaseDirectory') != name:
                 raise ValueError('Census report original recording identity differs')
             recordings.append({'case': name, 'reportIdentity': retained,
+                'arm': metadata[name].get('arm'), **{key: metadata[name].get(key) for key in CONTEXT_KEYS},
                 'completed': report.get('completed'), 'error': report.get('error'),
+                'savedJvmContext': context.inspect(report, selected, represented_exports),
                 'eventCounts': report.get('eventCounts'),
                 'observedAllClassMetrics': report.get('observedAllClassMetrics'),
                 'observedTierMetrics': report.get('observedTierMetrics'),
@@ -374,6 +378,8 @@ def inspect(selected, manifest, prefix, declaration=None):
         'pairArmRepresentation': 'observationIndex references sibling familyCaseObservations; all arms and duplicates retained',
         'metadataOnlyCaseNames': sorted(set(metadata) - {row['caseDirectory'] for row in index['cases']}),
         'recordingObservations': recordings,
+        'unreferencedSavedExportPaths': [name for name in selected
+            if re.fullmatch(r'events-[0-9]{6}\.json\.gz', name) and name not in represented_exports],
         'recordingsWithoutFamilyCensus': [row for row in recordings if not row['familyNames']],
         'familyCaseObservations': rows, 'allOriginalContextPairs': referenced_pairs(pairs, rows),
         'observedComparisonSummaries': summaries(pairs),
@@ -429,6 +435,11 @@ def main():
         summary['familyObservationSummaries'] = observation_summaries(result.get('familyCaseObservations', []))
         summary['mappedFamilyObservationSummaries'] = observation_summaries(mapped['familyCaseObservations']) \
             if mapped is not None else None
+        summary['recordingObservationSummaries'] = [{key: row.get(key) for key in
+            ('case', 'arm', *CONTEXT_KEYS, 'reportIdentity', 'completed', 'error', 'eventCounts',
+             'savedJvmContext', 'observedAllClassMetrics', 'observedTierMetrics')}
+            for row in result.get('recordingObservations', [])]
+        summary['unreferencedSavedExportPaths'] = result.get('unreferencedSavedExportPaths')
         summary['observationSummaryScope'] = 'Complete descriptive reported root quantities, including excluded contexts; '
         summary['observationSummaryScope'] += 'not paired eligibility, exhaustive source costs or current-source benefit.'
         raw = (json.dumps(summary, indent=2) + '\n').encode()

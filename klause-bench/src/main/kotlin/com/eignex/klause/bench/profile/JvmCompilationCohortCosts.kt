@@ -90,6 +90,7 @@ internal object JvmCompilationCohortCosts {
         val names = listOf(
             "report_jvm_compilation_cohort.py", "review_jvm_compilation_cohort.py", "jvm_compilation_events.py",
             "jvm_compilation_mapping.py",
+            "jvm_recording_context.py", "read_jvm_class_origins.py",
             "review_jvm_task_log_cohort.py", "review_jvm_task_log.py", "stream_jvm_task_log.py",
             "review_native_vm_log_identities.py", "review_native_vm_live_arguments.py", "native_vm_event_loss.py",
         )
