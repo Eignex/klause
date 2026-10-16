@@ -59,7 +59,7 @@ class SourceExecutionTest {
 
         val outcome = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
         assertEquals(FiniteSolveVerdict.SAT, outcome.verdict)
-        assertEquals(2L, assertNotNull(outcome.bestSample).intValue(0))
+        assertEquals(1L, outcome.solutions)
         assertEquals(2L, samples.last().intValue(0))
         assertSame(source.semantics, result.semantics)
         assertSame(invocation, result.invocation)
@@ -79,7 +79,9 @@ class SourceExecutionTest {
             bound = 1.0,
         )
             ),
-            numRealVars = 1
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0), constant = 7)
         val invocation = SourceSetup.prepare(
