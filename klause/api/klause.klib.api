@@ -2450,6 +2450,176 @@ sealed interface com.eignex.klause.ir/ConstList { // com.eignex.klause.ir/ConstL
         abstract fun <get-size>(): kotlin/Int // com.eignex.klause.ir/ConstList.size.<get-size>|<get-size>(){}[0]
 }
 
+sealed interface com.eignex.klause.ir/DefinitionHint { // com.eignex.klause.ir/DefinitionHint|null[0]
+    abstract val output // com.eignex.klause.ir/DefinitionHint.output|{}output[0]
+        abstract fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.output.<get-output>|<get-output>(){}[0]
+
+    open fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/DefinitionHint? // com.eignex.klause.ir/DefinitionHint.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+
+    sealed interface Boolean : com.eignex.klause.ir/DefinitionHint // com.eignex.klause.ir/DefinitionHint.Boolean|null[0]
+
+    sealed interface Integer : com.eignex.klause.ir/DefinitionHint // com.eignex.klause.ir/DefinitionHint.Integer|null[0]
+
+    sealed interface Operand { // com.eignex.klause.ir/DefinitionHint.Operand|null[0]
+        final class Constant : com.eignex.klause.ir/DefinitionHint.Operand { // com.eignex.klause.ir/DefinitionHint.Operand.Constant|null[0]
+            constructor <init>(kotlin/Long) // com.eignex.klause.ir/DefinitionHint.Operand.Constant.<init>|<init>(kotlin.Long){}[0]
+
+            final val value // com.eignex.klause.ir/DefinitionHint.Operand.Constant.value|{}value[0]
+                final fun <get-value>(): kotlin/Long // com.eignex.klause.ir/DefinitionHint.Operand.Constant.value.<get-value>|<get-value>(){}[0]
+        }
+
+        final class Variable : com.eignex.klause.ir/DefinitionHint.Operand { // com.eignex.klause.ir/DefinitionHint.Operand.Variable|null[0]
+            constructor <init>(kotlin/Int) // com.eignex.klause.ir/DefinitionHint.Operand.Variable.<init>|<init>(kotlin.Int){}[0]
+
+            final val id // com.eignex.klause.ir/DefinitionHint.Operand.Variable.id|{}id[0]
+                final fun <get-id>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Operand.Variable.id.<get-id>|<get-id>(){}[0]
+        }
+    }
+
+    final class Abs : com.eignex.klause.ir/DefinitionHint.Integer { // com.eignex.klause.ir/DefinitionHint.Abs|null[0]
+        constructor <init>(kotlin/Int, com.eignex.klause.ir/DefinitionHint.Operand) // com.eignex.klause.ir/DefinitionHint.Abs.<init>|<init>(kotlin.Int;com.eignex.klause.ir.DefinitionHint.Operand){}[0]
+
+        final val input // com.eignex.klause.ir/DefinitionHint.Abs.input|{}input[0]
+            final fun <get-input>(): com.eignex.klause.ir/DefinitionHint.Operand // com.eignex.klause.ir/DefinitionHint.Abs.input.<get-input>|<get-input>(){}[0]
+        final val output // com.eignex.klause.ir/DefinitionHint.Abs.output|{}output[0]
+            final fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Abs.output.<get-output>|<get-output>(){}[0]
+    }
+
+    final class BooleanReference : com.eignex.klause.ir/DefinitionHint.Boolean { // com.eignex.klause.ir/DefinitionHint.BooleanReference|null[0]
+        constructor <init>(kotlin/Int, kotlin/Int = ...) // com.eignex.klause.ir/DefinitionHint.BooleanReference.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+
+        final val literal // com.eignex.klause.ir/DefinitionHint.BooleanReference.literal|{}literal[0]
+            final fun <get-literal>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.BooleanReference.literal.<get-literal>|<get-literal>(){}[0]
+        final val output // com.eignex.klause.ir/DefinitionHint.BooleanReference.output|{}output[0]
+            final fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.BooleanReference.output.<get-output>|<get-output>(){}[0]
+    }
+
+    final class BooleanValue : com.eignex.klause.ir/DefinitionHint.Integer { // com.eignex.klause.ir/DefinitionHint.BooleanValue|null[0]
+        constructor <init>(kotlin/Int, kotlin/Int) // com.eignex.klause.ir/DefinitionHint.BooleanValue.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+
+        final val literal // com.eignex.klause.ir/DefinitionHint.BooleanValue.literal|{}literal[0]
+            final fun <get-literal>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.BooleanValue.literal.<get-literal>|<get-literal>(){}[0]
+        final val output // com.eignex.klause.ir/DefinitionHint.BooleanValue.output|{}output[0]
+            final fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.BooleanValue.output.<get-output>|<get-output>(){}[0]
+    }
+
+    final class Comparison : com.eignex.klause.ir/DefinitionHint.Boolean { // com.eignex.klause.ir/DefinitionHint.Comparison|null[0]
+        constructor <init>(kotlin/Int, kotlin/LongArray, kotlin/Array<com.eignex.klause.ir/DefinitionHint.Operand>, kotlin/Long, com.eignex.klause.ir/LinearOp, kotlin/Boolean = ...) // com.eignex.klause.ir/DefinitionHint.Comparison.<init>|<init>(kotlin.Int;kotlin.LongArray;kotlin.Array<com.eignex.klause.ir.DefinitionHint.Operand>;kotlin.Long;com.eignex.klause.ir.LinearOp;kotlin.Boolean){}[0]
+
+        final val bound // com.eignex.klause.ir/DefinitionHint.Comparison.bound|{}bound[0]
+            final fun <get-bound>(): kotlin/Long // com.eignex.klause.ir/DefinitionHint.Comparison.bound.<get-bound>|<get-bound>(){}[0]
+        final val coefficients // com.eignex.klause.ir/DefinitionHint.Comparison.coefficients|{}coefficients[0]
+            final fun <get-coefficients>(): kotlin/LongArray // com.eignex.klause.ir/DefinitionHint.Comparison.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
+        final val inputs // com.eignex.klause.ir/DefinitionHint.Comparison.inputs|{}inputs[0]
+            final fun <get-inputs>(): kotlin/Array<com.eignex.klause.ir/DefinitionHint.Operand> // com.eignex.klause.ir/DefinitionHint.Comparison.inputs.<get-inputs>|<get-inputs>(){}[0]
+        final val output // com.eignex.klause.ir/DefinitionHint.Comparison.output|{}output[0]
+            final fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Comparison.output.<get-output>|<get-output>(){}[0]
+        final val relation // com.eignex.klause.ir/DefinitionHint.Comparison.relation|{}relation[0]
+            final fun <get-relation>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.ir/DefinitionHint.Comparison.relation.<get-relation>|<get-relation>(){}[0]
+        final val strict // com.eignex.klause.ir/DefinitionHint.Comparison.strict|{}strict[0]
+            final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.ir/DefinitionHint.Comparison.strict.<get-strict>|<get-strict>(){}[0]
+    }
+
+    final class Element : com.eignex.klause.ir/DefinitionHint.Integer { // com.eignex.klause.ir/DefinitionHint.Element|null[0]
+        constructor <init>(kotlin/Int, kotlin/Int, kotlin/IntArray?, kotlin/LongArray?, kotlin/Int) // com.eignex.klause.ir/DefinitionHint.Element.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.IntArray?;kotlin.LongArray?;kotlin.Int){}[0]
+
+        final val index // com.eignex.klause.ir/DefinitionHint.Element.index|{}index[0]
+            final fun <get-index>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Element.index.<get-index>|<get-index>(){}[0]
+        final val offset // com.eignex.klause.ir/DefinitionHint.Element.offset|{}offset[0]
+            final fun <get-offset>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Element.offset.<get-offset>|<get-offset>(){}[0]
+        final val output // com.eignex.klause.ir/DefinitionHint.Element.output|{}output[0]
+            final fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Element.output.<get-output>|<get-output>(){}[0]
+        final val values // com.eignex.klause.ir/DefinitionHint.Element.values|{}values[0]
+            final fun <get-values>(): kotlin/LongArray? // com.eignex.klause.ir/DefinitionHint.Element.values.<get-values>|<get-values>(){}[0]
+        final val variables // com.eignex.klause.ir/DefinitionHint.Element.variables|{}variables[0]
+            final fun <get-variables>(): kotlin/IntArray? // com.eignex.klause.ir/DefinitionHint.Element.variables.<get-variables>|<get-variables>(){}[0]
+    }
+
+    final class Extreme : com.eignex.klause.ir/DefinitionHint.Integer { // com.eignex.klause.ir/DefinitionHint.Extreme|null[0]
+        constructor <init>(kotlin/Int, kotlin/Array<com.eignex.klause.ir/DefinitionHint.Operand>, kotlin/Boolean) // com.eignex.klause.ir/DefinitionHint.Extreme.<init>|<init>(kotlin.Int;kotlin.Array<com.eignex.klause.ir.DefinitionHint.Operand>;kotlin.Boolean){}[0]
+
+        final val inputs // com.eignex.klause.ir/DefinitionHint.Extreme.inputs|{}inputs[0]
+            final fun <get-inputs>(): kotlin/Array<com.eignex.klause.ir/DefinitionHint.Operand> // com.eignex.klause.ir/DefinitionHint.Extreme.inputs.<get-inputs>|<get-inputs>(){}[0]
+        final val maximum // com.eignex.klause.ir/DefinitionHint.Extreme.maximum|{}maximum[0]
+            final fun <get-maximum>(): kotlin/Boolean // com.eignex.klause.ir/DefinitionHint.Extreme.maximum.<get-maximum>|<get-maximum>(){}[0]
+        final val output // com.eignex.klause.ir/DefinitionHint.Extreme.output|{}output[0]
+            final fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Extreme.output.<get-output>|<get-output>(){}[0]
+    }
+
+    final class Fold : com.eignex.klause.ir/DefinitionHint.Boolean { // com.eignex.klause.ir/DefinitionHint.Fold|null[0]
+        constructor <init>(com.eignex.klause.ir/BoolFoldDefinition) // com.eignex.klause.ir/DefinitionHint.Fold.<init>|<init>(com.eignex.klause.ir.BoolFoldDefinition){}[0]
+
+        final val definition // com.eignex.klause.ir/DefinitionHint.Fold.definition|{}definition[0]
+            final fun <get-definition>(): com.eignex.klause.ir/BoolFoldDefinition // com.eignex.klause.ir/DefinitionHint.Fold.definition.<get-definition>|<get-definition>(){}[0]
+        final val output // com.eignex.klause.ir/DefinitionHint.Fold.output|{}output[0]
+            final fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Fold.output.<get-output>|<get-output>(){}[0]
+    }
+
+    final class IntegerReference : com.eignex.klause.ir/DefinitionHint.Integer { // com.eignex.klause.ir/DefinitionHint.IntegerReference|null[0]
+        constructor <init>(kotlin/Int) // com.eignex.klause.ir/DefinitionHint.IntegerReference.<init>|<init>(kotlin.Int){}[0]
+
+        final val output // com.eignex.klause.ir/DefinitionHint.IntegerReference.output|{}output[0]
+            final fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.IntegerReference.output.<get-output>|<get-output>(){}[0]
+    }
+
+    final class Linear : com.eignex.klause.ir/DefinitionHint.Integer { // com.eignex.klause.ir/DefinitionHint.Linear|null[0]
+        constructor <init>(kotlin/Int, kotlin/LongArray, kotlin/Array<com.eignex.klause.ir/DefinitionHint.Operand>, kotlin/Long) // com.eignex.klause.ir/DefinitionHint.Linear.<init>|<init>(kotlin.Int;kotlin.LongArray;kotlin.Array<com.eignex.klause.ir.DefinitionHint.Operand>;kotlin.Long){}[0]
+
+        final val bound // com.eignex.klause.ir/DefinitionHint.Linear.bound|{}bound[0]
+            final fun <get-bound>(): kotlin/Long // com.eignex.klause.ir/DefinitionHint.Linear.bound.<get-bound>|<get-bound>(){}[0]
+        final val coefficients // com.eignex.klause.ir/DefinitionHint.Linear.coefficients|{}coefficients[0]
+            final fun <get-coefficients>(): kotlin/LongArray // com.eignex.klause.ir/DefinitionHint.Linear.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
+        final val inputs // com.eignex.klause.ir/DefinitionHint.Linear.inputs|{}inputs[0]
+            final fun <get-inputs>(): kotlin/Array<com.eignex.klause.ir/DefinitionHint.Operand> // com.eignex.klause.ir/DefinitionHint.Linear.inputs.<get-inputs>|<get-inputs>(){}[0]
+        final val output // com.eignex.klause.ir/DefinitionHint.Linear.output|{}output[0]
+            final fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Linear.output.<get-output>|<get-output>(){}[0]
+    }
+
+    final class Membership : com.eignex.klause.ir/DefinitionHint.Boolean { // com.eignex.klause.ir/DefinitionHint.Membership|null[0]
+        constructor <init>(kotlin/Int, kotlin/Int, kotlin/LongArray) // com.eignex.klause.ir/DefinitionHint.Membership.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.LongArray){}[0]
+
+        final val input // com.eignex.klause.ir/DefinitionHint.Membership.input|{}input[0]
+            final fun <get-input>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Membership.input.<get-input>|<get-input>(){}[0]
+        final val output // com.eignex.klause.ir/DefinitionHint.Membership.output|{}output[0]
+            final fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Membership.output.<get-output>|<get-output>(){}[0]
+        final val values // com.eignex.klause.ir/DefinitionHint.Membership.values|{}values[0]
+            final fun <get-values>(): kotlin/LongArray // com.eignex.klause.ir/DefinitionHint.Membership.values.<get-values>|<get-values>(){}[0]
+    }
+
+    final class Plus : com.eignex.klause.ir/DefinitionHint.Integer { // com.eignex.klause.ir/DefinitionHint.Plus|null[0]
+        constructor <init>(kotlin/Int, com.eignex.klause.ir/DefinitionHint.Operand, com.eignex.klause.ir/DefinitionHint.Operand) // com.eignex.klause.ir/DefinitionHint.Plus.<init>|<init>(kotlin.Int;com.eignex.klause.ir.DefinitionHint.Operand;com.eignex.klause.ir.DefinitionHint.Operand){}[0]
+
+        final val left // com.eignex.klause.ir/DefinitionHint.Plus.left|{}left[0]
+            final fun <get-left>(): com.eignex.klause.ir/DefinitionHint.Operand // com.eignex.klause.ir/DefinitionHint.Plus.left.<get-left>|<get-left>(){}[0]
+        final val output // com.eignex.klause.ir/DefinitionHint.Plus.output|{}output[0]
+            final fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Plus.output.<get-output>|<get-output>(){}[0]
+        final val right // com.eignex.klause.ir/DefinitionHint.Plus.right|{}right[0]
+            final fun <get-right>(): com.eignex.klause.ir/DefinitionHint.Operand // com.eignex.klause.ir/DefinitionHint.Plus.right.<get-right>|<get-right>(){}[0]
+    }
+
+    final class Power : com.eignex.klause.ir/DefinitionHint.Integer { // com.eignex.klause.ir/DefinitionHint.Power|null[0]
+        constructor <init>(kotlin/Int, com.eignex.klause.ir/DefinitionHint.Operand, kotlin/Int) // com.eignex.klause.ir/DefinitionHint.Power.<init>|<init>(kotlin.Int;com.eignex.klause.ir.DefinitionHint.Operand;kotlin.Int){}[0]
+
+        final val base // com.eignex.klause.ir/DefinitionHint.Power.base|{}base[0]
+            final fun <get-base>(): com.eignex.klause.ir/DefinitionHint.Operand // com.eignex.klause.ir/DefinitionHint.Power.base.<get-base>|<get-base>(){}[0]
+        final val exponent // com.eignex.klause.ir/DefinitionHint.Power.exponent|{}exponent[0]
+            final fun <get-exponent>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Power.exponent.<get-exponent>|<get-exponent>(){}[0]
+        final val output // com.eignex.klause.ir/DefinitionHint.Power.output|{}output[0]
+            final fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Power.output.<get-output>|<get-output>(){}[0]
+    }
+
+    final class Product : com.eignex.klause.ir/DefinitionHint.Integer { // com.eignex.klause.ir/DefinitionHint.Product|null[0]
+        constructor <init>(kotlin/Int, com.eignex.klause.ir/DefinitionHint.Operand, com.eignex.klause.ir/DefinitionHint.Operand) // com.eignex.klause.ir/DefinitionHint.Product.<init>|<init>(kotlin.Int;com.eignex.klause.ir.DefinitionHint.Operand;com.eignex.klause.ir.DefinitionHint.Operand){}[0]
+
+        final val left // com.eignex.klause.ir/DefinitionHint.Product.left|{}left[0]
+            final fun <get-left>(): com.eignex.klause.ir/DefinitionHint.Operand // com.eignex.klause.ir/DefinitionHint.Product.left.<get-left>|<get-left>(){}[0]
+        final val output // com.eignex.klause.ir/DefinitionHint.Product.output|{}output[0]
+            final fun <get-output>(): kotlin/Int // com.eignex.klause.ir/DefinitionHint.Product.output.<get-output>|<get-output>(){}[0]
+        final val right // com.eignex.klause.ir/DefinitionHint.Product.right|{}right[0]
+            final fun <get-right>(): com.eignex.klause.ir/DefinitionHint.Operand // com.eignex.klause.ir/DefinitionHint.Product.right.<get-right>|<get-right>(){}[0]
+    }
+}
+
 sealed interface com.eignex.klause.ir/FactorReduction { // com.eignex.klause.ir/FactorReduction|null[0]
     final class Rewrite : com.eignex.klause.ir/FactorReduction { // com.eignex.klause.ir/FactorReduction.Rewrite|null[0]
         constructor <init>(kotlin.collections/List<com.eignex.klause.ir/Factor>, kotlin.collections/Map<kotlin/Int, kotlin.ranges/IntRange> = ...) // com.eignex.klause.ir/FactorReduction.Rewrite.<init>|<init>(kotlin.collections.List<com.eignex.klause.ir.Factor>;kotlin.collections.Map<kotlin.Int,kotlin.ranges.IntRange>){}[0]
@@ -7233,12 +7403,14 @@ final class com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram { // com
 }
 
 final class com.eignex.klause.formats.flatzinc/FlatZincProgram { // com.eignex.klause.formats.flatzinc/FlatZincProgram|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.formats.flatzinc/SolveDirective, kotlin.collections/Map<kotlin/String, kotlin/Int>, kotlin.collections/Map<kotlin/String, kotlin/Int>, kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatBucketing>, kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/FlatZincArray>, kotlin.collections/List<com.eignex.klause.formats.flatzinc/OutputItem>?, com.eignex.klause.formats.flatzinc/FlatZincSearchHints?, kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/String>> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/SetVarLayout> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatRepresentation> = ..., com.eignex.klause.ir/EffectiveSourceSemantics = ...) // com.eignex.klause.formats.flatzinc/FlatZincProgram.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.formats.flatzinc.SolveDirective;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatBucketing>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.FlatZincArray>;kotlin.collections.List<com.eignex.klause.formats.flatzinc.OutputItem>?;com.eignex.klause.formats.flatzinc.FlatZincSearchHints?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<kotlin.String>>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.SetVarLayout>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatRepresentation>;com.eignex.klause.ir.EffectiveSourceSemantics){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.formats.flatzinc/SolveDirective, kotlin.collections/Map<kotlin/String, kotlin/Int>, kotlin.collections/Map<kotlin/String, kotlin/Int>, kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatBucketing>, kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/FlatZincArray>, kotlin.collections/List<com.eignex.klause.formats.flatzinc/OutputItem>?, com.eignex.klause.formats.flatzinc/FlatZincSearchHints?, kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/String>> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/SetVarLayout> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatRepresentation> = ..., com.eignex.klause.ir/EffectiveSourceSemantics = ..., kotlin.collections/List<com.eignex.klause.ir/DefinitionHint> = ...) // com.eignex.klause.formats.flatzinc/FlatZincProgram.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.formats.flatzinc.SolveDirective;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatBucketing>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.FlatZincArray>;kotlin.collections.List<com.eignex.klause.formats.flatzinc.OutputItem>?;com.eignex.klause.formats.flatzinc.FlatZincSearchHints?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<kotlin.String>>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.SetVarLayout>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatRepresentation>;com.eignex.klause.ir.EffectiveSourceSemantics;kotlin.collections.List<com.eignex.klause.ir.DefinitionHint>){}[0]
 
     final val arraysByName // com.eignex.klause.formats.flatzinc/FlatZincProgram.arraysByName|{}arraysByName[0]
         final fun <get-arraysByName>(): kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/FlatZincArray> // com.eignex.klause.formats.flatzinc/FlatZincProgram.arraysByName.<get-arraysByName>|<get-arraysByName>(){}[0]
     final val boolVarsByName // com.eignex.klause.formats.flatzinc/FlatZincProgram.boolVarsByName|{}boolVarsByName[0]
         final fun <get-boolVarsByName>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.flatzinc/FlatZincProgram.boolVarsByName.<get-boolVarsByName>|<get-boolVarsByName>(){}[0]
+    final val definitionHints // com.eignex.klause.formats.flatzinc/FlatZincProgram.definitionHints|{}definitionHints[0]
+        final fun <get-definitionHints>(): kotlin.collections/List<com.eignex.klause.ir/DefinitionHint> // com.eignex.klause.formats.flatzinc/FlatZincProgram.definitionHints.<get-definitionHints>|<get-definitionHints>(){}[0]
     final val enumLabelsByVar // com.eignex.klause.formats.flatzinc/FlatZincProgram.enumLabelsByVar|{}enumLabelsByVar[0]
         final fun <get-enumLabelsByVar>(): kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/String>> // com.eignex.klause.formats.flatzinc/FlatZincProgram.enumLabelsByVar.<get-enumLabelsByVar>|<get-enumLabelsByVar>(){}[0]
     final val floatRepresentations // com.eignex.klause.formats.flatzinc/FlatZincProgram.floatRepresentations|{}floatRepresentations[0]
@@ -7264,6 +7436,7 @@ final class com.eignex.klause.formats.flatzinc/FlatZincProgram { // com.eignex.k
     final fun component10(): kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/SetVarLayout> // com.eignex.klause.formats.flatzinc/FlatZincProgram.component10|component10(){}[0]
     final fun component11(): kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatRepresentation> // com.eignex.klause.formats.flatzinc/FlatZincProgram.component11|component11(){}[0]
     final fun component12(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.formats.flatzinc/FlatZincProgram.component12|component12(){}[0]
+    final fun component13(): kotlin.collections/List<com.eignex.klause.ir/DefinitionHint> // com.eignex.klause.formats.flatzinc/FlatZincProgram.component13|component13(){}[0]
     final fun component2(): com.eignex.klause.formats.flatzinc/SolveDirective // com.eignex.klause.formats.flatzinc/FlatZincProgram.component2|component2(){}[0]
     final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.flatzinc/FlatZincProgram.component3|component3(){}[0]
     final fun component4(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.flatzinc/FlatZincProgram.component4|component4(){}[0]
@@ -7272,7 +7445,7 @@ final class com.eignex.klause.formats.flatzinc/FlatZincProgram { // com.eignex.k
     final fun component7(): kotlin.collections/List<com.eignex.klause.formats.flatzinc/OutputItem>? // com.eignex.klause.formats.flatzinc/FlatZincProgram.component7|component7(){}[0]
     final fun component8(): com.eignex.klause.formats.flatzinc/FlatZincSearchHints? // com.eignex.klause.formats.flatzinc/FlatZincProgram.component8|component8(){}[0]
     final fun component9(): kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/String>> // com.eignex.klause.formats.flatzinc/FlatZincProgram.component9|component9(){}[0]
-    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.formats.flatzinc/SolveDirective = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatBucketing> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/FlatZincArray> = ..., kotlin.collections/List<com.eignex.klause.formats.flatzinc/OutputItem>? = ..., com.eignex.klause.formats.flatzinc/FlatZincSearchHints? = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/String>> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/SetVarLayout> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatRepresentation> = ..., com.eignex.klause.ir/EffectiveSourceSemantics = ...): com.eignex.klause.formats.flatzinc/FlatZincProgram // com.eignex.klause.formats.flatzinc/FlatZincProgram.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.formats.flatzinc.SolveDirective;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatBucketing>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.FlatZincArray>;kotlin.collections.List<com.eignex.klause.formats.flatzinc.OutputItem>?;com.eignex.klause.formats.flatzinc.FlatZincSearchHints?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<kotlin.String>>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.SetVarLayout>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatRepresentation>;com.eignex.klause.ir.EffectiveSourceSemantics){}[0]
+    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.formats.flatzinc/SolveDirective = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatBucketing> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/FlatZincArray> = ..., kotlin.collections/List<com.eignex.klause.formats.flatzinc/OutputItem>? = ..., com.eignex.klause.formats.flatzinc/FlatZincSearchHints? = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/String>> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/SetVarLayout> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatRepresentation> = ..., com.eignex.klause.ir/EffectiveSourceSemantics = ..., kotlin.collections/List<com.eignex.klause.ir/DefinitionHint> = ...): com.eignex.klause.formats.flatzinc/FlatZincProgram // com.eignex.klause.formats.flatzinc/FlatZincProgram.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.formats.flatzinc.SolveDirective;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatBucketing>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.FlatZincArray>;kotlin.collections.List<com.eignex.klause.formats.flatzinc.OutputItem>?;com.eignex.klause.formats.flatzinc.FlatZincSearchHints?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<kotlin.String>>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.SetVarLayout>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatRepresentation>;com.eignex.klause.ir.EffectiveSourceSemantics;kotlin.collections.List<com.eignex.klause.ir.DefinitionHint>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.flatzinc/FlatZincProgram.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.flatzinc/FlatZincProgram.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.flatzinc/FlatZincProgram.toString|toString(){}[0]
@@ -8854,6 +9027,7 @@ final class com.eignex.klause.localsearch/DefinitionalSweep { // com.eignex.klau
     final val size // com.eignex.klause.localsearch/DefinitionalSweep.size|{}size[0]
         final fun <get-size>(): kotlin/Int // com.eignex.klause.localsearch/DefinitionalSweep.size.<get-size>|<get-size>(){}[0]
 
+    final fun functionalObjective(com.eignex.klause.solver.objective/LinearObjective): com.eignex.klause.solver.objective/IncrementalObjective? // com.eignex.klause.localsearch/DefinitionalSweep.functionalObjective|functionalObjective(com.eignex.klause.solver.objective.LinearObjective){}[0]
     final fun functionalObjective(kotlin/IntArray, kotlin/LongArray, kotlin/Long, kotlin/Boolean, kotlin/IntArray = ..., kotlin/LongArray = ...): com.eignex.klause.solver.objective/IncrementalObjective? // com.eignex.klause.localsearch/DefinitionalSweep.functionalObjective|functionalObjective(kotlin.IntArray;kotlin.LongArray;kotlin.Long;kotlin.Boolean;kotlin.IntArray;kotlin.LongArray){}[0]
     final fun network(kotlin/Int, kotlin/Int): com.eignex.klause.localsearch/InvariantNetwork // com.eignex.klause.localsearch/DefinitionalSweep.network|network(kotlin.Int;kotlin.Int){}[0]
     final fun sweep(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin/Array<out com.eignex.klause.ir/Factor> = ..., kotlin/Function1<kotlin/Int, kotlin/Boolean> = ...) // com.eignex.klause.localsearch/DefinitionalSweep.sweep|sweep(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.Array<out|com.eignex.klause.ir.Factor>;kotlin.Function1<kotlin.Int,kotlin.Boolean>){}[0]
@@ -8966,6 +9140,7 @@ final class com.eignex.klause.localsearch/DefinitionalSweep { // com.eignex.klau
     }
 
     final object Companion { // com.eignex.klause.localsearch/DefinitionalSweep.Companion|null[0]
+        final fun fromSource(com.eignex.klause.ir/Problem, kotlin.collections/List<com.eignex.klause.ir/DefinitionHint>, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.localsearch/DefinitionalSweep.Companion.fromSource|fromSource(com.eignex.klause.ir.Problem;kotlin.collections.List<com.eignex.klause.ir.DefinitionHint>;com.eignex.klause.util.Cancellation){}[0]
         final fun infer(com.eignex.klause.ir/Problem, kotlin/IntArray = ..., kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ...): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.localsearch/DefinitionalSweep.Companion.infer|infer(com.eignex.klause.ir.Problem;kotlin.IntArray;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>){}[0]
         final fun infer(kotlin/Array<com.eignex.klause.ir/Factor>, kotlin/Int, kotlin/IntArray = ..., kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ...): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.localsearch/DefinitionalSweep.Companion.infer|infer(kotlin.Array<com.eignex.klause.ir.Factor>;kotlin.Int;kotlin.IntArray;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>){}[0]
     }
