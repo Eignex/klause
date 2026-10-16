@@ -340,6 +340,17 @@ Admission decline leaves witness probing available; prefix exhaustion retains sp
 work and leaves complete CAD available. It introduces no coordinate bounds or finite
 domains and exports no proof artifact.
 
+The same bounded prefix can derive necessary coordinate magnitudes from an
+unconditional upper bound on a positive sum of even monomials. Each univariate
+summand supplies a conservative rational magnitude bound without root extraction;
+a zero upper bound forces each summand to zero. Exact closed term enclosures then
+retain even-power correlation and coefficient signs. A relation disjoint from its
+polynomial enclosure refutes the conjunction. Guarded premises, missing coordinate
+bounds and representation declines supply no refutation. These private consequences
+install no source bounds, CP domains or search boxes. They share the existing
+coordinate, atom, term, degree, coefficient and native-work limits, and completed
+refutations receive the containing final stop check.
+
 Before projection, bounded witness probing checks complete exact points and can
 repair one coordinate at a time using roots of an equality specialized at all other
 coordinates. Repaired points can guide later repairs even when the full check fails.
