@@ -24,11 +24,12 @@ The compatibility `toExactSourceProblem` entry defaults to zero;
 its explicit overrides and internal exact-row fallback retain their resolved policy.
 Source representation and the permitted feasibility slack are separate properties.
 
-The CLI loader captures shared typed caller overrides before lowering. `--exact`
-replaces the feasibility tolerance with zero while preserving other fields for
-applicability checking. Finite leaf checks and numerical source publication use
-that captured policy throughout the loaded source's lifetime. Absolute slack and
-rendered objective values remain in source units when working rows or costs are scaled.
+The CLI loader resolves shared typed caller overrides before opening the input.
+`--exact` requires zero feasibility tolerance and rejects explicit positive tolerance;
+inapplicable controls are usage errors. Zero tolerance selects certified numerical
+execution. Finite leaf checks and numerical source publication use the captured
+policy throughout the loaded source's lifetime. Absolute slack and rendered objective
+values remain in source units when working rows or costs are scaled.
 
 ## Source correspondence
 

@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.MpsLoweringException
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.FloatSemantics
@@ -50,7 +51,12 @@ class MpsModeTest {
             val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(99.5))
 
             assertEquals(policy, original.semantics.effective.feasibilityTolerance)
-            assertEquals(accepted, assertNotNull(loaded.toleranceCheck)(point))
+            if (policy.isExact) {
+                assertNull(loaded.toleranceCheck)
+                assertFailsWith<MpsLoweringException> { loaded.render(point) }
+            } else {
+                assertEquals(accepted, assertNotNull(loaded.toleranceCheck)(point))
+            }
         }
     }
 
@@ -87,23 +93,34 @@ class MpsModeTest {
     }
 
     @Test
-    fun `MPS exact loading should replace the shared tolerance without mutating caller overrides`() {
+    fun `MPS exact loading should capture zero tolerance in the lowered policy`() {
         val source = File.createTempFile("mps-shared-exact", ".mps").apply {
             writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA\n")
             deleteOnExit()
         }
-        val policy = SourceTolerance(absolute = SemanticRational.ONE)
-        val common = CommonOptions().apply {
-            exact = true
-            semanticOverrides = SemanticOverrides(feasibilityTolerance = policy)
-        }
+        val common = CommonOptions().apply { exact = true }
 
         val loaded = MpsMode.newSession().load(source.absolutePath, common)
         val original = assertIs<Problem>(loaded.finiteShape.preparedPlan.originalSource)
 
         assertEquals(SourceTolerance(), original.semantics.effective.feasibilityTolerance)
-        assertEquals(policy, common.semanticOverrides.feasibilityTolerance)
         assertNull(loaded.toleranceCheck)
+    }
+
+    @Test
+    fun `MPS exact loading should reject positive caller tolerance before input`() {
+        val common = CommonOptions().apply {
+            exact = true
+            semanticOverrides = SemanticOverrides(
+                feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ONE),
+            )
+        }
+
+        val error = assertFailsWith<CliUsageException> {
+            MpsMode.newSession().load("missing-mps-positive-tolerance.mps", common)
+        }
+
+        assertTrue(error.message.orEmpty().contains("conflicts with --exact"))
     }
 
     @Test
@@ -117,7 +134,7 @@ class MpsModeTest {
             semanticOverrides = SemanticOverrides(floats = FloatSemantics.Continuous)
         }
 
-        assertFailsWith<IllegalArgumentException> { MpsMode.newSession().load(source.absolutePath, common) }
+        assertFailsWith<CliUsageException> { MpsMode.newSession().load(source.absolutePath, common) }
     }
 
     @Test
