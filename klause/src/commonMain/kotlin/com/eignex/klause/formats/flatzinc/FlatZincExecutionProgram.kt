@@ -117,7 +117,9 @@ fun parseFlatZincExecution(
     val selected = program.retainedSource?.executionProgram(invocation) ?: original
     val finite = invocation.engineRoute as? SourceProblemRoute.Finite
     val shape = finite?.let { invocation.finiteShape() }
-    val sweep = shape?.let { DefinitionalSweep.fromSource(it.problem, original.definitionHints, invocation.cancellation) }
+    val sweep = shape?.let {
+        DefinitionalSweep.fromSource(it.problem, original.definitionHints, invocation.cancellation)
+    }
     val objective = shape?.linearObjective?.let { sweep?.functionalObjective(it, invocation.cancellation) }
     return FlatZincExecutionProgram(selected, objective, sweep).also { it.bindSourceInvocation(invocation) }
 }

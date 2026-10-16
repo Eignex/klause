@@ -22,7 +22,11 @@ import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.FloatInterval
 
-internal data class FloatGridVariable(val source: SourceRealId, val buckets: Int? = null, val auxiliary: Boolean = false)
+internal data class FloatGridVariable(
+    val source: SourceRealId,
+    val buckets: Int? = null,
+    val auxiliary: Boolean = false,
+)
 
 internal class FloatGridRequest(val source: Problem, variables: List<FloatGridVariable>, val owner: Any = Any()) {
     val variables = variables.toList()
@@ -176,12 +180,16 @@ internal fun floatGridColumn(
     if (source.realLower[id].isNaN() || source.realUpper[id].isNaN() ||
         source.realLower[id] == Double.POSITIVE_INFINITY || source.realUpper[id] == Double.NEGATIVE_INFINITY
     ) return null
-    val origin = (if (source.realLower[id].isFinite()) BigFraction.ofDouble(source.realLower[id]) else if (image != null) {
+    val origin = (if (source.realLower[id].isFinite()) {
+        BigFraction.ofDouble(source.realLower[id])
+    } else if (image != null) {
         BigFraction.ofDouble(image.lo)
     } else {
         policy.unrangedBounds.lower?.let { BigFraction.of(it.numerator, it.denominator) }
     }) ?: return null
-    val upper = (if (source.realUpper[id].isFinite()) BigFraction.ofDouble(source.realUpper[id]) else if (image != null) {
+    val upper = (if (source.realUpper[id].isFinite()) {
+        BigFraction.ofDouble(source.realUpper[id])
+    } else if (image != null) {
         BigFraction.ofDouble(image.hi)
     } else {
         policy.unrangedBounds.upper?.let { BigFraction.of(it.numerator, it.denominator) }
@@ -218,7 +226,8 @@ private fun lowerFloatGridFactor(
             listOf(GridAbs(input.variable, output.variable, input.lower, input.upper, input.buckets,
                 output.lower, output.upper, output.buckets, image))
         }
-        is ContinuousProduct -> listOf(GridProduct(coordinate(factor.a), coordinate(factor.b), coordinate(factor.result)))
+        is ContinuousProduct -> listOf(GridProduct(coordinate(factor.a), coordinate(factor.b),
+            coordinate(factor.result)))
         is Power -> listOf(GridPower(coordinate((factor.base as Power.Coordinate.Real).id.index), factor.exponent,
             coordinate((factor.result as Power.Coordinate.Real).id.index)))
         is RealArrayMinMax -> listOf(lowerGridMinMax(factor, columns, policy.linearScale, cancellation) ?: return null)

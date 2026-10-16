@@ -72,7 +72,9 @@ internal class FloatGridMapping(
                 it.coordinate.variable in source.numIntVars until target.numIntVars &&
                 this.retainedReals[it.source.index] == -1
         })
-        require((0 until source.numRealVars).all { it in bySource || this.retainedReals[it] in 0 until target.numRealVars })
+        require((0 until source.numRealVars).all {
+            it in bySource || this.retainedReals[it] in 0 until target.numRealVars
+        })
         require(this.retainedReals.filter { it >= 0 }.distinct().size == target.numRealVars)
         require(origins.toSet().size == source.numFactors)
     }
@@ -159,7 +161,8 @@ internal class FloatGridMapping(
             ints[id] = sample.intValue(id)
         }
         if (stop()) return null
-        val result = Sample(bools, ints, approximate, exact, sample.exactInts?.take(source.numIntVars), algebraic, symbolic)
+        val result = Sample(bools, ints, approximate, exact, sample.exactInts?.take(source.numIntVars),
+            algebraic, symbolic)
             .withSourceSemantics(source.semantics)
             .withCoordinateFrame(source)
         return if (stop()) null else result
