@@ -13,13 +13,18 @@ class ContinuationBudgetTest {
         budget.step(units = 0L)
         budget.phase = ContinuationPhase.INPUT
         budget.step(units = 7L, bytes = 11L)
+        budget.phase = ContinuationPhase.REPAIR
+        budget.step(units = 0L)
         budget.phase = ContinuationPhase.VERIFY
 
         budget.step(units = 3L, bytes = 5L)
 
-        assertEquals(mapOf(ContinuationPhase.VERIFY to 3L, ContinuationPhase.INPUT to 7L), budget.workByPhase)
-        assertEquals(mapOf(ContinuationPhase.VERIFY to 5L, ContinuationPhase.INPUT to 11L), budget.allocationByPhase)
-        assertEquals(listOf(ContinuationPhase.VERIFY, ContinuationPhase.INPUT), budget.workByPhase.keys.toList())
+        assertEquals(mapOf(ContinuationPhase.VERIFY to 3L, ContinuationPhase.INPUT to 7L,
+            ContinuationPhase.REPAIR to 0L), budget.workByPhase)
+        assertEquals(mapOf(ContinuationPhase.VERIFY to 5L, ContinuationPhase.INPUT to 11L,
+            ContinuationPhase.REPAIR to 0L), budget.allocationByPhase)
+        assertEquals(listOf(ContinuationPhase.VERIFY, ContinuationPhase.INPUT, ContinuationPhase.REPAIR),
+            budget.workByPhase.keys.toList())
         assertEquals(10L, budget.work)
         assertEquals(16L, budget.allocation)
     }
