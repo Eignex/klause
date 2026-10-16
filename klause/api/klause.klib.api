@@ -6557,8 +6557,10 @@ final class com.eignex.klause.factor.global/LexLess : com.eignex.klause.ir/Facto
 }
 
 final class com.eignex.klause.factor.global/NValue : com.eignex.klause.factor/OptionalFactor, com.eignex.klause.ir/Factor { // com.eignex.klause.factor.global/NValue|null[0]
-    constructor <init>(kotlin/Int, kotlin/IntArray, com.eignex.klause.factor.global/NValue.Mode = ..., kotlin/IntArray = ...) // com.eignex.klause.factor.global/NValue.<init>|<init>(kotlin.Int;kotlin.IntArray;com.eignex.klause.factor.global.NValue.Mode;kotlin.IntArray){}[0]
+    constructor <init>(kotlin/Int, kotlin/IntArray, com.eignex.klause.factor.global/NValue.Mode = ..., kotlin/IntArray = ..., kotlin/LongArray = ...) // com.eignex.klause.factor.global/NValue.<init>|<init>(kotlin.Int;kotlin.IntArray;com.eignex.klause.factor.global.NValue.Mode;kotlin.IntArray;kotlin.LongArray){}[0]
 
+    final val exceptSet // com.eignex.klause.factor.global/NValue.exceptSet|{}exceptSet[0]
+        final fun <get-exceptSet>(): kotlin/LongArray // com.eignex.klause.factor.global/NValue.exceptSet.<get-exceptSet>|<get-exceptSet>(){}[0]
     final val mode // com.eignex.klause.factor.global/NValue.mode|{}mode[0]
         final fun <get-mode>(): com.eignex.klause.factor.global/NValue.Mode // com.eignex.klause.factor.global/NValue.mode.<get-mode>|<get-mode>(){}[0]
     final val n // com.eignex.klause.factor.global/NValue.n|{}n[0]
