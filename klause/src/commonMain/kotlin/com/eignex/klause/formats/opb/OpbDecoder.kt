@@ -4,10 +4,13 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.BoolFoldDefinition
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.ProblemBuilder
 import com.eignex.klause.lowering.tseitinAnd
@@ -33,7 +36,10 @@ data class OpbProblem(
     val boolFolds: List<BoolFoldDefinition> = emptyList(),
     /** Number of source Boolean variables, excluding auxiliary indicators. */
     val numDeclaredVars: Int = 0,
-)
+) : SourceSemanticsOwner {
+    /** Effective interpretation captured by the lowered source. */
+    override val semantics: EffectiveSourceSemantics get() = problem.semantics
+}
 
 /** Raised when a parsed OPB document cannot be represented by the lowering. */
 class OpbLoweringException(msg: String) : IllegalArgumentException("OPB: $msg")
@@ -41,8 +47,12 @@ class OpbLoweringException(msg: String) : IllegalArgumentException("OPB: $msg")
 /** Decodes an OPB syntax document into solver data. */
 internal object OpbDecoder {
 
-    fun decode(document: OpbDocument, settings: ProblemSettings = ProblemSettings()): OpbProblem {
-        val builder = Builder(document.numDeclaredVars, settings)
+    fun decode(
+        document: OpbDocument,
+        settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+        semantics: EffectiveSourceSemantics = opbSemantics.resolve(),
+    ): OpbProblem {
+        val builder = Builder(document.numDeclaredVars, settings, semantics)
         val objectiveWeights = HashMap<Int, BigInt>()
         var objectiveConstant = BIG_ZERO
         var hasObjective = false
@@ -136,8 +146,12 @@ internal object OpbDecoder {
 
     private class Relation(val weights: Array<BigInt>, val literals: IntArray, val op: PbOp, val bound: BigInt)
 
-    private class Builder(numDeclaredVars: Int, settings: ProblemSettings) : CnfLowering {
-        private val problemBuilder = ProblemBuilder(settings)
+    private class Builder(
+        numDeclaredVars: Int,
+        settings: ProblemSettings,
+        semantics: EffectiveSourceSemantics,
+    ) : CnfLowering {
+        private val problemBuilder = ProblemBuilder(settings, semantics)
 
         override val factors get() = problemBuilder.factors
         override var trueLitCache: Int
@@ -203,5 +217,7 @@ internal object OpbDecoder {
 }
 
 /** Lower this parsed OPB document to a solver problem. */
-fun OpbDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.problemSettings()): OpbProblem =
-    OpbDecoder.decode(this, settings)
+fun OpbDocument.toProblem(
+    settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+    semanticOverrides: SemanticOverrides = SemanticOverrides(),
+): OpbProblem = OpbDecoder.decode(this, settings, opbSemantics.resolve(semanticOverrides))

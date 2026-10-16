@@ -11,7 +11,10 @@ This page records format-specific encodings and source validation.
 
 DIMACS CNF supplies Boolean clauses. WCNF supplies weighted partial MaxSAT.
 OPB/WBO supplies pseudo-Boolean constraints and objectives, including supported
-product and soft-constraint encodings. XCSP3 supplies finite-domain variables,
+product and soft-constraint encodings. Its `opbSemantics` declares exact source
+authority before lowering and rejects inapplicable semantic overrides.
+`OpbProblem` forwards the captured policy from its lowered problem; omitted
+resource settings capture the ambient configuration. XCSP3 supplies finite-domain variables,
 supported globals and optional objectives. Each frontend retains its source
 objective orientation and output names.
 
