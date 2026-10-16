@@ -378,6 +378,9 @@ mechanisms; they do not promise full consistency at every size or resource limit
 AllDifferent filtering selects its cached incremental path before the full matching
 fallback. The fallback retains value mapping, matching, Hall reasons, pruning and
 cache publication in one private phase with borrowed state.
+The incremental rebuild separates value counting, warm seeding, Hall recovery,
+matching publication and fixpoint recording. Matching publication precedes SCC
+pruning; validity and domain-reference publication follow successful pruning.
 
 Complete finite checks pin the full assignment and run a completed CP fixpoint.
 They stop after an interrupted root or before further coordinate pins when their
