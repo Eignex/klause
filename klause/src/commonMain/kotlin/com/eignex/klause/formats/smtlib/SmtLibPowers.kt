@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.integerPowerOrNull
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
+import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.lowering.isConstant
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.bigIntOf
@@ -27,7 +28,6 @@ private fun powerExponent(term: IntComb): Int {
 }
 
 internal fun Compiler.Builder.integerPower(base: IntComb, power: IntComb): IntComb {
-    if (macros.isNotEmpty()) smtUnsupported("power requires lexical source lowering")
     val exponent = powerExponent(power)
     if (exponent == 0) return IntComb.Narrow(LinComb(emptyMap(), 1L))
     if (exponent == 1) return base
@@ -49,20 +49,15 @@ internal fun Compiler.Builder.integerPower(base: IntComb, power: IntComb): IntCo
 }
 
 internal fun Compiler.Builder.realPower(base: RealComb, power: IntComb): Res.R {
-    if (macros.isNotEmpty()) smtUnsupported("power requires lexical source lowering")
     val exponent = powerExponent(power)
     if (exponent == 0) return Res.R(RealComb(emptyMap(), emptyMap(), BigFraction.ONE))
     if (exponent == 1) return Res.R(base)
     if (base.isConstant) {
-        var remaining = exponent
-        var value = BigFraction.ONE
-        var factor = base.constant
-        while (remaining > 0) {
-            if (remaining and 1 != 0) value *= factor
-            remaining = remaining ushr 1
-            if (remaining > 0) factor *= factor
-        }
-        return Res.R(RealComb(emptyMap(), emptyMap(), value))
+        val value = PolynomialRealLowering.power(PolynomialRealLowering.constant(base.constant), exponent,
+            sourceCancellation)
+        val coefficient = PolynomialRealLowering.rational(value)
+            ?: smtUnsupported("constant power requires an exact source expression")
+        return Res.R(RealComb(emptyMap(), emptyMap(), coefficient))
     }
     if (inferringBounds) smtUnsupported("power requires source lowering")
     val result = nextReal++

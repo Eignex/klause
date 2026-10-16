@@ -317,7 +317,9 @@ are rejected. Logic declaration syntax does not choose a source representation.
 Quoted and bare spellings of one symbol share its declaration identity, while
 quoted numeral symbols stay separate from numeral literals. Output metadata keeps
 the declaration's original spelling. Source lowering charges and polls the containing
-admission allowance while expanding actual helper applications.
+admission allowance while expanding actual helper applications and folding constant
+powers. Product and power representation depends on the lowered operands, rather
+than the presence of unrelated helper declarations.
 
 Parallel `let` values read the enclosing scope. Typed nonrecursive `define-fun` macros
 capture their definition scope, and assertions retain the declarations visible at

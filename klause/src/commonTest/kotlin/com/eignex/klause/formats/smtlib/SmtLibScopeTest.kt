@@ -27,8 +27,21 @@ class SmtLibScopeTest {
 
     @Test
     fun `nonlinear helper applications should preserve original finite source values`() {
-        val source = SmtLib.parse("(set-logic QF_NIA) (declare-const n Int) " +
-            "(define-fun square ((v Int)) Int (* v v)) (assert (<= 1 n 2)) (assert (= (square n) 4))")
+        for (body in listOf("(* v v)", "(^ v 2)")) {
+            val source = SmtLib.parse("(set-logic QF_NIA) (declare-const n Int) " +
+                "(define-fun square ((v Int)) Int $body) (assert (<= 1 n 2)) (assert (= (square n) 4))")
+
+            val result = BacktrackSolver.source(source.model).solve()
+
+            assertEquals("2", assertIs<OpenTheoryResult.Sat>(result).assignment
+                .intValue(source.intVarNames.getValue("n")))
+        }
+    }
+
+    @Test
+    fun `unused helper declarations should retain unrelated native products`() {
+        val source = SmtLib.parse("(declare-const n Int) (define-fun identity ((v Int)) Int v) " +
+            "(assert (<= 1 n 2)) (assert (= (* n n) 4))")
 
         val result = BacktrackSolver.source(source.model).solve()
 

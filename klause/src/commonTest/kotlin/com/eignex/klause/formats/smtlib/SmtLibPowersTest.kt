@@ -14,7 +14,6 @@ import com.eignex.klause.solver.pipeline.pipelineRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 class SmtLibPowersTest {
     @Test
@@ -23,20 +22,19 @@ class SmtLibPowersTest {
             "(declare-const x Int) " +
                 "(assert (and (<= (- 3) x 3) (= (^ x 4) 16)))",
         )
-        val lexical = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse(
-                "(declare-const x Int) (define-fun fourth ((y Int)) Int (^ y 4)) " +
-                    "(assert (and (<= (- 3) x 3) (= (fourth x) 16)))",
-            )).source.originalSource)
+        val lexical = SmtLib.parse(
+            "(declare-const x Int) (define-fun fourth ((y Int)) Int (^ y 4)) " +
+                "(assert (and (<= (- 3) x 3) (= (fourth x) 16)))",
+        )
         assertEquals(4, bounded.model.factors.filterIsInstance<Power>().single().exponent)
         val finite = BacktrackSolver(bounded.model.bake()).enumerate(BacktrackParams(maxDecisions = 50))
             .map { it.intValue(0).toString() }.toSet()
 
-        val result = OpenTheoryPipeline.execute(lexical.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+        val lexicalRoots = BacktrackSolver(lexical.model.bake()).enumerate(BacktrackParams(maxDecisions = 50))
+            .map { it.intValue(0).toString() }.toSet()
 
-        val witness = assertIs<OpenTheoryResult.Sat>(result.result).assignment.intValue(0)
         assertEquals(setOf("-2", "2"), finite)
-        assertTrue(witness in finite)
+        assertEquals(finite, lexicalRoots)
     }
 
     @Test
