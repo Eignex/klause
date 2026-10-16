@@ -1544,6 +1544,19 @@ not establish a unique owner or cause, and counts overlap the phase and self tab
 Both CPU counts and estimated allocation weights are summarized after CLI timing;
 recorder settings and solver execution are unchanged.
 
+Captured context-marker tables join each event's model-facing caller tuple with
+observed concrete entry methods: `ResumableOpenTheory.runSlice` or
+`OpenTheoryEngine.OpenTheoryRun.advance`, `RetainedLinearQueries` check/preparation,
+`ExactNeighborhood.advance` or `OpenExactNeighborhood.check`, `LpProbeSolver.probe`,
+and `QfLiraSolverKt.sharedExactLiraSource` or `PreparedSearchComponents.prepareSource`.
+Nested JVM method frames retain their entry marker. Missing captured ancestors remain
+unknown; multiple contexts remain explicit, including a common engine ancestor and a
+retained-query or neighborhood entry together. These markers do not establish unique
+invocation identity or public/private authority. Absence of a private marker does not
+prove complete public traversal. Each event contributes once to each context table;
+all context/caller groups are printed. Tables are overlapping facets of the same
+samples and allocation weights, so their totals must not be added together.
+
 `com.eignex.klause.bench.profile.CliRecordingSummary` replays retained recordings
 on the remote lab host. Pass one positive `sourceJob=<id>` and one to eight
 `recording=<case>:<measurementUUID>:<rawSHA256>` arguments. It derives sibling jobs
