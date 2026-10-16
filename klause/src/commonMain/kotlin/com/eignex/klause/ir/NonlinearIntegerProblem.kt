@@ -8,7 +8,9 @@ class NonlinearIntegerProblem internal constructor(
     intVarNames: Map<String, Int>,
     realVarNames: Map<String, Int>,
     boolVarNames: Map<String, Int>,
-) {
+    /** Effective source declaration semantics captured before lowering. */
+    override val semantics: EffectiveSourceSemantics = defaultIrSemantics,
+) : SourceSemanticsOwner {
     private val integers = intVarNames.toMap()
     private val reals = realVarNames.toMap()
     private val booleans = boolVarNames.toMap()
