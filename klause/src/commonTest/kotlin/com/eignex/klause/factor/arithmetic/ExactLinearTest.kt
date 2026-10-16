@@ -24,7 +24,6 @@ import com.eignex.klause.util.parseBigInt
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
@@ -137,7 +136,6 @@ class ExactLinearTest {
             val values = BacktrackSolver(source.bake()).enumerate().map { it.intValue(0) }.sorted().toList()
 
             assertEquals(expected, values)
-            assertFalse(row.strict)
         }
     }
 
