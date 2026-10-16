@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 
 class PolynomialSignRefutationTest {
     @Test
@@ -65,6 +66,21 @@ class PolynomialSignRefutationTest {
         for ((atoms, terms) in listOf(1 to 2048, 128 to 1)) {
             assertFalse(refutePolynomialSigns(formula, arithmetic, atoms, terms))
         }
+    }
+
+    @Test
+    fun `containing work exhaustion withholds the completed refutation`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (assert (and (> x 0) (= (* x x) 0)))",
+        )
+        val completed = assertIs<QfNraResult.Unsatisfiable>(
+            solveQfNra(source.formula, source.boolCount, source.realCount),
+        )
+
+        val stopped = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1))
+
+        assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(stopped).reason)
     }
 
     @Test
