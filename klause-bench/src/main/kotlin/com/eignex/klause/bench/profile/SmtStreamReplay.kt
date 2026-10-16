@@ -13,8 +13,11 @@ internal object SmtStreamReplay {
     @Suppress("TooGenericExceptionCaught")
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size == 1) { "Supply a base64 JSON array of captured SMT records" }
-        val bytes = Base64.getDecoder().decode(args.single())
+        require(args.size in 1..2 && (args.size == 1 || args[1] == "checker=functions")) {
+            "Supply a base64 JSON array of captured SMT records and optional checker=functions"
+        }
+        val functions = args.size == 2
+        val bytes = Base64.getDecoder().decode(args[0])
         val records = Json.decodeFromString<List<CapturedStreamRecord>>(bytes.toString(Charsets.UTF_8))
         require(records.isNotEmpty())
         val output = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
@@ -28,7 +31,10 @@ internal object SmtStreamReplay {
                 val stdout = File(directory, "stdout").apply { writeText(record.stdout) }
                 require(sha256(source.readBytes()) == record.sourceSha256) { "Original source hash differs" }
                 require(sha256(stdout.readBytes()) == record.stdoutSha256) { "Original output hash differs" }
-                checker.check(directory, source, record.interrupted, record.minimumWitnesses, provision = true)
+                checker.check(
+                    directory, source, record.interrupted, record.minimumWitnesses,
+                    provision = true, functions = functions,
+                )
             } catch (error: Exception) {
                 Reports.writeJson(File(directory, "failure.json").path, ReplayFailure(error.toString()))
             }

@@ -116,6 +116,9 @@ internal object MiniZincMode : CliMode {
                 ),
             )
             return when (val route = invocation.route) {
+                is SourceProblemRoute.NativeFormula ->
+                    unsupportedFiniteSource("FlatZinc finite admission selected a native formula")
+
                 is SourceProblemRoute.Finite -> Solvable(
                     finite = invocation.finiteShape(),
                     render = render,

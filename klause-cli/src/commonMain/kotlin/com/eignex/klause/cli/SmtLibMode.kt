@@ -10,13 +10,12 @@ import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.algebraicRealValue
-import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.pipeline.symbolicRealValue
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.plus
@@ -53,46 +52,47 @@ internal object SmtLibMode : CliMode {
             )
             val parsed = when (admitted) {
                 is SmtLibInput.Linear -> admitted.problem
+
                 is SmtLibInput.Polynomial -> {
-                    common.takeOpenBoundProof()
                     val source = admitted.problem
                     val bools = source.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
                     val reals = source.realVarNames.mapKeys { smtSourceSymbol(it.key) }
-                    return polynomialSolvable(
-                        source.pipelineRequest(),
+                    return attachedSourceSolvable(
+                        SourceAttachment(source, config.problemSettings()),
+                        common,
                         { assignment -> renderOpenTheoryModel(emptyMap(), bools, reals, assignment) },
                         admissionStart.elapsedNow().inWholeMilliseconds,
                     )
                 }
 
                 is SmtLibInput.NonlinearInteger -> {
-                    common.takeOpenBoundProof()
                     val source = admitted.problem
                     val ints = source.intVarNames.mapKeys { smtSourceSymbol(it.key) }
                     val bools = source.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
                     val reals = source.realVarNames.mapKeys { smtSourceSymbol(it.key) }
-                    return nonlinearIntegerSolvable(
-                        source.pipelineRequest(),
+                    return attachedSourceSolvable(
+                        SourceAttachment(source, config.problemSettings()),
+                        common,
                         { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
                         admissionStart.elapsedNow().inWholeMilliseconds,
                     )
                 }
 
                 is SmtLibInput.Transcendental -> {
-                    common.takeOpenBoundProof()
                     val source = admitted.problem
                     val ints = source.intVarNames.mapKeys { smtSourceSymbol(it.key) }
                     val bools = source.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
                     val reals = source.realVarNames.mapKeys { smtSourceSymbol(it.key) }
-                    return exactTheorySolvable(source.pipelineRequest(),
+                    return attachedSourceSolvable(
+                        SourceAttachment(source, config.problemSettings()),
+                        common,
                         { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
                         admissionStart.elapsedNow().inWholeMilliseconds,
-                        pipelineName = "transcendental-theory", declaredTheoryRoute = "transcendental")
+                    )
                 }
 
                 is SmtLibInput.Quadratic -> {
-                    common.takeOpenBoundProof()
-                    return quadraticSmtSolvable(admitted, admissionStart.elapsedNow().inWholeMilliseconds)
+                    return quadraticSmtSolvable(admitted, common, admissionStart.elapsedNow().inWholeMilliseconds)
                 }
 
                 SmtLibInput.Interrupted -> return interruptedSolvable(
@@ -128,33 +128,40 @@ internal object SmtLibMode : CliMode {
     }
 }
 
-private fun quadraticSmtSolvable(input: SmtLibInput.Quadratic, admissionElapsedMs: Long): Solvable {
-    val request: QuadraticRequest
+private fun quadraticSmtSolvable(
+    input: SmtLibInput.Quadratic,
+    common: CommonOptions,
+    admissionElapsedMs: Long,
+): Solvable {
+    val attachment: SourceAttachment
     val ints: Map<String, Int>
     val bools: Map<String, Int>
     val reals: Map<String, Int>
     when (val source = input.source) {
         is SmtLibInput.Polynomial -> {
-            request = QuadraticRequest.Polynomial(source.problem.pipelineRequest())
+            attachment = SourceAttachment(source.problem, common.config.problemSettings())
             ints = emptyMap()
             bools = source.problem.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
             reals = source.problem.realVarNames.mapKeys { smtSourceSymbol(it.key) }
         }
+
         is SmtLibInput.NonlinearInteger -> {
-            request = QuadraticRequest.Integer(source.problem.pipelineRequest())
+            attachment = SourceAttachment(source.problem, common.config.problemSettings())
             ints = source.problem.intVarNames.mapKeys { smtSourceSymbol(it.key) }
             bools = source.problem.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
             reals = source.problem.realVarNames.mapKeys { smtSourceSymbol(it.key) }
         }
+
         else -> error("quadratic SMT source snapshot is invalid")
     }
-    return quadraticSolvable(request, input.objective, input.sense, { sample ->
-        val assignment = OpenTheoryAssignment.Rebuilt(
-            OpenTheoryAssignment.ExactNra(ExactNraAssignment(sample.bools, requireNotNull(sample.algebraicReals))),
-            sample.bools, Array(sample.numIntVars) { sample.exactIntValue(it) },
-        )
-        renderOpenTheoryModel(ints, bools, reals, assignment)
-    }, admissionElapsedMs)
+    return attachedSourceSolvable(
+        attachment,
+        common,
+        { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
+        admissionElapsedMs,
+        input.objective,
+        input.sense,
+    )
 }
 
 /** Render an SMT-LIB `(get-model)`-style model: one `(define-fun name () Sort value)` per
@@ -269,22 +276,29 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
 
     override fun arithmeticWitnessStatus(): String = "sat"
 
-    override fun formatArithmeticObjective(objective: SourceValue): String =
-        when (objective) {
-            is SourceValue.Algebraic -> smtAlgebraicValue(objective.value)
-            else -> arithmeticObjectiveText(objective)
-        }
+    override fun formatArithmeticObjective(objective: SourceValue): String = when (objective) {
+        is SourceValue.Algebraic -> smtAlgebraicValue(objective.value)
+        else -> arithmeticObjectiveText(objective)
+    }
 
     override fun completionMetadata(verdict: Verdict): String? {
         if (!optimize) return null
         val status = if (linearResult?.terminal?.claim is SourceClaim.Limit) {
-            if (linearResult?.scope?.objective?.sense == ObjectiveSense.MINIMIZE) "unattained-infimum"
-            else "unattained-supremum"
-        } else when (val result = quadraticResult) {
+            if (linearResult?.scope?.objective?.sense == ObjectiveSense.MINIMIZE) {
+                "unattained-infimum"
+            } else {
+                "unattained-supremum"
+            }
+        } else {
+            when (val result = quadraticResult) {
             is QuadraticOptimizationResult.UnattainedLimit -> if (result.sense == ObjectiveSense.MINIMIZE) {
                 "unattained-infimum"
-            } else "unattained-supremum"
+            } else {
+                "unattained-supremum"
+            }
+
             else -> verdict.name.lowercase().replace('_', '-')
+        }
         }
         return "optimizationStatus=$status"
     }

@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.encodingPreparationScope
@@ -8,7 +10,7 @@ import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.util.Cancellation
 
 /** One operation binding over an attached source and its containing preparation allowance. */
-class SourceSetupRequest(
+class SourceSetupRequest private constructor(
     /** Source identity, interpretation and neutral construction hints. */
     val source: SourceAttachment,
     /** Operation whose execution capabilities are inspected. */
@@ -16,21 +18,61 @@ class SourceSetupRequest(
     /** Requested finite strategy, retained when that source route is selected. */
     val engine: FiniteEngine,
     /** Original source objective before consumer-specific direction normalization. */
-    val objective: LinearObjective? = null,
+    val objective: LinearObjective?,
     /** Original maximization direction. */
-    val maximize: Boolean = false,
+    val maximize: Boolean,
     /** Source projection providers captured once for this setup. */
-    val providers: FactorProjectionProviders = source.providers,
+    val providers: FactorProjectionProviders,
     /** Containing allowance for required source preparation and native views. */
-    val cancellation: Cancellation = Cancellation.Never,
+    val cancellation: Cancellation,
     /** Optional deduction allowance, also bounded by [cancellation]. */
-    val boundCancellation: Cancellation = cancellation,
+    val boundCancellation: Cancellation,
+    /** Original exact quadratic source objective, when the operation supplies one. */
+    val quadraticObjective: QuadraticObjectiveSpec?,
 ) {
+    /** Bind an affine operation or the objective already embedded in a native formula. */
+    constructor(
+        source: SourceAttachment,
+        operation: ExecutionOperation,
+        engine: FiniteEngine,
+        objective: LinearObjective? = null,
+        maximize: Boolean = false,
+        providers: FactorProjectionProviders = source.providers,
+        cancellation: Cancellation = Cancellation.Never,
+        boundCancellation: Cancellation = cancellation,
+    ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null)
+
+    /** Bind an original exact quadratic objective and direction before native preparation. */
+    constructor(
+        source: SourceAttachment,
+        engine: FiniteEngine,
+        quadraticObjective: QuadraticObjectiveSpec,
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+        providers: FactorProjectionProviders = source.providers,
+        cancellation: Cancellation = Cancellation.Never,
+        boundCancellation: Cancellation = cancellation,
+    ) : this(
+        source, ExecutionOperation.OPTIMIZE, engine, null, sense == ObjectiveSense.MAXIMIZE,
+        providers, cancellation, boundCancellation, quadraticObjective,
+    )
+
     init {
-        require((operation == ExecutionOperation.OPTIMIZE) == (objective != null)) {
+        val embedded = source.embeddedObjectiveSense
+        require(embedded == null || (objective == null && quadraticObjective == null)) {
+            "an embedded source objective cannot be replaced by another objective"
+        }
+        require(embedded == null || maximize == (embedded == ObjectiveSense.MAXIMIZE)) {
+            "embedded source objective direction differs from its operation binding"
+        }
+        require(
+            (operation == ExecutionOperation.OPTIMIZE) ==
+                (objective != null || quadraticObjective != null || embedded != null),
+        ) {
             "optimization and its source objective must be bound together"
         }
-        require(objective != null || !maximize) { "maximization requires a source objective" }
+        require(
+            objective != null || quadraticObjective != null || embedded != null || !maximize,
+        ) { "maximization requires a source objective" }
     }
 
     internal fun finiteObjective(): LinearObjective? {
@@ -65,9 +107,20 @@ object SourceSetup {
         polynomialCancellation: Cancellation = request.cancellation,
     ): PreparedSourceInvocation {
         val stop = request.cancellation.encodingPreparationScope()
+        request.source.formula?.let { formula ->
+            val route = prepareNativeSource(request, formula, stop)
+            return PreparedSourceInvocation(request, route, stop)
+        }
         val problem = request.source.problem
         val projections = (problem as? BakedProblem)?.factorProjections
             ?.takeIf { it.providers === request.providers } ?: request.providers.prepare(problem)
+        if (request.quadraticObjective != null) {
+            return PreparedSourceInvocation(
+                request,
+                prepareFactorQuadratic(request, projections, polynomialCancellation or stop, stop),
+                stop,
+            )
+        }
         val route = problem.pipelineRoute(
             projections = projections,
             objective = request.objective,

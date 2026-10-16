@@ -968,6 +968,13 @@ use the stream checker's controls. It verifies byte hashes before checking each
 record, preserves the original solver revision separately from checker provenance,
 and retains an outcome for every supplied record. Replay does not relabel the
 original solve or establish its output timing.
+For exact function sources, append `checker=functions` as the second profile argument.
+That mode checks every completed original SMT publication through the existing rational
+and symbolic function ground evaluator, including declaration sorts and function domains.
+Unsupported algebraic carriers or symbolic identities remain unavailable. Optimization
+metadata is rejected by this satisfaction witness checker; it supplies no refutation,
+optimality or exported-proof credit and performs no solver search queries. Source,
+output, checker and runtime hashes retain the same replay custody.
 `com.eignex.klause.bench.profile.FznStreamChecker` accepts the same saved-record
 array for FlatZinc output. It retains original bytes and source-check results,
 including failures, without invoking the CLI. These replays check witness and

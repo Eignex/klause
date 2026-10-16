@@ -11,11 +11,13 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.SourceExecutionRequest
+import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.TheoryParams
-import com.eignex.klause.solver.pipeline.minimize
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.optimizeLinear
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
@@ -492,14 +494,15 @@ class CliModePublicationTest {
             writeText("(declare-const x Real) (assert (= (* x x) 2)) (assert (> x 0)) (minimize x)")
             deleteOnExit()
         }
-        val pipeline = assertIs<SolvablePipeline.QuadraticTheory>(
-            SmtLibMode.newSession().load(source.absolutePath, CommonOptions()).pipeline,
+        val pipeline = assertIs<SolvablePipeline.NativeSource>(
+            SmtLibMode.newSession().load(source.absolutePath, CommonOptions().apply { engine = "cp" }).pipeline,
         )
-        val request = assertIs<QuadraticRequest.Polynomial>(pipeline.request)
-        val result = OpenTheoryPipeline.minimize(request.request, pipeline.objective, engine = FiniteEngine.BACKTRACK)
-            .result
+        val execution = assertIs<SourceExecutionResult.Quadratic>(
+            SourceSetup.execute(SourceExecutionRequest(pipeline.invocation)),
+        )
+        val result = execution.result.result
         val point = assertIs<QuadraticOptimizationResult.Optimal>(result).incumbent
-        val model = pipeline.render(point.sample)
+        val model = pipeline.render(polynomialAssignment(point.sample))
         val output = SmtLibOutput()
         val publication = ArithmeticPublication(output)
 

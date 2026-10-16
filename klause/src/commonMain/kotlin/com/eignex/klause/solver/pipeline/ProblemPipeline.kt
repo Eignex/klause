@@ -38,6 +38,16 @@ enum class ProblemPipeline {
 
 /** A source model prepared for the finite or complete open-theory pipeline. */
 sealed interface SourceProblemRoute {
+    /** Captured exact source formula, with no invented factor model or finite declarations. */
+    class NativeFormula internal constructor(
+        internal val execution: NativeSourceExecution?,
+        internal val preparationReason: com.eignex.klause.solver.result.TerminationReason? =
+            if (execution == null) com.eignex.klause.solver.result.TerminationReason.Cancelled else null,
+    ) : SourceProblemRoute {
+        /** Completed native ownership, absent when source preparation was interrupted. */
+        val preparedPlan: PreparedSourcePlan? get() = execution?.preparedPlan
+    }
+
     /** Exact polynomial completion beside a finite projection of the shared source model. */
     data class PolynomialTheory(
         /** Source decomposition and exact continuous constraints. */

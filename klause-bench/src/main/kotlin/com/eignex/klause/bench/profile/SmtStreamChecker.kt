@@ -13,10 +13,19 @@ internal class SmtStreamChecker(private val output: File) {
     private var prepared = false
     private var attempted = false
 
-    fun check(directory: File, source: File, interrupted: Boolean, minimumWitnesses: Int, provision: Boolean): Boolean {
+    fun check(
+        directory: File,
+        source: File,
+        interrupted: Boolean,
+        minimumWitnesses: Int,
+        provision: Boolean,
+        functions: Boolean = false,
+    ): Boolean {
         prepare(provision)
+        val checker = if (functions) "verify_function_stream_source_results.py" else "verify_stream_source_results.py"
         val command = listOf(File(environment, "bin/python").path,
-            File(tools, "verify_stream_source_results.py").path, source.path, File(directory, "stdout").path,
+            File(tools, checker).path,
+            source.path, File(directory, "stdout").path,
             "--minimum-witnesses", minimumWitnesses.toString()) +
             if (interrupted) listOf("--interrupted") else emptyList()
         val execution = execute(command, File(directory, "source-check.stdout"), File(directory, "source-check.stderr"))
@@ -45,7 +54,8 @@ internal class SmtStreamChecker(private val output: File) {
         requireSuccess(version)
         requireSuccess(packages)
         val checkerFiles = listOf("verify_stream_source_results.py", "verify_nra_source_results.py",
-            "verify_source_results.py", "requirements-source-checks.txt")
+            "verify_source_results.py", "verify_function_stream_source_results.py",
+            "verify_transcendental_source_results.py", "requirements-source-checks.txt")
         Reports.writeJson(File(output, "source-check-provenance.json").path, CheckerProvenance(
             pythonSha256 = sha256(python.canonicalFile.readBytes()),
             pythonVersion = File(output, "python-version.stdout").readText().trim(),

@@ -94,6 +94,11 @@ internal object SolveCore {
         // `-p N` gives the open portfolio a lane per core, as it does the finite one.
         val openCores = common.parallel ?: 1
         when (val pipeline = rawSolvable.pipeline) {
+            is SolvablePipeline.NativeSource -> {
+                solveNativeSource(rawSolvable, pipeline, common, output, publication, deadlineCancel, openCores)
+                return
+            }
+
             is SolvablePipeline.NumericalLinear -> {
                 if (solutionSetSensitive) usageError("all-solution enumeration is unavailable for numerical MIP")
                 val work = takeOpenNodeLimit(common) ?: Long.MAX_VALUE
@@ -215,14 +220,14 @@ internal object SolveCore {
                         (
                             SourceSetup.execute(
                                 SourceExecutionRequest(
-                            invocation,
-                            polynomial = polynomialParams,
-                            cores = openCores,
-                        ),
-                            SourceExecutionCallbacks(onQuadraticIncumbent = accepted)
+                                    invocation,
+                                    polynomial = polynomialParams,
+                                    cores = openCores,
+                                ),
+                                SourceExecutionCallbacks(onQuadraticIncumbent = accepted),
                             )
-                            as SourceExecutionResult.Quadratic
-                        ).result
+                                as SourceExecutionResult.Quadratic
+                            ).result
                     } ?: OpenTheoryPipeline.optimize(
                         pipeline.request,
                         sourceObjective,
@@ -254,12 +259,12 @@ internal object SolveCore {
                     (
                         SourceSetup.execute(
                             SourceExecutionRequest(
-                        invocation,
-                        polynomial = polynomialParams,
-                        cores = openCores,
-                    )
+                                invocation,
+                                polynomial = polynomialParams,
+                                cores = openCores,
+                            ),
                         ) as SourceExecutionResult.Polynomial
-                    ).result
+                        ).result
                 } ?: pipeline.request.execute(polynomialParams, engine, openCores)
                 val result = if ((engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) &&
                     execution.result is OpenTheoryResult.Unsat
@@ -388,10 +393,10 @@ internal object SolveCore {
                     rawSolvable.sourceInvocation?.let { invocation ->
                         (
                             SourceSetup.execute(
-                            SourceExecutionRequest(invocation, theory = params, cores = openCores),
-                            SourceExecutionCallbacks(onLinearIncumbent = onAccepted),
-                        ) as SourceExecutionResult.Linear
-                        ).result
+                                SourceExecutionRequest(invocation, theory = params, cores = openCores),
+                                SourceExecutionCallbacks(onLinearIncumbent = onAccepted),
+                            ) as SourceExecutionResult.Linear
+                            ).result
                     } ?: OpenTheoryPipeline.searchWithoutTheory(
                         pipeline.model,
                         params,
@@ -503,17 +508,17 @@ internal object SolveCore {
                         (
                             SourceSetup.execute(
                                 SourceExecutionRequest(
-                            invocation,
-                            theory = theoryParams,
-                            cores = openCores,
-                            presolveConfig = config,
-                            presolveCancellation = presolveCancel,
-                            presolveBudget = presolveBudget,
-                        ),
-                            SourceExecutionCallbacks(onLinearIncumbent = onAccepted)
+                                    invocation,
+                                    theory = theoryParams,
+                                    cores = openCores,
+                                    presolveConfig = config,
+                                    presolveCancellation = presolveCancel,
+                                    presolveBudget = presolveBudget,
+                                ),
+                                SourceExecutionCallbacks(onLinearIncumbent = onAccepted),
                             )
-                            as SourceExecutionResult.Linear
-                        ).result
+                                as SourceExecutionResult.Linear
+                            ).result
                     } ?: OpenTheoryPipeline.execute(request, theoryParams, engine, openCores, onAccepted)
                 val objective = request.objective
                 if (objective != null) {
@@ -636,7 +641,7 @@ internal object SolveCore {
      * Consumes `node-limit` as a shared [NodeBudget] and removes it from [CommonOptions.engineParams].
      * Every arm spends the same invocation allowance; engines must not consume the key again.
      */
-    private fun takeNodeBudget(common: CommonOptions): NodeBudget? = takeOpenNodeLimit(common)?.let(::NodeBudget)
+    internal fun takeNodeBudget(common: CommonOptions): NodeBudget? = takeOpenNodeLimit(common)?.let(::NodeBudget)
 
     // The engine params only the open-theory route reads. A sweep that sets them for its open models also runs its
     // finite ones, where they mean nothing, so they are dropped there rather than failing the run as unknown keys.
@@ -1069,12 +1074,12 @@ internal object SolveCore {
             (
                 SourceSetup.execute(
                     SourceExecutionRequest(invocation, finiteRequest = { shape ->
-                require(shape === request.shape) { "finite CLI request belongs to another source invocation" }
-                request
-            }),
-                SourceExecutionCallbacks(finite = callbacks)
+                        require(shape === request.shape) { "finite CLI request belongs to another source invocation" }
+                        request
+                    }),
+                    SourceExecutionCallbacks(finite = callbacks),
                 ) as SourceExecutionResult.Finite
-            ).result
+                ).result
         }
         val preparation = result.preparation
         cliLogger(common.verbose).v {

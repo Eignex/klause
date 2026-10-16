@@ -57,6 +57,15 @@ execution. `SourceSetup.prepare` binds the operation, original objective and dir
 finite engine choice, providers and containing preparation token. The selected finite
 shape retains that exact source plan; constructing it does not repeat routing.
 Baked sources retain their selected providers unless the request explicitly replaces them.
+The same attachment accepts exact polynomial, integer polynomial and real-function
+snapshots with explicitly captured settings. It retains the actual native source object
+and formula; factor access is valid only for factor content. Native preparation retains
+its installed request, original coordinate mapping and operation objective under the
+same invocation. Exact quadratic objectives retain their rational coefficients and
+source direction on this binding, including factor sources. Embedded function objectives
+remain part of their source; unsupported optimization keeps its native incomplete
+result rather than becoming satisfaction. Required preparation interruption publishes
+no runnable partial plan.
 Automatic pure-real and wide integral-objective preferences belong to setup; the
 objective interval scan observes and charges the containing preparation allowance.
 DIMACS, WCNF, OPB, XCSP3, exact or original-real FlatZinc and SMT-LIB linear admission

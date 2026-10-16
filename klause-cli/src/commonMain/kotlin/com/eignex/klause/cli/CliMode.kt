@@ -68,6 +68,7 @@ internal fun CommonOptions.routingPreparationCancellation(): Cancellation {
  */
 internal fun CommonOptions.logRoute(route: SourceProblemRoute, elapsedMs: Long) {
     val lane = when (route) {
+        is SourceProblemRoute.NativeFormula -> "native-formula"
         is SourceProblemRoute.PolynomialTheory -> "polynomial"
         is SourceProblemRoute.Finite -> "finite"
         is SourceProblemRoute.OpenTheory -> "open"
