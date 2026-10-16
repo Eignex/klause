@@ -378,3 +378,8 @@ see [source setup](../api.md#source-setup) and [resource allowances](../solver/r
 Finite optimization incumbents stream each original objective with its complete
 SMT model. Terminal metadata does not repeat an already published incumbent, so
 source stream checking can verify every objective against its own coordinates.
+
+Open integer declarations beside retained polynomial factors remain in the factor
+source. Shared library setup selects a complete whole-factor polynomial projection
+or returns its typed decline; SMT admission does not inspect solver completion
+requirements to classify that source.
