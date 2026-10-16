@@ -91,7 +91,9 @@ planning can be retained after the optional phase stops; it retains no phase tok
 The routing overload with separate bound and preparation tokens uses the containing
 preparation token for initial admission, admission after partial bound closure and
 finite ownership selection. Legacy single-token overloads apply that token to both
-scopes. Optional probe exhaustion neither erases complete linear admission nor
+scopes. CLI required admission retains the shared routing meter while observing
+only the containing stop; required work remains charged after the optional slice
+ends. Optional probe exhaustion neither erases complete linear admission nor
 turns an uncovered source into a supported fragment.
 
 ## Phase allowance and telemetry
