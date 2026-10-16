@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.incumbent
 
 import com.eignex.klause.ir.SourceSemanticsOwner
-
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
