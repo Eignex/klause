@@ -58,7 +58,10 @@ internal object SmtLibCompilationInspection {
             put("sourceVerdictClaim", false)
             put("cliRoutingEquivalence", "unverified")
             put("additionalCompilationBeforeOpeningDeadline", true)
-            put("additionalNumericalOperation", false)
+            val boundClosing = field(builder, "productBoundsClosed") == true
+            put("additionalNumericalOperation", boundClosing)
+            put("additionalCompilerBoundClosing", boundClosing)
+            put("additionalNumericalOperationCount", "unmeasured")
             put("traversalAdvanced", false)
             put("timingClaim", false)
             put("workLimit", limit)

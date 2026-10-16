@@ -325,15 +325,18 @@ bounds, contiguous declared domains and ordered factor keys against canonical ad
 then records the shared comparison visit limit, usage, caches and definition counts.
 Its row histogram includes defining rows and selection channels, without attributing
 ownership or a refusal cause. This additional compilation supplies no timing,
-CLI-equivalence or verdict claim and starts no additional numerical operation.
+CLI-equivalence or verdict claim. Sources that run compiler bound closing repeat
+that normal stage in the separate compilation. Reports mark this additional numerical
+work without claiming an operation count; the canonical opening remains separate.
 
 With `inspect=compiler-ownership`, the separate compilation stages satisfaction-only
 integer lowering through its existing private entry points. It snapshots definition
 owners before compaction, checks its dependency closure against the compiler's actual
 removed columns and factors, and requires the final model to match canonical admission
 by the same source names, bounds and ordered factor keys. It records external numeric
-consumers separately from integer defining factors. This mode declines objectives,
-real columns and open product operands; it changes no solver code or allowance.
+consumers separately from integer defining factors. This mode declines objectives
+and real columns; it changes no solver code or allowance. It replays the ordinary
+compiler bound-closing stage when required and marks its additional numerical work.
 For each unknown definition image it also calls the existing image calculation once
 against completed child metadata, without storing its result or changing the expansion
 counter. This observes late image availability rather than performing an image fixpoint.

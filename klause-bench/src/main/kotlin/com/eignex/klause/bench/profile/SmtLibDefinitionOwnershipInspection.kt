@@ -30,7 +30,8 @@ internal object SmtLibDefinitionOwnershipInspection {
         require(field(builder, "objectiveSpec") == null && canonical.objective == null)
         require(canonical.model.numRealVars == 0 && canonical.realVarNames.isEmpty())
         extension("SmtLibBoundsKt", "inferBounds", builder)
-        require(extension("SmtLibBoundsKt", "hasOpenProductOperand", builder) == false)
+        val boundClosing = extension("SmtLibBoundsKt", "hasOpenProductOperand", builder) == true
+        if (boundClosing) extension("SmtLibBoundsKt", "closeProductBounds", builder)
         val assertions = field(builder, "asserts") as List<*>
         for (assertion in assertions) extension("SmtLibExprKt", "assert", builder, assertion)
         extension("SmtLibIteChainKt", "lowerOpenIteChains", builder)
@@ -60,7 +61,7 @@ internal object SmtLibDefinitionOwnershipInspection {
         require(parsed.intVarNames == canonical.intVarNames && parsed.boolVarNames == canonical.boolVarNames)
         SmtLibCompilationInspection.requireSameModel(parsed.model, canonical.model)
         val observedWork = field(state, "work")
-        val report = report(snapshot, originalFactors, originalSources, removedInts, removedBools)
+        val report = report(snapshot, originalFactors, originalSources, removedInts, removedBools, boundClosing)
         require(field(state, "work") == observedWork)
         out.resolve("compiler-ownership.json").writeText(report.toString() + "\n")
         return parsed
@@ -127,6 +128,7 @@ internal object SmtLibDefinitionOwnershipInspection {
         sources: Set<Int>,
         removedInts: Set<Int>,
         removedBools: Set<Int>,
+        boundClosing: Boolean,
     ): JsonObject {
         val surviving = factors.filter { snapshot.owners[it]?.let { owner -> owner !in snapshot.retained } != true }
         val externalReads = surviving.filter { factor ->
@@ -141,7 +143,9 @@ internal object SmtLibDefinitionOwnershipInspection {
             put("canonicalModelVerified", true)
             put("actualRetentionClosureVerified", true)
             put("sourceVerdictClaim", false)
-            put("additionalNumericalOperation", false)
+            put("additionalNumericalOperation", boundClosing)
+            put("additionalCompilerBoundClosing", boundClosing)
+            put("additionalNumericalOperationCount", "unmeasured")
             put("timingClaim", false)
             put("integerDefinitions", snapshot.integerOwners.size)
             put("retainedIntegerDefinitions", retainedDefinitions.size)
