@@ -56,6 +56,21 @@ internal class SmtLibPolynomialProblem(
 }
 
 internal object SmtLibPolynomial {
+    // Reflection-based diagnostics bind the four-argument source entries.
+    fun parse(
+        text: String,
+        cancellation: Cancellation,
+        allowIntegers: Boolean,
+        allowFunctions: Boolean,
+    ): SmtLibPolynomialProblem = parse(text, cancellation, allowIntegers, allowFunctions, smtLibSemantics.resolve())
+
+    fun parse(
+        source: CharSource,
+        cancellation: Cancellation,
+        allowIntegers: Boolean,
+        allowFunctions: Boolean,
+    ): SmtLibPolynomialProblem = parse(source, cancellation, allowIntegers, allowFunctions, smtLibSemantics.resolve())
+
     fun parse(
         text: String,
         cancellation: Cancellation = Cancellation.Never,
