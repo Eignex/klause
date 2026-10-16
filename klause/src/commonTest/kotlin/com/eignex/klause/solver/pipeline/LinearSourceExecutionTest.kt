@@ -1,0 +1,217 @@
+package com.eignex.klause.solver.pipeline
+
+import com.eignex.klause.ir.LinearSourceObjective
+import com.eignex.klause.ir.LinearSourceProblem
+import com.eignex.klause.ir.LinearSourceRow
+import com.eignex.klause.ir.LinearSourceTerm
+import com.eignex.klause.ir.LinearSourceVariable
+import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.validation.LinearSourceWitness
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+
+class LinearSourceExecutionTest {
+    @Test
+    fun `open numerical maximization should retain scaled native costs and original exact units`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("n", true)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, BigFraction.ofLong(2))),
+                upper = BigFraction.ofLong(7))),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, BigFraction.ONE)),
+                BigFraction.ofLong(10).reciprocal(), ObjectiveSense.MAXIMIZE),
+            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+                absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
+            )).resolve(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE,
+            FiniteEngine.FIXED, maximize = true,
+        ))
+        val points = mutableListOf<LinearSourceWitness>()
+
+        val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(
+            SourceExecutionRequest(invocation, finiteRequest = { error("open source has no finite consumer") }),
+            SourceExecutionCallbacks(onLinearSourceIncumbent = points::add),
+        ))
+
+        val outcome = assertNotNull(result.linearSource)
+        assertSame(source, invocation.source.originalSource)
+        assertSame(source.objective, invocation.sourceLinearObjective)
+        assertNull(invocation.sourceObjective)
+        assertSame(source, assertNotNull(invocation.preparedPlan).originalSource)
+        assertEquals(0, assertNotNull(invocation.preparedPlan).sourceRealCount)
+        assertEquals(BigFraction.ofLong(10), outcome.objectiveScale)
+        assertEquals(BigFraction.ofLong(31), result.result.value)
+        assertIs<SourceClaim.Optimal>(assertNotNull(result.result.terminal).claim)
+        assertEquals(BigFraction.ofLong(31) / BigFraction.ofLong(10), points.last().objective)
+        assertEquals(points.last().objective, outcome.incumbent?.objective)
+        assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
+        assertTrue(outcome.claimsCoverTolerance)
+    }
+
+    @Test
+    fun `a nominal rational optimum should retain its certificate without claiming tolerance optimality`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("n", true), LinearSourceVariable("x", false)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(1, BigFraction.ofLong(3))),
+                lower = BigFraction.ONE, upper = BigFraction.ONE)),
+            LinearSourceObjective(listOf(LinearSourceTerm(1, BigFraction.ONE))),
+            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+                absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
+            )).resolve(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
+        ))
+
+        val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(SourceExecutionRequest(invocation)))
+
+        val outcome = assertNotNull(result.linearSource)
+        assertIs<SourceClaim.Optimal>(assertNotNull(result.result.terminal).claim)
+        assertEquals(LinearSourceConclusion.OPTIMAL, outcome.nativeConclusion)
+        assertEquals(LinearSourceConclusion.SATISFIABLE, outcome.conclusion)
+        assertFalse(outcome.claimsCoverTolerance)
+        assertEquals(BigFraction.ofLong(3).reciprocal(), outcome.incumbent?.objective)
+        assertTrue(assertNotNull(outcome.acceptedObjectiveBound) < assertNotNull(outcome.incumbent?.objective))
+        assertEquals(1, assertNotNull(invocation.preparedPlan).sourceRealCount)
+        assertEquals(2, assertNotNull(invocation.preparedPlan).model?.numRealVars)
+    }
+
+    @Test
+    fun `a stopped source preparation should not construct a finite consumer or revive its scope`() {
+        val source = LinearSourceProblem(listOf(LinearSourceVariable("n", true)), emptyList())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+            cancellation = Cancellation { true },
+        ))
+
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
+            finiteRequest = { error("stopped preparation constructed a finite consumer") }))
+
+        assertIs<SourceExecutionResult.Declined>(result)
+        assertNull(invocation.preparedPlan)
+        assertSame(source.semantics, result.semantics)
+    }
+
+    @Test
+    fun `binding another objective should reject without changing the original source plan`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false)), emptyList(),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, BigFraction.ONE))),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
+        ))
+        val plan = assertNotNull(invocation.preparedPlan)
+
+        assertFailsWith<IllegalArgumentException> { plan.withObjective(LinearObjective(constant = 2)) }
+
+        assertSame(source.objective, plan.sourceLinearObjective)
+        assertSame(source, plan.originalSource)
+    }
+
+    @Test
+    fun `finite preparation should preserve original source identity and fractional maximization`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("n", true, BigFraction.ZERO, BigFraction.ofLong(3))),
+            emptyList(),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, BigFraction.ofLong(3).reciprocal())),
+                BigFraction.ofLong(10).reciprocal(), ObjectiveSense.MAXIMIZE),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE,
+            FiniteEngine.FIXED, maximize = true,
+        ))
+        val values = mutableListOf<LinearSourceWitness>()
+
+        val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(
+            SourceExecutionRequest(invocation, finiteRequest = { shape ->
+                FiniteSolveRequest(
+                    shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                    presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
+                    randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.OFF,
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                    solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                    deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
+                )
+            }),
+            SourceExecutionCallbacks(onLinearSourceIncumbent = values::add),
+        ))
+
+        val outcome = assertNotNull(result.linearSource)
+        assertSame(source, outcome.source)
+        assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
+        assertEquals(BigFraction.ofLong(11) / BigFraction.ofLong(10), outcome.incumbent?.objective)
+        assertEquals(outcome.incumbent?.objective, values.last().objective)
+        assertEquals(BigFraction.ofLong(30), outcome.objectiveScale)
+        assertEquals(FiniteSolveVerdict.OPTIMAL,
+            assertIs<FiniteSolveOutcome.Completed>(result.result.outcome).verdict)
+    }
+
+    @Test
+    fun `retained numerical source outcomes should survive a later stopped execution`() {
+        val source = LinearSourceProblem(listOf(LinearSourceVariable("n", true)), emptyList(),
+            semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+                absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
+            )).resolve())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+        ))
+        val points = mutableListOf<LinearSourceWitness>()
+        val first = SourceSetup.execute(SourceExecutionRequest(invocation),
+            SourceExecutionCallbacks(onLinearSourceIncumbent = points::add))
+        val snapshot = assertNotNull(first.linearSource)
+        val retained = assertNotNull(snapshot.incumbent)
+
+        val second = SourceSetup.execute(SourceExecutionRequest(invocation,
+            theory = TheoryParams(cancellation = Cancellation { true })))
+
+        assertEquals(LinearSourceConclusion.SATISFIABLE, snapshot.conclusion)
+        assertEquals(LinearSourceConclusion.UNKNOWN, assertNotNull(second.linearSource).conclusion)
+        assertSame(retained, snapshot.incumbent)
+        assertEquals(listOf(BigFraction.ZERO), retained.values)
+        assertEquals(1, points.size)
+    }
+
+    @Test
+    fun `a source callback failure should leave the captured numerical source reusable`() {
+        val source = LinearSourceProblem(listOf(LinearSourceVariable("n", true)), emptyList(),
+            semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+                absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
+            )).resolve())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+        ))
+        val failure = IllegalStateException("source callback failed")
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            SourceSetup.execute(SourceExecutionRequest(invocation),
+                SourceExecutionCallbacks(onLinearSourceIncumbent = { throw failure }))
+        }
+        val retry = SourceSetup.execute(SourceExecutionRequest(invocation))
+
+        assertSame(failure, thrown)
+        assertEquals(LinearSourceConclusion.SATISFIABLE, assertNotNull(retry.linearSource).conclusion)
+    }
+}

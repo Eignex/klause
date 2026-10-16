@@ -91,7 +91,8 @@ internal fun solveNativeSource(
             if (common.statistics) output.onStatistics(SolveStats.EMPTY, solvable.routingElapsedMs, 0L)
         }
 
-        is SourceExecutionResult.Finite, is SourceExecutionResult.Linear, is SourceExecutionResult.Refuted ->
+        is SourceExecutionResult.Finite, is SourceExecutionResult.Linear, is SourceExecutionResult.Refuted,
+        is SourceExecutionResult.Numerical ->
             error("native source execution returned an unrelated execution family")
     }
 }

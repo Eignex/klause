@@ -21,7 +21,8 @@ class PolynomialTheoryRequest internal constructor(
 ) {
     internal val sharedModel: SharedPolynomialModel?
         get() = preparedPlan.execution.polynomial?.completion
-            .takeIf { preparedPlan.originalSource is Problem }
+            .takeIf { preparedPlan.originalSource is Problem ||
+                preparedPlan.originalSource is com.eignex.klause.ir.LinearSourceProblem }
 }
 
 /** Select the complete polynomial-real theory without materializing finite domains. */

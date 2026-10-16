@@ -8,6 +8,7 @@ class PreparedSourceInvocation internal constructor(
     /** Existing source route selected once by library setup. */
     val route: SourceProblemRoute,
     internal val cancellation: Cancellation,
+    internal val linearSource: PreparedLinearSource? = null,
 ) {
     /** Canonical source attachment whose identity and interpretation bound this invocation. */
     val source: SourceAttachment get() = request.source
@@ -29,8 +30,8 @@ class PreparedSourceInvocation internal constructor(
     val admission: StrategyAdmission? = preparedPlan?.capabilities?.admission(request.engine, operation)
 
     private val finite = (route as? SourceProblemRoute.Finite)?.let { selected ->
-        require(selected.preparedPlan.belongsTo(source.problem)) { "setup selected an unrelated source" }
-        val objective = request.finiteObjective()
+        require(selected.preparedPlan.belongsTo(source.originalSource)) { "setup selected an unrelated source" }
+        val objective = request.finiteObjective(linearSource?.objective ?: request.objective)
         FiniteSolveShape(
             problem = selected.problem,
             optimize = operation == ExecutionOperation.OPTIMIZE,

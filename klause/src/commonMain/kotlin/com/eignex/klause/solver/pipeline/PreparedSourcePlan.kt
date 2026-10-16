@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.LinearSourceObjective
+import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealFormula
@@ -33,6 +35,9 @@ enum class PreparedExecutionKind {
 
     /** Original exact real functions retain their sound incomplete source service. */
     TRANSCENDENTAL,
+
+    /** Numerical linear traversal with a retained original-unit source. */
+    NUMERICAL,
 }
 
 /** Semantic responsibility of a component, independent of an engine name. */
@@ -183,6 +188,7 @@ class PreparedSourcePlan private constructor(
     )
 
     internal val execution: PreparedExecution get() = preparation.execution
+    internal val sourceModel: Problem? get() = preparation.sourceModel
 
     /** Original neutral source object, including its declaration identities and representation. */
     val originalSource: Any get() = preparation.originalSource
@@ -213,6 +219,11 @@ class PreparedSourcePlan private constructor(
     /** Source objective preserved across coordinate-identical bound preparation. */
     val objective: LinearObjective? get() = operation.objective
 
+    /** Original rational linear objective, independent of a private working objective column. */
+    val sourceLinearObjective: LinearSourceObjective? get() = (originalSource as? LinearSourceProblem)?.objective
+
+    internal val workingLinearObjective: LinearObjective? get() = operation.workingLinearObjective ?: operation.objective
+
     /** Direction of [objective]. */
     val maximize: Boolean get() = operation.maximize
 
@@ -236,18 +247,38 @@ class PreparedSourcePlan private constructor(
         operation.supportedBy(preparation),
     )
 
+    internal fun withLinearSource(
+        source: LinearSourceProblem,
+        integerCount: Int,
+        realCount: Int,
+        workingObjective: LinearObjective?,
+    ): PreparedSourcePlan = PreparedSourcePlan(
+        PreparedSourceStructure(
+            source, preparation.execution, preparation.components, 0, integerCount, realCount,
+            (0 until integerCount).toList(), (0 until realCount).toList(),
+            preparation.operations, preparation.factorProjections, preparation.sourceModel,
+        ),
+        PreparedOperationBinding(
+            maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE,
+            workingLinearObjective = workingObjective,
+        ),
+    )
+
     /** Bind an immutable linear objective without reselecting source ownership. */
-    fun withObjective(objective: LinearObjective, maximize: Boolean = false): PreparedSourcePlan =
-        PreparedSourcePlan(preparation, PreparedOperationBinding(objective, maximize))
+    fun withObjective(objective: LinearObjective, maximize: Boolean = false): PreparedSourcePlan {
+        require(originalSource !is LinearSourceProblem) { "a linear source retains its embedded original objective" }
+        return PreparedSourcePlan(preparation, PreparedOperationBinding(objective, maximize))
+    }
 
     /** Bind an exact quadratic objective while preserving source coordinate mappings and completion. */
     fun withObjective(
         objective: QuadraticObjectiveSpec,
         sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-    ): PreparedSourcePlan = PreparedSourcePlan(
-        preparation,
-        PreparedOperationBinding(quadraticObjective = objective, quadraticSense = sense),
-    )
+    ): PreparedSourcePlan {
+        require(originalSource !is LinearSourceProblem) { "a linear source retains its embedded original objective" }
+        return PreparedSourcePlan(preparation,
+            PreparedOperationBinding(quadraticObjective = objective, quadraticSense = sense))
+    }
 
     /** Independent component list whose values own their coordinate and factor lists. */
     val components: List<ExecutionComponentDescriptor> get() = preparation.components.toList()
@@ -264,8 +295,9 @@ class PreparedSourcePlan private constructor(
         val selected = execution.finiteLinear ?: return null
         val ownership = selected.ownership.forLinearConditions(selected.model, cancellation = cancellation)
             ?: return null
-        val original = originalSource as? Problem ?: return null
-        return selected.model.preparedWithComponents(ownership, original, objective, maximize)
+        val original = sourceModel ?: return null
+        return selected.model.preparedWithComponents(ownership, original, workingLinearObjective, maximize)
+            .retainingLinearSource(this)
     }
 
     /** Whether this plan retains [source] as its original source object. */
@@ -285,10 +317,12 @@ class PreparedSourcePlan private constructor(
             is PreparedExecution.Declined -> when (val retained = selected.retained) {
                 is PreparedExecution.Polynomial -> id
                 is PreparedExecution.FiniteLinear -> retained.ownership.cpIntVars.indexOf(id).takeIf { it >= 0 }
+                is PreparedExecution.Numerical -> null
                 null -> null
             }
 
             is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
+            is PreparedExecution.Numerical -> null
         }
     }
 
@@ -647,3 +681,8 @@ fun NonlinearIntegerProblem.prepareExecutionPlan(): PreparedSourcePlan = Prepare
     integerCoordinates = integerCoordinates,
     realCoordinates = realCoordinates,
 )
+
+internal fun PreparedSourcePlan.retainingLinearSource(binding: PreparedSourcePlan): PreparedSourcePlan {
+    val source = binding.originalSource as? LinearSourceProblem ?: return this
+    return withLinearSource(source, binding.sourceIntCount, binding.sourceRealCount, binding.workingLinearObjective)
+}

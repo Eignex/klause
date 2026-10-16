@@ -465,6 +465,13 @@ internal fun FinitePipeline.solve(
             FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
         )
     }
+    val linearSource = request.shape.sourceInvocation?.linearSource
+    val sourceCheck: ((Sample) -> Boolean)? = if (linearSource == null) request.toleranceCheck else {
+        { sample ->
+            linearSource.check(sample, stop) is com.eignex.klause.solver.validation.LinearSourceCheck.Accepted &&
+                request.toleranceCheck?.invoke(sample) != false
+        }
+    }
     val execution = execute(
         FiniteExecutionRequest(
             problem = preparation.executableProblem(),
@@ -492,7 +499,7 @@ internal fun FinitePipeline.solve(
             onPortfolioEvent = request.onPortfolioEvent,
             onPortfolioFault = request.onPortfolioFault,
             lpSolveContext = lpSolveContext,
-            toleranceCheck = request.toleranceCheck?.let { check -> { check(preparation.reconstruct(it)) } },
+            toleranceCheck = sourceCheck?.let { check -> { check(preparation.reconstruct(it)) } },
             sourceInvocation = request.shape.sourceInvocation,
             sourceMapping = preparation.sourceMapping,
         ),

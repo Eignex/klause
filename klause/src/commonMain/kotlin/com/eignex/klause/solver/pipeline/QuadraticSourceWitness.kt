@@ -28,8 +28,11 @@ internal fun checkQuadraticSourceWitness(
 ): SourceEvidenceCheck = try {
     val arithmetic = PolynomialArithmetic(cancellation, limits)
     arithmetic.step()
-    if (point.numBoolVars != plan.sourceBoolCount || point.numIntVars != plan.sourceIntCount ||
-        point.numRealVars != plan.sourceRealCount
+    val linear = plan.originalSource is com.eignex.klause.ir.LinearSourceProblem
+    val model = plan.sourceModel.takeIf { linear }
+    if (point.numBoolVars != (model?.numBoolVars ?: plan.sourceBoolCount) ||
+        point.numIntVars != (model?.numIntVars ?: plan.sourceIntCount) ||
+        point.numRealVars != (model?.numRealVars ?: plan.sourceRealCount)
     ) SourceEvidenceCheck.Rejected("quadratic witness has different source coordinates")
     else when (val source = plan.originalSource) {
         is PolynomialRealProblem -> checkProjectedPolynomialWitness(source, point, cancellation, limits)
@@ -48,6 +51,7 @@ internal fun checkQuadraticSourceWitness(
                     point.bools, values, cancellation, arithmetic, limits)
             }
         }
+        is com.eignex.klause.ir.LinearSourceProblem -> checkQuadraticIrWitness(plan, point, cancellation, arithmetic, limits)
         is Problem -> checkQuadraticIrWitness(plan, point, cancellation, arithmetic, limits)
         else -> SourceEvidenceCheck.Unavailable("quadratic source has no installed witness checker")
     }

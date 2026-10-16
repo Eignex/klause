@@ -28,7 +28,7 @@ import kotlin.uuid.Uuid
 internal fun OpenTheoryRequest.linearAuthorityContext(cancellation: Cancellation): SourceProofContext? {
     linearContext?.let { return it }
     val objective = objective ?: return null
-    val original = preparedPlan.originalSource as? Problem ?: return null
+    val original = preparedPlan.sourceModel ?: return null
     return original.linearAuthorityContext(objective, if (maximize) ObjectiveSense.MAXIMIZE
         else ObjectiveSense.MINIMIZE, cancellation)
 }

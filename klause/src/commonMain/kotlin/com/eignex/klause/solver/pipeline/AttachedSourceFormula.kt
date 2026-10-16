@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealProblem
@@ -9,6 +10,10 @@ import com.eignex.klause.util.Cancellation
 
 internal sealed interface AttachedSourceFormula {
     val source: SourceSemanticsOwner
+
+    class Linear(val problem: LinearSourceProblem) : AttachedSourceFormula {
+        override val source: SourceSemanticsOwner get() = problem
+    }
 
     class Polynomial(val problem: PolynomialRealProblem) : AttachedSourceFormula {
         override val source: SourceSemanticsOwner get() = problem
@@ -25,6 +30,11 @@ internal sealed interface AttachedSourceFormula {
 
 internal sealed interface NativeSourceExecution {
     val preparedPlan: PreparedSourcePlan
+
+    class Numerical(
+        val request: NumericalLinearRequest,
+        override val preparedPlan: PreparedSourcePlan,
+    ) : NativeSourceExecution
 
     class Polynomial(val request: PolynomialTheoryRequest) : NativeSourceExecution {
         override val preparedPlan: PreparedSourcePlan get() = request.preparedPlan
@@ -46,6 +56,7 @@ internal fun prepareNativeSource(
 ): SourceProblemRoute.NativeFormula {
     if (stop()) return SourceProblemRoute.NativeFormula(null)
     val visits = when (formula) {
+        is AttachedSourceFormula.Linear -> error("linear sources prepare their source-unit execution view")
         is AttachedSourceFormula.Polynomial -> formula.problem.totalRealCount.toLong() + formula.problem.totalBoolCount
         is AttachedSourceFormula.IntegerPolynomial -> formula.problem.numericCount.toLong() + formula.problem.boolCount
         is AttachedSourceFormula.Functions -> formula.problem.numericCount.toLong() + formula.problem.boolCount
@@ -53,6 +64,7 @@ internal fun prepareNativeSource(
     stop.charge(visits)
     if (stop()) return SourceProblemRoute.NativeFormula(null)
     val execution = when (formula) {
+        is AttachedSourceFormula.Linear -> error("linear sources prepare their source-unit execution view")
         is AttachedSourceFormula.Polynomial -> NativeSourceExecution.Polynomial(
             PolynomialTheoryRequest(
                 formula.problem,

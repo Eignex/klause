@@ -75,8 +75,8 @@ class SourceSetupRequest private constructor(
         ) { "maximization requires a source objective" }
     }
 
-    internal fun finiteObjective(): LinearObjective? {
-        val selected = objective ?: return null
+    internal fun finiteObjective(workingObjective: LinearObjective? = objective): LinearObjective? {
+        val selected = workingObjective ?: return null
         if (!maximize) return selected
         require(
             selected.constant != Long.MIN_VALUE &&
@@ -108,6 +108,7 @@ object SourceSetup {
     ): PreparedSourceInvocation {
         val stop = request.cancellation.encodingPreparationScope()
         request.source.formula?.let { formula ->
+            if (formula is AttachedSourceFormula.Linear) return prepareLinearSource(request, formula.problem, stop, onLpStats)
             val route = prepareNativeSource(request, formula, stop)
             return PreparedSourceInvocation(request, route, stop)
         }

@@ -47,6 +47,17 @@ See [model ownership](../model.md#published-assignments-and-objectives) for immu
 coordinate lifetimes and [resource allowances](resources.md) for containing work
 and cancellation scopes.
 
+Original linear-source checking evaluates original rational rows and declaration
+bounds before normalization. Integrality remains exact; row slack uses the maximum
+of absolute tolerance and relative tolerance times the larger of bound magnitude and
+the sum of absolute original term activities. Repeated canceling terms retain their
+individual magnitudes. Inactive indicator rows impose no constraint. Accepted points
+retain exact original objective units and whether nominal relations also hold.
+Cancellation declines the check. Finite execution installs this check before worker
+admission, after reconstructing source coordinates. Pipeline publication checks native
+points through the same service and retains native conclusions separately from their
+accepted-source qualification; tolerance acceptance does not transfer nominal proofs.
+
 ## Dependencies
 
 The shared services depend on source/factor descriptions, propagation, neutral sample

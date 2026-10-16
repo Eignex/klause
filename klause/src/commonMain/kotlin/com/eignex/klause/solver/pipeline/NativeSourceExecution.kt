@@ -78,6 +78,22 @@ internal fun executeNativeSource(
     val quadratic = invocation.sourceQuadraticObjective
     val affine = invocation.sourceObjective
     return when (native) {
+        is NativeSourceExecution.Numerical -> {
+            val publication = SourcePublicationObserver(callbacks.onLinearIncumbent)
+            val controls = request.theory.copy(
+                cancellation = request.theory.cancellation or invocation.cancellation,
+                timeout = request.theory.timeout or invocation.nativeDeadline(),
+            )
+            SourceExecutionResult.Numerical(invocation, publication.execute {
+                native.request.solve(
+                    controls,
+                    complete = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
+                    onIncumbent = { sample, value ->
+                        publication.accepted(sample, com.eignex.klause.solver.evidence.SourceValue.Rational(value))
+                    },
+                )
+            })
+        }
         is NativeSourceExecution.Polynomial -> {
             val params = request.polynomial.nativeBoundTo(invocation)
             when {

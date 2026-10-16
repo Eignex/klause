@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.EffectiveSourceSemantics
+import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealProblem
@@ -29,6 +30,10 @@ class SourceAttachment private constructor(
         searchHints: SearchHints? = null,
     ) : this(problem, null, definitionHints, searchHints, problem.settings)
 
+    /** Attach original rational linear rows and their captured source-unit interpretation. */
+    constructor(problem: LinearSourceProblem, settings: ProblemSettings) :
+        this(null, AttachedSourceFormula.Linear(problem), emptyList(), null, settings)
+
     /** Attach an exact real formula without materializing a finite source model. */
     constructor(problem: PolynomialRealProblem, settings: ProblemSettings) :
         this(null, AttachedSourceFormula.Polynomial(problem), emptyList(), null, settings)
@@ -54,8 +59,11 @@ class SourceAttachment private constructor(
     override val semantics: EffectiveSourceSemantics = originalSource.semantics
 
     /** Embedded source objective direction, when the formula itself retains an objective. */
-    val embeddedObjectiveSense: ObjectiveSense? = (formula as? AttachedSourceFormula.Functions)?.problem
-        ?.takeIf { it.hasObjective }?.objectiveSense
+    val embeddedObjectiveSense: ObjectiveSense? = when (formula) {
+        is AttachedSourceFormula.Linear -> formula.problem.objective?.sense
+        is AttachedSourceFormula.Functions -> formula.problem.takeIf { it.hasObjective }?.objectiveSense
+        else -> null
+    }
 
     /** Source orientations; their payloads retain the source's borrowed-read-only lifetime. */
     val definitionHints: List<DefinitionHint> get() = definitions.toList()
