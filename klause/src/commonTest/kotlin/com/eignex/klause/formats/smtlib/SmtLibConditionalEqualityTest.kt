@@ -2,6 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Lit
@@ -28,18 +29,89 @@ import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
     @Test
-    fun `affine equality children expand across multiple pending generations`() {
+    fun `affine comparisons expand across multiple pending generations`() {
         val depth = 16
-        val source = buildString {
-            for (index in 0..depth) append("(declare-const b$index Bool)\n")
-            append("(assert (let ((v0 (ite b0 0 1000))) ")
-            for (index in 1..depth) {
-                append("(let ((v$index (ite b$index (+ v${index - 1} 1) 1000))) ")
+        for ((op, target) in listOf("=" to depth, "<" to depth + 1, "<=" to depth)) {
+            val source = buildString {
+                for (index in 0..depth) append("(declare-const b$index Bool)\n")
+                append("(assert (let ((v0 (ite b0 0 1000))) ")
+                for (index in 1..depth) {
+                    append("(let ((v$index (ite b$index (+ v${index - 1} 1) 1000))) ")
+                }
+                append("($op v$depth $target)")
+                repeat(depth + 2) { append(')') }
             }
-            append("(= v$depth $depth)")
-            repeat(depth + 2) { append(')') }
+            val parsed = SmtLib.parse(source)
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            val result = session.initialize()
+
+            assertEquals(0, parsed.model.numIntVars, op)
+            assertTrue(parsed.model.factors.all { it is Clause }, op)
+            assertIs<ComponentResult.Consistent>(result, op)
+            for (index in 0..depth) assertEquals(true, session.boolValue(parsed.boolVarNames.getValue("b$index")), op)
         }
-        val parsed = SmtLib.parse(source)
+    }
+
+    @Test
+    fun `ordered comparisons select the matching conditional branch`() {
+        for ((comparison, expected) in listOf(
+            "(< t 8)" to true, "(<= t 2)" to true,
+            "(> t 2)" to false, "(>= t 8)" to false,
+            "(< 2 t)" to false, "(<= 8 t)" to false,
+            "(> 8 t)" to true, "(>= 2 t)" to true,
+        )) {
+            val parsed = SmtLib.parse("(declare-const b Bool) (assert (let ((t (ite b 2 8))) $comparison))")
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            val result = session.initialize()
+
+            assertEquals(0, parsed.model.numIntVars, comparison)
+            assertTrue(parsed.model.factors.all { it is Clause }, comparison)
+            assertIs<ComponentResult.Consistent>(result, comparison)
+            assertEquals(expected, session.boolValue(parsed.boolVarNames.getValue("b")), comparison)
+        }
+    }
+
+    @Test
+    fun `signed unit affine orders retain their source branch`() {
+        for ((comparison, expected) in listOf(
+            "(<= (+ t 1) 3)" to true,
+            "(< (+ t 1) 9)" to true,
+            "(> (+ t 1) 3)" to false,
+            "(>= 3 (+ t 1))" to true,
+            "(<= (- t) (- 8))" to false,
+            "(>= (+ (- t) 1) (- 1))" to true,
+            "(> (- 1) (+ (- t) 1))" to false,
+        )) {
+            val parsed = SmtLib.parse("(declare-const b Bool) (assert (let ((t (ite b 2 8))) $comparison))")
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            val result = session.initialize()
+
+            assertEquals(0, parsed.model.numIntVars, comparison)
+            assertTrue(parsed.model.factors.all { it is Clause }, comparison)
+            assertIs<ComponentResult.Consistent>(result, comparison)
+            assertEquals(expected, session.boolValue(parsed.boolVarNames.getValue("b")), comparison)
+        }
+    }
+
+    @Test
+    fun `conditional comparisons at one threshold retain their operators`() {
+        val parsed = SmtLib.parse("""
+            (declare-const b Bool) (declare-const c Bool)
+            (assert (and b (not c) (let ((t (ite b (- 1) (ite c 0 1)))) (and
+                (not (= t 0)) (< t 0) (<= t 0) (not (> t 0)) (not (>= t 0))))))
+        """.trimIndent())
         val session = SearchSession(
             listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
             atoms = SearchAtomRegistry(parsed.model.numBoolVars),
@@ -50,7 +122,104 @@ class SmtLibConditionalEqualityTest {
         assertEquals(0, parsed.model.numIntVars)
         assertTrue(parsed.model.factors.all { it is Clause })
         assertIs<ComponentResult.Consistent>(result)
-        for (index in 0..depth) assertEquals(true, session.boolValue(parsed.boolVarNames.getValue("b$index")))
+        assertEquals(true, session.boolValue(parsed.boolVarNames.getValue("b")))
+        assertEquals(false, session.boolValue(parsed.boolVarNames.getValue("c")))
+    }
+
+    @Test
+    fun `ordered defaults exclude a selected selector branch`() {
+        val parsed = SmtLib.parse("""
+            (declare-const i Int) (assert (<= 0 i 2))
+            (assert (= i 1)) (assert (<= (ite (= i 1) 5 i) 2))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `ordered arms preserve a matching selector branch`() {
+        val parsed = SmtLib.parse("""
+            (declare-const i Int) (assert (<= 0 i 2))
+            (assert (= i 1)) (assert (<= (ite (= i 1) i 5) 2))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        assertEquals("1", assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+            .intValue(parsed.intVarNames.getValue("i")))
+    }
+
+    @Test
+    fun `an unselected open ordered branch preserves its source input`() {
+        val parsed = SmtLib.parse("""
+            (declare-const b Bool) (declare-const x Int)
+            (assert (> x 1000000)) (assert (< (ite b x 0) 5))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+        assertEquals(false, sample.boolValue(parsed.boolVarNames.getValue("b")))
+        assertTrue(sample.intValue(parsed.intVarNames.getValue("x")).toLong() > 1000000)
+    }
+
+    @Test
+    fun `nonunit affine orders retain exact arithmetic rounding`() {
+        val parsed = SmtLib.parse("(declare-const b Bool) (assert (< (+ (* 2 (ite b 2 8)) 1) 6))")
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        assertTrue(parsed.model.factors.any { it !is Clause })
+        assertEquals(true, assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+            .boolValue(parsed.boolVarNames.getValue("b")))
+    }
+
+    @Test
+    fun `equality and order comparisons share one expansion allowance`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE, Long.MAX_VALUE, false,
+            conditionalEqualities = SmtLibConditionalEquality(workLimit = 3),
+        )
+        val reader = SExprReader(StringCharSource(
+            "(declare-const b Bool) (assert (let ((t (ite b 2 8))) (and (= t 2) (< t 5))))",
+        ))
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        assertTrue(parsed.model.factors.any { it is Element })
+        assertEquals(true, assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+            .boolValue(parsed.boolVarNames.getValue("b")))
+    }
+
+    @Test
+    fun `capped strict comparisons preserve thresholds outside a signed word`() {
+        for ((comparison, expected) in listOf(
+            "(< (ite b x 0) (- (- 9223372036854775807) 1))" to "-9223372036854775809",
+            "(> (ite b x 0) 9223372036854775807)" to "9223372036854775808",
+        )) {
+            val builder = Compiler.Builder(
+                Long.MIN_VALUE, Long.MAX_VALUE, false,
+                conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+            )
+            val reader = SExprReader(StringCharSource(
+                "(declare-const b Bool) (declare-const x Int) (assert $comparison)",
+            ))
+            while (true) builder.command(reader.readCommandOrNull() ?: break)
+
+            val parsed = builder.build()
+
+            val row = parsed.model.factors.filterIsInstance<ReifiedLinear>().single { it.wideConstants != null }
+            assertEquals(expected, row.constants.exactBound.toString(), comparison)
+        }
     }
 
     @Test

@@ -69,12 +69,12 @@ complete relation beside other constraints before theory checks.
 
 ## Linear and conditional lowering
 
-Asserted and reified equalities between an integer conditional result and a constant
-can lower directly to Boolean tests of its branches. Completed conditional definitions and equality
+Asserted and reified equality and ordering comparisons between an integer conditional
+result and a constant can lower directly to Boolean tests of its branches. Completed conditional definitions and comparison
 results are shared within one parse; nested definitions are traversed iteratively.
 Primitive equality literals are shared across source uses and branch expansion.
 Reified pairwise unit integer differences use lower/upper comparison gates with complete
-Boolean-definition ownership. A deferred conditional equality keeps one arithmetic
+Boolean-definition ownership. A deferred conditional comparison keeps one arithmetic
 placeholder, which is removed only after its branch expansion completes.
 Comparisons finish open decision lists before expanding their branch tests.
 Constant branch images of at most 1,024 distinct values can reject a comparison
@@ -98,10 +98,17 @@ can exclude conflicting selector tests and omit guard tests implied by that comp
 Conflicting branches and excluded defaults are skipped before traversing their definitions.
 Equality keys whose sign reversal exceeds a signed word retain their arithmetic encoding.
 A parse expands comparisons after lowering all assertions and objectives, visiting
-the newest comparisons first. Equality of a one-variable affine conditional term
+the newest comparisons first, with separate cache keys for each comparison operator.
+Equality of a one-variable affine conditional term
 and a constant is reduced to an integer value test when checked subtraction and
 exact division fit a signed word. A nonintegral target is false; overflow retains
-the arithmetic comparison. Normalized child comparisons join the same iterative
+the arithmetic comparison. Ordering comparisons normalize unit coefficients and
+constant offsets with checked arithmetic, reversing the relation for a negative
+coefficient or a constant left operand. Nonunit order coefficients retain their
+arithmetic encoding. Strict bounds outside a signed word retain exact wide rows
+when expansion is capped. Selector-equality guard shortcuts apply only to equality;
+ordered branches and defaults retain their complete guards.
+Normalized child comparisons join the same iterative
 queue. Expansion shares a limit of 65,536 visits; comparisons
 that cannot finish retain their exact arithmetic encoding. Numeric branch definitions remain enforced whenever
 a surviving constraint, objective or shared reified predicate needs them. Unused

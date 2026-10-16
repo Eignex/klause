@@ -79,7 +79,7 @@ internal fun Compiler.Builder.assertRelation(op: String, a: IntComb, b: IntComb)
         if (!it) forceTrue(Lit.negate(trueLit()))
         return
     }
-    if (op == "=") conditionalEquality(a, b)?.let {
+    conditionalComparison(op, a, b)?.let {
         forceTrue(it)
         return
     }
@@ -99,7 +99,7 @@ internal fun Compiler.Builder.assertRelation(op: String, a: IntComb, b: IntComb)
  *  when a coefficient or the bound exceeds the 64-bit range. */
 internal fun Compiler.Builder.reifyRelation(op: String, a: IntComb, b: IntComb): Int {
     constantConditionalComparison(op, a, b)?.let { return if (it) trueLit() else Lit.negate(trueLit()) }
-    if (op == "=") conditionalEquality(a, b)?.let { return it }
+    conditionalComparison(op, a, b)?.let { return it }
     val linOp = relLinearOp(op)
     return when (val rel = intCombDiff(a, b, strictDelta(op).toLong())) {
         is LinRelation.LongRel -> reifyIntegerRelation(rel, linOp).also {
@@ -139,13 +139,20 @@ private fun Compiler.Builder.constantConditionalComparison(op: String, a: IntCom
     return conditionalEqualities.constantComparison(op, a.lin, b.lin)
 }
 
-private fun Compiler.Builder.conditionalEquality(a: IntComb, b: IntComb): Int? {
+private fun Compiler.Builder.conditionalComparison(op: String, a: IntComb, b: IntComb): Int? {
+    var comparison = when (op) {
+        "=", "<", "<=", ">", ">=" -> op
+        else -> return null
+    }
     if (a !is IntComb.Narrow || b !is IntComb.Narrow) return null
     val term = if (b.lin.coeffs.isEmpty()) a.lin else {
-        if (a.lin.coeffs.isEmpty()) b.lin else return null
+        if (a.lin.coeffs.isNotEmpty()) return null
+        comparison = reverseComparison(comparison)
+        b.lin
     }
     val source = term.coeffs.entries.singleOrNull() ?: return null
     if (source.value == 0L) return null
+    if (comparison != "=" && source.value != 1L && source.value != -1L) return null
     val variable = source.key
     closeIteChain(variable)
     if (!conditionalEqualities.isDefined(variable) && (source.value != 1L || term.constant != 0L)) return null
@@ -156,13 +163,22 @@ private fun Compiler.Builder.conditionalEquality(a: IntComb, b: IntComb): Int? {
         return null
     }
     if (difference == Long.MIN_VALUE && source.value == -1L) return null
-    if (difference % source.value != 0L) return Lit.negate(trueLit())
+    if (comparison == "=" && difference % source.value != 0L) return Lit.negate(trueLit())
     val value = difference / source.value
-    return conditionalEqualities.reify(variable, value, this)?.also { literal ->
-        if (intDomains[variable] is PresolveDomain.Finite) {
+    if (source.value < 0L) comparison = reverseComparison(comparison)
+    return conditionalEqualities.reify(variable, value, this, comparison)?.also { literal ->
+        if (comparison == "=" && intDomains[variable] is PresolveDomain.Finite) {
             iteChains.noteAtom(literal, variable, value, allowsElement = !conditionalEqualities.isDefined(variable))
         }
     }
+}
+
+private fun reverseComparison(op: String): String = when (op) {
+    "<" -> ">"
+    "<=" -> ">="
+    ">" -> "<"
+    ">=" -> "<="
+    else -> op
 }
 
 /** Record `lit ⇔ variable = value` when the reified row is exactly that, so an `ite` chain can read its
