@@ -461,6 +461,95 @@ class QfLiraSolverTest {
         }
     }
 
+    @Test
+    fun `a retracted strict Boolean row should admit its closed sibling`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 0.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 2.0), LinearOp.LE, 0.0, strict = true),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+            val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+            assertEquals(listOf(BigFraction.ZERO, BigFraction.ZERO), witness.reals)
+            assertEquals(false, witness.bools[0])
+        }
+    }
+
+    @Test
+    fun `a retracted Boolean row should preserve the integer leaf`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+            val witness = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertEquals(BIG_ONE, witness.intValue(0))
+            assertEquals(false, witness.bools[0])
+        }
+    }
+
+    @Test
+    fun `a private operation stop should withhold a Boolean leaf until a live operation`() {
+        var privateStopped = false
+        val component = ExactLiraSearchComponent(partialModel())
+        component.useOperationAllowance { parent -> parent or Cancellation { privateStopped } }
+        component.use { owned ->
+            val session = SearchSession(listOf(owned))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            privateStopped = true
+
+            assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertNull(session.model().valueOf<ExactLiraAssignment>(owned))
+            session.popTo(0)
+            privateStopped = false
+            assertIs<ComponentResult.Consistent>(session.propagate())
+
+            assertIs<SearchResult.Satisfied>(session.solve(2))
+        }
+    }
+
+    @Test
+    fun `a containing stop should prevent Boolean leaf publication`() {
+        var stopped = false
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            val session = SearchSession(listOf(component), cancellation = Cancellation { stopped })
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            stopped = true
+
+            assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+        }
+    }
+
     private fun comparisonClauseModel(xUpper: Long) = Problem(
         numBoolVars = 0,
         intBounds = openBounds(2),
