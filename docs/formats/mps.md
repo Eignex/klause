@@ -56,6 +56,8 @@ containers retain their numbers when the parsed model's coefficient arrays chang
 `MpsCompiled` retains that same neutral representation for its witness helpers and
 delegates original-unit point checks and tolerance qualification to the shared
 validator and evidence mechanisms used by source setup.
+Compatibility compilation captures this source before constructing a working view;
+an exact-row fallback reuses that snapshot and its effective policy.
 
 MPS lowering returns an engine-neutral `Problem` with its source columns, numbers
 and effective semantics retained for validation. The model-facing LP layer assembles
