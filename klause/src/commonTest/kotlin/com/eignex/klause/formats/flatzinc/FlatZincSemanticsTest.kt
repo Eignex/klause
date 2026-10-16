@@ -54,6 +54,7 @@ class FlatZincSemanticsTest {
                 program.semantics.effective.undeclaredIntegers,
             )
             assertTrue(program.semantics.hasOverrides)
+            assertEquals(program.semantics.effective, program.problem.semantics.effective)
         }
     }
 

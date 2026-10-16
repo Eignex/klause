@@ -275,6 +275,7 @@ private fun Problem.withBounds(bounds: Array<OpenIntBounds>): Problem? {
         ?: return null
     return Problem(
         settings = settings,
+        semantics = semantics,
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         declaredIntDomains = rebounded,

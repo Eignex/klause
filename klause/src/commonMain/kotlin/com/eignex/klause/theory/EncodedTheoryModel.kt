@@ -13,7 +13,7 @@ internal class EncodedTheoryModel(
     implied, source.hasSymmetryBreaking, realCount,
     DoubleArray(realCount) { if (it < source.numRealVars) source.realLower[it] else Double.NEGATIVE_INFINITY },
     DoubleArray(realCount) { if (it < source.numRealVars) source.realUpper[it] else Double.POSITIVE_INFINITY },
-    source.settings)
+    source.settings, source.semantics)
 
 internal val Problem.encodingSourceRealCount: Int get() = (this as? EncodedTheoryModel)?.sourceRealCount ?: numRealVars
 
