@@ -43,7 +43,7 @@ import kotlin.time.Duration.Companion.milliseconds
 internal fun CommonOptions.routingCancellation(): Cancellation {
     routingToken?.let { return it }
     if (!takeOpenBoundProof()) return Cancellation { true }.also { routingToken = it }
-    val solveStop = routingPreparationCancellation()
+    val solveStop = Cancellation { deadlineAtMs?.let { nowMillis() >= it } == true }
     val budget = sharedPresolveBudget()
     val phaseStop = presolveTimeCancellation or solveStop
     val token = budget?.let { routingSlice(it, phaseStop) } ?: phaseStop
@@ -51,9 +51,14 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
     return token
 }
 
-/** Containing invocation stop for required source admission, independent of optional probing. */
-internal fun CommonOptions.routingPreparationCancellation(): Cancellation =
-    Cancellation { deadlineAtMs?.let { nowMillis() >= it } == true }
+/** Required admission observes the containing stop while retaining the shared routing work ledger. */
+internal fun CommonOptions.routingPreparationCancellation(): Cancellation {
+    val meter = routingCancellation().workMeter()
+    return object : Cancellation {
+        override fun isCancelled(): Boolean = deadlineAtMs?.let { nowMillis() >= it } == true
+        override fun workMeter() = meter
+    }
+}
 
 /**
  * Retain the measured frontend route for invocation statistics and log it under `-v`. The elapsed

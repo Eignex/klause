@@ -299,6 +299,21 @@ class CliModePresolveTest {
     }
 
     @Test
+    fun `required admission should retain routing charges after optional exhaustion`() {
+        val common = CommonOptions().apply { engineParams += "presolve-work-limit=1" }
+        val optional = common.routingCancellation()
+        val required = common.routingPreparationCancellation()
+        val budget = checkNotNull(common.presolveBudget)
+
+        required.charge(2)
+
+        assertTrue(optional())
+        assertFalse(required())
+        assertSame(optional.workMeter(), required.workMeter())
+        assertEquals(2L, budget.spent())
+    }
+
+    @Test
     fun `required routing admission should retain the containing deadline`() {
         val common = CommonOptions().apply {
             deadlineAtMs = nowMillis() - 1L
