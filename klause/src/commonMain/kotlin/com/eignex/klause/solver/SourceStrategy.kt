@@ -8,17 +8,18 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
-import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.presolve.OpenPresolveResult
-import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.FinitePipeline
-import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
+import com.eignex.klause.solver.pipeline.FiniteSolveRequest
+import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
+import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
+import com.eignex.klause.solver.pipeline.SourceFiniteControls
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
@@ -117,7 +118,7 @@ class SourceStrategy internal constructor(
                     ).result.result
             }
 
-            is SourceProblemRoute.Finite -> finiteSolve(route, scope)
+            is SourceProblemRoute.Finite -> finiteSolve(invocation, scope)
 
             is SourceProblemRoute.OpenTheory -> {
                 if (!scope.supportsOpen(engine)) {
@@ -350,41 +351,30 @@ class SourceStrategy internal constructor(
         0,
     )
 
-    private fun finiteSolve(route: SourceProblemRoute.Finite, scope: SourceInvocation): OpenTheoryResult {
-        if (!route.preparedPlan.capabilities.admission(engine).runnable) return scope.unsupported()
-        val preparation = FinitePipeline.prepare(
-            FinitePipelineRequest(
-            problem = route.problem,
-            engine = engine,
-            preparedPlan = route.preparedPlan,
-            presolveConfig = PresolveConfig.NONE,
-            explicitPresolveConfig = true,
-            solutionSetSensitive = true,
-            cancellation = scope.stop,
-        )
-        )
-        if (scope.stop()) return scope.unknown()
-        if (preparation.presolve?.infeasible == true) return OpenTheoryResult.Unsat(SolveStats.EMPTY)
-        val model = preparation.executableProblem()
-        val solved = when (engine) {
-            FiniteEngine.BACKTRACK -> BacktrackSolver(model).solve(scope.backtrack)
-
-            FiniteEngine.LOCAL_SEARCH -> LocalSearchSolver(
-                model,
-                completion = if (model.numRealVars > 0) LeafRealCompletion(model, null) else null,
-            ).solve(scope.localSearch)
-
-            else -> error("unsupported source strategy $engine")
-        }
-        return when (solved) {
-            is SolveResult.Sat -> OpenTheoryResult.Sat(
-                OpenTheoryAssignment.Sampled(preparation.reconstruct(solved.assignment)),
-                solved.stats,
+    private fun finiteSolve(invocation: PreparedSourceInvocation, scope: SourceInvocation): OpenTheoryResult {
+        if (invocation.admission?.runnable != true) return scope.unsupported()
+        val result = (
+            SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+                val controls = when (engine) {
+                    FiniteEngine.BACKTRACK -> SourceFiniteControls.Backtrack(scope.backtrack)
+                    FiniteEngine.LOCAL_SEARCH -> SourceFiniteControls.LocalSearch(scope.localSearch)
+                    else -> error("unsupported source strategy $engine")
+                }
+                FiniteSolveRequest(shape, controls)
+            })) as SourceExecutionResult.Finite
+        ).result
+        val outcome = result.outcome as FiniteSolveOutcome.Completed
+        return when (outcome.verdict) {
+            FiniteSolveVerdict.SAT -> OpenTheoryResult.Sat(
+                OpenTheoryAssignment.Sampled(requireNotNull(outcome.bestSample)), outcome.stats,
             )
-
-            is SolveResult.Unsat -> OpenTheoryResult.Unsat(solved.stats)
-
-            is SolveResult.Unknown -> OpenTheoryResult.Unknown(solved.reason, solved.stats)
+            FiniteSolveVerdict.UNSAT -> OpenTheoryResult.Unsat(outcome.stats)
+            FiniteSolveVerdict.UNKNOWN -> OpenTheoryResult.Unknown(
+                (result.nativeSourceResult as? SolveResult.Unknown)?.reason
+                    ?: if (scope.stop()) scope.unknown().reason else TerminationReason.BudgetExhausted,
+                outcome.stats,
+            )
+            else -> error("source satisfaction returned an optimization verdict")
         }
     }
 
