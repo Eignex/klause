@@ -9,7 +9,15 @@ import kotlin.test.assertFalse
 class LinearQueryInputProbeTest {
     @Test
     fun `probing an unopened component should not initialize its numerical owner`() {
-        val source = Problem(0, 0, intDomains = emptyArray(), factors = emptyArray())
+        val source = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val samples = LinearQueryInputSamples<Any>()
         ExactLiraSearchComponent(source).use { component ->
             val delegate = component.javaClass.getDeclaredField("lpDelegate").apply { isAccessible = true }
