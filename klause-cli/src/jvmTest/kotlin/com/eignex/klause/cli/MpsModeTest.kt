@@ -34,6 +34,24 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `shared integer range flags should replace MPS defaults and qualify the terminal result`() {
+        val file = File.createTempFile("mps-declaration-flags", ".mps").apply {
+            writeText("ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1\nENDATA\n")
+            deleteOnExit()
+        }
+
+        val text = capture {
+            assertEquals(0, runCli(arrayOf("--unbounded-int-lo", "2", "--unbounded-int-hi", "5",
+                "-e", "cp", "-p", "1", file.absolutePath)))
+        }
+
+        assertTrue("v I=2" in text.lines(), text)
+        assertTrue("unbounded-int-lo=2 unbounded-int-hi=5" in text, text)
+        assertTrue("effective MPS declaration bounds" in text, text)
+        assertFalse("original MPS source witness" in text, text)
+    }
+
+    @Test
     fun `zero tolerance checking should use exact rational source coordinates when supplied`() {
         val input = File.createTempFile("mps-zero-rational", ".mps").apply {
             writeText("ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 0.1\nENDATA\n")
