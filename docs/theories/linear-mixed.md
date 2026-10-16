@@ -75,8 +75,10 @@ and every finite integer is fixed, it rounds the copied model prefix's integer c
 private guesses and substitutes them into all selected source rows and current
 branch bounds. It first checks the exact IEEE real prefix and rationally reconstructed
 source reals against those rows, independently of LP auxiliary columns. If neither
-point passes and the remaining real system is entirely a supported difference graph,
-an exact graph point can complete those guesses. The full rows,
+point passes, a residual with wider rows can repair its guessed real prefix through
+paired opposite, non-strict source equations. Bounded sparse elimination retains
+free-coordinate guesses and reconstructs pivot values. If the remaining real system
+is entirely a supported difference graph, an exact graph point can complete those guesses. The full rows,
 strictness, integrality and source reconstruction still gate acceptance. Failed or
 unsupported guesses supply no conflict, bound or exhaustion claim. This path adds
 no LP solve and uses the current operation allowance; private neighborhood openings
