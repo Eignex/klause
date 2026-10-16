@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.Term
@@ -123,7 +122,11 @@ private fun AlgebraicReal.linearRational(): BigFraction? {
 internal fun executeLinearSource(
     request: SourceExecutionRequest,
     callbacks: SourceExecutionCallbacks,
-    execute: (SourceExecutionRequest, SourceExecutionCallbacks, ((Cancellation) -> Unit)?) -> SourceExecutionResult,
+    execute: (
+        SourceExecutionRequest,
+        SourceExecutionCallbacks,
+        ((Cancellation, Boolean) -> Unit)?,
+    ) -> SourceExecutionResult,
 ): SourceExecutionResult {
     val invocation = request.invocation
     val prepared = requireNotNull(invocation.linearSource)
@@ -154,21 +157,21 @@ internal fun executeLinearSource(
             },
         ),
         onLinearIncumbent = { publication ->
-            accept(prepared.check(publication.sample, stop))?.objective?.let { value ->
-                callbacks.onLinearIncumbent?.invoke(publication.copy(value = SourceValue.Rational(value)))
+            if (accept(prepared.check(publication.sample, stop)) != null) {
+                callbacks.onLinearIncumbent?.invoke(publication)
             }
         },
         onQuadraticIncumbent = { publication ->
-            accept(prepared.check(publication.incumbent.sample, stop))?.objective?.let { value ->
-                callbacks.onQuadraticIncumbent?.invoke(
-                    publication.copy(
-                    incumbent = publication.incumbent.copy(value = AlgebraicArithmetic().rational(value)),
-                )
-                )
+            if (accept(prepared.check(publication.incumbent.sample, stop)) != null) {
+                callbacks.onQuadraticIncumbent?.invoke(publication)
             }
         },
     )
-    val result = execute(request, observed) { scope -> stop = stop or scope }
+    var finiteUnrestricted = true
+    val result = execute(request, observed) { scope, unrestricted ->
+        stop = stop or scope
+        finiteUnrestricted = unrestricted
+    }
     var native = LinearSourceConclusion.UNKNOWN
     var nativeOptimalValue: BigFraction? = null
     var unboundedBaseExact = false
@@ -311,7 +314,7 @@ internal fun executeLinearSource(
         is SourceExecutionResult.Transcendental -> error("linear source selected function execution")
     }
     val strategy = request.polynomial.strategy
-    val nativeClaimsUnrestricted = if (result is SourceExecutionResult.Polynomial ||
+    val nativeClaimsUnrestricted = finiteUnrestricted && if (result is SourceExecutionResult.Polynomial ||
         result is SourceExecutionResult.Quadratic
     ) {
         listOf(strategy.assumptions, strategy.backtrack.assumptions, strategy.localSearch.assumptions)

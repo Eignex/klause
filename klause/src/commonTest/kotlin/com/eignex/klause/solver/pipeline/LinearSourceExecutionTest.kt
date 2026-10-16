@@ -19,6 +19,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.validation.LinearSourceWitness
@@ -67,11 +68,13 @@ class LinearSourceExecutionTest {
         )
         )
         val points = mutableListOf<LinearSourceWitness>()
+        val nativeValues = mutableListOf<SourceValue>()
 
         val result = assertIs<SourceExecutionResult.Numerical>(
             SourceSetup.execute(
             SourceExecutionRequest(invocation, finiteRequest = { error("open source has no finite consumer") }),
-            SourceExecutionCallbacks(onLinearSourceIncumbent = points::add),
+            SourceExecutionCallbacks(onLinearSourceIncumbent = points::add,
+                onLinearIncumbent = { nativeValues += it.value }),
         )
         )
 
@@ -83,6 +86,7 @@ class LinearSourceExecutionTest {
         assertEquals(0, assertNotNull(invocation.preparedPlan).sourceRealCount)
         assertEquals(BigFraction.ofLong(10), outcome.objectiveScale)
         assertEquals(BigFraction.ofLong(31), result.result.value)
+        assertEquals(BigFraction.ofLong(31), assertIs<SourceValue.Rational>(nativeValues.last()).value)
         assertIs<SourceClaim.Optimal>(assertNotNull(result.result.terminal).claim)
         assertEquals(BigFraction.ofLong(31) * BigFraction.ofLong(10).reciprocal(), points.last().objective)
         assertEquals(points.last().objective, outcome.incumbent?.objective)
@@ -439,7 +443,7 @@ class LinearSourceExecutionTest {
 
         val result = executeLinearSource(SourceExecutionRequest(invocation),
             SourceExecutionCallbacks(onLinearSourceIncumbent = points::add)) { _, callbacks, bind ->
-            assertNotNull(bind).invoke(Cancellation { true })
+            assertNotNull(bind).invoke(Cancellation { true }, true)
             callbacks.finite.onSample(Sample(booleanArrayOf(), longArrayOf(2)))
             SourceExecutionResult.Declined(invocation, TerminationReason.Cancelled)
         }
@@ -447,5 +451,32 @@ class LinearSourceExecutionTest {
         assertTrue(points.isEmpty())
         assertEquals(LinearSourceConclusion.UNKNOWN, assertNotNull(result.linearSource).conclusion)
         assertEquals(TerminationReason.Cancelled, assertIs<SourceExecutionResult.Declined>(result).reason)
+    }
+
+    @Test
+    fun `an additional finite acceptance filter should not refute the whole original source`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false, SemanticRational.ZERO, SemanticRational.ONE)), emptyList(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+        ))
+
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+            FiniteSolveRequest(
+                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
+                randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
+                toleranceCheck = { false },
+            )
+        }))
+
+        val outcome = assertNotNull(result.linearSource)
+        assertFalse(outcome.nativeClaimsUnrestricted)
+        assertTrue(outcome.conclusion != LinearSourceConclusion.UNSATISFIABLE)
+        assertSame(source, outcome.source)
     }
 }
