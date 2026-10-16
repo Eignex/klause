@@ -38,6 +38,8 @@ internal fun cliInvocationStats(common: CommonOptions, pipeline: SolvablePipelin
         common.loadElapsedMs,
         common.frontendRouting,
         when (pipeline) {
+            is SolvablePipeline.LinearSource -> "linear-source"
+
             is SolvablePipeline.NativeSource -> pipeline.nativePipelineName()
 
             SolvablePipeline.FiniteCp -> "finite-cp"
