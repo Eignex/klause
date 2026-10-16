@@ -2175,6 +2175,11 @@ outcome selects a subset. Every archive member is checked for safe regular-file
 membership, size and SHA-256 before any log is interpreted, including members
 that are not extracted. Linked, duplicate, unexpected and missing members decline
 the archive binding. Duplicate manifest JSON keys are rejected.
+The archive download bound applies to compressed transport bytes. Individual
+member identities require nonnegative integer sizes; the expanded cohort bound
+is checked against each tar member before reading its payload. A large unselected
+report is hashed incrementally rather than extracted or interpreted, so its
+expanded size need not fit the compressed archive download allowance.
 
 Complete raw logs are retained losslessly as `raw-logs/log-NNNNNN.xml.gz` and
 per-log reports as `log-reviews/log-NNNNNN.json.gz`. `cohort-review.json` maps
