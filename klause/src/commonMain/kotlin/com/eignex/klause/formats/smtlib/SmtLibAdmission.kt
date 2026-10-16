@@ -7,11 +7,13 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.QuadraticObjectiveSpec
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.solver.FactorProjectionProviders
@@ -71,7 +73,8 @@ object SmtLibAdmission {
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         cancellation: Cancellation = Cancellation.Never,
-    ): SmtLibInput = parse({ StringCharSource(text) }, unboundedIntLo, unboundedIntHi, settings, cancellation)
+        semanticOverrides: SemanticOverrides = SemanticOverrides(),
+    ): SmtLibInput = parse({ StringCharSource(text) }, unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides)
 
     /**
      * Admit a streamed source. [openSource] must recreate the same input for each attempted lowering.
@@ -84,7 +87,9 @@ object SmtLibAdmission {
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         cancellation: Cancellation = Cancellation.Never,
+        semanticOverrides: SemanticOverrides = SemanticOverrides(),
     ): SmtLibInput {
+        val semantics = resolveSmtLibSemantics(unboundedIntLo, unboundedIntHi, semanticOverrides)
         if (cancellation()) return SmtLibInput.Interrupted
         return try {
             val result = try {
@@ -95,20 +100,21 @@ object SmtLibAdmission {
                         unboundedIntHi,
                         settings,
                         cancellation,
+                        semantics,
                     )
                 }
                 SmtLibInput.Linear(linear)
             } catch (_: UnsupportedSmtException) {
                 if (cancellation()) throw PolynomialSourceInterrupted()
                 val polynomial = withSource(openSource, cancellation) { source ->
-                    SmtLibPolynomial.parse(source, cancellation, allowIntegers = true, allowFunctions = true)
+                    SmtLibPolynomial.parse(source, cancellation, allowIntegers = true, allowFunctions = true, semantics = semantics)
                 }
                 if (polynomial.transcendental != null) SmtLibInput.Transcendental(polynomial.transcendental)
                 else {
                 val source = if (polynomial.intVarNames.isNotEmpty()) {
                     SmtLibInput.NonlinearInteger(NonlinearIntegerProblem(
                         polynomial.formula, polynomial.realCount, polynomial.boolCount,
-                        polynomial.intVarNames, polynomial.realVarNames, polynomial.boolVarNames,
+                        polynomial.intVarNames, polynomial.realVarNames, polynomial.boolVarNames, semantics,
                     ))
                 } else SmtLibInput.Polynomial(
                     PolynomialRealProblem(
@@ -119,6 +125,7 @@ object SmtLibAdmission {
                         polynomial.sourceBoolCount,
                         polynomial.realVarNames,
                         polynomial.boolVarNames,
+                        semantics,
                     ),
                 )
                 polynomial.objective?.let { SmtLibInput.Quadratic(source, it, polynomial.objectiveSense) } ?: source
@@ -144,9 +151,10 @@ private fun parseLinearAdmission(
     unboundedIntHi: Long,
     settings: ProblemSettings,
     cancellation: Cancellation,
+    semantics: EffectiveSourceSemantics,
 ): SmtLibProblem {
     val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds = false, settings = settings,
-        sourceCancellation = cancellation)
+        sourceCancellation = cancellation, semantics = semantics)
     val reader = SExprReader(source)
     val scope = SmtLibScope(cancellation)
     val declarations = ArrayList<SExpr>()

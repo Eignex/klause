@@ -3,10 +3,13 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 
@@ -24,7 +27,9 @@ data class SmtLibProblem(
     val realVarNames: Map<String, Int> = emptyMap(),
     /** The objective's optimisation sense (minimise for satisfaction instances, which have none). */
     val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-)
+) : SourceSemanticsOwner {
+    override val semantics: EffectiveSourceSemantics get() = model.semantics
+}
 
 /** SMT-LIB factor facade for linear arithmetic and representable bounded polynomial products. */
 object SmtLib {
@@ -35,7 +40,8 @@ object SmtLib {
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         strictBounds: Boolean = false,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
-    ): SmtLibProblem = parse(StringCharSource(text), unboundedIntLo, unboundedIntHi, strictBounds, settings)
+        semanticOverrides: SemanticOverrides = SemanticOverrides(),
+    ): SmtLibProblem = parse(StringCharSource(text), unboundedIntLo, unboundedIntHi, strictBounds, settings, semanticOverrides)
 
     /** Decode and lower a streamed SMT-LIB [source], retaining only one top-level command at a time. */
     fun parse(
@@ -44,8 +50,10 @@ object SmtLib {
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         strictBounds: Boolean = false,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+        semanticOverrides: SemanticOverrides = SemanticOverrides(),
     ): SmtLibProblem {
-        val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds, settings)
+        val semantics = resolveSmtLibSemantics(unboundedIntLo, unboundedIntHi, semanticOverrides)
+        val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds, settings, semantics = semantics)
         val reader = SExprReader(source)
         while (true) builder.command(reader.readCommandOrNull() ?: break)
         return builder.build()

@@ -7,10 +7,10 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
-import com.eignex.klause.lowering.PolynomialSourceInterrupted
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Bits
 
 /**
@@ -23,8 +23,9 @@ import com.eignex.klause.util.Bits
 internal fun Compiler.Builder.inferBounds() {
     if (intNames.isEmpty()) return
     // null = unbounded on that side (-inf for lo, +inf for hi); no sentinel magnitude.
-    val lo = arrayOfNulls<Long>(nextInt)
-    val hi = arrayOfNulls<Long>(nextInt)
+    val bounds = requireNotNull(semantics.effective.undeclaredIntegers)
+    val lo = Array<Long?>(nextInt) { bounds.lower }
+    val hi = Array<Long?>(nextInt) { bounds.upper }
     val relations = boundPremises.apply { clear() }
     inferringBounds = true
     try {

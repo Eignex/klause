@@ -1,5 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
@@ -29,9 +31,10 @@ internal object Compiler {
         val unboundedIntLo: Long,
         val unboundedIntHi: Long,
         val strictBounds: Boolean,
-        internal val settings: ProblemSettings = ProblemSettings(),
+        internal val settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         internal val conditionalEqualities: SmtLibConditionalEquality = SmtLibConditionalEquality(),
         internal val sourceCancellation: Cancellation = Cancellation.Never,
+        internal val semantics: EffectiveSourceSemantics = resolveSmtLibSemantics(unboundedIntLo, unboundedIntHi),
     ) :
         CnfLowering {
         internal val boolNames = HashMap<String, Int>()
@@ -144,15 +147,8 @@ internal object Compiler {
 
         override fun newBool(): Int = nextBool++
         internal fun newInt(): Int {
-            // An unbounded declaration is Open on whichever side the caller left at the `Long.MIN/MAX`
-            // marker; source bound inference either closes it or preserves the open side.
-            intDomains.add(
-                openOrFinite(
-                    if (unboundedIntLo == Long.MIN_VALUE) null else unboundedIntLo,
-                    if (unboundedIntHi == Long.MAX_VALUE) null else unboundedIntHi,
-                ),
-            )
-            return nextInt++
+            val bounds = requireNotNull(semantics.effective.undeclaredIntegers)
+            return newInt(bounds.lower, bounds.upper)
         }
         internal fun newInt(lo: Long?, hi: Long?): Int {
             intDomains.add(openOrFinite(lo, hi))
@@ -281,6 +277,7 @@ internal object Compiler {
 
         fun build(): SmtLibProblem {
             inferBounds()
+            retainDeclarationBounds()
             if (hasOpenProductOperand()) closeProductBounds()
             for (a in asserts) assert(a)
             lowerOpenIteChains()
@@ -297,6 +294,7 @@ internal object Compiler {
 
             val model = Problem(
                 settings = settings,
+                semantics = semantics,
                 numBoolVars = nextBool,
                 intBounds = sourceBounds,
                 factors = factors.toTypedArray(),
