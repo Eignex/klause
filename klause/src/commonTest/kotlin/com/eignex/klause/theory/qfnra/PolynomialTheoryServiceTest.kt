@@ -36,11 +36,13 @@ class PolynomialTheoryServiceTest {
             (declare-const x Real)
             (declare-const y Real)
             (assert (= y (* x x)))
-            (assert (< y 0))
+            (assert (= (* x x) 2))
+            (assert (= (* y y) 3))
             """.trimIndent(),
         )
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         val complete = service.invocation().use { assertIs<QfNraResult.Unsatisfiable>(it.check()) }
+        assertTrue(complete.stats.projectedPolynomials > 0)
 
         service.invocation(QfNraParams(maximumWork = complete.stats.workSpent + 1)).use { invocation ->
             val pending = invocation.prepareCheck()
