@@ -320,6 +320,9 @@ source owner's interpretation, including early interruption and admission declin
 Qualification preserves the native verdict and the exact accepted-incumbent receipt;
 the receipt remains separate from a limit or ray certificate's private witness.
 An execution over a source without a semantic owner remains unbound.
+Native polynomial, nonlinear-integer and transcendental source verdicts retain
+their declared owner's capture. Shared private polynomial views preserve that
+interpretation independently of their execution coordinates.
 
 These value types define the source carrier contract. FlatZinc captures its
 [effective declaration policy](formats/flatzinc.md#declared-semantics-and-caller-ranges)

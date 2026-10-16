@@ -96,13 +96,14 @@ fun OpenTheoryPipeline.execute(
     cores: Int,
 ): TranscendentalTheoryExecution {
     require(cores > 0)
-    return if (request.problem.hasObjective || !params.supportsInvocation(engine)) {
+    return (if (request.problem.hasObjective || !params.supportsInvocation(engine)) {
         TranscendentalTheoryExecution(
             OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY), 0, false,
         )
     } else if (engine == FiniteEngine.MIXED || (engine != FiniteEngine.FIXED && cores > 1)) {
         TranscendentalPortfolioInvocation(request, params, engine, cores).execute()
-    } else TranscendentalWorkerAdapter(request.problem, params, engine).use { it.execute() }
+    } else TranscendentalWorkerAdapter(request.problem, params, engine).use { it.execute() })
+        .withSourceSemantics(request.problem.semantics)
 }
 
 private fun TranscendentalTheoryParams.supportsInvocation(engine: FiniteEngine): Boolean {

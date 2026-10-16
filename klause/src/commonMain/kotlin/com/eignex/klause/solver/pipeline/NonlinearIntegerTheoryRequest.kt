@@ -79,9 +79,10 @@ fun OpenTheoryPipeline.execute(
     cores: Int,
 ): PolynomialTheoryExecution {
     require(cores > 0)
-    return if (engine == FiniteEngine.MIXED || (engine != FiniteEngine.FIXED && cores > 1)) {
+    return (if (engine == FiniteEngine.MIXED || (engine != FiniteEngine.FIXED && cores > 1)) {
         NonlinearIntegerPortfolio(request, params, cores, engine).execute()
-    } else NonlinearIntegerInvocation(request, params, engine).execute()
+    } else NonlinearIntegerInvocation(request, params, engine).execute())
+        .withSourceSemantics(request.preparedPlan.sourceSemantics)
 }
 
 internal class NonlinearIntegerInvocation(
