@@ -42,7 +42,7 @@ class LinearStopAttributionProfileTest {
         assertEquals(true, stop())
         assertSame(deadline, stop.deadline())
         assertSame(meter, stop.workMeter())
-        assertEquals(7, spent)
+        assertEquals(7L, spent)
         assertNull(stop.observation)
     }
 }
