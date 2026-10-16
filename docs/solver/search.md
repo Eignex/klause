@@ -819,7 +819,8 @@ and is not a source witness. These counters exclude private queries.
 Other `smtCompleteSearchStage_*` observations follow existing branch paths: finite choices pending,
 finite and Boolean choices complete, source disjunction or disequality branches,
 and source branchers offering no further choice. `RECOVERY_*` records an actual mixed point attempt
-and its existing return path. These are component stages, not full-source acceptance
+and its existing return path; equality repair records its own attempt and any
+fully checked point. These are component stages, not full-source acceptance
 or explanations for UNKNOWN. A missing recovery attempt cannot identify which earlier
 stage stopped progress without the corresponding observations. Stage recording adds
 no scan, owner poll, numerical query or work allowance. Stages overlap and their

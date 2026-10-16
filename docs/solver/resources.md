@@ -204,8 +204,10 @@ prefix is a guess; it supplies no proof package or separate numerical allowance.
 The snapshot is cleared by assertions, retraction, restart and close.
 
 Complete mixed witness recovery uses the current exact-linear operation token for
-integer guesses, source-prefix reconstruction, selected-row substitution, graph
-construction and full-row validation. Its difference potential query charges copied cells and conservative
+integer guesses, source-prefix reconstruction, selected-row substitution, equation
+repair, graph construction and full-row validation. Equation repair admits at most
+65,536 input entries and pivot cells and 4,096-bit scalars; pairing, sparse elimination
+and substitution charge the same token before bounded arithmetic. Its difference potential query charges copied cells and conservative
 edge-sweep and predecessor-walk batches to that same token. These nonrefundable
 batches add no allowance. An observed stop withholds the recovered point, and a
 failed guessed integer assignment supplies no source refutation.

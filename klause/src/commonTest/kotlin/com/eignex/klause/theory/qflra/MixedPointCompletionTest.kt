@@ -44,6 +44,43 @@ class MixedPointCompletionTest {
     }
 
     @Test
+    fun `opposite source rows repair coupled real equalities before full validation`() {
+        val third = BigFraction.ofLong(3).reciprocal()
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            exactColumnLower(0, third), exactColumnUpper(0, third),
+            exactColumnLower(1, third), exactColumnUpper(1, third),
+            ExactRationalInequality(intArrayOf(2), listOf(BigFraction.ONE), BigFraction.ONE, strict = true),
+        )
+
+        val point = assertNotNull(completeMixedPoint(3, 1, doubleArrayOf(1.0 / 3, 1.0 / 3, 0.7, 1.0),
+            rows, Cancellation.Never))
+
+        assertEquals(third + third, point[2])
+        assertTrue(point.satisfiesSourceRows(rows))
+    }
+
+    @Test
+    fun `repaired equalities cannot bypass real inequalities`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            exactColumnLower(0, BigFraction.ONE), exactColumnUpper(0, BigFraction.ONE),
+            exactColumnLower(1, BigFraction.ONE), exactColumnUpper(1, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(2), listOf(BigFraction.ONE), BigFraction.ONE, strict = true),
+        )
+
+        val point = completeMixedPoint(3, 1, doubleArrayOf(1.0, 1.0, 0.7, 1.0), rows, Cancellation.Never)
+
+        assertNull(point)
+    }
+
+    @Test
     fun `integer guesses admit exact strict real completion only after full row checking`() {
         val rows = listOf(
             exactColumnLower(0, BigFraction.ZERO),
