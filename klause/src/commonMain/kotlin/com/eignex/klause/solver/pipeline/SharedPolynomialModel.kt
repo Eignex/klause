@@ -15,6 +15,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
@@ -64,38 +65,34 @@ internal class SharedPolynomialModel private constructor(
             cancellation: Cancellation,
             onDecline: (EncoderDecline) -> Unit,
         ): SharedPolynomialModel? {
+            projections.requireSource(source)
+            val stop = cancellation.encodingPreparationScope()
+            fun stopped(): Boolean {
+                if (!stop()) return false
+                onDecline(EncoderDecline.RESOURCE)
+                return true
+            }
+            if (stopped()) return null
             if ((0 until source.numIntVars).any { !source.intBounds.hasLower(it) || !source.intBounds.hasUpper(it) }) {
                 return null
             }
-            val lowering = PolynomialRealLowering(source.numRealVars)
-            val integerIds = LinkedHashMap<Int, Int>()
-            fun integer(id: Int): PolynomialExpression = PolynomialExpression.Variable(
-                SourceRealId(integerIds.getOrPut(id) { lowering.opaqueReal().id.index }),
-            )
-            fun real(id: Int): PolynomialExpression = PolynomialExpression.Variable(SourceRealId(id))
-            val formulas = ArrayList<PolynomialRealFormula>()
-            sourceFormula?.let(formulas::add)
-            val kept = ArrayList<Int>()
-            val attributions = ArrayList<EncodingAttribution>()
-            val installationStop = cancellation
             val participating = BooleanArray(source.numFactors)
             val relevantIntegers = BooleanArray(source.numIntVars)
             val relevantBooleans = BooleanArray(source.numBoolVars)
             for ((index, factor) in source.factors.withIndex()) {
+                if (stopped()) return null
                 val continuous = factor.variables.reals.isNotEmpty() ||
                     factor.linearForm?.rows?.any { it.constants is RealConstants } == true
                 val required = continuous ||
                     projections.capabilities(index).propagation == PropagationCapability.UNSUPPORTED
-                if (required) {
-                    if (!projections.encoder(index, EncodingTarget.POLYNOMIAL).enforcesSource) return null
-                    participating[index] = true
-                }
+                if (required) participating[index] = true
             }
             var changed = true
             while (changed) {
-                if (cancellation()) return null
+                if (stopped()) return null
                 changed = false
                 for ((index, factor) in source.factors.withIndex()) {
+                    if (stopped()) return null
                     if (!participating[index] && projections.encoder(index, EncodingTarget.POLYNOMIAL).enforcesSource &&
                         (factor.intVars.any { relevantIntegers[it] } ||
                             factor.boolVars.any { relevantBooleans[it] })
@@ -115,14 +112,29 @@ internal class SharedPolynomialModel private constructor(
                     }
                 }
             }
+            val request = projections.requestEncoders(EncodingTarget.POLYNOMIAL,
+                participating.indices.filter { participating[it] }, cancellation = stop, onDecline = onDecline)
+                ?: return null
+            val lowering = PolynomialRealLowering(source.numRealVars)
+            val integerIds = LinkedHashMap<Int, Int>()
+            fun integer(id: Int): PolynomialExpression = PolynomialExpression.Variable(
+                SourceRealId(integerIds.getOrPut(id) { lowering.opaqueReal().id.index }),
+            )
+            fun real(id: Int): PolynomialExpression = PolynomialExpression.Variable(SourceRealId(id))
+            val formulas = ArrayList<PolynomialRealFormula>()
+            sourceFormula?.let(formulas::add)
+            val kept = ArrayList<Int>()
+            val attributions = ArrayList<EncodingAttribution>()
+            val installationStop = request.cancellation
+            var selectedIndex = 0
             for ((index, factor) in source.factors.withIndex()) {
-                if (cancellation()) return null
-                cancellation.charge(1)
+                if (stopped()) return null
+                stop.charge(1)
                 val finite = factor.variables.reals.isEmpty() &&
                     projections.capabilities(index).propagation != PropagationCapability.UNSUPPORTED
                 if (finite) kept += index
                 if (!participating[index]) continue
-                val selected = projections.encoder(index, EncodingTarget.POLYNOMIAL)
+                val selected = request.encoders[selectedIndex++]
                 val emitted = ArrayList<PolynomialRealFormula>()
                 val integerMapping = LinkedHashMap<SourceIntId, TheoryRealId>()
                 val realMapping = LinkedHashMap<SourceRealId, TheoryRealId>()
@@ -192,13 +204,13 @@ internal class SharedPolynomialModel private constructor(
                 if (lower.isFinite()) formulas += bound(real(id), PolynomialRelation.GE, lower)
                 if (upper.isFinite()) formulas += bound(real(id), PolynomialRelation.LE, upper)
             }
-            if (cancellation()) return null
+            if (stopped()) return null
             val formula = lowering.formula(formulas)
             val fixedReals = (0 until source.numRealVars).mapNotNull { id ->
                 source.realLower[id].takeIf { it.isFinite() && it == source.realUpper[id] }
                     ?.let { id to requireNotNull(BigFraction.ofDouble(it)) }
             }.toMap()
-            if (cancellation()) return null
+            if (stopped()) return null
             return SharedPolynomialModel(
                 source,
                 Problem(

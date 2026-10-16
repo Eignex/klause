@@ -50,13 +50,14 @@ can declare a target and implement the same installation scope. Selection contai
 no mutable solving state. Prepared relations are combined within one arithmetic
 owner before its checks, rather than checked as independent factor witnesses.
 
-Selected linear and difference requests preflight their entire ordered source scope
+Selected linear, difference and polynomial requests preflight their entire ordered source scope
 before allocating a receiver or invoking any selected installer. Unsupported and
 relaxation-only descriptors decline enforcement; missing source pins decline the
 condition scope. An ineligible whole source does not suppress a separately admitted
 connected subset. Candidate planning retains finite ownership and encoding
 participation independently. A complete LRA candidate needs no difference
-installation. Each admitted receiver still performs the installer's own condition,
+installation. Polynomial composition discovers its required and connected scope before
+allocating the polynomial receiver. Each admitted receiver still performs the installer's own condition,
 resource and formula validation; a descriptor cannot certify that work in advance.
 Source identities and captured pin maps survive through original factor attribution.
 
