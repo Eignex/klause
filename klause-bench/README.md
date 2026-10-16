@@ -1528,6 +1528,35 @@ do not establish full tree-search or whole-CLI gains. Keep raw measurements exte
 
 ## Profiling
 
+`bench.profile.LinearQueryEligibilityProfile` observes existing exact-linear numerical
+input references while driving one hash-pinned satisfaction source through the public
+open-theory run. Pass `suite=... problem=... sha256=...`. Its single-processor child
+uses a 10-second deadline including source admission and compilation; the transport
+limit is 120 seconds. This diagnostic has no CLI prefix, timing, verdict or proof credit.
+It creates no numerical reduced model and performs no witness checking after timing.
+
+The observer forwards the original cancellation exactly once. It reads only cached
+fields and already initialized numerical owners, accepting a solved-input pointer
+only when identical to the current source-owner state. Uncached storage, unsupported
+owners and missing inputs remain explicit coverage gaps. Sampling follows observed
+pointer transitions, not individual continuation invocations or dimension declines.
+At most eleven power-of-two checkpoints and the latest storage-admissible input are
+retained. A weak transition marker retains no rejected input. Checkpoints share one
+million numeric storage units and the last slot another million; each input is at
+most one million units. These sampled-input units do not bound the process heap.
+
+After timing and normal cleanup, bounded metadata analysis keeps unknown rows and
+protected finite coordinates. It considers only free, continuous, unconditional
+zero-cost definition identities and isolated unbounded zero-origin coordinates.
+Static dimension, scalar, admission and reconstruction-capture guards use the
+unchanged default limits, including implicit logical entries and dense continuation
+cells. A static lead still lacks a numerical basis, remaining original allowance,
+subsequent arithmetic bounds and original-source acceptance. Missing or rejected
+samples provide no universal eligibility conclusion. Source size is limited to
+1 MiB; model dimensions to 16,384, matrix entries to 131,072, analysis to two million
+metadata steps and ten seconds, and aggregate diagnostic output to 1 MiB.
+
+
 `profile=cpu|wall|alloc` writes `build/bench-prof.jfr` and prints a flat method table.
 `profile-scope=solve` starts after selection resolution; `all` covers the harness.
 Profiling uses an in-process single `cp`/`fixed` or `ls` engine, cannot profile
