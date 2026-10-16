@@ -231,10 +231,8 @@ class ExactLiraSearchComponent private constructor(
     private var operationStop = Cancellation.Never
     private var parentStop = Cancellation.Never
     private var pollContextStop = true
-    private val lpStop = object : Cancellation {
-        override fun isCancelled(): Boolean = operationStop() || (pollContextStop && context?.cancelled() == true)
-        override fun deadline() = operationStop.deadline()
-        override fun workMeter() = operationStop.workMeter()
+    private val lpStop = LinearOperationCancellation({ operationStop }) {
+        pollContextStop && context?.cancelled() == true
     }
     internal var operationBudgetExhausted = false
         private set
@@ -1072,9 +1070,11 @@ class ExactLiraSearchComponent private constructor(
         context?.executionControls?.beginOperation()
         operationStop = operationAllowance?.invoke(parentStop)
             ?: checkNotNull(context).executionControls.operationAllowance(parentStop)
+        lpStop.begin()
     }
 
     private fun endOperation(context: SearchContext) {
+        lpStop.end()
         if (operationStop() && !context.cancelled()) {
             operationBudgetExhausted = true
             context.executionControls.reportStop(SearchStopCause.OperationAllowance)

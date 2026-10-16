@@ -188,6 +188,14 @@ facts remain valid if a later enclosing callback stops. An observed stop is latc
 only for that operation. Completed atomic heap or buffer operations retain their
 charges and expose no result after abandonment.
 
+The model-facing exact-linear component batches unmetered LP cancellation polls
+within each arithmetic operation, polling at most every 64 numerical token visits.
+An attached caller meter retains eager polls after every debit. Deadline and meter
+metadata remain live delegates to the current operation. Entry and result delivery
+poll the operation directly; leaving it restores eager polling. A detected numerical
+stop is latched only until the next operation, without renewing native LP or exact
+continuation limits. Retraction and full-source witness checks retain their owners.
+
 Difference feasibility can reuse a completed private numerical seed with exact
 source-node identity. Node comparisons and initial-value copies charge the same
 component token. Repair and predecessor-cycle walks poll that owner; a numerical
