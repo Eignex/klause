@@ -112,6 +112,25 @@ class MpsExactSourceTest {
     }
 
     @Test
+    fun `retained integer objectives should map back to the original decimal value`() {
+        for ((coefficient, denominator) in listOf("0.5" to 2L, "0.2" to 5L)) {
+            val source = Mps.parse(
+                "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST $coefficient\n" +
+                    " M1 'MARKER' 'INTEND'\nBOUNDS\n FX B I 1\nENDATA",
+            )
+            val compiled = source.toExactSourceProblem()
+
+            val witness = compiled.sourceWitness(listOf(BigFraction.ONE))
+            val retained = checkNotNull(compiled.objective)
+            val workingValue = BigFraction.ofLong(retained.intCoefficients.single() + retained.constant)
+            val originalValue = workingValue * BigFraction.ofLong(compiled.objectiveScale).reciprocal()
+
+            assertEquals(BigFraction.ofLong(denominator).reciprocal(), witness.objective)
+            assertEquals(witness.objective, originalValue)
+        }
+    }
+
+    @Test
     fun `exact source capture should survive mutations of parser arrays`() {
         val source = Mps.parse("ROWS\n N COST\n E ROW\nCOLUMNS\n X ROW 0.1\nRHS\n R ROW 0.3\nENDATA")
         val compiled = source.toExactSourceProblem()
