@@ -1,41 +1,27 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.WideLinComb
 import com.eignex.klause.lowering.isConstant
-import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_TEN
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.gcd
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.rem
 import com.eignex.klause.util.signum
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toLong
-import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 
-// Real-arithmetic lowering for the SMT-LIB front-end (LRA / the real half of LIRA): real variables
-// become LP-only continuous columns and linear real constraints become real Linear rows, with no
-// discretisation. Coefficients are folded as exact rationals (BigFraction), and each emitted row is
-// multiplied through by the least common denominator so the row's doubles are exact integers: the
-// LP-side certifiers then reason about precisely the asserted constraint. Strict atoms keep their
-// strictness for the delta-rational exact deciders (Dutertre and de Moura, "A Fast Linear-Arithmetic
-// Solver for DPLL(T)", CAV 2006, https://doi.org/10.1007/11817963_11). Real atoms under boolean
-// structure reify through [ReifiedRealLinear].
+// Source rows retain arbitrary-precision rational coefficients. Numerical consumers choose their
+// own representable projections; strictness and Boolean equivalence remain exact source data.
 
 /** The integer combination this real term embeds, or null when any coefficient is fractional or
  *  a real column appears — the inverse of [toRealComb], for `to_int` over an integral real term. */
@@ -152,161 +138,27 @@ private fun Compiler.Builder.assertRealRelation(op: String, a: RealComb, b: Real
         if (!holds) forceTrue(Lit.negate(trueLit()))
         return
     }
-    if (d.realCoeffs.isEmpty()) {
-        // Integer variables compared against a rational (e.g. `x <= 1.5`): multiplying through by the
-        // least common denominator gives an exact all-integer row — no real column is involved, and
-        // strictness folds into the integer bound.
-        val scaled = integerRow(d) ?: smtUnsupported("rational comparison exceeds the 64-bit range")
-        val (vars, coeffs, bound) = scaled
-        val adjusted = when {
-            !strict -> bound
-            linOp == LinearOp.LE -> bound - 1
-            else -> bound + 1
-        }
-        assertLinearRow(coeffs, vars, linOp, adjusted)
-        return
-    }
     factors.add(realRow(d, linOp, strict))
 }
 
-/** Scale an all-integer-variable `d ⟨op⟩ 0` by the least common denominator into an exact Long row
- *  `Σ coeffs·vars ⟨op⟩ bound`, or null when a scaled value escapes 64 bits. */
-internal fun Compiler.Builder.integerRow(d: RealComb): Triple<IntArray, LongArray, Long>? {
-    var lcm = d.constant.den
-    for (c in d.intCoeffs.values) lcm = lcmOf(lcm, c.den)
-    val scale = BigFraction.of(lcm, BIG_ONE)
-    val vars = IntArray(d.intCoeffs.size)
-    val coeffs = LongArray(d.intCoeffs.size)
-    var i = 0
-    for ((v, c) in d.intCoeffs) {
-        vars[i] = v
-        coeffs[i] = (c * scale).toExactLongOrNull() ?: return null
-        i++
-    }
-    val bound = (d.constant.negated() * scale).toExactLongOrNull() ?: return null
-    return Triple(vars, coeffs, bound)
-}
+/** Retain exact rational source coefficients, strictness and tagged numeric coordinates. */
+internal fun Compiler.Builder.realRow(d: RealComb, op: LinearOp, strict: Boolean = false): ExactLinear =
+    exactRealRow(d, op, strict)
 
-/** Scale `d ⟨op⟩ 0` by the least common denominator and emit the exact-integer double row. A scaled
- *  value past the exactly-representable double range routes through the [wideRealRow] chain encoding
- *  instead — exact either way, never approximated. */
-internal fun Compiler.Builder.realRow(d: RealComb, op: LinearOp, strict: Boolean = false): Linear {
-    var lcm = d.constant.den
-    for (c in d.intCoeffs.values) lcm = lcmOf(lcm, c.den)
-    for (c in d.realCoeffs.values) lcm = lcmOf(lcm, c.den)
-    val scale = BigFraction.of(lcm, BIG_ONE)
-    fun scaled(c: BigFraction): BigInt = (c * scale).num
-    fun wide(c: BigFraction): Boolean = scaled(c).abs() > MAX_EXACT_ROW_BIG
-    if (d.intCoeffs.values.any { wide(it) } || d.realCoeffs.values.any { wide(it) } || wide(d.constant)) {
-        return wideRealRow(d, scale, op, strict)
-    }
-    fun exact(c: BigFraction): Double = scaled(c).toLongExact().toDouble()
-    val intVars = IntArray(d.intCoeffs.size)
-    val intCoeffs = DoubleArray(d.intCoeffs.size)
-    var i = 0
-    for ((v, c) in d.intCoeffs) {
-        intVars[i] = v
-        intCoeffs[i] = exact(c)
-        i++
-    }
-    val realVars = IntArray(d.realCoeffs.size)
-    val realCoeffs = DoubleArray(d.realCoeffs.size)
-    i = 0
-    for ((v, c) in d.realCoeffs) {
-        realVars[i] = v
-        realCoeffs[i] = exact(c)
-        i++
-    }
-    val bound = exact(d.constant.negated())
-    return Linear(intVars, intCoeffs, realVars, realCoeffs, op, bound, strict)
-}
-
-// Exact encoding of a row whose least-common-denominator scale pushes an integer coefficient past the
-// exact-double range: each oversized coefficient `C·x` decomposes in base `B = 2⁴⁰` over chain
-// variables `x⁽ᵏ⁾ = Bᵏ·x` (fresh reals tied by exact defining rows, cached per variable), so every
-// emitted coefficient is a base-B digit — an exact double. An oversized constant moves onto the
-// auxiliary real pinned to 1. Depth is capped at WIDE_MAX_DIGITS digits; beyond that the row rejects
-// (exact-or-reject, never approximated).
-private fun Compiler.Builder.wideRealRow(d: RealComb, scale: BigFraction, op: LinearOp, strict: Boolean): Linear {
-    val realVarsL = ArrayList<Int>()
-    val realCoeffsL = ArrayList<Double>()
-    val intVarsL = ArrayList<Int>()
-    val intCoeffsL = ArrayList<Double>()
-    fun emit(varId: Int, isInt: Boolean, c: BigInt) {
-        val neg = c.signum() < 0
-        var mag = c.abs()
-        var k = 0
-        while (mag.signum() != 0) {
-            if (k >= WIDE_MAX_DIGITS) smtUnsupported("real coefficient exceeds the exactly-representable range")
-            val digit = (mag % WIDE_BASE_BIG).toLongExact()
-            mag /= WIDE_BASE_BIG
-            if (digit != 0L) {
-                val coeff = (if (neg) -digit else digit).toDouble()
-                if (k == 0 && isInt) {
-                    intVarsL.add(varId)
-                    intCoeffsL.add(coeff)
-                } else {
-                    realVarsL.add(if (k == 0) varId else chainVar(varId, k, isInt))
-                    realCoeffsL.add(coeff)
-                }
-            }
-            k++
-        }
-    }
-    for ((v, c) in d.intCoeffs) emit(v, true, (c * scale).num)
-    for ((v, c) in d.realCoeffs) emit(v, false, (c * scale).num)
-    val rhs = (d.constant.negated() * scale).num
-    val bound: Double
-    if (rhs.abs() <= MAX_EXACT_ROW_BIG) {
-        bound = rhs.toLongExact().toDouble()
-    } else {
-        emit(oneVar(), false, -rhs)
-        bound = 0.0
-    }
-    return Linear(
-        intVarsL.toIntArray(),
-        intCoeffsL.toDoubleArray(),
-        realVarsL.toIntArray(),
-        realCoeffsL.toDoubleArray(),
-        op,
-        bound,
-        strict,
-    )
-}
-
-// The chain variable standing for `Bᵏ · var`, with its exact defining row added on first use.
-private fun Compiler.Builder.chainVar(varId: Int, k: Int, isInt: Boolean): Int {
-    val key = (varId.toLong() shl 3) or (k.toLong() shl 1) or (if (isInt) 1L else 0L)
-    realChainVars[key]?.let { return it }
-    val fresh = nextReal++
-    val prev = if (k == 1) varId else chainVar(varId, k - 1, isInt)
-    val base = WIDE_BASE.toDouble()
-    // chain − B·prev = 0; at k == 1 the base term is the original variable (integer or real).
-    val row = if (k == 1 && isInt) {
-        Linear(intArrayOf(varId), doubleArrayOf(-base), intArrayOf(fresh), doubleArrayOf(1.0), LinearOp.EQ, 0.0)
-    } else {
-        Linear(IntArray(0), DoubleArray(0), intArrayOf(fresh, prev), doubleArrayOf(1.0, -base), LinearOp.EQ, 0.0)
-    }
-    factors.add(row)
-    realChainVars[key] = fresh
-    return fresh
-}
-
-// The auxiliary real pinned to 1 (for oversized row constants), created on first use.
-private fun Compiler.Builder.oneVar(): Int {
-    if (realOneVar >= 0) return realOneVar
-    val fresh = nextReal++
-    factors.add(Linear(IntArray(0), DoubleArray(0), intArrayOf(fresh), doubleArrayOf(1.0), LinearOp.EQ, 1.0))
-    realOneVar = fresh
-    return fresh
-}
-
-private fun lcmOf(a: BigInt, b: BigInt): BigInt = ((a * b) / a.gcd(b)).abs()
+private fun exactRealRow(
+    d: RealComb,
+    op: LinearOp,
+    strict: Boolean,
+    activator: Int = LinearRow.ALWAYS,
+): ExactLinear = ExactLinear.of(
+    (d.intCoeffs.keys.map(Term::ofIntVar) + d.realCoeffs.keys.map(Term::ofRealVar)).toIntArray(),
+    d.intCoeffs.values.toList() + d.realCoeffs.values.toList(), op, d.constant.negated(), strict, activator,
+)
 
 /**
  * Reify a real relation `(op a b)` as a Boolean literal: an inequality atom becomes one
- * [ReifiedRealLinear]; an equality is the conjunction of its two inequality atoms (its complement is
- * a disjunction no single row expresses). Pure-integer sides fall back to the integer reification.
+ * exact reified row; an equality is the conjunction of its two inequality atoms (its complement is
+ * a disjunction no single row expresses). Integer-only rows retain exact lattice thresholds.
  */
 internal fun Compiler.Builder.reifyRealRel(op: String, a: RealComb, b: RealComb): Int {
     val d = a.plus(b.scaled(BigFraction.MINUS_ONE))
@@ -335,31 +187,8 @@ private fun Compiler.Builder.reifyRealAtom(d: RealComb, linOp: LinearOp, strict:
         }
         return if (holds) trueLit() else Lit.negate(trueLit())
     }
-    if (d.realCoeffs.isEmpty()) {
-        val scaled = integerRow(d) ?: throw UnsupportedSmtException("rational comparison exceeds the 64-bit range")
-        val (vars, coeffs, bound) = scaled
-        val adjusted = when {
-            !strict -> bound
-            linOp == LinearOp.LE -> bound - 1
-            else -> bound + 1
-        }
-        return reifyLinear(coeffs, vars, linOp, adjusted)
-    }
-    val row = realRow(d, linOp, strict)
-    val constants = checkNotNull(row.realConstants) { "a real row carries continuous constants" }
     val w = newBool()
-    factors.add(
-        ReifiedRealLinear(
-            aux = w,
-            vars = row.vars,
-            intCoeffs = constants.intCoefficients.toDoubleArray(),
-            realVars = row.realVars,
-            realCoeffs = constants.realCoefficients.toDoubleArray(),
-            op = if (row.op == LinearOp.EQ) LinearOp.LE else row.op,
-            bound = constants.bound,
-            strict = constants.strict,
-        ),
-    )
+    factors.add(exactRealRow(d, linOp, strict, w))
     return Lit.make(w, true)
 }
 
@@ -410,16 +239,3 @@ private fun BigFraction.toExactDoubleOrNull(): Double? {
     val back = BigFraction.ofDouble(v) ?: return null
     return if (back == this) v else null
 }
-
-// Coefficient magnitude cap for an emitted row: integers up to 2^53 are exact doubles.
-private const val MAX_EXACT_ROW = 1L shl 53
-
-private val MAX_EXACT_ROW_BIG = bigIntOf(MAX_EXACT_ROW)
-
-// Chain-encoding digit base: digits stay far under the exact-double cap.
-private const val WIDE_BASE = 1L shl 40
-
-private val WIDE_BASE_BIG = bigIntOf(WIDE_BASE)
-
-// Digit cap for the chain encoding (`B⁴ = 2¹⁶⁰` covers any realistic decimal literal).
-private const val WIDE_MAX_DIGITS = 4

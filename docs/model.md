@@ -114,11 +114,19 @@ pins, competing definitions and cycles remain authoritative.
 
 `factor.arithmetic.ExactLinear` captures rational comparisons over tagged integer
 and real coordinates, coalescing aliases before exact denominator clearing. Narrow
-and arbitrary-width constants retain the same mathematical relation. Its finite
-projection filters integer bounds; mixed scoring is heuristic and requires a
-complete source check. The numerical projection emits representable scaled integer
+and arbitrary-width constants retain the same mathematical relation. Strict real
+comparisons retain their open boundary; integer-only strict comparisons clear
+denominators and use the equivalent integral threshold. An optional Boolean
+activator reifies the whole comparison, including its complement. Remapping and
+structural keys retain both strictness and activation identity. Finite integer
+projections enforce reification in both directions. Mixed scoring is heuristic
+and requires a complete source check. The numerical projection emits representable scaled integer
 constants without changing the source relation. Missing numerical rows weaken the
-relaxation and cannot certify an omitted source comparison.
+relaxation and cannot certify an omitted source comparison. Representable compact
+strict/reified rows retain their exact boundary and live Boolean premise in the
+numerical projection. Wider strict or reified rows require the selected exact
+linear or polynomial consumer; an omitted numerical row supplies no enforcement
+authority.
 
 `LinearIndicator` retains one integer trigger, its zero/one polarity and an exact
 enabled row. It is a one-way implication; the disabled branch leaves the row

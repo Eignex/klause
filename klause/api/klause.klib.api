@@ -6210,6 +6210,8 @@ final class com.eignex.klause.factor.arithmetic/DivMod : com.eignex.klause.ir/Fa
 }
 
 final class com.eignex.klause.factor.arithmetic/ExactLinear : com.eignex.klause.ir/Factor, com.eignex.klause.ir/LinearRow { // com.eignex.klause.factor.arithmetic/ExactLinear|null[0]
+    final val activator // com.eignex.klause.factor.arithmetic/ExactLinear.activator|{}activator[0]
+        final fun <get-activator>(): kotlin/Int // com.eignex.klause.factor.arithmetic/ExactLinear.activator.<get-activator>|<get-activator>(){}[0]
     final val constants // com.eignex.klause.factor.arithmetic/ExactLinear.constants|{}constants[0]
         final fun <get-constants>(): com.eignex.klause.ir/IntegralConstants // com.eignex.klause.factor.arithmetic/ExactLinear.constants.<get-constants>|<get-constants>(){}[0]
     final val linearForm // com.eignex.klause.factor.arithmetic/ExactLinear.linearForm|{}linearForm[0]
@@ -6218,6 +6220,8 @@ final class com.eignex.klause.factor.arithmetic/ExactLinear : com.eignex.klause.
         final fun <get-relation>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/ExactLinear.relation.<get-relation>|<get-relation>(){}[0]
     final val size // com.eignex.klause.factor.arithmetic/ExactLinear.size|{}size[0]
         final fun <get-size>(): kotlin/Int // com.eignex.klause.factor.arithmetic/ExactLinear.size.<get-size>|<get-size>(){}[0]
+    final val strict // com.eignex.klause.factor.arithmetic/ExactLinear.strict|{}strict[0]
+        final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/ExactLinear.strict.<get-strict>|<get-strict>(){}[0]
     final val variables // com.eignex.klause.factor.arithmetic/ExactLinear.variables|{}variables[0]
         final fun <get-variables>(): com.eignex.klause.ir/MixedVars // com.eignex.klause.factor.arithmetic/ExactLinear.variables.<get-variables>|<get-variables>(){}[0]
 
@@ -6227,7 +6231,7 @@ final class com.eignex.klause.factor.arithmetic/ExactLinear : com.eignex.klause.
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ExactLinear.structuralKey|structuralKey(){}[0]
 
     final object Companion { // com.eignex.klause.factor.arithmetic/ExactLinear.Companion|null[0]
-        final fun of(kotlin/IntArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.ir/LinearOp, com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.factor.arithmetic/ExactLinear // com.eignex.klause.factor.arithmetic/ExactLinear.Companion.of|of(kotlin.IntArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.ir.LinearOp;com.eignex.klause.simplex.exact.BigFraction){}[0]
+        final fun of(kotlin/IntArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.ir/LinearOp, com.eignex.klause.simplex.exact/BigFraction, kotlin/Boolean = ..., kotlin/Int = ...): com.eignex.klause.factor.arithmetic/ExactLinear // com.eignex.klause.factor.arithmetic/ExactLinear.Companion.of|of(kotlin.IntArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.ir.LinearOp;com.eignex.klause.simplex.exact.BigFraction;kotlin.Boolean;kotlin.Int){}[0]
     }
 }
 

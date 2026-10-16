@@ -1275,7 +1275,8 @@ public final class com/eignex/klause/factor/arithmetic/ExactLinear : com/eignex/
 }
 
 public final class com/eignex/klause/factor/arithmetic/ExactLinear$Companion {
-	public final fun of ([ILjava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/factor/arithmetic/ExactLinear;
+	public final fun of ([ILjava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;ZI)Lcom/eignex/klause/factor/arithmetic/ExactLinear;
+	public static synthetic fun of$default (Lcom/eignex/klause/factor/arithmetic/ExactLinear$Companion;[ILjava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;ZIILjava/lang/Object;)Lcom/eignex/klause/factor/arithmetic/ExactLinear;
 }
 
 public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klause/ir/Factor, com/eignex/klause/ir/LinearRow {

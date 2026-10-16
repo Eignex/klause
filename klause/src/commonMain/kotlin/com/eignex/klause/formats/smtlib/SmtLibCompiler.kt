@@ -47,12 +47,6 @@ internal object Compiler {
         internal val boundPremises = ArrayList<Rel>()
         internal var productBoundsClosed = false
 
-        /** Chain variables of the wide-coefficient row encoding, keyed `(varId shl 3) or (k shl 1) or isInt`:
-         *  chain k stands for `B^k · var` (see `wideRealRow` in `SmtLibReal.kt`). */
-        internal val realChainVars = HashMap<Long, Int>()
-
-        /** The auxiliary real pinned to 1 that absorbs a wide row's oversized constant, or -1. */
-        internal var realOneVar = -1
         internal val intDomains = ArrayList<PresolveDomain>()
         internal val divModTerms = HashMap<SmtDivModKey, Pair<IntComb, IntComb>>()
 

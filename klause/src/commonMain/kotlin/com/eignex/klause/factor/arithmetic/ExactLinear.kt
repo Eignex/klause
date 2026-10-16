@@ -2,10 +2,9 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
-import com.eignex.klause.ir.LinearForm
-import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.IntegerConstants
-import com.eignex.klause.ir.constsOf
+import com.eignex.klause.ir.IntegralConstants
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.MixedVars
@@ -14,17 +13,18 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.ir.WideConsts
+import com.eignex.klause.ir.constsOf
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.div
-import com.eignex.klause.util.gcd
 import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.gcd
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 
 /** An exact rational comparison over tagged integer and real source coordinates. */
@@ -90,7 +90,11 @@ class ExactLinear private constructor(
 
     /** Exact source construction; positive denominator clearing preserves the comparison direction. */
     companion object {
-        /** Coalesce repeated tagged coordinates before capturing the exact relation. */
+        /**
+         * Coalesce tagged coordinates and clear denominators without approximation. [strict] keeps an
+         * open real boundary; integer-only strict comparisons use the equivalent integral threshold.
+         * [activator] reifies the whole comparison in both directions, or [LinearRow.ALWAYS] asserts it.
+         */
         fun of(
             refs: IntArray,
             coefficients: List<BigFraction>,
