@@ -122,6 +122,14 @@ the gate and its inputs.
 Source declarations and arithmetic leaves remain authoritative, including open
 defaults and sparse decision-list selectors. Shared search has no unconstrained
 predicate columns from these omitted definitions.
+Complete finite definitions whose branches are constants or other eligible definitions
+can share private Boolean codes across equality tests. Codes are injective over the
+parse's constant values; each bit retains all branch guards and the no-arm default.
+Code preparation, eligibility and bit visits spend the same expansion allowance.
+Partial construction retains arithmetic fallback, and unused bit gates follow the
+ordinary Boolean dependency closure. Unknown images and nontrivial arithmetic
+branches retain ordinary comparison expansion. Numeric consumers retain their
+original integer definitions independently of these private Boolean codes.
 Finite integer conditionals retain native `Element` relations over materialized branch
 values. Short and sparse finite decision lists use one finite choice index whose guards
 retain the original equality meanings and default. Choices, affine branch columns

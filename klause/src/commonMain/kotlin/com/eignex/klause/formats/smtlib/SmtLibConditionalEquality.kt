@@ -17,7 +17,7 @@ import com.eignex.klause.lowering.trueLit
 internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     class UnusedColumns(val ints: Set<Int>, val bools: Set<Int>)
 
-    private class Definition(
+    class Definition(
         val guards: List<Int>,
         val arms: List<LinComb>,
         val default: LinComb,
@@ -246,10 +246,11 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
 
     fun expandPending(builder: Compiler.Builder) {
         val replaced = HashSet<Factor>()
+        val finiteImages = SmtLibFiniteImageEncoding(definitions, ::visit)
         while (pendingOrder.isNotEmpty()) {
             val key = pendingOrder.removeLast()
             val comparison = pendingComparisons.getValue(key)
-            val expanded = expand(key.variable, key.value, builder, key.op) ?: continue
+            val expanded = expand(key.variable, key.value, builder, key.op, finiteImages) ?: continue
             if (expanded == comparison.literal) continue
             val clauses = listOf(
                 Clause(intArrayOf(Lit.negate(comparison.literal), expanded)),
@@ -263,7 +264,15 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         pendingComparisons.clear()
     }
 
-    private fun expand(variable: Int, value: Long, builder: Compiler.Builder, op: String): Int? {
+    private fun visit(): Boolean = ++work <= workLimit
+
+    private fun expand(
+        variable: Int,
+        value: Long,
+        builder: Compiler.Builder,
+        op: String,
+        finiteImages: SmtLibFiniteImageEncoding,
+    ): Int? {
         val key = Key(variable, value, op)
         comparisons[key]?.let { return it }
         if (op == "=" && definitions[variable]?.image?.contains(value) == false) {
@@ -277,11 +286,11 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         while (pending.isNotEmpty()) {
             when (val frame = pending.removeLast()) {
                 is Frame.Known -> {
-                    if (++work > workLimit) return null
+                    if (!visit()) return null
                     literals.addLast(frame.literal)
                 }
                 is Frame.Eval -> {
-                    if (++work > workLimit) return null
+                    if (!visit()) return null
                     val term = frame.term
                     val source = term.asSimpleVar()
                     val cached = source?.let { comparisons[Key(it, value, op)] }
@@ -292,6 +301,11 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                         known != null -> {
                             val literal = if (known) builder.trueLit() else Lit.negate(builder.trueLit())
                             if (source != null) comparisons[Key(source, value, op)] = literal
+                            literals.addLast(literal)
+                        }
+                        op == "=" && source != null && finiteImages.accepts(source) -> {
+                            val literal = finiteImages.equality(source, value, builder) ?: return null
+                            comparisons[Key(source, value)] = literal
                             literals.addLast(literal)
                         }
                         source != null && definition != null -> {
@@ -384,7 +398,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     }
 }
 
-private fun Compiler.Builder.foldConditionalAnd(literals: List<Int>): Int {
+internal fun Compiler.Builder.foldConditionalAnd(literals: List<Int>): Int {
     val truth = trueLit()
     val retained = LinkedHashSet<Int>()
     for (literal in literals) {
@@ -398,7 +412,7 @@ private fun Compiler.Builder.foldConditionalAnd(literals: List<Int>): Int {
     }
 }
 
-private fun Compiler.Builder.foldConditionalOr(literals: List<Int>): Int {
+internal fun Compiler.Builder.foldConditionalOr(literals: List<Int>): Int {
     val truth = trueLit()
     val retained = LinkedHashSet<Int>()
     for (literal in literals) {

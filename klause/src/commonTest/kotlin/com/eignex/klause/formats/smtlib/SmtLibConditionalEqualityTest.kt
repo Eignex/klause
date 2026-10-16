@@ -31,6 +31,69 @@ import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `shared finite value comparisons preserve every signed branch value`() {
+        val values = listOf(-1000000000000L, -307L, -99L, -13L, -1L, 0L, 2L, 17L,
+            101L, 303L, 1009L, 104729L, 2147483648L, 4294967297L, 999999999999L, 1000000000000L)
+        var terms = values.map { if (it < 0) "(- ${-it})" else "$it" }
+        for (bit in 0..3) terms = terms.chunked(2).map { "(ite b$bit ${it[1]} ${it[0]})" }
+        val source = buildString {
+            for (bit in 0..3) append("(declare-const b$bit Bool)\n")
+            for (index in values.indices) append("(declare-const r$index Bool)\n")
+            append("(assert (let ((v ${terms.single()})) (and ")
+            for (index in values.indices) {
+                val value = values[index].let { if (it < 0) "(- ${-it})" else "$it" }
+                append("(= r$index (= v $value)) ")
+            }
+            append(")))")
+        }
+        val parsed = SmtLib.parse(source)
+        assertEquals(0, parsed.model.numIntVars)
+        assertTrue(parsed.model.factors.all { it is Clause })
+        for (selected in values.indices) {
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            for (bit in 0..3) {
+                val literal = Lit.make(parsed.boolVarNames.getValue("b$bit"), selected and (1 shl bit) != 0)
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(literal)), "$selected/$bit")
+            }
+
+            for (index in values.indices) {
+                assertEquals(index == selected, session.boolValue(parsed.boolVarNames.getValue("r$index")), "$selected/$index")
+            }
+        }
+    }
+
+    @Test
+    fun `partial finite bit construction retains exact arithmetic and releases unused gates`() {
+        for (selected in listOf(false, true)) {
+            val builder = Compiler.Builder(
+                Long.MIN_VALUE, Long.MAX_VALUE, false,
+                conditionalEqualities = SmtLibConditionalEquality(workLimit = 24),
+            )
+            val reader = SExprReader(StringCharSource("""
+                (declare-const b Bool) (declare-const c Bool) (declare-const r Bool)
+                (assert ${if (selected) "b" else "(not b)"}) (assert c)
+                (assert (= r (= (ite b (ite c (- 11) 29) (ite c 101 307)) (- 11))))
+            """.trimIndent()))
+            while (true) builder.command(reader.readCommandOrNull() ?: break)
+            val parsed = builder.build()
+
+            val result = BacktrackSolver.source(parsed.model)
+                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+            assertTrue(parsed.model.factors.any { it is Element })
+            assertEquals(selected, assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+                .boolValue(parsed.boolVarNames.getValue("r")))
+            val used = parsed.model.factors.flatMap { it.variables.boolVars.toList() }.toSet() + parsed.boolVarNames.values
+            assertEquals((0 until parsed.model.numBoolVars).toSet(), used)
+        }
+    }
+
+    @Test
     fun `affine comparisons expand across multiple pending generations`() {
         val depth = 16
         for ((op, target) in listOf("=" to depth, "<" to depth + 1, "<=" to depth)) {
