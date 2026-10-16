@@ -12,7 +12,7 @@ This page defines admission, lowering and source model rendering.
 
 `smtLibSemantics` declares exact rational literals, continuous real variables and
 open integer and real declarations. `SmtLib.parse`
-resolve `SemanticOverrides` before reading source commands. Integer and exact
+resolves `SemanticOverrides` before reading source commands. Integer and exact
 rational real endpoint replacements constrain every original declaration of that
 sort, including unused declarations. Assertions remain additional constraints;
 bound inference intersects them with the declaration policy. Explicit open
@@ -46,7 +46,9 @@ Boolean, integer and real declarations remain in the same source snapshot.
 Lexical helpers and simultaneous `let` bindings preserve their definition scope;
 a user-defined helper with a function name retains its own meaning.
 Factor helper calls evaluate arguments in the caller scope, then isolate parameter
-bindings from caller-local names while evaluating the body. Nested calls restore
+bindings from caller-local names while evaluating the body. Declared parameter sorts
+are enforced even for unused arguments; integer arguments to real parameters are
+promoted before the body is evaluated. Nested calls restore
 the enclosing scope, and local bindings take precedence over zero-arity helper
 names and their declared sorts.
 Deferred Boolean `let` values retain the enclosing binding depth from before the

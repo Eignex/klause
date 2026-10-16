@@ -3,9 +3,31 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class SmtLibEvalTest {
+    @Test
+    fun `helpers should reject arguments outside their declared sorts even when unused`() {
+        for ((sort, argument) in listOf("Real" to "false", "Int" to "1.5", "Bool" to "1")) {
+            val source = "(define-fun accepts ((p $sort)) Bool true) (assert (accepts $argument))"
+
+            assertFailsWith<UnsupportedSmtException> { SmtLib.parse(source) }
+        }
+    }
+
+    @Test
+    fun `real helper parameters should promote integer arguments before evaluating the body`() {
+        val source = SmtLib.parse(
+            "(declare-const x Real) (define-fun half ((p Real)) Real (/ p 2.0)) " +
+                "(assert (= x (half 3))) (assert (= x 1.5))",
+        )
+
+        val result = BacktrackSolver.source(source.model).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
     @Test
     fun `helper arguments should use the caller while free names use declarations`() {
         val source = SmtLib.parse(
