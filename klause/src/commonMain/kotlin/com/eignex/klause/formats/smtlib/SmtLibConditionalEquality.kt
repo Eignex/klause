@@ -8,6 +8,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
+import com.eignex.klause.lowering.addExact
+import com.eignex.klause.lowering.mulExact
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 
@@ -97,9 +99,17 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         }
     }
 
-    private fun imageOf(term: LinComb): Set<Long>? =
-        if (term.coeffs.isEmpty()) setOf(term.constant)
-        else term.asSimpleVar()?.let { definitions[it]?.image }
+    private fun imageOf(term: LinComb): Set<Long>? {
+        if (term.coeffs.isEmpty()) return setOf(term.constant)
+        val source = term.coeffs.entries.singleOrNull() ?: return null
+        val image = definitions[source.key]?.image ?: return null
+        if (source.value == 1L && term.constant == 0L) return image
+        return try {
+            image.mapTo(HashSet()) { addExact(mulExact(source.value, it), term.constant) }
+        } catch (_: ArithmeticException) {
+            null
+        }
+    }
 
     fun branchUnder(variable: Int, knownLiteral: Int): LinComb? {
         val definition = definitions[variable] ?: return null
@@ -122,14 +132,9 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     ): Set<Long>? {
         val values = HashSet<Long>()
         fun include(term: LinComb, coverage: GuardCoverage? = null): Boolean {
-            if (term.coeffs.isEmpty()) {
-                values += term.constant
-            } else {
-                val source = term.asSimpleVar() ?: return false
-                val image = definitions[source]?.image ?: return false
-                if (coverage == null) values += image
-                else image.filterTo(values) { coverage.allowsDefault(it) }
-            }
+            val image = imageOf(term) ?: return false
+            if (coverage == null) values += image
+            else image.filterTo(values) { coverage.allowsDefault(it) }
             return values.size <= IMAGE_LIMIT
         }
         for (index in arms.indices) {

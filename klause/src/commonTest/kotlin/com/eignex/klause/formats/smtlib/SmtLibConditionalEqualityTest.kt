@@ -28,6 +28,72 @@ import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `affine conditional images reject unreachable values without equality expansion`() {
+        for (term in listOf(
+            "(ite c (+ (ite b 2 8) 1) 17)",
+            "(ite c 17 (+ (ite b 2 8) 1))",
+            "(ite c (- (* 2 (ite b 2 8)) 1) 17)",
+            "(ite c (+ (* (- 2) (ite b 2 8)) 1) 17)",
+        )) {
+            val builder = Compiler.Builder(
+                Long.MIN_VALUE, Long.MAX_VALUE, false,
+                conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+            )
+            val reader = SExprReader(StringCharSource(
+                "(declare-const b Bool) (declare-const c Bool) (assert (= $term 7))",
+            ))
+            while (true) builder.command(reader.readCommandOrNull() ?: break)
+            val parsed = builder.build()
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            val result = session.initialize()
+
+            assertEquals(0, parsed.model.numIntVars, term)
+            assertTrue(parsed.model.factors.all { it is Clause }, term)
+            assertIs<ComponentResult.Conflict>(result, term)
+        }
+    }
+
+    @Test
+    fun `affine image propagation preserves selected branch values`() {
+        for (inner in listOf(false, true)) {
+            for (outer in listOf(false, true)) {
+                val parsed = SmtLib.parse("""
+                    (declare-const b Bool) (declare-const c Bool) (declare-const z Int)
+                    (assert ${if (inner) "b" else "(not b)"})
+                    (assert ${if (outer) "c" else "(not c)"})
+                    (assert (= z (ite c (+ (* (- 2) (ite b 2 8)) 1) 17)))
+                """.trimIndent())
+
+                val result = BacktrackSolver.source(parsed.model)
+                    .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+                val expected = if (!outer) "17" else if (inner) "-3" else "-15"
+                assertEquals(expected, assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+                    .intValue(parsed.intVarNames.getValue("z")))
+            }
+        }
+    }
+
+    @Test
+    fun `overflowing affine images retain the arithmetic comparison`() {
+        val parsed = SmtLib.parse("""
+            (declare-const b Bool) (declare-const c Bool)
+            (assert (and b c (let ((base (ite b 9223372036854775807 0)))
+                (< (ite c (* 2 base) 0) 9223372036854775807))))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        assertTrue(parsed.model.factors.any { it !is Clause })
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
     fun `uniformly true image comparisons omit their private selections`() {
         for (comparison in listOf(
             "(not (= (ite b 2 8) (ite c 5 7)))",

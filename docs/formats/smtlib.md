@@ -83,8 +83,10 @@ Complete images also decide equality between disjoint value sets and ordering wh
 every pair has the same outcome. This folds narrow bare conditional results and
 constants without branch expansion. Overlapping, open, affine and wide operands
 retain their arithmetic comparison unless another existing rule applies.
-Immutable guard meanings exclude unreachable arms from those images. A default
-omits selector values covered by its guards, and a fully covered selector image
+Completed single-variable affine terms preserve these images when checked coefficient
+multiplication and constant addition fit a signed word. Overflow and multi-variable
+terms retain an unknown image. Immutable guard meanings exclude unreachable arms
+from those images. A default omits selector values covered by its guards, and a fully covered selector image
 excludes the default even when that default is open arithmetic.
 An integer conditional with a constant guard returns its selected branch directly.
 A directly nested single-guard integer conditional can be restricted by the enclosing
