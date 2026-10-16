@@ -6,6 +6,7 @@ import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
@@ -140,6 +141,7 @@ private const val OPEN_BOUND_PROOF_KEY = "open-bound-proof"
 /** Solver-control flags shared by every mode; populated by [commonFlagSpecs] during parsing. */
 internal class CommonOptions {
     var config: KlauseConfig = KlauseConfig.current
+    var semanticOverrides: SemanticOverrides = SemanticOverrides()
 
     var engine: String? = null
     var timeLimitMs: Long? = null
