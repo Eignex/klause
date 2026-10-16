@@ -139,7 +139,8 @@ private class PolynomialConsequenceRefutation(
             for (term in terms) for (variable in term.monomial.variables) {
                 arithmetic.step()
                 if (variable in used || occurrences[variable] != 1 || term.monomial.exponent(variable) != 1) continue
-                val rank = listOf(term.monomial.variables.size, inputDegrees.getValue(variable), terms.size, index, variable)
+                val rank = listOf(term.monomial.variables.size, inputDegrees.getValue(variable),
+                    terms.size, index, variable)
                 val previous = best
                 if (previous == null || rank.indices.firstOrNull { arithmetic.step(); rank[it] != previous.rank[it] }
                         ?.let { rank[it] < previous.rank[it] } == true
