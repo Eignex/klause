@@ -381,8 +381,8 @@ than rounded. A format can decline precision it cannot represent. Source toleran
 [typed source contract](model.md#typed-source-semantics).
 
 FlatZinc and SMT-LIB support undeclared numeric defaults. Grid controls apply to FlatZinc;
-SMT-LIB requires continuous values. MPS declares decimal source feasibility tolerance; its parsed
-mathematical bounds are source data. Boolean and finite XCSP3 formats reject inapplicable numeric
+SMT-LIB requires continuous values. MPS exposes decimal source feasibility tolerance;
+explicit parsed mathematical bounds remain source data. Boolean and finite XCSP3 formats reject inapplicable numeric
 policies. A nondefault effective interpretation is printed as a protocol comment before results,
 including exact rational endpoints. That qualification adds no proof authority.
 
