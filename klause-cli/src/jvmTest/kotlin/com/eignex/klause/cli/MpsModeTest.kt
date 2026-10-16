@@ -3,6 +3,8 @@ package com.eignex.klause.cli
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.ir.BoundOverride
+import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SemanticOverrides
@@ -47,6 +49,57 @@ class MpsModeTest {
 
         assertTrue(check(exact))
         assertFalse(check(approximate))
+    }
+
+    @Test
+    fun `MPS caller declaration defaults should qualify optimum output to the effective source`() {
+        val input = File.createTempFile("mps-effective-defaults", ".mps").apply {
+            writeText("ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1\n M1 'MARKER' 'INTEND'\nENDATA")
+            deleteOnExit()
+        }
+        val common = CommonOptions().apply {
+            exact = true
+            semanticOverrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(
+                BoundOverride.Value(2L), BoundOverride.Value(3L),
+            ))
+        }
+        val session = MpsMode.newSession()
+        val loaded = session.load(input.absolutePath, common)
+        val output = session.output(common)
+
+        val text = capture {
+            output.onSolution(loaded.render(Sample(BooleanArray(0), longArrayOf(2L))), 2L, null)
+            output.onComplete(Verdict.OPTIMAL)
+        }
+
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("o 2" in text.lines(), text)
+        assertTrue("exact effective MPS source witness" in text, text)
+        assertTrue("MPS source scope=effective declaration defaults" in text, text)
+        assertFalse("exact original MPS source witness" in text, text)
+    }
+
+    @Test
+    fun `MPS caller declaration defaults should qualify source refutations`() {
+        val input = File.createTempFile("mps-effective-refutation", ".mps").apply {
+            writeText("ROWS\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 1\n" +
+                " M1 'MARKER' 'INTEND'\nRHS\n RHS R 1\nENDATA")
+            deleteOnExit()
+        }
+        val common = CommonOptions().apply {
+            exact = true
+            semanticOverrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(
+                BoundOverride.Value(2L), BoundOverride.Open,
+            ))
+        }
+        val session = MpsMode.newSession()
+        val loaded = session.load(input.absolutePath, common)
+
+        val text = capture { session.output(common).onComplete(Verdict.UNSATISFIABLE) }
+
+        assertIs<SolvablePipeline.Refuted>(loaded.pipeline)
+        assertTrue("s UNSATISFIABLE" in text.lines(), text)
+        assertTrue("MPS source scope=effective declaration defaults" in text, text)
     }
 
     @Test

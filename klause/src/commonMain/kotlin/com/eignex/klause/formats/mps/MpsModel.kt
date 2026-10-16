@@ -11,6 +11,7 @@ internal class MpsSourceNumber private constructor(
     private val rational: BigFraction?,
     private val ieeeBits: Long?,
     private val projectionBits: Long,
+    val literalBound: Boolean = false,
 ) {
     val fraction: BigFraction
         get() = rational ?: requireNotNull(BigFraction.ofDouble(Double.fromBits(checkNotNull(ieeeBits))))
@@ -38,9 +39,13 @@ internal class MpsSourceNumber private constructor(
         fun parsed(value: BigFraction, projection: Double = value.toDouble()): MpsSourceNumber =
             MpsSourceNumber(value, null, projection.toRawBits())
 
-        fun ieee(value: Double): MpsSourceNumber {
+        fun bound(value: BigFraction): MpsSourceNumber = MpsSourceNumber(value, null, value.toDouble().toRawBits(), true)
+
+        fun ieee(value: Double): MpsSourceNumber = ieee(value, false)
+
+        fun ieee(value: Double, literalBound: Boolean): MpsSourceNumber {
             require(value.isFinite()) { "MPS source number must be finite" }
-            return MpsSourceNumber(null, value.toRawBits(), value.toRawBits())
+            return MpsSourceNumber(null, value.toRawBits(), value.toRawBits(), literalBound)
         }
     }
 }
@@ -51,9 +56,11 @@ internal class MpsSourceNumbers(
     constraintBounds: List<Pair<MpsSourceNumber?, MpsSourceNumber?>>,
     objectiveCoefficients: List<MpsSourceNumber>,
     val objectiveConstant: MpsSourceNumber,
+    explicitVariableRanges: List<Boolean> = List(variableBounds.size) { true },
     private val snapshot: MpsSourceSnapshot? = null,
 ) {
     val variableBounds = variableBounds.toList()
+    val explicitVariableRanges = explicitVariableRanges.toList()
     val constraintCoefficients = constraintCoefficients.map { it.toList() }
     val constraintBounds = constraintBounds.toList()
     val objectiveCoefficients = objectiveCoefficients.toList()
@@ -68,6 +75,7 @@ internal class MpsSourceNumbers(
         constraintBounds,
         objectiveCoefficients,
         objectiveConstant,
+        explicitVariableRanges,
         MpsSourceSnapshot.capture(objective, variables, constraints),
     )
 
@@ -120,7 +128,11 @@ internal class MpsSourceNumbers(
                 row.lower.toRowBoundSource() to row.upper.toRowBoundSource()
             }
         }
-        return MpsSourceNumbers(nextVariables, nextCoefficients, nextBounds, nextObjective, nextConstant)
+        val nextRanges = variables.map { variable ->
+            val sourceIndex = before?.variables?.indexOfFirst { it === variable } ?: -1
+            if (sourceIndex >= 0) explicitVariableRanges[sourceIndex] else true
+        }
+        return MpsSourceNumbers(nextVariables, nextCoefficients, nextBounds, nextObjective, nextConstant, nextRanges)
             .attachedTo(objective, variables, constraints)
     }
 
@@ -189,12 +201,12 @@ private fun DoubleArray.rawBitsEqual(bits: LongArray): Boolean =
 
 private fun Double?.toVariableLowerSource(): MpsSourceNumber? = when (this) {
     null, Double.NEGATIVE_INFINITY -> null
-    else -> MpsSourceNumber.ieee(this)
+    else -> MpsSourceNumber.ieee(this, literalBound = true)
 }
 
 private fun Double?.toVariableUpperSource(): MpsSourceNumber? = when (this) {
     null, Double.POSITIVE_INFINITY -> null
-    else -> MpsSourceNumber.ieee(this)
+    else -> MpsSourceNumber.ieee(this, literalBound = true)
 }
 
 private fun Double?.toRowBoundSource(): MpsSourceNumber? = when {
@@ -272,9 +284,12 @@ class MpsModel(
             semantics.numericAuthority == NumericAuthority.BINARY64_LITERALS
         ) { "MPS requires decimal or binary64 literal authority" }
         require(semantics.feasibilityTolerance != null) { "MPS requires an explicit feasibility tolerance" }
-        require(semantics.floats == null && semantics.undeclaredIntegers == null &&
-            semantics.undeclaredReals == null && semantics.pinAbsentOptionalValues == null
-        ) { "MPS does not support grid, undeclared range or optional-value policies" }
+        require(semantics.undeclaredIntegers != null && semantics.undeclaredReals != null) {
+            "MPS requires explicit undeclared range defaults"
+        }
+        require(semantics.floats == null && semantics.pinAbsentOptionalValues == null) {
+            "MPS does not support grid or optional-value policies"
+        }
     }
 
     private var parsedSourceNumbers: MpsSourceNumbers? = null
@@ -289,6 +304,7 @@ class MpsModel(
     internal fun withSourceNumbers(source: MpsSourceNumbers): MpsModel = apply {
         check(parsedSourceNumbers == null) { "MPS source authority is already attached" }
         require(source.variableBounds.size == variables.size)
+        require(source.explicitVariableRanges.size == variables.size)
         require(source.constraintCoefficients.size == constraints.size)
         require(source.constraintBounds.size == constraints.size)
         require(source.objectiveCoefficients.size == objective.coeffs.size)

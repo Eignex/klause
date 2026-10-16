@@ -29,7 +29,10 @@ import com.eignex.klause.util.unaryMinus
 fun MpsModel.toExactSourceProblem(
     settings: ProblemSettings = KlauseConfig.current.problemSettings(),
     semanticOverrides: SemanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-): MpsCompiled = lowerExactSource(settings, semantics.resolve(semanticOverrides))
+): MpsCompiled {
+    val effective = semantics.resolve(semanticOverrides)
+    return effectiveDeclarations(effective).lowerExactSource(settings, effective)
+}
 
 internal fun MpsModel.lowerExactSource(
     settings: ProblemSettings,

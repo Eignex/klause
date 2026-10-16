@@ -14,8 +14,24 @@ the claims each route may publish.
 `DECIMAL_LITERALS`; programmatic models interpret supplied doubles as exact binary64
 literals. `toProblem(settings, semanticOverrides)` resolves caller policy before
 constructing a model. `MpsCompiled.semantics` and its `Problem` retain the same effective
-contract. Float grids, default undeclared ranges and optional-value policies are
-inapplicable to MPS and reject overrides.
+contract. Float grids and optional-value policies are inapplicable to MPS and reject overrides.
+
+Wholly unranged marker integers default to `[0,1]`; wholly unranged real columns
+default to `[0,+infinity)`. Typed declaration-default overrides replace either endpoint
+independently before lowering. A declaration with any explicit BOUNDS record retains
+its complete source range, including omitted or explicitly open sides. Programmatic
+variable ranges are explicit. Copies preserve parsed range origins for retained
+declarations; replacement variables carry their supplied ranges.
+
+Lowering and source validation share one captured effective declaration snapshot.
+Caller finite endpoints retain literal authority independently of the MPS text
+infinity convention. Signed-word integer extrema remain finite. Rational endpoints
+that binary64 cannot represent exactly use exact source rows; a missing numerical
+projection cannot erase the bound. The parsed model and declared defaults remain
+available for separate original-file checking. `sourceExact` describes correspondence
+to the effective snapshot. CLI results under replaced defaults identify the effective
+source scope, including witnesses, optimum and refutation status; they do not claim
+authority under the original file's declaration defaults.
 
 MPS defaults to `SourceTolerance(absolute=1/10000000, relative=1/10000000)`.
 Each component can be replaced independently, including zero. Zero tolerance requires

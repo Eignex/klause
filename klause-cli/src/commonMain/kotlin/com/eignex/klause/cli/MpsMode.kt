@@ -75,7 +75,9 @@ internal object MpsMode : CliMode {
             else common.frontendRouting = CliRoutingStats("numerical-mip", routingElapsedMs)
             if (exact) requireExactMpsSource(compiled)
             val state = MpsOutputState(compiled.objectiveScale, compiled.toleranceDifference,
-                compiled.sourceExact, compiled.sourceDifference)
+                compiled.sourceExact, compiled.sourceDifference,
+                compiled.semantics.declared.undeclaredIntegers != compiled.semantics.effective.undeclaredIntegers ||
+                    compiled.semantics.declared.undeclaredReals != compiled.semantics.effective.undeclaredReals)
             outputState = state
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.model.numIntVars} " +
@@ -156,6 +158,7 @@ internal object MpsMode : CliMode {
                     if (state.sourceWitnessAccepted) state.latestSourceObjective?.let(SourceValue::Rational) else null
                 },
                 exactSourceOptimum = { state.exactSourceOptimum },
+                effectiveDeclarations = state.effectiveDeclarations,
             )
         }
     }
@@ -166,6 +169,7 @@ private class MpsOutputState(
     val toleranceDifference: String? = null,
     val sourceExact: Boolean = true,
     val sourceDifference: String? = null,
+    val effectiveDeclarations: Boolean = false,
 ) {
     var latestSourceObjective: BigFraction? = null
     var sourceWitnessAccepted = true
@@ -267,6 +271,7 @@ internal class MpsOutput(
     private val exactSourceWitness: () -> Boolean? = { null },
     private val sourceArithmeticValue: ((SourceValue) -> SourceValue?)? = null,
     private val exactSourceOptimum: () -> Boolean? = exactSourceWitness,
+    private val effectiveDeclarations: Boolean = false,
 ) : BufferedBestOutput() {
     private var bestObjective: Long? = null
 
@@ -293,7 +298,7 @@ internal class MpsOutput(
         if (sourceArithmeticValue == null) objective else sourceArithmeticValue.invoke(objective)
 
     override fun arithmeticWitnessStatus(): String? = when (exactSourceWitness()) {
-        true -> "c exact original MPS source witness"
+        true -> "c exact $sourceScope MPS source witness"
         false -> "c MPS source tolerance witness"
         null -> null
     }
@@ -349,13 +354,16 @@ internal class MpsOutput(
         val cause = super.verdictReason(verdict)
         val sourceQualification = sourceDifference?.let { "lowered model differs from MPS source at $it" }
         val witnessQualification = when (exactSourceWitness()) {
-            true -> "exact original MPS source witness"
+            true -> "exact $sourceScope MPS source witness"
             false -> "MPS source tolerance witness"
             null -> null
         }
-        return listOfNotNull(sourceQualification, witnessQualification, cause)
+        val declarationQualification = if (effectiveDeclarations) "MPS source scope=effective declaration defaults" else null
+        return listOfNotNull(declarationQualification, sourceQualification, witnessQualification, cause)
             .joinToString("; ").ifEmpty { null }
     }
+
+    private val sourceScope: String get() = if (effectiveDeclarations) "effective" else "original"
 }
 
 /** Print terminating rationals within 64 decimal places as decimals, and others as fractions. */

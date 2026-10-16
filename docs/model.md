@@ -286,6 +286,13 @@ retains its default. Replacements can widen or narrow ranges; they are not
 intersections with format defaults. Bounds on declarations with
 an explicit range remain source data.
 
+MPS retains whether a column had any BOUNDS record. Only wholly unranged columns
+receive declaration-default replacements: marker integers default to `[0,1]` and
+reals to `[0,+infinity)`. An explicit one-sided or open range retains both of its
+source sides. Programmatic ranges are explicit. Exact caller endpoints govern
+both lowering and source checking, independently of the text infinity convention;
+see [MPS semantics](formats/mps.md#declared-policy).
+
 `FloatSemantics.Grid` retains its approximation window separately from undeclared
 source-real bounds. Replacing a grid with continuous semantics removes that window,
 while retaining an explicitly supplied source range. Numeric literal authority
