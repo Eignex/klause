@@ -242,6 +242,11 @@ Integer-aware fallback publishes `ir.NonlinearIntegerProblem` through
 `SmtLibInput.NonlinearInteger`, retaining original Int/Real/Bool identities and an
 exact `to_real` embedding. Its `pipelineRequest()` selects sound incomplete integer
 execution. Native admission validates declaration visibility and canonical names.
+Factor admission resolves source declarations and local bindings before treating
+function names as unsupported factor syntax. A declared `pi` or a linear integer
+helper named `exp`, `log`, `sin` or `cos` retains its source meaning. Actual
+mathematical functions use exact function lowering, including expressions in unused
+`let` bindings.
 Syntactically nonlinear helpers use lexical fallback even when a constant argument
 makes the expanded expression linear; caller-local bindings cannot alter definition
 scope. Nonlinear sessions accept one nonincremental query with at most one objective.
