@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
@@ -47,6 +48,7 @@ internal object SmtLibMode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val config = common.config
+            val overrides = common.sourceOverrides(smtLibSemantics)
             latestSourceObjective = null
             val admissionStart = TimeSource.Monotonic.markNow()
             val stop = Cancellation { common.deadlineAtMs?.let { nowMillis() >= it } == true }
@@ -54,6 +56,7 @@ internal object SmtLibMode : CliMode {
                 { openFileSource(path) },
                 settings = config.problemSettings(),
                 cancellation = stop,
+                semanticOverrides = overrides,
             )
             val parsed = when (admitted) {
                 is SmtLibInput.Linear -> admitted.problem

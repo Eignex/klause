@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.formats.opb.opbSemantics
 import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.formats.opb.toProblem
 import com.eignex.klause.solver.Sample
@@ -21,7 +22,8 @@ internal object OpbMode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val parsed = Opb.parse(openFileSource(path)).toProblem(common.config.problemSettings())
+            val overrides = common.sourceOverrides(opbSemantics)
+            val parsed = Opb.parse(openFileSource(path)).toProblem(common.config.problemSettings(), semanticOverrides = overrides)
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} factors=${parsed.problem.numFactors}"
             }

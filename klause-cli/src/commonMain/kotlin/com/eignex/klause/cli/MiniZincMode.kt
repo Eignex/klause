@@ -1,16 +1,15 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_HI
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_LO
-
 import com.eignex.klause.formats.flatzinc.OznApplier
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
+import com.eignex.klause.formats.flatzinc.flatZincSemantics
 import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.formats.flatzinc.toSearchHints
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.ir.EffectiveSourceSemantics
+import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -35,13 +34,9 @@ internal object MiniZincMode : CliMode {
 
     private class Session : ModeSession {
         private var oznPath: String? = null
-        private var unboundedIntLo: Long? = null
-        private var unboundedIntHi: Long? = null
         private var outputObjective = false
         private var floatApproximation = false
         private var sourceSemantics: EffectiveSourceSemantics? = null
-        private var unboundedFloatLo: Double? = null
-        private var unboundedFloatHi: Double? = null
 
         override fun flags(): List<FlagSpec> = listOf(
             FlagSpec(
@@ -51,27 +46,11 @@ internal object MiniZincMode : CliMode {
                 valueLabel = "file",
                 help = "MiniZinc output model (.ozn) for solution reconstruction",
             ) { oznPath = it },
-            FlagSpec(listOf("--unbounded-int-lo"), true) { unboundedIntLo = requireNotNull(it).toLong() },
-            FlagSpec(listOf("--unbounded-int-hi"), true) { unboundedIntHi = requireNotNull(it).toLong() },
             // Like `minizinc --output-objective`: append `_objective = <value>;` to each solution
             // so a parser reading the raw solution stream can recover the optimised objective even
             // when the objective var is not in the model's `output` section. Off by default — the
             // standard MiniZinc flow renders objectives through solns2out, not this binary.
             FlagSpec(listOf("--output-objective"), false) { outputObjective = true },
-            FlagSpec(
-                listOf("--unbounded-float-lo"),
-                true,
-                FlagGroup.MODE,
-                valueLabel = "number",
-                help = "Lower bound for bucketed floats without a declared range",
-            ) { unboundedFloatLo = parseFloatBound(requireNotNull(it)) },
-            FlagSpec(
-                listOf("--unbounded-float-hi"),
-                true,
-                FlagGroup.MODE,
-                valueLabel = "number",
-                help = "Upper bound for bucketed floats without a declared range",
-            ) { unboundedFloatHi = parseFloatBound(requireNotNull(it)) },
         )
 
         override fun load(path: String, common: CommonOptions): Solvable {
@@ -79,19 +58,14 @@ internal object MiniZincMode : CliMode {
             // Stream the .fzn straight from disk: the lexer/parser pull characters incrementally, so the
             // whole source is never held as one String. Parsing only reads; the base bake runs as
             // presolve step 0, bounded by the presolve deadline.
-            val floatLo = unboundedFloatLo ?: DEFAULT_UNBOUNDED_FLOAT_LO
-            val floatHi = unboundedFloatHi ?: DEFAULT_UNBOUNDED_FLOAT_HI
-            if (!common.exact && floatLo > floatHi) usageError("unbounded float lower bound exceeds upper bound")
+            val overrides = common.sourceOverrides(flatZincSemantics)
             val executionProgram = parseFlatZincExecution(
                 settings = config.problemSettings(),
                 source = openFileSource(path),
-                unboundedIntLo = unboundedIntLo,
-                unboundedIntHi = unboundedIntHi,
-                unboundedFloatLo = floatLo,
-                unboundedFloatHi = floatHi,
-                exactFloats = common.exact,
+                semanticOverrides = overrides,
             )
             val program = executionProgram.program
+            val exactFloats = program.semantics.effective.floats == FloatSemantics.Continuous
             sourceSemantics = program.semantics
             floatApproximation = program.floatVarsByName.values.any { !it.lpOnly }
             cliLogger(common.verbose).v {
@@ -102,7 +76,7 @@ internal object MiniZincMode : CliMode {
             val render: (Sample) -> String =
                 { s -> applier?.render(program, s) ?: writeFlatZincSolution(program, s, outputObjective) }
 
-            if (common.exact || program.problem.numRealVars > 0) {
+            if (exactFloats || program.problem.numRealVars > 0) {
                 val maximize = program.solve is SolveDirective.Maximize
                 val minimized = program.linearObjective()
                 val sourceObjective = if (maximize) minimized?.negated() else minimized
@@ -190,9 +164,6 @@ internal object MiniZincMode : CliMode {
                 }
             }
         }
-
-        private fun parseFloatBound(raw: String): Double = raw.toDoubleOrNull()?.takeIf { it.isFinite() }
-            ?: usageError("unbounded float bounds must be finite numbers, got `$raw`")
 
         override fun output(common: CommonOptions): OutputProtocol = MiniZincOutput(floatApproximation, sourceSemantics)
     }

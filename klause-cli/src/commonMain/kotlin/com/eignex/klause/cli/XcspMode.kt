@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.formats.xcsp3.xcsp3Semantics
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.solver.Sample
@@ -19,9 +20,10 @@ internal object Xcsp3Mode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
+            val overrides = common.sourceOverrides(xcsp3Semantics)
             // Parsing only reads: the base bake runs as presolve step 0, bounded by the presolve deadline.
             // The file is streamed into the parser so a huge instance is never fully resident.
-            val parsed = Xcsp3.parse(openFileSource(path), common.config.problemSettings())
+            val parsed = Xcsp3.parse(openFileSource(path), common.config.problemSettings(), semanticOverrides = overrides)
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} int=${parsed.problem.numIntVars} " +
                     "factors=${parsed.problem.numFactors}"
