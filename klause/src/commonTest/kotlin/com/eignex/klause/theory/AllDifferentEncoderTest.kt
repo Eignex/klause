@@ -13,12 +13,33 @@ import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraResult
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class AllDifferentEncoderTest {
+    @Test
+    fun `cancelled all different installation should publish no enforcing fragment`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 2) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2))))
+        var charged = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = charged > 1
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+        val declines = mutableListOf<EncoderDecline>()
+
+        val installed = FactorProjectionProviders.Default.prepare(source).installLinearFactor(0,
+            EncodingTarget.LINEAR, cancellation = cancellation, onDecline = declines::add)
+
+        assertNull(installed)
+        assertEquals(listOf(EncoderDecline.RESOURCE), declines)
+    }
+
     @Test
     fun `linear all different encoding should retain optional polarity and exempt collisions`() {
         for ((value, present, expectedSat) in listOf(Triple(1L, true, false),
@@ -44,7 +65,7 @@ class AllDifferentEncoderTest {
                 presents = intArrayOf(Lit.make(0, true), Lit.make(1, false)), exceptSet = longArrayOf(7))
             val source = Problem(2, 2, Array(2) { IntDomain(value, value) }, arrayOf<Factor>(relation,
                 Clause(intArrayOf(Lit.make(0, present))), Clause(intArrayOf(Lit.make(1, false))),
-                RealProduct(0, 0, 0)), numRealVars = 1,
+                RealProduct(0, 0, 0, 0.0, 0.0)), numRealVars = 1,
                 realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
             val shared = assertNotNull(source.preparePolynomialExecutionPlan().polynomialModel)
 
