@@ -110,8 +110,12 @@ class DefinitionalSweep internal constructor(
             if (cancellation()) return null
             val base = infer(problem.factors, problem.numIntVars, definedHints, boolFolds, cancellation)
             if (cancellation()) return null
-            val nodes = base?.nodes.orEmpty() + elementResultDefinitions(problem, definedHints, cancellation) +
-                divModDefinitions(problem, cancellation) + wideDivModDefinitions(problem, cancellation)
+            val nodes = ArrayList(base?.nodes.orEmpty())
+            nodes += elementResultDefinitions(problem, definedHints, cancellation)
+            if (cancellation()) return null
+            nodes += divModDefinitions(problem, cancellation)
+            if (cancellation()) return null
+            nodes += wideDivModDefinitions(problem, cancellation)
             if (cancellation()) return null
             val ordered = literalDefinitions(problem, definedHints, nodes, cancellation)
             return if (cancellation() || ordered.isEmpty()) null else DefinitionalSweep(ordered)
@@ -123,6 +127,7 @@ class DefinitionalSweep internal constructor(
             hints: List<DefinitionHint>,
             cancellation: Cancellation,
         ): DefinitionalSweep? {
+            if (cancellation()) return null
             if (hints.isEmpty()) return inferred
             val source = fromSource(problem, hints, cancellation)
             if (cancellation()) return null
@@ -245,7 +250,9 @@ class DefinitionalSweep internal constructor(
                     claim(definition.variable, definition.factor, definition.outputIndex)
                 }
             }
+            if (cancellation()) return null
             val extrema = extremumDefinitions(factors, numIntVars, definedHints, cancellation)
+            if (cancellation()) return null
             val priorDefinitions = def.copyOf()
             val extremumOutputs = BooleanArray(numIntVars)
             for (definition in extrema) {
@@ -272,7 +279,9 @@ class DefinitionalSweep internal constructor(
                 val inputs: IntArray
                 if (f is Product) {
                     visit(f.a)
+                    if (cancellation()) return
                     visit(f.b)
+                    if (cancellation()) return
                     node = FunctionalObjective.Times(
                         v,
                         FunctionalObjective.Operand.v(f.a),
@@ -281,11 +290,13 @@ class DefinitionalSweep internal constructor(
                     inputs = intArrayOf(f.a, f.b)
                 } else if (f is Abs) {
                     visit(f.operand)
+                    if (cancellation()) return
                     node = FunctionalObjective.Abs(v, FunctionalObjective.Operand.v(f.operand))
                     inputs = intArrayOf(f.operand)
                 } else if (f is Power) {
                     val input = (f.base as Power.Coordinate.Integer).id.index
                     visit(input)
+                    if (cancellation()) return
                     node = FunctionalObjective.Power(v, FunctionalObjective.Operand.v(input), f.exponent)
                     inputs = intArrayOf(input)
                 } else if (f is ArrayMinMax) {
