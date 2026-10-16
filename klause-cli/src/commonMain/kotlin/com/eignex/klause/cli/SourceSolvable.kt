@@ -112,6 +112,37 @@ internal fun attachedSourceSolvable(
     )
 }
 
+internal fun linearSourceSolvable(
+    source: SourceAttachment,
+    common: CommonOptions,
+    render: (com.eignex.klause.solver.validation.LinearSourceWitness) -> String,
+    admissionElapsedMs: Long = 0L,
+): Solvable {
+    require(source.originalSource is com.eignex.klause.ir.LinearSourceProblem)
+    val start = TimeSource.Monotonic.markNow()
+    val operation = when {
+        source.embeddedObjectiveSense != null -> ExecutionOperation.OPTIMIZE
+        common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
+        else -> ExecutionOperation.SATISFY
+    }
+    val invocation = SourceSetup.prepare(SourceSetupRequest(
+        source, operation, common.resolvedEngine(),
+        maximize = source.embeddedObjectiveSense == ObjectiveSense.MAXIMIZE,
+        cancellation = common.routingPreparationCancellation(),
+        boundCancellation = common.routingCancellation(),
+    ))
+    val elapsed = start.elapsedNow().inWholeMilliseconds
+    common.logRoute(invocation.route, elapsed)
+    return Solvable(
+        finite = null,
+        render = { error("linear source publication requires its checked original coordinates") },
+        objectiveValue = null,
+        pipeline = SolvablePipeline.LinearSource(invocation, render),
+        routingElapsedMs = admissionElapsedMs + elapsed,
+        sourceInvocation = invocation,
+    )
+}
+
 internal fun preparedSourceSolvable(
     invocation: PreparedSourceInvocation,
     render: (Sample) -> String,

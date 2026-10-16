@@ -588,6 +588,7 @@ internal interface OutputProtocol {
         rendered?.let { onSolution(it, null) }
     }
     fun onLinearResult(result: LinearOptimizationResult) {}
+    fun onLinearSourceResult(result: com.eignex.klause.solver.pipeline.SourceExecutionResult) {}
     fun onComplete(verdict: Verdict)
     fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long)
     fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {}
