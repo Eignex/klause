@@ -2822,8 +2822,8 @@ public final class com/eignex/klause/formats/opb/Opb {
 }
 
 public final class com/eignex/klause/formats/opb/OpbDecoderKt {
-	public static final fun toProblem (Lcom/eignex/klause/formats/opb/OpbDocument;Lcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/formats/opb/OpbProblem;
-	public static synthetic fun toProblem$default (Lcom/eignex/klause/formats/opb/OpbDocument;Lcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/formats/opb/OpbProblem;
+	public static final fun toProblem (Lcom/eignex/klause/formats/opb/OpbDocument;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/formats/opb/OpbProblem;
+	public static synthetic fun toProblem$default (Lcom/eignex/klause/formats/opb/OpbDocument;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/formats/opb/OpbProblem;
 }
 
 public final class com/eignex/klause/formats/opb/OpbDocument {
@@ -2847,7 +2847,7 @@ public final class com/eignex/klause/formats/opb/OpbLoweringException : java/lan
 	public fun <init> (Ljava/lang/String;)V
 }
 
-public final class com/eignex/klause/formats/opb/OpbProblem {
+public final class com/eignex/klause/formats/opb/OpbProblem : com/eignex/klause/ir/SourceSemanticsOwner {
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/List;I)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/List;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
@@ -2861,6 +2861,7 @@ public final class com/eignex/klause/formats/opb/OpbProblem {
 	public final fun getNumDeclaredVars ()I
 	public final fun getObjective ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -2878,6 +2879,10 @@ public final class com/eignex/klause/formats/opb/OpbRelation {
 	public final fun getTerms ()Ljava/util/List;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/formats/opb/OpbSemanticsKt {
+	public static final fun getOpbSemantics ()Lcom/eignex/klause/ir/SourceSemantics;
 }
 
 public abstract interface class com/eignex/klause/formats/opb/OpbStatement {
