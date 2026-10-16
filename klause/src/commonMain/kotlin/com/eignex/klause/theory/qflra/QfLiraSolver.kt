@@ -2325,8 +2325,11 @@ private class SourceEqualityOrigins private constructor(
     }
 
     fun current(variables: Set<Int>, current: IntArray): Boolean {
-        stop.charge(variables.size.toLong() + 1L)
-        return !stop() && variables.all { value(it) >= 0 && current[it] == value(it) } && !stop()
+        stop.charge(3L * variables.size + 1L)
+        return !stop() && variables.all { variable ->
+            val capturedValue = value(variable)
+            capturedValue >= 0 && current[variable] == capturedValue
+        } && !stop()
     }
 
     companion object {
@@ -2336,6 +2339,13 @@ private class SourceEqualityOrigins private constructor(
             bools: IntArray,
             stop: Cancellation,
         ): SourceEqualityOrigins? {
+            stop.charge(1L)
+            if (stop()) return null
+            val originCount = 2L * columns + 2L * rows.size
+            val minimumCells = originCount + rows.size + 1L + bools.size + 48L
+            if (columns.toLong() * columns + minimumCells > 65536L ||
+                4L * columns + minimumCells > 65536L
+            ) return null
             var capture = 4L * columns
             var dependencyCount = 0L
             for (prepared in rows) {
@@ -2345,8 +2355,7 @@ private class SourceEqualityOrigins private constructor(
                 dependencyCount += prepared.booleans.size
                 if (capture > 65536L || dependencyCount > 65536L) return null
             }
-            val originCount = 2L * columns + 2L * rows.size
-            val cells = originCount + rows.size + 1L + dependencyCount + bools.size + 48L
+            val cells = minimumCells + dependencyCount
             if (capture + cells > 65536L || columns.toLong() * columns + cells > 65536L) return null
             stop.charge(3L * cells)
             if (stop()) return null

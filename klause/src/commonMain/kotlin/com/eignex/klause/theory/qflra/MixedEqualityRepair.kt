@@ -78,7 +78,7 @@ private fun prepareEqualities(
         } else {
             val flags = previous and 3
             if (flags == 0) {
-                stop.charge(1L)
+                stop.charge(3L)
                 if (stop()) return SourceEqualityPreparation.Declined
                 directions[key] = ((rowIndex + 1) shl 2) or direction
             } else if (flags and direction == 0) {
@@ -414,7 +414,8 @@ internal class SourceEqualityTrace private constructor(
             if (columns.toLong() * columns + added > MAX_REPAIR_ENTRIES ||
                 captureEntries + added > MAX_REPAIR_ENTRIES
             ) return SourceEqualityProof.Unavailable
-            stop.charge(3L * added)
+            val initialized = snapshotCells + (columns + 1L) * words + rows.size + 128L
+            stop.charge(3L * initialized)
             if (stop()) return SourceEqualityProof.Declined
             val copied = ArrayList<ExactRationalInequality>(rows.size)
             for (row in rows) {
