@@ -1,6 +1,5 @@
 package com.eignex.klause.lp.relaxation
 
-import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
@@ -9,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
@@ -21,8 +21,8 @@ import com.eignex.klause.ir.complemented
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.bigIntOf
 
 /**
