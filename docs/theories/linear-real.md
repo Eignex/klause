@@ -80,7 +80,9 @@ values and dependencies, row offsets and 48 wrapper cells. Each object or array
 header allowance is conservatively 64 bytes; the source-capture wrapper reserves
 128 bytes. These are accounting assumptions rather than measured heap usage.
 The source-only residual pass retains no projected-row collection when only
-refutation is required.
+refutation is required. Completed capture, support selection and exclusion of unused
+antecedents have separate observations. They reuse existing outcomes and set sizes;
+they measure neither learned-clause width nor source recovery.
 
 For a source containing integer or real coordinates, the exact-linear component can
 reuse the exact source-coordinate prefix of an existing completed LP witness, or

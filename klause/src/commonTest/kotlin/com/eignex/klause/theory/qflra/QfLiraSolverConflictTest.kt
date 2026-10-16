@@ -93,6 +93,7 @@ class QfLiraSolverConflictTest {
 
                 assertContentEquals(intArrayOf(1), assertNotNull(conflict.explanation).literals)
                 assertEquals(1L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_SUPPORT_USED"))
+                assertEquals(1L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_SUPPORT_REDUCED"))
             }
         }
     }

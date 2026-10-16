@@ -1037,12 +1037,18 @@ class ExactLiraSearchComponent private constructor(
         }
         val supported = origins?.let { capture ->
             refuteCapturedSourceEqualities(model.numRealVars, rows, operationStop, capture.cells, entries) { stage ->
-                if (stage == "RECOVERY_SOURCE_EQUALITY_PREPARED") observeCompleteStage("SOURCE_EQUALITY_PREPARED")
+                when (stage) {
+                    "RECOVERY_SUPPORT_CAPTURED" -> observeCompleteStage("SOURCE_EQUALITY_SUPPORT_CAPTURED")
+                    "RECOVERY_SOURCE_EQUALITY_PREPARED" -> observeCompleteStage("SOURCE_EQUALITY_PREPARED")
+                    else -> Unit
+                }
             }
         } ?: SourceEqualityProof.Unavailable
         val refuted = when (supported) {
             is SourceEqualityProof.Refuted -> {
+                val capturedVariables = variables.size
                 if (origins == null || !origins.retain(supported.support, variables, bools)) return null
+                if (variables.size < capturedVariables) observeCompleteStage("SOURCE_EQUALITY_SUPPORT_REDUCED")
                 observeCompleteStage("SOURCE_EQUALITY_SUPPORT_USED")
                 true
             }
