@@ -182,6 +182,36 @@ settings. Raw `Problem` and `IntDomain` constructors use built-in defaults and a
 explicit settings. Root propagation, presolve and LP planning read the captured
 model settings. Search effort stays in the existing per-call backend parameters.
 
+## Typed source semantics
+
+`ir.SourceSemantics` describes numeric literal authority, float interpretation,
+default undeclared ranges, source feasibility tolerance and absent optional-value
+canonicalization. Optional policies state applicability: an absent policy cannot
+be introduced by a caller override. `SemanticOverrides` replaces applicable policies
+before lowering. Range replacements can widen, narrow or explicitly open endpoints;
+they are not intersections with the format defaults. Bounds on declarations with
+an explicit range remain source data.
+
+`FloatSemantics.Grid` retains its approximation window separately from undeclared
+source-real bounds. Replacing a grid with continuous semantics removes that window,
+while retaining an explicitly supplied source range. Numeric literal authority
+stays fixed when tolerance or float interpretation changes. A zero feasibility
+tolerance requires exact checking of the declared numeric source values.
+
+`EffectiveSourceSemantics` retains both defaults and effective policy. Its
+`isApproximate` flag identifies a grid or positive tolerance; it supplies no
+feasibility, completeness or proof authority. `hasOverrides` records changes to the
+interpretation, including range replacements. Results referring to an overridden
+source must retain the effective policy rather than claim the original defaults.
+`SemanticSource<M>` pairs an immutable or borrowed-read-only source payload with
+that capture. The IR types select no route, theory, engine or resource policy.
+
+These value types define the source carrier contract. Existing frontend and CLI
+entry points still use their format-specific parameters; they do not yet populate
+this carrier or uniformly apply its overrides. Their implemented publication rules
+remain in [input semantics](formats.md). The types alone do not alter execution or
+qualify an existing solver result.
+
 ## Engine projections and factor capabilities
 
 The intended [factor retention and composed reasoning](vision.md#high-level-factors-and-composed-reasoning)
