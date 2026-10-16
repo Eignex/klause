@@ -99,7 +99,9 @@ class MpsSemanticsTest {
             "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1\n M1 'MARKER' 'INTEND'\nENDATA",
         )
         val overrides = SemanticOverrides(
-            undeclaredIntegers = BoundsOverride(BoundOverride.Value(Long.MIN_VALUE), BoundOverride.Value(Long.MAX_VALUE)),
+            undeclaredIntegers = BoundsOverride(
+                BoundOverride.Value(Long.MIN_VALUE), BoundOverride.Value(Long.MAX_VALUE),
+            ),
             feasibilityTolerance = SourceTolerance(),
         )
 
@@ -137,7 +139,9 @@ class MpsSemanticsTest {
                 BigFraction.of(constants.exactCoeff(0), BIG_ONE) * value ==
                     BigFraction.of(constants.exactBound, BIG_ONE)
             })
-            assertFailsWith<MpsLoweringException> { model.sourceWitness(listOf(checkNotNull(BigFraction.ofDouble(1.0 / 3)))) }
+            assertFailsWith<MpsLoweringException> {
+                model.sourceWitness(listOf(checkNotNull(BigFraction.ofDouble(1.0 / 3))))
+            }
         }
     }
 
@@ -179,7 +183,9 @@ class MpsSemanticsTest {
     fun `programmatic declaration ranges should remain explicit under caller defaults`() {
         val source = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA")
         val supplied = source.copy(variables = listOf(MpsVar("X", false, null, null)))
-        val overrides = SemanticOverrides(undeclaredReals = BoundsOverride(upper = BoundOverride.Value(SemanticRational.ONE)))
+        val overrides = SemanticOverrides(
+            undeclaredReals = BoundsOverride(upper = BoundOverride.Value(SemanticRational.ONE)),
+        )
 
         val compiled = supplied.toProblem(semanticOverrides = overrides)
 

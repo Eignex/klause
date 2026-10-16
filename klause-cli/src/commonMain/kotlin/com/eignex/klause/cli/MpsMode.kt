@@ -358,7 +358,9 @@ internal class MpsOutput(
             false -> "MPS source tolerance witness"
             null -> null
         }
-        val declarationQualification = if (effectiveDeclarations) "MPS source scope=effective declaration defaults" else null
+        val declarationQualification = if (effectiveDeclarations) {
+            "MPS source scope=effective declaration defaults"
+        } else null
         return listOfNotNull(declarationQualification, sourceQualification, witnessQualification, cause)
             .joinToString("; ").ifEmpty { null }
     }

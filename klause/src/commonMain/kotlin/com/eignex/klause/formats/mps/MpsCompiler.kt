@@ -360,7 +360,10 @@ fun MpsModel.toProblem(
     return effectiveDeclarations(effectiveSemantics).lowerProblem(settings, effectiveSemantics)
 }
 
-private fun MpsModel.lowerProblem(settings: ProblemSettings, effectiveSemantics: EffectiveSourceSemantics): MpsCompiled {
+private fun MpsModel.lowerProblem(
+    settings: ProblemSettings,
+    effectiveSemantics: EffectiveSourceSemantics,
+): MpsCompiled {
     val exactInput = exactAdapterSnapshot()
     val sourceNumbers = exactInput.sourceNumbers()
     if (sourceNumbers.variableBounds.any { (lower, upper) ->
