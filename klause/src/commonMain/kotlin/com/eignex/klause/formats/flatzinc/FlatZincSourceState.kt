@@ -16,6 +16,7 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.prepareSelectedFloatGrid
 import com.eignex.klause.solver.projection.FloatGridDefinition
 import com.eignex.klause.solver.projection.FloatGridVariable
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntDisjointSet
 
@@ -223,12 +224,23 @@ fun FlatZincProgram.prepareFiniteCompatibility(request: SourceSetupRequest): Pre
 fun FlatZincProgram.prepareSourceExecution(request: SourceSetupRequest): PreparedSourceInvocation =
     prepareInvocation(request, FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY)
 
+/** Observe the canonical source preparation while retaining the same automatic invocation and controls. */
+fun FlatZincProgram.prepareSourceExecution(
+    request: SourceSetupRequest,
+    onLpStats: (LpStats) -> Unit,
+): PreparedSourceInvocation = prepareInvocation(
+    request,
+    FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
+    onLpStats,
+)
+
 private fun FlatZincProgram.prepareInvocation(
     request: SourceSetupRequest,
     purpose: FloatGridConsumerPurpose,
+    onLpStats: ((LpStats) -> Unit)? = null,
 ): PreparedSourceInvocation {
     require(request.source.originalSource === sourceProgram.problem) { "FlatZinc request belongs to another source" }
-    val invocation = SourceSetup.prepare(request)
+    val invocation = if (onLpStats == null) SourceSetup.prepare(request) else SourceSetup.prepare(request, onLpStats)
     retainedSource?.prepare(invocation, purpose)
     return invocation
 }

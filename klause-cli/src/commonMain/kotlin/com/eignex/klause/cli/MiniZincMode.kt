@@ -19,9 +19,11 @@ import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.NativeGridOutcome
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.result.LinearOptimizationResult
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import kotlin.time.TimeSource
 
 /**
  * MiniZinc / FlatZinc front-end. The default mode: MiniZinc invokes this binary via the
@@ -85,6 +87,8 @@ internal object MiniZincMode : CliMode {
                 common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
                 else -> ExecutionOperation.SATISFY
             }
+            val start = TimeSource.Monotonic.markNow()
+            var lpStats = LpStats()
             val invocation = program.prepareSourceExecution(
                 SourceSetupRequest(
                     program.sourceAttachment(),
@@ -95,7 +99,10 @@ internal object MiniZincMode : CliMode {
                     cancellation = common.routingPreparationCancellation(),
                     boundCancellation = common.routingCancellation(),
                 ),
+                onLpStats = { lpStats = it },
             )
+            val elapsed = start.elapsedNow().inWholeMilliseconds
+            common.logRoute(invocation.route, elapsed)
             floatApproximation = invocation.floatProjection != null
             if (invocation.floatProjection != null) {
                 val realObjective = sourceObjective?.takeIf {
@@ -109,12 +116,14 @@ internal object MiniZincMode : CliMode {
                     continuousObjectiveValue = realObjective?.let { linear ->
                         { sample -> linear.evaluateExact(sample).toDouble() }
                     },
+                    routingLpStats = lpStats,
+                    routingElapsedMs = elapsed,
                 )
             }
             return preparedSourceSolvable(invocation, render, { assignment ->
                 applier?.render(original, assignment)
                     ?: writeFlatZincSolution(original, assignment, outputObjective)
-            })
+            }, lpStats, elapsed)
         }
 
         override fun output(common: CommonOptions): OutputProtocol = MiniZincOutput(floatApproximation, sourceSemantics)
