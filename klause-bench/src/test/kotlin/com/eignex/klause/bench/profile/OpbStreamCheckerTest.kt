@@ -19,6 +19,14 @@ class OpbStreamCheckerTest {
         assertEquals("invalid", invalid.status)
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["x1", "-x1"])
+    fun `accepted and rejected outcomes should retain their OPB source scope`(coordinate: String) {
+        val result = OpbStreamChecker.check("1 x1 >= 1 ;", "v $coordinate\n", false, 1).single()
+
+        assertEquals("opb-integral", result.scope)
+    }
+
     @Test
     fun `repeated and complementary source terms should contribute their exact values`() {
         val source = "18446744073709551616 x1 -18446744073709551616 x1 3 ~x1 = 3 ;"
