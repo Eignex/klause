@@ -26,6 +26,16 @@ internal class PolynomialFormula private constructor(
     val atoms: List<PolynomialAtom>,
     val booleanVariables: List<Int>,
 ) {
+    fun refuteBooleans(
+        arithmetic: PolynomialArithmetic,
+        maximumAtoms: Int,
+        maximumTerms: Int,
+        maximumBits: Int,
+    ): Boolean {
+        if (booleanVariables.isEmpty()) return false
+        return refutePolynomialBooleans(nodes, root, atoms, arithmetic, maximumAtoms, maximumTerms, maximumBits)
+    }
+
     fun conjunctiveAtoms(
         arithmetic: PolynomialArithmetic,
         maximumAtoms: Int,
@@ -230,7 +240,7 @@ internal class PolynomialFormula private constructor(
     }
 }
 
-private sealed interface FormulaNode {
+internal sealed interface FormulaNode {
     data class Constant(val value: Boolean) : FormulaNode
     data class BooleanVariable(val variable: Int) : FormulaNode
     data class Atom(val atom: Int) : FormulaNode
