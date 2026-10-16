@@ -2768,6 +2768,11 @@ public final class com/eignex/klause/formats/mps/MpsIndicator {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/formats/mps/MpsLinearSourceKt {
+	public static final fun toLinearSourceProblem (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/ir/LinearSourceProblem;
+	public static synthetic fun toLinearSourceProblem$default (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/ir/LinearSourceProblem;
+}
+
 public final class com/eignex/klause/formats/mps/MpsLoweringException : java/lang/IllegalArgumentException {
 	public fun <init> (Ljava/lang/String;)V
 }
