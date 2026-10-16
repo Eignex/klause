@@ -25,7 +25,7 @@ class PolynomialPhaseProfileTest {
     fun `native work exhaustion retains its reason and exact caller charges`() {
         val source = "(declare-const x Real) (assert (> (* x x) 2))"
 
-        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, maximumWork = 1)
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, maximumWork = 1, timeoutMs = 10_000)
 
         assertEquals("Unknown", trace.result)
         assertEquals("WorkLimit", trace.reason)
