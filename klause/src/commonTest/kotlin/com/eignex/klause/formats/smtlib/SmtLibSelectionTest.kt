@@ -300,8 +300,10 @@ class SmtLibSelectionTest {
 
             val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
 
-            assertEquals(if (branch) "1" else "1152921504606846977/1152921504606846976",
-                assertIs<OpenTheoryResult.Sat>(result).assignment.realValue(parsed.realVarNames.getValue("y")))
+            assertEquals(
+                if (branch) "1" else "1152921504606846977/1152921504606846976",
+                assertIs<OpenTheoryResult.Sat>(result).assignment.realValue(parsed.realVarNames.getValue("y")),
+            )
         }
     }
 

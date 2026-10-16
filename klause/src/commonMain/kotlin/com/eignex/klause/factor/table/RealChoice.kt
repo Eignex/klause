@@ -25,13 +25,19 @@ class RealChoice(
         require(condition >= 0 && result >= 0 && whenTrue >= 0 && whenFalse >= 0)
     }
 
-    override val variables: VarList = MixedVars(boolVars = intArrayOf(Lit.variable(condition)),
-        reals = intArrayOf(result, whenTrue, whenFalse).distinct().toIntArray())
+    override val variables: VarList = MixedVars(
+        boolVars = intArrayOf(Lit.variable(condition)),
+        reals = intArrayOf(result, whenTrue, whenFalse).distinct().toIntArray(),
+    )
 
     override val structuralKeyWeight: Int get() = 4
 
-    override fun remap(mapping: VarRemap): Factor = RealChoice(mapping.lit(condition), mapping.real(result),
-        mapping.real(whenTrue), mapping.real(whenFalse))
+    override fun remap(mapping: VarRemap): Factor = RealChoice(
+        mapping.lit(condition),
+        mapping.real(result),
+        mapping.real(whenTrue),
+        mapping.real(whenFalse),
+    )
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REAL_CHOICE, ::buildKey)
 

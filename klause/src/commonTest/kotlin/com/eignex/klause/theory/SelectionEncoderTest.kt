@@ -50,29 +50,48 @@ import kotlin.test.assertSame
 class SelectionEncoderTest {
     @Test
     fun `real choice branch conditions should retract before a sibling completion`() {
-        val source = Problem(1, 0, emptyArray(),
-            arrayOf<Factor>(RealChoice(Lit.make(0, true), 0, 1, 2)), numRealVars = 3,
-            realLower = doubleArrayOf(2.0, 1.0, 2.0), realUpper = doubleArrayOf(2.0, 1.0, 2.0))
+        val source = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(RealChoice(Lit.make(0, true), 0, 1, 2)),
+            numRealVars = 3,
+            realLower = doubleArrayOf(2.0, 1.0, 2.0),
+            realUpper = doubleArrayOf(2.0, 1.0, 2.0),
+        )
         val prepared = source.prepareExecutionPlan()
 
         OpenExactNeighborhood(source, TheoryParams(), preparedSource = prepared).use { completion ->
-            val rejected = completion.check(ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap()),
-                Cancellation.Never)
-            val sibling = completion.check(ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap()),
-                Cancellation.Never)
+            val rejected = completion.check(
+                ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap()),
+                Cancellation.Never,
+            )
+            val sibling = completion.check(
+                ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap()),
+                Cancellation.Never,
+            )
 
             assertIs<ExactNeighborhoodResult.Refuted>(rejected)
             val sample = assertIs<ExactNeighborhoodResult.Witness>(sibling).sample
             assertFalse(sample.boolValue(0))
-            assertEquals(2.0, sample.realValue(0))
+            assertEquals(2.0, sample.reals[0])
         }
     }
 
     @Test
     fun `real choice and polynomial relations should require the same selected point`() {
-        val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(
-            ContinuousProduct(0, 0, 1), RealChoice(Lit.make(0, true), 2, 0, 1)), numRealVars = 3,
-            realLower = doubleArrayOf(1.0, 2.0, 2.0), realUpper = doubleArrayOf(2.0, 2.0, 2.0))
+        val source = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                ContinuousProduct(0, 0, 1),
+                RealChoice(Lit.make(0, true), 2, 0, 1),
+            ),
+            numRealVars = 3,
+            realLower = doubleArrayOf(1.0, 2.0, 2.0),
+            realUpper = doubleArrayOf(2.0, 2.0, 2.0),
+        )
         val shared = assertNotNull(source.prepareExecutionPlan().polynomialModel)
 
         val result = shared.service.invocation().use { it.check(PolynomialCondition(bools = mapOf(0 to true))) }
@@ -83,9 +102,15 @@ class SelectionEncoderTest {
 
     @Test
     fun `interrupted real choice installation should withhold its complete relation`() {
-        val source = Problem(1, 0, emptyArray(),
-            arrayOf<Factor>(RealChoice(Lit.make(0, true), 0, 1, 2)), numRealVars = 3,
-            realLower = DoubleArray(3), realUpper = DoubleArray(3) { 3.0 })
+        val source = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(RealChoice(Lit.make(0, true), 0, 1, 2)),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3) { 3.0 },
+        )
         var work = 0L
         val cancellation = object : Cancellation {
             override fun isCancelled(): Boolean = work >= 2
@@ -94,7 +119,10 @@ class SelectionEncoderTest {
         val declines = mutableListOf<EncoderDecline>()
 
         val installed = FactorProjectionProviders.Default.prepare(source).installLinearFactor(
-            0, EncodingTarget.LINEAR, cancellation = cancellation, onDecline = declines::add,
+            0,
+            EncodingTarget.LINEAR,
+            cancellation = cancellation,
+            onDecline = declines::add,
         )
 
         assertNull(installed)

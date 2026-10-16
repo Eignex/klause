@@ -17,9 +17,15 @@ class RealChoiceInvariantTest {
     fun `real move deltas should preserve signed choices and result aliases`() {
         for (positive in listOf(false, true)) {
             for (truth in listOf(false, true)) {
-                val source = Problem(1, 0, emptyArray(),
+                val source = Problem(
+                    1,
+                    0,
+                    emptyArray(),
                     arrayOf<Factor>(RealChoice(Lit.make(0, positive), 1, 0, 1)),
-                    numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(4.0, 4.0))
+                    numRealVars = 2,
+                    realLower = doubleArrayOf(0.0, 0.0),
+                    realUpper = doubleArrayOf(4.0, 4.0),
+                )
                 val state = LocalSearchState(LocalSearchModel.open(source), Random(0))
                 state.assignment.setBool(0, truth)
                 state.assignment.setReal(0, 1.0)
@@ -40,10 +46,15 @@ class RealChoiceInvariantTest {
     @Test
     fun `Boolean move deltas should preserve the source literal polarity`() {
         for (positive in listOf(false, true)) {
-            val source = Problem(1, 0, emptyArray(),
+            val source = Problem(
+                1,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(RealChoice(Lit.make(0, positive), 0, 1, 2)),
-                numRealVars = 3, realLower = doubleArrayOf(0.0, 0.0, 0.0),
-                realUpper = doubleArrayOf(4.0, 4.0, 4.0))
+                numRealVars = 3,
+                realLower = doubleArrayOf(0.0, 0.0, 0.0),
+                realUpper = doubleArrayOf(4.0, 4.0, 4.0),
+            )
             val state = LocalSearchState(LocalSearchModel.open(source), Random(0))
             state.assignment.setBool(0, positive)
             state.assignment.setReal(0, 2.0)
@@ -64,8 +75,15 @@ class RealChoiceInvariantTest {
     @Test
     fun `repair proposals should retain guard and real coordinate alternatives`() {
         val factor = RealChoice(Lit.make(0, true), 0, 1, 2)
-        val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(factor), numRealVars = 3,
-            realLower = doubleArrayOf(0.0, 0.0, 0.0), realUpper = doubleArrayOf(4.0, 4.0, 4.0))
+        val source = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(factor),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 0.0, 0.0),
+            realUpper = doubleArrayOf(4.0, 4.0, 4.0),
+        )
         val state = LocalSearchState(LocalSearchModel.open(source), Random(0))
         state.assignment.setBool(0, true)
         state.assignment.setReal(0, 2.0)

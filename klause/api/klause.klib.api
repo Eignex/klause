@@ -7228,6 +7228,26 @@ final class com.eignex.klause.factor.table/Mdd : com.eignex.klause.ir/Factor { /
     final fun structuralReduce(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.ir/FactorReduction // com.eignex.klause.factor.table/Mdd.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 }
 
+final class com.eignex.klause.factor.table/RealChoice : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.table/RealChoice|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int) // com.eignex.klause.factor.table/RealChoice.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+
+    final val condition // com.eignex.klause.factor.table/RealChoice.condition|{}condition[0]
+        final fun <get-condition>(): kotlin/Int // com.eignex.klause.factor.table/RealChoice.condition.<get-condition>|<get-condition>(){}[0]
+    final val result // com.eignex.klause.factor.table/RealChoice.result|{}result[0]
+        final fun <get-result>(): kotlin/Int // com.eignex.klause.factor.table/RealChoice.result.<get-result>|<get-result>(){}[0]
+    final val structuralKeyWeight // com.eignex.klause.factor.table/RealChoice.structuralKeyWeight|{}structuralKeyWeight[0]
+        final fun <get-structuralKeyWeight>(): kotlin/Int // com.eignex.klause.factor.table/RealChoice.structuralKeyWeight.<get-structuralKeyWeight>|<get-structuralKeyWeight>(){}[0]
+    final val variables // com.eignex.klause.factor.table/RealChoice.variables|{}variables[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.table/RealChoice.variables.<get-variables>|<get-variables>(){}[0]
+    final val whenFalse // com.eignex.klause.factor.table/RealChoice.whenFalse|{}whenFalse[0]
+        final fun <get-whenFalse>(): kotlin/Int // com.eignex.klause.factor.table/RealChoice.whenFalse.<get-whenFalse>|<get-whenFalse>(){}[0]
+    final val whenTrue // com.eignex.klause.factor.table/RealChoice.whenTrue|{}whenTrue[0]
+        final fun <get-whenTrue>(): kotlin/Int // com.eignex.klause.factor.table/RealChoice.whenTrue.<get-whenTrue>|<get-whenTrue>(){}[0]
+
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.table/RealChoice.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.table/RealChoice.structuralKey|structuralKey(){}[0]
+}
+
 final class com.eignex.klause.factor.table/RealElement : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.table/RealElement|null[0]
     constructor <init>(kotlin/Int, kotlin/Int, kotlin/DoubleArray, kotlin/Int = ...) // com.eignex.klause.factor.table/RealElement.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.DoubleArray;kotlin.Int){}[0]
     constructor <init>(kotlin/Int, kotlin/Int, kotlin/IntArray, kotlin/Int = ...) // com.eignex.klause.factor.table/RealElement.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.IntArray;kotlin.Int){}[0]

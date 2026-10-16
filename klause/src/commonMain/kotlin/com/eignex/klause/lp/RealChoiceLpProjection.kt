@@ -12,6 +12,11 @@ internal fun RealChoice.emitLpRelaxation(builder: RelaxationBuilder) {
     val input = builder.realColumn(selected)
     if (output < 0 || input < 0) return
     val premise = if (active) condition else Lit.negate(condition)
-    builder.realRow(intArrayOf(output, input), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0,
-        premiseLits = intArrayOf(premise))
+    builder.realRow(
+        intArrayOf(output, input),
+        doubleArrayOf(1.0, -1.0),
+        LinearOp.EQ,
+        0.0,
+        premiseLits = intArrayOf(premise),
+    )
 }

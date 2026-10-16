@@ -67,9 +67,12 @@ private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): 
     val reals = checkNotNull(point.exactReals)
     return when (factor) {
         is Distinct -> factor.keeps(point, direction)
+
         is ExactLinear -> factor.keeps(point, direction)
+
         is LinearIndicator -> point.exactIntValue(factor.indicator) != bigIntOf(if (factor.whenOne) 1L else 0L) ||
             factor.row.keeps(point, direction)
+
         is Linear -> {
             val constants = factor.realConstants ?: return false
             rowKeeps(
@@ -97,8 +100,10 @@ private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): 
             val result = factor.result as Power.Coordinate.Real
             when (factor.exponent) {
                 0 -> reals[result.id.index] == BigFraction.ONE && direction[result.id.index].isZero
+
                 1 -> reals[result.id.index] == reals[base.id.index] &&
                     direction[result.id.index] == direction[base.id.index]
+
                 else -> false
             }
         }
@@ -121,7 +126,7 @@ private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): 
             reals[factor.a] * reals[factor.b] == reals[factor.result] &&
                 (direction[factor.a] * direction[factor.b]).isZero &&
                 direction[factor.result] == direction[factor.a] * reals[factor.b] +
-                    reals[factor.a] * direction[factor.b]
+                reals[factor.a] * direction[factor.b]
         }
 
         // With the integer operand fixed at k, the product is the row `result − k·operand = 0`.
@@ -135,22 +140,30 @@ private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): 
             val value = reals[factor.result]
             val slope = direction[factor.result]
             factor.xs.all { operand ->
-                if (factor.max) value >= reals[operand] && slope >= direction[operand]
-                else value <= reals[operand] && slope <= direction[operand]
+                if (factor.max) {
+                    value >= reals[operand] && slope >= direction[operand]
+                } else {
+                    value <= reals[operand] && slope <= direction[operand]
+                }
             } && factor.xs.any { reals[it] == value && direction[it] == slope }
         }
 
         is RealChoice -> {
             val selected = if (Lit.evaluate(factor.condition, point.boolValue(Lit.variable(factor.condition)))) {
                 factor.whenTrue
-            } else factor.whenFalse
+            } else {
+                factor.whenFalse
+            }
             reals[factor.result] == reals[selected] && direction[factor.result] == direction[selected]
         }
 
         is RealElement -> {
             val position = factor.position(point.intValue(factor.idx)) ?: return false
-            val selected = if (factor.arrIsVars) reals[factor.entries[position]]
-                else BigFraction.ofDouble(factor.constants[position]) ?: return false
+            val selected = if (factor.arrIsVars) {
+                reals[factor.entries[position]]
+            } else {
+                BigFraction.ofDouble(factor.constants[position]) ?: return false
+            }
             val slope = if (factor.arrIsVars) direction[factor.entries[position]] else BigFraction.ZERO
             reals[factor.result] == selected && direction[factor.result] == slope
         }

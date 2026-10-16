@@ -19,12 +19,16 @@ import com.eignex.klause.propagation.difference.DifferenceSystem
 enum class PropagationCapability {
     /** No finite deduction implementation is available. */
     UNSUPPORTED,
+
     /** Deduction is deliberately absent; another source check must enforce the factor. */
     INERT,
+
     /** Deductions preserve every source solution. */
     SOUND_FILTERING,
+
     /** Deductions filter finite interval bounds. */
     BOUNDS_FILTERING,
+
     /** Deductions can remove interior finite-domain values. */
     DOMAIN_FILTERING,
 }
@@ -33,10 +37,13 @@ enum class PropagationCapability {
 enum class AssignmentCheckCapability {
     /** No assignment check is supplied by this role. */
     UNSUPPORTED,
+
     /** The role checks the exact source relation at a pinned assignment. */
     EXACT,
+
     /** A separate exact source completion must certify the assignment. */
     SOURCE_CERTIFICATION,
+
     /** Other installed source rows enforce this redundant role. */
     REDUNDANT,
 }
@@ -45,10 +52,13 @@ enum class AssignmentCheckCapability {
 enum class ScoringCapability {
     /** No scoring implementation is available. */
     UNSUPPORTED,
+
     /** This role contributes no score and requires another source check. */
     INERT,
+
     /** Scores and move deltas agree on discrete violation degree. */
     GRADED,
+
     /** Scores guide search but require exact source certification. */
     HEURISTIC,
 }
@@ -57,6 +67,7 @@ enum class ScoringCapability {
 enum class RelaxationCapability {
     /** This role emits no relaxation rows. */
     NONE,
+
     /** Emitted rows contain every source solution under their stated premises. */
     SOUND,
 }
@@ -111,38 +122,71 @@ private val symmetryRestriction = redundantRows.copy(
 // SOUND declares a relaxation family; its engine still applies domain, resource and feature gates.
 internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities? = when (this) {
     is Table -> if (hi == null) domainRelaxation else finiteDomains
+
     is Element, is Mdd, is Regular, is GlobalCardinality, is NValue, is SymmetricAllDifferent -> domainRelaxation
+
     is AllDifferent -> if (boundsConsistent && presents.isEmpty() && exceptSet.isEmpty()) {
         boundRelaxation
     } else {
         domainRelaxation
     }
+
     is Abs, is GridAbs -> domainRelaxation
+
     is GridArithmetic -> finiteDomains
+
     is WideDivMod -> finiteBounds
+
     is DivMod -> finiteDomains
+
     is Inverse, is ValuePrecede -> finiteDomains
-    is Power -> if (base is Power.Coordinate.Integer) finiteDomains else
+
+    is Power -> if (base is Power.Coordinate.Integer) {
+        finiteDomains
+    } else {
         realArithmetic.copy(relaxation = if (exponent <= 1) RelaxationCapability.SOUND else RelaxationCapability.NONE)
+    }
+
     is AffineAbs, is ArrayMinMax, is Product, is Increasing, is ReifiedLinear -> boundRelaxation
-    is Distinct -> if (variables.reals.isEmpty()) finiteFiltering else
+
+    is Distinct -> if (variables.reals.isEmpty()) {
+        finiteFiltering
+    } else {
         realArithmetic.copy(relaxation = RelaxationCapability.NONE)
+    }
+
     is ExactLinear -> if (variables.reals.isNotEmpty()) realArithmetic else boundRelaxation
+
     is LinearIndicator -> if (variables.reals.isNotEmpty()) realArithmetic else filteringRelaxation
+
     is Linear -> if (constants is RealConstants) realArithmetic else boundRelaxation
+
     is Clause, is Cardinality, is PseudoBoolean, is ReifiedCardinality, is ReifiedPseudoBoolean,
     is Circuit, is Cumulative, is Diffn,
     -> filteringRelaxation
+
     is ComparisonClause, is Xor, is LexLess, is Sort -> finiteFiltering
+
     is GridArrayMinMax -> filteringRelaxation
+
     is RealElement -> realArithmetic.copy(propagation = PropagationCapability.BOUNDS_FILTERING, inertReason = null)
+
     is RealArrayMinMax -> realArithmetic.copy(propagation = PropagationCapability.UNSUPPORTED, inertReason = null)
+
     is RealAbs, is RealProduct, is ReifiedRealLinear, is RealChoice -> realArithmetic
-    is ContinuousProduct -> if (finiteChoices?.hasGuards == true) realArithmetic else
+
+    is ContinuousProduct -> if (finiteChoices?.hasGuards == true) {
+        realArithmetic
+    } else {
         realArithmetic.copy(relaxation = RelaxationCapability.NONE)
+    }
+
     is ObjectiveBoundFactor -> objectiveOverlay
+
     is GaussianXor, is DifferenceSystem -> redundantRows
+
     is SymmetryHandling -> symmetryRestriction
+
     else -> null
 }
 

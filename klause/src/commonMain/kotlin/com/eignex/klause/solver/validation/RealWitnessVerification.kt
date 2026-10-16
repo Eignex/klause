@@ -32,21 +32,29 @@ import com.eignex.klause.util.toLongExact
 internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification<Sample, Unit> {
     if (model.factors.any { it is Distinct || it is AllDifferent } &&
         (sample.numIntVars != model.numIntVars || sample.numBoolVars != model.numBoolVars)
-    ) return Verification.Rejected("assignment does not cover distinctness coordinates")
+    ) {
+        return Verification.Rejected("assignment does not cover distinctness coordinates")
+    }
     for ((id, factor) in model.factors.withIndex()) {
         if (factor !is Abs && factor !is AffineAbs && factor !is AllDifferent &&
             !(factor is Distinct && factor.variables.reals.isEmpty())
-        ) continue
+        ) {
+            continue
+        }
         if (sample.numIntVars != model.numIntVars) {
             return Verification.Rejected("assignment does not cover the integer variables")
         }
         val valid = when (factor) {
             is Abs -> sample.exactIntValue(factor.operand).abs() == sample.exactIntValue(factor.result)
+
             is AffineAbs -> factor.isSatisfied(sample::exactIntValue)
+
             is AllDifferent -> factor.isSatisfied(sample)
+
             is Distinct -> factor.isSatisfied(sample::exactIntValue, sample::boolValue) {
                 error("integer distinct operand has a real coordinate")
             }
+
             else -> false
         }
         if (!valid) {
@@ -65,12 +73,16 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
     }
     val witness = object : ExactWitness {
         override fun truth(boolVar: Int): Boolean = sample.boolValue(boolVar)
-        override fun at(column: Int): BigFraction = if (column < model.numRealVars) reals[column] else {
+        override fun at(column: Int): BigFraction = if (column < model.numRealVars) {
+            reals[column]
+        } else {
             BigFraction.of(sample.exactIntValue(column - model.numRealVars), BIG_ONE)
         }
     }
     fun holds(row: LinearRow): Boolean = row.exactComparison(
-        model.numRealVars, row.activator == LinearRow.ALWAYS || witness.truth(row.activator), witness::truth,
+        model.numRealVars,
+        row.activator == LinearRow.ALWAYS || witness.truth(row.activator),
+        witness::truth,
     ).holdsAt(witness)
     for ((id, factor) in model.factors.withIndex()) {
         if (factor.variables.reals.isEmpty()) continue
@@ -137,7 +149,9 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             }
             val selected = if (Lit.evaluate(factor.condition, sample.boolValue(Lit.variable(factor.condition)))) {
                 factor.whenTrue
-            } else factor.whenFalse
+            } else {
+                factor.whenFalse
+            }
             if (reals[selected] != reals[factor.result]) {
                 return Verification.Rejected("real factor $id refutes the assignment")
             }
@@ -147,8 +161,11 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             val index = sample.exactIntValue(factor.idx)
             val position = if (index.fitsLong()) factor.position(index.toLongExact()) else null
             if (position == null) return Verification.Rejected("real factor $id has an invalid index")
-            val selected = if (factor.arrIsVars) reals[factor.entries[position]]
-                else checkNotNull(BigFraction.ofDouble(factor.constants[position]))
+            val selected = if (factor.arrIsVars) {
+                reals[factor.entries[position]]
+            } else {
+                checkNotNull(BigFraction.ofDouble(factor.constants[position]))
+            }
             if (selected != reals[factor.result]) return Verification.Rejected("real factor $id refutes the assignment")
             continue
         }
