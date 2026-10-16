@@ -191,7 +191,9 @@ class Sample private constructor(
 
     internal fun withSourceSemantics(semantics: EffectiveSourceSemantics): Sample {
         val previous = this.semantics
-        require(previous == null || previous.declared == semantics.declared && previous.effective == semantics.effective) {
+        require(previous == null ||
+            (previous.declared == semantics.declared && previous.effective == semantics.effective)
+        ) {
             "sample belongs to a different source interpretation"
         }
         if (capturedSemantics === semantics) return this

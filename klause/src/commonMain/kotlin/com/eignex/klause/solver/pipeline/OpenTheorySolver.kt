@@ -226,7 +226,9 @@ sealed interface OpenTheoryResult {
 
 internal fun OpenTheoryResult.withSourceSemantics(semantics: EffectiveSourceSemantics): OpenTheoryResult {
     val previous = this.semantics
-    require(previous == null || previous.declared == semantics.declared && previous.effective == semantics.effective) {
+    require(previous == null ||
+        (previous.declared == semantics.declared && previous.effective == semantics.effective)
+    ) {
         "result belongs to a different source interpretation"
     }
     if (previous === semantics) return this

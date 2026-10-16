@@ -6,18 +6,19 @@ import com.eignex.klause.solver.result.SampleResult
 import com.eignex.klause.solver.result.SatisfyResult
 
 private fun requireMatchingSemantics(previous: EffectiveSourceSemantics?, semantics: EffectiveSourceSemantics) {
-    require(previous == null || previous.declared == semantics.declared && previous.effective == semantics.effective) {
+    require(previous == null ||
+        (previous.declared == semantics.declared && previous.effective == semantics.effective)
+    ) {
         "result belongs to a different source interpretation"
     }
 }
 
 internal fun SolveResult.withSourceSemantics(semantics: EffectiveSourceSemantics): SolveResult {
     requireMatchingSemantics(this.semantics, semantics)
-    if (this.semantics === semantics &&
-        (this !is SolveResult.Sat || assignment.semantics === semantics)
-    ) return this
+    if (this is SolveResult.Sat) requireMatchingSemantics(assignment.semantics, semantics)
+    if (this.semantics === semantics) return this
     return when (this) {
-        is SolveResult.Sat -> copy(assignment = assignment.withSourceSemantics(semantics), semantics = semantics)
+        is SolveResult.Sat -> copy(semantics = semantics)
         is SolveResult.Unsat -> copy(semantics = semantics)
         is SolveResult.Unknown -> copy(semantics = semantics)
     }
@@ -25,11 +26,10 @@ internal fun SolveResult.withSourceSemantics(semantics: EffectiveSourceSemantics
 
 internal fun SampleResult.withSourceSemantics(semantics: EffectiveSourceSemantics): SampleResult {
     requireMatchingSemantics(this.semantics, semantics)
-    if (this.semantics === semantics &&
-        (this !is SampleResult.Found || sample.semantics === semantics)
-    ) return this
+    if (this is SampleResult.Found) requireMatchingSemantics(sample.semantics, semantics)
+    if (this.semantics === semantics) return this
     return when (this) {
-        is SampleResult.Found -> copy(sample = sample.withSourceSemantics(semantics), semantics = semantics)
+        is SampleResult.Found -> copy(semantics = semantics)
         is SampleResult.Infeasible -> copy(semantics = semantics)
         is SampleResult.Unknown -> copy(semantics = semantics)
     }
@@ -37,13 +37,12 @@ internal fun SampleResult.withSourceSemantics(semantics: EffectiveSourceSemantic
 
 internal fun MinimizeResult.withSourceSemantics(semantics: EffectiveSourceSemantics): MinimizeResult {
     requireMatchingSemantics(this.semantics, semantics)
-    if (this.semantics === semantics &&
-        (this !is MinimizeResult.WithSample || sample.semantics === semantics)
-    ) return this
+    if (this is MinimizeResult.WithSample) requireMatchingSemantics(sample.semantics, semantics)
+    if (this.semantics === semantics) return this
     return when (this) {
-        is MinimizeResult.Optimal -> copy(sample = sample.withSourceSemantics(semantics), semantics = semantics)
-        is MinimizeResult.BestFound -> copy(sample = sample.withSourceSemantics(semantics), semantics = semantics)
-        is MinimizeResult.Unbounded -> copy(sample = sample.withSourceSemantics(semantics), semantics = semantics)
+        is MinimizeResult.Optimal -> copy(semantics = semantics)
+        is MinimizeResult.BestFound -> copy(semantics = semantics)
+        is MinimizeResult.Unbounded -> copy(semantics = semantics)
         is MinimizeResult.Infeasible -> copy(semantics = semantics)
         is MinimizeResult.Unknown -> copy(semantics = semantics)
     }
@@ -55,11 +54,10 @@ internal fun MinimizeResult.WithSample.withSourceSemantics(
 
 internal fun SatisfyResult.withSourceSemantics(semantics: EffectiveSourceSemantics): SatisfyResult {
     requireMatchingSemantics(this.semantics, semantics)
-    if (this.semantics === semantics &&
-        (this !is SatisfyResult.Sat || sample.semantics === semantics)
-    ) return this
+    if (this is SatisfyResult.Sat) requireMatchingSemantics(sample.semantics, semantics)
+    if (this.semantics === semantics) return this
     return when (this) {
-        is SatisfyResult.Sat -> copy(sample = sample.withSourceSemantics(semantics), semantics = semantics)
+        is SatisfyResult.Sat -> copy(semantics = semantics)
         is SatisfyResult.UnsatUnderAssumptions -> copy(semantics = semantics)
         is SatisfyResult.GloballyUnsat -> copy(semantics = semantics)
         is SatisfyResult.Unknown -> copy(semantics = semantics)

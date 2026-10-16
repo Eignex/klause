@@ -8,8 +8,10 @@ The caller opens a session, establishes assumptions, starts an operation, consum
 or resumes it, and closes its owner before changing scope. Published results remain
 readable independently of the live operation. Finite solve, sample and optimization
 results retain the model's captured source interpretation, including cancellation
-and refutation without an assignment. Stream points and resumable incumbents retain
-the same policy after their owner closes; this metadata adds no proof authority.
+and refutation without an assignment. Raw stream points and resumable result
+envelopes retain the same policy after their owner closes. Qualifying a verdict
+preserves its assignment object; an imported incumbent can remain an unbound
+point inside a qualified result. This metadata adds no proof authority.
 This page defines capture, exclusion
 and cleanup; backend state follows [search](search.md) and [local search](local-search.md).
 
