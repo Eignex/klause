@@ -67,7 +67,7 @@ object SmtLib {
         { StringCharSource(text) }, unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides,
     )
 
-    /** Admit [source], exhausting it or closing it once when it is closeable. */
+    /** Admit [source], closing it once when closeable, including refusal before the first read. */
     fun parse(
         source: CharSource,
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
@@ -75,9 +75,20 @@ object SmtLib {
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         cancellation: Cancellation = Cancellation.Never,
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
-    ): SmtLibProblem = parse(
-        { source }, unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides,
-    )
+    ): SmtLibProblem {
+        var transferred = false
+        return try {
+            parse(
+                {
+                    transferred = true
+                    source
+                },
+                unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides,
+            )
+        } finally {
+            if (!transferred && source is AutoCloseable) source.close()
+        }
+    }
 
     /**
      * Open and parse one source, retaining its commands through lowering.

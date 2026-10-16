@@ -336,8 +336,9 @@ Polynomial expansion and decision work remain owned by the nonlinear kernel/theo
 same attachment to `SourceSetupRequest`; callers bind the retained affine or exact
 quadratic objective and sense before `SourceSetup.prepare` and `SourceSetup.execute`.
 The CLI and preparation/execution probes use this common contract instead of
-frontend source classifications. Source ownership and captured resource defaults
-survive every fresh invocation; traversal state belongs to execution. Finite CLI
+frontend source classifications. A provided closeable stream is closed even when admission refuses before its first
+read; a factory is not opened when cancellation is already observed. Source ownership
+and captured resource defaults survive every fresh invocation; traversal state belongs to execution. Finite CLI
 execution retains the invocation's selected shape and minimized consumer objective,
 while rendering costs in original source units.
 
