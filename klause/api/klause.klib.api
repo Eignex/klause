@@ -1346,6 +1346,11 @@ abstract interface com.eignex.klause.ir/LinearRow { // com.eignex.klause.ir/Line
     }
 }
 
+abstract interface com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.ir/SourceSemanticsOwner|null[0]
+    abstract val semantics // com.eignex.klause.ir/SourceSemanticsOwner.semantics|{}semantics[0]
+        abstract fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/SourceSemanticsOwner.semantics.<get-semantics>|<get-semantics>(){}[0]
+}
+
 abstract interface com.eignex.klause.localsearch.movesource/MoveSource { // com.eignex.klause.localsearch.movesource/MoveSource|null[0]
     abstract val id // com.eignex.klause.localsearch.movesource/MoveSource.id|{}id[0]
         abstract fun <get-id>(): com.eignex.klause.localsearch.movesource/MoveSourceId // com.eignex.klause.localsearch.movesource/MoveSource.id.<get-id>|<get-id>(){}[0]
@@ -5231,7 +5236,7 @@ final class <#A: out kotlin/Any?, #B: out kotlin/Any?> com.eignex.klause.solver.
         final fun <get-version>(): kotlin/Long // com.eignex.klause.solver.incumbent/VerifiedIncumbent.version.<get-version>|<get-version>(){}[0]
 }
 
-final class <#A: out kotlin/Any?> com.eignex.klause.ir/SemanticSource { // com.eignex.klause.ir/SemanticSource|null[0]
+final class <#A: out kotlin/Any?> com.eignex.klause.ir/SemanticSource : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.ir/SemanticSource|null[0]
     constructor <init>(#A, com.eignex.klause.ir/EffectiveSourceSemantics) // com.eignex.klause.ir/SemanticSource.<init>|<init>(1:0;com.eignex.klause.ir.EffectiveSourceSemantics){}[0]
 
     final val model // com.eignex.klause.ir/SemanticSource.model|{}model[0]
@@ -15956,6 +15961,8 @@ final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample
         final fun <get-numRealVars>(): kotlin/Int // com.eignex.klause.solver/Sample.numRealVars.<get-numRealVars>|<get-numRealVars>(){}[0]
     final val reals // com.eignex.klause.solver/Sample.reals|{}reals[0]
         final fun <get-reals>(): kotlin/DoubleArray // com.eignex.klause.solver/Sample.reals.<get-reals>|<get-reals>(){}[0]
+    final val semantics // com.eignex.klause.solver/Sample.semantics|{}semantics[0]
+        final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver/Sample.semantics.<get-semantics>|<get-semantics>(){}[0]
     final val symbolicReals // com.eignex.klause.solver/Sample.symbolicReals|{}symbolicReals[0]
         final fun <get-symbolicReals>(): kotlin.collections/List<com.eignex.klause.arithmetic.real/ExactRealValue>? // com.eignex.klause.solver/Sample.symbolicReals.<get-symbolicReals>|<get-symbolicReals>(){}[0]
 
@@ -16463,11 +16470,11 @@ open class com.eignex.klause.formats/FormatException : kotlin/RuntimeException {
     constructor <init>(kotlin/String, kotlin/String, kotlin/Throwable? = ...) // com.eignex.klause.formats/FormatException.<init>|<init>(kotlin.String;kotlin.String;kotlin.Throwable?){}[0]
 }
 
-open class com.eignex.klause.ir/Problem { // com.eignex.klause.ir/Problem|null[0]
-    constructor <init>(kotlin/Int, com.eignex.klause.ir/IntBounds, kotlin/Array<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., com.eignex.klause.ir/ProblemSettings = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;com.eignex.klause.ir.IntBounds;kotlin.Array<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;com.eignex.klause.ir.ProblemSettings){}[0]
-    constructor <init>(kotlin/Int, kotlin/Int, com.eignex.klause.ir/SourceIntDomains, kotlin/Array<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., com.eignex.klause.ir/ProblemSettings = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;com.eignex.klause.ir.SourceIntDomains;kotlin.Array<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;com.eignex.klause.ir.ProblemSettings){}[0]
-    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin.collections/List<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ..., com.eignex.klause.ir/ProblemSettings = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.collections.List<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?;com.eignex.klause.ir.ProblemSettings){}[0]
-    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin/Array<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ..., com.eignex.klause.ir/ProblemSettings = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.Array<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?;com.eignex.klause.ir.ProblemSettings){}[0]
+open class com.eignex.klause.ir/Problem : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.ir/Problem|null[0]
+    constructor <init>(kotlin/Int, com.eignex.klause.ir/IntBounds, kotlin/Array<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/EffectiveSourceSemantics = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;com.eignex.klause.ir.IntBounds;kotlin.Array<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.EffectiveSourceSemantics){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, com.eignex.klause.ir/SourceIntDomains, kotlin/Array<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/EffectiveSourceSemantics = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;com.eignex.klause.ir.SourceIntDomains;kotlin.Array<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.EffectiveSourceSemantics){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin.collections/List<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/EffectiveSourceSemantics = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.collections.List<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.EffectiveSourceSemantics){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin/Array<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/EffectiveSourceSemantics = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.Array<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.EffectiveSourceSemantics){}[0]
 
     final val declaredIntDomains // com.eignex.klause.ir/Problem.declaredIntDomains|{}declaredIntDomains[0]
         final fun <get-declaredIntDomains>(): com.eignex.klause.ir/SourceIntDomains // com.eignex.klause.ir/Problem.declaredIntDomains.<get-declaredIntDomains>|<get-declaredIntDomains>(){}[0]
@@ -16493,6 +16500,8 @@ open class com.eignex.klause.ir/Problem { // com.eignex.klause.ir/Problem|null[0
         final fun <get-realUpper>(): kotlin/DoubleArray // com.eignex.klause.ir/Problem.realUpper.<get-realUpper>|<get-realUpper>(){}[0]
     final val settings // com.eignex.klause.ir/Problem.settings|{}settings[0]
         final fun <get-settings>(): com.eignex.klause.ir/ProblemSettings // com.eignex.klause.ir/Problem.settings.<get-settings>|<get-settings>(){}[0]
+    open val semantics // com.eignex.klause.ir/Problem.semantics|{}semantics[0]
+        open fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/Problem.semantics.<get-semantics>|<get-semantics>(){}[0]
 
     final fun intDomainOrNull(kotlin/Int): com.eignex.klause.ir/IntDomain? // com.eignex.klause.ir/Problem.intDomainOrNull|intDomainOrNull(kotlin.Int){}[0]
     final fun withFactors(kotlin/Array<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ...): com.eignex.klause.ir/Problem // com.eignex.klause.ir/Problem.withFactors|withFactors(kotlin.Array<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?){}[0]
