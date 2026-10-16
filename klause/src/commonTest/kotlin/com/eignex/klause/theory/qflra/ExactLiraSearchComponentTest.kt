@@ -123,7 +123,8 @@ class ExactLiraSearchComponentTest {
                 val choices = assertNotNull(component.nextBranch(session))
 
                 assertEquals(2, choices.size)
-                val decision = assertIs<RegisteredTheoryDecision>(assertIs<SearchDecision.Theory>(choices.first()).decision)
+                val chosen = assertIs<SearchDecision.Theory>(choices.first()).decision
+                val decision = assertIs<RegisteredTheoryDecision>(chosen)
                 val side = assertIs<SourceBoundPredicate>(decision.payload).sourceBound
                 assertEquals(guided, side.upper)
                 assertEquals(if (guided) BigFraction.MINUS_ONE else BigFraction.ZERO, side.threshold)
