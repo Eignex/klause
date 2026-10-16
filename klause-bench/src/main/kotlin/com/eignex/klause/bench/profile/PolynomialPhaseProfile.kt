@@ -1,12 +1,23 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.formats.smtlib.SmtLibAdmission
+import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
+import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
+import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import java.io.File
@@ -20,7 +31,9 @@ import kotlinx.serialization.json.Json
 internal object PolynomialPhaseProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size == 1 && args[0].startsWith("request64="))
+        require(args.size in 1..2 && args[0].startsWith("request64="))
+        require(args.size == 1 || args[1] == "pipeline=true")
+        val pipelineMode = args.size == 2
         val encoded = args[0].substringAfter('=')
         require(encoded.length <= 48 * 1024)
         val request = Base64.getDecoder().decode(encoded)
@@ -41,7 +54,8 @@ internal object PolynomialPhaseProfile {
             "containingTimeoutMs" to "60000",
             "maximumWork" to "null",
             "representationLimits" to "default",
-            "route" to "direct normalized QfNraQuery; separate gate inspection",
+            "route" to if (pipelineMode) "source admission and default MIXED pipeline/P1/seed3"
+                else "direct normalized QfNraQuery; separate gate inspection",
         )))
         val access = PhaseAccess()
         for ((index, source) in cases.withIndex()) {
@@ -52,8 +66,48 @@ internal object PolynomialPhaseProfile {
             val directory = out.resolve(index.toString()).apply { mkdirs() }
             directory.resolve("source.smt2").writeBytes(bytes)
             val text = bytes.decodeToString()
-            directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text)))
-            directory.resolve("trace.json").writeText(Json.encodeToString(access.measure(text)))
+            if (pipelineMode) {
+                directory.resolve("pipeline.json").writeText(Json.encodeToString(pipeline(text)))
+            } else {
+                directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text)))
+                directory.resolve("trace.json").writeText(Json.encodeToString(access.measure(text)))
+            }
+        }
+    }
+
+    internal fun pipeline(text: String): PipelinePhaseTrace {
+        val observation = DeadlineObservation()
+        val source = SmtLibAdmission.parse(text, cancellation = observation)
+        require(source is SmtLibInput.Polynomial) { "Source did not select polynomial admission: ${source.javaClass}" }
+        val request = source.problem.pipelineRequest()
+        val preparedCharges = observation.charges
+        val execution = OpenTheoryPipeline.execute(request, PolynomialTheoryParams(
+            timeout = observation,
+            strategy = PolynomialStrategyParams(
+                backtrack = BacktrackParams(randomSeed = 3),
+                localSearch = LocalSearchParams(randomSeed = 3),
+            ),
+        ), FiniteEngine.MIXED, 1)
+        return PipelinePhaseTrace(execution.result.javaClass.simpleName,
+            (execution.result as? OpenTheoryResult.Unknown)?.reason?.toString(),
+            execution.resource?.toString(), execution.nativeResource,
+            execution.stats.toString(), execution.result.stats.toString(),
+            preparedCharges, observation.charges - preparedCharges, observation.stack)
+    }
+
+    private class DeadlineObservation : Cancellation, WorkMeter {
+        private val clock = Cancellation.after(60.seconds)
+        var charges = 0L
+            private set
+        var stack: List<String>? = null
+            private set
+        override fun deadline() = clock.deadline()
+        override fun workMeter(): WorkMeter = this
+        override fun charge(units: Long) { charges += units }
+        override fun isCancelled(): Boolean {
+            val stopped = clock()
+            if (stopped && stack == null) stack = Thread.currentThread().stackTrace.map { it.toString() }
+            return stopped
         }
     }
 
@@ -209,5 +263,18 @@ internal data class PhaseTrace(
     val nativeWork: Long,
     val chargeSum: Long,
     val preparationCharges: Long,
+    val containingDeadlineStack: List<String>?,
+)
+
+@Serializable
+internal data class PipelinePhaseTrace(
+    val result: String,
+    val reason: String?,
+    val resource: String?,
+    val nativeResource: String?,
+    val nativeStats: String,
+    val searchStats: String,
+    val preparationCharges: Long,
+    val executionCharges: Long,
     val containingDeadlineStack: List<String>?,
 )
