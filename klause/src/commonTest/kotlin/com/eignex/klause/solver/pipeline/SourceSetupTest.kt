@@ -1,9 +1,13 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchGroup
@@ -22,6 +26,7 @@ import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -32,6 +37,93 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SourceSetupTest {
+    @Test
+    fun `captured integer orientations should survive caller mutation until heuristic construction`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(10, 20)),
+            arrayOf(Element(0, 1, longArrayOf(10, 20), arrIsVars = false, indexOffset = 0)))
+        val outputs = intArrayOf(1)
+        val attachment = SourceAttachment(source, outputs, emptyList())
+        outputs[0] = 0
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            attachment, ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH,
+        ))
+        val shape = invocation.finiteShape()
+        val preparation = FinitePipeline.prepare(FinitePipelineRequest(
+            shape.problem, FiniteEngine.LOCAL_SEARCH, null, PresolveConfig.NONE, preparedPlan = shape.preparedPlan,
+        ))
+        val assignment = Assignment(0, 2)
+        assignment.setInt(0, 1)
+        assignment.setInt(1, 10)
+
+        val view = assertNotNull(invocation.heuristicHints(
+            preparation.problem, null, preparation.sourceMapping, Cancellation.Never,
+            setOf(ExecutionStrategy.LOCAL_SEARCH), assertNotNull(preparation.executionPlan).capabilities,
+        ))
+        assertNotNull(view.sweep).sweep(assignment, source.finiteIntDomains(), source.factors)
+
+        assertEquals(20L, assignment.intValue(1))
+        assertNull(shape.definitionalSweep)
+    }
+
+    @Test
+    fun `an unpriced fold should remain searched while its objective gradient follows captured inputs`() {
+        val source = Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(2, false), Lit.make(0, true))),
+            Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(2, true), Lit.make(0, false), Lit.make(1, false))),
+        ))
+        val inputs = intArrayOf(Lit.make(0, true), Lit.make(1, true))
+        val folds = mutableListOf(BoolFoldDefinition(2, inputs, true))
+        val attachment = SourceAttachment(source, intArrayOf(), folds)
+        inputs[0] = Lit.make(0, false)
+        folds.clear()
+        val canonical = LinearObjective(boolWeights = longArrayOf(0, 0, 1))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            attachment, ExecutionOperation.OPTIMIZE, FiniteEngine.LOCAL_SEARCH, canonical,
+        ))
+        val shape = invocation.finiteShape()
+        val preparation = FinitePipeline.prepare(FinitePipelineRequest(
+            shape.problem, FiniteEngine.LOCAL_SEARCH, shape.linearObjective, PresolveConfig.NONE,
+            preparedPlan = shape.preparedPlan,
+        ))
+        val assignment = Assignment(3, 0)
+        assignment.setBool(1, true)
+
+        val view = assertNotNull(invocation.heuristicHints(
+            preparation.problem, preparation.objective, preparation.sourceMapping, Cancellation.Never,
+            setOf(ExecutionStrategy.LOCAL_SEARCH), assertNotNull(preparation.executionPlan).capabilities,
+        ))
+
+        assertNull(view.sweep)
+        assertEquals(1.0, assertNotNull(view.objective).deltaIfApplied(assignment, Move.BoolFlip(0)))
+    }
+
+    @Test
+    fun `complete only construction should not spend work inferring captured definitions`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(10, 20)),
+            arrayOf(Element(0, 1, longArrayOf(10, 20), arrIsVars = false, indexOffset = 0)))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, intArrayOf(1), emptyList()), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val shape = invocation.finiteShape()
+        val preparation = FinitePipeline.prepare(FinitePipelineRequest(
+            shape.problem, FiniteEngine.BACKTRACK, null, PresolveConfig.NONE, preparedPlan = shape.preparedPlan,
+        ))
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+
+        val view = invocation.heuristicHints(
+            preparation.problem, null, preparation.sourceMapping, stop,
+            setOf(ExecutionStrategy.COMPLETE), assertNotNull(preparation.executionPlan).capabilities,
+        )
+
+        assertNull(view)
+        assertEquals(0L, charged)
+    }
+
     @Test
     fun `setup should retain baked source providers unless explicitly replaced`() {
         val selections = mutableMapOf<EncodingTarget, Int>()

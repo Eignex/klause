@@ -152,6 +152,21 @@ A rewritten factor model selects its own descriptors and execution plan while ke
 the original source identity and objective binding. Coordinate and metadata visits
 spend the containing construction allowance; cancellation discards the whole view.
 
+Finite source attachments also capture factor-backed integer orientations and Boolean-fold
+roles supplied by compatibility callers. The selected heuristic consumer remaps these
+containers through the retained source plan and actual presolve mapping, then infers
+native definitions from that working factor model. Inference and projection spend the
+containing work allowance and discard the entire optional view on interruption.
+Complete-only execution does not request inference. Explicit neutral relations own
+their hinted outputs when combined with inferred definitions; dependency ordering
+keeps competing or cyclic outputs searched.
+
+For compatibility Boolean folds, the move view retains unit folds and wider folds
+whose inputs all carry objective weight. Other folds remain searched for feasibility
+repair. The separate objective-gradient view reads all retained folds, while the
+canonical working objective keeps its direction and coefficients. Satisfaction does
+not use those compatibility folds to exclude Boolean coordinates from search.
+
 `DefinitionalSweep.fromSource` reads neutral `DefinitionHint` relations from an
 unchanged source problem and builds the native dependency graph when requested.
 It keeps integer and Boolean namespaces separate. Sparse output indexes scale with
