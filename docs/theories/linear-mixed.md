@@ -45,6 +45,13 @@ fractional source integer is not a model value and integrality remains a
 complete-check requirement. Integer branches, retraction, stops and opening close
 retain the component point lifetime and existing work owners.
 
+Automatic Boolean branching selects conflict activity for a complete mixed worker
+with one admitted default linear point owner. Explicit source-order or activity
+selections retain their policy. Private queries, explicit hint allowances, custom
+registered providers and multiple completion owners retain their existing source
+order under automatic selection. This changes only exhaustive Boolean variable
+ordering; arithmetic checks and source publication retain their authority.
+
 Open mixed traversal consults arithmetic proposals before the finite fallback. A completed
 continuous point can guide adjacent exhaustive integer splits while bounded declarations
 retain CP ownership. Integral point coordinates guide a finite equality and its remaining

@@ -1032,6 +1032,9 @@ class CliModeTest {
         val sourceOrder = capture {
             assertEquals(0, runCli(arrayOf("--param", "open-branching=source-order", smt.absolutePath)))
         }
+        val automatic = capture {
+            assertEquals(0, runCli(arrayOf("--param", "open-branching=auto", smt.absolutePath)))
+        }
         var code = -1
         val err = captureErr {
             code = runCli(arrayOf("--param", "open-branching=nope", smt.absolutePath))
@@ -1039,6 +1042,7 @@ class CliModeTest {
 
         assertEquals("sat", activity.lines().firstOrNull(), activity)
         assertEquals("sat", sourceOrder.lines().firstOrNull(), sourceOrder)
+        assertEquals("sat", automatic.lines().firstOrNull(), automatic)
         assertEquals(2, code, err)
         assertTrue("open-branching" in err, err)
     }

@@ -69,7 +69,7 @@ internal class LinearAuthorityInvocation(
         it.bindOpenTheoryWork(state.work)
     }
     private var initialized = false
-    private val branching = if (params.openBranching == OpenBranching.SourceOrder)
+    private val branching = if (params.openBranching != OpenBranching.Activity)
         BooleanBranching.SourceOrder(context.coordinates.count {
             it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
         }) else HeuristicBooleanBranching(Vsids(), context.coordinates.count {
