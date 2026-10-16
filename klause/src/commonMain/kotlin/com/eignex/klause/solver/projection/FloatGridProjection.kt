@@ -140,7 +140,7 @@ private fun preflightFloatFactor(
     cancellation.charge(1)
     if (cancellation()) return false
     val roles = factor.variables
-    for (id in roles.bools) {
+    for (id in factor.boolVars) {
         cancellation.charge(1)
         if (cancellation() || id !in 0 until source.numBoolVars) return false
     }
@@ -176,16 +176,16 @@ internal fun floatGridColumn(
     if (source.realLower[id].isNaN() || source.realUpper[id].isNaN() ||
         source.realLower[id] == Double.POSITIVE_INFINITY || source.realUpper[id] == Double.NEGATIVE_INFINITY
     ) return null
-    val origin = if (source.realLower[id].isFinite()) BigFraction.ofDouble(source.realLower[id]) else if (image != null) {
+    val origin = (if (source.realLower[id].isFinite()) BigFraction.ofDouble(source.realLower[id]) else if (image != null) {
         BigFraction.ofDouble(image.lo)
     } else {
         policy.unrangedBounds.lower?.let { BigFraction.of(it.numerator, it.denominator) }
-    } ?: return null
-    val upper = if (source.realUpper[id].isFinite()) BigFraction.ofDouble(source.realUpper[id]) else if (image != null) {
+    }) ?: return null
+    val upper = (if (source.realUpper[id].isFinite()) BigFraction.ofDouble(source.realUpper[id]) else if (image != null) {
         BigFraction.ofDouble(image.hi)
     } else {
         policy.unrangedBounds.upper?.let { BigFraction.of(it.numerator, it.denominator) }
-    } ?: return null
+    }) ?: return null
     if (origin > upper) return null
     val buckets = if (origin == upper) 1 else variable.buckets ?: inheritedBuckets ?: policy.buckets
     val step = if (buckets == 1) BigFraction.ZERO
