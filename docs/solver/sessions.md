@@ -76,7 +76,8 @@ sampling backend; local-search enumeration remains sampling with replacement.
 Count bounds retain the captured source interpretation through exact, approximate
 and scoped counting. The source policy is separate from the algorithm's confidence
 and exactness: an exact count of a bounded interpretation does not count an
-unrestricted source.
+unrestricted source. Combining bounds requires matching captured policies when
+both inputs are bound; an unbound input cannot establish source qualification.
 
 Approximate counting and accurate sampling project only Boolean and finite integer
 values. Real columns remain existential feasibility constraints: neither a real
