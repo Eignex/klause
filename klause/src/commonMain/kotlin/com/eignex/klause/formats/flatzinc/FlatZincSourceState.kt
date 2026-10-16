@@ -121,7 +121,18 @@ internal class FlatZincSourceState(
     fun copyFor(copied: FlatZincProgram): FlatZincSourceState? {
         if (copied.problem !== legacy.problem || copied.semantics !== original.semantics) return null
         val definition = geometry.definition
-        val sourceSearch = if (copied.searchHints === legacy.searchHints) original.searchHints else {
+        val sourceCopy = if (definition == null) copied.suppliedCopy() else {
+            copiedSourceProgram(original, legacy, copied, definition, sourceSearch(copied)) ?: return null
+        }
+        val search = if (copied.searchHints === legacy.searchHints) projectSearch else { program: FlatZincProgram ->
+            program.searchHints
+        }
+        return FlatZincSourceState(sourceCopy, declaredReals, selectLegacy, geometryOwner, copied.suppliedCopy(),
+            search)
+    }
+
+    private fun sourceSearch(copied: FlatZincProgram): FlatZincSearchHints? =
+        if (copied.searchHints === legacy.searchHints) original.searchHints else {
             copied.searchHints?.let { hints ->
                 val tiers = hints.tiers.mapNotNull { tier ->
                     val integers = tier.intVars.filter { it in 0 until original.problem.numIntVars }.toIntArray()
@@ -130,26 +141,33 @@ internal class FlatZincSourceState(
                 hints.copy(tiers = tiers).takeIf { tiers.isNotEmpty() }
             }
         }
-        val sourceCopy = if (definition == null) copied.suppliedCopy() else {
-            val floats = LinkedHashMap<String, FloatBucketing>()
-            for ((name, value) in copied.floatVarsByName) {
-                floats[name] = originalBucketing(value, definition) ?: return null
-            }
-            val arrays = LinkedHashMap<String, FlatZincArray>()
-            for ((name, array) in copied.arraysByName) {
-                arrays[name] = originalArray(array, definition) ?: return null
-            }
-            FlatZincProgram(original.problem, copied.solve, copied.boolVarsByName,
-                copied.intVarsByName.filter { (name, id) -> name !in floats && id < original.problem.numIntVars },
-                floats, arrays, copied.outputItems, sourceSearch, copied.enumLabelsByVar, copied.setVarsByName,
-                copied.floatRepresentations, copied.semantics, copied.definitionHints)
-        }
-        val search = if (copied.searchHints === legacy.searchHints) projectSearch else { program: FlatZincProgram ->
-            program.searchHints
-        }
-        return FlatZincSourceState(sourceCopy, declaredReals, selectLegacy, geometryOwner, copied.suppliedCopy(),
-            search)
+}
+
+private fun copiedSourceProgram(
+    original: FlatZincProgram,
+    legacy: FlatZincProgram,
+    copied: FlatZincProgram,
+    definition: FloatGridDefinition,
+    sourceSearch: FlatZincSearchHints?,
+): FlatZincProgram? {
+    val floats = LinkedHashMap<String, FloatBucketing>()
+    for ((name, value) in copied.floatVarsByName) {
+        floats[name] = if (value === legacy.floatVarsByName[name]) {
+            original.floatVarsByName[name] ?: return null
+        } else originalBucketing(value, definition) ?: return null
     }
+    val arrays = LinkedHashMap<String, FlatZincArray>()
+    for ((name, array) in copied.arraysByName) {
+        arrays[name] = if (array === legacy.arraysByName[name]) {
+            original.arraysByName[name] ?: return null
+        } else originalArray(array, definition) ?: return null
+    }
+    return FlatZincProgram(original.problem, copied.solve, copied.boolVarsByName,
+        copied.intVarsByName.filter { (name, id) -> name !in floats && id < original.problem.numIntVars },
+        floats, arrays, copied.outputItems, sourceSearch, copied.enumLabelsByVar, copied.setVarsByName,
+        if (copied.floatRepresentations === legacy.floatRepresentations) original.floatRepresentations
+        else floats.mapValues { (_, value) -> FloatRepresentation(value.varId, null) },
+        copied.semantics, copied.definitionHints)
 }
 
 private fun projectedProgram(original: FlatZincProgram, geometry: FlatZincGridGeometry): FlatZincProgram {

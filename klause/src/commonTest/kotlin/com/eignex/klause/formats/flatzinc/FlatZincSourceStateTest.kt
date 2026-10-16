@@ -96,6 +96,8 @@ class FlatZincSourceStateTest {
         assertSame(legacy, copied.problem)
         assertSame(source, copied.sourceProgram.problem)
         assertSame(source, copied.sourceAttachment().originalSource)
+        assertEquals(program.sourceProgram.floatVarsByName, copied.sourceProgram.floatVarsByName)
+        assertEquals(program.sourceProgram.floatRepresentations, copied.sourceProgram.floatRepresentations)
         assertEquals(program, copied)
         assertEquals(program.hashCode(), copied.hashCode())
         assertEquals(program.toString(), copied.toString())
