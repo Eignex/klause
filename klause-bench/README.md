@@ -176,6 +176,11 @@ example, an LP-ceiling comparison uses the lab's configuration maps:
 }
 ```
 
+Leave `host` out: the lab then runs an experiment on its Mac when that is free and
+on AWS otherwise, spot first and on demand after a few minutes (`auto`). Name `aws`
+or `lab` only when the host matters to what you measure, such as timings you will
+compare with earlier jobs on that host; the example above pins `lab` for that reason.
+
 `problems` takes a selection map or a list of maps, each naming `suite` or `set`.
 `base` is overlaid by each `configs` entry and crossed with optional `grid` axes.
 Configuration values are strings; `param.<name>` becomes CLI `--param <name>=<value>`.
@@ -223,7 +228,7 @@ experiment rather than directly on the lab Mac, where a run competes with the la
 A measurement no experiment expresses, such as timing a component on captured inputs, runs as
 a profile job: `lab profile <main> <ref> <description> [aws|lab] [timeout-sec] [arg...]` runs
 the class `<main>` (directly in `com.eignex.klause.bench.profile`, committed at `<ref>`) once
-under JFR, on AWS by default, and keeps its output and whatever it writes to `$OUT` with the job; from AWS at most 1 GiB
+under JFR, on the lab Mac when it is free and on AWS otherwise, and keeps its output and whatever it writes to `$OUT` with the job; from AWS at most 1 GiB
 of `$OUT` comes back, smallest files first, with the rest listed in `$OUT/omitted.tsv` and lost, so
 write summaries rather than raw dumps.
 The lab runs no shell scripts: the code goes in a commit. Profile jobs are not for tests, lint or
@@ -552,7 +557,6 @@ machine count after submission does not retract machines already launched.
     "args": ["<exact real-box-square source JSON>", "BACKTRACK"]
   },
   "base": {"ref": "<revision>", "timeout": "600000"},
-  "host": "aws",
   "machines": 1,
   "parallel": 1
 }
@@ -1435,7 +1439,7 @@ function sources through the shared satisfaction dispatcher. Its `sources` argum
 is a JSON array of `{name, text}` objects. `controls` lists `ENGINE:cores` selections;
 `seeds`, `repeats`, `work`, `timeout` and optional `cancel-work` pin the repeated
 controls. Alternating control order reduces order effects. Run the committed main
-through the lab client on a pinned revision with `host=aws`; it writes `sources.json`,
+through the lab client on a pinned revision; it writes `sources.json`,
 `results.json`, payload hashes and runtime settings to `$OUT`. Retain the job's
 revision/build/dependency hashes with those files. JFR profile times are diagnostic
 costs, not ordinary benchmark throughput.
