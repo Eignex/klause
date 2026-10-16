@@ -72,7 +72,7 @@ def catalog(manifest_path, expected):
         raise ValueError('Saved cohort manifest has no bounded file inventory')
     for name, item in files.items():
         if not isinstance(item, dict) or not {'size', 'sha256'} <= item.keys() or not safe_name(name) or \
-                type(item['size']) is not int or not 0 <= item['size'] <= MAX_ARCHIVE_BYTES or \
+                type(item['size']) is not int or item['size'] < 0 or \
                 not isinstance(item['sha256'], str) or not re.fullmatch('[0-9a-f]{64}', item['sha256']):
             raise ValueError('Saved cohort member identity is unsafe or malformed')
     archive = manifest['archive']
