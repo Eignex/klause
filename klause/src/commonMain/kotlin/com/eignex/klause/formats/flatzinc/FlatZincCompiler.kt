@@ -116,7 +116,7 @@ internal class FlatZincCompiler(
 
     internal val setVarsByName = LinkedHashMap<String, SetVarLayout>()
 
-    internal fun compile(onLowered: ((FlatZincCompiler, SolveDirective) -> Unit)? = null): FlatZincProgram {
+    internal fun compile(): FlatZincProgram {
         floatRepresentations = selectFloatRepresentations()
         lpOnlyFloats = floatRepresentations.filterValues { !it.approximate }.keys
         processDeclarations()
@@ -128,7 +128,7 @@ internal class FlatZincCompiler(
             }
             emitFiniteFloatDomains()
         }
-        return compileConstraints(onLowered)
+        return compileConstraints()
     }
 
     // Real and integer ids overlap after lowering; planning keeps all declarations in one
@@ -163,7 +163,7 @@ internal class FlatZincCompiler(
         currentCol = c.col
     }
 
-    private fun compileConstraints(onLowered: ((FlatZincCompiler, SolveDirective) -> Unit)?): FlatZincProgram {
+    private fun compileConstraints(): FlatZincProgram {
         collectBooleanIntegerChannels()
         selectBooleanZeroSumLowering()
         val impliedFactorIds = IntArrayList()
@@ -180,9 +180,8 @@ internal class FlatZincCompiler(
             if (redundant || symmetry) for (i in before until factors.size) impliedFactorIds.add(i)
         }
         val solveDirective = compileSolve()
-        // Execution metadata may resolve constraint arguments, allocating a singleton int var per integer
-        // literal. Build it before snapshotting [Problem] so those vars are counted in its domains.
-        onLowered?.invoke(this, solveDirective)
+        // Source references may allocate fixed literal columns before the Problem snapshot.
+        val definitionHints = collectDefinitionHints()
         val impliedFactorMask = if (impliedFactorIds.isEmpty()) {
             null
         } else {
@@ -222,6 +221,7 @@ internal class FlatZincCompiler(
             setVarsByName = setVarsByName.toMap(),
             floatRepresentations = floatRepresentations,
             semantics = sourceSemantics,
+            definitionHints = definitionHints,
         )
     }
 
@@ -779,7 +779,7 @@ fun parseFlatZinc(
     exactFloats,
     settings,
     semanticOverrides,
-) { _, _ -> }
+)
 
 internal fun parseFlatZincWithMetadata(
     source: CharSource,
@@ -793,7 +793,6 @@ internal fun parseFlatZincWithMetadata(
     exactFloats: Boolean = false,
     settings: ProblemSettings = KlauseConfig.current.problemSettings(),
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
-    onLowered: (FlatZincCompiler, SolveDirective) -> Unit,
 ): FlatZincProgram {
     val model = FlatZincParser(FlatZincLexer(CharReader(source))).parse()
     return FlatZincCompiler(
@@ -808,5 +807,5 @@ internal fun parseFlatZincWithMetadata(
         exactFloats = exactFloats,
         settings = settings,
         semanticOverrides = semanticOverrides,
-    ).compile(onLowered)
+    ).compile()
 }

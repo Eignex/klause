@@ -134,6 +134,30 @@ polls cancellation every 256 coordinate or link visits and discards interrupted 
 Caller pins are filtered after expansion and remain in the repair assumptions. The
 declared destroy draw, repair allowance and outer iteration charge remain unchanged.
 
+## Source definition materialization
+
+`DefinitionalSweep.fromSource` reads neutral `DefinitionHint` relations from an
+unchanged source problem and builds the native dependency graph when requested.
+It keeps integer and Boolean namespaces separate. Sparse output indexes scale with
+the supplied definitions. Competing outputs remain searched; iterative ordering
+also leaves cyclic outputs and cones that depend on them searched. Cancellation discards the entire materialization.
+The source factors remain enforced, and hints grant no feasibility or proof authority.
+
+Arithmetic selection belongs to this consumer. Source bounds establish when the
+existing signed-word node kernels are safe. Wider intermediate arithmetic uses exact
+integer evaluation, saturating only values outside a signed-word output's range;
+those values cannot satisfy that output's source relation. Strict Boolean comparisons
+keep exact endpoints rather than shifting a minimum or maximum bound. Integer outputs
+that can equal the reserved no-write sentinel remain searched. Unsupported reference
+hints also remain searched; no source constraint is removed by these declines.
+
+`functionalObjective(LinearObjective)` builds an optional gradient view from the
+materialized integer/Boolean cones. The canonical objective stays unchanged, and the
+view agrees with it at every feasible assignment. Membership and reified comparison
+readers retain their integer dependencies through Boolean folds and channels.
+No parser-specific object is needed by these readers. Source-hint construction polls
+cancellation synchronously; it does not add a retained solver-preparation cursor.
+
 ## Definitions and repairs
 
 Integer Abs outputs join acyclic functional definition cones. Competing definitions

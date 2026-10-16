@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lowering.FloatBucketing
@@ -32,6 +33,9 @@ data class FlatZincProgram(
     val floatRepresentations: Map<String, FloatRepresentation> = emptyMap(),
     /** Declared defaults and effective caller policy captured before lowering. */
     val semantics: EffectiveSourceSemantics = problem.semantics,
+    /** Source integer/Boolean definitions in [problem]'s coordinates; rewrites must remap these hints.
+     * No consumer state or dependency order is retained here. */
+    val definitionHints: List<DefinitionHint> = emptyList(),
 )
 
 /** Bool-indicator layout of one FlatZinc set variable. */

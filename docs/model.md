@@ -35,6 +35,21 @@ the source relation.
 Generic `Problem` polynomial composition keeps its [finite integer boundary](theories/polynomial-real.md#scope-and-boundaries);
 admitted open/wide SMT powers retain their exact nonlinear source snapshots.
 
+## Source definition hints
+
+`ir.DefinitionHint` records an integer or Boolean output orientation and its source
+relation data without a native graph, score or objective object. Typed hints retain
+operand order, constants, multiplicity, strictness and Boolean polarity. Reference
+hints retain annotations whose functional expression is unavailable or whose output
+role was not justified. Source factors remain the authority for all constraints.
+
+`DefinitionHint.remap` renumbers every variable role in its own namespace, retaining
+aliases and constants. A removed required coordinate declines the hint instead of
+inventing a value or dropping the underlying constraint. Payloads follow the source
+model's borrowed read-only lifetime. [FlatZinc](formats/flatzinc.md#source-definitions)
+retains these records; [native local search](solver/local-search.md#source-definition-materialization)
+materializes its private view only when requested.
+
 ## Distinct integer positions
 
 `AllDifferent` retains integer positions, paired optional-presence literals and

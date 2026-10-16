@@ -47,6 +47,57 @@ class ExactFlatZincValidationTest {
         assertEquals("unknown", ExactFlatZincValidation.inspect(source, "x = true;", null).status)
     }
 
+    @ParameterizedTest
+    @CsvSource(
+        "true,1,valid", "false,0,valid", "true,0,invalid", "false,1,invalid", "true,2,invalid", "false,-1,invalid",
+    )
+    fun `Boolean channels should check exact source zero and one units`(
+        boolean: String, integer: String, status: String,
+    ) {
+        val source = "var bool: b; var -1..2: i; constraint bool2int(b, i); solve satisfy;"
+
+        assertEquals(status, ExactFlatZincValidation.inspect(source, "b = $boolean;\ni = $integer;", null).status)
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "array_bool_and,true,true,true,valid", "array_bool_and,true,false,false,valid",
+        "array_bool_and,false,true,false,valid", "array_bool_and,false,false,false,valid",
+        "array_bool_or,true,true,true,valid", "array_bool_or,true,false,true,valid",
+        "array_bool_or,false,true,true,valid", "array_bool_or,false,false,false,valid",
+        "array_bool_and,true,false,true,invalid", "array_bool_or,true,false,false,invalid",
+    )
+    fun `Boolean folds should check every repeated source role`(
+        predicate: String, a: String, b: String, result: String, status: String,
+    ) {
+        val source = "var bool: a; var bool: b; var bool: r; " +
+            "constraint $predicate([a, a, b], r); solve satisfy;"
+
+        assertEquals(status, ExactFlatZincValidation.inspect(source, "a = $a;\nb = $b;\nr = $result;", null).status)
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "array_bool_and,true,valid", "array_bool_and,false,invalid",
+        "array_bool_or,false,valid", "array_bool_or,true,invalid",
+    )
+    fun `empty Boolean folds should retain their source identity`(predicate: String, result: String, status: String) {
+        val source = "var bool: r; constraint $predicate([], r); solve satisfy;"
+
+        assertEquals(status, ExactFlatZincValidation.inspect(source, "r = $result;", null).status)
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "-2,true,valid", "0,true,valid", "1,false,valid", "2,true,valid", "3,false,valid",
+        "-2,false,invalid", "1,true,invalid",
+    )
+    fun `reified membership should check the original source set`(value: String, result: String, status: String) {
+        val source = "var -2..3: x; var bool: r; constraint set_in_reif(x, {-2, 0, 2}, r); solve satisfy;"
+
+        assertEquals(status, ExactFlatZincValidation.inspect(source, "x = $value;\nr = $result;", null).status)
+    }
+
     @Test
     fun `absolute value checking should preserve holes in an integer value set`() {
         val source = "var {-2,-1,1,2}: n; var float: x; var float: y; " +

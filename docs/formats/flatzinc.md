@@ -90,6 +90,22 @@ consumer. Presolve reads the symmetry flag before adding its own symmetry breaks
 [Local-search weights](../solver/local-search.md) belong to the selected consumer;
 source parsing does not remove constraints for that policy.
 
+## Source definitions
+
+`FlatZincProgram.definitionHints` retains `defines_var` targets and integer/Boolean
+relation data in the compiled source coordinates. Inputs retain constants, aliases,
+repeated roles and literal polarity; strict comparisons retain their original
+endpoint. Unrecognized or mismatched orientations remain reference hints. Source
+constraints enforce every relation independently of these annotations.
+
+Both plain parsing and the compatibility execution request capture this data before
+snapshotting `Problem`, including any fixed literal columns referenced by the data.
+Parsing does not order a definition graph or construct a local-search objective.
+`parseFlatZincExecution` explicitly delegates its requested views to the native
+consumer after the source program exists. [Native definition materialization](../solver/local-search.md#source-definition-materialization)
+owns ordering, arithmetic and the gradient view. Model rewrites must remap hint
+coordinates alongside their source mappings; a removed dependency declines a hint.
+
 ## FlatZinc Boolean channels
 
 FlatZinc retains `bool2int` channels and recognizes them independently of constraint

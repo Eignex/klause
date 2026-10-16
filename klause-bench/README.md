@@ -876,8 +876,9 @@ integer/Boolean/set array selection directly from the original predicates. Integ
 `alldifferent_except_0` omits only exact zeroes before comparing distinct values.
 Redundant and symmetry wrappers, including `fzn_` spellings, require their original
 Boolean argument to hold; malformed arity or non-Boolean arguments leave validation
-unknown. Set values
-use normalized integer intervals for equality and source-universe bounds, without
+unknown. Boolean channels check exact zero/one values; conjunction/disjunction
+folds retain repeated and empty arrays. Integer set membership and its reification
+check original set values. Set values use normalized integer intervals for equality and source-universe bounds, without
 enumerating ranges. Index bounds and repeated entries retain their source meaning.
 It checks the preceding `% objective=` cost or finite `_objective` field against the
 original solve objective. When both are present, their exact values must agree. Its source scope
