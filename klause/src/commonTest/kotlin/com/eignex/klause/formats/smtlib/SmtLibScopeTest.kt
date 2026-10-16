@@ -2,6 +2,12 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.SourceExecutionKind
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.executionKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -46,6 +52,19 @@ class SmtLibScopeTest {
         val result = BacktrackSolver.source(source.model).solve()
 
         assertEquals("2", assertIs<OpenTheoryResult.Sat>(result).assignment.intValue(source.intVarNames.getValue("n")))
+    }
+
+    @Test
+    fun `unrestricted integer declarations beside retained real products should reach shared setup`() {
+        val source = SmtLib.parse("(declare-const unused Int) (declare-const x Real) " +
+            "(assert (= x 1)) (assert (= (* x x) 1))")
+        val invocation = SourceSetup.prepare(SourceSetupRequest(source.source,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
+
+        val result = BacktrackSolver.source(source.model).solve()
+
+        assertEquals(SourceExecutionKind.NONLINEAR_INTEGER, SourceSetup.executionKind(invocation))
+        assertEquals("1", assertIs<OpenTheoryResult.Sat>(result).assignment.realValue(source.realVarNames.getValue("x")))
     }
 
     @Test

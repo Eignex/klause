@@ -2,7 +2,6 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Power
-import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.NonlinearIntegerProblem
@@ -10,9 +9,7 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.pipeline.SourceAttachment
-import com.eignex.klause.solver.pipeline.requiresPolynomialCompletion
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CharSource
 import kotlin.coroutines.cancellation.CancellationException
@@ -135,15 +132,6 @@ private fun parseLinearAdmission(
             it is ContinuousProduct || it is RealProduct || (it is Power && it.base is Power.Coordinate.Real)
         }
     ) smtUnsupported("polynomial objectives require exact source capture")
-    if (problem.model.factors.any {
-            it is ContinuousProduct || it is RealProduct || (it is Power && it.base is Power.Coordinate.Real)
-        } &&
-        ((0 until problem.model.numIntVars).any { id ->
-                problem.model.intBounds.isOpenLower(id) || problem.model.intBounds.isOpenUpper(id)
-            } && problem.model.requiresPolynomialCompletion(FactorProjectionProviders.Default.prepare(problem.model)))
-    ) {
-        smtUnsupported("open integer products require an exact source formula")
-    }
     return problem
 }
 
