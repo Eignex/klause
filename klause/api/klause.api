@@ -2693,6 +2693,8 @@ public final class com/eignex/klause/formats/mps/MpsCompiled : com/eignex/klause
 	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;ZLjava/util/List;JI)Lcom/eignex/klause/formats/mps/MpsCompiled;
 	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsCompiled;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;ZLjava/util/List;JIILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun exactClaimsCoverTolerance (Lcom/eignex/klause/util/Cancellation;)Z
+	public static synthetic fun exactClaimsCoverTolerance$default (Lcom/eignex/klause/formats/mps/MpsCompiled;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Z
 	public final fun getColumns ()Ljava/util/List;
 	public final fun getFloatColumns ()I
 	public final fun getMaximize ()Z
@@ -2710,6 +2712,8 @@ public final class com/eignex/klause/formats/mps/MpsCompiled : com/eignex/klause
 	public static synthetic fun sourceWitness$default (Lcom/eignex/klause/formats/mps/MpsCompiled;Ljava/util/List;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsSourceWitness;
 	public final fun sourceWitnessOrNull ([JLjava/util/List;I)Lcom/eignex/klause/formats/mps/MpsSourceWitness;
 	public fun toString ()Ljava/lang/String;
+	public final fun toleranceObjectiveBound (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public static synthetic fun toleranceObjectiveBound$default (Lcom/eignex/klause/formats/mps/MpsCompiled;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/simplex/exact/BigFraction;
 	public final fun withinTolerance ([J[DLcom/eignex/klause/util/Cancellation;)Z
 	public static synthetic fun withinTolerance$default (Lcom/eignex/klause/formats/mps/MpsCompiled;[J[DLcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Z
 }
