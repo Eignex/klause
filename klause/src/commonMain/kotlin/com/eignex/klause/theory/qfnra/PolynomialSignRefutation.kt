@@ -72,18 +72,18 @@ private fun negateSigns(signs: Int): Int = (signs and ZERO_SIGN) or
 
 private fun multiplySigns(left: Int, right: Int): Int =
     (if ((left or right) and ZERO_SIGN == 0) 0 else ZERO_SIGN) or
-        (if (left and NEGATIVE_SIGN != 0 && right and POSITIVE_SIGN != 0 ||
-            left and POSITIVE_SIGN != 0 && right and NEGATIVE_SIGN != 0
+        (if ((left and NEGATIVE_SIGN != 0 && right and POSITIVE_SIGN != 0) ||
+            (left and POSITIVE_SIGN != 0 && right and NEGATIVE_SIGN != 0)
         ) NEGATIVE_SIGN else 0) or
-        (if (left and NEGATIVE_SIGN != 0 && right and NEGATIVE_SIGN != 0 ||
-            left and POSITIVE_SIGN != 0 && right and POSITIVE_SIGN != 0
+        (if ((left and NEGATIVE_SIGN != 0 && right and NEGATIVE_SIGN != 0) ||
+            (left and POSITIVE_SIGN != 0 && right and POSITIVE_SIGN != 0)
         ) POSITIVE_SIGN else 0)
 
 private fun addSigns(left: Int, right: Int): Int {
     if (left == ZERO_SIGN) return right
     if (right == ZERO_SIGN) return left
-    if (left and NEGATIVE_SIGN != 0 && right and POSITIVE_SIGN != 0 ||
-        left and POSITIVE_SIGN != 0 && right and NEGATIVE_SIGN != 0
+    if ((left and NEGATIVE_SIGN != 0 && right and POSITIVE_SIGN != 0) ||
+        (left and POSITIVE_SIGN != 0 && right and NEGATIVE_SIGN != 0)
     ) return ALL_SIGNS
     return left or right
 }
