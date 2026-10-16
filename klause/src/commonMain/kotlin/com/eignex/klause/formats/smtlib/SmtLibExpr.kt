@@ -13,20 +13,30 @@ import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 
+private sealed interface AssertionFrame {
+    class Visit(val expression: SExpr) : AssertionFrame
+    class RestoreBindings(val scope: Compiler.Builder.BindingScope) : AssertionFrame
+    object PopScope : AssertionFrame
+}
+
 /** Post each conjunct of an assertion. `and`/`let` nesting is walked with an explicit worklist (not
  *  recursion) so a degenerate conjunction can't overflow the stack; relations, arithmetic equalities
  *  and `distinct` are posted as hard constraints, everything else is reified and forced true. */
 internal fun Compiler.Builder.assert(top: SExpr) {
-    // Worklist of pending assertion nodes; a `null` entry is a let-scope pop marker.
-    val work = ArrayDeque<SExpr?>()
-    work.addLast(top)
+    val work = ArrayDeque<AssertionFrame>()
+    work.addLast(AssertionFrame.Visit(top))
     while (work.isNotEmpty()) {
-        val item = work.removeLast()
-        if (item == null) {
-            popLetScope()
-            continue
+        var node = when (val frame = work.removeLast()) {
+            is AssertionFrame.Visit -> frame.expression
+            is AssertionFrame.PopScope -> {
+                popLetScope()
+                continue
+            }
+            is AssertionFrame.RestoreBindings -> {
+                bindingScope = frame.scope
+                continue
+            }
         }
-        var node: SExpr = item
         var lets = 0
         while (node is SExpr.SList && (node.items.firstOrNull() as? SExpr.Atom)?.text == "let") {
             pushLetScope(node.items[1])
@@ -34,7 +44,7 @@ internal fun Compiler.Builder.assert(top: SExpr) {
             node = node.items[2]
         }
         // Pop markers go under the conjuncts, so the scope stays active while they are processed.
-        repeat(lets) { work.addLast(null) }
+        repeat(lets) { work.addLast(AssertionFrame.PopScope) }
         // A `let`-bound Bool that nothing has asked for a literal yet can be asserted rather than
         // reified: substituting its term here sends it back through this loop, where `and`, the
         // comparisons and `distinct` each have a direct posting that allocates no auxiliary literal.
@@ -43,9 +53,13 @@ internal fun Compiler.Builder.assert(top: SExpr) {
             val bound = lookup(node.text)
             val src = bound?.takeIf { it.isBool && it.lit == null }?.srcBool
             if (src != null) {
+                val sourceScope = checkNotNull(bound.sourceScope)
                 bound.srcBool = null
+                bound.sourceScope = null
                 bound.lit = trueLit()
-                work.addLast(src)
+                work.addLast(AssertionFrame.RestoreBindings(bindingScope))
+                bindingScope = Compiler.Builder.BindingScope(sourceScope)
+                work.addLast(AssertionFrame.Visit(src))
                 continue
             }
         }
@@ -54,7 +68,7 @@ internal fun Compiler.Builder.assert(top: SExpr) {
             val args = node.items.drop(1)
             when {
                 h == "and" -> {
-                    for (i in args.indices.reversed()) work.addLast(args[i])
+                    for (i in args.indices.reversed()) work.addLast(AssertionFrame.Visit(args[i]))
                     continue
                 }
 

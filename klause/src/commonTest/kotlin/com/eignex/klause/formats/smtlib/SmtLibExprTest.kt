@@ -1,10 +1,13 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 
 class SmtLibExprTest {
     private fun parse(text: String): Problem = SmtLib.parse("$text\n(check-sat)").model.bake()
@@ -24,5 +27,56 @@ class SmtLibExprTest {
         assertEquals(1, p.factors.size)
         assertEquals(3, p.factors.filterIsInstance<Clause>().single().literals.size)
         assertEquals(3, p.numBoolVars)
+    }
+
+    @Test
+    fun `directly asserted Boolean bindings should retain their enclosing values`() {
+        val source = parse(
+            "(declare-const p Bool) (assert p) " +
+                "(assert (let ((bound p)) (let ((p false)) bound)))",
+        )
+
+        val result = BacktrackSolver(source).solve()
+
+        assertIs<SolveResult.Sat>(result)
+    }
+
+    @Test
+    fun `reified Boolean bindings should retain their enclosing values`() {
+        val source = parse(
+            "(declare-const p Bool) (assert (not p)) " +
+                "(assert (let ((bound p)) (let ((p true)) (not bound))))",
+        )
+
+        val result = BacktrackSolver(source).solve()
+
+        assertIs<SolveResult.Sat>(result)
+    }
+
+    @Test
+    fun `simultaneous Boolean binding values should exclude their peer bindings`() {
+        val source = parse(
+            "(declare-const p Bool) (assert p) (assert (let ((p false) (bound p)) bound))",
+        )
+
+        val result = BacktrackSolver(source).solve()
+
+        assertIs<SolveResult.Sat>(result)
+    }
+
+    @Test
+    fun `shared Boolean bindings should retain their value across caller scopes`() {
+        val source = parse(
+            """
+                (declare-const p Bool)
+                (assert (not p))
+                (assert (let ((bound p))
+                    (and (let ((p true)) (not bound)) (let ((p false)) (not bound)))))
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver(source).solve()
+
+        assertIs<SolveResult.Sat>(result)
     }
 }

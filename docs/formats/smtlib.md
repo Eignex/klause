@@ -49,6 +49,10 @@ Factor helper calls evaluate arguments in the caller scope, then isolate paramet
 bindings from caller-local names while evaluating the body. Nested calls restore
 the enclosing scope, and local bindings take precedence over zero-arity helper
 names and their declared sorts.
+Deferred Boolean `let` values retain the enclosing binding depth from before the
+simultaneous bindings were introduced. Direct assertions and reified reads use
+that captured view, so later shadows do not change a shared Boolean value.
+Scope restoration remains iterative, including long chains of asserted aliases.
 
 Exp is the real exponential, log is the natural logarithm on strictly positive
 arguments, and sine/cosine use radians. Every arithmetic atom must have defined
