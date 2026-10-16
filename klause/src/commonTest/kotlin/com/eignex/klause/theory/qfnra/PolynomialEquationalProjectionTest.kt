@@ -280,4 +280,136 @@ class PolynomialEquationalProjectionTest {
 
         assertEquals(1L, result.stats.equationalSections)
     }
+
+    @Test
+    fun `Boolean unit consequences expose required arithmetic equalities`() {
+        for (assertion in listOf(
+            "(and a (= a b) (=> b (= x 1)))",
+            "(and a (not (and a b)) (or b (= x 1)))",
+        )) {
+            val source = SmtLibPolynomial.parse(
+                "(declare-const a Bool) (declare-const b Bool) (declare-const x Real) (assert $assertion)",
+            )
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+            val equations = formula.requiredZeroPolynomials(arithmetic)
+
+            assertEquals(listOf(arithmetic.subtract(x, Polynomial.ONE)), equations, assertion)
+        }
+    }
+
+    @Test
+    fun `unresolved Boolean alternatives do not select an arithmetic equality`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const a Bool) (declare-const b Bool) (declare-const x Real)
+            (assert (and (or a b) (=> a (= x 0)) (=> b (= x 1))))
+            """.trimIndent(),
+        )
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        assertTrue(formula.requiredZeroPolynomials(arithmetic).isEmpty())
+    }
+
+    @Test
+    fun `a conflicting Boolean unit closure publishes no partial guarded requirements`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const a Bool) (declare-const x Real) (assert (and a (not a) (=> a (= x 1))))",
+        )
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        assertTrue(formula.requiredZeroPolynomials(arithmetic).isEmpty())
+    }
+
+    @Test
+    fun `complete CAD retains source coordinates beyond optional Boolean and real admissions`() {
+        val reals = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val bools = (0..64).joinToString(" ") { "(declare-const a$it Bool)" }
+        val facts = (0..64).joinToString(" ") { "a$it" }
+        val source = SmtLibPolynomial.parse(
+            "$reals $bools (assert (and $facts (=> a64 (= x0 (* x1 x1))) (= x1 2)))",
+        )
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, 65, 33))
+
+        assertEquals(33, result.assignment.realCount)
+        assertEquals(65, result.assignment.boolCount)
+        assertTrue(result.assignment.bools.all { it })
+        assertEquals(BigFraction.ofLong(4), result.assignment.realValue(0).rational)
+        assertEquals(BigFraction.ofLong(2), result.assignment.realValue(1).rational)
+        assertEquals(2L, result.stats.equationalSections)
+        assertEquals(0L, result.stats.dyadicAttempts)
+    }
+
+    @Test
+    fun `a false source guard selects only its entailed equality section`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const a Bool)
+            (assert (and (not a) (=> a (= x0 0)) (=> (not a) (= x0 1))))
+            """.trimIndent(),
+        )
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, 1, 33))
+
+        assertFalse(result.assignment.boolValue(0))
+        assertEquals(BigFraction.ONE, result.assignment.realValue(0).rational)
+        assertEquals(1L, result.stats.equationalSections)
+    }
+
+    @Test
+    fun `interruption withholds incomplete Boolean unit requirements`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const a Bool) (declare-const b Bool) (declare-const x Real)
+            (assert (and a (= a b) (=> b (= x 1))))
+            """.trimIndent(),
+        )
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        var completedWork = 0L
+        val counter = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { completedWork += it }
+        }
+        assertEquals(1, formula.requiredZeroPolynomials(PolynomialArithmetic(counter)).size)
+
+        for (limit in listOf(1L, completedWork / 2, completedWork - 1)) {
+            var spent = 0L
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = spent >= limit
+                override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            }
+            assertFailsWith<PolynomialInterrupted> {
+                formula.requiredZeroPolynomials(PolynomialArithmetic(stop))
+            }
+        }
+    }
+
+    @Test
+    fun `retracted Boolean pins do not retain equality projection premises`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const a Bool)
+            (assert (and (=> a (= x0 1)) (=> (not a) (= x0 2))))
+            """.trimIndent(),
+        )
+        val invocation = PolynomialTheoryService(source.formula, 1, 33).invocation()
+
+        try {
+            for (pin in listOf(true, false, true)) {
+                val result = assertIs<QfNraResult.Satisfiable>(
+                    invocation.check(PolynomialCondition(bools = mapOf(0 to pin))),
+                )
+
+                assertEquals(pin, result.assignment.boolValue(0))
+                assertEquals(BigFraction.ofLong(if (pin) 1 else 2), result.assignment.realValue(0).rational)
+                assertEquals(1L, result.stats.equationalSections)
+            }
+            assertEquals(3L, invocation.stats.equationalSections)
+        } finally {
+            invocation.close()
+        }
+    }
 }

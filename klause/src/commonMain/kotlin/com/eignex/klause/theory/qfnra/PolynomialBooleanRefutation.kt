@@ -42,10 +42,17 @@ internal fun refutePolynomialBooleans(
     return PolynomialBooleanRefutation(nodes, root, arithmetic).refutes()
 }
 
+internal fun requiredPolynomialAtoms(
+    nodes: List<FormulaNode>,
+    root: Int,
+    arithmetic: PolynomialArithmetic,
+): List<Int>? = PolynomialBooleanRefutation(nodes, root, arithmetic, skipConfirmedParents = true).requiredAtoms()
+
 private class PolynomialBooleanRefutation(
     private val nodes: List<FormulaNode>,
     private val root: Int,
     private val arithmetic: PolynomialArithmetic,
+    private val skipConfirmedParents: Boolean = false,
 ) {
     private val values = IntArray(nodes.size) { UNASSIGNED }
     private val parents = List(nodes.size) {
@@ -59,6 +66,32 @@ private class PolynomialBooleanRefutation(
     private val choices = ArrayList<Choice>()
 
     fun refutes(): Boolean {
+        if (!initialize()) return true
+        while (true) {
+            arithmetic.step()
+            if (propagate()) {
+                val leaf = unassignedLeaf() ?: return false
+                arithmetic.step()
+                choices.add(Choice(leaf, trail.size))
+                check(assign(leaf, FALSE))
+            } else if (!backtrack()) {
+                arithmetic.step()
+                return true
+            }
+        }
+    }
+
+    fun requiredAtoms(): List<Int>? {
+        if (!initialize() || !propagate()) return null
+        val result = ArrayList<Int>()
+        for ((index, node) in nodes.withIndex()) {
+            arithmetic.step()
+            if (node is FormulaNode.Atom && values[index] == TRUE) result.add(node.atom)
+        }
+        return result
+    }
+
+    private fun initialize(): Boolean {
         for ((index, node) in nodes.withIndex()) {
             arithmetic.step()
             when (node) {
@@ -72,21 +105,9 @@ private class PolynomialBooleanRefutation(
         for ((index, node) in nodes.withIndex()) {
             arithmetic.step()
             if (node is FormulaNode.Atom) leaves.add(index)
-            if (node is FormulaNode.Constant && !assign(index, if (node.value) TRUE else FALSE)) return true
+            if (node is FormulaNode.Constant && !assign(index, if (node.value) TRUE else FALSE)) return false
         }
-        if (!assign(root, TRUE)) return true
-        while (true) {
-            arithmetic.step()
-            if (propagate()) {
-                val leaf = unassignedLeaf() ?: return false
-                arithmetic.step()
-                choices.add(Choice(leaf, trail.size))
-                check(assign(leaf, FALSE))
-            } else if (!backtrack()) {
-                arithmetic.step()
-                return true
-            }
-        }
+        return assign(root, TRUE)
     }
 
     private fun addParent(child: Int, parent: Int) {
@@ -108,7 +129,21 @@ private class PolynomialBooleanRefutation(
         values[index] = value
         trail.add(index)
         enqueue(index)
-        for (parent in parents[index]) enqueue(parent)
+        for (parent in parents[index]) {
+            if (skipConfirmedParents) {
+                arithmetic.step()
+                val parentValue = values[parent]
+                if (parentValue != UNASSIGNED) {
+                    val confirmed = when (nodes[parent]) {
+                        is FormulaNode.Junction -> parentValue == value
+                        is FormulaNode.Not -> parentValue != value
+                        else -> false
+                    }
+                    if (confirmed) continue
+                }
+            }
+            enqueue(parent)
+        }
         return true
     }
 

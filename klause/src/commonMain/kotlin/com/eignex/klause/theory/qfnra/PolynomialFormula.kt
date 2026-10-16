@@ -46,6 +46,19 @@ internal class PolynomialFormula private constructor(
                 else -> Unit
             }
         }
+        if (booleanVariables.isEmpty()) return equations
+        // Unit consequences restrict every model; no Boolean choices supply projection premises.
+        val required = requiredPolynomialAtoms(nodes, root, arithmetic) ?: return equations
+        val present = HashSet<Polynomial>()
+        for (equation in equations) {
+            arithmetic.step()
+            present.add(equation)
+        }
+        for (index in required) {
+            arithmetic.step()
+            val atom = atoms[index]
+            if (atom.relation == PolynomialRelation.EQ && present.add(atom.polynomial)) equations.add(atom.polynomial)
+        }
         return equations
     }
 

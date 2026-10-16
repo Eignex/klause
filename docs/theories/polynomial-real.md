@@ -618,9 +618,15 @@ shared. One caller-supplied arithmetic context spans construction; interruption 
 kernel resource stops propagate without publishing a partial family.
 
 Without required equations, variable IDs define ascending lifting order. Complete
-query preparation also collects positive equality atoms reached only through
-conjunctions. Alternatives and negated compounds supply no required equation; every
-original formula node remains in the sample checker. A coordinate occurring as one
+query preparation also collects positive equality atoms reached through conjunctions.
+For a source with Boolean coordinates, gate equivalences and source constants can
+propagate unit requirements through guards and negated compounds. This preparation
+makes no Boolean decisions and retains only equality atoms forced true by those
+requirements. A conflicting unit closure supplies no additional projection premises.
+Unresolved alternatives supply none on their own; every original formula node remains
+in the sample checker. The pass runs after the unchanged optional probe under the
+containing native owner, with no private allowance or renewed input admission.
+A coordinate occurring as one
 isolated linear monomial in a required equation has a nonzero rational coefficient.
 Solving that equation divides only by the coefficient and gives a total polynomial
 graph over the other coordinates, including zero and singular base points.
