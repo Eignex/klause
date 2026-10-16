@@ -149,6 +149,7 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is RealProduct, is ContinuousProduct -> NoPropagator
     is RealElement -> RealElementPropagator(this)
+    is RealChoice -> NoPropagator
 
     is ReifiedCardinality -> ReifiedCardinalityPropagator(auxBoolVar, literals, min, max, boolVars, intVars)
 

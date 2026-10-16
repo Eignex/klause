@@ -3,7 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
-import com.eignex.klause.factor.table.RealElement
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -53,10 +53,10 @@ internal fun Compiler.Builder.realSelection(condition: Int, whenTrue: RealComb, 
         if (condition == trueLitCache) return whenTrue
         if (condition == Lit.negate(trueLitCache)) return whenFalse
     }
-    val entries = intArrayOf(selectionRealColumn(whenFalse), selectionRealColumn(whenTrue))
-    val index = selectionIndex(listOf(condition))
+    val falseColumn = selectionRealColumn(whenFalse)
+    val trueColumn = selectionRealColumn(whenTrue)
     val result = nextReal++
-    factors.add(RealElement(index, result, entries, indexOffset = 0))
+    factors.add(RealChoice(condition, result, trueColumn, falseColumn))
     return RealComb(emptyMap(), mapOf(result to BigFraction.ONE), BigFraction.ZERO)
 }
 

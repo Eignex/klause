@@ -35,6 +35,19 @@ the source relation.
 Generic `Problem` polynomial composition keeps its [finite integer boundary](theories/polynomial-real.md#scope-and-boundaries);
 admitted open/wide SMT powers retain their exact nonlinear source snapshots.
 
+## Real choices
+
+`RealChoice` retains one signed Boolean condition, a real result and two real arm
+coordinates. Its result equals the selected arm; equal arms do not restrict the
+condition, and all real roles may alias. It introduces no integer index. Native
+local search retains real residuals, guard flips and real repair proposals.
+Finite deduction is inert; selected complete arithmetic encoders retain both
+guarded equalities, and composed finite execution waits for the Boolean choice.
+The LP view emits a selected equality only for a live Boolean pin, with that
+literal as a premise, and cannot retain the row through a sibling branch. Exact
+point and recession checks read the selected original arm. This relation and an
+integer-indexed `RealElement` keep distinct source identities and consumers.
+
 ## Source definition hints
 
 `ir.DefinitionHint` records an integer or Boolean output orientation and its source

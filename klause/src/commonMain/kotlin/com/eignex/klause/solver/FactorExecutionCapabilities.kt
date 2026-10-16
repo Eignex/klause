@@ -137,7 +137,7 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     is GridArrayMinMax -> filteringRelaxation
     is RealElement -> realArithmetic.copy(propagation = PropagationCapability.BOUNDS_FILTERING, inertReason = null)
     is RealArrayMinMax -> realArithmetic.copy(propagation = PropagationCapability.UNSUPPORTED, inertReason = null)
-    is RealAbs, is RealProduct, is ReifiedRealLinear -> realArithmetic
+    is RealAbs, is RealProduct, is ReifiedRealLinear, is RealChoice -> realArithmetic
     is ContinuousProduct -> if (finiteChoices?.hasGuards == true) realArithmetic else
         realArithmetic.copy(relaxation = RelaxationCapability.NONE)
     is ObjectiveBoundFactor -> objectiveOverlay

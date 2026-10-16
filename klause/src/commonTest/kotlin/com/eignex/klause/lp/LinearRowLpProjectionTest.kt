@@ -5,9 +5,11 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.floorBigInt
@@ -29,6 +31,8 @@ class LinearRowLpProjectionTest {
 
         val integerRows = mutableListOf<IntegerRow>()
         val realRows = mutableListOf<RealRow>()
+        val realColumns = mutableListOf<List<Int>>()
+        val realPremises = mutableListOf<List<Int>>()
         var bigMRows = 0
         val booleanWeights = mutableListOf<LongArray?>()
 
@@ -51,6 +55,8 @@ class LinearRowLpProjectionTest {
             premiseLits: IntArray,
         ) {
             realRows += RealRow(strict)
+            realColumns += columns.toList()
+            realPremises += premiseLits.toList()
         }
 
         override fun bigMRow(
@@ -85,6 +91,33 @@ class LinearRowLpProjectionTest {
         }
         override fun row(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, contribution: Contribution) =
             error("unused")
+    }
+
+    @Test
+    fun `real choice rows should retain the actual signed guard premise`() {
+        for (positive in listOf(false, true)) {
+            for (truth in listOf(false, true)) {
+                val builder = RecordingBuilder(pin = truth)
+                val factor = RealChoice(Lit.make(0, positive), 0, 1, 2)
+
+                factor.emitLpRelaxation(builder)
+
+                assertEquals(listOf(RecordingBuilder.RealRow(strict = false)), builder.realRows)
+                assertEquals(listOf(200, if (truth == positive) 201 else 202), builder.realColumns.single())
+                assertEquals(listOf(Lit.make(0, truth)), builder.realPremises.single())
+            }
+        }
+    }
+
+    @Test
+    fun `an unpinned real choice should emit no conditional equality`() {
+        val builder = RecordingBuilder()
+
+        RealChoice(Lit.make(0, true), 0, 1, 2).emitLpRelaxation(builder)
+
+        assertTrue(builder.realRows.isEmpty())
+        assertTrue(builder.integerRows.isEmpty())
+        assertEquals(0, builder.bigMRows)
     }
 
     @Test

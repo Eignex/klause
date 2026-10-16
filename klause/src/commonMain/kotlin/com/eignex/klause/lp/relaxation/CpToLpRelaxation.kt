@@ -17,6 +17,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.GlobalCardinality
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -706,7 +707,8 @@ internal class CpToLpRelaxation(
         if (structurallyPersistent) for (fid in problem.factors.indices) {
             val factor = problem.factors[fid]
             if (factor is ReifiedLinear || factor is ReifiedPseudoBoolean || factor is ReifiedCardinality ||
-                factor is ReifiedRealLinear || factor is RealElement || factor is LinearIndicator
+                factor is ReifiedRealLinear || factor is RealElement || factor is RealChoice ||
+                factor is LinearIndicator
             ) {
                 structurallyPersistent = false
                 break

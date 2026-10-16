@@ -9,11 +9,13 @@ import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProjection
@@ -46,6 +48,59 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class SelectionEncoderTest {
+    @Test
+    fun `real choice branch conditions should retract before a sibling completion`() {
+        val source = Problem(1, 0, emptyArray(),
+            arrayOf<Factor>(RealChoice(Lit.make(0, true), 0, 1, 2)), numRealVars = 3,
+            realLower = doubleArrayOf(2.0, 1.0, 2.0), realUpper = doubleArrayOf(2.0, 1.0, 2.0))
+        val prepared = source.prepareExecutionPlan()
+
+        OpenExactNeighborhood(source, TheoryParams(), preparedSource = prepared).use { completion ->
+            val rejected = completion.check(ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap()),
+                Cancellation.Never)
+            val sibling = completion.check(ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap()),
+                Cancellation.Never)
+
+            assertIs<ExactNeighborhoodResult.Refuted>(rejected)
+            val sample = assertIs<ExactNeighborhoodResult.Witness>(sibling).sample
+            assertFalse(sample.boolValue(0))
+            assertEquals(2.0, sample.realValue(0))
+        }
+    }
+
+    @Test
+    fun `real choice and polynomial relations should require the same selected point`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(
+            ContinuousProduct(0, 0, 1), RealChoice(Lit.make(0, true), 2, 0, 1)), numRealVars = 3,
+            realLower = doubleArrayOf(1.0, 2.0, 2.0), realUpper = doubleArrayOf(2.0, 2.0, 2.0))
+        val shared = assertNotNull(source.prepareExecutionPlan().polynomialModel)
+
+        val result = shared.service.invocation().use { it.check(PolynomialCondition(bools = mapOf(0 to true))) }
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+        assertEquals(listOf(0, 1), shared.encodingAttributions.map { it.sourceFactorIndex })
+    }
+
+    @Test
+    fun `interrupted real choice installation should withhold its complete relation`() {
+        val source = Problem(1, 0, emptyArray(),
+            arrayOf<Factor>(RealChoice(Lit.make(0, true), 0, 1, 2)), numRealVars = 3,
+            realLower = DoubleArray(3), realUpper = DoubleArray(3) { 3.0 })
+        var work = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = work >= 2
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+        val declines = mutableListOf<EncoderDecline>()
+
+        val installed = FactorProjectionProviders.Default.prepare(source).installLinearFactor(
+            0, EncodingTarget.LINEAR, cancellation = cancellation, onDecline = declines::add,
+        )
+
+        assertNull(installed)
+        assertEquals(listOf(EncoderDecline.RESOURCE), declines)
+    }
+
     @Test
     fun `real extrema and a polynomial product should require one shared continuous point`() {
         val source = Problem(

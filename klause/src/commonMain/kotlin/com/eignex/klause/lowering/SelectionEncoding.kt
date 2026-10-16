@@ -4,9 +4,11 @@ import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.GridArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.WideConstants
@@ -122,6 +124,25 @@ private fun binaryElementRow(factor: Element): LinearRow {
             LinearOp.EQ, bound.toLongExact())
     } else LinearRow.ofColumns(variables, intArrayOf(), WideConstants(WideConsts(coefficients), bound), LinearOp.EQ)
     return equality
+}
+
+internal fun <T> realChoiceEncoding(
+    factor: RealChoice,
+    cancellation: Cancellation,
+    row: (LinearRow) -> T,
+    all: (List<T>) -> T,
+    any: (List<T>) -> T,
+): T {
+    fun guarded(guard: Int, arm: Int): T {
+        selectionCheckpoint(cancellation)
+        val inactive = row(LinearRow.ofBools(intArrayOf(Lit.negate(guard)), LinearOp.GE, 1))
+        val equality = LinearRow.ofColumns(intArrayOf(), intArrayOf(factor.result, arm),
+            RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0, -1.0)), 0.0,
+                strict = false), LinearOp.EQ)
+        return any(listOf(inactive, row(equality)))
+    }
+    return all(listOf(guarded(factor.condition, factor.whenTrue),
+        guarded(Lit.negate(factor.condition), factor.whenFalse)))
 }
 
 internal fun <T> realElementEncoding(

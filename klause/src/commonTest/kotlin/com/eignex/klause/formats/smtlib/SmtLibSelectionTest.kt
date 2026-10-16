@@ -3,7 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.table.Element
-import com.eignex.klause.factor.table.RealElement
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.propagation.bake
@@ -282,8 +282,45 @@ class SmtLibSelectionTest {
                 assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
                     .realValue(parsed.realVarNames.getValue("y")),
             )
-            assertEquals(1, parsed.model.factors.filterIsInstance<RealElement>().size)
+            assertEquals(1, parsed.model.factors.filterIsInstance<RealChoice>().size)
+            assertEquals(0, parsed.model.numIntVars)
         }
+    }
+
+    @Test
+    fun `complemented real choices should preserve wide rational arm values`() {
+        for (branch in listOf(false, true)) {
+            val parsed = SmtLib.parse(
+                """
+                (declare-const b Bool) (declare-const x Real) (declare-const y Real)
+                (assert ${if (branch) "b" else "(not b)"}) (assert (= x 1.0))
+                (assert (= y (ite (not b) (+ x (/ 1 1152921504606846976)) x)))
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+            assertEquals(if (branch) "1" else "1152921504606846977/1152921504606846976",
+                assertIs<OpenTheoryResult.Sat>(result).assignment.realValue(parsed.realVarNames.getValue("y")))
+        }
+    }
+
+    @Test
+    fun `mixed real choices should retain original integer coordinates without selector columns`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const i Int) (declare-const y Real)
+            (assert (not b)) (assert (= i 2))
+            (assert (= y (ite b (+ (to_real i) 0.5) (- (to_real i) 0.5))))
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        val point = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertEquals(1, parsed.model.numIntVars)
+        assertEquals("2", point.intValue(parsed.intVarNames.getValue("i")))
+        assertEquals("3/2", point.realValue(parsed.realVarNames.getValue("y")))
     }
 
     @Test

@@ -9,6 +9,7 @@ import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.global.Distinct
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
@@ -137,6 +138,13 @@ private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): 
                 if (factor.max) value >= reals[operand] && slope >= direction[operand]
                 else value <= reals[operand] && slope <= direction[operand]
             } && factor.xs.any { reals[it] == value && direction[it] == slope }
+        }
+
+        is RealChoice -> {
+            val selected = if (Lit.evaluate(factor.condition, point.boolValue(Lit.variable(factor.condition)))) {
+                factor.whenTrue
+            } else factor.whenFalse
+            reals[factor.result] == reals[selected] && direction[factor.result] == direction[selected]
         }
 
         is RealElement -> {

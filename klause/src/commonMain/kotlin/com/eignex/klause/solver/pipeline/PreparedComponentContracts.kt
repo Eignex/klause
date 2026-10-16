@@ -1,16 +1,17 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.factor.arithmetic.Power
-import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
-import com.eignex.klause.lp.finiteRelaxationSupported
+import com.eignex.klause.factor.arithmetic.Power
+import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.finiteRelaxationSupported
 import com.eignex.klause.lp.hasCompleteGuardedLpCompletion
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.PreparedFactorProjections
@@ -77,7 +78,7 @@ internal fun Problem.finiteRealFactorSupported(index: Int, projections: Prepared
         intBounds.hasUpper(factor.intOperand) &&
         intBounds.lower(factor.intOperand) >= -9007199254740992L &&
         intBounds.upper(factor.intOperand) <= 9007199254740992L
-    return factor is RealAbs || factor is RealElement ||
+    return factor is RealAbs || factor is RealElement || factor is RealChoice ||
         (factor is ContinuousProduct && factor.hasCompleteGuardedLpCompletion()) ||
         (factor is Power && factor.base is Power.Coordinate.Real && factor.exponent <= 1) ||
         ((factor.linearForm is LinearForm.Conjunction || factor.linearForm is LinearForm.Disjunction) &&

@@ -155,6 +155,7 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
     is ContinuousProduct -> ContinuousProductInvariant(this)
 
     is RealElement -> RealElementInvariant(this)
+    is RealChoice -> RealChoiceInvariant(this)
 
     is ReifiedRealLinear -> RealRowInvariant(vars, intCoeffs, realVars, realCoeffs, op, bound, strict, aux)
 
