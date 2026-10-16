@@ -681,26 +681,28 @@ class QfLraSystemTest {
 
     @Test
     fun `definition staging should forward work exhaustion before publishing a layout`() {
-        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
-            doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0)
-        val comparison = factor.linearRows.single().exactForm(2).comparison(true) { false }
-        var armed = false
-        var charged = 0L
-        val meter = WorkMeter { if (armed) charged += it }
-        val stop = object : Cancellation {
-            override fun isCancelled() = charged >= 8L
-            override fun workMeter() = meter
-        }
-        LpPropagator(object : LpSearchPolicy {}, cancellation = stop).use { lp ->
-            val system = LiveQfLraSystem(source().withFactors(arrayOf(factor)), lp)
-            assertTrue(system.install())
-            val before = lp.state
-            armed = true
+        for (limit in listOf(8L, 14L)) {
+            val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0)
+            val comparison = factor.linearRows.single().exactForm(2).comparison(true) { false }
+            var armed = false
+            var charged = 0L
+            val meter = WorkMeter { if (armed) charged += it }
+            val stop = object : Cancellation {
+                override fun isCancelled() = charged >= limit
+                override fun workMeter() = meter
+            }
+            LpPropagator(object : LpSearchPolicy {}, cancellation = stop).use { lp ->
+                val system = LiveQfLraSystem(source().withFactors(arrayOf(factor)), lp)
+                assertTrue(system.install())
+                val before = lp.state
+                armed = true
 
-            assertNull(system.prepareComparisons(listOf(comparison), 0, stop))
+                assertNull(system.prepareComparisons(listOf(comparison), 0, stop))
 
-            assertTrue(charged >= 8L)
-            assertTrue(before === lp.state)
+                assertTrue(charged >= limit)
+                assertTrue(before === lp.state)
+            }
         }
     }
 
