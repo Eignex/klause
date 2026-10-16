@@ -26,6 +26,22 @@ import kotlin.test.assertNull
 
 class DefinitionalSweepTest {
     @Test
+    fun `definition inference should not spend work after its containing allowance stops`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(10, 20)),
+            arrayOf(Element(0, 1, longArrayOf(10, 20), arrIsVars = false, indexOffset = 0)))
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 23
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+
+        val view = DefinitionalSweep.infer(problem, intArrayOf(1), emptyList(), stop)
+
+        assertNull(view)
+        assertEquals(23L, charged)
+    }
+
+    @Test
     fun `an explicit source relation should retain its inferred downstream definition cone`() {
         val problem = Problem(0, 5, Array(5) { IntDomain(0, 100) }, labsShapedFactors())
         val inferred = DefinitionalSweep.infer(problem, intArrayOf(2, 3, 4))
