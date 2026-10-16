@@ -93,6 +93,15 @@ complete relation beside other constraints before theory checks.
 
 ## Linear and conditional lowering
 
+Real and rational mixed comparisons retain `ExactLinear` rows with exact rational
+coefficients, tagged original coordinates, strictness and Boolean reification.
+Coefficient magnitude adds no frontend digit columns or unit auxiliaries. The
+selected arithmetic consumer reads the complete exact row; numerical projections
+may decline values they cannot represent. Integer-only rational comparisons retain
+exact denominator-cleared lattice thresholds. Source witnesses and proofs remain
+subject to the complete selected relation and original declaration checks.
+
+
 Asserted and reified equalities between an integer conditional result and a constant
 can lower directly to Boolean tests of its branches. Completed conditional definitions and equality
 results are shared within one parse; nested definitions are traversed iteratively.

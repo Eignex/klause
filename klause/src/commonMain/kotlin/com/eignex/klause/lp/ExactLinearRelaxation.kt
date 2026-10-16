@@ -2,15 +2,15 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
-import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
 
 internal fun ExactLinear.finiteRelaxationSupported(): Boolean = relation != LinearOp.NE &&
-    !strict && activator == LinearRow.ALWAYS &&
-    (compactRelaxationSupported() || numericalRow() != null)
+    ((compactRelaxationSupported() && (activator == LinearRow.ALWAYS || relation != LinearOp.EQ)) ||
+        (!strict && activator == LinearRow.ALWAYS && numericalRow() != null))
 
 private fun ExactLinear.compactRelaxationSupported(): Boolean =
     constants.exactBound.fitsLong() &&
@@ -21,7 +21,11 @@ private fun ExactLinear.compactRelaxationSupported(): Boolean =
         }
 
 internal fun ExactLinear.emitExactLpRelaxation(builder: RelaxationBuilder, indicator: Int = -1, value: Long = 0L) {
-    if (relation == LinearOp.NE || activator != LinearRow.ALWAYS) return
+    if (relation == LinearOp.NE) return
+    if (strict || activator != LinearRow.ALWAYS) {
+        if (compactRelaxationSupported() && indicator < 0) (this as LinearRow).emitLpRelaxation(builder)
+        return
+    }
     if (!compactRelaxationSupported()) {
         if (builder is ExactRelaxationBuilder) {
             val row = numericalRow() ?: return

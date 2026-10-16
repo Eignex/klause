@@ -18,6 +18,7 @@ class LinearIndicator(
 ) : Factor {
     init {
         require(indicator >= 0)
+        require(!row.strict) { "indicator row must be non-strict" }
         require(row.activator == LinearRow.ALWAYS) { "indicator row must be unconditional" }
     }
 

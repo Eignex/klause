@@ -2,8 +2,8 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.bool.internals.reifiedDegree
 import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
