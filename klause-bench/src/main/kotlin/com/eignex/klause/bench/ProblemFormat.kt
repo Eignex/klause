@@ -15,6 +15,7 @@ import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.hasFiniteIntegerRanges
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
@@ -117,6 +118,10 @@ internal object SmtLibFormat : ProblemFormat {
         val maximize = parsed.sense == ObjectiveSense.MAXIMIZE
         return Ingested(
             lazy {
+                val source = parsed.source.originalSource as? Problem
+                check(source?.hasFiniteIntegerRanges() == true) {
+                    "${file.name}: in-process benchmarks require a finite factor source; use the CLI for open models"
+                }
                 val operation = if (objective != null || parsed.source.embeddedObjectiveSense != null) {
                     ExecutionOperation.OPTIMIZE
                 } else ExecutionOperation.SATISFY
