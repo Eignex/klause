@@ -127,7 +127,8 @@ internal object SmtLibMode : CliMode {
                 objective = objective,
                 maximize = parsed.sense == ObjectiveSense.MAXIMIZE,
                 routePureRealToTheory = true,
-                routeLinearToTheory = objective?.requiresExactRoute(parsed.model) == true,
+                routeLinearToTheory = objective?.requiresExactRoute(parsed.model) == true ||
+                    (ints.isEmpty() && reals.isNotEmpty()),
                 boundCancellation = common.routingCancellation(),
                 preparationCancellation = common.routingPreparationCancellation(),
                 onLpStats = { routingLpStats = it },
