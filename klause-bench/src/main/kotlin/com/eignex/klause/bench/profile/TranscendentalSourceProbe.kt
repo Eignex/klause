@@ -17,6 +17,7 @@ import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import java.io.File
@@ -87,12 +88,20 @@ internal object TranscendentalSourceProbe {
                         ))
                         val completed = SourceSetup.execute(SourceExecutionRequest(invocation,
                             polynomial = params, cores = cores))
-                        val native = (completed as? SourceExecutionResult.Transcendental)?.result
-                            ?: error("source setup did not install function satisfaction")
-                        val execution = PolynomialTheoryExecution(native.result,
-                            PolynomialTheoryStats(workSpent = native.workSpent),
-                            nativeWorkScope = "transcendental",
-                            nativeResource = if (native.representationDeclined) "RepresentationLimit" else null)
+                        val execution = when (completed) {
+                            is SourceExecutionResult.Transcendental -> {
+                                val native = completed.result
+                                PolynomialTheoryExecution(native.result,
+                                    PolynomialTheoryStats(workSpent = native.workSpent),
+                                    nativeWorkScope = "transcendental",
+                                    nativeResource = if (native.representationDeclined) "RepresentationLimit" else null)
+                            }
+                            is SourceExecutionResult.Declined -> PolynomialTheoryExecution(
+                                OpenTheoryResult.Unknown(completed.reason, SolveStats.EMPTY, parsed.semantics),
+                                PolynomialTheoryStats(), nativeWorkScope = "source-preparation",
+                            )
+                            else -> error("source setup did not install function satisfaction: $completed")
+                        }
                         val elapsed = started.elapsedNow().inWholeNanoseconds
                         val result = execution.result
                         add(buildJsonObject {
@@ -107,6 +116,7 @@ internal object TranscendentalSourceProbe {
                             put("elapsedNanos", elapsed)
                             put("kind", result::class.simpleName)
                             put("reason", (result as? OpenTheoryResult.Unknown)?.reason?.name)
+                            put("preparationDeclined", completed is SourceExecutionResult.Declined)
                             put("nativeScope", execution.nativeWorkScope)
                             put("nativeResource", execution.nativeResource)
                             put("nativeWork", execution.stats.workSpent)

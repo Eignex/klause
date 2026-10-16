@@ -44,7 +44,8 @@ zero-argument `pi` constant, in quantifier-free numeric sources. Function argume
 retain exact rational, polynomial and nested function expressions. Original
 Boolean, integer and real declarations remain in the same source snapshot.
 Lexical helpers and simultaneous `let` bindings preserve their definition scope;
-a user-defined helper with a function name retains its own meaning.
+a user-defined helper with a function name retains its own meaning. Recursive
+helpers decline before body expansion.
 Factor helper calls evaluate arguments in the caller scope, then isolate parameter
 bindings from caller-local names while evaluating the body. Declared parameter sorts
 are enforced even for unused arguments; integer arguments to real parameters are

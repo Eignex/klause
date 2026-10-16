@@ -23,11 +23,11 @@ data class SmtLibProblem(
     val source: SourceAttachment,
     /** Original affine objective in [sense]; other objectives remain in [quadraticObjective] or [source]. */
     val objective: LinearObjectiveSpec?,
-    /** Declared `Int` variable name to int id. */
+    /** Declared `Int` variable name to its retained source integer coordinate. */
     val intVarNames: Map<String, Int> = emptyMap(),
-    /** Declared `Bool` variable name to bool id. */
+    /** Declared `Bool` variable name to its retained source Boolean coordinate. */
     val boolVarNames: Map<String, Int> = emptyMap(),
-    /** Declared `Real` variable name to LP-only real id. */
+    /** Declared `Real` variable name to its retained source real coordinate. */
     val realVarNames: Map<String, Int> = emptyMap(),
     /** The objective's optimisation sense (minimise for satisfaction instances, which have none). */
     val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,

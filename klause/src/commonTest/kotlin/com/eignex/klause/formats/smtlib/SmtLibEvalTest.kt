@@ -8,6 +8,16 @@ import kotlin.test.assertIs
 
 class SmtLibEvalTest {
     @Test
+    fun `recursive helpers should be rejected before body expansion`() {
+        for (source in listOf(
+            "(define-fun value () Int value) (assert (= value 1))",
+            "(define-fun value ((n Int)) Int (value n)) (assert (= (value 1) 1))",
+        )) {
+            assertFailsWith<UnsupportedSmtException> { SmtLib.parse(source) }
+        }
+    }
+
+    @Test
     fun `helpers should reject arguments outside their declared sorts even when unused`() {
         for ((sort, argument) in listOf("Real" to "false", "Int" to "1.5", "Bool" to "1")) {
             val source = "(define-fun accepts ((p $sort)) Bool true) (assert (accepts $argument))"
