@@ -262,7 +262,11 @@ coordinates can register bounded comparison rows, charging the opening token. In
 columns use the same entry and scalar limits; their fractional point values remain
 branch-order guesses. Evaluation of its existing completed point charges that
 check's existing operation token. This direct primitive path creates no source-clause
-index or Boolean draw.
+index or Boolean draw. A complete mixed worker can lazily build the existing bounded
+source-clause adapter at its first live-point consultation. Its factor pass and
+index construction charge the retained opening token under the existing source,
+storage and visit limits. Declined construction retains spent work and the direct
+provider; private queries perform no lazy construction. Closing releases the index.
 For a default opening with an established complete pure-real difference graph,
 an at-most-one or exactly-one source Boolean cardinality over three or more
 literals retains direct comparison guidance under the existing operation token.
