@@ -18,8 +18,9 @@ contract. Float grids, default undeclared ranges and optional-value policies are
 inapplicable to MPS and reject overrides.
 
 MPS defaults to `SourceTolerance(absolute=1/10000000, relative=1/10000000)`.
-Each component can be replaced independently, including zero. Zero tolerance uses
-exact source rows. The compatibility `toExactSourceProblem` entry defaults to zero;
+Each component can be replaced independently, including zero. Zero tolerance requires
+exact source correspondence; inexact hybrid projections are rebuilt from source rows.
+The compatibility `toExactSourceProblem` entry defaults to zero;
 its explicit overrides and internal exact-row fallback retain their resolved policy.
 Source representation and the permitted feasibility slack are separate properties.
 

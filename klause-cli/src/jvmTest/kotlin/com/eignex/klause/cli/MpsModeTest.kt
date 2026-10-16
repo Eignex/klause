@@ -270,7 +270,7 @@ class MpsModeTest {
                     } else {
                         "s SATISFIABLE" in text.lines()
                     },
-                    text,
+                    "exact=$exact engine=$engine\n$text",
                 )
                 assertTrue(
                     if (exact) {
@@ -278,7 +278,7 @@ class MpsModeTest {
                     } else {
                         "MPS source tolerance witness" in text
                     },
-                    text,
+                    "exact=$exact engine=$engine\n$text",
                 )
                 if (exact) assertTrue("v X=1/3" in text.lines(), text)
                 if (engine == "ls") assertFalse("optimizationStatus=" in text, text)

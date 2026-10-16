@@ -357,9 +357,6 @@ fun MpsModel.toProblem(
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ): MpsCompiled {
     val effectiveSemantics = semantics.resolve(semanticOverrides)
-    if (checkNotNull(effectiveSemantics.effective.feasibilityTolerance).isExact) {
-        return lowerExactSource(settings, effectiveSemantics)
-    }
     val exactInput = exactAdapterSnapshot()
     val sourceNumbers = exactInput.sourceNumbers()
     if (constraints.any { it.indicator != null }) return exactInput.lowerExactSource(settings, effectiveSemantics)
@@ -475,7 +472,9 @@ fun MpsModel.toProblem(
         MpsColumn(v.name, isFloat[i], if (isFloat[i]) realVarOf[i] else intVarOf[i])
     }
     val mismatch = exactInput.sourceMismatch(isFloat, objRowScale, objectiveRow)
-    if (numInt > 0 && mismatch != null) {
+    if (mismatch != null && (numInt > 0 ||
+            checkNotNull(effectiveSemantics.effective.feasibilityTolerance).isExact)
+    ) {
         return exactInput.lowerExactSource(settings, effectiveSemantics)
     }
     return MpsCompiled(
