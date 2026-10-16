@@ -130,7 +130,7 @@ class CliModeSmtTest {
         }
 
         assertTrue("; objective=10000000000000000000000000000000000000000.0" in output.lines(), output)
-        assertTrue("(define-fun |i| () Int 100000000000000000000)" in output, output)
+        assertTrue("(define-fun i () Int 100000000000000000000)" in output, output)
         assertTrue("; optimizationStatus=best-found" in output.lines(), output)
         assertTrue("; lsMoves=1" in output.lines(), output)
     }
@@ -264,7 +264,7 @@ class CliModeSmtTest {
         assertTrue("; reportedBackend=backtrack" in output, output)
         assertTrue("; frontendLoadMs=" in output, output)
         assertTrue("; frontendRoutingMs=" in output, output)
-        assertTrue("; frontendRoutingOutcome=native-formula" in output, output)
+        assertTrue("; frontendRoutingOutcome=polynomial" in output, output)
         assertTrue("nativeCpPropagationMs=" in output, output)
         assertFalse("define-fun" in output, output)
     }

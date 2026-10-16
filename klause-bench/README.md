@@ -436,8 +436,9 @@ The SMT replay checks points and objectives; global optimum, ray and refutation
 claims require separate original-source checking. Optimization captures retain each
 encoder verdict and a per-source comparison, including UNKNOWN differences caused
 by admission or bounded work; verdict equality supplies no proof verification.
-The finite in-process SMT adapter prepares lazily from captured source metadata
-and disables optional bound-closing deductions; open sources use the CLI adapter.
+The finite in-process SMT adapter checks its finite factor-source precondition
+before preparing lazily through shared setup. It disables optional bound-closing
+deductions; other sources use the CLI adapter.
 Source preparation declines remain explicit diagnostic UNKNOWN records with no
 native execution work or optimization certificate. Source preparation refutations
 are labelled separately from a native optimization result.
