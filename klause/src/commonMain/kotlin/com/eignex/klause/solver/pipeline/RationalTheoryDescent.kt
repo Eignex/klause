@@ -95,7 +95,7 @@ internal class RationalTheoryDescent(
             } ?: return null
             val sourceContext = requireNotNull(context)
             val authority = LinearOptimizationResult(sourceContext.scope, completed.terminal, completed.bound,
-                completed.incumbent, completed.value, completed.reason, completed.stats)
+                completed.incumbent, completed.value, completed.reason, completed.stats, sourceContext.semantics)
             linearResult = authority
             if (authority.terminal == null && authority.reason == TerminationReason.Unsupported &&
                 sourceContext.affineObjectiveAvailable && sourceContext.linearCoordinatesSupported()
@@ -200,7 +200,7 @@ internal class RationalTheoryDescent(
         val captured = context ?: return null
         val snapshot = linear?.snapshot(reason) ?: return null
         return LinearOptimizationResult(captured.scope, snapshot.terminal, snapshot.bound,
-            snapshot.incumbent, snapshot.value, snapshot.reason, snapshot.stats)
+            snapshot.incumbent, snapshot.value, snapshot.reason, snapshot.stats, captured.semantics)
     }
 
     fun matchesInvocation(invocation: EngineInvocation): Boolean =
@@ -260,8 +260,11 @@ internal class RationalTheoryDescent(
             source.impliedFactorMask?.let { it + BooleanArray(rows.size) })
     }
 
-    private fun partial(reason: TerminationReason): LinearOptimizationResult = LinearOptimizationResult(
-        requireNotNull(context).scope, null, linearResult?.bound, checkedIncumbent, checkedValue, reason, stats)
+    private fun partial(reason: TerminationReason): LinearOptimizationResult {
+        val captured = requireNotNull(context)
+        return LinearOptimizationResult(captured.scope, null, linearResult?.bound, checkedIncumbent, checkedValue,
+            reason, stats, captured.semantics)
+    }
 
     @Suppress("TooGenericExceptionCaught") // Publication failure closes the retained search before propagating.
     private fun publish(candidate: MinimizeResult.WithSample, callback: (MinimizeResult.WithSample) -> Unit) {

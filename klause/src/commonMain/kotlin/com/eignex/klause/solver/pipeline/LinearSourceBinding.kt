@@ -87,5 +87,5 @@ internal fun Problem.linearAuthorityContext(
         }
     }
     return SourceProofContext(scope, captured.coordinates, captured.premises, captured.objective,
-        captured.objectiveConstant, checker)
+        captured.objectiveConstant, checker, captured.semantics)
 }

@@ -175,5 +175,5 @@ fun Problem.sourceProofContext(
         }
     }
     return SourceProofContext(scope, coordinates, premises, coefficients,
-        BigFraction.ofLong(objective?.constant ?: 0L), checker)
+        BigFraction.ofLong(objective?.constant ?: 0L), checker, semantics)
 }

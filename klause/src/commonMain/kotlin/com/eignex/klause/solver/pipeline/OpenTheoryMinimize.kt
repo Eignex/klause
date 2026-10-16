@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -45,6 +46,8 @@ import kotlin.time.TimeSource
  * the incumbent. Scalar values use minimized units; linear evidence uses the original objective direction.
  */
 sealed interface OpenTheoryOptimum {
+    /** Source interpretation captured by a model-facing invocation, absent on an unbound value. */
+    val semantics: EffectiveSourceSemantics?
 
     /** Statistics collected while optimizing. */
     val stats: SolveStats
@@ -60,12 +63,14 @@ sealed interface OpenTheoryOptimum {
         val value: BigFraction,
         override val stats: SolveStats,
         override val linearResult: LinearOptimizationResult? = null,
+        override val semantics: EffectiveSourceSemantics? = linearResult?.semantics,
     ) : OpenTheoryOptimum
 
     /** The model has no feasible assignment, at any objective value. */
     data class Infeasible(
         override val stats: SolveStats,
         override val linearResult: LinearOptimizationResult? = null,
+        override val semantics: EffectiveSourceSemantics? = linearResult?.semantics,
     ) : OpenTheoryOptimum
 
     /**
@@ -81,6 +86,7 @@ sealed interface OpenTheoryOptimum {
         val value: BigFraction,
         override val stats: SolveStats,
         override val linearResult: LinearOptimizationResult? = null,
+        override val semantics: EffectiveSourceSemantics? = linearResult?.semantics,
     ) : OpenTheoryOptimum
 
     /**
@@ -97,6 +103,7 @@ sealed interface OpenTheoryOptimum {
         val reason: TerminationReason,
         override val stats: SolveStats,
         override val linearResult: LinearOptimizationResult? = null,
+        override val semantics: EffectiveSourceSemantics? = linearResult?.semantics,
     ) : OpenTheoryOptimum
 }
 
@@ -216,7 +223,7 @@ class OpenTheoryMinimizer internal constructor(
         checkNotNull(descent.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { _, _ -> }) {
             "an unsliced descent never pauses"
         }
-    }
+    }.withSourceSemantics(source.semantics)
 
     /**
      * The descent advanced a slice at a time, for a portfolio to schedule beside other arms.

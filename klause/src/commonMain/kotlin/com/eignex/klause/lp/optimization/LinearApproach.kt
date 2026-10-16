@@ -131,11 +131,12 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
  */
 fun SourceProofContext.withLinearAuthority(): SourceProofContext = SourceProofContext(
     scope, coordinates, premises, objective.takeIf { affineObjectiveAvailable }, objectiveConstant,
-    LinearAuthoritySemantics(this),
+    LinearAuthoritySemantics(this), semantics,
 )
 
 internal fun SourceProofContext.atScope(scope: SourceScope): SourceProofContext = SourceProofContext(
     scope, coordinates, premises, objective.takeIf { affineObjectiveAvailable }, objectiveConstant, semanticsChecker,
+    semantics,
 )
 
 internal fun SourceProofContext.linearCoordinatesSupported(): Boolean = coordinates.groupBy { it.kind }.values.all {
@@ -164,5 +165,5 @@ internal fun SourceProofContext.numericContext(): SourceProofContext {
     }
     return SourceProofContext(scope, coordinates, rows, objective.filterKeys {
         it.kind != SourceCoordinate.Kind.Boolean
-    }, pinnedConstant())
+    }, pinnedConstant(), semantics = semantics)
 }
