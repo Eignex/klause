@@ -1,7 +1,6 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
@@ -18,12 +17,7 @@ import com.eignex.klause.util.toLongExact
 fun MpsModel.toExactSourceProblem(
     settings: ProblemSettings = KlauseConfig.current.problemSettings(),
     semanticOverrides: SemanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-): MpsCompiled = lowerExactSource(settings, semantics.resolve(semanticOverrides))
-
-internal fun MpsModel.lowerExactSource(
-    settings: ProblemSettings,
-    effectiveSemantics: EffectiveSourceSemantics,
-): MpsCompiled = checkNotNull(captureLinearSource(effectiveSemantics, Cancellation.Never))
+): MpsCompiled = checkNotNull(toLinearSourceProblem(semanticOverrides))
     .compileMpsView(settings, allowProjection = false)
 
 internal fun LinearSourceProblem.compileMpsView(settings: ProblemSettings, allowProjection: Boolean): MpsCompiled {
