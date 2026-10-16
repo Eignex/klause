@@ -16,6 +16,7 @@ import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import java.io.File

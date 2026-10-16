@@ -118,8 +118,7 @@ internal object SmtLibFormat : ProblemFormat {
             FiniteEngine.BACKTRACK, objective, maximize,
         ))
         return Ingested(
-            lazy { requireNotNull(invocation.preparedPlan?.model) { "source has no finite benchmark model" }
-                .requireFiniteBenchModel(file) },
+            lazy { invocation.finiteShape().problem.bake() },
             if (maximize) objective?.negated() else objective,
             parsed.sense == ObjectiveSense.MAXIMIZE,
         )
