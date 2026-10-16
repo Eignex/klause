@@ -45,7 +45,10 @@ class LpScopedRowsTest {
         assertEquals(source.column(2), appended.column(4))
         assertEquals(metadata, appended.row(1))
         assertEquals(third, appended.rhs(1))
-        assertEquals(source.objective.withCosts(listOf(one, binary, third, one, third, binary)), appended.objective)
+        assertEquals(
+            ExactLpObjective(listOf(one, binary, third, one, third, binary), binary, third, one, Sense.MAXIMIZE),
+            appended.objective,
+        )
         assertEquals(0.1.toRawBits(), appended.entries(0).last().number.ieeeBits)
     }
 
