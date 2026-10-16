@@ -44,6 +44,7 @@ internal fun completeMixedPoint(
             !row.coefficients.admittedSourcePoint() || !listOf(row.rhs).admittedSourcePoint()
         ) return declined("RECOVERY_SOURCE_INPUT")
     }
+    var realGuess: List<BigFraction>? = null
     for (reconstruct in listOf(false, true)) {
         val reals = ArrayList<BigFraction>(realColumns)
         for (real in 0 until realColumns) {
@@ -60,6 +61,7 @@ internal fun completeMixedPoint(
             reals += value
         }
         if (reals.size != realColumns) continue
+        realGuess = reals
         val point = reals + integers
         stop.charge(rowWork)
         if (stop()) return declined("RECOVERY_STOPPED")
@@ -90,9 +92,23 @@ internal fun completeMixedPoint(
                 return declined("RECOVERY_INTEGER_ROWS")
             }
         } else {
-            if (real.size > 2) return declined("RECOVERY_NON_DIFFERENCE")
             residual += ExactRationalInequality(real.toIntArray(), coefficients, bound, row.strict)
         }
+    }
+    if (residual.any { it.columns.size > 2 }) {
+        onStage?.invoke("RECOVERY_EQUALITY_REPAIR_ATTEMPT")
+        val repaired = realGuess?.let { repairMixedEqualities(it, residual, stop) }
+        if (stop()) return declined("RECOVERY_STOPPED")
+        if (repaired != null) {
+            val point = repaired + integers
+            stop.charge(rowWork)
+            if (!stop() && point.satisfiesSourceRows(rows, stop) && !stop()) {
+                onStage?.invoke("RECOVERY_EQUALITY_POINT")
+                return point
+            }
+        }
+        if (stop()) return declined("RECOVERY_STOPPED")
+        return declined("RECOVERY_NON_DIFFERENCE")
     }
     val reals = if (residual.isEmpty()) {
         List(realColumns) { BigFraction.ZERO }
