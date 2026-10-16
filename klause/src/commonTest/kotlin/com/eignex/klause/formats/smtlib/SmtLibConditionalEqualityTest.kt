@@ -62,34 +62,39 @@ class SmtLibConditionalEqualityTest {
             }
 
             for (index in values.indices) {
-                assertEquals(index == selected, session.boolValue(parsed.boolVarNames.getValue("r$index")), "$selected/$index")
+                assertEquals(
+                    index == selected, session.boolValue(parsed.boolVarNames.getValue("r$index")), "$selected/$index",
+                )
             }
         }
     }
 
     @Test
-    fun `partial finite bit construction retains exact arithmetic and releases unused gates`() {
-        for (selected in listOf(false, true)) {
-            val builder = Compiler.Builder(
-                Long.MIN_VALUE, Long.MAX_VALUE, false,
-                conditionalEqualities = SmtLibConditionalEquality(workLimit = 24),
-            )
-            val reader = SExprReader(StringCharSource("""
-                (declare-const b Bool) (declare-const c Bool) (declare-const r Bool)
-                (assert ${if (selected) "b" else "(not b)"}) (assert c)
-                (assert (= r (= (ite b (ite c (- 11) 29) (ite c 101 307)) (- 11))))
-            """.trimIndent()))
-            while (true) builder.command(reader.readCommandOrNull() ?: break)
-            val parsed = builder.build()
+    fun `finite encoding budget stops retain exact arithmetic and release unused gates`() {
+        for (workLimit in listOf(24, 34)) {
+            for (selected in listOf(false, true)) {
+                val builder = Compiler.Builder(
+                    Long.MIN_VALUE, Long.MAX_VALUE, false,
+                    conditionalEqualities = SmtLibConditionalEquality(workLimit = workLimit),
+                )
+                val reader = SExprReader(StringCharSource("""
+                    (declare-const b Bool) (declare-const c Bool) (declare-const r Bool)
+                    (assert ${if (selected) "b" else "(not b)"}) (assert c)
+                    (assert (= r (= (ite b (ite c (- 11) 29) (ite c 101 307)) (- 11))))
+                """.trimIndent()))
+                while (true) builder.command(reader.readCommandOrNull() ?: break)
+                val parsed = builder.build()
 
-            val result = BacktrackSolver.source(parsed.model)
-                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+                val result = BacktrackSolver.source(parsed.model)
+                    .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
 
-            assertTrue(parsed.model.factors.any { it is Element })
-            assertEquals(selected, assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
-                .boolValue(parsed.boolVarNames.getValue("r")))
-            val used = parsed.model.factors.flatMap { it.variables.boolVars.toList() }.toSet() + parsed.boolVarNames.values
-            assertEquals((0 until parsed.model.numBoolVars).toSet(), used)
+                assertTrue(parsed.model.factors.any { it is Element })
+                assertEquals(selected, assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+                    .boolValue(parsed.boolVarNames.getValue("r")))
+                val used = parsed.model.factors.flatMap { it.variables.boolVars.toList() }.toSet() +
+                    parsed.boolVarNames.values
+                assertEquals((0 until parsed.model.numBoolVars).toSet(), used)
+            }
         }
     }
 
