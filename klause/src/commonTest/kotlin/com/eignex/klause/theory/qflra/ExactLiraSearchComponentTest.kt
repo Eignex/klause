@@ -30,6 +30,7 @@ import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
@@ -44,6 +45,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.theory.TheoryCheck
@@ -89,6 +91,42 @@ class ExactLiraSearchComponentTest {
                 val witness = assertNotNull(assertIs<SearchResult.Satisfied>(result).model
                     .valueOf<ExactLiraAssignment>(component))
                 assertEquals(bigIntOf(expected), witness.intValue(0))
+            }
+        }
+    }
+
+    @Test
+    fun `default mixed disequality choices prefer a side satisfied by the current point`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 1), longArrayOf(3, 2), null, null),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(Lit.make(0, false))),
+                Clause(intArrayOf(Lit.make(1, true))),
+                ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 1.0),
+            ),
+        )
+        for (guided in listOf(false, true)) {
+            ExactLiraSearchComponent(model).use { component ->
+                assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+                component.useMixedPointCompletion()
+                if (guided) component.useDefaultDisjunctionHints()
+                val session = SearchSession(
+                    listOf(ClauseSearchComponent(model.factors.filterIsInstance<Clause>()), component),
+                    atoms = SearchAtomRegistry(2),
+                )
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                val choices = assertNotNull(component.nextBranch(session))
+
+                assertEquals(2, choices.size)
+                val decision = assertIs<RegisteredTheoryDecision>(assertIs<SearchDecision.Theory>(choices.first()).decision)
+                val side = assertIs<SourceBoundPredicate>(decision.payload).sourceBound
+                assertEquals(guided, side.upper)
+                assertEquals(if (guided) BigFraction.MINUS_ONE else BigFraction.ZERO, side.threshold)
             }
         }
     }

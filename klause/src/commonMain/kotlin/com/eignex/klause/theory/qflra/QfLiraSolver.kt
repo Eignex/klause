@@ -305,6 +305,7 @@ class ExactLiraSearchComponent private constructor(
         check(context == null && !completeTraversalObserved)
         completeTraversalObserved = true
         smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
+        observeCompleteStage("OPENING")
     }
 
     internal fun partialPointHints(
@@ -780,20 +781,70 @@ class ExactLiraSearchComponent private constructor(
     private fun disjunctHintComparison(factor: Int, disjunct: DisjunctAtom): ExactComparison? {
         val row = model.factors[factor].linearRows[disjunct.address.row]
         if (row.activator != LinearRow.ALWAYS) return null
-        val atom = disjunct.row
-        if (atom != null) {
-            val width = atom.terms.size.toLong() + 1L
-            operationStop.charge(width * width + 3L * width)
-            if (operationStop() || pointHintStop()) return null
-            val terms = system.sourceTerms(atom) ?: return null
-            if (!hintScalar(atom.threshold) || terms.values.any { !hintScalar(it) }) return null
-            return ExactComparison(terms, atom.threshold, if (atom.upper) LinearOp.LE else LinearOp.GE,
-                atom.strict, terms.keys.any { it < model.numRealVars })
-        }
+        disjunct.row?.let { return sourceAtomHintComparison(it) }
         return exactForms[factor][disjunct.address.row].hintComparison(
             { variable -> bools.getOrNull(variable)?.takeIf { it != UNASSIGNED }?.let { it == TRUE } },
             ::hintScalar, ::hintPreflight,
         )
+    }
+
+    private fun sourceAtomHintComparison(atom: SourceBoundAtom): ExactComparison? {
+        val width = atom.terms.size.toLong() + 1L
+        operationStop.charge(width * width + 3L * width)
+        if (operationStop() || pointHintStop()) return null
+        val terms = system.sourceTerms(atom) ?: return null
+        if (!hintScalar(atom.threshold) || terms.values.any { !hintScalar(it) }) return null
+        return ExactComparison(terms, atom.threshold, if (atom.upper) LinearOp.LE else LinearOp.GE,
+            atom.strict, terms.keys.any { it < model.numRealVars })
+    }
+
+    private fun disequalityBranches(
+        comparison: ExactComparison,
+        first: RegisteredTheoryDecision,
+        second: RegisteredTheoryDecision,
+    ): List<SearchDecision>? {
+        val choices = listOf(first, second)
+        if (!mixedPointCompletion || !defaultDisjunctionHints || pointHintStop()) {
+            return choices.map { SearchDecision.Theory(it) }
+        }
+        val exact = candidate
+        val numerical = floatCandidate
+        if (exact == null && numerical == null) return choices.map { SearchDecision.Theory(it) }
+        observeCompleteStage("DISEQUALITY_GUIDE_ATTEMPT")
+        val value: (Int) -> BigFraction? = { column ->
+            val coordinate = exact?.getOrNull(column) ?: numerical?.getOrNull(column)?.let { BigFraction.ofDouble(it) }
+            coordinate?.takeIf(::hintScalar)
+        }
+        var preferred = first
+        if (hintScalar(comparison.bound) && comparison.terms.values.all(::hintScalar)) {
+            val different = hintTruth(comparison, value)
+            if (different == false) observeCompleteStage("DISEQUALITY_POINT_ON_ROW")
+            if (different == true) {
+                for (choice in choices) {
+                    operationStop.charge(1L)
+                    if (operationStop() || pointHintStop()) break
+                    val atom = (choice.payload as? SourceBoundPredicate)?.sourceBound
+                    val side = if (atom != null) sourceAtomHintComparison(atom) else {
+                        val private = choice.payload as? NamedPrivateDisequality
+                        if (private == null || private.owner !== disjunctOwner) continue
+                        ExactComparison(comparison.terms, comparison.bound, private.direction, true,
+                            comparison.hasReals, comparison.ordered)
+                    }
+                    if (side != null && hintTruth(side, value) == true) {
+                        preferred = choice
+                        observeCompleteStage(if (exact == null) "DISEQUALITY_FLOAT_GUIDE" else "DISEQUALITY_EXACT_GUIDE")
+                        break
+                    }
+                }
+            }
+        }
+        if (operationStop()) {
+            outcome = ComponentCheck.Indeterminate
+            return null
+        }
+        if (preferred !== first) observeCompleteStage("DISEQUALITY_GUIDED_ALTERNATIVE")
+        return if (preferred === first) choices.map { SearchDecision.Theory(it) }
+            else listOf(SearchDecision.Theory(second), SearchDecision.Theory(first))
     }
 
     private fun accept(decision: SearchDecision, context: SearchContext): ComponentResult {
@@ -1181,13 +1232,18 @@ class ExactLiraSearchComponent private constructor(
                 bools[it] == TRUE
             }
             if (comparison.terms.keys.any { it in sourceRealCount until model.numRealVars }) {
+                observeCompleteStage("DISEQUALITY_PRIVATE_BRANCH")
                 val split = context.registerAtom(
                     NamedPrivateDisequality(disjunctOwner, address, LinearOp.LE),
                     NamedPrivateDisequality(disjunctOwner, address, LinearOp.GE),
                 )
-                if (split == null) outcome = ComponentCheck.Indeterminate
-                return split?.let { listOf(SearchDecision.Theory(it.positive), SearchDecision.Theory(it.negative)) }
+                if (split == null) {
+                    observeCompleteStage("DISEQUALITY_REGISTER_DECLINED")
+                    outcome = ComponentCheck.Indeterminate
+                }
+                return split?.let { disequalityBranches(comparison, it.positive, it.negative) }
             }
+            observeCompleteStage("DISEQUALITY_SOURCE_BRANCH")
             val terms = comparison.terms.map { (column, coefficient) ->
                 val source = if (column < model.numRealVars) {
                     SearchRealValue(column)
@@ -1201,8 +1257,11 @@ class ExactLiraSearchComponent private constructor(
             } else {
                 SourceBoundAtom.integerSplit(context, terms, comparison.bound - BigFraction.ONE)
             }
-            if (split == null) outcome = ComponentCheck.Indeterminate
-            return split?.let { listOf(SearchDecision.Theory(it.negative), SearchDecision.Theory(it.positive)) }
+            if (split == null) {
+                observeCompleteStage("DISEQUALITY_REGISTER_DECLINED")
+                outcome = ComponentCheck.Indeterminate
+            }
+            return split?.let { disequalityBranches(comparison, it.negative, it.positive) }
         }
         observeCompleteStage("SOURCE_BRANCHERS_DONE")
         if (candidate == null) {
