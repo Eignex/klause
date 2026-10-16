@@ -12108,10 +12108,12 @@ public final class com/eignex/klause/solver/pipeline/ProblemPipelineKt {
 	public static final fun pipelineRoute (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;ZLkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
 	public static final fun pipelineRoute (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;Z)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
 	public static final fun pipelineRoute (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;ZLkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
+	public static final fun pipelineRoute (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/objective/LinearObjective;ZZZLcom/eignex/klause/solver/FactorProjectionProviders;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
+	public static final fun sourceRoute (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
 	public static synthetic fun pipelineRoute$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;ZLkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
 	public static synthetic fun pipelineRoute$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;ZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
 	public static synthetic fun pipelineRoute$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;ZLkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
-	public static final fun sourceRoute (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static synthetic fun pipelineRoute$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/objective/LinearObjective;ZZZLcom/eignex/klause/solver/FactorProjectionProviders;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
 }
 
 public final class com/eignex/klause/solver/pipeline/ProcedureCompleteness : java/lang/Enum {

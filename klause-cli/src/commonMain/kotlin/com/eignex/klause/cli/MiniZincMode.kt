@@ -118,9 +118,10 @@ internal object MiniZincMode : CliMode {
                             sourceObjective.boolWeights.all { it == 0L }
                         )
                 val route = program.problem.pipelineRoute(
-                    sourceObjective,
-                    maximize,
+                    objective = sourceObjective,
+                    maximize = maximize,
                     boundCancellation = common.routingCancellation(),
+                    preparationCancellation = common.routingPreparationCancellation(),
                     routeLinearToTheory = integralObjective,
                 )
                 return when (route) {
