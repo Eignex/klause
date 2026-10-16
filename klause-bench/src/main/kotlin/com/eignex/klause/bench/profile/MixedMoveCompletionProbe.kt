@@ -47,7 +47,8 @@ internal object MixedMoveCompletionProbe {
         }
         require(options.keys.all {
             it in setOf("input", "text64", "suite", "problem", "sourceSHA256", "initial64", "exact",
-                "instructions", "seed", "repeats", "timeout", "lowering", "residualObjective", "lambda")
+                "instructions", "seed", "repeats", "timeout", "lowering", "residualObjective", "lambda",
+                "pointRecovery")
         })
         require(listOf(options["input"], options["text64"], options["suite"]).count { it != null } == 1)
         require((options["suite"] == null) == (options["problem"] == null))
@@ -89,7 +90,9 @@ internal object MixedMoveCompletionProbe {
         val original = parsed.toExactSourceProblem()
         val values = initialBytes?.let { Json.parseToJsonElement(it.decodeToString()).jsonObject
             .mapValues { entry -> fraction(entry.value.jsonPrimitive.content) } }
-        require(values == null || values.keys == compiled.columns.map { it.name }.toSet()) { "Supply every original column once" }
+        require(values == null || values.keys == compiled.columns.map { it.name }.toSet()) {
+            "Supply every original column once"
+        }
         val checkedInitial = values?.let { supplied -> runCatching {
             original.sourceWitness(compiled.columns.map { supplied.getValue(it.name) })
         }.getOrNull() }
@@ -127,6 +130,7 @@ internal object MixedMoveCompletionProbe {
         val residualObjective = options["residualObjective"] ?: "source"
         require(residualObjective in setOf("source", "feasibility"))
         val lambda = options["lambda"]?.toDouble()?.also { require(it.isFinite() && it >= 0.0) }
+        val pointRecovery = options["pointRecovery"]?.toBooleanStrict() ?: false
         val cases = mutableListOf<JsonObject>()
         val runs = mutableListOf<JsonObject>()
         out.resolve("settings.json").writeText(buildJsonObject {
@@ -144,6 +148,7 @@ internal object MixedMoveCompletionProbe {
             put("sourceExact", compiled.sourceExact)
             put("residualObjective", residualObjective)
             put("lambda", lambda)
+            put("pointRecovery", pointRecovery)
             put("instructions", instructions)
             put("seed", seed)
             put("repeats", repeats)
@@ -170,7 +175,14 @@ internal object MixedMoveCompletionProbe {
                 val context = tolerant.parameterTypes.last()
                 val companion = context.getField("Companion").get(null)
                 val production = companion.javaClass.getMethod("getProduction").invoke(companion)
-                constructor.newInstance(compiled.model, objective.takeIf { residualObjective == "source" }, callback, production)
+                val selected = if (!pointRecovery) production else {
+                    context.declaredConstructors.single {
+                        it.parameterCount == 4 && it.parameterTypes.last() == Boolean::class.javaPrimitiveType
+                    }.newInstance(context.getMethod("getEngineFactory").invoke(production),
+                        context.getMethod("getCertificationPolicy").invoke(production), null, true)
+                }
+                constructor.newInstance(compiled.model, objective.takeIf { residualObjective == "source" },
+                    callback, selected)
             }
             val attempts = mutableListOf<JsonObject>()
             var lpVerdict: String? = null

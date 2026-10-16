@@ -2380,6 +2380,10 @@ objective. The default is `source`. Optional `lambda=<nonnegative number>` selec
 linear cost shaping and class weight normalization for the diagnostic; absence keeps
 its standalone feasibility-first shaping. These controls are recorded independently
 and do not change source witness checks or confer residual optimality.
+`pointRecovery=true` requests the numerical engine's existing bounded sparse point
+repair through its private solve context. Its default is false. It retains the
+existing repair, arithmetic and containing-work limits and still requires exact
+row and coordinate verification; a repaired point supplies no optimum proof.
 `cases.json` uses the maintained offline source-verifier record format; `sources/`
 contains its hash-named original bytes. Independently check it with
 `verify_source_results.py --source-root <sources> --witness-only` on the analysis host.

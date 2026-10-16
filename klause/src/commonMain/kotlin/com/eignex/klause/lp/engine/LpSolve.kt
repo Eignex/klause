@@ -342,6 +342,7 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         val certified = certifyLpResult(
             model, solver, result, cancellation, observer, context.certificationPolicy,
             counterResults, continuationCache = continuation, refinement = refinement,
+            sparsePointRecovery = context.sparsePointRecovery,
         )
         ladderTimer.finish(certified.verdict.name)
         return certified
