@@ -349,6 +349,18 @@ Every original atom and Boolean relation remains checked under the same native
 allowance; the cache supplies no independent acceptance authority. Later proposals
 capture fresh points. Ordinary CAD checks retain their direct evaluator. See
 [point arithmetic](../arithmetic/polynomial.md#algebraic-arithmetic-and-lifting).
+
+Within the existing coupled prefix, unconditional constant-coefficient variable
+equations can first guide a reconstructed rational proposal. Private elimination
+substitutes each solved polynomial into the remaining conjunctive atoms; reverse
+reconstruction retains every original declaration and fixed coordinate. Remaining
+unary source comparisons guide the free-coordinate proposal. Nonconstant pivots,
+guarded equalities and partial preparation supply no defining facts. Coefficients,
+coordinate degrees and total retained terms respect the existing optional admission
+ceilings. Substitution, hinting, reconstruction and complete original-formula checking
+share the same native prefix as coupled guidance, without renewing it. A rejected
+proposal supplies no refutation and leaves the ordinary producer and CAD available.
+
 Nonlinear numeric conjunctions also propose coupled exact lines from positive
 rational and zero centers on referenced unfixed coordinates. Source monomial co-occurrence
 selects coordinate groups. Unconditional affine
