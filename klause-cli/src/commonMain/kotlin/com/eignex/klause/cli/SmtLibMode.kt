@@ -276,22 +276,29 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
 
     override fun arithmeticWitnessStatus(): String = "sat"
 
-    override fun formatArithmeticObjective(objective: SourceValue): String =
-        when (objective) {
-            is SourceValue.Algebraic -> smtAlgebraicValue(objective.value)
-            else -> arithmeticObjectiveText(objective)
-        }
+    override fun formatArithmeticObjective(objective: SourceValue): String = when (objective) {
+        is SourceValue.Algebraic -> smtAlgebraicValue(objective.value)
+        else -> arithmeticObjectiveText(objective)
+    }
 
     override fun completionMetadata(verdict: Verdict): String? {
         if (!optimize) return null
         val status = if (linearResult?.terminal?.claim is SourceClaim.Limit) {
-            if (linearResult?.scope?.objective?.sense == ObjectiveSense.MINIMIZE) "unattained-infimum"
-            else "unattained-supremum"
-        } else when (val result = quadraticResult) {
+            if (linearResult?.scope?.objective?.sense == ObjectiveSense.MINIMIZE) {
+                "unattained-infimum"
+            } else {
+                "unattained-supremum"
+            }
+        } else {
+            when (val result = quadraticResult) {
             is QuadraticOptimizationResult.UnattainedLimit -> if (result.sense == ObjectiveSense.MINIMIZE) {
                 "unattained-infimum"
-            } else "unattained-supremum"
+            } else {
+                "unattained-supremum"
+            }
+
             else -> verdict.name.lowercase().replace('_', '-')
+        }
         }
         return "optimizationStatus=$status"
     }

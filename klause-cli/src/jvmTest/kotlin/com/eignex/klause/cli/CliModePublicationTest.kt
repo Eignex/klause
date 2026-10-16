@@ -1,13 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.solver.pipeline.execute
-
-import com.eignex.klause.solver.pipeline.SourceSetup
-
-import com.eignex.klause.solver.pipeline.SourceExecutionResult
-
-import com.eignex.klause.solver.pipeline.SourceExecutionRequest
-
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -19,11 +11,13 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.SourceExecutionRequest
+import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.TheoryParams
-import com.eignex.klause.solver.pipeline.minimize
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.optimizeLinear
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult

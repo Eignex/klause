@@ -42,12 +42,12 @@ internal fun solveNativeSource(
     val result = SourceSetup.execute(
         controls,
         SourceExecutionCallbacks(onQuadraticIncumbent = { accepted ->
-        publication.publish(
-            pipeline.render(polynomialAssignment(accepted.incumbent.sample)),
-            SourceValue.Algebraic(accepted.incumbent.value),
-            accepted.version,
-        )
-    })
+            publication.publish(
+                pipeline.render(polynomialAssignment(accepted.incumbent.sample)),
+                SourceValue.Algebraic(accepted.incumbent.value),
+                accepted.version,
+            )
+        }),
     )
     when (result) {
         is SourceExecutionResult.Quadratic -> reportQuadraticOptimization(
@@ -112,9 +112,9 @@ private fun reportNativeSatisfaction(
     }
     output.onVerdictContext(
         VerdictContext(
-        terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
-        completePool = complete,
-    )
+            terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
+            completePool = complete,
+        ),
     )
     when (result) {
         is OpenTheoryResult.Sat -> {

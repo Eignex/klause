@@ -31,7 +31,10 @@ internal object SmtStreamReplay {
                 val stdout = File(directory, "stdout").apply { writeText(record.stdout) }
                 require(sha256(source.readBytes()) == record.sourceSha256) { "Original source hash differs" }
                 require(sha256(stdout.readBytes()) == record.stdoutSha256) { "Original output hash differs" }
-                checker.check(directory, source, record.interrupted, record.minimumWitnesses, provision = true, functions = functions)
+                checker.check(
+                    directory, source, record.interrupted, record.minimumWitnesses,
+                    provision = true, functions = functions,
+                )
             } catch (error: Exception) {
                 Reports.writeJson(File(directory, "failure.json").path, ReplayFailure(error.toString()))
             }

@@ -42,13 +42,13 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.parseBigInt
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 
 /** Compare default and private equivalent encoders through source routing and independent SMT witness checks. */
 object EncoderProviderProfile {
@@ -71,7 +71,8 @@ object EncoderProviderProfile {
         val inputs = requireNotNull(options["inputs"]) { "inputs=<comma-separated SMT paths> is required" }
             .split(',').map { path -> File(path).takeIf { it.isAbsolute } ?: File(CorpusFetcher.workspaceRoot(), path) }
         require(inputs.isNotEmpty() && inputs.all(File::isFile))
-        output.resolve("provenance.json").writeText(buildJsonObject {
+        output.resolve("provenance.json").writeText(
+            buildJsonObject {
             put("revision", Reports.readGitSha())
             put("javaVersion", System.getProperty("java.version"))
             put("javaOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
@@ -80,18 +81,28 @@ object EncoderProviderProfile {
             put("seed", seed)
             put("repeats", repeats)
             put("warmups", warmups)
-            put("classpath", buildJsonArray {
+            put(
+                "classpath",
+                buildJsonArray {
                 System.getProperty("java.class.path").split(File.pathSeparator).map(::File)
-                    .filter(File::isFile).forEach { file -> add(buildJsonObject {
-                        put("name", file.name)
-                        put("sha256", sha256(file.readBytes()))
-                    }) }
-            })
-        }.toString())
+                    .filter(File::isFile).forEach { file ->
+                        add(
+                            buildJsonObject {
+                            put("name", file.name)
+                            put("sha256", sha256(file.readBytes()))
+                        }
+                        )
+                    }
+            }
+            )
+        }.toString()
+        )
         val checker = SmtStreamChecker(output)
         for ((index, input) in inputs.withIndex()) {
             val bytes = input.readBytes()
-            val problem = if (parser == "factor") SmtLib.parse(bytes.decodeToString()) else {
+            val problem = if (parser == "factor") {
+                SmtLib.parse(bytes.decodeToString())
+            } else {
                 val parsed = SmtLibAdmission.parse(bytes.decodeToString())
                 require(parsed is SmtLibInput.Linear) { "input is not a factor-admitted SMT source: $input" }
                 parsed.problem
@@ -113,24 +124,46 @@ object EncoderProviderProfile {
                     }
                     val providers = providers(alternate) { installations++ }
                     val started = System.nanoTime()
-                    val route = problem.model.pipelineRoute(providers, routePureRealToTheory = true,
-                        routeLinearToTheory = true, boundCancellation = stop)
+                    val route = problem.model.pipelineRoute(
+                        providers,
+                        routePureRealToTheory = true,
+                        routeLinearToTheory = true,
+                        boundCancellation = stop,
+                    )
                     val result = when (route) {
                         is SourceProblemRoute.NativeFormula -> error("factor routing selected a native formula")
 
                         is SourceProblemRoute.OpenTheory -> {
-                            val execution = OpenTheoryPipeline.execute(route.request,
-                                TheoryParams(cancellation = stop, randomSeed = seed), FiniteEngine.BACKTRACK)
+                            val execution = OpenTheoryPipeline.execute(
+                                route.request,
+                                TheoryParams(cancellation = stop, randomSeed = seed),
+                                FiniteEngine.BACKTRACK,
+                            )
                             require(execution is OpenTheoryExecution.Satisfy)
                             execution.result
                         }
-                        is SourceProblemRoute.PolynomialTheory -> OpenTheoryPipeline.execute(route.request,
-                            PolynomialTheoryParams(cancellation = stop, strategy = PolynomialStrategyParams(
-                                backtrack = BacktrackParams(randomSeed = seed))), FiniteEngine.BACKTRACK).result
+
+                        is SourceProblemRoute.PolynomialTheory -> OpenTheoryPipeline.execute(
+                            route.request,
+                            PolynomialTheoryParams(
+                                cancellation = stop,
+                                strategy = PolynomialStrategyParams(
+                                backtrack = BacktrackParams(randomSeed = seed),
+                            )
+                            ),
+                            FiniteEngine.BACKTRACK,
+                        ).result
+
                         is SourceProblemRoute.Finite -> BacktrackSolver.source(problem.model)
-                            .withProjectionProviders(providers).solve(BacktrackParams(cancellation = stop,
-                                randomSeed = seed))
+                            .withProjectionProviders(providers).solve(
+                                BacktrackParams(
+                                cancellation = stop,
+                                randomSeed = seed,
+                            )
+                            )
+
                         SourceProblemRoute.Refuted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
+
                         is SourceProblemRoute.UnsupportedOpen ->
                             error("unsupported source route: ${route.preparedPlan.decline}")
                     }
@@ -141,10 +174,14 @@ object EncoderProviderProfile {
                         is OpenTheoryResult.Unknown -> "unknown"
                     }
                     results += verdict
-                    val stdout = if (result is OpenTheoryResult.Sat) render(problem, result.assignment)
-                        else "$verdict\n"
+                    val stdout = if (result is OpenTheoryResult.Sat) {
+                        render(problem, result.assignment)
+                    } else {
+                        "$verdict\n"
+                    }
                     directory.resolve("stdout").writeText(stdout)
-                    directory.resolve("measurement.json").writeText(buildJsonObject {
+                    directory.resolve("measurement.json").writeText(
+                        buildJsonObject {
                         put("revision", Reports.readGitSha())
                         put("sourceSha256", sha256(bytes))
                         put("stdoutSha256", sha256(stdout.toByteArray()))
@@ -157,13 +194,25 @@ object EncoderProviderProfile {
                         put("seed", seed)
                         put("timeoutMs", 10000)
                         put("independentProofCheck", false)
-                    }.toString())
-                    if (result is OpenTheoryResult.Sat) check(checker.check(directory, source,
-                        interrupted = false, minimumWitnesses = 1, provision = true)) {
+                    }.toString()
+                    )
+                    if (result is OpenTheoryResult.Sat) {
+                        check(
+                            checker.check(
+                        directory,
+                        source,
+                        interrupted = false,
+                        minimumWitnesses = 1,
+                        provision = true,
+                    )
+                        ) {
                         "source witness check failed: $directory"
                     }
-                    println("source=$index alternate=$alternate round=$round verdict=$verdict " +
-                        "elapsedNs=$elapsed nativeWork=$work installations=$installations")
+                    }
+                    println(
+                        "source=$index alternate=$alternate round=$round verdict=$verdict " +
+                            "elapsedNs=$elapsed nativeWork=$work installations=$installations",
+                    )
                 }
                 check(results.distinct().size == 1) { "encoder modes disagreed for $input round=$round: $results" }
             }
@@ -178,9 +227,13 @@ object EncoderProviderProfile {
             override fun isCancelled(): Boolean = cancelled
             override fun workMeter(): WorkMeter = WorkMeter { work += it }
         }
-        val selected = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+        val selected = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
             val descriptor = BuiltInEncoderProvider.select(factor, target)
-            if (!descriptor.enforcesSource) descriptor else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+            if (!descriptor.enforcesSource) {
+                descriptor
+            } else {
+                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
                 installations++
                 val result = descriptor.install(view, encoding)
                 encoding.cancellation.charge(1)
@@ -188,35 +241,46 @@ object EncoderProviderProfile {
                 check(encoding.cancellation()) { "installer cannot observe the containing token" }
                 result
             }
-        })
+            }
+        }
+        )
         val route = problem.model.pipelineRoute(selected, routeLinearToTheory = true, boundCancellation = stop)
         val decline = (route as? SourceProblemRoute.UnsupportedOpen)?.preparedPlan?.decline
-        if (installations != 0) check(decline == PreparedPlanDecline.RESOURCE) {
+        if (installations != 0) {
+            check(decline == PreparedPlanDecline.RESOURCE) {
             "interrupted construction was admitted"
         }
+        }
         directory.resolve("source.smt2").writeBytes(source)
-        directory.resolve("measurement.json").writeText(buildJsonObject {
+        directory.resolve("measurement.json").writeText(
+            buildJsonObject {
             put("revision", Reports.readGitSha())
             put("sourceSha256", sha256(source))
             put("nativeWork", work)
             put("installations", installations)
             put("outcome", if (installations == 0) "inapplicable" else "resource")
             put("independentProofCheck", false)
-        }.toString())
+        }.toString()
+        )
     }
 
     private fun providers(alternate: Boolean, installed: () -> Unit): FactorProjectionProviders =
-        FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+        FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
             val selected = BuiltInEncoderProvider.select(factor, target)
             if (alternate && target == EncodingTarget.POLYNOMIAL && selected.enforcesSource) {
                 Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
                     installed()
                     selected.install(view, encoding)
                 }
-            } else if (alternate && target == EncodingTarget.DIFFERENCE) Encoder(EncoderSupport.UNSUPPORTED)
-            else if (!alternate || target != EncodingTarget.LINEAR || !selected.enforcesSource ||
+            } else if (alternate && target == EncodingTarget.DIFFERENCE) {
+                Encoder(EncoderSupport.UNSUPPORTED)
+            } else if (!alternate || target != EncodingTarget.LINEAR || !selected.enforcesSource ||
                 factor.linearForm?.rows?.any { it.activator != LinearRow.ALWAYS } != false
-            ) selected else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+            ) {
+                selected
+            } else {
+                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
                 installed()
                 val form = requireNotNull(view.linearForm)
                 val comparisons = form.rows.map { row ->
@@ -225,23 +289,47 @@ object EncoderProviderProfile {
                     val definition = List(row.size) { index ->
                         EncodingLinearTerm.source(row.ref(index), coefficients[index].negated())
                     } + EncodingLinearTerm.auxiliary(private, BigFraction.ONE)
-                    encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(definition),
-                        LinearOp.EQ, BigFraction.ZERO))
-                    LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                    encoding.linearFormula(
+                        LinearEncodingFormula.Comparison(
+                        EncodingAffineExpression(definition),
+                        LinearOp.EQ,
+                        BigFraction.ZERO,
+                    )
+                    )
+                    LinearEncodingFormula.Comparison(
+                        EncodingAffineExpression(
+                            listOf(
                         EncodingLinearTerm.auxiliary(private, BigFraction.ONE),
-                    )), row.relation, bound(row), row.strict)
+                    )
+                        ),
+                        row.relation, bound(row), row.strict
+                    )
                 }
-                encoding.linearFormula(if (form is LinearForm.Disjunction) LinearEncodingFormula.Or(comparisons)
-                    else LinearEncodingFormula.And(comparisons))
+                encoding.linearFormula(
+                    if (form is LinearForm.Disjunction) {
+                        LinearEncodingFormula.Or(comparisons)
+                    } else {
+                        LinearEncodingFormula.And(comparisons)
+                    },
+                )
                 null
             }
-        })
+            }
+        }
+        )
 
     private fun coefficient(row: LinearRow, index: Int): BigFraction = when (val constants = row.constants) {
         is IntegralConstants -> BigFraction.of(constants.exactCoeff(index), BIG_ONE)
-        is RealConstants -> requireNotNull(BigFraction.ofDouble(if (index < constants.intCoefficients.size) {
+
+        is RealConstants -> requireNotNull(
+            BigFraction.ofDouble(
+                if (index < constants.intCoefficients.size) {
             constants.intCoefficients.at(index)
-        } else constants.realCoefficients.at(index - constants.intCoefficients.size)))
+        } else {
+            constants.realCoefficients.at(index - constants.intCoefficients.size)
+        }
+            )
+        )
     }
 
     private fun bound(row: LinearRow): BigFraction = when (val constants = row.constants) {
@@ -260,8 +348,10 @@ object EncoderProviderProfile {
                 if (coefficient != 0L) value += BigFraction.ofLong(coefficient) * rational(assignment.intValue(id))
             }
             for ((id, coefficient) in objective.realCoefficients.withIndex()) {
-                if (coefficient != 0.0) value += requireNotNull(BigFraction.ofDouble(coefficient)) *
+                if (coefficient != 0.0) {
+                    value += requireNotNull(BigFraction.ofDouble(coefficient)) *
                     rational(assignment.realValue(id))
+                }
             }
             if (source.sense == ObjectiveSense.MAXIMIZE) value = value.negated()
             append("; objective=$value\n")
@@ -284,17 +374,24 @@ object EncoderProviderProfile {
     private fun signed(value: String): String = if (value.startsWith('-')) "(- ${value.drop(1)})" else value
 
     private fun launch(args: Array<String>, output: File) {
-        val command = arrayListOf(File(System.getProperty("java.home"), "bin/java").path,
-            "-Xmx3g", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1", "--enable-native-access=ALL-UNNAMED",
-            "--add-modules=jdk.incubator.vector")
+        val command = arrayListOf(
+            File(System.getProperty("java.home"), "bin/java").path,
+            "-Xmx3g",
+            "-XX:+UseSerialGC",
+            "-XX:ActiveProcessorCount=1",
+            "--enable-native-access=ALL-UNNAMED",
+            "--add-modules=jdk.incubator.vector",
+        )
         for (name in listOf("klause.workspace.root", "klause.bench.corpusCache")) {
             System.getProperty(name)?.let { command += "-D$name=$it" }
         }
         command += listOf("-cp", System.getProperty("java.class.path"), javaClass.name)
         command += args
-        output.resolve("launcher.json").writeText(buildJsonObject {
+        output.resolve("launcher.json").writeText(
+            buildJsonObject {
             put("command", buildJsonArray { command.forEach { add(JsonPrimitive(it)) } })
-        }.toString())
+        }.toString()
+        )
         val builder = ProcessBuilder(command).inheritIO()
         builder.environment()["KLAUSE_ENCODER_MEASURED_JVM"] = "1"
         check(builder.start().waitFor() == 0) { "encoder measurement JVM failed" }

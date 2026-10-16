@@ -38,10 +38,10 @@ internal fun prepareFactorQuadratic(
         return SourceProblemRoute.NativeFormula(
             null,
             if (plan.decline == PreparedPlanDecline.RESOURCE) {
-            TerminationReason.BudgetExhausted
-        } else {
-            TerminationReason.Unsupported
-        }
+                TerminationReason.BudgetExhausted
+            } else {
+                TerminationReason.Unsupported
+            },
         )
     }
     return SourceProblemRoute.NativeFormula(NativeSourceExecution.Polynomial(plan.polynomialRequest()))
@@ -84,27 +84,27 @@ internal fun executeNativeSource(
                 quadratic != null -> SourceExecutionResult.Quadratic(
                     invocation,
                     OpenTheoryPipeline.minimize(
-                    native.request,
-                    quadratic,
-                    params,
-                    engine,
-                    sense,
-                    request.cores,
-                    callbacks.onQuadraticIncumbent,
-                )
+                        native.request,
+                        quadratic,
+                        params,
+                        engine,
+                        sense,
+                        request.cores,
+                        callbacks.onQuadraticIncumbent,
+                    ),
                 )
 
                 affine != null -> SourceExecutionResult.Quadratic(
                     invocation,
                     OpenTheoryPipeline.optimize(
-                    native.request,
-                    affine,
-                    params,
-                    engine,
-                    sense,
-                    request.cores,
-                    callbacks.onQuadraticIncumbent,
-                )
+                        native.request,
+                        affine,
+                        params,
+                        engine,
+                        sense,
+                        request.cores,
+                        callbacks.onQuadraticIncumbent,
+                    ),
                 )
 
                 else -> SourceExecutionResult.Polynomial(
@@ -127,14 +127,14 @@ internal fun executeNativeSource(
                 SourceExecutionResult.Quadratic(
                     invocation,
                     OpenTheoryPipeline.minimize(
-                    native.request,
-                    objective,
-                    params,
-                    engine,
-                    sense,
-                    request.cores,
-                    callbacks.onQuadraticIncumbent,
-                )
+                        native.request,
+                        objective,
+                        params,
+                        engine,
+                        sense,
+                        request.cores,
+                        callbacks.onQuadraticIncumbent,
+                    ),
                 )
             }
         }

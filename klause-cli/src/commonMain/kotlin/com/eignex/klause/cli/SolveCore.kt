@@ -220,14 +220,14 @@ internal object SolveCore {
                         (
                             SourceSetup.execute(
                                 SourceExecutionRequest(
-                            invocation,
-                            polynomial = polynomialParams,
-                            cores = openCores,
-                        ),
-                            SourceExecutionCallbacks(onQuadraticIncumbent = accepted)
+                                    invocation,
+                                    polynomial = polynomialParams,
+                                    cores = openCores,
+                                ),
+                                SourceExecutionCallbacks(onQuadraticIncumbent = accepted),
                             )
-                            as SourceExecutionResult.Quadratic
-                        ).result
+                                as SourceExecutionResult.Quadratic
+                            ).result
                     } ?: OpenTheoryPipeline.optimize(
                         pipeline.request,
                         sourceObjective,
@@ -259,12 +259,12 @@ internal object SolveCore {
                     (
                         SourceSetup.execute(
                             SourceExecutionRequest(
-                        invocation,
-                        polynomial = polynomialParams,
-                        cores = openCores,
-                    )
+                                invocation,
+                                polynomial = polynomialParams,
+                                cores = openCores,
+                            ),
                         ) as SourceExecutionResult.Polynomial
-                    ).result
+                        ).result
                 } ?: pipeline.request.execute(polynomialParams, engine, openCores)
                 val result = if ((engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) &&
                     execution.result is OpenTheoryResult.Unsat
@@ -393,10 +393,10 @@ internal object SolveCore {
                     rawSolvable.sourceInvocation?.let { invocation ->
                         (
                             SourceSetup.execute(
-                            SourceExecutionRequest(invocation, theory = params, cores = openCores),
-                            SourceExecutionCallbacks(onLinearIncumbent = onAccepted),
-                        ) as SourceExecutionResult.Linear
-                        ).result
+                                SourceExecutionRequest(invocation, theory = params, cores = openCores),
+                                SourceExecutionCallbacks(onLinearIncumbent = onAccepted),
+                            ) as SourceExecutionResult.Linear
+                            ).result
                     } ?: OpenTheoryPipeline.searchWithoutTheory(
                         pipeline.model,
                         params,
@@ -508,17 +508,17 @@ internal object SolveCore {
                         (
                             SourceSetup.execute(
                                 SourceExecutionRequest(
-                            invocation,
-                            theory = theoryParams,
-                            cores = openCores,
-                            presolveConfig = config,
-                            presolveCancellation = presolveCancel,
-                            presolveBudget = presolveBudget,
-                        ),
-                            SourceExecutionCallbacks(onLinearIncumbent = onAccepted)
+                                    invocation,
+                                    theory = theoryParams,
+                                    cores = openCores,
+                                    presolveConfig = config,
+                                    presolveCancellation = presolveCancel,
+                                    presolveBudget = presolveBudget,
+                                ),
+                                SourceExecutionCallbacks(onLinearIncumbent = onAccepted),
                             )
-                            as SourceExecutionResult.Linear
-                        ).result
+                                as SourceExecutionResult.Linear
+                            ).result
                     } ?: OpenTheoryPipeline.execute(request, theoryParams, engine, openCores, onAccepted)
                 val objective = request.objective
                 if (objective != null) {
@@ -1074,12 +1074,12 @@ internal object SolveCore {
             (
                 SourceSetup.execute(
                     SourceExecutionRequest(invocation, finiteRequest = { shape ->
-                require(shape === request.shape) { "finite CLI request belongs to another source invocation" }
-                request
-            }),
-                SourceExecutionCallbacks(finite = callbacks)
+                        require(shape === request.shape) { "finite CLI request belongs to another source invocation" }
+                        request
+                    }),
+                    SourceExecutionCallbacks(finite = callbacks),
                 ) as SourceExecutionResult.Finite
-            ).result
+                ).result
         }
         val preparation = result.preparation
         cliLogger(common.verbose).v {

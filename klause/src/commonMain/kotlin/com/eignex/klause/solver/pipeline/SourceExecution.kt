@@ -264,14 +264,14 @@ fun SourceSetup.execute(
                 SourceExecutionResult.Quadratic(
                     invocation,
                     OpenTheoryPipeline.optimize(
-                    route.request,
-                    objective,
-                    params,
-                    engine,
-                    sense,
-                    request.cores,
-                    callbacks.onQuadraticIncumbent,
-                )
+                        route.request,
+                        objective,
+                        params,
+                        engine,
+                        sense,
+                        request.cores,
+                        callbacks.onQuadraticIncumbent,
+                    ),
                 )
             }
         }

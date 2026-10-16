@@ -89,10 +89,7 @@ class SourceStrategy internal constructor(
         theory: TheoryParams = TheoryParams(),
     ): OpenTheoryResult = solveSource(polynomial, theory).withSourceSemantics(source.semantics)
 
-    private fun solveSource(
-        polynomial: PolynomialTheoryParams,
-        theory: TheoryParams,
-    ): OpenTheoryResult {
+    private fun solveSource(polynomial: PolynomialTheoryParams, theory: TheoryParams): OpenTheoryResult {
         val scope = scope(polynomial, theory)
         if (scope.stop()) return scope.unknown()
         if (!scope.supportsSource()) return scope.unsupported()
@@ -128,8 +125,8 @@ class SourceStrategy internal constructor(
                 }
                 val execution = (
                     SourceSetup.execute(SourceExecutionRequest(invocation, theory = scope.theory))
-                    as SourceExecutionResult.Linear
-                ).result
+                        as SourceExecutionResult.Linear
+                    ).result
                 (execution as OpenTheoryExecution.Satisfy).result
             }
 
@@ -142,8 +139,8 @@ class SourceStrategy internal constructor(
                 }
                 val execution = (
                     SourceSetup.execute(SourceExecutionRequest(invocation, theory = scope.theory))
-                    as SourceExecutionResult.Linear
-                ).result
+                        as SourceExecutionResult.Linear
+                    ).result
                 (execution as OpenTheoryExecution.Satisfy).result
             }
 
@@ -196,9 +193,16 @@ class SourceStrategy internal constructor(
             .withObjective(objective, maximize = sense == ObjectiveSense.MAXIMIZE)
         if (plan.execution !is PreparedExecution.Polynomial ||
             !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
-        ) return unsupportedQuadratic(sense, if (plan.decline == PreparedPlanDecline.RESOURCE) {
+        ) {
+            return unsupportedQuadratic(
+                sense,
+                if (plan.decline == PreparedPlanDecline.RESOURCE) {
             if (scope.stop()) scope.unknown().reason else TerminationReason.BudgetExhausted
-        } else TerminationReason.Unsupported)
+        } else {
+            TerminationReason.Unsupported
+        }
+            )
+        }
         return OpenTheoryPipeline.optimize(plan.polynomialRequest(), objective, scope.polynomial, engine, sense)
     }
 
@@ -244,9 +248,16 @@ class SourceStrategy internal constructor(
             .withObjective(objective, sense)
         if (plan.execution !is PreparedExecution.Polynomial ||
             !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
-        ) return unsupportedQuadratic(sense, if (plan.decline == PreparedPlanDecline.RESOURCE) {
+        ) {
+            return unsupportedQuadratic(
+                sense,
+                if (plan.decline == PreparedPlanDecline.RESOURCE) {
             if (scope.stop()) scope.unknown().reason else TerminationReason.BudgetExhausted
-        } else TerminationReason.Unsupported)
+        } else {
+            TerminationReason.Unsupported
+        }
+            )
+        }
         return OpenTheoryPipeline.minimize(plan.polynomialRequest(), objective, scope.polynomial, engine, sense)
     }
 
@@ -276,21 +287,32 @@ class SourceStrategy internal constructor(
         if (scope.stop()) return incomplete(scope.unknown().reason)
         if (!scope.supportsOpen(engine)) return incomplete(TerminationReason.Unsupported)
         val route = source.pipelineRoute(
-            projectionProviders, objective, maximize = sense == ObjectiveSense.MAXIMIZE,
-            routePureRealToTheory = true, routeLinearToTheory = true, boundCancellation = scope.stop,
+            projectionProviders,
+            objective,
+            maximize = sense == ObjectiveSense.MAXIMIZE,
+            routePureRealToTheory = true,
+            routeLinearToTheory = true,
+            boundCancellation = scope.stop,
         )
         if (scope.stop()) return incomplete(scope.unknown().reason)
         if (route is SourceProblemRoute.UnsupportedOpen &&
             route.preparedPlan.decline == PreparedPlanDecline.RESOURCE
-        ) return incomplete(TerminationReason.BudgetExhausted)
+        ) {
+            return incomplete(TerminationReason.BudgetExhausted)
+        }
         return when (route) {
             is SourceProblemRoute.OpenTheory -> OpenTheoryPipeline.execute(route.request, scope.theory, engine)
+
             is SourceProblemRoute.UnsupportedOpen -> OpenTheoryPipeline.searchWithoutTheory(
-                route.preparedPlan, scope.theory,
-                if (sense == ObjectiveSense.MAXIMIZE) objective.negated() else objective, engine,
+                route.preparedPlan,
+                scope.theory,
+                if (sense == ObjectiveSense.MAXIMIZE) objective.negated() else objective,
+                engine,
                 maximize = sense == ObjectiveSense.MAXIMIZE,
             )
+
             SourceProblemRoute.Refuted -> OpenTheoryExecution.Optimize(OpenTheoryOptimum.Infeasible(SolveStats.EMPTY))
+
             else -> incomplete(TerminationReason.Unsupported)
         }
     }
@@ -300,15 +322,22 @@ class SourceStrategy internal constructor(
         polynomialCancellation: Cancellation,
     ): PreparedSourcePlan {
         val selected = projectionProviders.prepare(source)
-        val bounded = if (source.hasFiniteIntegerRanges()) source else {
+        val bounded = if (source.hasFiniteIntegerRanges()) {
+            source
+        } else {
             when (val outcome = source.closeOpenBounds(boundCancellation)) {
                 is OpenPresolveResult.Tightened -> outcome.spec
+
                 // The quadratic result requires its producing engine's completion certificate.
                 OpenPresolveResult.Refuted -> source
             }
         }
-        return bounded.preparePolynomialExecutionPlan(original = source, providers = projectionProviders,
-            projections = selected.forEngineView(bounded), cancellation = polynomialCancellation)
+        return bounded.preparePolynomialExecutionPlan(
+            original = source,
+            providers = projectionProviders,
+            projections = selected.forEngineView(bounded),
+            cancellation = polynomialCancellation,
+        )
     }
 
     private fun unsupportedQuadratic(
@@ -316,41 +345,61 @@ class SourceStrategy internal constructor(
         reason: TerminationReason = TerminationReason.Unsupported,
     ): QuadraticOptimizationExecution = QuadraticOptimizationExecution(
         QuadraticOptimizationResult.Unknown(null, reason, sense, SolveStats.EMPTY),
-        PolynomialTheoryStats(), 0, 0,
+        PolynomialTheoryStats(),
+        0,
+        0,
     )
 
     private fun finiteSolve(route: SourceProblemRoute.Finite, scope: SourceInvocation): OpenTheoryResult {
         if (!route.preparedPlan.capabilities.admission(engine).runnable) return scope.unsupported()
-        val preparation = FinitePipeline.prepare(FinitePipelineRequest(
-            problem = route.problem, engine = engine, preparedPlan = route.preparedPlan,
-            presolveConfig = PresolveConfig.NONE, explicitPresolveConfig = true, solutionSetSensitive = true,
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+            problem = route.problem,
+            engine = engine,
+            preparedPlan = route.preparedPlan,
+            presolveConfig = PresolveConfig.NONE,
+            explicitPresolveConfig = true,
+            solutionSetSensitive = true,
             cancellation = scope.stop,
-        ))
+        )
+        )
         if (scope.stop()) return scope.unknown()
         if (preparation.presolve?.infeasible == true) return OpenTheoryResult.Unsat(SolveStats.EMPTY)
         val model = preparation.executableProblem()
         val solved = when (engine) {
             FiniteEngine.BACKTRACK -> BacktrackSolver(model).solve(scope.backtrack)
+
             FiniteEngine.LOCAL_SEARCH -> LocalSearchSolver(
-                model, completion = if (model.numRealVars > 0) LeafRealCompletion(model, null) else null,
+                model,
+                completion = if (model.numRealVars > 0) LeafRealCompletion(model, null) else null,
             ).solve(scope.localSearch)
+
             else -> error("unsupported source strategy $engine")
         }
         return when (solved) {
             is SolveResult.Sat -> OpenTheoryResult.Sat(
-                OpenTheoryAssignment.Sampled(preparation.reconstruct(solved.assignment)), solved.stats,
+                OpenTheoryAssignment.Sampled(preparation.reconstruct(solved.assignment)),
+                solved.stats,
             )
+
             is SolveResult.Unsat -> OpenTheoryResult.Unsat(solved.stats)
+
             is SolveResult.Unknown -> OpenTheoryResult.Unknown(solved.reason, solved.stats)
         }
     }
 
     private fun scope(polynomial: PolynomialTheoryParams, theory: TheoryParams): SourceInvocation {
-        val selected = if (engine == FiniteEngine.BACKTRACK) polynomial.strategy.backtrack.assumptions
-        else polynomial.strategy.localSearch.assumptions
+        val selected = if (engine == FiniteEngine.BACKTRACK) {
+            polynomial.strategy.backtrack.assumptions
+        } else {
+            polynomial.strategy.localSearch.assumptions
+        }
         val assumptions = polynomial.strategy.assumptions.mergedWith(selected)
-        val selectedStop = if (engine == FiniteEngine.BACKTRACK) polynomial.strategy.backtrack.cancellation
-        else polynomial.strategy.localSearch.cancellation
+        val selectedStop = if (engine == FiniteEngine.BACKTRACK) {
+            polynomial.strategy.backtrack.cancellation
+        } else {
+            polynomial.strategy.localSearch.cancellation
+        }
         val stop = polynomial.timeout or polynomial.cancellation or
             theory.timeout or theory.cancellation or selectedStop
         val backtrack = polynomial.strategy.backtrack.copy(assumptions = assumptions, cancellation = stop)
@@ -363,27 +412,42 @@ class SourceStrategy internal constructor(
             FiniteEngine.BACKTRACK -> theory.copy(
                 cancellation = stop,
                 maxDecisions = minOf(
-                    theory.maxDecisions, backtrack.maxDecisions, backtrack.maxInstructions ?: Long.MAX_VALUE,
+                    theory.maxDecisions,
+                    backtrack.maxDecisions,
+                    backtrack.maxInstructions ?: Long.MAX_VALUE,
                 ),
                 nodeBudget = selectedBudget ?: theory.nodeBudget,
                 randomSeed = backtrack.randomSeed ?: theory.randomSeed,
             )
+
             FiniteEngine.LOCAL_SEARCH -> theory.copy(
                 cancellation = stop,
                 maxFlips = minOf(theory.maxFlips, localSearch.maxFlips),
                 maxInstructions = minOf(
-                    theory.maxInstructions ?: Long.MAX_VALUE, localSearch.maxInstructions ?: Long.MAX_VALUE,
+                    theory.maxInstructions ?: Long.MAX_VALUE,
+                    localSearch.maxInstructions ?: Long.MAX_VALUE,
                 ).takeIf { it != Long.MAX_VALUE },
                 nodeBudget = selectedBudget ?: theory.nodeBudget,
                 randomSeed = localSearch.randomSeed ?: theory.randomSeed,
             )
+
             else -> error("unsupported source strategy $engine")
         }
         return SourceInvocation(
-            assumptions, stop, polynomial.timeout or theory.timeout, backtrack, localSearch, open,
-            polynomial.copy(cancellation = stop, strategy = polynomial.strategy.copy(
-                backtrack = backtrack, localSearch = localSearch, assumptions = assumptions,
-            )),
+            assumptions,
+            stop,
+            polynomial.timeout or theory.timeout,
+            backtrack,
+            localSearch,
+            open,
+            polynomial.copy(
+                cancellation = stop,
+                strategy = polynomial.strategy.copy(
+                backtrack = backtrack,
+                localSearch = localSearch,
+                assumptions = assumptions,
+            )
+            ),
         )
     }
 
@@ -406,14 +470,20 @@ class SourceStrategy internal constructor(
             override fun deadline() = stop.deadline()
             override fun workMeter(): WorkMeter = WorkMeter { units ->
                 require(units >= 0)
-                preparationWork = if (units > Long.MAX_VALUE - preparationWork) Long.MAX_VALUE
-                else preparationWork + units
+                preparationWork = if (units > Long.MAX_VALUE - preparationWork) {
+                    Long.MAX_VALUE
+                } else {
+                    preparationWork + units
+                }
                 stop.charge(units)
             }
         }
         fun unknown(stats: SolveStats = SolveStats.EMPTY): OpenTheoryResult.Unknown = OpenTheoryResult.Unknown(
-            if (timeout() || stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout
-            else TerminationReason.Cancelled,
+            if (timeout() || stop.deadline()?.hasPassedNow() == true) {
+                TerminationReason.Timeout
+            } else {
+                TerminationReason.Cancelled
+            },
             stats,
         )
         fun supportsSource(): Boolean = assumptions.deductions.isEmpty &&
@@ -422,12 +492,11 @@ class SourceStrategy internal constructor(
             (engine != FiniteEngine.LOCAL_SEARCH || supportsLocalHooks())
         private fun supportsLocalHooks(): Boolean = localSearch.initialAssignment == null &&
             localSearch.pooledIncumbents == null && localSearch.lsObjective == null && localSearch.onEvent == null
-        fun supportsOpen(engine: FiniteEngine): Boolean =
-            supportsSource() && assumptions.isEmpty && when (engine) {
-                FiniteEngine.BACKTRACK -> backtrack.nodeBudget == null && backtrack.onEvent == null
-                FiniteEngine.LOCAL_SEARCH -> supportsLocalHooks()
-                else -> false
-            }
+        fun supportsOpen(engine: FiniteEngine): Boolean = supportsSource() && assumptions.isEmpty && when (engine) {
+            FiniteEngine.BACKTRACK -> backtrack.nodeBudget == null && backtrack.onEvent == null
+            FiniteEngine.LOCAL_SEARCH -> supportsLocalHooks()
+            else -> false
+        }
         fun unsupported(): OpenTheoryResult.Unknown =
             OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
     }

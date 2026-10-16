@@ -12410,12 +12410,17 @@ public final class com/eignex/klause/solver/pipeline/QuadraticOptimizationExecut
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceAttachment : com/eignex/klause/ir/SourceSemanticsOwner {
+	public fun <init> (Lcom/eignex/klause/ir/NonlinearIntegerProblem;Lcom/eignex/klause/ir/ProblemSettings;)V
+	public fun <init> (Lcom/eignex/klause/ir/PolynomialRealProblem;Lcom/eignex/klause/ir/ProblemSettings;)V
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Ljava/util/List;Lcom/eignex/klause/ir/SearchHints;)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Ljava/util/List;Lcom/eignex/klause/ir/SearchHints;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/TranscendentalProblem;Lcom/eignex/klause/ir/ProblemSettings;)V
 	public final fun getDefinitionHints ()Ljava/util/List;
+	public final fun getEmbeddedObjectiveSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun getOriginalSource ()Lcom/eignex/klause/ir/SourceSemanticsOwner;
 	public final fun getSearchHints ()Lcom/eignex/klause/ir/SearchHints;
 	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun getSettings ()Lcom/eignex/klause/ir/ProblemSettings;
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceExecutionCallbacks {
@@ -12429,8 +12434,10 @@ public final class com/eignex/klause/solver/pipeline/SourceExecutionCallbacks {
 
 public final class com/eignex/klause/solver/pipeline/SourceExecutionKind : java/lang/Enum {
 	public static final field FINITE Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
+	public static final field FUNCTIONS Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
 	public static final field HEURISTIC Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
 	public static final field LINEAR Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
+	public static final field NONLINEAR_INTEGER Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
 	public static final field POLYNOMIAL Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
 	public static final field REFUTED Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
@@ -12444,25 +12451,36 @@ public final class com/eignex/klause/solver/pipeline/SourceExecutionKt {
 	public static final fun executionKind (Lcom/eignex/klause/solver/pipeline/SourceSetup;Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;)Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
 	public static final fun getMaximizeSourceObjective (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;)Z
 	public static final fun getSourceObjective (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;)Lcom/eignex/klause/solver/objective/LinearObjective;
+	public static final fun getSourceQuadraticObjective (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;)Lcom/eignex/klause/ir/QuadraticObjectiveSpec;
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceExecutionRequest {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;I)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;I)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;ILcom/eignex/klause/presolve/PresolveConfig;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;)V
 	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;ILcom/eignex/klause/presolve/PresolveConfig;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCores ()I
 	public final fun getFiniteRequest ()Lkotlin/jvm/functions/Function1;
 	public final fun getInvocation ()Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
+	public final fun getNonlinearInteger ()Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;
 	public final fun getPolynomial ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;
 	public final fun getPresolveBudget ()Lcom/eignex/klause/presolve/PresolveBudget;
 	public final fun getPresolveCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getPresolveConfig ()Lcom/eignex/klause/presolve/PresolveConfig;
 	public final fun getTheory ()Lcom/eignex/klause/solver/pipeline/TheoryParams;
+	public final fun getTranscendental ()Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;
 }
 
 public abstract class com/eignex/klause/solver/pipeline/SourceExecutionResult : com/eignex/klause/ir/SourceSemanticsOwner {
 	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getInvocation ()Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
 	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Declined : com/eignex/klause/solver/pipeline/SourceExecutionResult {
+	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Finite : com/eignex/klause/solver/pipeline/SourceExecutionResult {
@@ -12482,6 +12500,10 @@ public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Quadr
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Refuted : com/eignex/klause/solver/pipeline/SourceExecutionResult {
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Transcendental : com/eignex/klause/solver/pipeline/SourceExecutionResult {
+	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceIncumbentPublication {
@@ -12516,6 +12538,10 @@ public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$Finite :
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$NativeFormula : com/eignex/klause/solver/pipeline/SourceProblemRoute {
+	public final fun getPreparedPlan ()Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$OpenTheory : com/eignex/klause/solver/pipeline/SourceProblemRoute {
@@ -12579,6 +12605,8 @@ public final class com/eignex/klause/solver/pipeline/SourceSetup {
 public final class com/eignex/klause/solver/pipeline/SourceSetupRequest {
 	public fun <init> (Lcom/eignex/klause/solver/pipeline/SourceAttachment;Lcom/eignex/klause/solver/pipeline/ExecutionOperation;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;ZLcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)V
 	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/SourceAttachment;Lcom/eignex/klause/solver/pipeline/ExecutionOperation;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;ZLcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/SourceAttachment;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/SourceAttachment;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getBoundCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
@@ -12586,6 +12614,7 @@ public final class com/eignex/klause/solver/pipeline/SourceSetupRequest {
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getOperation ()Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
 	public final fun getProviders ()Lcom/eignex/klause/solver/FactorProjectionProviders;
+	public final fun getQuadraticObjective ()Lcom/eignex/klause/ir/QuadraticObjectiveSpec;
 	public final fun getSource ()Lcom/eignex/klause/solver/pipeline/SourceAttachment;
 }
 

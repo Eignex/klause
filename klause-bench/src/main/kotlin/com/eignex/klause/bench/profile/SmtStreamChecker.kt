@@ -22,8 +22,9 @@ internal class SmtStreamChecker(private val output: File) {
         functions: Boolean = false,
     ): Boolean {
         prepare(provision)
+        val checker = if (functions) "verify_function_stream_source_results.py" else "verify_stream_source_results.py"
         val command = listOf(File(environment, "bin/python").path,
-            File(tools, if (functions) "verify_function_stream_source_results.py" else "verify_stream_source_results.py").path,
+            File(tools, checker).path,
             source.path, File(directory, "stdout").path,
             "--minimum-witnesses", minimumWitnesses.toString()) +
             if (interrupted) listOf("--interrupted") else emptyList()
