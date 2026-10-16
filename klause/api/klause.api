@@ -2669,7 +2669,7 @@ public final class com/eignex/klause/formats/mps/MpsColumn {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/eignex/klause/formats/mps/MpsCompiled {
+public final class com/eignex/klause/formats/mps/MpsCompiled : com/eignex/klause/ir/SourceSemanticsOwner {
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;ZLjava/util/List;JI)V
 	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
 	public final fun component2 ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
@@ -2686,22 +2686,25 @@ public final class com/eignex/klause/formats/mps/MpsCompiled {
 	public final fun getModel ()Lcom/eignex/klause/ir/Problem;
 	public final fun getObjective ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
 	public final fun getObjectiveScale ()J
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public final fun getSourceDifference ()Ljava/lang/String;
 	public final fun getSourceExact ()Z
 	public final fun getToleranceDifference ()Ljava/lang/String;
 	public fun hashCode ()I
 	public final fun sourceObjective ([J[D)Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun sourceWitness (Ljava/util/List;)Lcom/eignex/klause/formats/mps/MpsSourceWitness;
+	public final fun sourceWitness (Ljava/util/List;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/formats/mps/MpsSourceWitness;
 	public final fun sourceWitness ([JLjava/util/List;)Lcom/eignex/klause/formats/mps/MpsSourceWitness;
+	public static synthetic fun sourceWitness$default (Lcom/eignex/klause/formats/mps/MpsCompiled;Ljava/util/List;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsSourceWitness;
 	public final fun sourceWitnessOrNull ([JLjava/util/List;I)Lcom/eignex/klause/formats/mps/MpsSourceWitness;
 	public fun toString ()Ljava/lang/String;
-	public final fun withinTolerance ([J[D)Z
+	public final fun withinTolerance ([J[DLcom/eignex/klause/util/Cancellation;)Z
+	public static synthetic fun withinTolerance$default (Lcom/eignex/klause/formats/mps/MpsCompiled;[J[DLcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Z
 }
 
 public final class com/eignex/klause/formats/mps/MpsCompilerKt {
 	public static final field MPS_TOLERANCE D
-	public static final fun toProblem (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/formats/mps/MpsCompiled;
-	public static synthetic fun toProblem$default (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
+	public static final fun toProblem (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/formats/mps/MpsCompiled;
+	public static synthetic fun toProblem$default (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
 }
 
 public final class com/eignex/klause/formats/mps/MpsConstraint {
@@ -2727,8 +2730,8 @@ public final class com/eignex/klause/formats/mps/MpsConstraint {
 }
 
 public final class com/eignex/klause/formats/mps/MpsExactSourceKt {
-	public static final fun toExactSourceProblem (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/formats/mps/MpsCompiled;
-	public static synthetic fun toExactSourceProblem$default (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
+	public static final fun toExactSourceProblem (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/formats/mps/MpsCompiled;
+	public static synthetic fun toExactSourceProblem$default (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
 }
 
 public final class com/eignex/klause/formats/mps/MpsFormatException : com/eignex/klause/formats/FormatException {
@@ -2753,18 +2756,20 @@ public final class com/eignex/klause/formats/mps/MpsLoweringException : java/lan
 }
 
 public final class com/eignex/klause/formats/mps/MpsModel {
-	public fun <init> (Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;)V
+	public fun <init> (Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/SourceSemantics;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/SourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun component3 ()Lcom/eignex/klause/formats/mps/MpsObjective;
 	public final fun component4 ()Ljava/util/List;
 	public final fun component5 ()Ljava/util/List;
-	public final fun copy (Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/formats/mps/MpsModel;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsModel;Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsModel;
+	public final fun copy (Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/SourceSemantics;)Lcom/eignex/klause/formats/mps/MpsModel;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsModel;Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/SourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsModel;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getConstraints ()Ljava/util/List;
 	public final fun getName ()Ljava/lang/String;
 	public final fun getObjective ()Lcom/eignex/klause/formats/mps/MpsObjective;
+	public final fun getSemantics ()Lcom/eignex/klause/ir/SourceSemantics;
 	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun getVariables ()Ljava/util/List;
 	public fun hashCode ()I
@@ -2788,13 +2793,20 @@ public final class com/eignex/klause/formats/mps/MpsObjective {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/formats/mps/MpsSemanticsKt {
+	public static final fun getMpsSemantics ()Lcom/eignex/klause/ir/SourceSemantics;
+}
+
 public final class com/eignex/klause/formats/mps/MpsSourceWitness {
-	public fun <init> (Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;)V
+	public fun <init> (Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;Z)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
 	public final fun component2 ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun copy (Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/formats/mps/MpsSourceWitness;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsSourceWitness;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsSourceWitness;
+	public final fun component3 ()Z
+	public final fun copy (Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;Z)Lcom/eignex/klause/formats/mps/MpsSourceWitness;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsSourceWitness;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ZILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsSourceWitness;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExact ()Z
 	public final fun getObjective ()Lcom/eignex/klause/simplex/exact/BigFraction;
 	public final fun getValues ()Ljava/util/List;
 	public fun hashCode ()I
