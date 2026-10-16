@@ -585,11 +585,7 @@ internal fun observedCandidateHints(
         if (component === SearchCandidateHints.None) return@SearchCandidateHints null
         usage.componentConsulted()
         component.preferredBool(variable)?.also {
-            val indexed = when (component) {
-                is SourceConjunctionHints -> component
-                is DefaultMixedPointHints -> component.indexedHints
-                else -> null
-            }
+            val indexed = component as? SourceConjunctionHints
             usage.componentSelected(indexed?.isPrimitive(variable), indexed?.isGate(variable) == true)
         }
     }

@@ -641,10 +641,8 @@ Primitive and gate selections classify outer consultations, not recursive leaf
 reads. Missing fields in older records are unavailable rather than observed zero.
 Use the same record's route, index outcome and usage to establish feature coverage.
 With absent `open-hint-flips`, one exact-linear completion owner can supply direct
-primitive preferences from an existing partial point. A complete mixed worker can
-lazily construct the bounded source-clause adapter at its first live consultation;
-pure sources and private queries retain direct preferences. Index observations
-require actual construction. Explicit zero permits bounded construction observations
+primitive preferences from an existing partial point without source-clause indexing.
+Index observations require actual construction through the explicit allowance. Explicit zero permits bounded construction observations
 but no component steering; positive values allow indexed preferences after caller
 or deferred hints decline. The optional Boolean draw requires this explicit
 allowance. None of these paths renews numerical or indexing allowances; full
