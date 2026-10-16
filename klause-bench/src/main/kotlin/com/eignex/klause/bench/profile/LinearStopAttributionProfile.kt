@@ -34,7 +34,7 @@ import java.util.Base64
 internal object LinearStopAttributionProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size == 1 && args[0].startsWith("request64="))
+        val timeoutMs = requestedTimeoutMs(args)
         val request = Base64.getDecoder().decode(args[0].substringAfter('='))
         require(request.size <= 32 * 1024)
         val sources = Json.decodeFromString<List<LinearStopSource>>(request.decodeToString())
@@ -60,7 +60,7 @@ internal object LinearStopAttributionProfile {
             )
             put("entryPoint", "installed-cli-frontend-and-public-pipeline")
             put("cliDriverExecuted", false)
-            put("timeoutMs", 60000)
+            put("timeoutMs", timeoutMs)
             put("nativeLimitsChanged", false)
         }.toString() + "\n"
         )
@@ -92,10 +92,20 @@ internal object LinearStopAttributionProfile {
                 val order = if (source.bounded) listOf(false, true, true, false) else listOf(false, true)
                 for ((run, observed) in order.withIndex()) {
                     val destination = directory.resolve(run.toString()).apply { mkdirs() }
-                    access.measure(source, input, observed, destination)
+                    access.measure(source, input, observed, destination, timeoutMs)
                 }
             }
         }
+    }
+
+    internal fun requestedTimeoutMs(args: Array<String>): Long {
+        require(args.size in 1..2 && args[0].startsWith("request64="))
+        val timeoutMs = if (args.size == 1) 60000L else {
+            require(args[1].startsWith("timeoutMs="))
+            requireNotNull(args[1].substringAfter('=').toLongOrNull()) { "timeoutMs must be an integer" }
+        }
+        require(timeoutMs in 1L..60000L) { "timeoutMs must be positive and at most 60000" }
+        return timeoutMs
     }
 }
 
@@ -116,14 +126,14 @@ private class LinearCliAccess(private val loader: ClassLoader) {
     private val core = coreType.getField("INSTANCE").get(null)
     private val cliMode = loader.loadClass(prefix + "CliModeKt")
 
-    fun measure(source: LinearStopSource, input: File, observed: Boolean, out: File) {
+    fun measure(source: LinearStopSource, input: File, observed: Boolean, out: File, timeoutMs: Long) {
         val started = System.nanoTime()
         val common = optionsType.getDeclaredConstructor().newInstance()
         val config = loader.loadClass(prefix + "PlatformKt").getDeclaredMethod("installCliConfig").invoke(null)
         set(common, "config", requireNotNull(config))
-        set(common, "timeLimitMs", 60000L)
+        set(common, "timeLimitMs", timeoutMs)
         val cliNow = loader.loadClass(prefix + "PlatformKt").getDeclaredMethod("nowMillis").invoke(null) as Long
-        set(common, "deadlineAtMs", cliNow + 60000L)
+        set(common, "deadlineAtMs", cliNow + timeoutMs)
         set(common, "randomSeed", source.seed)
         set(common, "parallel", 1)
         set(common, "statistics", true)
@@ -158,7 +168,7 @@ private class LinearCliAccess(private val loader: ClassLoader) {
             .invoke(core, common) as Pair<*, *>
         val containing = LinearObservedStop(deadline.second as Cancellation, observed)
         val remaining = requireNotNull(containing.deadline()) - TimeSource.Monotonic.markNow()
-        require(remaining.inWholeMilliseconds <= 60000L) { "CLI deadline uses a different clock" }
+        require(remaining.inWholeMilliseconds <= timeoutMs) { "CLI deadline uses a different clock" }
         val allowance = coreType.declaredMethods.single { it.name.startsWith("presolveAllowance") }
             .apply { isAccessible = true }.invoke(core, common, containing) as Pair<*, *>
         val preparation = LinearObservedStop(allowance.first as Cancellation, observed)
@@ -211,6 +221,7 @@ private class LinearCliAccess(private val loader: ClassLoader) {
         out.resolve("result.json").writeText(
             buildJsonObject {
             put("observed", observed)
+            put("timeoutMs", timeoutMs)
             put("boundedControl", source.bounded)
             put("engine", if (source.bounded) (if (request != null) "backtrack" else "localsearch") else "mixed")
             put("sourceSha256", source.sha256)
