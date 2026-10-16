@@ -710,6 +710,8 @@ witness. That witness retains floating coordinates without exact-real authority;
 it carries no optimum proof. Without the callback, including explicit exact MPS
 invocations, unavailable exact certification leaves completion undecided. Both
 policies retain numerical execution and the containing cancellation/work ledger.
+An optional private completion observer receives the residual verdict and existing LP
+statistics. It supplies no admission authority and performs no additional numerical query.
 
 Theory-backed linear completion retains a worker-private conditioned query owner. Boolean pins
 and arbitrary-width integer equalities use the prepared source plan's arithmetic

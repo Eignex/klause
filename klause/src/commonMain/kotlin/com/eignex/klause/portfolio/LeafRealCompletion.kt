@@ -14,6 +14,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
@@ -38,6 +39,7 @@ internal class LeafRealCompletion(
 
     private val encoders = problem.selectedFactorProjections()
     private val absCompletion = if (problem.factors.any { it is RealAbs }) AbsRealCompletion(problem) else null
+    var observeLp: ((LpVerdict, LpStats) -> Unit)? = null
 
     override fun complete(candidate: Sample, cancellation: Cancellation): Completion {
         if (objective == null || objective.realCoefficientValues.all { it == 0.0 }) {
@@ -66,6 +68,7 @@ internal class LeafRealCompletion(
         val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink,
             context = context, toleranceCheck = toleranceCheck, encoders = encoders)
         val work = movesFor(sink.snapshot().standaloneWorkOps.sum)
+        observeLp?.invoke(real.verdict, sink.snapshot())
         if (cancellation()) return Completion.Undecided(work)
         return when (real.verdict) {
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED ->
