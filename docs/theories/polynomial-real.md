@@ -617,6 +617,17 @@ returned list do not change captured families. Immutable kernel polynomials may 
 shared. One caller-supplied arithmetic context spans construction; interruption and
 kernel resource stops propagate without publishing a partial family.
 
+Boundary preparation splits a common monomial from each polynomial into its
+coordinate factors and the exact remaining polynomial. One boundary per coordinate
+suffices regardless of its multiplicity: sign invariance of all factors gives sign
+invariance of the product, including zero-coordinate fibers. This selection applies
+to input and derived projection boundaries, including objective-image projection.
+The original atoms retain their coefficients, powers and relations for exact source
+checking. Required equations remain whole products; splitting a boundary never makes
+each factor a required zero. A graph substitution rewrites those whole equations even
+when their boundary representatives have been factored. Preparation uses the same
+native owner and kernel limits, with no source-variable division or nonzero premise.
+
 Without required equations, variable IDs define ascending lifting order. Complete
 query preparation also collects positive equality atoms reached through conjunctions.
 For a source with Boolean coordinates, gate equivalences and source constants can
@@ -654,13 +665,14 @@ cells, including completed substitutions before a containing stop. Invocation
 snapshots retain and saturatingly aggregate those observations without extra work or
 cancellation polls. They expose no partial boundary family or result authority.
 
-For each ordinarily eliminated coordinate family, the projection contains all coefficient
+For each ordinarily eliminated coordinate family, projection derives all coefficient
 polynomials, every principal subresultant coefficient of each nonconstant reductum
 and its derivative, and every principal subresultant coefficient between reducta
 from distinct input polynomials. Equal-degree pairs use the same exact kernel
-operation. Zero and rational constant projections add no boundaries. Projection
-polynomials are normalized by nonzero rational scaling and deduplicated; this
-normalization concerns zero loci and does not provide signed source-atom truth.
+operation. Each derived family receives the same boundary factor selection. Zero
+and rational constant projections add no boundaries. Projection polynomials are
+normalized by nonzero rational scaling and deduplicated; this normalization concerns
+zero loci and does not provide signed source-atom truth.
 
 Coefficient signs preserve degree and identically-zero specializations over a base
 cell. Subresultant vanishing preserves distinct-root counts and common-root

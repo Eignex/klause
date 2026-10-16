@@ -1,7 +1,9 @@
 package com.eignex.klause.theory.qfnra
 
+import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
 
 internal class PolynomialProjection private constructor(
     private val levels: Array<List<Polynomial>>,
@@ -79,7 +81,7 @@ internal class PolynomialProjection private constructor(
                         IntArray(variableCount) { it }, arrayOfNulls(variableCount), arithmetic, true, sectionCount))
                     return@sequence
                 }
-                equations = projectionFamily(equations, arithmetic)
+                equations = canonicalFamily(equations, arithmetic)
                 val section = equationalSection(equations, pending, arithmetic)
                 while (fallback >= 0 && !available[fallback]) {
                     arithmetic.step()
@@ -111,7 +113,9 @@ internal class PolynomialProjection private constructor(
                     }
                     equations = equations.map {
                         arithmetic.step()
-                        rewritten.getValue(it)
+                        rewritten[it] ?: if (variable in it.variables) {
+                            arithmetic.substitute(it, variable, section.replacement)
+                        } else it
                     }
                     pending = projectionFamily(projected, arithmetic)
                     sectionCount++
@@ -149,6 +153,49 @@ private fun inconsistentEquations(equations: List<Polynomial>, arithmetic: Polyn
 }
 
 private fun projectionFamily(values: List<Polynomial>, arithmetic: PolynomialArithmetic): List<Polynomial> {
+    val factors = ArrayList<Polynomial>()
+    for (polynomial in values) {
+        arithmetic.step()
+        val terms = polynomial.terms
+        if (terms.isEmpty()) continue
+        val common = LinkedHashMap<Int, Int>()
+        for (variable in terms.first().monomial.variables) {
+            arithmetic.step()
+            common[variable] = terms.first().monomial.exponent(variable)
+        }
+        for (index in 1 until terms.size) {
+            arithmetic.step()
+            if (common.isEmpty()) break
+            val entries = common.iterator()
+            while (entries.hasNext()) {
+                arithmetic.step()
+                val entry = entries.next()
+                val degree = minOf(entry.value, terms[index].monomial.exponent(entry.key))
+                if (degree == 0) entries.remove() else entry.setValue(degree)
+            }
+        }
+        if (common.isEmpty()) {
+            factors.add(polynomial)
+        } else {
+            for (variable in common.keys) {
+                arithmetic.step()
+                factors.add(Polynomial.variable(variable))
+            }
+            arithmetic.step()
+            val divisor = Monomial.of(common)
+            val remainder = terms.map {
+                arithmetic.step()
+                PolynomialTerm(checkNotNull(it.monomial.quotient(divisor)), it.coefficient)
+            }
+            factors.add(Polynomial.of(remainder))
+        }
+    }
+    // Factor signs determine the product sign, including every zero-coordinate fiber.
+    // Required equations keep the whole product; its factors are not separate premises.
+    return canonicalFamily(factors, arithmetic)
+}
+
+private fun canonicalFamily(values: List<Polynomial>, arithmetic: PolynomialArithmetic): List<Polynomial> {
     val distinct = LinkedHashSet<Polynomial>()
     for (polynomial in values) {
         arithmetic.step()

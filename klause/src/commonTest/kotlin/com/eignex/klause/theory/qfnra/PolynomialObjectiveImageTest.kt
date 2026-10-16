@@ -10,8 +10,25 @@ import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class PolynomialObjectiveImageTest {
+    @Test
+    fun `a product equality retains the attained objective on its zero factor`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (assert (and (= (* x y) 0) (>= x 1)))",
+        )
+        val objective = PolynomialExpression.Variable(SourceRealId(1))
+        val algebraic = AlgebraicArithmetic()
+
+        val result = solvePolynomialObjectiveImage(source.formula, objective, source.boolCount, source.realCount)
+
+        val optimum = assertIs<PolynomialObjectiveResult.Optimum>(result)
+        assertEquals(BigFraction.ZERO, optimum.value.rational)
+        assertEquals(BigFraction.ZERO, optimum.assignment.realValue(1).rational)
+        assertTrue(algebraic.compare(optimum.assignment.realValue(0), algebraic.rational(BigFraction.ONE)) >= 0)
+    }
+
     @Test
     fun `square objective should attain its global continuous minimum`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (check-sat)")

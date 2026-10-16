@@ -1,16 +1,20 @@
 package com.eignex.klause.theory.qfnra
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
+import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class PolynomialProjectionTest {
@@ -129,6 +133,112 @@ class PolynomialProjectionTest {
     fun `projection should reject variables outside the declared coordinate space`() {
         assertFailsWith<IllegalArgumentException> {
             PolynomialProjection.compute(listOf(y), 1, arithmetic)
+        }
+    }
+
+    @Test
+    fun `coordinate factors retain intersections under a linear matrix allowance`() {
+        val factor = arithmetic.multiply(arithmetic.power(x, 4), arithmetic.power(y, 6))
+        val polynomial = arithmetic.multiply(factor, arithmetic.subtract(y, x))
+        val limited = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 4))
+
+        val projection = PolynomialProjection.compute(listOf(polynomial), 2, limited)
+
+        assertTrue(hasBoundary(projection, BigFraction.ZERO))
+        assertTrue(projection.polynomials(1).any {
+            arithmetic.substitute(arithmetic.substitute(it, 0, Polynomial.ONE), 1, Polynomial.ONE).isZero
+        })
+    }
+
+    @Test
+    fun `a product equality retains a branch with a nonzero coordinate factor`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= (* x0 x1) 0) (> x0 0)))",
+        )
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, 0, 33))
+
+        assertEquals(33, result.assignment.realCount)
+        assertTrue(AlgebraicArithmetic().sign(result.assignment.realValue(0)) > 0)
+        assertEquals(BigFraction.ZERO, result.assignment.realValue(1).rational)
+    }
+
+    @Test
+    fun `a product equality retains its nonmonomial zero factor`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= (* x0 x1 (+ x0 x1)) 0) (> x0 0) (< x1 0)))",
+        )
+        val algebraic = AlgebraicArithmetic()
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, 0, 33))
+
+        val first = result.assignment.realValue(0)
+        val second = result.assignment.realValue(1)
+        assertTrue(algebraic.sign(first) > 0)
+        assertTrue(algebraic.sign(second) < 0)
+        assertEquals(0, algebraic.sign(algebraic.add(first, second)))
+    }
+
+    @Test
+    fun `equality section rewriting retains whole product premises`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= x0 (* x2 x2)) (= (* x0 x1) 0) (> x1 0)))",
+        )
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, 0, 33))
+
+        assertEquals(BigFraction.ZERO, result.assignment.realValue(0).rational)
+        assertEquals(BigFraction.ZERO, result.assignment.realValue(2).rational)
+        assertTrue(AlgebraicArithmetic().sign(result.assignment.realValue(1)) > 0)
+        assertTrue(result.stats.equationalSections > 0)
+    }
+
+    @Test
+    fun `factor boundaries preserve even multiplicity in strict inequalities`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (< (* x0 x0 x1) 0) (> x1 0) (not (= x0 0))))",
+        )
+
+        val result = solveQfNra(source.formula, 0, 33)
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
+    fun `factor boundaries preserve opposite source coefficient signs`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (> (* x0 x1) 0) (> (* (- 2) x0 x1) 0)))",
+        )
+
+        val result = solveQfNra(source.formula, 0, 33)
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
+    fun `interrupted factor preparation publishes no partial family`() {
+        val polynomial = arithmetic.multiply(arithmetic.power(x, 3), arithmetic.power(y, 5))
+        var completedWork = 0L
+        val counter = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { completedWork += it }
+        }
+        PolynomialProjection.compute(listOf(polynomial), 2, PolynomialArithmetic(counter))
+
+        for (limit in listOf(1L, completedWork / 2, completedWork - 1)) {
+            var spent = 0L
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = spent >= limit
+                override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            }
+            assertFailsWith<PolynomialInterrupted> {
+                PolynomialProjection.compute(listOf(polynomial), 2, PolynomialArithmetic(stop))
+            }
         }
     }
 
