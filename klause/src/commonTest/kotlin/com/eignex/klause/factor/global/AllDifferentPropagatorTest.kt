@@ -157,6 +157,18 @@ class AllDifferentPropagatorTest {
         assertFalse(feasible)
     }
 
+    @Test
+    fun `a shareable value should survive non-contiguous Hall pruning`() {
+        val d13 = IntDomain(1, 3).excludeValue(2)
+        val factor = AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 4, exceptSet = longArrayOf(0))
+        val state = stateWithAD(factor, arrayOf(d13, d13, IntDomain(0, 3)))
+
+        val feasible = state.problem.propagators[0].propagate(state, factorId = 0)
+
+        assertTrue(feasible)
+        assertEquals(IntDomain(0, 2).excludeValue(1), state.intDomains[2])
+    }
+
     private fun problemOf(factor: Factor, vararg domains: IntDomain) = Problem(
         numBoolVars = 0,
         numIntVars = domains.size,
