@@ -2,7 +2,7 @@ package com.eignex.klause.compile
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.model.AllDifferent
@@ -126,8 +126,8 @@ class CompilerOptLoweringTest {
 
     @Test
     fun `the float pin should reject a non-default bucket only when enabled`() {
-        val pinned = AbsentFloatZero().compile(KlauseConfig(pinAbsentOptVars = true))
-        val unpinned = AbsentFloatZero().compile(KlauseConfig(pinAbsentOptVars = false))
+        val pinned = AbsentFloatZero().compile(semanticOverrides = SemanticOverrides(pinAbsentOptionalValues = true))
+        val unpinned = AbsentFloatZero().compile(semanticOverrides = SemanticOverrides(pinAbsentOptionalValues = false))
         val nonDefault = mapOf(unpinned.intVarIdByName.getValue("f") to 1L)
         assertTrue(
             BacktrackSolver(unpinned.problem.bake()).solve(

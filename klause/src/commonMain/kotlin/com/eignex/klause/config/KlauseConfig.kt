@@ -72,9 +72,8 @@ const val DEFAULT_DOMAIN_WALK_CAP: Long = DEFAULT_BITSET_THRESHOLD.toLong()
 /**
  * Immutable invocation configuration for klause's core (compiler + frontends).
  *
- * [KlauseConfig] consolidates semantic choices, storage policy and preparation effort into a
- * single immutable value object, rather than ad-hoc `System.getenv` / `System.getProperty` reads
- * and loose constants resolved at each call site.
+ * [KlauseConfig] captures storage policy and preparation effort for one invocation.
+ * Source interpretation belongs to [com.eignex.klause.ir.SemanticOverrides].
  *
  * Two usage modes:
  *  - **Ambient:** set [current] once at startup (e.g. a CLI entry point translating env vars
@@ -94,47 +93,11 @@ const val DEFAULT_DOMAIN_WALK_CAP: Long = DEFAULT_BITSET_THRESHOLD.toLong()
  *    benchmarking harness, not solving semantics, and live in their own namespace.
  */
 data class KlauseConfig(
-    /**
-     * When true, an optional variable whose presence Boolean is false is pinned to a
-     * canonical in-domain default: `0` coerced into `[min, max]` for ints, `false` for bools,
-     * and the first declared label for nominals.
-     *
-     * An absent opt var is otherwise free to take any domain value, and every such value
-     * yields an equivalent model. Pinning collapses that dead-value symmetry — it shrinks the
-     * solution space for enumeration / model-counting and gives clean, deterministic decoded
-     * values for absent vars.
-     *
-     * Disable via `KLAUSE_PIN_ABSENT_OPT_VARS=0` (e.g. for the MiniZinc challenge, where absent
-     * opt-var output values are unconstrained by spec, so the extra clauses are pure overhead).
-     */
-    val pinAbsentOptVars: Boolean = true,
-
-    /** Lower bound assigned to unbounded `var int` declarations (FlatZinc auxiliaries with no
-     *  explicit range). Effectively-infinite `Long` sentinel; see [DEFAULT_UNBOUNDED_INT_LO]. */
-    val unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
-
-    /** Upper bound counterpart to [unboundedIntLo]. */
-    val unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
-
     /** Integer-domain span above which the span-gated LP presolve steps engage (see
      *  [DEFAULT_LARGE_SPAN_THRESHOLD]). A pure cost gate — below it, presolve/solve behaviour is
      *  unchanged; coupled columns above it use LP feasibility / bound tightening ahead of the O(span)
      *  root bake. Wide columns coupled to continuous columns also use that LP preparation. */
     val largeSpanThreshold: Long = DEFAULT_LARGE_SPAN_THRESHOLD,
-
-    /** Number of uniformly-spaced buckets a `floatVar` is discretised into when no explicit
-     *  count is given. Higher = finer precision, more bits per float var. */
-    val floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
-
-    /** Fixed-point scale used by the FlatZinc float-linear lowering (real coefficients and
-     *  bounds are multiplied by this and rounded to integers). */
-    val floatScale: Long = DEFAULT_FLOAT_SCALE,
-
-    /** Lower search bound for bucketed FlatZinc floats without a declared range. */
-    val unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
-
-    /** Upper search bound for bucketed FlatZinc floats without a declared range. */
-    val unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
 
     /** Base relaxation-size cap (see [DEFAULT_LP_MAX_TABLEAU_CELLS]): a model whose base relaxation
      *  fits it budgets its gated hulls against it. A pure cost guard — the bound is always sound. */
@@ -210,17 +173,28 @@ data class KlauseConfig(
 
         /**
          * Layer property/env/file overrides onto [base], reading each knob through [lookup] — a
-         * function from a knob's [ConfigKey.propertyKey] (e.g. `klause.float.buckets`) to its raw
+         * function from a knob's [ConfigKey.propertyKey] (e.g. `klause.bitset.threshold`) to its raw
          * string value, or `null` when unset. The recognised knobs, their keys and their parsing all
          * come from [KlauseConfigSchema] (one declaration per knob), so this never re-spells a key.
          * Unset / unparseable values leave the [base] value untouched.
+         * Source-semantic keys are rejected; pass [com.eignex.klause.ir.SemanticOverrides] to the source entry.
          *
          * Platform entry points supply the [lookup]: a CLI maps the dotted key to a system property
-         * and/or the `KLAUSE_FLOAT_BUCKETS`-style env var; a config file maps it to a parsed value.
+         * and/or the `KLAUSE_BITSET_THRESHOLD`-style env var; a config file maps it to a parsed value.
          */
-        fun fromProps(base: KlauseConfig = current, lookup: (String) -> String?): KlauseConfig =
-            KlauseConfigSchema.keys.fold(base) { config, key ->
+        fun fromProps(base: KlauseConfig = current, lookup: (String) -> String?): KlauseConfig {
+            for (name in retiredSourceKnobs) {
+                val key = klausePropertyKey(name)
+                require(lookup(key) == null) { "$key is source semantics; pass SemanticOverrides at the source entry" }
+            }
+            return KlauseConfigSchema.keys.fold(base) { config, key ->
                 lookup(key.propertyKey)?.let { key.applyRaw(config, it) } ?: config
             }
+        }
+
+        private val retiredSourceKnobs = listOf(
+            "pinAbsentOptVars", "unboundedIntLo", "unboundedIntHi", "floatBuckets", "floatScale",
+            "unboundedFloatLo", "unboundedFloatHi",
+        )
     }
 }

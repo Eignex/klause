@@ -2,7 +2,6 @@ package com.eignex.klause.compile
 
 import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.NumericAuthority
@@ -18,12 +17,9 @@ val schemaSemantics: SourceSemantics = SourceSemantics(
     pinAbsentOptionalValues = true,
 )
 
-internal fun schemaSemantics(config: KlauseConfig, overrides: SemanticOverrides): EffectiveSourceSemantics {
-    val legacy = schemaSemantics.copy(
-        floats = FloatSemantics.Grid(config.floatBuckets, config.floatScale),
-        pinAbsentOptionalValues = config.pinAbsentOptVars,
-    )
-    val effective = legacy.resolve(overrides).effective
+internal fun schemaSemantics(overrides: SemanticOverrides): EffectiveSourceSemantics {
+    val resolved = schemaSemantics.resolve(overrides)
+    val effective = resolved.effective
     val grid = effective.floats as? FloatSemantics.Grid
     require(grid == null || grid.buckets >= 2) { "schema float grids require at least two buckets" }
     if (grid != null) {
@@ -32,5 +28,5 @@ internal fun schemaSemantics(config: KlauseConfig, overrides: SemanticOverrides)
             "schema float-linear scale cannot be represented exactly in binary64"
         }
     }
-    return EffectiveSourceSemantics(schemaSemantics, effective)
+    return resolved
 }

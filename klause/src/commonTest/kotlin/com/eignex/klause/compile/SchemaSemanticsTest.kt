@@ -2,7 +2,6 @@ package com.eignex.klause.compile
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.FloatSemantics
@@ -64,13 +63,13 @@ class SchemaSemanticsTest {
     }
 
     @Test
-    fun `legacy schema bucket defaults should be captured independently for each compilation`() {
+    fun `caller schema bucket defaults should be captured independently for each compilation`() {
         val source = object : VariableSchema() {
             val x by optFloatVar(0.0, 1.0)
         }
 
-        val first = source.compile(KlauseConfig.DEFAULT.copy(floatBuckets = 7))
-        val second = source.compile(KlauseConfig.DEFAULT.copy(floatBuckets = 9))
+        val first = source.compile(semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(7, 1_000_000)))
+        val second = source.compile(semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(9, 1_000_000)))
 
         assertEquals(7, first.floatDecoders.getValue("x").buckets)
         assertEquals(9, second.floatDecoders.getValue("x").buckets)
@@ -78,7 +77,7 @@ class SchemaSemanticsTest {
     }
 
     @Test
-    fun `caller absent value policy should replace legacy canonical pinning`() {
+    fun `caller absent value policy should replace declared canonical pinning`() {
         val source = object : VariableSchema() {
             val x by optFloatVar(0.0, 1.0, buckets = 5)
         }

@@ -85,7 +85,7 @@ import com.eignex.skema.SchemaDef
 import kotlin.math.roundToInt
 
 internal class Compiler(config: KlauseConfig, overrides: SemanticOverrides) {
-    private val semantics = schemaSemantics(config, overrides)
+    private val semantics = schemaSemantics(overrides)
     private val settings = config.problemSettings()
 
     fun compile(def: SchemaDef<SchemaEntry>): CompiledSchema = Lowering(settings, semantics).run(def)

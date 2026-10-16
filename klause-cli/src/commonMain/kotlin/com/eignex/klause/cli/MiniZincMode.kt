@@ -1,7 +1,7 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_HI
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_LO
 
 import com.eignex.klause.formats.flatzinc.OznApplier
 import com.eignex.klause.formats.flatzinc.SolveDirective
@@ -51,7 +51,6 @@ internal object MiniZincMode : CliMode {
                 valueLabel = "file",
                 help = "MiniZinc output model (.ozn) for solution reconstruction",
             ) { oznPath = it },
-            // Advanced unbounded-`var int` range knobs (also env-configurable); hidden from --help.
             FlagSpec(listOf("--unbounded-int-lo"), true) { unboundedIntLo = requireNotNull(it).toLong() },
             FlagSpec(listOf("--unbounded-int-hi"), true) { unboundedIntHi = requireNotNull(it).toLong() },
             // Like `minizinc --output-objective`: append `_objective = <value>;` to each solution
@@ -76,23 +75,18 @@ internal object MiniZincMode : CliMode {
         )
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            // Unbounded `var int` resolution: CLI flag → KlauseConfig → built-in default.
             val config = common.config
             // Stream the .fzn straight from disk: the lexer/parser pull characters incrementally, so the
             // whole source is never held as one String. Parsing only reads; the base bake runs as
             // presolve step 0, bounded by the presolve deadline.
-            val floatLo = unboundedFloatLo ?: config.unboundedFloatLo
-            val floatHi = unboundedFloatHi ?: config.unboundedFloatHi
+            val floatLo = unboundedFloatLo ?: DEFAULT_UNBOUNDED_FLOAT_LO
+            val floatHi = unboundedFloatHi ?: DEFAULT_UNBOUNDED_FLOAT_HI
             if (!common.exact && floatLo > floatHi) usageError("unbounded float lower bound exceeds upper bound")
             val executionProgram = parseFlatZincExecution(
                 settings = config.problemSettings(),
                 source = openFileSource(path),
-                floatBuckets = config.floatBuckets,
-                floatScale = config.floatScale,
-                unboundedIntLo = unboundedIntLo
-                    ?: config.unboundedIntLo.takeUnless { it == DEFAULT_UNBOUNDED_INT_LO },
-                unboundedIntHi = unboundedIntHi
-                    ?: config.unboundedIntHi.takeUnless { it == DEFAULT_UNBOUNDED_INT_HI },
+                unboundedIntLo = unboundedIntLo,
+                unboundedIntHi = unboundedIntHi,
                 unboundedFloatLo = floatLo,
                 unboundedFloatHi = floatHi,
                 exactFloats = common.exact,
