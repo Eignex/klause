@@ -206,8 +206,10 @@ The snapshot is cleared by assertions, retraction, restart and close.
 Complete mixed witness recovery uses the current exact-linear operation token for
 integer guesses, source-prefix reconstruction, selected-row substitution, equation
 repair, graph construction and full-row validation. Equation repair admits at most
-65,536 input entries and pivot cells and 4,096-bit scalars; pairing, sparse elimination
-and substitution charge the same token before bounded arithmetic. Its difference potential query charges copied cells and conservative
+65,536 input entries, pivot cells and projected entries and 4,096-bit scalars; pairing,
+sparse elimination and substitution charge the same token before bounded arithmetic.
+Retained pivots can reduce inequalities to a difference graph over free real coordinates;
+this reuses the same decomposition and token, without a second elimination or LP call. Its difference potential query charges copied cells and conservative
 edge-sweep and predecessor-walk batches to that same token. These nonrefundable
 batches add no allowance. An observed stop withholds the recovered point, and a
 failed guessed integer assignment supplies no source refutation.
@@ -262,11 +264,7 @@ coordinates can register bounded comparison rows, charging the opening token. In
 columns use the same entry and scalar limits; their fractional point values remain
 branch-order guesses. Evaluation of its existing completed point charges that
 check's existing operation token. This direct primitive path creates no source-clause
-index or Boolean draw. A complete mixed worker can lazily build the existing bounded
-source-clause adapter at its first live-point consultation. Its factor pass and
-index construction charge the retained opening token under the existing source,
-storage and visit limits. Declined construction retains spent work and the direct
-provider; private queries perform no lazy construction. Closing releases the index.
+index or Boolean draw.
 For a default opening with an established complete pure-real difference graph,
 an at-most-one or exactly-one source Boolean cardinality over three or more
 literals retains direct comparison guidance under the existing operation token.
@@ -280,8 +278,7 @@ The opening registration and all capture work already spent remain charged witho
 checks skip released hint capture. No live consultation means this release has not
 occurred, including when caller preferences bypass the component. Required source,
 graph, LP and witness work retains its existing token and limits.
-Outside the complete mixed path, other built-in linear guidance and compound
-indexed preferences remain opt-in.
+Other built-in linear guidance and compound indexed preferences remain opt-in.
 Their existing real-coordinate producer admission is unchanged.
 Explicit zero can retain construction observations but withholds component
 preferences; positive values permit indexed guidance. The local-search flip ceiling

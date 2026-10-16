@@ -39,11 +39,8 @@ reuse completed partial LP points for the same direct primitive Boolean preferen
 providers retain precedence; explicit zero and positive allowances retain their
 existing real-coordinate producer admission and opt-in behavior. Integer-only
 sources use the same default path under [linear-integer semantics](linear-integer.md).
-A complete worker can lazily build the existing bounded source-clause adapter at
-its first consultation with a live point, extending primitive preferences to compound
-Boolean choices. Private queries retain direct primitive preferences; source and
-storage limits retain their existing bounded admission. An index decline keeps the
-direct provider. No Boolean draw or extra LP check is created. Preferences remain guesses about branch order; a
+No source-clause index, Boolean draw or extra LP check is created by the default
+path. Preferences remain guesses about branch order; a
 fractional source integer is not a model value and integrality remains a
 complete-check requirement. Integer branches, retraction, stops and opening close
 retain the component point lifetime and existing work owners.
@@ -80,8 +77,11 @@ branch bounds. It first checks the exact IEEE real prefix and rationally reconst
 source reals against those rows, independently of LP auxiliary columns. If neither
 point passes, a residual with wider rows can repair its guessed real prefix through
 paired opposite, non-strict source equations. Bounded sparse elimination retains
-free-coordinate guesses and reconstructs pivot values. If the remaining real system
-is entirely a supported difference graph, an exact graph point can complete those guesses. The full rows,
+free-coordinate guesses and reconstructs pivot values. If that guess fails full-row
+validation, the same retained pivots reduce the remaining inequalities. A supported
+difference residual can complete the free real coordinates before pivot reconstruction.
+Without equation repair, an entirely supported real difference graph can also complete
+the integer guesses. The full rows,
 strictness, integrality and source reconstruction still gate acceptance. Failed or
 unsupported guesses supply no conflict, bound or exhaustion claim. This path adds
 no LP solve and uses the current operation allowance; private neighborhood openings
