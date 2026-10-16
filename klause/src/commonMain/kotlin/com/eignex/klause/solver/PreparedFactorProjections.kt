@@ -1,10 +1,10 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
+import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem

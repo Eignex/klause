@@ -6689,6 +6689,34 @@ final class com.eignex.klause.factor.global/AllDifferent : com.eignex.klause.fac
     final fun structuralReduce(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.ir/FactorReduction // com.eignex.klause.factor.global/AllDifferent.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 }
 
+final class com.eignex.klause.factor.global/Distinct : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.global/Distinct|null[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.factor.global/Distinct.Operand>, kotlin/Int = ...) // com.eignex.klause.factor.global/Distinct.<init>|<init>(kotlin.collections.List<com.eignex.klause.factor.global.Distinct.Operand>;kotlin.Int){}[0]
+
+    final val activator // com.eignex.klause.factor.global/Distinct.activator|{}activator[0]
+        final fun <get-activator>(): kotlin/Int // com.eignex.klause.factor.global/Distinct.activator.<get-activator>|<get-activator>(){}[0]
+    final val operands // com.eignex.klause.factor.global/Distinct.operands|{}operands[0]
+        final fun <get-operands>(): kotlin.collections/List<com.eignex.klause.factor.global/Distinct.Operand> // com.eignex.klause.factor.global/Distinct.operands.<get-operands>|<get-operands>(){}[0]
+    final val variables // com.eignex.klause.factor.global/Distinct.variables|{}variables[0]
+        final fun <get-variables>(): com.eignex.klause.ir/MixedVars // com.eignex.klause.factor.global/Distinct.variables.<get-variables>|<get-variables>(){}[0]
+
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.factor.global/Distinct // com.eignex.klause.factor.global/Distinct.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.global/Distinct.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/Distinct.structuralKey|structuralKey(){}[0]
+
+    final class Operand { // com.eignex.klause.factor.global/Distinct.Operand|null[0]
+        constructor <init>(kotlin/IntArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.simplex.exact/BigFraction = ...) // com.eignex.klause.factor.global/Distinct.Operand.<init>|<init>(kotlin.IntArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.simplex.exact.BigFraction){}[0]
+
+        final val coefficients // com.eignex.klause.factor.global/Distinct.Operand.coefficients|{}coefficients[0]
+            final fun <get-coefficients>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.factor.global/Distinct.Operand.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
+        final val constant // com.eignex.klause.factor.global/Distinct.Operand.constant|{}constant[0]
+            final fun <get-constant>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.factor.global/Distinct.Operand.constant.<get-constant>|<get-constant>(){}[0]
+        final val references // com.eignex.klause.factor.global/Distinct.Operand.references|{}references[0]
+            final fun <get-references>(): kotlin/IntArray // com.eignex.klause.factor.global/Distinct.Operand.references.<get-references>|<get-references>(){}[0]
+        final val size // com.eignex.klause.factor.global/Distinct.Operand.size|{}size[0]
+            final fun <get-size>(): kotlin/Int // com.eignex.klause.factor.global/Distinct.Operand.size.<get-size>|<get-size>(){}[0]
+    }
+}
+
 final class com.eignex.klause.factor.global/GlobalCardinality : com.eignex.klause.factor/OptionalFactor, com.eignex.klause.ir/Factor { // com.eignex.klause.factor.global/GlobalCardinality|null[0]
     constructor <init>(kotlin/IntArray, kotlin/LongArray, kotlin/IntArray? = ..., kotlin/IntArray? = ..., kotlin/IntArray? = ..., kotlin/Boolean = ..., kotlin/IntArray = ...) // com.eignex.klause.factor.global/GlobalCardinality.<init>|<init>(kotlin.IntArray;kotlin.LongArray;kotlin.IntArray?;kotlin.IntArray?;kotlin.IntArray?;kotlin.Boolean;kotlin.IntArray){}[0]
 

@@ -1750,6 +1750,37 @@ public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/kla
 	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
+public final class com/eignex/klause/factor/global/Distinct : com/eignex/klause/ir/Factor {
+	public fun <init> (Ljava/util/List;I)V
+	public synthetic fun <init> (Ljava/util/List;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun canSubstituteAffine (IIII)Z
+	public final fun getActivator ()I
+	public fun getBoolVars ()[I
+	public fun getIntVars ()[I
+	public fun getLinearForm ()Lcom/eignex/klause/ir/LinearForm;
+	public final fun getOperands ()Ljava/util/List;
+	public fun getStructuralKeyWeight ()I
+	public fun getVariables ()Lcom/eignex/klause/ir/MixedVars;
+	public synthetic fun getVariables ()Lcom/eignex/klause/ir/VarList;
+	public fun isValueAnonymous ()Z
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/factor/global/Distinct;
+	public synthetic fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
+	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
+	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
+}
+
+public final class com/eignex/klause/factor/global/Distinct$Operand {
+	public fun <init> ([ILjava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;)V
+	public synthetic fun <init> ([ILjava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCoefficients ()Ljava/util/List;
+	public final fun getConstant ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getReferences ()[I
+	public final fun getSize ()I
+}
+
 public final class com/eignex/klause/factor/global/GlobalCardinality : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/ir/Factor {
 	public fun <init> ([I[J[I[I[IZ[I)V
 	public synthetic fun <init> ([I[J[I[I[IZ[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
