@@ -83,9 +83,12 @@ internal object Compiler {
         // shadow stack (innermost binding on top) for O(1) lookup; `scopeNames` records the names bound
         // by each active scope so it can be popped. A deeply nested formula unwinds its `let` chain
         // iteratively into these structures instead of recursing through the call stack.
-        private val bindingStacks = HashMap<String, ArrayDeque<Binding>>()
-        private val scopeNames = ArrayDeque<List<String>>()
-        internal fun lookup(name: String): Binding? = bindingStacks[name]?.lastOrNull()
+        internal class BindingScope {
+            val bindingStacks = HashMap<String, ArrayDeque<Binding>>()
+            val scopeNames = ArrayDeque<List<String>>()
+        }
+        internal var bindingScope = BindingScope()
+        internal fun lookup(name: String): Binding? = bindingScope.bindingStacks[name]?.lastOrNull()
 
         /** The literal for a Bool binding, compiling its held term on the first ask. */
         internal fun boolLit(b: Binding): Int {
@@ -125,17 +128,17 @@ internal object Compiler {
                 // A value reachable by name can be referenced any number of times, so an `ite` chain it
                 // holds is finished: nothing can extend it any more, and it must define its variable.
                 (b.lin as? IntComb.Narrow)?.lin?.asSimpleVar()?.let { closeIteChain(it) }
-                bindingStacks.getOrPut(name) { ArrayDeque() }.addLast(b)
+                bindingScope.bindingStacks.getOrPut(name) { ArrayDeque() }.addLast(b)
                 names.add(name)
             }
-            scopeNames.addLast(names)
+            bindingScope.scopeNames.addLast(names)
         }
 
         internal fun popLetScope() {
-            for (name in scopeNames.removeLast()) {
-                val stack = bindingStacks.getValue(name)
+            for (name in bindingScope.scopeNames.removeLast()) {
+                val stack = bindingScope.bindingStacks.getValue(name)
                 stack.removeLast()
-                if (stack.isEmpty()) bindingStacks.remove(name)
+                if (stack.isEmpty()) bindingScope.bindingStacks.remove(name)
             }
         }
 

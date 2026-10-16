@@ -52,7 +52,8 @@ private fun Res.asReal(): RealComb = when (this) {
 private sealed interface Frame {
     class Eval(val node: SExpr, val sort: Sort) : Frame
     class Combine(val node: SExpr.SList, val sort: Sort, val argc: Int) : Frame
-    class MakeScope(val names: List<String>, val bools: BooleanArray) : Frame
+    class MakeScope(val names: List<String>, val bools: BooleanArray, val isolated: Boolean = false) : Frame
+    class RestoreBindings(val scope: Compiler.Builder.BindingScope) : Frame
     object PopScope : Frame
 }
 
@@ -71,7 +72,10 @@ internal fun Compiler.Builder.evalTerm(root: SExpr, sort: Sort): Res {
         when (val fr = work.removeLast()) {
             is Frame.PopScope -> popLetScope()
 
+            is Frame.RestoreBindings -> bindingScope = fr.scope
+
             is Frame.MakeScope -> {
+                if (fr.isolated) bindingScope = Compiler.Builder.BindingScope()
                 val k = fr.names.size
                 // Values were pushed in binding order, so the top-of-stack is the last binding.
                 val popped = ArrayList<Res>(k)
@@ -103,8 +107,8 @@ internal fun Compiler.Builder.evalTerm(root: SExpr, sort: Sort): Res {
                     is SExpr.Atom -> {
                         // A bare reference to a 0-parameter `define-fun` inlines its body.
                         val m = macros[node.text]
-                        if (m != null && m.params.isEmpty()) {
-                            work.addLast(Frame.Eval(m.body, fr.sort))
+                        if (m != null && m.params.isEmpty() && lookup(node.text) == null) {
+                            scheduleMacro(SExpr.SList(listOf(node)), node.text, fr.sort, work)
                         } else {
                             vals.addLast(evalAtom(node, fr.sort))
                         }
@@ -164,8 +168,19 @@ private fun Compiler.Builder.scheduleMacro(node: SExpr.SList, head: String, sort
     if (callArgs.size != m.params.size) {
         smtUnsupported("'$head' applied to ${callArgs.size} args, expected ${m.params.size}")
     }
-    val bindings = SExpr.SList(m.params.indices.map { SExpr.SList(listOf(SExpr.Atom(m.params[it]), callArgs[it])) })
-    scheduleLet(SExpr.SList(listOf(SExpr.Atom("let"), bindings, m.body)), sort, work)
+    val bools = BooleanArray(callArgs.size) { isBoolExpr(callArgs[it]) }
+    // Arguments see the caller; free names in the body see declarations and its own parameters.
+    work.addLast(Frame.RestoreBindings(bindingScope))
+    work.addLast(Frame.Eval(m.body, sort))
+    work.addLast(Frame.MakeScope(m.params, bools, isolated = true))
+    for (i in callArgs.indices.reversed()) {
+        val argumentSort = when {
+            bools[i] -> Sort.BOOL
+            isRealExpr(callArgs[i]) -> Sort.REAL
+            else -> Sort.INT
+        }
+        work.addLast(Frame.Eval(callArgs[i], argumentSort))
+    }
 }
 
 /** The child sub-terms to fold (with their sorts) for a non-`let` list node. */
