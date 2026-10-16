@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.formats.smtlib.SmtLibProblem
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.PlannedSearch
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import java.io.File
@@ -26,7 +27,7 @@ internal object LinearCachedPointInspection {
             unavailable("layout-field-unavailable: ${missing.message}")
         }
         out.resolve("cached-root-point.json").writeText(buildJsonObject {
-            put("schema", 1)
+            put("schema", 2)
             put("sourceSha256", sourceHash)
             put("entryPoint", "direct-library-linear-root-opening")
             put("sourceVerdictClaim", false)
@@ -59,11 +60,16 @@ internal object LinearCachedPointInspection {
         val float = field(result, "float") ?: return unavailable("no-cached-float-result")
         val primal = field(float, "primal") as DoubleArray
         if (primal.size > MAX_COORDINATES) return unavailable("diagnostic-vector-limit")
+        val witness = field(result, "witness")
+        val exactPrimal = witness?.let { field(it, "primal") as List<*> }
+        val exactLength = exactPrimal?.size
+        val exactValues = exactPrimal?.takeIf { it.size <= MAX_COORDINATES }?.toList()
         val model = field(component, "model") as Problem
         if (compiled.model.numBoolVars > MAX_COORDINATES) return unavailable("diagnostic-boolean-limit")
         val prepared = requireNotNull(field(run, "prepared"))
         val preparedSource = field(prepared, "source")
         val preparedProblem = field(prepared, "problem")
+        val sourceMappingMetadata = mappingMetadata(prepared, compiled)
         val trail = requireNotNull(field(owner, "trail"))
         val state = requireNotNull(field(trail, "state"))
         val stateModel = requireNotNull(field(state, "model"))
@@ -106,6 +112,7 @@ internal object LinearCachedPointInspection {
             put("layoutContract", "LiveQfLraSystem.install: real then integer source prefix, followed by expression columns")
             put("preparedSourceIsCompiled", preparedSource === compiled.model)
             put("preparedProblemIsCompiled", preparedProblem === compiled.model)
+            put("sourceMappingMetadata", sourceMappingMetadata)
             put("componentModelClass", model.javaClass.name)
             put("modelKeyIsComponentModel", modelKeyMatches)
             put("systemSourceIsComponentModel", systemSourceMatches)
@@ -130,7 +137,8 @@ internal object LinearCachedPointInspection {
             put("stateRevisions", stateRevisions)
             put("cachedVerdict", field(result, "verdict").toString())
             put("floatOptimal", field(float, "optimal") as Boolean)
-            put("exactWitnessPresent", field(result, "witness") != null)
+            put("exactWitnessPresent", witness != null)
+            put("exactPointSnapshot", exactPoint(exactValues, exactLength))
             put("declaredBooleans", buildJsonObject {
                 compiled.boolVarNames.toSortedMap().forEach { (name, id) ->
                     put(name, buildJsonObject {
@@ -156,6 +164,10 @@ internal object LinearCachedPointInspection {
         }
         check(lpLazy.value === lp && systemLazy.value === system && field(lp, "owner") === owner)
         check(field(owner, "lastResult") === result && field(result, "float") === float)
+        check(field(result, "witness") === witness)
+        check(witness == null || field(witness, "primal") === exactPrimal)
+        check(exactValues == null || exactValues.indices.all { exactPrimal?.get(it) === exactValues[it] })
+        check(exactPrimal?.size == exactLength)
         check(field(float, "primal") === primal && rawBits.indices.all { rawBits[it] == primal[it].toRawBits() })
         check(field(owner, "trail") === trail && field(trail, "state") === state && field(state, "model") === stateModel)
         check(revisions(state) == stateRevisions && field(lp, "closed") == lpClosed)
@@ -165,6 +177,7 @@ internal object LinearCachedPointInspection {
         check((field(system, "source") === model) == systemSourceMatches)
         check((field(float, "exactState") === state) == floatStateMatches)
         check((field(component, "context") === session) == componentContextMatches)
+        check(mappingMetadata(prepared, compiled) == sourceMappingMetadata)
         check((field(component, "bools") as IntArray).contentEquals(theoryBools))
         check(sessionBools.indices.all { session.boolValue(it) == sessionBools[it] })
         check(session.decisionLevel == level && field(session, "checks") == checks && work.snapshot() == counters)
@@ -176,6 +189,90 @@ internal object LinearCachedPointInspection {
 
     private fun names(names: Map<String, Int>): JsonObject = buildJsonObject {
         names.toSortedMap().forEach { (name, id) -> put(name, id) }
+    }
+
+    private fun exactPoint(values: List<*>?, length: Int?): JsonObject {
+        if (length == null) return unavailable("no-cached-exact-witness")
+        if (values == null) return unavailable("diagnostic-exact-vector-limit")
+        val copied = ArrayList<Pair<String, String>>(values.size)
+        var remaining = MAX_EXACT_TEXT_CHARACTERS
+        for (raw in values) {
+            val value = raw as BigFraction
+            val numerator = value.num.toString()
+            val denominator = value.den.toString()
+            if (numerator.length > remaining) return unavailable("diagnostic-exact-text-limit")
+            remaining -= numerator.length
+            if (denominator.length > remaining) return unavailable("diagnostic-exact-text-limit")
+            remaining -= denominator.length
+            copied += numerator to denominator
+        }
+        return buildJsonObject {
+            put("status", "CAPTURED")
+            put("authority", "CACHED_CONTINUOUS_LP_POINT_ONLY")
+            put("vectorLength", length)
+            put("values", buildJsonArray {
+                copied.forEach { (numerator, denominator) ->
+                    add(buildJsonObject {
+                        put("numerator", numerator)
+                        put("denominator", denominator)
+                    })
+                }
+            })
+        }
+    }
+
+    private fun mappingMetadata(prepared: Any, compiled: SmtLibProblem): JsonObject {
+        val mapping = requireNotNull(field(prepared, "mapping"))
+        val rebuild = requireNotNull(field(prepared, "rebuild"))
+        val steps = field(rebuild, "steps") as List<*>
+        if (steps.size > MAX_COORDINATES) return unavailable("diagnostic-rebuild-step-limit")
+        val writes = steps.map { raw ->
+            val step = requireNotNull(raw)
+            val kind = step.javaClass.simpleName
+            val space = when (kind) {
+                "CopyLiteral", "SatisfyClauses", "RepairClause" -> "BOOLEAN"
+                "AffineValue", "QuotientValue" -> "INTEGER"
+                else -> "UNKNOWN"
+            }
+            val variable = when (kind) {
+                "RepairClause" -> (field(step, "literal") as Int) ushr 1
+                "CopyLiteral", "SatisfyClauses", "AffineValue", "QuotientValue" -> field(step, "variable") as Int
+                else -> null
+            }
+            buildJsonObject {
+                put("kind", step.javaClass.name)
+                put("space", space)
+                put("mayWriteId", variable)
+                put("writesDeclaredCoordinate", when (space) {
+                    "BOOLEAN" -> variable in compiled.boolVarNames.values
+                    "INTEGER" -> variable in compiled.intVarNames.values
+                    else -> null
+                })
+            }
+        }
+        val source = field(prepared, "source") as Problem
+        val target = field(prepared, "problem") as Problem
+        return buildJsonObject {
+            put("status", "CAPTURED")
+            put("reconstructionInvoked", false)
+            put("coordinateMappingPolicyChanged", false)
+            put("mappingSourceIsPreparedSource", field(mapping, "source") === source)
+            put("mappingTargetIsPreparedProblem", field(mapping, "target") === target)
+            put("mappingRebuildIsPreparedRebuild", field(mapping, "rebuild") === rebuild)
+            put("capturedMappingChainLength", (field(mapping, "capturedChain") as List<*>).size)
+            put("sourceBooleans", source.numBoolVars)
+            put("sourceIntegers", source.numIntVars)
+            put("sourceReals", source.numRealVars)
+            put("targetBooleans", target.numBoolVars)
+            put("targetIntegers", target.numIntVars)
+            put("targetReals", target.numRealVars)
+            put("sourcePassesFired", buildJsonArray {
+                (field(prepared, "passesFired") as List<*>).forEach { pass ->
+                    add(JsonPrimitive((pass as Enum<*>).name))
+                }
+            })
+            put("rebuildSteps", buildJsonArray { writes.forEach { add(it) } })
+        }
     }
 
     private fun revisions(state: Any): JsonObject = buildJsonObject {
@@ -194,4 +291,5 @@ internal object LinearCachedPointInspection {
         .apply { isAccessible = true }.get(owner)
 
     private const val MAX_COORDINATES = 65_536
+    private const val MAX_EXACT_TEXT_CHARACTERS = 8 * 1024 * 1024
 }

@@ -313,13 +313,17 @@ is explicitly closed. This diagnostic claims neither CLI routing equivalence nor
 source verdict, and cannot establish a default-route recovery.
 
 With `inspect=cached-root-point`, the tool copies an already cached floating LP
-point from the actual initialized root component before it closes. It invokes no
-additional preparation, solve, traversal or reconstruction. Raw IEEE bits, Boolean
-tri-state assignments, declared-name IDs and state provenance remain separate from
+point and any stored exact LP witness from the actual initialized root component
+before it closes. It invokes no additional preparation, solve, traversal or
+reconstruction. Raw IEEE bits, Boolean tri-state assignments, exact numerator and
+denominator strings, declared-name IDs and state provenance remain separate from
 feasibility or witness authority. Source-coordinate mapping requires unchanged
 preparation, matching installed model identities and a cached float result belonging
 to the current exact state. Missing state or uncertain mapping remains explicit;
-values are never rounded or filled. Snapshot invariants check that observation
+values are never rounded or filled. The report includes the actual source mapping's
+source/target/rebuild identities, fired passes and conservative reconstruction write
+IDs. It invokes no reconstruction and keeps changed preparation unmapped.
+Snapshot invariants check that observation
 leaves the state, point, assignments and work counters unchanged. Diagnostic
 overhead occurs after the opening measurement; this mode makes no CLI timing,
 source-verdict or published-candidate claim.
