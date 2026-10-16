@@ -280,7 +280,8 @@ The opening registration and all capture work already spent remain charged witho
 checks skip released hint capture. No live consultation means this release has not
 occurred, including when caller preferences bypass the component. Required source,
 graph, LP and witness work retains its existing token and limits.
-Other built-in linear guidance and compound indexed preferences remain opt-in.
+Outside the complete mixed path, other built-in linear guidance and compound
+indexed preferences remain opt-in.
 Their existing real-coordinate producer admission is unchanged.
 Explicit zero can retain construction observations but withholds component
 preferences; positive values permit indexed guidance. The local-search flip ceiling
