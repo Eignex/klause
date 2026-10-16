@@ -70,6 +70,14 @@ class BuildProvenanceTest {
     }
 
     @Test
+    fun `preflight options should remain distinct from measured solve options in provenance`() {
+        val environment = mapOf("KLAUSE_CLI_OPTS" to "-Xmx3g -XX:LogFile=solve.xml",
+            "KLAUSE_CLI_PREFLIGHT_OPTS" to "-Xmx3g")
+
+        assertEquals(environment, runtimeOptions(environment))
+    }
+
+    @Test
     fun `a manifest should reuse captured hashes and bind each case runtime options`() = withRoot { root ->
         val launcher = distribution(root)
         val runtime = File(root, "jdk")

@@ -241,6 +241,56 @@ wall time and verdict to `$OUT/timings.json`; without arguments it times `opb-co
   suite=dimacs-core problem=random3sat-50-200 repeats=3 timeout=10000
 ```
 
+`com.eignex.klause.bench.profile.CliCompilationStudy` captures fresh paired CLI
+invocations on a Linux profile worker. Required arguments are `selection=<https-url>`,
+`sha256=<selection-sha256>`, `plan=<https-url>`, `plan-sha256=<sha256>`,
+`control=<40-character-git-sha>` and `candidate=<40-character-git-sha>`. Optional
+`families=<https-url>` and `families-sha256=<sha256>` must appear together. Metadata
+URLs have no credentials, query or fragment. Selection and plan inputs are bounded
+to 1 MiB each; family declarations to 16 MiB.
+
+Selection entries contain `suite`, `problem`, `format` and original `sourceHashes`
+(`model`, optionally `data`). The catalog source bytes must match every digest.
+Plans explicitly contain `mode`, original input ordinals in `inputs`, `repeats`,
+`timeout` in milliseconds, `engines` and `profile`. Optional `params`, `lp`, `exact`,
+`recipe`, `caseSuffix`, `orderOffset` and `solverSeed` preserve distinct controls;
+the default solver seed is 3. Source validation is fixed on for MiniZinc/XCSP3 and
+cannot be overridden by plan parameters. Case names must be unique across all
+plans. Bounds are 128 inputs, 100 repeats, one hour per invocation, 4096 planned
+arm invocations, 128 MiB per original source and 1 GiB total source reads.
+
+Each pinned revision is built in a separate owned detached worktree with
+`:klause-cli:installJvmDist` and the installed bench. Equal revisions are allowed
+for repeated source controls. Both pinned harnesses must support
+`KLAUSE_CLI_PREFLIGHT_OPTS`; an older harness is rejected before building.
+Before/after build cleanliness, actual heads and
+CLI/harness/JDK manifests are retained; installed-file metadata is checked around
+every invocation. Arm order alternates by original ordinal, repetition and offset.
+Both arms use one pinned CPU, one visible processor, Serial GC, a 3 GiB CLI heap
+and one thread for the configured native math libraries. Profiled cases retain
+threshold-zero compilation/phase/inlining JFR, compilation XML and class-loading
+source logs; unprofiled controls retain the ordinary CLI options without those
+observers. `KLAUSE_CLI_PREFLIGHT_OPTS` selects the unprofiled options for the
+version check, while `KLAUSE_CLI_OPTS` retains the measured solve options. The
+capture sets the same heap, collector and processor controls in both. Each case
+records both option strings, and installed provenance retains their separate
+identities. Version checks cannot rotate or overwrite the solve recording files.
+Initial environment/system-property JFR events are disabled; explicit
+controlled options and installed provenance remain recorded.
+
+Every attempted case retains its command, raw streams, watchdog/exit, original
+benchmark record, source-hash check and recording-presence fields. Ordinary child
+failures do not discard later planned cases. MiniZinc/XCSP3 checks follow the
+ordinary bench path; separate Boolean/SMT/MPS verifier setup and runs follow all
+planned measurements. Their source/dependency identities, outputs and exits stay
+separate from capture completion and source validity. Owned builds and checker
+environments are cleaned, with cleanup failures retained. Complete output is
+compressed through the capture archive. Choose explicit cohorts that fit the lab
+return limit; an incomplete returned archive establishes no complete study.
+Capture alone establishes no source proof, root-cost comparison, allocation/RNG/
+work equivalence or performance benefit. Analyse complete recordings and run the
+required independent runtime and state controls separately.
+
 `bench.profile.SearchSelectionProfile` compares default selection with all six
 Boolean/finite/arithmetic category priorities on an original satisfaction SMT source.
 Pass `source64=<base64 source>` and `finite=<bounded integer name>`; optional
