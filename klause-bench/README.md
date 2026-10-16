@@ -323,6 +323,9 @@ to the current exact state. Missing state or uncertain mapping remains explicit;
 values are never rounded or filled. The report includes the actual source mapping's
 source/target/rebuild identities, fired passes and conservative reconstruction write
 IDs. It invokes no reconstruction and keeps changed preparation unmapped.
+Write-set completeness requires known steps, valid source IDs, matching mapping
+identities and an empty composed chain. Declared-coordinate intersections remain
+unqualified when the source identity or the pinned column-ID contract is unavailable.
 Snapshot invariants check that observation
 leaves the state, point, assignments and work counters unchanged. Diagnostic
 overhead occurs after the opening measurement; this mode makes no CLI timing,

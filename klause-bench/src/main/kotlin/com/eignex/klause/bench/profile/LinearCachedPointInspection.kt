@@ -225,10 +225,24 @@ internal object LinearCachedPointInspection {
         val mapping = requireNotNull(field(prepared, "mapping"))
         val rebuild = requireNotNull(field(prepared, "rebuild"))
         val steps = field(rebuild, "steps") as List<*>
-        if (steps.size > MAX_COORDINATES) return unavailable("diagnostic-rebuild-step-limit")
+        if (steps.size > MAX_COORDINATES) return buildJsonObject {
+            unavailable("diagnostic-rebuild-step-limit").forEach { (key, value) -> put(key, value) }
+            put("completeWriteSet", false)
+            put("declaredWriteIntersectionsQualified", false)
+        }
+        val source = field(prepared, "source") as Problem
+        val target = field(prepared, "problem") as Problem
+        val sourceMatches = field(mapping, "source") === source
+        val targetMatches = field(mapping, "target") === target
+        val rebuildMatches = field(mapping, "rebuild") === rebuild
+        val chainLength = (field(mapping, "capturedChain") as List<*>).size
+        val intersectionsQualified = source === compiled.model && sourceMatches && targetMatches && rebuildMatches &&
+            chainLength == 0 && source.numBoolVars == target.numBoolVars &&
+            source.numIntVars == target.numIntVars && source.numRealVars == target.numRealVars
+        var allWritesKnownAndInRange = true
         val writes = steps.map { raw ->
             val step = requireNotNull(raw)
-            val kind = step.javaClass.simpleName
+            val kind = step.javaClass.name.removePrefix("com.eignex.klause.presolve.RebuildStep\$")
             val space = when (kind) {
                 "CopyLiteral", "SatisfyClauses", "RepairClause" -> "BOOLEAN"
                 "AffineValue", "QuotientValue" -> "INTEGER"
@@ -239,27 +253,35 @@ internal object LinearCachedPointInspection {
                 "CopyLiteral", "SatisfyClauses", "AffineValue", "QuotientValue" -> field(step, "variable") as Int
                 else -> null
             }
+            val inRange = when (space) {
+                "BOOLEAN" -> variable != null && variable in 0 until source.numBoolVars
+                "INTEGER" -> variable != null && variable in 0 until source.numIntVars
+                else -> null
+            }
+            if (inRange != true) allWritesKnownAndInRange = false
             buildJsonObject {
                 put("kind", step.javaClass.name)
                 put("space", space)
                 put("mayWriteId", variable)
-                put("writesDeclaredCoordinate", when (space) {
+                put("writeIdInSourceRange", inRange)
+                put("writesDeclaredCoordinate", if (!intersectionsQualified || inRange != true) null else when (space) {
                     "BOOLEAN" -> variable in compiled.boolVarNames.values
                     "INTEGER" -> variable in compiled.intVarNames.values
                     else -> null
                 })
             }
         }
-        val source = field(prepared, "source") as Problem
-        val target = field(prepared, "problem") as Problem
         return buildJsonObject {
             put("status", "CAPTURED")
             put("reconstructionInvoked", false)
             put("coordinateMappingPolicyChanged", false)
-            put("mappingSourceIsPreparedSource", field(mapping, "source") === source)
-            put("mappingTargetIsPreparedProblem", field(mapping, "target") === target)
-            put("mappingRebuildIsPreparedRebuild", field(mapping, "rebuild") === rebuild)
-            put("capturedMappingChainLength", (field(mapping, "capturedChain") as List<*>).size)
+            put("mappingSourceIsPreparedSource", sourceMatches)
+            put("mappingTargetIsPreparedProblem", targetMatches)
+            put("mappingRebuildIsPreparedRebuild", rebuildMatches)
+            put("capturedMappingChainLength", chainLength)
+            put("columnIdContract", "SourceRebuild.RebuildStep retains eliminated columns without renumbering")
+            put("declaredWriteIntersectionsQualified", intersectionsQualified)
+            put("completeWriteSet", intersectionsQualified && allWritesKnownAndInRange)
             put("sourceBooleans", source.numBoolVars)
             put("sourceIntegers", source.numIntVars)
             put("sourceReals", source.numRealVars)
