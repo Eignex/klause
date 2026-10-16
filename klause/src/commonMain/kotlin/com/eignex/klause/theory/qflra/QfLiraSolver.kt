@@ -984,21 +984,42 @@ class ExactLiraSearchComponent private constructor(
             model.realUpper[real].takeIf(Double::isFinite)?.let { rows += exactColumnUpper(real, it.asFraction()) }
         }
         var entries = rows.size * 2L
+        val arithmetic = MixedPointArithmetic(operationStop)
         for (prepared in preparedRows) {
-            operationStop.charge(1L + prepared.booleans.size)
+            operationStop.charge(1L)
+            if (operationStop()) return null
+            val row = prepared.row
+            if (row.size.toLong() + 1L > 65536L - entries || prepared.booleans.size >= 4096) {
+                observeCompleteStage("SOURCE_EQUALITY_CAPTURE_DECLINED")
+                return null
+            }
+            operationStop.charge(prepared.booleans.size.toLong())
             if (operationStop()) return null
             if (prepared.booleans.any { bools[it] == UNASSIGNED }) continue
-            val row = prepared.row
             operationStop.charge(row.size.toLong() + 1L)
             if (operationStop()) return null
             if ((0 until row.size).none { Term.isReal(row.ref(it)) }) continue
             val truth = node.rowTruth(prepared.address, row, bools) ?: continue
-            val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
-            if (comparison.op == LinearOp.NE) continue
-            val copyEntries = (row.size.toLong() + 1L) * if (comparison.op == LinearOp.EQ) 2L else 1L
-            if (copyEntries > 65536L - entries) return null
+            val relation = if (truth) row.relation else row.relation.complemented()
+            if (relation == LinearOp.NE) continue
+            val copyEntries = (row.size.toLong() + 1L) * if (relation == LinearOp.EQ) 2L else 1L
+            if (copyEntries > 65536L - entries) {
+                observeCompleteStage("SOURCE_EQUALITY_CAPTURE_DECLINED")
+                return null
+            }
             operationStop.charge(copyEntries + prepared.booleans.size)
             if (operationStop()) return null
+            val comparison = prepared.form.checkedComparison(
+                truth,
+                { variable -> bools[variable].takeIf { it != UNASSIGNED }?.let { it == TRUE } },
+                arithmetic::admitted,
+                arithmetic::preflight,
+            )
+            if (operationStop()) return null
+            if (comparison == null) {
+                observeCompleteStage("SOURCE_EQUALITY_CAPTURE_DECLINED")
+                return null
+            }
             entries += copyEntries
             comparison.rowsInto(rows)
             for (variable in prepared.booleans) {

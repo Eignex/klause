@@ -39,8 +39,11 @@ withhold this deduction and retain ordinary numerical handling.
 Equality preparation distinguishes completed refutations from private declines.
 The point-completion adapter preserves its nullable interface, while the proof
 consumer uses only an explicit exact contradiction. It creates no point or LP
-invocation. Its ephemeral workspace retains the existing 65,536 source-entry and
-square-column admission, 4,096-bit arithmetic and containing operation token.
+invocation. Its ephemeral workspace retains the existing 65,536 source entries,
+column count whose square is at most 65,536, 4,096-bit arithmetic and containing
+operation token. Capture admits raw row and antecedent sizes before constructing
+comparisons. Exact-form coefficients, right-hand sides and every Boolean
+substitution intermediate require the same bounded scalar checks and token.
 At most 4,095 distinct active Boolean antecedents enter the flat explanation.
 Every assertion attempt rebuilds the rows from current source values; retraction
 and cancellation cannot retain a pending conflict for another frame.

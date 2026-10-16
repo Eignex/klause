@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.ComparisonClause
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -16,6 +17,8 @@ import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.WideConstants
+import com.eignex.klause.ir.WideConsts
 import com.eignex.klause.ir.constsOf
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.SmtStatsSink
@@ -35,6 +38,8 @@ import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
+import com.eignex.klause.util.shl
+import com.eignex.klause.util.unaryMinus
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -44,6 +49,157 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverConflictTest {
+    @Test
+    fun `source capture should reject oversized Boolean arithmetic before cancellation`() {
+        val wide = BIG_ONE shl 4096
+        val admitted = BIG_ONE shl 4095
+        val cases = listOf(
+            listOf(wide, -wide) to true,
+            listOf(wide, -wide) to false,
+            listOf(-admitted, -admitted, admitted, admitted) to true,
+        )
+        for ((coefficients, positive) in cases) {
+            val references = IntArray(coefficients.size + 1) { index ->
+                if (index == coefficients.size) Term.ofRealVar(1) else Term.ofLit(Lit.make(index + 1, true))
+            }
+            val constants = Array(coefficients.size + 1) { index ->
+                if (index == coefficients.size) BIG_ONE else coefficients[index]
+            }
+            val row = object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+                intArrayOf(1), doubleArrayOf(1.0), LinearOp.LE, 0.0) {
+                override val linearForm: LinearForm = LinearForm.Conjunction(listOf(TaggedLinearRow(
+                    references, WideConstants(WideConsts(constants), BIG_ZERO), LinearOp.LE, activator = 0,
+                )))
+            }
+            val source = Problem(
+                numBoolVars = coefficients.size + 1,
+                intBounds = openBounds(0),
+                numRealVars = 2,
+                realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+                factors = arrayOf(
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                        doubleArrayOf(1.0, 2.0), LinearOp.EQ, 2.0),
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                        doubleArrayOf(1.0, -2.0), LinearOp.EQ, -2.0),
+                    row,
+                ),
+            )
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(source).use { component ->
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(source.numBoolVars))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                for (variable in 1 until source.numBoolVars) {
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, positive))))
+                }
+
+                assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(0)))
+
+                assertEquals(1L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_CAPTURE_DECLINED"))
+                assertEquals(0L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_CONFLICT") ?: 0L)
+            }
+        }
+    }
+
+    @Test
+    fun `source capture should decline an oversized antecedent row before folding`() {
+        val references = IntArray(4096) { index ->
+            if (index == 4095) Term.ofRealVar(1) else Term.ofLit(Lit.make(index + 1, true))
+        }
+        val row = object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+            intArrayOf(1), doubleArrayOf(1.0), LinearOp.LE, 0.0) {
+            override val linearForm: LinearForm = LinearForm.Conjunction(listOf(TaggedLinearRow(
+                references, IntegerConstants(constsOf(LongArray(4096) { 1L }), 0L), LinearOp.LE, activator = 0,
+            )))
+        }
+        val source = Problem(
+            numBoolVars = 4096,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.EQ, 2.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, -2.0), LinearOp.EQ, -2.0),
+                row,
+            ),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4096))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_CAPTURE_DECLINED"))
+            assertEquals(0L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_CONFLICT") ?: 0L)
+        }
+    }
+
+    @Test
+    fun `a stop during bounded Boolean capture should allow a live retry`() {
+        val wide = BIG_ONE shl 4095
+        val row = object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+            intArrayOf(1), doubleArrayOf(1.0), LinearOp.LE, 0.0) {
+            override val linearForm: LinearForm = LinearForm.Conjunction(listOf(TaggedLinearRow(
+                intArrayOf(Term.ofLit(2), Term.ofLit(4), Term.ofRealVar(1)),
+                WideConstants(WideConsts(arrayOf(wide, -wide, BIG_ONE)), BIG_ZERO), LinearOp.LE, activator = 0,
+            )))
+        }
+        val source = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.EQ, 2.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, -2.0), LinearOp.EQ, -2.0),
+                row,
+            ),
+        )
+        var armed = false
+        var stopped = false
+        val stats = SmtStatsSink()
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(3))
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            component.useOperationAllowance { parent ->
+                object : Cancellation {
+                    override fun isCancelled(): Boolean = stopped || parent()
+                    override fun deadline() = parent.deadline()
+                    override fun workMeter() = parent.workMeter()
+                    override fun charge(units: Long) {
+                        parent.charge(units)
+                        if (armed && units == 65L) stopped = true
+                    }
+                }
+            }
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(component.initialize(session))
+            for (variable in listOf(1, 2, 0)) {
+                val decision = SearchDecision.Bool(Lit.make(variable, true))
+                assertIs<ComponentResult.Consistent>(session.push(decision))
+                assertIs<ComponentResult.Consistent>(component.assert(decision, session))
+                if (variable != 0) assertIs<ComponentResult.Consistent>(component.propagate(session))
+            }
+            armed = true
+
+            assertIs<ComponentResult.Indeterminate>(component.propagate(session))
+
+            assertTrue(stopped)
+            assertEquals(0L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_CONFLICT") ?: 0L)
+            armed = false
+            stopped = false
+            val conflict = assertIs<ComponentResult.Conflict>(component.propagate(session))
+            assertEquals(setOf(1, 3, 5), assertNotNull(conflict.explanation).literals.toSet())
+        }
+    }
+
     @Test
     fun `source equalities should refute an incompatible row without a numeric check`() {
         val source = Problem(
@@ -82,8 +238,11 @@ class QfLiraSolverConflictTest {
             realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
             factors = arrayOf(
                 Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.EQ, 1.0),
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
-                    doubleArrayOf(1.0, -2.0), LinearOp.EQ, 1.0),
+                ExactLinear.of(
+                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.ofLong(-2)),
+                    LinearOp.EQ, BigFraction.ONE, activator = 0,
+                ),
                 Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0), LinearOp.GE, 1.0),
             ),
         )
@@ -150,8 +309,11 @@ class QfLiraSolverConflictTest {
             realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
             factors = arrayOf(
                 Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.EQ, 1.0),
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
-                    doubleArrayOf(1.0, -2.0), LinearOp.EQ, 1.0),
+                ExactLinear.of(
+                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.ofLong(-2)),
+                    LinearOp.EQ, BigFraction.ONE, activator = 0,
+                ),
                 Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0), LinearOp.GE, 1.0),
             ),
         )
@@ -189,8 +351,11 @@ class QfLiraSolverConflictTest {
             realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
             factors = arrayOf(
                 Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.EQ, 1.0),
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
-                    doubleArrayOf(1.0, -2.0), LinearOp.EQ, 1.0),
+                ExactLinear.of(
+                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.ofLong(-2)),
+                    LinearOp.EQ, BigFraction.ONE, activator = 0,
+                ),
                 Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0), LinearOp.GE, 1.0),
             ),
         )
