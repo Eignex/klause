@@ -99,7 +99,7 @@ object SmtLibAdmission {
                 val reader = SExprReader(AdmissionSource(source, cancellation))
                 val commands = ArrayList<SExpr>()
                 while (true) {
-                    cancellation.polynomialSourceCheckpoint()
+                    cancellation.polynomialSourceCheckpoint(1)
                     commands.add(reader.readCommandOrNull() ?: break)
                 }
                 commands

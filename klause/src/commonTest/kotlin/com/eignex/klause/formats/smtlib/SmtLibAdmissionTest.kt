@@ -483,8 +483,7 @@ class SmtLibAdmissionTest {
             {
                 opens++
                 val source = StringCharSource(
-                    "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) " +
-                        "(assert (= (f x) 2)) (check-sat)",
+                    "(declare-const x Real) (assert (= (exp x) 1)) (check-sat)",
                 )
                 object : CharSource, AutoCloseable {
                     override fun next(): String? = source.next()
