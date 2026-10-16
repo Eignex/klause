@@ -8,6 +8,30 @@ execution strategy are separate boundaries.
 [Shared input semantics](../formats.md) owns routing and result qualifications.
 This page defines admission, lowering and source model rendering.
 
+## Declaration policy
+
+`smtLibSemantics` declares exact rational literals, continuous real variables and
+open integer and real declarations. `SmtLib.parse` and `SmtLibAdmission.parse`
+resolve `SemanticOverrides` before reading source commands. Integer and exact
+rational real endpoint replacements constrain every original declaration of that
+sort, including unused declarations. Assertions remain additional constraints;
+bound inference intersects them with the declaration policy. Explicit open
+replacements remove a caller default, never an asserted source inequality.
+
+Linear factors retain real endpoints as exact rational comparisons. Polynomial,
+nonlinear integer and function snapshots retain the same endpoints as formula
+atoms. Auxiliary coordinates receive only their defining constraints and inferred
+ranges. Strict comparisons and integrality remain unchanged. A finite
+`Long.MIN_VALUE` or `Long.MAX_VALUE` supplied through a typed replacement is a
+finite endpoint; the legacy positional integer arguments use those values as
+open markers. Typed replacements take precedence independently on each side.
+
+Grid float interpretation, feasibility tolerance and absent-value policies are
+rejected for SMT-LIB. Source wrappers capture the effective policy alongside
+numeric authority; its qualification does not establish a witness or proof.
+Resource defaults are captured from `KlauseConfig.current` consistently by the
+factor facade and its builder.
+
 ## Supported models
 
 The frontend supports quantifier-free linear integer and real arithmetic, including

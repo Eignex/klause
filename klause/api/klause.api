@@ -2974,18 +2974,18 @@ public final class com/eignex/klause/formats/smtlib/SExprReader {
 
 public final class com/eignex/klause/formats/smtlib/SmtLib {
 	public static final field INSTANCE Lcom/eignex/klause/formats/smtlib/SmtLib;
-	public final fun parse (Lcom/eignex/klause/util/CharSource;JJZLcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
-	public final fun parse (Ljava/lang/String;JJZLcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
-	public static synthetic fun parse$default (Lcom/eignex/klause/formats/smtlib/SmtLib;Lcom/eignex/klause/util/CharSource;JJZLcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
-	public static synthetic fun parse$default (Lcom/eignex/klause/formats/smtlib/SmtLib;Ljava/lang/String;JJZLcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
+	public final fun parse (Lcom/eignex/klause/util/CharSource;JJZLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
+	public final fun parse (Ljava/lang/String;JJZLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
+	public static synthetic fun parse$default (Lcom/eignex/klause/formats/smtlib/SmtLib;Lcom/eignex/klause/util/CharSource;JJZLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
+	public static synthetic fun parse$default (Lcom/eignex/klause/formats/smtlib/SmtLib;Ljava/lang/String;JJZLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
 }
 
 public final class com/eignex/klause/formats/smtlib/SmtLibAdmission {
 	public static final field INSTANCE Lcom/eignex/klause/formats/smtlib/SmtLibAdmission;
-	public final fun parse (Ljava/lang/String;JJLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/formats/smtlib/SmtLibInput;
-	public final fun parse (Lkotlin/jvm/functions/Function0;JJLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/formats/smtlib/SmtLibInput;
-	public static synthetic fun parse$default (Lcom/eignex/klause/formats/smtlib/SmtLibAdmission;Ljava/lang/String;JJLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibInput;
-	public static synthetic fun parse$default (Lcom/eignex/klause/formats/smtlib/SmtLibAdmission;Lkotlin/jvm/functions/Function0;JJLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibInput;
+	public final fun parse (Ljava/lang/String;JJLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/formats/smtlib/SmtLibInput;
+	public final fun parse (Lkotlin/jvm/functions/Function0;JJLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/formats/smtlib/SmtLibInput;
+	public static synthetic fun parse$default (Lcom/eignex/klause/formats/smtlib/SmtLibAdmission;Ljava/lang/String;JJLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibInput;
+	public static synthetic fun parse$default (Lcom/eignex/klause/formats/smtlib/SmtLibAdmission;Lkotlin/jvm/functions/Function0;JJLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibInput;
 }
 
 public abstract interface class com/eignex/klause/formats/smtlib/SmtLibInput {
@@ -3057,7 +3057,7 @@ public final class com/eignex/klause/formats/smtlib/SmtLibInput$Transcendental :
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/eignex/klause/formats/smtlib/SmtLibProblem {
+public final class com/eignex/klause/formats/smtlib/SmtLibProblem : com/eignex/klause/ir/SourceSemanticsOwner {
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
@@ -3074,9 +3074,14 @@ public final class com/eignex/klause/formats/smtlib/SmtLibProblem {
 	public final fun getModel ()Lcom/eignex/klause/ir/Problem;
 	public final fun getObjective ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
 	public final fun getRealVarNames ()Ljava/util/Map;
+	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/formats/smtlib/SmtLibSemanticsKt {
+	public static final fun getSmtLibSemantics ()Lcom/eignex/klause/ir/SourceSemantics;
 }
 
 public final class com/eignex/klause/formats/smtlib/UnsupportedSmtException : com/eignex/klause/formats/FormatException {

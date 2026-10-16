@@ -7628,7 +7628,7 @@ final class com.eignex.klause.formats.smtlib/SExprReader { // com.eignex.klause.
     final fun readCommandOrNull(): com.eignex.klause.formats.smtlib/SExpr? // com.eignex.klause.formats.smtlib/SExprReader.readCommandOrNull|readCommandOrNull(){}[0]
 }
 
-final class com.eignex.klause.formats.smtlib/SmtLibProblem { // com.eignex.klause.formats.smtlib/SmtLibProblem|null[0]
+final class com.eignex.klause.formats.smtlib/SmtLibProblem : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.formats.smtlib/SmtLibProblem|null[0]
     constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.ir/LinearObjectiveSpec?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ...) // com.eignex.klause.formats.smtlib/SmtLibProblem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense){}[0]
 
     final val boolVarNames // com.eignex.klause.formats.smtlib/SmtLibProblem.boolVarNames|{}boolVarNames[0]
@@ -7641,6 +7641,8 @@ final class com.eignex.klause.formats.smtlib/SmtLibProblem { // com.eignex.klaus
         final fun <get-objective>(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.formats.smtlib/SmtLibProblem.objective.<get-objective>|<get-objective>(){}[0]
     final val realVarNames // com.eignex.klause.formats.smtlib/SmtLibProblem.realVarNames|{}realVarNames[0]
         final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
+    final val semantics // com.eignex.klause.formats.smtlib/SmtLibProblem.semantics|{}semantics[0]
+        final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.formats.smtlib/SmtLibProblem.semantics.<get-semantics>|<get-semantics>(){}[0]
     final val sense // com.eignex.klause.formats.smtlib/SmtLibProblem.sense|{}sense[0]
         final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibProblem.sense.<get-sense>|<get-sense>(){}[0]
 
@@ -16875,13 +16877,13 @@ final object com.eignex.klause.formats.opb/Opb { // com.eignex.klause.formats.op
 }
 
 final object com.eignex.klause.formats.smtlib/SmtLib { // com.eignex.klause.formats.smtlib/SmtLib|null[0]
-    final fun parse(com.eignex.klause.util/CharSource, kotlin/Long = ..., kotlin/Long = ..., kotlin/Boolean = ..., com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLib.parse|parse(com.eignex.klause.util.CharSource;kotlin.Long;kotlin.Long;kotlin.Boolean;com.eignex.klause.ir.ProblemSettings){}[0]
-    final fun parse(kotlin/String, kotlin/Long = ..., kotlin/Long = ..., kotlin/Boolean = ..., com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLib.parse|parse(kotlin.String;kotlin.Long;kotlin.Long;kotlin.Boolean;com.eignex.klause.ir.ProblemSettings){}[0]
+    final fun parse(com.eignex.klause.util/CharSource, kotlin/Long = ..., kotlin/Long = ..., kotlin/Boolean = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLib.parse|parse(com.eignex.klause.util.CharSource;kotlin.Long;kotlin.Long;kotlin.Boolean;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.SemanticOverrides){}[0]
+    final fun parse(kotlin/String, kotlin/Long = ..., kotlin/Long = ..., kotlin/Boolean = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLib.parse|parse(kotlin.String;kotlin.Long;kotlin.Long;kotlin.Boolean;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.SemanticOverrides){}[0]
 }
 
 final object com.eignex.klause.formats.smtlib/SmtLibAdmission { // com.eignex.klause.formats.smtlib/SmtLibAdmission|null[0]
-    final fun parse(kotlin/Function0<com.eignex.klause.util/CharSource>, kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.formats.smtlib/SmtLibInput // com.eignex.klause.formats.smtlib/SmtLibAdmission.parse|parse(kotlin.Function0<com.eignex.klause.util.CharSource>;kotlin.Long;kotlin.Long;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.util.Cancellation){}[0]
-    final fun parse(kotlin/String, kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.formats.smtlib/SmtLibInput // com.eignex.klause.formats.smtlib/SmtLibAdmission.parse|parse(kotlin.String;kotlin.Long;kotlin.Long;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.util.Cancellation){}[0]
+    final fun parse(kotlin/Function0<com.eignex.klause.util/CharSource>, kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.smtlib/SmtLibInput // com.eignex.klause.formats.smtlib/SmtLibAdmission.parse|parse(kotlin.Function0<com.eignex.klause.util.CharSource>;kotlin.Long;kotlin.Long;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.util.Cancellation;com.eignex.klause.ir.SemanticOverrides){}[0]
+    final fun parse(kotlin/String, kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.smtlib/SmtLibInput // com.eignex.klause.formats.smtlib/SmtLibAdmission.parse|parse(kotlin.String;kotlin.Long;kotlin.Long;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.util.Cancellation;com.eignex.klause.ir.SemanticOverrides){}[0]
 }
 
 final object com.eignex.klause.formats.xcsp3/Xcsp3 { // com.eignex.klause.formats.xcsp3/Xcsp3|null[0]
@@ -17123,6 +17125,9 @@ final val com.eignex.klause.formats.flatzinc/flatZincSemantics // com.eignex.kla
     final fun <get-flatZincSemantics>(): com.eignex.klause.ir/SourceSemantics // com.eignex.klause.formats.flatzinc/flatZincSemantics.<get-flatZincSemantics>|<get-flatZincSemantics>(){}[0]
 final val com.eignex.klause.formats.opb/opbSemantics // com.eignex.klause.formats.opb/opbSemantics|{}opbSemantics[0]
     final fun <get-opbSemantics>(): com.eignex.klause.ir/SourceSemantics // com.eignex.klause.formats.opb/opbSemantics.<get-opbSemantics>|<get-opbSemantics>(){}[0]
+final val com.eignex.klause.formats.smtlib/smtLibSemantics // com.eignex.klause.formats.smtlib/smtLibSemantics|{}smtLibSemantics[0]
+    final fun <get-smtLibSemantics>(): com.eignex.klause.ir/SourceSemantics // com.eignex.klause.formats.smtlib/smtLibSemantics.<get-smtLibSemantics>|<get-smtLibSemantics>(){}[0]
+
 final val com.eignex.klause.formats.xcsp3/xcsp3Semantics // com.eignex.klause.formats.xcsp3/xcsp3Semantics|{}xcsp3Semantics[0]
     final fun <get-xcsp3Semantics>(): com.eignex.klause.ir/SourceSemantics // com.eignex.klause.formats.xcsp3/xcsp3Semantics.<get-xcsp3Semantics>|<get-xcsp3Semantics>(){}[0]
 final val com.eignex.klause.ir/NoConsts // com.eignex.klause.ir/NoConsts|{}NoConsts[0]
