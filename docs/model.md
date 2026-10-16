@@ -177,6 +177,11 @@ and rational reals. A checked ray preserves every affine separation; false
 reification requires a permanent affine collision. Distinctness supplies no
 unconditional numerical relaxation.
 
+Caller-selected linear and polynomial encoders expand the retained relation into
+exact pairwise comparisons. Whole-relation reification includes both truth
+directions. Encoding uses the source coordinate namespaces, carries factor
+attribution, and checks cancellation before publishing an enforcing fragment.
+
 ## Published assignments and objectives
 
 `Sample`, exact theory assignments and reconstructed witnesses own immutable
