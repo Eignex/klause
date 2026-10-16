@@ -326,7 +326,7 @@ internal class MpsOutput(
             if (best == null) {
                 "s UNKNOWN"
             } else if (verdict == Verdict.OPTIMAL && sourceWitnessAccepted() &&
-                (sourceExact && claimsCoverTolerance || attainsAcceptedObjectiveBound())
+                ((sourceExact && claimsCoverTolerance) || attainsAcceptedObjectiveBound())
             ) {
                 "s OPTIMUM FOUND"
             } else {
@@ -335,7 +335,7 @@ internal class MpsOutput(
 
         Verdict.UNBOUNDED -> when {
             proofExact && sourceWitnessAccepted() &&
-                (exactSourceWitness() == true || claimsCoverTolerance && exactSourceWitness() == null) -> "s UNBOUNDED"
+                (exactSourceWitness() == true || (claimsCoverTolerance && exactSourceWitness() == null)) -> "s UNBOUNDED"
             best != null -> "s SATISFIABLE"
             else -> "s UNKNOWN"
         }
