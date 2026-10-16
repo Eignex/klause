@@ -154,4 +154,18 @@ class DistinctTest {
 
         assertIs<Verification.Rejected>(result)
     }
+
+    @Test
+    fun `original distinct checking should reject missing Boolean coordinates`() {
+        val relation = Distinct(listOf(
+            Distinct.Operand(intArrayOf(Term.ofLit(Lit.make(0, true))), listOf(BigFraction.ONE)),
+            Distinct.Operand(intArrayOf(), emptyList(), BigFraction.ONE),
+        ))
+        val source = Problem(1, 0, emptyArray(), arrayOf(relation))
+        val point = Sample(booleanArrayOf(), longArrayOf())
+
+        val result = verifyRealCoordinates(source, point)
+
+        assertIs<Verification.Rejected>(result)
+    }
 }
