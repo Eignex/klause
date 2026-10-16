@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
@@ -25,6 +26,7 @@ internal sealed interface PreparedExecution {
     }
     class NonlinearInteger(val source: NonlinearIntegerProblem) : PreparedExecution
     class Transcendental(val source: TranscendentalProblem) : PreparedExecution
+    class Numerical(val source: LinearSourceProblem, override val model: Problem) : Factor
     class Declined(
         val model: Problem,
         val reason: PreparedPlanDecline,
@@ -40,6 +42,7 @@ internal val PreparedExecution.model: Problem? get() = when (this) {
     is PreparedExecution.FiniteLinear -> model
     is PreparedExecution.Polynomial -> completion.source
     is PreparedExecution.Declined -> model
+    is PreparedExecution.Numerical -> model
     is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
 }
 
@@ -49,6 +52,7 @@ internal val PreparedExecution.finiteLinear: PreparedExecution.FiniteLinear? get
     is PreparedExecution.FiniteLinear -> this
     is PreparedExecution.Declined -> retained as? PreparedExecution.FiniteLinear
     is PreparedExecution.Polynomial, is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
+    is PreparedExecution.Numerical -> null
 }
 
 internal val PreparedExecution.polynomial: PreparedExecution.Polynomial? get() = when (this) {
@@ -56,6 +60,7 @@ internal val PreparedExecution.polynomial: PreparedExecution.Polynomial? get() =
     is PreparedExecution.Declined -> retained as? PreparedExecution.Polynomial
     is PreparedExecution.FiniteLinear, is PreparedExecution.NonlinearInteger,
     is PreparedExecution.Transcendental -> null
+    is PreparedExecution.Numerical -> null
 }
 
 internal val PreparedExecution.kind: PreparedExecutionKind get() = when (this) {
@@ -63,6 +68,7 @@ internal val PreparedExecution.kind: PreparedExecutionKind get() = when (this) {
     is PreparedExecution.Polynomial -> PreparedExecutionKind.POLYNOMIAL
     is PreparedExecution.NonlinearInteger -> PreparedExecutionKind.NONLINEAR_INTEGER
     is PreparedExecution.Transcendental -> PreparedExecutionKind.TRANSCENDENTAL
+    is PreparedExecution.Numerical -> PreparedExecutionKind.NUMERICAL
     is PreparedExecution.Declined -> PreparedExecutionKind.DECLINED
 }
 
@@ -72,6 +78,7 @@ internal val PreparedExecution.decline: PreparedPlanDecline? get() = when (this)
     }
     is PreparedExecution.Declined -> reason
     is PreparedExecution.Polynomial, is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
+    is PreparedExecution.Numerical -> null
 }
 
 internal class PreparedSourceStructure(
@@ -85,6 +92,7 @@ internal class PreparedSourceStructure(
     realCoordinates: List<Int>,
     operations: Set<ExecutionOperation>,
     val factorProjections: PreparedFactorProjections?,
+    val sourceModel: Problem? = originalSource as? Problem ?: execution.model,
 ) {
     val components = components.toList()
     val integerCoordinates = integerCoordinates.toList()
@@ -101,6 +109,7 @@ internal class PreparedSourceStructure(
         when (execution) {
             is PreparedExecution.NonlinearInteger -> require(originalSource === execution.source)
             is PreparedExecution.Transcendental -> require(originalSource === execution.source)
+            is PreparedExecution.Numerical -> require(originalSource === execution.source)
             else -> Unit
         }
     }
@@ -112,9 +121,18 @@ internal class PreparedOperationBinding(
     val quadraticObjective: QuadraticObjectiveSpec? = null,
     val quadraticSense: ObjectiveSense = ObjectiveSense.MINIMIZE,
     val decline: PreparedPlanDecline? = null,
+    val workingLinearObjective: LinearObjective? = null,
 ) {
     fun supportedBy(source: PreparedSourceStructure): Boolean {
         val execution = source.execution
+        if ((source.originalSource as? LinearSourceProblem)?.objective != null) {
+            val working = workingLinearObjective ?: return false
+            val model = execution.model ?: return false
+            return working.boolWeightValues.size <= model.numBoolVars &&
+                working.intCoefficientValues.size <= model.numIntVars &&
+                working.realCoefficientValues.size <= model.numRealVars &&
+                working.realCoefficientValues.all { it.isFinite() }
+        }
         if (quadraticObjective != null) {
             return (execution.polynomial != null || execution is PreparedExecution.NonlinearInteger) &&
                 quadraticObjective.terms.all { term -> listOfNotNull(term.first, term.second).all { variable ->
@@ -151,6 +169,7 @@ internal fun legacyPreparedExecution(
         originalSource as NonlinearIntegerProblem,
     )
     PreparedExecutionKind.TRANSCENDENTAL -> PreparedExecution.Transcendental(originalSource as TranscendentalProblem)
+    PreparedExecutionKind.NUMERICAL -> PreparedExecution.Numerical(originalSource as LinearSourceProblem, requireNotNull(model))
     PreparedExecutionKind.DECLINED -> if (decline == PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE &&
         polynomialModel != null
     ) PreparedExecution.Polynomial(polynomialModel) else PreparedExecution.Declined(

@@ -282,7 +282,8 @@ private fun Problem.pipelineRouteObserved(
 
         is PreparedExecution.FiniteLinear -> execution
 
-        is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental ->
+        is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental,
+        is PreparedExecution.Numerical ->
             error("factor source requires factor execution")
     }
     val arithmeticRoute = arithmeticExecution.ownership.theoryPipeline

@@ -125,13 +125,13 @@ object FinitePipeline {
         // model the engine is built from; an untouched model keeps the plan routing already built.
         val sourcePlan = if (prepared.changed) {
             prepared.problem.prepareExecutionPlan(
-                original = requireNotNull(request.preparedPlan.originalSource as? Problem),
-                objective = request.preparedPlan.objective,
+                original = requireNotNull(request.preparedPlan.sourceModel),
+                objective = request.preparedPlan.workingLinearObjective,
                 maximize = request.preparedPlan.maximize,
                 preferFinite = true,
                 providers = request.preparedPlan.factorProjections?.providers ?: FactorProjectionProviders.Default,
                 cancellation = request.solveCancellation,
-            )
+            ).retainingLinearSource(request.preparedPlan)
         } else {
             request.preparedPlan
         }
@@ -180,14 +180,14 @@ object FinitePipeline {
             val providers = request.preparedPlan.factorProjections?.providers ?: FactorProjectionProviders.Default
             val projections = model.factorProjections?.takeIf { it.providers === providers } ?: providers.prepare(model)
             model.prepareExecutionPlan(
-                original = requireNotNull(request.preparedPlan.originalSource as? Problem),
-                objective = request.preparedPlan.objective,
+                original = requireNotNull(request.preparedPlan.sourceModel),
+                objective = request.preparedPlan.workingLinearObjective,
                 maximize = request.preparedPlan.maximize,
                 preferFinite = true,
                 providers = providers,
                 projections = projections,
                 cancellation = request.solveCancellation,
-            )
+            ).retainingLinearSource(request.preparedPlan)
         }
         return FinitePipelinePreparation(
             problem = finiteModel,

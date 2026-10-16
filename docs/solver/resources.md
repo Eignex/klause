@@ -497,3 +497,10 @@ function controls retain their work, bit, depth and matrix limits. Default polyn
 controls retain the existing function-wrapper interpretation. A mismatched native
 control family rejects before worker construction. Neither a fresh execution request
 nor an unused finite factory can renew stopped source preparation.
+
+Original-unit linear lowering, row/coordinate capture, tolerance qualification and
+point checks poll and charge the containing source invocation token. Stopped
+preparation exports no partial source binding. Every execution owns a fresh checked
+incumbent and immutable result qualification; retained outcomes do not read later
+publication state. Native numerical execution retains its existing theory-work
+currency and cleanup owner, including when an original-unit callback fails.

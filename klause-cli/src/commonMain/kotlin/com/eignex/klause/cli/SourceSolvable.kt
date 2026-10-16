@@ -181,7 +181,7 @@ internal fun preparedSourceSolvable(
             routingElapsedMs,
         ).withSourceInvocation(invocation)
 
-        SourceExecutionKind.NONLINEAR_INTEGER, SourceExecutionKind.FUNCTIONS ->
+        SourceExecutionKind.NONLINEAR_INTEGER, SourceExecutionKind.FUNCTIONS, SourceExecutionKind.NUMERICAL ->
             error("native formula execution requires its captured native source route")
 
         SourceExecutionKind.REFUTED -> refutedSolvable(

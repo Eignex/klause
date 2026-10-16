@@ -84,6 +84,16 @@ its solution cap is one. Source, operation and engine mismatches reject before f
 preparation. An observed setup stop remains effective when execution supplies another
 token. Mutable search state belongs to the existing worker or executor lifetime.
 
+`LinearSourceProblem` retains immutable original rational linear terms, variable
+bounds, row sides, indicator pins and affine objective coefficients before any
+working normalization. Declaration order is independent of integer and real output
+namespaces. Generic lowering preserves absent bounds, uses numerical real rows when
+admitted by the source policy, and retains exact rows otherwise. Rational integer
+objectives use a positive integral scale when representable; other affine objectives
+use a private defining column. Public source counts and original objective descriptors
+exclude that column. Source-safe finite rewrites preserve the original attachment and
+the distinct working factor source used for reconstruction and native certification.
+
 ## Distinct integer positions
 
 `AllDifferent` retains integer positions, paired optional-presence literals and
