@@ -110,9 +110,23 @@ private class LinearCliAccess(private val loader: ClassLoader) {
         set(common, "randomSeed", source.seed)
         set(common, "parallel", 1)
         set(common, "statistics", true)
-        val routing = cliMode.getDeclaredMethod("routingCancellation", optionsType).invoke(null, common) as Cancellation
-        val routingStop = LinearObservedStop(routing, observed)
-        optionsType.getDeclaredField("routingToken").apply { isAccessible = true }.set(common, routingStop)
+        val routingField = optionsType.getDeclaredField("routingToken").apply { isAccessible = true }
+        lateinit var routingStop: LinearObservedStop
+        val routing by lazy {
+            // Routing's elapsed allowance starts after source parsing, at its ordinary first use.
+            routingField.set(common, null)
+            val token = cliMode.getDeclaredMethod("routingCancellation", optionsType).invoke(null, common)
+                as Cancellation
+            routingField.set(common, routingStop)
+            token
+        }
+        val deferred = object : Cancellation {
+            override fun isCancelled() = routing()
+            override fun deadline() = routing.deadline()
+            override fun workMeter() = routing.workMeter()
+        }
+        routingStop = LinearObservedStop(deferred, observed)
+        routingField.set(common, routingStop)
         val mode = modeType.getField("INSTANCE").get(null)
         val session = modeType.getMethod("newSession").invoke(mode)
         val load = session.javaClass.getDeclaredMethod("load", String::class.java, optionsType)
