@@ -104,6 +104,22 @@ class MpsCompiled(
     val toleranceDifference: String?
         get() = if (sourceModel == null) "compiled model lacks source mapping" else toleranceMismatch
 
+    /**
+     * Whether nominal constraints and tolerance acceptance have provably identical feasible points.
+     * Representation correspondence remains separate; an interrupted check establishes no equivalence.
+     */
+    fun exactClaimsCoverTolerance(cancellation: Cancellation = Cancellation.Never): Boolean =
+        sourceModel?.exactClaimsCoverTolerance(checkNotNull(semantics.effective.feasibilityTolerance), cancellation)
+            ?: false
+
+    /**
+     * An exact objective bound from tolerance-accepted declarations and enabled one-term rows, in source units.
+     * The bound is lower for minimization and upper for maximization.
+     * An open required side or interruption yields null.
+     */
+    fun toleranceObjectiveBound(cancellation: Cancellation = Cancellation.Never): BigFraction? =
+        sourceModel?.toleranceObjectiveBound(checkNotNull(semantics.effective.feasibilityTolerance), cancellation)
+
     /** Check finite binary64 coordinates against original source numbers under the effective policy. */
     fun withinTolerance(
         ints: LongArray,

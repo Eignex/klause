@@ -32,6 +32,92 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `a checked accepted objective bound should retain attained optimum authority`() {
+        val output = MpsOutput(
+            sourceExact = false,
+            sourceObjective = { BigFraction.ONE },
+            exactSourceWitness = { false },
+            claimsCoverTolerance = false,
+            acceptedObjectiveBound = BigFraction.ONE,
+        )
+
+        val text = capture {
+            output.onExactSolution("v X=1", BigFraction.ONE)
+            output.onComplete(Verdict.OPTIMAL)
+        }
+
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("c optimizationStatus=attained-optimum" in text.lines(), text)
+        assertTrue("c MPS source tolerance witness" in text.lines(), text)
+        assertFalse("tolerance-accepted optimality unproved" in text, text)
+    }
+
+    @Test
+    fun `a nominal root bound should retain its value and source units under tolerant publication`() {
+        for ((proofExact, key) in listOf(true to "nominalSourceLpRootBound", false to "workingModelLpRootBound")) {
+            val output = MpsOutput(objectiveScale = 3L, proofExact = proofExact, claimsCoverTolerance = false)
+            val stats = SolveStats(
+                run = RunStats(backend = "backtrack"),
+                lp = LpStats(solves = SumResult(1.0), rootBound = -1.23456789),
+            )
+
+            val text = capture { output.onStatistics(stats, 1L, 0L) }
+
+            assertTrue("c $key=-1.23456789" in text.lines(), text)
+            assertTrue("c ${key}Scale=3" in text.lines(), text)
+            assertFalse(text.lines().any { it.startsWith("c lpRootBound=") }, text)
+        }
+    }
+
+    @Test
+    fun `an exact nominal unbounded ray should remain valid in the tolerance accepted superset`() {
+        val output = MpsOutput(exactSourceWitness = { true }, claimsCoverTolerance = false)
+
+        val text = capture {
+            output.onExactSolution("v X=1", BigFraction.ONE)
+            output.onComplete(Verdict.UNBOUNDED)
+        }
+
+        assertTrue("s UNBOUNDED" in text.lines(), text)
+        assertTrue("v X=1" in text.lines(), text)
+    }
+
+    @Test
+    fun `a tolerance accepted constant row must not inherit a nominal refutation`() {
+        val source = File.createTempFile("mps-tolerated-empty-row", ".mps").apply {
+            writeText("ROWS\n N COST\n G R\nCOLUMNS\n X COST 0\nRHS\n RHS R 0.00000005\nENDATA\n")
+            deleteOnExit()
+        }
+        for (exact in listOf(false, true)) {
+            val flags = if (exact) arrayOf("--exact") else emptyArray()
+            val text = capture {
+                assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, source.absolutePath)))
+            }
+
+            assertTrue((if (exact) "s UNSATISFIABLE" else "s UNKNOWN") in text.lines(), text)
+            if (!exact) assertTrue("nominal refutation; tolerance-accepted feasibility unproved" in text, text)
+        }
+    }
+
+    @Test
+    fun `nominal continuous optimization should retain its point without claiming the tolerant optimum`() {
+        val source = File.createTempFile("mps-tolerant-objective", ".mps").apply {
+            writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n LO B X 1\nENDATA\n")
+            deleteOnExit()
+        }
+        val text = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--source-absolute-tolerance", "1",
+                "--source-relative-tolerance", "0", source.absolutePath)))
+        }
+
+        assertTrue("s SATISFIABLE" in text.lines(), text)
+        assertTrue("o 1" in text.lines(), text)
+        assertTrue("v X=1" in text.lines(), text)
+        assertTrue("nominalSourceOptimizationStatus=" in text, text)
+        assertTrue("tolerance-accepted optimality unproved" in text, text)
+    }
+
+    @Test
     fun `zero tolerance checking should use exact rational source coordinates when supplied`() {
         val input = File.createTempFile("mps-zero-rational", ".mps").apply {
             writeText("ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 0.1\nENDATA\n")
@@ -321,7 +407,8 @@ class MpsModeTest {
                 assertEquals(0, runCli(arrayOf("-s", "-p", "1", *flags, source.absolutePath)))
             }
 
-            assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+            assertTrue((if (flags.isNotEmpty()) "s OPTIMUM FOUND" else "s SATISFIABLE") in text.lines(), text)
+            if (flags.isEmpty()) assertTrue("nominalSourceOptimizationStatus=" in text, text)
             assertTrue("o 0" in text.lines(), text)
             assertTrue("solvePipeline=numerical-mip" in text, text)
             assertFalse("declaredTheoryRoute=" in text, text)
@@ -480,8 +567,8 @@ class MpsModeTest {
 
         val text = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", source.absolutePath))) }
 
-        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
-        assertTrue("optimizationStatus=tolerance-optimum" in text, text)
+        assertTrue("s SATISFIABLE" in text.lines(), text)
+        assertTrue("nominalSourceOptimizationStatus=tolerance-optimum" in text, text)
         assertTrue("exact original MPS source witness" in text, text)
     }
 
@@ -510,7 +597,7 @@ class MpsModeTest {
                 }
 
                 assertTrue(
-                    if (engine == "cp") {
+                    if (engine == "cp" && exact) {
                         "s OPTIMUM FOUND" in text.lines()
                     } else {
                         "s SATISFIABLE" in text.lines()
@@ -526,6 +613,9 @@ class MpsModeTest {
                     "exact=$exact engine=$engine\n$text",
                 )
                 if (exact) assertTrue("v X=1/3" in text.lines(), text)
+                if (engine == "cp" && !exact) {
+                    assertTrue("nominalSourceOptimizationStatus=" in text, text)
+                }
                 if (engine == "ls") assertFalse("optimizationStatus=" in text, text)
                 assertFalse("exact-neighborhood" in text, text)
                 assertFalse("declaredTheoryRoute=" in text, text)
@@ -936,7 +1026,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `complete search should prove decimal objective cutoffs`() {
+    fun `complete search should retain nominal decimal objective cutoff evidence`() {
         val mps = File.createTempFile("mpssourceobjective", ".mps").apply {
             writeText(
                 "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R -1\n" +
@@ -949,7 +1039,8 @@ class MpsModeTest {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--param", "node-limit=10000", mps.absolutePath)))
         }
 
-        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("s SATISFIABLE" in text.lines(), text)
+        assertTrue("nominalSourceOptimizationStatus=" in text, text)
         assertTrue("o 0.10000000000000000001" in text.lines(), text)
         assertTrue("v I=0 X=1/10" in text.lines(), text)
     }
@@ -984,11 +1075,16 @@ class MpsModeTest {
             deleteOnExit()
         }
 
-        val text = capture {
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", mps.absolutePath)))
-        }
+        for (exact in listOf(false, true)) {
+            val flags = if (exact) arrayOf("--exact") else emptyArray()
+            val text = capture {
+                assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, mps.absolutePath)))
+            }
 
-        assertTrue("s UNSATISFIABLE" in text.lines(), text)
+            assertTrue((if (exact) "s UNSATISFIABLE" else "s UNKNOWN") in text.lines(), text)
+            if (!exact) assertTrue("nominal refutation; tolerance-accepted feasibility unproved" in text, text)
+            assertFalse(text.lines().any { it.startsWith("v ") }, text)
+        }
     }
 
     @Test
@@ -1132,7 +1228,9 @@ class MpsModeTest {
             val qualification = if (exact) "exact original MPS source witness" else "MPS source tolerance witness"
             assertTrue(qualification in text, text)
             val status = if (exact) "attained-optimum" else "tolerance-optimum"
-            assertTrue("c optimizationStatus=$status" in text.lines(), text)
+            val scope = if (exact) "optimizationStatus" else "nominalSourceOptimizationStatus"
+            assertTrue("c $scope=$status" in text.lines(), text)
+            assertTrue((if (exact) "s OPTIMUM FOUND" else "s SATISFIABLE") in text.lines(), text)
         }
     }
 

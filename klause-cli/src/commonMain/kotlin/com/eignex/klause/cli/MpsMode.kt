@@ -74,10 +74,15 @@ internal object MpsMode : CliMode {
             if (route != null) common.logRoute(route, routingElapsedMs)
             else common.frontendRouting = CliRoutingStats("numerical-mip", routingElapsedMs)
             if (exact) requireExactMpsSource(compiled)
+            val qualificationStop = common.routingPreparationCancellation()
+            val claimsCoverTolerance = compiled.exactClaimsCoverTolerance(qualificationStop)
+            val acceptedObjectiveBound = if (claimsCoverTolerance) null else
+                compiled.toleranceObjectiveBound(qualificationStop)
             val state = MpsOutputState(compiled.objectiveScale, compiled.toleranceDifference,
                 compiled.sourceExact, compiled.sourceDifference,
                 compiled.semantics.declared.undeclaredIntegers != compiled.semantics.effective.undeclaredIntegers ||
-                    compiled.semantics.declared.undeclaredReals != compiled.semantics.effective.undeclaredReals)
+                    compiled.semantics.declared.undeclaredReals != compiled.semantics.effective.undeclaredReals,
+                claimsCoverTolerance, acceptedObjectiveBound)
             outputState = state
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.model.numIntVars} " +
@@ -159,6 +164,8 @@ internal object MpsMode : CliMode {
                 },
                 exactSourceOptimum = { state.exactSourceOptimum },
                 effectiveDeclarations = state.effectiveDeclarations,
+                claimsCoverTolerance = state.claimsCoverTolerance,
+                acceptedObjectiveBound = state.acceptedObjectiveBound,
             )
         }
     }
@@ -170,6 +177,8 @@ private class MpsOutputState(
     val sourceExact: Boolean = true,
     val sourceDifference: String? = null,
     val effectiveDeclarations: Boolean = false,
+    val claimsCoverTolerance: Boolean = true,
+    val acceptedObjectiveBound: BigFraction? = null,
 ) {
     var latestSourceObjective: BigFraction? = null
     var sourceWitnessAccepted = true
@@ -272,6 +281,8 @@ internal class MpsOutput(
     private val sourceArithmeticValue: ((SourceValue) -> SourceValue?)? = null,
     private val exactSourceOptimum: () -> Boolean? = exactSourceWitness,
     private val effectiveDeclarations: Boolean = false,
+    private val claimsCoverTolerance: Boolean = true,
+    private val acceptedObjectiveBound: BigFraction? = null,
 ) : BufferedBestOutput() {
     private var bestObjective: Long? = null
 
@@ -314,40 +325,56 @@ internal class MpsOutput(
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
             if (best == null) {
                 "s UNKNOWN"
-            } else if (verdict == Verdict.OPTIMAL && sourceExact && sourceWitnessAccepted()) {
+            } else if (verdict == Verdict.OPTIMAL && sourceWitnessAccepted() &&
+                (sourceExact && claimsCoverTolerance || attainsAcceptedObjectiveBound())
+            ) {
                 "s OPTIMUM FOUND"
             } else {
                 "s SATISFIABLE"
             }
 
         Verdict.UNBOUNDED -> when {
-            proofExact && sourceWitnessAccepted() && exactSourceWitness() != false -> "s UNBOUNDED"
+            proofExact && sourceWitnessAccepted() &&
+                (exactSourceWitness() == true || claimsCoverTolerance && exactSourceWitness() == null) -> "s UNBOUNDED"
             best != null -> "s SATISFIABLE"
             else -> "s UNKNOWN"
         }
 
-        Verdict.UNSATISFIABLE -> if (proofExact) "s UNSATISFIABLE" else "s UNKNOWN"
+        Verdict.UNSATISFIABLE -> if (proofExact && claimsCoverTolerance) "s UNSATISFIABLE" else "s UNKNOWN"
 
         Verdict.UNKNOWN -> "s UNKNOWN"
     }
 
     override fun lpStatisticPairs(stats: SolveStats): List<Pair<String, String>> {
         val pairs = super.lpStatisticPairs(stats)
+        val key = when {
+            claimsCoverTolerance -> "lpRootBound"
+            proofExact -> "nominalSourceLpRootBound"
+            else -> "workingModelLpRootBound"
+        }
+        val scoped = pairs.map { (name, value) -> (if (name == "lpRootBound") key else name) to value }
         return if (pairs.any { it.first == "lpRootBound" }) {
-            pairs + ("lpRootBoundScale" to "$objectiveScale")
+            scoped + ("${key}Scale" to "$objectiveScale")
         } else pairs
     }
 
     override fun keepStat(key: String): Boolean = true
 
     override fun completionMetadata(verdict: Verdict): String? {
-        if (verdict != Verdict.OPTIMAL || best == null || !sourceExact || !sourceWitnessAccepted()) return null
-        val status = when (exactSourceWitness()) {
+        if (verdict != Verdict.OPTIMAL || best == null || !sourceWitnessAccepted()) return null
+        val attainedBound = attainsAcceptedObjectiveBound()
+        if (!sourceExact && !attainedBound) return null
+        val status = if (attainedBound) "attained-optimum" else when (exactSourceWitness()) {
             true -> if (proofExact && exactSourceOptimum() == true) "attained-optimum" else "tolerance-optimum"
             false -> "tolerance-optimum"
             null -> return null
         }
-        return "optimizationStatus=$status"
+        val key = when {
+            claimsCoverTolerance || attainedBound -> "optimizationStatus"
+            proofExact -> "nominalSourceOptimizationStatus"
+            else -> "workingModelOptimizationStatus"
+        }
+        return "$key=$status"
     }
 
     override fun verdictReason(verdict: Verdict): String? {
@@ -361,11 +388,25 @@ internal class MpsOutput(
         val declarationQualification = if (effectiveDeclarations) {
             "MPS source scope=effective declaration defaults"
         } else null
-        return listOfNotNull(declarationQualification, sourceQualification, witnessQualification, cause)
+        val claimQualification = if (claimsCoverTolerance) null else when (verdict) {
+            Verdict.UNSATISFIABLE -> if (proofExact) {
+                "nominal refutation; tolerance-accepted feasibility unproved"
+            } else "working-model refutation; tolerance-accepted feasibility unproved"
+            Verdict.OPTIMAL -> if (attainsAcceptedObjectiveBound()) null else
+                "${if (proofExact) "nominal" else "working-model"} optimization result; " +
+                    "tolerance-accepted optimality unproved"
+            else -> null
+        }
+        return listOfNotNull(declarationQualification, claimQualification, sourceQualification,
+            witnessQualification, cause)
             .joinToString("; ").ifEmpty { null }
     }
 
     private val sourceScope: String get() = if (effectiveDeclarations) "effective" else "original"
+
+    private fun attainsAcceptedObjectiveBound(): Boolean = acceptedObjectiveBound?.let { bound ->
+        sourceWitnessAccepted() && sourceObjective() == bound
+    } == true
 }
 
 /** Print terminating rationals within 64 decimal places as decimals, and others as fractions. */
