@@ -10,6 +10,290 @@ import kotlin.test.assertTrue
 
 class ExactContinuationTest {
     @Test
+    fun `implicit empty columns should retain finite seats and global pivot order`() {
+        val two = BigFraction.ofLong(2)
+        for (implicit in listOf(false, true)) {
+            val input = ExactContinuationInput(
+                listOf(
+                    emptyList(), listOf(0 to BigFraction.ONE), emptyList(), listOf(0 to BigFraction.ONE), emptyList(),
+                ),
+                listOf(BigFraction.ONE),
+                listOf(two, BigFraction.ZERO, null, BigFraction.ZERO, null, BigFraction.ZERO),
+                listOf(two, BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.ONE, null, BigFraction.ZERO),
+                listOf(5),
+                listOf(
+                    ContinuationStatus.FIXED, ContinuationStatus.LOWER, ContinuationStatus.UPPER,
+                    ContinuationStatus.LOWER, ContinuationStatus.FREE, ContinuationStatus.BASIC,
+                ),
+                allowImplicitEmptyColumns = implicit,
+            )
+
+            val result = ExactContinuation(input).resume(ExactContinuationLimits(maxCells = if (implicit) 5 else 8))
+
+            assertEquals(
+                listOf(
+                    two, BigFraction.ONE, BigFraction.MINUS_ONE, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO,
+                ),
+                result.values,
+            )
+            assertEquals(listOf(1), result.headings)
+            assertNull(result.ray)
+        }
+    }
+
+    @Test
+    fun `implicit empty strict coordinates should share the full interior step`() {
+        val two = BigFraction.ofLong(2)
+        val three = BigFraction.ofLong(3)
+        for (upper in listOf(false, true)) {
+            val input = ExactContinuationInput(
+                listOf(emptyList(), listOf(0 to BigFraction.ONE), emptyList()),
+                listOf(BigFraction.ONE),
+                listOf(two, BigFraction.ZERO, two, BigFraction.ZERO),
+                listOf(three, BigFraction.ONE, two, BigFraction.ZERO),
+                listOf(3),
+                listOf(
+                    if (upper) ContinuationStatus.UPPER else ContinuationStatus.LOWER,
+                    ContinuationStatus.LOWER, ContinuationStatus.FIXED, ContinuationStatus.BASIC,
+                ),
+                lowerStrict = listOf(!upper, false, false, false),
+                upperStrict = listOf(upper, false, false, false),
+                allowImplicitEmptyColumns = true,
+            )
+
+            val result = ExactContinuation(input).resume(ExactContinuationLimits(maxCells = 4))
+
+            val point = assertNotNull(result.values)
+            assertTrue(point[0] > two && point[0] < three)
+            assertEquals(listOf(BigFraction.ONE, two, BigFraction.ZERO), point.drop(1))
+            assertNull(result.headings)
+        }
+    }
+
+    @Test
+    fun `implicit empty basic targets should retain logical repair`() {
+        val two = BigFraction.ofLong(2)
+        val input = ExactContinuationInput(
+            listOf(emptyList(), listOf(0 to BigFraction.ONE), emptyList()),
+            listOf(BigFraction.ZERO),
+            listOf(two, null, null, BigFraction.ZERO),
+            listOf(two, null, null, BigFraction.ZERO),
+            listOf(0),
+            listOf(
+                ContinuationStatus.BASIC, ContinuationStatus.FREE, ContinuationStatus.FREE, ContinuationStatus.FIXED,
+            ),
+            allowImplicitEmptyColumns = true,
+        )
+
+        val result = ExactContinuation(input).resume(ExactContinuationLimits(maxCells = 4))
+
+        assertEquals(listOf(3), result.headings)
+        assertEquals(two, assertNotNull(result.values)[0])
+        assertEquals(1, result.metrics.repairs)
+    }
+
+    @Test
+    fun `implicit columns should retain the original signed conflict row`() {
+        for (implicit in listOf(false, true)) {
+            val input = ExactContinuationInput(
+                listOf(emptyList(), listOf(0 to BigFraction.ONE), emptyList()),
+                listOf(BigFraction.ofLong(2)),
+                listOf(null, BigFraction.ZERO, null, BigFraction.ZERO),
+                listOf(null, BigFraction.ONE, null, BigFraction.ZERO),
+                listOf(3),
+                listOf(
+                    ContinuationStatus.FREE, ContinuationStatus.LOWER,
+                    ContinuationStatus.FREE, ContinuationStatus.BASIC,
+                ),
+                allowImplicitEmptyColumns = implicit,
+            )
+
+            val result = ExactContinuation(input).resume(ExactContinuationLimits(maxCells = if (implicit) 4 else 6))
+
+            assertNull(result.values)
+            assertEquals(listOf(BigFraction.ONE), result.ray)
+        }
+    }
+
+    @Test
+    fun `nonempty zero coefficients should count as stored structural columns`() {
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ZERO), listOf(0 to BigFraction.ONE), emptyList()),
+            listOf(BigFraction.ZERO),
+            List(4) { null },
+            List(4) { null },
+            listOf(3),
+            List(4) { if (it == 3) ContinuationStatus.BASIC else ContinuationStatus.FREE },
+            allowImplicitEmptyColumns = true,
+        )
+
+        val tooSmall = ExactContinuation(input).resume(ExactContinuationLimits(maxCells = 4))
+        val fitting = ExactContinuation(input).resume(ExactContinuationLimits(maxCells = 5))
+
+        assertEquals(ContinuationDecline.DIMENSION, tooSmall.metrics.decline)
+        assertEquals(0L, tooSmall.metrics.allocation)
+        assertNotNull(fitting.values)
+    }
+
+    @Test
+    fun `implicit layouts should retain original row and coordinate ceilings`() {
+        val input = ExactContinuationInput(
+            listOf(emptyList(), listOf(0 to BigFraction.ONE), emptyList()),
+            listOf(BigFraction.ZERO),
+            List(4) { null },
+            List(4) { null },
+            listOf(3),
+            List(4) { if (it == 3) ContinuationStatus.BASIC else ContinuationStatus.FREE },
+            allowImplicitEmptyColumns = true,
+        )
+        val limits = listOf(
+            ExactContinuationLimits(maxRows = 0),
+            ExactContinuationLimits(maxColumns = 3),
+            ExactContinuationLimits(maxCells = 3),
+        )
+        for (limit in limits) {
+            val result = ExactContinuation(input).resume(limit)
+
+            assertEquals(ContinuationDecline.DIMENSION, result.metrics.decline)
+            assertEquals(0L, result.metrics.allocation)
+            assertEquals(0, result.metrics.builds)
+        }
+    }
+
+    @Test
+    fun `implicit layouts should validate original basis identities`() {
+        val input = ExactContinuationInput(
+            listOf(emptyList(), listOf(0 to BigFraction.ONE), emptyList()),
+            listOf(BigFraction.ZERO),
+            List(4) { null },
+            List(4) { null },
+            listOf(4),
+            List(4) { ContinuationStatus.FREE },
+            allowImplicitEmptyColumns = true,
+        )
+
+        val result = ExactContinuation(input).resume(ExactContinuationLimits(maxCells = 4))
+
+        assertEquals(ContinuationDecline.INVALID_BASIS, result.metrics.decline)
+        assertEquals(0, result.metrics.builds)
+        assertNull(result.values)
+        assertNull(result.ray)
+    }
+
+    @Test
+    fun `a retained dense layout should decline a smaller cell ceiling`() {
+        val input = ExactContinuationInput(
+            listOf(emptyList(), listOf(0 to BigFraction.ONE), emptyList()),
+            listOf(BigFraction.ONE),
+            listOf(null, BigFraction.ZERO, null, BigFraction.ZERO),
+            listOf(null, null, null, BigFraction.ZERO),
+            listOf(3),
+            listOf(
+                ContinuationStatus.FREE, ContinuationStatus.LOWER, ContinuationStatus.FREE, ContinuationStatus.BASIC,
+            ),
+            allowImplicitEmptyColumns = true,
+        )
+        val session = ExactContinuation(input)
+        val dense = session.resume(ExactContinuationLimits(maxCells = 6, maxPivots = 0))
+
+        val smaller = session.resume(ExactContinuationLimits(maxCells = 4))
+
+        assertEquals(ContinuationDecline.PIVOTS, dense.metrics.decline)
+        assertEquals(ContinuationDecline.DIMENSION, smaller.metrics.decline)
+        assertEquals(0, smaller.metrics.builds)
+        assertNull(smaller.values)
+    }
+
+    @Test
+    fun `implicit feasibility should resume the same globally indexed tableau`() {
+        val input = ExactContinuationInput(
+            listOf(emptyList(), listOf(0 to BigFraction.ONE), emptyList()),
+            listOf(BigFraction.ONE),
+            listOf(null, BigFraction.ZERO, null, BigFraction.ZERO),
+            listOf(null, null, null, BigFraction.ZERO),
+            listOf(3),
+            listOf(
+                ContinuationStatus.FREE, ContinuationStatus.LOWER, ContinuationStatus.FREE, ContinuationStatus.BASIC,
+            ),
+            allowImplicitEmptyColumns = true,
+        )
+        val session = ExactContinuation(input)
+        val limits = ExactContinuationLimits(maxCells = 4, maxPivots = 0)
+        val stopped = session.resume(limits)
+
+        val resumed = session.resume(limits.copy(maxPivots = 1))
+
+        assertEquals(ContinuationDecline.PIVOTS, stopped.metrics.decline)
+        assertEquals(1, stopped.metrics.builds)
+        assertEquals(0, resumed.metrics.builds)
+        assertEquals(1, resumed.metrics.retainedPivots)
+        assertEquals(listOf(1), resumed.headings)
+        assertEquals(listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ZERO, BigFraction.ZERO), resumed.values)
+        assertEquals(stopped.metrics.work + resumed.metrics.work, session.usedWork)
+        assertEquals(stopped.metrics.allocation + resumed.metrics.allocation, session.usedAllocation)
+    }
+
+    @Test
+    fun `implicit layout preparation should retain failed allocation spending`() {
+        val input = ExactContinuationInput(
+            listOf(emptyList(), listOf(0 to BigFraction.ONE), emptyList()),
+            listOf(BigFraction.ZERO),
+            List(4) { null },
+            List(4) { null },
+            listOf(3),
+            List(4) { if (it == 3) ContinuationStatus.BASIC else ContinuationStatus.FREE },
+            allowImplicitEmptyColumns = true,
+        )
+        val session = ExactContinuation(input)
+        val limits = ExactContinuationLimits(maxCells = 4, maxAllocation = 160L)
+        val first = session.resume(limits)
+        val spent = session.usedAllocation
+
+        val repeated = session.resume(limits)
+
+        assertEquals(ContinuationDecline.ALLOCATION, first.metrics.decline)
+        assertEquals(ContinuationDecline.ALLOCATION, repeated.metrics.decline)
+        assertEquals(0, first.metrics.builds)
+        assertTrue(spent > 0L && session.usedAllocation >= spent && session.usedAllocation <= limits.maxAllocation)
+        assertNull(repeated.values)
+    }
+
+    @Test
+    fun `implicit strict equations should survive a precision restart`() {
+        val huge = BigFraction.of(BIG_ONE shl 100, BIG_ONE)
+        val two = BigFraction.ofLong(2)
+        val input = ExactContinuationInput(
+            listOf(
+                emptyList(), listOf(0 to huge, 1 to BigFraction.ONE),
+                listOf(0 to BigFraction.ONE, 1 to huge), emptyList(),
+            ),
+            List(2) { BigFraction.ONE },
+            listOf(null, BigFraction.ZERO, BigFraction.ZERO, two, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(null, null, null, two, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(1, 2),
+            listOf(
+                ContinuationStatus.FREE, ContinuationStatus.BASIC, ContinuationStatus.BASIC,
+                ContinuationStatus.FIXED, ContinuationStatus.FIXED, ContinuationStatus.FIXED,
+            ),
+            lowerStrict = listOf(false, true, true, false, false, false),
+            allowImplicitEmptyColumns = true,
+        )
+        val session = ExactContinuation(input)
+        val limits = ExactContinuationLimits(maxCells = 14)
+
+        val result = session.resume(limits)
+        val narrower = session.resume(limits.copy(maxBits = 24))
+
+        val point = assertNotNull(result.values)
+        assertEquals(BigFraction.ONE, huge * point[1] + point[2])
+        assertEquals(BigFraction.ONE, point[1] + huge * point[2])
+        assertEquals(two, point[3])
+        assertTrue(result.metrics.restarts > 0)
+        assertEquals(ContinuationDecline.BITS, narrower.metrics.decline)
+        assertNull(narrower.values)
+    }
+
+    @Test
     fun `strict endpoints should materialize interior coordinates in either direction`() {
         for (upper in listOf(false, true)) {
             val input = ExactContinuationInput(

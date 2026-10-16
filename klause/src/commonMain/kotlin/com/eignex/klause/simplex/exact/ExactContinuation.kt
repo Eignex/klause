@@ -81,6 +81,7 @@ internal class ExactContinuationInput(
     statuses: List<ContinuationStatus>,
     lowerStrict: List<Boolean> = emptyList(),
     upperStrict: List<Boolean> = emptyList(),
+    val allowImplicitEmptyColumns: Boolean = false,
 ) {
     val columns = columns.map { it.toList() }
     val rhs = rhs.toList()
@@ -181,6 +182,8 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
     private var attempts = 0
     private var eligible = false
     private var scalarHistory = 0
+    private var structuralWidth = -1
+    private var structuralSlots: IntArray? = null
 
     val usedWork get() = work
     val usedAllocation get() = allocation
@@ -220,6 +223,7 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
         var result: LaneResult? = null
         try {
             validate(budget)
+            prepareStructuralSlots(budget)
             eligible = true
             while (result == null) {
                 try {
@@ -227,9 +231,15 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
                         builds++
                         (
                             if (big) {
-                                RationalContinuationLane(input, BigFracOps, budget, ::admitScalarPeak)
+                                RationalContinuationLane(
+                                    input, structuralWidth, structuralSlots,
+                                    BigFracOps, budget, ::admitScalarPeak,
+                                )
                             } else {
-                                RationalContinuationLane(input, Frac128Ops(), budget, ::admitScalarPeak)
+                                RationalContinuationLane(
+                                    input, structuralWidth, structuralSlots,
+                                    Frac128Ops(), budget, ::admitScalarPeak,
+                                )
                             }
                             ).also { lane = it }
                     }
@@ -274,6 +284,19 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
         scalarHistory = maxOf(scalarHistory, bits)
     }
 
+    private fun prepareStructuralSlots(budget: ContinuationBudget) {
+        if (structuralSlots != null || structuralWidth == input.n) return
+        budget.step(input.n.toLong(), input.n * 4L + 32L)
+        val slots = IntArray(input.n) { -1 }
+        var next = 0
+        for (j in input.columns.indices) {
+            budget.step()
+            if (input.columns[j].isNotEmpty()) slots[j] = next++
+        }
+        budget.step()
+        structuralSlots = slots
+    }
+
     @Suppress("ThrowsCount")
     private fun validate(budget: ContinuationBudget) {
         if (normalizedScalarPeak > budget.limits.maxBits) throw ContinuationStop(ContinuationDecline.BITS)
@@ -286,9 +309,25 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
         }
         budget.step()
         val limits = budget.limits
-        if (input.m > limits.maxRows || input.total > limits.maxColumns ||
-            input.m.toLong() * (input.total.toLong() + input.m + 1L) > limits.maxCells
+        if (input.m > limits.maxRows || input.total > limits.maxColumns) {
+            throw ContinuationStop(ContinuationDecline.DIMENSION)
+        }
+        val columns = if (structuralWidth >= 0) {
+            structuralWidth
+        } else if (
+            input.m.toLong() * (input.total.toLong() + input.m + 1L) <= limits.maxCells
         ) {
+            input.n
+        } else {
+            if (!input.allowImplicitEmptyColumns) throw ContinuationStop(ContinuationDecline.DIMENSION)
+            var count = 0
+            for (column in input.columns) {
+                budget.step()
+                if (column.isNotEmpty()) count++
+            }
+            count
+        }
+        if (input.m.toLong() * (columns.toLong() + 2L * input.m + 1L) > limits.maxCells) {
             throw ContinuationStop(ContinuationDecline.DIMENSION)
         }
         if (input.lower.size != input.total || input.upper.size != input.total ||
@@ -343,6 +382,7 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
         }
         input.rhs.forEach(::visit)
         if (lane == null && oversized) big = true
+        structuralWidth = columns
     }
 }
 
@@ -373,16 +413,18 @@ private interface ContinuationLane {
 // L. de Moura, "A fast linear-arithmetic solver for DPLL(T)", CAV 2006, https://doi.org/10.1007/11817963_11.
 private class RationalContinuationLane<F>(
     private val input: ExactContinuationInput,
+    private val structuralWidth: Int,
+    private val structuralSlots: IntArray?,
     private val ops: FracOps<F>,
     budget: ContinuationBudget,
     private val admitScalarPeak: (Int) -> Unit,
 ) : ContinuationLane {
-    private val width = input.total + input.m + 1
+    private val width = structuralWidth + 2 * input.m + 1
     private var table: List<MutableList<F>>
-    private var headings = MutableList(input.m) { input.n + it }
+    private var headings: MutableList<Int>
     private var seats: MutableList<F>
     private val seatEpsilon: MutableList<F>?
-    private var statuses = MutableList(input.total) { j -> canonical(j) }
+    private var statuses: MutableList<ContinuationStatus>
     private val lower: List<F?>
     private val upper: List<F?>
     override var position = 0
@@ -398,20 +440,22 @@ private class RationalContinuationLane<F>(
     override val normalizedScalarPeak get() = scalarPeak
 
     init {
-        budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L + input.total * 48L)
+        budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L + input.total * 48L + tableMetadata())
+        headings = MutableList(input.m) { input.n + it }
+        statuses = MutableList(input.total) { j -> canonical(j) }
         lower = input.lower.map { it?.let { value -> fromBig(value, budget) } }
         upper = input.upper.map { it?.let { value -> fromBig(value, budget) } }
         table = List(input.m) { row ->
             MutableList(width) { j ->
                 when (j) {
-                    input.n + row, input.total + row -> ops.one
+                    structuralWidth + row, structuralWidth + input.m + row -> ops.one
                     width - 1 -> fromBig(input.rhs[row], budget)
                     else -> ops.zero
                 }
             }
         }
         for (j in input.columns.indices) {
-            for ((row, value) in input.columns[j]) table[row][j] = fromBig(value, budget)
+            for ((row, value) in input.columns[j]) table[row][slot(j)] = fromBig(value, budget)
         }
         seats = MutableList(input.total) { j ->
             val status = input.statuses[j].takeUnless { it == ContinuationStatus.BASIC } ?: canonical(j)
@@ -425,6 +469,20 @@ private class RationalContinuationLane<F>(
             null
         }
     }
+
+    private fun slot(column: Int): Int = if (column < input.n) {
+        structuralSlots?.get(column) ?: column
+    } else {
+        structuralWidth + column - input.n
+    }
+
+    private fun coefficient(row: Int, column: Int): F {
+        // Row operations preserve empty structural columns; source identities and seats stay global.
+        val physical = slot(column)
+        return if (physical < 0) ops.zero else table[row][physical]
+    }
+
+    private fun tableMetadata(): Long = if (structuralSlots == null) 0L else (input.m + 1L) * 32L
 
     override fun advance(
         budget: ContinuationBudget,
@@ -443,7 +501,7 @@ private class RationalContinuationLane<F>(
             if (target !in headings) {
                 val row = headings.indices.firstOrNull {
                     budget.step()
-                    headings[it] !in input.headings && !ops.isZero(table[it][target])
+                    headings[it] !in input.headings && !ops.isZero(coefficient(it, target))
                 }
                 if (row == null) {
                     budget.phase = ContinuationPhase.REPAIR
@@ -533,7 +591,7 @@ private class RationalContinuationLane<F>(
         for (j in 0 until input.total) {
             budget.step()
             if (statuses[j] == ContinuationStatus.BASIC) continue
-            val sign = ops.signum(table[row][j])
+            val sign = ops.signum(coefficient(row, j))
             if (sign == 0) continue
             val increasing = -sign == direction
             val movable = if (increasing) {
@@ -554,7 +612,7 @@ private class RationalContinuationLane<F>(
             for (j in 0 until input.total) {
                 budget.step()
                 if (statuses[j] != ContinuationStatus.BASIC && !ops.isZero(seats[j])) {
-                    value = subtract(value, multiply(table[row][j], seats[j], budget), budget)
+                    value = subtract(value, multiply(coefficient(row, j), seats[j], budget), budget)
                 }
             }
             result[headings[row]] = value
@@ -571,7 +629,7 @@ private class RationalContinuationLane<F>(
             for (j in 0 until input.total) {
                 budget.step()
                 if (statuses[j] != ContinuationStatus.BASIC && !ops.isZero(epsilon[j])) {
-                    value = subtract(value, multiply(table[row][j], epsilon[j], budget), budget)
+                    value = subtract(value, multiply(coefficient(row, j), epsilon[j], budget), budget)
                 }
             }
             result[headings[row]] = value
@@ -628,21 +686,22 @@ private class RationalContinuationLane<F>(
 
     private fun conflict(row: Int, direction: Int, budget: ContinuationBudget): LaneResult = LaneResult(
         ray = List(input.m) { i ->
-            val value = table[row][input.total + i]
+            val value = table[row][structuralWidth + input.m + i]
             toBig(if (direction > 0) multiply(ops.minusOne, value, budget) else value, budget)
         },
     )
 
     // Publish only a complete pivot. Resource failure leaves the previous basis and tableau usable.
     private fun pivot(row: Int, enter: Int, seat: ContinuationStatus, budget: ContinuationBudget) {
-        budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L)
+        budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L + tableMetadata())
         val next = table.map { it.toMutableList() }
-        val inverse = reciprocal(table[row][enter], budget)
+        val physical = slot(enter)
+        val inverse = reciprocal(table[row][physical], budget)
         for (j in 0 until width) next[row][j] = multiply(table[row][j], inverse, budget)
         for (i in headings.indices) {
-            if (i == row || ops.isZero(table[i][enter])) continue
+            if (i == row || ops.isZero(table[i][physical])) continue
             for (j in 0 until width) {
-                next[i][j] = subtract(table[i][j], multiply(table[i][enter], next[row][j], budget), budget)
+                next[i][j] = subtract(table[i][j], multiply(table[i][physical], next[row][j], budget), budget)
             }
         }
         budget.step()

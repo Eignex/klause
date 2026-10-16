@@ -75,7 +75,7 @@ internal fun captureContinuationTarget(
     var decline: ContinuationDecline? = null
     try {
         budget.step()
-        if (!limits.admitsDimensions(model)) {
+        if (!limits.mayAdmitDimensions(model)) {
             decline = ContinuationDecline.DIMENSION
         } else {
             admitContinuation(model, budget)
@@ -283,17 +283,46 @@ private fun admissionLimits(limits: ExactContinuationLimits) = limits.copy(
     maxAllocation = minOf(limits.maxAllocation, 4L * 1024L * 1024L),
 )
 
-internal fun ExactContinuationLimits.admitsDimensions(model: LpModel): Boolean =
+private fun ExactContinuationLimits.admitsDenseDimensions(model: LpModel): Boolean =
     model.m <= maxRows && model.numVars <= maxColumns &&
         model.m.toLong() * (model.numVars.toLong() + model.m + 1L) <= maxCells
 
-private fun admitContinuation(model: LpModel, budget: ContinuationBudget) {
-    if (!budget.limits.admitsDimensions(model)) {
+private fun ExactContinuationLimits.mayAdmitDimensions(model: LpModel): Boolean =
+    model.m <= maxRows && model.numVars <= maxColumns &&
+        (admitsDenseDimensions(model) || model.exactState != null)
+
+@Suppress("ThrowsCount")
+private fun usesImplicitContinuationColumns(model: LpModel, budget: ContinuationBudget): Boolean {
+    val limits = budget.limits
+    if (limits.admitsDenseDimensions(model)) return false
+    if (!limits.mayAdmitDimensions(model)) throw ContinuationStop(ContinuationDecline.DIMENSION)
+    val source = requireNotNull(model.exactState).model
+    repeat(model.numVars) { j ->
+        if (!budget.fraction(source.objective.cost(j).value).isZero) {
+            throw ContinuationStop(ContinuationDecline.DIMENSION)
+        }
+    }
+    if (!budget.fraction(source.objective.constant.value).isZero ||
+        !budget.fraction(source.objective.externalConstant.value).isZero
+    ) {
         throw ContinuationStop(ContinuationDecline.DIMENSION)
     }
+    budget.fraction(source.objective.scale.value)
+    var columns = 0
+    repeat(model.n) { j ->
+        budget.step()
+        if (source.columnEntries(j).isNotEmpty()) columns++
+    }
+    if (model.m.toLong() * (columns.toLong() + 2L * model.m + 1L) > limits.maxCells) {
+        throw ContinuationStop(ContinuationDecline.DIMENSION)
+    }
+    return true
+}
+
+private fun admitContinuation(model: LpModel, budget: ContinuationBudget) {
+    usesImplicitContinuationColumns(model, budget)
     val size = model.exactState?.model?.keySize ?: model.csc.colVal.size.toLong() * 3L + model.numVars * 16L
     budget.step(size + model.numVars, size * 8L)
-    // These are the only rational values compared by the target's current-state guard.
     model.exactState?.model?.let { source ->
         repeat(model.numVars) { j ->
             source.column(j).bounds.lower?.let { budget.fraction(it.number.value) }
@@ -323,7 +352,7 @@ private fun selectContinuation(
         cancellation,
     )
     budget.phase = ContinuationPhase.ADMISSION
-    if (basis != null && !limits.admitsDimensions(model)) {
+    if (basis != null && !limits.mayAdmitDimensions(model)) {
         val decline = try {
             budget.step()
             ContinuationDecline.DIMENSION
@@ -414,9 +443,7 @@ private fun remainingContinuationLimits(limits: ExactContinuationLimits, session
 private class ContinuationAuthority(val input: ExactContinuationInput, val origins: List<BigFraction>)
 
 private fun captureContinuation(model: LpModel, basis: Basis, budget: ContinuationBudget): ContinuationAuthority {
-    if (!budget.limits.admitsDimensions(model)) {
-        throw ContinuationStop(ContinuationDecline.DIMENSION)
-    }
+    val implicitColumns = usesImplicitContinuationColumns(model, budget)
     val size = model.exactState?.model?.keySize ?: model.csc.colVal.size.toLong() * 3L + model.numVars * 16L
     budget.step(size, size * 64L)
     if (!model.finiteExactInput()) throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
@@ -460,6 +487,7 @@ private fun captureContinuation(model: LpModel, basis: Basis, budget: Continuati
         },
         lowerStrict = if (strict) bounds.map { it.lower?.strict == true } else emptyList(),
         upperStrict = if (strict) bounds.map { it.upper?.strict == true } else emptyList(),
+        allowImplicitEmptyColumns = implicitColumns,
     )
     return ContinuationAuthority(input, List(model.n) { budget.fraction(model.exactShift(it)) })
 }

@@ -110,8 +110,36 @@ Exact basis verification checks current row and coordinate ceilings before autho
 heading, matrix or factor setup. Continuation target capture checks its current row,
 column and cell ceilings before exact-bound scans or exporting a basis. Direct
 continuation selection checks the same ceilings before resume identity setup.
-These dimension guards decline without constructing an exception. The entry work debit and current
+Cheap structural rejections decline without constructing an exception. The entry work debit and current
 cancellation, time and work checks still precede that rejection.
+
+Continuation keeps dense storage for inputs admitted by the dense cell predicate.
+When that predicate fails, an authoritative exact model with zero costs, zero
+objective constants and a checked positive scale can instead store empty structural
+coefficient columns implicitly. Nonempty columns, including explicit zero entries,
+remain stored. With `k` stored structural columns and `m` original rows, the cell
+predicate becomes `m * (k + 2*m + 1)`: all logical columns, row-combination columns
+and the RHS remain physical. The original row and full-coordinate ceilings still
+apply. The cell ceiling bounds one tableau; an atomic pivot temporarily holds its
+old and replacement tables under the allocation allowance.
+
+This representation retains every original coordinate, finite bound, nonbasic seat,
+strict epsilon and source origin. Entering, leaving, import and repair use original
+global indices. A structurally empty column remains zero under row operations;
+it still receives its original bound endpoint and full source verification. The
+chosen layout belongs to one continuation through suspension and precision restarts.
+Lower limits cannot relayout retained dense state; source or target-basis changes
+retain the existing authority invalidation rules. Internal points and row combinations
+still require the unchanged original-model certificate checks.
+
+Target and identity admission share a separately bounded per-attempt envelope of
+at most one million work units and 4 MiB. Objective qualification and physical-column
+counts debit that envelope before basis export or identity setup, and failures retain
+their actual interruption or resource reason. These admission metrics are reported
+alongside numerical costs; they are not retained numerical-cache spending. Input
+capture repeats qualification under its numerical budget. Layout maps, physical
+tables and clones, precision restarts, pivots and
+original verification use the continuation's cumulative numerical allowance.
 
 The basis verifier can reuse one immutable empty dimension-decline report. This
 report contains no model, basis, policy, proof or resource owner. Every call checks

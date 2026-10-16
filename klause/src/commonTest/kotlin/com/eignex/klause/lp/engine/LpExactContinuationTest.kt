@@ -12,6 +12,230 @@ import kotlin.test.assertTrue
 
 class LpExactContinuationTest {
     @Test
+    fun `implicit satisfaction should verify all source coordinates and origins`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val two = ExactLpNumber.of(2L)
+        val source = ExactLpModel(
+            listOf(emptyList(), listOf(ExactLpEntry(0, one)), emptyList()),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(two), ExactLpSide(two)), origin = ExactLpNumber.of(10L)),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))),
+                ExactLpColumn(
+                    ExactLpBounds(ExactLpSide(two, strict = true), ExactLpSide(ExactLpNumber.of(3L))),
+                    origin = ExactLpNumber.of(20L),
+                ),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(List(4) { zero }),
+        )
+
+        val result = continueExactLp(
+            assertNotNull(LpExactState(source).toWorkingModel()),
+            Basis(intArrayOf(3), arrayOf(VarStatus.FIXED, VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.BASIC)),
+            limits = ExactContinuationLimits(maxCells = 4),
+        )
+
+        val point = assertNotNull(result.witness).primal
+        assertEquals(3, point.size)
+        assertEquals(BigFraction.ofLong(12), point[0])
+        assertEquals(BigFraction.ONE, point[1])
+        assertTrue(point[2] > BigFraction.ofLong(22) && point[2] < BigFraction.ofLong(23))
+        assertTrue(result.metrics.success)
+        assertNull(result.conflict)
+    }
+
+    @Test
+    fun `nonzero objective components should keep dense continuation admission`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val objectives = listOf(
+            ExactLpObjective(listOf(one, zero, zero, zero)),
+            ExactLpObjective(List(4) { zero }, constant = one),
+            ExactLpObjective(List(4) { zero }, externalConstant = one),
+        )
+        for (objective in objectives) {
+            val source = ExactLpModel(
+                listOf(emptyList(), listOf(ExactLpEntry(0, one)), emptyList()),
+                listOf(zero),
+                List(4) { ExactLpColumn(ExactLpBounds()) },
+                listOf(ExactLpRow()),
+                objective,
+            )
+            val model = assertNotNull(LpExactState(source).toWorkingModel())
+            val basis = Basis(intArrayOf(3), arrayOf(VarStatus.FREE, VarStatus.FREE, VarStatus.FREE, VarStatus.BASIC))
+
+            val compact = continueExactLp(model, basis, limits = ExactContinuationLimits(maxCells = 4))
+            val dense = continueExactLp(model, basis)
+
+            assertEquals(ContinuationDecline.DIMENSION, compact.metrics.decline)
+            assertEquals(0, compact.metrics.builds)
+            assertNull(compact.witness)
+            assertNotNull(dense.witness)
+        }
+    }
+
+    @Test
+    fun `a cost bearing empty column should retain original unboundedness verification`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList(), listOf(ExactLpEntry(0, ExactLpNumber.of(1L))), emptyList()),
+            listOf(zero),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ExactLpColumn(ExactLpBounds()),
+                ExactLpColumn(ExactLpBounds()),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero, zero, zero)),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override val recessionDirection = doubleArrayOf(1.0, 0.0, 0.0)
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel) =
+                Basis(intArrayOf(3), arrayOf(VarStatus.AT_LOWER, VarStatus.FREE, VarStatus.FREE, VarStatus.BASIC))
+        }
+
+        val result = certifyLpResult(model, solver, null)
+
+        assertEquals(LpVerdict.UNBOUNDED, result.verdict)
+        assertEquals(
+            listOf(BigFraction.ONE, BigFraction.ZERO, BigFraction.ZERO),
+            assertNotNull(result.unboundedness).direction,
+        )
+    }
+
+    @Test
+    fun `implicit target admission should retain resource declines before basis export`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(emptyList(), listOf(ExactLpEntry(0, one)), emptyList()),
+            listOf(zero),
+            List(4) { ExactLpColumn(ExactLpBounds()) },
+            listOf(ExactLpRow()),
+            ExactLpObjective(List(4) { zero }, scale = ExactLpNumber.of(1L shl 25)),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        var exports = 0
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel): Basis {
+                exports++
+                return Basis(intArrayOf(3), arrayOf(VarStatus.FREE, VarStatus.FREE, VarStatus.FREE, VarStatus.BASIC))
+            }
+        }
+        val cases = listOf(
+            Triple(ExactContinuationLimits(maxCells = 4, maxWork = 2L), Cancellation.Never, ContinuationDecline.WORK),
+            Triple(
+                ExactContinuationLimits(maxCells = 4, maxAllocation = 0L),
+                Cancellation.Never,
+                ContinuationDecline.ALLOCATION,
+            ),
+            Triple(ExactContinuationLimits(maxCells = 4, maxBits = 24), Cancellation.Never, ContinuationDecline.BITS),
+            Triple(ExactContinuationLimits(maxCells = 4, maxTimeNs = 0L), Cancellation.Never, ContinuationDecline.TIME),
+            Triple(ExactContinuationLimits(maxCells = 4), Cancellation { true }, ContinuationDecline.CANCELLED),
+        )
+        for ((limits, token, reason) in cases) {
+            val declined = captureContinuationTarget(model, solver, null, limits, token)
+
+            assertEquals(reason, declined.metrics.decline)
+            assertNull(declined.basis)
+            assertEquals(declined.metrics.work, declined.metrics.workByPhase.values.sum())
+            assertTrue(declined.metrics.work <= limits.maxWork && declined.metrics.allocation <= limits.maxAllocation)
+        }
+        assertEquals(0, exports)
+
+        val target = captureContinuationTarget(
+            model, solver, null, ExactContinuationLimits(maxCells = 4), Cancellation.Never,
+        )
+
+        assertNotNull(target.basis)
+        assertNull(target.metrics.decline)
+        assertEquals(1, exports)
+    }
+
+    @Test
+    fun `appended source rows should give empty columns fresh physical authority`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))
+        val source = ExactLpModel(
+            listOf(emptyList(), listOf(ExactLpEntry(0, one)), emptyList()),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds()), logical,
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(List(4) { zero }),
+        )
+        val cache = LpExactContinuationCache()
+        val first = continueExactLp(
+            assertNotNull(LpExactState(source).toWorkingModel()),
+            Basis(intArrayOf(3), arrayOf(VarStatus.FREE, VarStatus.FREE, VarStatus.FREE, VarStatus.BASIC)),
+            cache,
+            limits = ExactContinuationLimits(maxCells = 4),
+        )
+        val appended = source.appendScopedRow(LpScopedRow(1L, listOf(0 to one), ExactLpNumber.of(2L), logical))
+
+        val changed = continueExactLp(
+            assertNotNull(LpExactState(appended).toWorkingModel()),
+            Basis(
+                intArrayOf(3, 4),
+                arrayOf(VarStatus.FREE, VarStatus.FREE, VarStatus.FREE, VarStatus.BASIC, VarStatus.BASIC),
+            ),
+            cache,
+            limits = ExactContinuationLimits(maxCells = 14),
+        )
+
+        assertEquals(BigFraction.ZERO, assertNotNull(first.witness).primal[0])
+        assertEquals(
+            listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.ZERO),
+            assertNotNull(changed.witness).primal,
+        )
+        assertTrue(changed.metrics.invalidated)
+        assertEquals(1, changed.metrics.builds)
+    }
+
+    @Test
+    fun `implicit column bound changes should invalidate the retained source point`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList(), listOf(ExactLpEntry(0, ExactLpNumber.of(1L))), emptyList()),
+            listOf(ExactLpNumber.of(1L)),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(3L)))),
+                ExactLpColumn(ExactLpBounds()),
+                ExactLpColumn(ExactLpBounds()),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(List(4) { zero }),
+        )
+        val trail = LpBoundTrail(source)
+        val cache = LpExactContinuationCache()
+        val basis = Basis(intArrayOf(3), arrayOf(VarStatus.AT_LOWER, VarStatus.FREE, VarStatus.FREE, VarStatus.BASIC))
+        val limits = ExactContinuationLimits(maxCells = 4)
+        val first = continueExactLp(assertNotNull(trail.state.toWorkingModel()), basis, cache, limits = limits)
+        trail.push()
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 11L))
+
+        val changed = continueExactLp(assertNotNull(trail.state.toWorkingModel()), basis, cache, limits = limits)
+
+        assertEquals(BigFraction.ZERO, assertNotNull(first.witness).primal[0])
+        assertEquals(BigFraction.ofLong(2), assertNotNull(changed.witness).primal[0])
+        assertTrue(changed.metrics.invalidated)
+    }
+
+    @Test
     fun `direct continuation dimension declines should retain no state and later admit another model`() {
         val cache = LpExactContinuationCache()
         val models = listOf(2, 1).map { rows ->
