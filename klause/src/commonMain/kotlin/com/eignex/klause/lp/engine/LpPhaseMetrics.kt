@@ -9,6 +9,7 @@ internal enum class LpSolvePhase {
     EXACT_DUALS,
     CLEANUP,
     EXACT_LADDER,
+    EXACT_POINT_RECOVERY,
     NODE_DEDUCTION,
     NODE_ROW_FIXING,
     NODE_PRIMARY_FIXING,

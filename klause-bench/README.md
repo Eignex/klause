@@ -2480,9 +2480,9 @@ disposing that environment. Keep generated outputs and recordings externally.
 ### Seeded mixed MPS completion
 
 `com.eignex.klause.bench.profile.MixedMoveCompletionProbe` runs numerical local
-search from a source-checked supplied MPS point. Pass `input=<original MPS path>`,
+search from a cold start or a source-checked supplied MPS point. Pass `input=<original MPS path>`,
 `suite=<catalog suite> problem=<name>`, or `text64=<base64 original bytes>`, with
-`initial64=<base64 JSON>` mapping every
+optional `initial64=<base64 JSON>` mapping every
 original column name to an exact integer, decimal or rational string. Optional
 `exact=false`, `instructions=20`, `seed=3`, `repeats=3` and `timeout=3000` retain
 bounded deterministic controls. File and catalog inputs require `sourceSHA256=<original hash>`;
@@ -2496,6 +2496,24 @@ leaf completion own execution. An unavailable numerical completion remains undec
 Run this committed profile through the lab client on AWS at an immutable revision.
 It retains original bytes/hash, supplied point/hash, installed CLI/harness/runtime
 identities, settings, every completion verdict/work charge and published named points.
+Each attempt also records its finite-coordinate hash, residual LP verdict, collected
+LP statistics and elapsed time; the first sixteen retain their complete finite point.
+These private proposals carry no witness credit. Absence of LP observations means
+the loaded adapter has no observer or did not enter its numerical path.
+`lowering=cli` retains an exactly representable hybrid source in exact mode, matching
+the CLI's initial lowering choice. The default `lowering=exact-source` preserves
+the supplied-point diagnostic's explicit exact source rows. Neither mode runs CLI
+routing or presolve; use ordinary CLI comparisons for integrated recovery claims.
+`residualObjective=feasibility` asks the same numerical completion to find a point
+without minimizing the residual objective; the search still measures the original
+objective. The default is `source`. Optional `lambda=<nonnegative number>` selects
+linear cost shaping and class weight normalization for the diagnostic; absence keeps
+its standalone feasibility-first shaping. These controls are recorded independently
+and do not change source witness checks or confer residual optimality.
+`pointRecovery=true` requests the numerical engine's existing bounded sparse point
+repair through its private solve context. Its default is false. It retains the
+existing repair, arithmetic and containing-work limits and still requires exact
+row and coordinate verification; a repaired point supplies no optimum proof.
 `cases.json` uses the maintained offline source-verifier record format; `sources/`
 contains its hash-named original bytes. Independently check it with
 `verify_source_results.py --source-root <sources> --witness-only` on the analysis host.

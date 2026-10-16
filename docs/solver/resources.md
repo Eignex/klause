@@ -444,6 +444,9 @@ Proposal and instruction caps divide among heuristic workers; completion work al
 charges their instruction ledger. Zero proposal, instruction or native work
 allowance prevents a heuristic completion. Timeout and external cancellation retain
 their separate reasons.
+Numerical mixed completion includes bounded exact point-recovery arithmetic in its
+LP-to-instruction conversion. The observed recovery phase retains its spent work on
+failure or cancellation and creates no additional query or allowance.
 
 [Transcendental execution](../theories/transcendental.md#state-and-resources) retains
 private source services in shared invocation slots. Slot native reservations and the

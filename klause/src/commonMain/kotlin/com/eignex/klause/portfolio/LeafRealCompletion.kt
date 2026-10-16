@@ -13,6 +13,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.LpRoute
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.verifyRealCoordinates
@@ -32,12 +33,16 @@ internal class LeafRealCompletion(
     private val problem: Problem,
     private val objective: LinearObjective?,
     private val toleranceCheck: ((Sample) -> Boolean)?,
-    private val context: LpSolveContext = LpSolveContext.Production,
+    private val context: LpSolveContext = if (toleranceCheck == null) {
+        LpSolveContext.Production.copy(sparsePointRecovery = true)
+    } else LpSolveContext.Production,
 ) : CandidateCompletion {
     constructor(problem: Problem, objective: LinearObjective?) : this(problem, objective, null)
 
     private val encoders = problem.selectedFactorProjections()
     private val absCompletion = if (problem.factors.any { it is RealAbs }) AbsRealCompletion(problem) else null
+    var observeLp: ((LpVerdict, LpStats) -> Unit)? = null
+    var observeFloat: ((Sample) -> Unit)? = null
 
     override fun complete(candidate: Sample, cancellation: Cancellation): Completion {
         if (objective == null || objective.realCoefficientValues.all { it == 0.0 }) {
@@ -63,9 +68,16 @@ internal class LeafRealCompletion(
             }
         }
         val sink = LpStatsSink(LpRoute.STANDALONE)
+        val check = if (observeFloat == null) toleranceCheck else { sample: Sample ->
+            observeFloat?.invoke(sample)
+            toleranceCheck?.invoke(sample) == true
+        }
         val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink,
-            context = context, toleranceCheck = toleranceCheck, encoders = encoders)
-        val work = movesFor(sink.snapshot().standaloneWorkOps.sum)
+            context = context, toleranceCheck = check, encoders = encoders)
+        val stats = sink.snapshot()
+        val pointWork = stats.phases["EXACT_POINT_RECOVERY_STANDALONE"]?.work?.toDouble() ?: 0.0
+        val work = movesFor(stats.standaloneWorkOps.sum + pointWork)
+        observeLp?.invoke(real.verdict, stats)
         if (cancellation()) return Completion.Undecided(work)
         return when (real.verdict) {
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED ->

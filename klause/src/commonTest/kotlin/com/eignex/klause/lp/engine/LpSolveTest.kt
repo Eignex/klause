@@ -16,6 +16,31 @@ import kotlin.test.assertTrue
 
 class LpSolveTest {
     @Test
+    fun `requested sparse recovery should certify independent denominators beyond the basis ceiling`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 1.0)
+        val y = builder.addRealVar(0.0, 1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(2_000_003.0), Relation.EQ, 1.0)
+        builder.addRealRow(intArrayOf(y), doubleArrayOf(2_000_029.0), Relation.EQ, 1.0)
+        repeat(129) {
+            builder.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 1.0), Relation.LE, 1.0)
+        }
+        val model = builder.build(Sense.MINIMIZE)
+        val limits = LpRefinementLimits(maxRounds = 0, maxAuxiliaries = 0)
+
+        val ordinary = solveAndCertify(model, componentSplit = false, refinementLimits = limits)
+        val recovered = solveAndCertify(model, componentSplit = false, refinementLimits = limits,
+            context = LpSolveContext(sparsePointRecovery = true))
+
+        assertNull(ordinary.witness)
+        val point = assertNotNull(recovered.witness)
+        assertEquals(listOf(BigFraction.of(BIG_ONE, bigIntOf(2_000_003)),
+            BigFraction.of(BIG_ONE, bigIntOf(2_000_029))), point.primal)
+        assertNotNull(checkedLpWitness(model, point.primal))
+        assertTrue(assertNotNull(recovered.exactPoint).work > 0L)
+    }
+
+    @Test
     fun `structurally declined certification retries should honor current policy and model authority`() {
         val model = LpBuilder().apply {
             addVar(0L, 3L)

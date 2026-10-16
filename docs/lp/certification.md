@@ -64,6 +64,10 @@ rounding can wrap an unsigned intermediate. Assignment subproblems track path
 reachability separately from exact costs; unrepresentable residual costs decline
 the bound through checked overflow.
 An off-status feasible point cannot furnish the claimed warm basis.
+Private numerical solve contexts can request the existing bounded sparse point
+repair independently of bound certification. The default leaves that request off;
+enabling it retains all arithmetic, repair and containing-work limits and exact
+point checks. Feasibility from this repair does not establish objective attainment.
 
 Zero-objective continuation imports the active strict lower and upper sides. Its
 rational tableau keeps one infinitesimal coefficient beside each nonbasic seat

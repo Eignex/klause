@@ -11,12 +11,14 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.localsearch.CandidateCompletion
+import com.eignex.klause.localsearch.CostShaping
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
@@ -45,7 +47,8 @@ internal object MixedMoveCompletionProbe {
         }
         require(options.keys.all {
             it in setOf("input", "text64", "suite", "problem", "sourceSHA256", "initial64", "exact",
-                "instructions", "seed", "repeats", "timeout")
+                "instructions", "seed", "repeats", "timeout", "lowering", "residualObjective", "lambda",
+                "pointRecovery")
         })
         require(listOf(options["input"], options["text64"], options["suite"]).count { it != null } == 1)
         require((options["suite"] == null) == (options["problem"] == null))
@@ -62,9 +65,9 @@ internal object MixedMoveCompletionProbe {
         }
         val bytes = input?.let { CorpusFiles.open(it).use { source -> source.readBytes() } }
             ?: Base64.getDecoder().decode(options.getValue("text64"))
-        val initialBytes = Base64.getDecoder().decode(options.getValue("initial64"))
+        val initialBytes = options["initial64"]?.let { Base64.getDecoder().decode(it) }
         out.resolve("input.mps").writeBytes(bytes)
-        out.resolve("initial.json").writeBytes(initialBytes)
+        initialBytes?.let { out.resolve("initial.json").writeBytes(it) }
         val hash = sha256(bytes)
         require(options["sourceSHA256"] == null || options["sourceSHA256"] == hash) { "Original source hash differs" }
         out.resolve("sources").apply { mkdirs() }.resolve("$hash.txt").writeBytes(bytes)
@@ -77,19 +80,25 @@ internal object MixedMoveCompletionProbe {
         require(instructions > 0L && repeats in 1..100 && timeout > 0L)
         val parsed = Mps.parse(bytes.decodeToString())
         val hybrid = parsed.toProblem()
-        val compiled = if (exact || (!hybrid.sourceExact && hybrid.model.numIntVars > 0)) {
+        val lowering = options["lowering"] ?: "exact-source"
+        require(lowering in setOf("cli", "exact-source"))
+        val compiled = if ((exact && (lowering == "exact-source" || !hybrid.sourceExact)) ||
+            (!hybrid.sourceExact && hybrid.model.numIntVars > 0)
+        ) {
             parsed.toExactSourceProblem()
         } else hybrid
         val original = parsed.toExactSourceProblem()
-        val values = Json.parseToJsonElement(initialBytes.decodeToString()).jsonObject
-            .mapValues { fraction(it.value.jsonPrimitive.content) }
-        require(values.keys == compiled.columns.map { it.name }.toSet()) { "Supply every original column once" }
-        val checkedInitial = runCatching {
-            original.sourceWitness(compiled.columns.map { values.getValue(it.name) })
-        }.getOrNull()
+        val values = initialBytes?.let { Json.parseToJsonElement(it.decodeToString()).jsonObject
+            .mapValues { entry -> fraction(entry.value.jsonPrimitive.content) } }
+        require(values == null || values.keys == compiled.columns.map { it.name }.toSet()) {
+            "Supply every original column once"
+        }
+        val checkedInitial = values?.let { supplied -> runCatching {
+            original.sourceWitness(compiled.columns.map { supplied.getValue(it.name) })
+        }.getOrNull() }
         val ints = LongArray(compiled.model.numIntVars)
         val reals = MutableList(compiled.model.numRealVars) { BigFraction.ZERO }
-        for (column in compiled.columns) {
+        if (values != null) for (column in compiled.columns) {
             val value = values.getValue(column.name)
             if (column.real) reals[column.id] = value else {
                 require(value.den == BigInteger.ONE) { "A finite coordinate must be integral" }
@@ -97,10 +106,11 @@ internal object MixedMoveCompletionProbe {
             }
         }
         val initialReals = DoubleArray(reals.size) { reals[it].toDouble() }
-        require(checkedInitial != null || (!exact && compiled.withinTolerance(ints, initialReals))) {
+        require(values == null || checkedInitial != null || (!exact && compiled.withinTolerance(ints, initialReals))) {
             "Initial point fails its configured original source guarantee"
         }
-        val initialCost = checkedInitial?.objective ?: requireNotNull(compiled.sourceObjective(ints, initialReals))
+        val initialCost = if (values == null) null else checkedInitial?.objective
+            ?: requireNotNull(compiled.sourceObjective(ints, initialReals))
         val objectiveSpec = requireNotNull(compiled.objective)
         val mappedReals = compiled.columns.filter { it.real }.map { it.id }.toSet()
         val auxiliaries = reals.indices.filter { it !in mappedReals }
@@ -110,22 +120,35 @@ internal object MixedMoveCompletionProbe {
                 objectiveSpec.realCoefficients.indices.all {
                     objectiveSpec.realCoefficients[it] == if (it == auxiliaries.single()) 1.0 else 0.0
                 }) { "Unmapped coordinates must be the source objective definition" }
-            reals[auxiliaries.single()] = initialCost
+            if (initialCost != null) reals[auxiliaries.single()] = initialCost
         }
-        val initial = Sample(BooleanArray(compiled.model.numBoolVars), ints,
+        val initial = if (values == null) null else Sample(BooleanArray(compiled.model.numBoolVars), ints,
             DoubleArray(reals.size) { reals[it].toDouble() }, exactReals = reals)
         val objective = objectiveSpec.toLinearObjective().let {
             if (compiled.maximize) it.negated() else it
         }
+        val residualObjective = options["residualObjective"] ?: "source"
+        require(residualObjective in setOf("source", "feasibility"))
+        val lambda = options["lambda"]?.toDouble()?.also { require(it.isFinite() && it >= 0.0) }
+        val pointRecovery = options["pointRecovery"]?.toBooleanStrict() ?: false
         val cases = mutableListOf<JsonObject>()
         val runs = mutableListOf<JsonObject>()
         out.resolve("settings.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha())
             put("sourceSHA256", hash)
-            put("initialSHA256", sha256(initialBytes))
-            put("initialObjective", initialCost.toString())
-            put("initialSourceGuarantee", if (checkedInitial != null) "exact source feasible" else "source tolerance")
+            put("initialSHA256", initialBytes?.let(::sha256))
+            put("initialObjective", initialCost?.toString())
+            put("initialSourceGuarantee", when {
+                values == null -> "absent"
+                checkedInitial != null -> "exact source feasible"
+                else -> "source tolerance"
+            })
             put("exact", exact)
+            put("lowering", lowering)
+            put("sourceExact", compiled.sourceExact)
+            put("residualObjective", residualObjective)
+            put("lambda", lambda)
+            put("pointRecovery", pointRecovery)
             put("instructions", instructions)
             put("seed", seed)
             put("repeats", repeats)
@@ -133,7 +156,7 @@ internal object MixedMoveCompletionProbe {
             put("processors", Runtime.getRuntime().availableProcessors())
             put("runtimeArguments", JsonArray(ManagementFactory.getRuntimeMXBean().inputArguments.map(::JsonPrimitive)))
             put("objectiveAuxiliaries", auxiliaries.size)
-            put("role", "seeded numerical LS incumbent comparison; no proof or whole-CLI timing")
+            put("role", "numerical LS completion diagnostic; no proof or whole-CLI timing")
         }.toString())
         repeat(repeats) { round ->
             val adapter = Class.forName("com.eignex.klause.portfolio.LeafRealCompletion")
@@ -147,26 +170,74 @@ internal object MixedMoveCompletionProbe {
                 compiled.withinTolerance(sample.ints, sample.reals)
             }
             val completion = if (tolerant == null) {
-                constructor.newInstance(compiled.model, objective)
+                constructor.newInstance(compiled.model, objective.takeIf { residualObjective == "source" })
             } else {
                 val context = tolerant.parameterTypes.last()
                 val companion = context.getField("Companion").get(null)
                 val production = companion.javaClass.getMethod("getProduction").invoke(companion)
-                constructor.newInstance(compiled.model, objective, callback, production)
+                val selected = if (!pointRecovery) production else {
+                    context.declaredConstructors.single {
+                        it.parameterCount == 4 && it.parameterTypes.last() == Boolean::class.javaPrimitiveType
+                    }.newInstance(context.getMethod("getEngineFactory").invoke(production),
+                        context.getMethod("getCertificationPolicy").invoke(production), null, true)
+                }
+                constructor.newInstance(compiled.model, objective.takeIf { residualObjective == "source" },
+                    callback, selected)
             }
             val attempts = mutableListOf<JsonObject>()
+            var lpVerdict: String? = null
+            var lpStats: LpStats? = null
+            var floatPoint: Sample? = null
+            val observe: (Any, LpStats) -> Unit = { verdict, stats ->
+                lpVerdict = verdict.toString()
+                lpStats = stats
+            }
+            adapter.methods.singleOrNull { it.name.startsWith("setObserveLp") }?.invoke(completion, observe)
+            val observeFloat: (Sample) -> Unit = { floatPoint = it }
+            adapter.methods.singleOrNull { it.name.startsWith("setObserveFloat") }?.invoke(completion, observeFloat)
             val observed = CandidateCompletion { candidate, cancellation ->
+                lpVerdict = null
+                lpStats = null
+                floatPoint = null
+                val started = System.nanoTime()
                 val result = (completion as CandidateCompletion).complete(candidate, cancellation)
+                val elapsed = System.nanoTime() - started
+                val finite = buildJsonObject {
+                    put("booleans", JsonArray(candidate.bools.map(::JsonPrimitive)))
+                    put("integers", JsonArray(candidate.ints.map(::JsonPrimitive)))
+                }
                 attempts += buildJsonObject {
+                    put("elapsedNs", elapsed)
+                    put("finiteSHA256", sha256(finite.toString().toByteArray()))
+                    if (attempts.size < 16) put("finite", finite)
+                    put("lpVerdict", lpVerdict)
+                    put("lpStats", lpStats?.toString())
+                    floatPoint?.let { point ->
+                        val sourceValues = compiled.columns.map { column ->
+                            if (column.real) requireNotNull(BigFraction.ofDouble(point.approximateRealValue(column.id)))
+                            else BigFraction.ofLong(point.intValue(column.id))
+                        }
+                        val checked = runCatching { original.sourceWitness(sourceValues) }.getOrNull()
+                        put("floatExactlySourceFeasible", checked != null)
+                        if (attempts.size < 16) {
+                            put("floatWitness", "v " + compiled.columns.zip(sourceValues).joinToString(" ") {
+                                (column, value) -> "${column.name}=$value"
+                            })
+                            put("floatSourceObjective", checked?.objective?.toString())
+                        }
+                    }
                     put("verdict", result::class.simpleName)
                     put("work", result.work)
                 }
                 result
             }
-            val solver = LocalSearchSolver(compiled.model.bake(), completion = observed, greedyRepairOnRestart = false)
+            val solver = LocalSearchSolver(compiled.model.bake(), completion = observed,
+                greedyRepairOnRestart = initial == null)
             val begun = System.nanoTime()
             val results = solver.improvements(objective, LocalSearchParams(
                 maxInstructions = instructions, randomSeed = seed, initialAssignment = initial,
+                costShaping = lambda?.let { CostShaping.Linear(it) } ?: CostShaping.FeasibilityFirst,
+                normalizeWeightsByClass = lambda != null,
                 cancellation = Cancellation.after(timeout.milliseconds),
             )).toList()
             for ((publication, result) in results.withIndex()) {
