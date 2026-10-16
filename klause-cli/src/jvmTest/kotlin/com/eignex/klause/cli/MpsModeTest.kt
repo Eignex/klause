@@ -55,6 +55,38 @@ class MpsModeTest {
     }
 
     @Test
+    fun `MPS caller tolerance and objective publication should retain original source units`() {
+        val source = File.createTempFile("mps-shared-source-units", ".mps").apply {
+            writeText(
+                "ROWS\n N COST\n G R\nCOLUMNS\n X COST 0.1 R 0.1\n" +
+                    "RHS\n RHS R 0.3 COST -0.05\nENDATA\n",
+            )
+            deleteOnExit()
+        }
+        val common = CommonOptions().apply {
+            semanticOverrides = SemanticOverrides(
+                feasibilityTolerance = SourceTolerance(absolute = SemanticRational.of(BIG_ONE, bigIntOf(10))),
+            )
+        }
+        val session = MpsMode.newSession()
+        val loaded = session.load(source.absolutePath, common)
+        val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(2.5))
+        val check = assertNotNull(loaded.toleranceCheck)
+        val output = session.output(common)
+
+        val text = capture {
+            output.onSolution(loaded.render(point), null, assertNotNull(loaded.continuousObjectiveValue)(point))
+            output.onComplete(Verdict.BEST_FOUND)
+        }
+
+        assertTrue(check(point))
+        assertFalse(check(Sample(BooleanArray(0), LongArray(0), doubleArrayOf(1.5))))
+        assertTrue("o 0.3" in text.lines(), text)
+        assertTrue("s SATISFIABLE" in text.lines(), text)
+        assertTrue("MPS source tolerance witness" in text, text)
+    }
+
+    @Test
     fun `MPS exact loading should replace the shared tolerance without mutating caller overrides`() {
         val source = File.createTempFile("mps-shared-exact", ".mps").apply {
             writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA\n")
