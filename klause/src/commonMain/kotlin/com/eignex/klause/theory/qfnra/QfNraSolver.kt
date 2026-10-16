@@ -394,6 +394,12 @@ internal class WitnessProbe(
                 } finally {
                     admittedTerms = null
                 }
+            } else if (nonlinear) {
+                coupledPhase {
+                    formula.witnessAtoms(arithmetic, MAX_WITNESS_ATOMS)?.let {
+                        definitionWitness(it, realCount, fixed)
+                    }
+                }?.let { return it }
             }
             if (nonlinear && conjunctive != null && conjunctive.none {
                     arithmetic.step()
@@ -471,18 +477,73 @@ internal class WitnessProbe(
     ): QfNraAssignment? {
         if (exhausted) return null
         return try {
-            val point = PolynomialWitnessDefinitions(
+            val plan = PolynomialWitnessDefinitions(
                 arithmetic, MAX_WITNESS_TERMS, MAX_WITNESS_DEGREE, MAX_WITNESS_BITS,
-            ).point(atoms, realCount, fixed) ?: return null
-            val captured = LinkedHashMap<Int, AlgebraicReal>()
-            for ((variable, value) in point) {
-                arithmetic.step()
-                captured[variable] = algebraic.rational(value)
-            }
-            candidate(captured)
+            ).prepare(atoms, realCount, fixed) ?: return null
+            val point = plan.point() ?: return null
+            candidate(captureRational(point)) ?: definitionBoundaries(plan, fixed)
         } catch (_: PolynomialResourceLimit) {
             null
         }
+    }
+
+    private fun captureRational(point: Map<Int, BigFraction>): Map<Int, AlgebraicReal> {
+        val captured = LinkedHashMap<Int, AlgebraicReal>()
+        for ((variable, value) in point) {
+            arithmetic.step()
+            captured[variable] = algebraic.rational(value)
+        }
+        return captured
+    }
+
+    private fun definitionBoundaries(
+        plan: PolynomialWitnessDefinitions.Plan,
+        fixed: Map<Int, BigFraction>,
+    ): QfNraAssignment? {
+        for (atom in plan.residualAtoms) {
+            arithmetic.step()
+            val payload = atom.polynomial.terms
+            val nonlinear = payload.any { term ->
+                arithmetic.step()
+                val variables = term.monomial.variables
+                variables.size > 1 || variables.any {
+                    arithmetic.step()
+                    term.monomial.exponent(it) > 1
+                }
+            }
+            if (!nonlinear) continue
+            for (variable in atom.polynomial.variables) {
+                arithmetic.step()
+                if (variable in fixed) continue
+                if (queries >= MAX_WITNESS_AXES / 2 || proposals >= MAX_WITNESS_PROPOSALS / 2) return null
+                queries++
+                val axis = plan.axis(atom.polynomial, variable) ?: return null
+                if (axis.isZero || axis.degree <= 0) continue
+                val boundaries = ArrayList<AlgebraicReal?>()
+                for (root in algebraic.roots(axis)) { arithmetic.step(); boundaries.add(root) }
+                val seen = HashSet<BigFraction>()
+                while (boundaries.any { arithmetic.step(); it != null }) {
+                    for (index in boundaries.indices) {
+                        arithmetic.step()
+                        if (exhausted || proposals >= MAX_WITNESS_PROPOSALS / 2) return null
+                        var root = boundaries[index] ?: continue
+                        repeat(MAX_WITNESS_PASSES) {
+                            arithmetic.step()
+                            if (root.rational == null) root = algebraic.refine(root)
+                        }
+                        boundaries[index] = if (root.rational == null) root else null
+                        for (value in listOf(root.lowerBound, root.upperBound)) {
+                            arithmetic.step()
+                            if (!seen.add(value)) continue
+                            if (exhausted || proposals >= MAX_WITNESS_PROPOSALS / 2) return null
+                            val proposed = plan.point(variable, value) ?: return null
+                            candidate(captureRational(proposed))?.let { return it }
+                        }
+                    }
+                }
+            }
+        }
+        return null
     }
 
     fun candidate(point: Map<Int, AlgebraicReal>): QfNraAssignment? = candidate(point, null)
