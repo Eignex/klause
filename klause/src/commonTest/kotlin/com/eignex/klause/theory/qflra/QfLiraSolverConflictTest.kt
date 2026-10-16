@@ -32,6 +32,7 @@ import com.eignex.klause.util.Bits
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
