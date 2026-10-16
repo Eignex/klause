@@ -64,7 +64,7 @@ internal data class CompilationStudyPlan(
                 require(plan.params.all { it.matches(Regex("[a-z][a-z0-9-]*=[^\\s]+")) })
                 require(plan.params.none { it.startsWith("source-validation=") })
                 require(plan.lp == null ||
-                    plan.lp.isNotBlank() && plan.lp.none { it.isWhitespace() || it.isISOControl() })
+                    (plan.lp.isNotBlank() && plan.lp.none { it.isWhitespace() || it.isISOControl() }))
                 cases += plan.inputs.size.toLong() * plan.repeats * plan.engines.size * 2
             }
             require(cases in 1..MAX_CASES)

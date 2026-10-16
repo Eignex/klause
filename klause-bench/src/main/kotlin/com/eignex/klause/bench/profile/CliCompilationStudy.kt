@@ -83,7 +83,7 @@ internal object CliCompilationStudy {
                 allAttempted, checksCompleted, measurements.size,
                 measurements.isNotEmpty() && measurements.all {
                     it.exit == 0 && it.sourceHashesMatch && it.error == null && !it.interrupted &&
-                        (!it.profile || it.recordingPresent && it.compilationLogPresent)
+                        (!it.profile || (it.recordingPresent && it.compilationLogPresent))
                 }))
         }
     }
@@ -204,10 +204,9 @@ internal object CliCompilationStudy {
             process?.takeIf { it.isAlive }?.let(CompilationStudyBuilds::kill)
         }
         val ended = Instant.now().toString()
-        val records = directory.listFiles().orEmpty().filter { it.extension == "json" && it.name != "command.json" }
+        val record = directory.listFiles().orEmpty().filter { it.extension == "json" && it.name != "command.json" }
             .mapNotNull { file -> runCatching { json.parseToJsonElement(file.readText()).jsonObject }.getOrNull() }
-            .filter { "sourceHashes" in it }
-        val record = records.singleOrNull()
+            .singleOrNull { "sourceHashes" in it }
         if (record == null && failure == null) failure = "Missing or ambiguous original benchmark record"
         InstalledBuild.readManifest(build.provenance, launcher, runtime, environment)
         InstalledBuild.readManifest(harnessManifest, build.bench, runtime, environment)
