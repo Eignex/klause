@@ -197,7 +197,8 @@ publishes no point, model or conflict, and optional seed storage is released eve
 when hint indexing declines.
 
 Default Boolean-complete mixed disjunction ordering reads only the current
-factor's unresolved rows. Its bounded exact comparisons charge the current
+factor's unresolved rows; disequality ordering reads the current comparison and
+its registered sides. Bounded exact comparisons charge the current
 arithmetic operation and retain the opening hint stop. A copied optimal float
 prefix is a guess; it supplies no proof package or separate numerical allowance.
 The snapshot is cleared by assertions, retraction, restart and close.
