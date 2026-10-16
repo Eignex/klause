@@ -968,6 +968,7 @@ class ExactLiraSearchComponent private constructor(
     private fun assertSource(context: SearchContext): Boolean {
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
+        val comparisons = ArrayList<Triple<Int, ExactComparison, SearchAtomPremise>>(64)
         for ((index, prepared) in preparedRows.withIndex()) {
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
@@ -985,10 +986,14 @@ class ExactLiraSearchComponent private constructor(
             if (comparison.op == LinearOp.NE) {
                 disequalities += Triple(address, comparison, premise)
             } else {
-                if (!system.assertComparison(comparison, null, premise)) return false
-                sourceAssertionLevels[index] = context.decisionLevel
+                comparisons += Triple(index, comparison, premise)
+                if (comparisons.size == 64) {
+                    if (!assertComparisons(comparisons, context)) return false
+                    comparisons.clear()
+                }
             }
         }
+        if (!assertComparisons(comparisons, context)) return false
         for (atom in node.sourceBranches) {
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)
             if (!system.assertAtom(atom, premise)) return false
@@ -1000,6 +1005,25 @@ class ExactLiraSearchComponent private constructor(
         }
         if (!assertDisequalities(disequalities)) return false
         nodesByLevel.put(context.decisionLevel, node)
+        return true
+    }
+
+    private fun assertComparisons(
+        pending: List<Triple<Int, ExactComparison, SearchAtomPremise>>,
+        context: SearchContext,
+    ): Boolean {
+        val comparisons = pending.map { it.second }
+        var first = 0
+        while (first < pending.size) {
+            val end = system.prepareComparisons(comparisons, first, operationStop) ?: return false
+            for (position in first until end) {
+                if (operationStop()) return false
+                val (index, comparison, premise) = pending[position]
+                if (!system.assertComparison(comparison, null, premise)) return false
+                sourceAssertionLevels[index] = context.decisionLevel
+            }
+            first = end
+        }
         return true
     }
 

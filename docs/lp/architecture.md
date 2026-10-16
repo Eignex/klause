@@ -22,7 +22,15 @@ rows without Boolean terms. Guarded rows, Boolean-dependent rows and source disj
 materialize their definitions when asserted, through the same permanent tautological
 row path used for transient source comparisons. Bounds and their source premises
 retract with the search scope; definitions remain available to sibling scopes.
-Each append retains the existing numerical limits and construction accounting.
+Active ordinary comparisons stage at most 64 layouts in source order and append
+new multi-column definitions together. Zero- and single-column layouts end a group:
+their bounds apply before subsequent normalization can substitute a root-fixed column.
+Source bounds still apply individually, with their original premises and edit debits.
+Definition mappings publish only after an atomic append; a declined append permits
+sequential fallback only while the captured state and cancellation remain valid.
+Each append retains the existing numerical limits and charges its actual construction
+work, including failed preparation. Batching avoids repeated owner construction;
+it does not reset the containing allowance or refund previously spent work.
 Source acceptance still checks the full selected source rows and original coordinates;
 these numerical definitions supply no separate witness or proof authority.
 

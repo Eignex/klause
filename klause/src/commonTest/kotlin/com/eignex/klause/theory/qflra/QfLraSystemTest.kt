@@ -27,6 +27,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -474,6 +475,204 @@ class QfLraSystemTest {
                 assertEquals(0, assertNotNull(lp.state).model.m)
                 assertTrue(lp.atLevel(0))
             }
+        }
+    }
+
+    @Test
+    fun `staged signed comparisons should share a definition and retain strict premises`() {
+        val factors = arrayOf<Factor>(
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0, strict = true),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(-1.0, -2.0), LinearOp.LE, 3.0),
+        )
+        val comparisons = factors.map { it.linearRows.single().exactForm(2).comparison(true) { false } }
+        val debits = ArrayList<Long>()
+        LpPropagator(object : LpSearchPolicy {}, onEdit = { debits += it }).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(factors), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            for (variable in 0..1) session.publish(SearchDecision.Bool(Lit.make(variable, true)))
+
+            assertEquals(2, system.prepareComparisons(comparisons, 0, Cancellation.Never))
+            for ((index, comparison) in comparisons.withIndex()) {
+                assertTrue(system.assertComparison(comparison, null, premise(index)))
+            }
+
+            assertEquals(1, assertNotNull(lp.state).model.m)
+            val upper = assertNotNull(lp.state?.activeSide(2, true))
+            val lower = assertNotNull(lp.state?.activeSide(2, false))
+            assertTrue(upper.side.strict)
+            assertFalse(lower.side.strict)
+            assertEquals(listOf(Lit.make(0, false)),
+                assertNotNull(session.explainAtoms(lp.boundPremise(upper.witness))).literals.toList())
+            assertEquals(listOf(Lit.make(1, false)),
+                assertNotNull(session.explainAtoms(lp.boundPremise(lower.witness))).literals.toList())
+            assertEquals(listOf(3L, 3L), debits)
+        }
+    }
+
+    @Test
+    fun `a staged root equality should fix a source column before the next normalization`() {
+        for (sign in listOf(-1.0, 1.0)) {
+            val factors = arrayOf<Factor>(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(sign), LinearOp.EQ, 2.0 * sign),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, sign), LinearOp.LE, 5.0, strict = true),
+            )
+            val comparisons = factors.map { it.linearRows.single().exactForm(2).comparison(true) { false } }
+            LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                val system = LiveQfLraSystem(source().withFactors(factors), lp)
+                assertTrue(system.install())
+
+                assertEquals(1, system.prepareComparisons(comparisons, 0, Cancellation.Never))
+                assertTrue(system.assertComparison(comparisons[0], null, axiom))
+                assertEquals(2, system.prepareComparisons(comparisons, 1, Cancellation.Never))
+                assertTrue(system.assertComparison(comparisons[1], null, premise(1)))
+
+                assertEquals(0, assertNotNull(lp.state).model.m)
+                val side = assertNotNull(lp.state?.activeSide(1, sign > 0))
+                assertEquals(BigFraction.ofDouble(3.0 * sign), side.side.number.value)
+                assertTrue(side.side.strict)
+            }
+        }
+    }
+
+    @Test
+    fun `a declined definition group should leave room for its sequential prefix`() {
+        val factors = arrayOf<Factor>(
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(1.0, 3.0), LinearOp.LE, 4.0),
+        )
+        val comparisons = factors.map { it.linearRows.single().exactForm(2).comparison(true) { false } }
+        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 1) }).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(factors), lp)
+            assertTrue(system.install())
+            val before = lp.state
+
+            assertEquals(2, system.prepareComparisons(comparisons, 0, Cancellation.Never))
+            assertTrue(before === lp.state)
+            assertTrue(system.assertComparison(comparisons[0], null, premise(0)))
+            assertFalse(system.assertComparison(comparisons[1], null, premise(1)))
+
+            assertEquals(1, assertNotNull(lp.state).model.m)
+            assertEquals(3, assertNotNull(lp.state).model.numVars)
+            assertTrue(system.assertComparison(comparisons[0], null, premise(0)))
+            assertNotNull(lp.state?.activeSide(2, true))
+        }
+    }
+
+    @Test
+    fun `a capacity decline should preserve the first conflicting source premises`() {
+        val factors = arrayOf<Factor>(
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(1.0, 2.0), LinearOp.LE, 0.0),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(-1.0, -2.0), LinearOp.LE, -1.0),
+            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(1.0, 3.0), LinearOp.LE, 4.0),
+        )
+        val comparisons = factors.map { it.linearRows.single().exactForm(2).comparison(true) { false } }
+        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 1) }).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(factors), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            for (variable in 0..2) session.publish(SearchDecision.Bool(Lit.make(variable, true)))
+
+            assertEquals(3, system.prepareComparisons(comparisons, 0, Cancellation.Never))
+            assertTrue(system.assertComparison(comparisons[0], null, premise(0)))
+            assertTrue(system.assertComparison(comparisons[1], null, premise(1)))
+            assertFalse(system.assertComparison(comparisons[2], null, premise(2)))
+            val conflict = assertIs<ComponentResult.Conflict>(lp.propagate(session))
+
+            assertEquals(listOf(Lit.make(0, false), Lit.make(1, false)),
+                assertNotNull(conflict.explanation).literals.sorted())
+            assertEquals(1, assertNotNull(lp.state).model.m)
+        }
+    }
+
+    @Test
+    fun `staged definitions should survive sibling rollback without retaining their bounds`() {
+        val factors = arrayOf<Factor>(
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(1.0, 3.0), LinearOp.LE, 4.0),
+        )
+        val comparisons = factors.map { it.linearRows.single().exactForm(2).comparison(true) { false } }
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(factors), lp)
+            assertTrue(system.install())
+            assertTrue(lp.atLevel(1))
+            assertEquals(2, system.prepareComparisons(comparisons, 0, Cancellation.Never))
+            for ((index, comparison) in comparisons.withIndex()) {
+                assertTrue(system.assertComparison(comparison, null, premise(index)))
+            }
+            val lastId = assertNotNull(lp.state).rows.lastId
+
+            assertTrue(lp.atLevel(0))
+            assertTrue(lp.atLevel(1))
+            assertEquals(2, system.prepareComparisons(comparisons, 0, Cancellation.Never))
+
+            assertEquals(lastId, assertNotNull(lp.state).rows.lastId)
+            assertNull(lp.state?.activeSide(2, true))
+            assertNull(lp.state?.activeSide(3, true))
+            assertTrue(system.assertComparison(comparisons[1], null, premise(1)))
+            assertNotNull(lp.state?.activeSide(3, true))
+        }
+    }
+
+    @Test
+    fun `cancelled definition preparation should leave the captured layout reusable`() {
+        for (cancelAt in listOf(2, 5)) {
+            val factors = arrayOf<Factor>(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 3.0), LinearOp.LE, 4.0),
+            )
+            val comparisons = factors.map { it.linearRows.single().exactForm(2).comparison(true) { false } }
+            var armed = false
+            var polls = 0
+            val stop = Cancellation { armed && ++polls >= cancelAt }
+            LpPropagator(object : LpSearchPolicy {}, cancellation = stop).use { lp ->
+                val system = LiveQfLraSystem(source().withFactors(factors), lp)
+                assertTrue(system.install())
+                val before = lp.state
+                armed = true
+
+                assertNull(system.prepareComparisons(comparisons, 0, stop))
+
+                assertTrue(before === lp.state)
+                armed = false
+                assertEquals(2, system.prepareComparisons(comparisons, 0, stop))
+                assertTrue(system.assertComparison(comparisons[1], null, premise(1)))
+                assertEquals(2, assertNotNull(lp.state).model.m)
+            }
+        }
+    }
+
+    @Test
+    fun `definition preparation should bound its source lookahead`() {
+        val factors = Array<Factor>(65) { index ->
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(1.0, index + 2.0), LinearOp.LE, 3.0)
+        }
+        val comparisons = factors.map { it.linearRows.single().exactForm(2).comparison(true) { false } }
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(factors), lp)
+            assertTrue(system.install())
+
+            assertEquals(64, system.prepareComparisons(comparisons, 0, Cancellation.Never))
+
+            assertEquals(64, assertNotNull(lp.state).model.m)
+            assertEquals(65, system.prepareComparisons(comparisons, 64, Cancellation.Never))
+            assertEquals(65, assertNotNull(lp.state).model.m)
         }
     }
 

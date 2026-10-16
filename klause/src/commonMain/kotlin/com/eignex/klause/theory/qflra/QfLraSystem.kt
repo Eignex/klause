@@ -30,6 +30,7 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.util.Cancellation
 
 internal class QfLraSystem(private val model: Problem) {
     fun build(booleanValue: (Int) -> Boolean?): QfLraRelaxation {
@@ -168,7 +169,7 @@ internal class LiveQfLraSystem(
     }
     private val terms = normalized.filterKeys { it in initialTerms }.values
         .map { it.term.coefficients }.filter { it.size != 1 }.distinct()
-    private val definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
+    private var definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
 
     fun install(): Boolean {
         val structural = sourceColumns.map { column ->
@@ -223,6 +224,48 @@ internal class LiveQfLraSystem(
             if (!assertTerms(key, true, row.rhs, row.strict, premise)) return false
         }
         return true
+    }
+
+    fun prepareComparisons(comparisons: List<ExactComparison>, first: Int, stop: Cancellation): Int? {
+        val state = lp.state ?: return null
+        val pending = LinkedHashMap<Map<Int, BigFraction>, Int>()
+        var end = first
+        while (end < comparisons.size && end - first < 64) {
+            if (stop()) return null
+            val comparison = comparisons[end]
+            val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
+            val term = termSlot(key).term
+            // A source-column bound can change the root substitutions used by the following row.
+            if (term.coefficients.size <= 1) {
+                if (end == first) end++
+                break
+            }
+            if (term.coefficients !in definitions && term.coefficients !in pending) {
+                if (state.model.numVars > Int.MAX_VALUE - pending.size - 1 ||
+                    state.rows.lastId > Long.MAX_VALUE - pending.size - 1L
+                ) break
+                pending[term.coefficients] = state.model.numVars + pending.size
+            }
+            end++
+        }
+        if (end == first) return (first + 1).takeUnless { stop() || lp.state !== state }
+        if (pending.isEmpty()) return end.takeUnless { stop() || lp.state !== state }
+        val definitionsAfter = definitions.toMutableMap().also { it.putAll(pending) }
+        val rows = pending.keys.mapIndexed { index, coefficients ->
+            LpScopedRow(
+                state.rows.lastId + index + 1L,
+                coefficients.map { it.key to ExactLpNumber.of(it.value.negated()) },
+                ExactLpNumber.of(0L),
+                ExactLpColumn(ExactLpBounds(), integral = false),
+            )
+        }
+        if (stop() || lp.state !== state) return null
+        if (lp.append(rows, scoped = false)) {
+            definitions = definitionsAfter
+            return end.takeUnless { stop() }
+        }
+        // Failed preparation retains its work; sequential assertions may still fit a valid prefix.
+        return end.takeUnless { stop() || lp.state !== state }
     }
 
     fun disequalitySide(comparison: ExactComparison): DerivedDisequalitySide? {
@@ -280,13 +323,7 @@ internal class LiveQfLraSystem(
         strict: Boolean,
         premise: SearchAtomPremise,
     ): Boolean {
-        val fixed = rootFixedColumns(key.columns)
-        val slot = if (fixed.isEmpty()) {
-            key.slot ?: normalized.getOrPut(key) { SmtTermSlot(intern(key.expression(), declaredFixed)) }
-                .also { key.slot = it }
-        } else {
-            SmtTermSlot(intern(key.expression(), declaredFixed + fixed))
-        }
+        val slot = termSlot(key)
         val term = slot.term
         val column = slot.column.takeIf { it >= 0 } ?: (definitionColumn(term.coefficients) ?: return false)
         slot.column = column
@@ -296,6 +333,16 @@ internal class LiveQfLraSystem(
             ExactLpSide(ExactLpNumber.of(term.bound(threshold)), strict),
             term.premise(premise),
         )
+    }
+
+    private fun termSlot(key: SmtTermKey): SmtTermSlot {
+        val fixed = rootFixedColumns(key.columns)
+        return if (fixed.isEmpty()) {
+            key.slot ?: normalized.getOrPut(key) { SmtTermSlot(intern(key.expression(), declaredFixed)) }
+                .also { key.slot = it }
+        } else {
+            SmtTermSlot(intern(key.expression(), declaredFixed + fixed))
+        }
     }
 
     private fun definitionColumn(coefficients: Map<Int, BigFraction>): Int? =
