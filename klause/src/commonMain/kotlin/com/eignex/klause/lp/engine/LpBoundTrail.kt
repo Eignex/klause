@@ -242,6 +242,10 @@ internal class LpBoundTrail(initial: LpExactState) {
         token: Cancellation = Cancellation.Never,
         permanentRows: Set<Long> = emptySet(),
     ): Boolean {
+        if (columns.isEmpty() && rows.isNotEmpty()) {
+            val next = state.appendRows(rows, scoped, token, permanentRows) ?: return false
+            return next === state || commit(next, token)
+        }
         if (token()) return false
         if (columns.isEmpty() && rows.isEmpty()) return permanentRows.isEmpty()
         val newN = state.model.n.toLong() + columns.size
