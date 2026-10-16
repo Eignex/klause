@@ -27,6 +27,22 @@ import kotlin.test.assertTrue
 
 class FlatZincSourceStateTest {
     @Test
+    fun `automatic original or stopped preparation should not force legacy grid geometry`() {
+        for (stopped in listOf(false, true)) {
+            val program = parseFlatZinc("var 0.0..1.0: x; constraint float_eq(x,0.25); solve satisfy;",
+                floatBuckets = 2)
+            val original = program.sourceProgram.problem
+
+            val invocation = program.prepareSourceExecution(SourceSetupRequest(program.sourceAttachment(),
+                ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK, cancellation = Cancellation { stopped }))
+
+            assertSame(original, invocation.source.originalSource)
+            assertNull(invocation.floatProjection)
+            assertFalse(assertNotNull(program.retainedSource).materialized)
+        }
+    }
+
+    @Test
     fun `a copied private search group should retain only original integer hints on source attachment`() {
         val program = parseFlatZinc("""
             var 1..2: i;

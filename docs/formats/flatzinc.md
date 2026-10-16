@@ -149,6 +149,8 @@ finite compatibility view. `prepareFiniteCompatibility` binds that view to the s
 source invocation with the caller's actual operation, providers and containing stop.
 `parseFlatZincExecution` uses this binding and exposes its `sourceInvocation`.
 `prepareSourceExecution` selects automatic execution from the same original invocation.
+The CLI reads canonical metadata and captures this invocation before requesting any
+optional geometry; legacy compatibility getters do not select its route.
 An actually admitted original complete arm takes precedence over a private grid; mixed
 requests retain that original arm through the common dispatcher. Otherwise the permitted
 compatibility view may run, with the original route retained on decline. Admission uses

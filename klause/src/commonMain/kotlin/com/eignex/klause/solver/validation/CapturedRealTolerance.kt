@@ -32,8 +32,10 @@ internal fun capturedSourceSlack(
     if (policy == null || policy.isExact) return BigFraction.ZERO
     val absolute = BigFraction.of(policy.absolute.numerator, policy.absolute.denominator)
     val relative = BigFraction.of(policy.relative.numerator, policy.relative.denominator)
-    val scaled = relative * maxOf(bound.magnitude(), magnitude)
-    return maxOf(absolute, scaled)
+    val boundMagnitude = bound.magnitude()
+    val scale = if (boundMagnitude > magnitude) boundMagnitude else magnitude
+    val scaled = relative * scale
+    return if (absolute > scaled) absolute else scaled
 }
 
 internal fun verifyCapturedLinearTolerance(
