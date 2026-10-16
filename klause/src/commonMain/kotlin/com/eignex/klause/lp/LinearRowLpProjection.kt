@@ -1,5 +1,6 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
@@ -40,6 +41,7 @@ private fun LinearRow.emitIntegerLpRelaxation(builder: RelaxationBuilder) {
         return
     }
     if ((0 until size).all { Term.isBool(ref(it)) }) {
+        if (!permitsLongPseudoBoolean(constants as IntegerConstants)) return
         val weights = if ((constants as IntegerConstants).coefficients is UnitConsts) null else integerCoeffs
         builder.boolRow(IntArray(size) { Term.lit(ref(it)) }, weights, relation, bound)
         return

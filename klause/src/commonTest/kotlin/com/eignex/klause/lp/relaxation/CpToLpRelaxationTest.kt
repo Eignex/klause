@@ -28,15 +28,20 @@ import kotlin.test.assertTrue
 
 class CpToLpRelaxationTest {
     @Test
-    fun `weighted Boolean activities outside the LP integer range should decline their optional row`() {
-        val factor = PseudoBoolean(longArrayOf(Long.MAX_VALUE, 1), IntArray(2) { Lit.make(it, true) },
-            PbOp.LE, Long.MAX_VALUE)
-        val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(1, 1))
+    fun `unrepresentable Boolean rows should decline through direct and delegated source views`() {
+        val sources = listOf(
+            PseudoBoolean(longArrayOf(Long.MAX_VALUE, 1), IntArray(2) { Lit.make(it, true) },
+                PbOp.LE, Long.MAX_VALUE),
+            PseudoBoolean(longArrayOf(Long.MIN_VALUE), intArrayOf(Lit.make(0, false)), PbOp.GE, Long.MIN_VALUE),
+        )
+        for (source in sources) for (factor in listOf<Factor>(source, object : Factor by source {})) {
+            val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
+            val objective = LinearObjective(boolWeights = longArrayOf(1, 1))
 
-        val relaxation = CpToLpRelaxation(problem, objective).build(RootDomains(problem))
+            val relaxation = CpToLpRelaxation(problem, objective).build(RootDomains(problem))
 
-        assertEquals(0, relaxation.model.m)
+            assertEquals(0, relaxation.model.m)
+        }
     }
 
     @Test
