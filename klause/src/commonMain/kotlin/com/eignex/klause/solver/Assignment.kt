@@ -2,6 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.real.ExactRealValue
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.randomValue
@@ -180,6 +181,12 @@ class Sample private constructor(
     val numIntVars: Int get() = exactInts?.size ?: integerValues.size
 
     internal var witnessCertificate: EvidenceCertificate? = null
+
+    /**
+     * Effective source policy retained by an accepted witness, or null for an unbound sample.
+     * The policy describes interpretation; it establishes no additional proof authority.
+     */
+    val semantics: EffectiveSourceSemantics? get() = witnessCertificate?.model?.semantics
 
     /** Certified real values indexed by real variable id, when a residual LP supplied them. */
     val exactReals: List<BigFraction>? = exactReals?.let { snapshotValues(it) }

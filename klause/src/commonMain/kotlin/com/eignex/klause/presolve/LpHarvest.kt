@@ -169,6 +169,7 @@ internal fun lpRootBoundsReporting(
     return LpRootBoundsResult(
         Problem(
             settings = problem.settings,
+            semantics = problem.semantics,
             numBoolVars = problem.numBoolVars,
             numIntVars = problem.numIntVars,
             intDomains = domains,
@@ -285,6 +286,7 @@ fun lpHarvestReporting(
     val transformed = RootBaker.reseed(
         BakedProblem(
             settings = problem.settings,
+            semantics = problem.semantics,
             numBoolVars = problem.numBoolVars,
             numIntVars = problem.numIntVars,
             intDomains = domains,

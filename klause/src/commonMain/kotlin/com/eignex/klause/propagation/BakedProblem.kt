@@ -1,11 +1,13 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SourceIntDomains
+import com.eignex.klause.ir.defaultIrSemantics
 import com.eignex.klause.ir.withStorage
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
@@ -58,8 +60,10 @@ class BakedProblem private constructor(
     settings: ProblemSettings,
     internal val projectionProviders: FactorProjectionProviders?,
     private val projectionSelection: ((Problem) -> PreparedFactorProjections)?,
+    semantics: EffectiveSourceSemantics,
 ) : Problem(
     settings = settings,
+    semantics = semantics,
     numBoolVars = numBoolVars,
     numIntVars = numIntVars,
     declaredIntDomains = SourceIntDomains.ofDomains(
@@ -146,8 +150,10 @@ class BakedProblem private constructor(
         settings: ProblemSettings = ProblemSettings(),
         projectionProviders: FactorProjectionProviders? = null,
         projectionSelection: ((Problem) -> PreparedFactorProjections)? = null,
+        semantics: EffectiveSourceSemantics = defaultIrSemantics,
     ) : this(
         settings = settings,
+        semantics = semantics,
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         // The fold rewrites what every reader of this projection sees, so it needs an array of its own:
@@ -196,8 +202,10 @@ class BakedProblem private constructor(
         settings: ProblemSettings = ProblemSettings(),
         projectionProviders: FactorProjectionProviders? = null,
         projectionSelection: ((Problem) -> PreparedFactorProjections)? = null,
+        semantics: EffectiveSourceSemantics = defaultIrSemantics,
     ) : this(
         settings = settings,
+        semantics = semantics,
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         intDomains = intDomains,

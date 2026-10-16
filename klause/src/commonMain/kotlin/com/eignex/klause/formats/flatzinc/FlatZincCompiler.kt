@@ -186,6 +186,7 @@ internal class FlatZincCompiler(
         // in the presolve lane via [RootBaker].
         val problem = Problem(
             settings = settings,
+            semantics = sourceSemantics,
             numBoolVars = numBoolVars,
             numIntVars = intDomains.size,
             intDomains = intDomains.toTypedArray(),

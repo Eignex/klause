@@ -518,6 +518,7 @@ internal fun ComponentPlan.booleanSkeleton(
     for (clause in clauses) for (v in clause.variables.boolVars) touched[v] = true
     val skeleton = Problem(
         settings = source.settings,
+        semantics = source.semantics,
         numBoolVars = source.numBoolVars,
         numIntVars = 0,
         intDomains = emptyArray(),

@@ -224,10 +224,18 @@ class EffectiveSourceSemantics internal constructor(
         get() = effective.floats is FloatSemantics.Grid || effective.feasibilityTolerance?.isExact == false
 }
 
+/** Immutable source declaration policy, independent of a strategy or execution projection. */
+interface SourceSemanticsOwner {
+    /** Effective policy retained unchanged for this source's lifetime. */
+    val semantics: EffectiveSourceSemantics
+}
+
+internal val defaultIrSemantics: EffectiveSourceSemantics = SourceSemantics(SourceFormat.IR).resolve()
+
 /** Source payload paired with the effective semantics under which it was lowered. */
 data class SemanticSource<out M>(
     /** Immutable or borrowed-read-only source representation. */
     val model: M,
     /** Declared defaults and caller replacements captured before lowering. */
-    val semantics: EffectiveSourceSemantics,
-)
+    override val semantics: EffectiveSourceSemantics,
+) : SourceSemanticsOwner

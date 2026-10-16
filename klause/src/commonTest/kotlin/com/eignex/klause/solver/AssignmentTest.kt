@@ -4,6 +4,8 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
@@ -260,4 +262,36 @@ class AssignmentTest {
         assertEquals(exact, sample.exactReals?.single())
         assertEquals(Double.POSITIVE_INFINITY, sample.approximateRealValue(0))
     }
+
+    @Test
+    fun `an accepted witness should retain its source semantic policy through an unchanged copy`() {
+        val semantics = SourceSemantics(SourceFormat.DIMACS).resolve()
+        val source = Problem(1, 0, emptyArray(), emptyArray(), semantics = semantics)
+        val sample = Sample(booleanArrayOf(true), longArrayOf())
+        val runtime = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
+        sample.witnessCertificate = EvidenceCertificate.published(
+            CompletedEnginePublication.Witness(runtime, sample, null),
+        )
+
+        val copied = sample.copy()
+
+        assertEquals(semantics.effective, copied.semantics?.effective)
+    }
+
+    @Test
+    fun `replacing witness coordinates should discard source semantic qualification`() {
+        val source = Problem(
+            1, 0, emptyArray(), emptyArray(), semantics = SourceSemantics(SourceFormat.DIMACS).resolve(),
+        )
+        val sample = Sample(booleanArrayOf(true), longArrayOf())
+        val runtime = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
+        sample.witnessCertificate = EvidenceCertificate.published(
+            CompletedEnginePublication.Witness(runtime, sample, null),
+        )
+
+        val replaced = sample.copy(bools = booleanArrayOf(false))
+
+        assertNull(replaced.semantics)
+    }
+
 }

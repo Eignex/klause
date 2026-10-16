@@ -205,7 +205,7 @@ internal class SharedPolynomialModel private constructor(
                     source.numBoolVars, source.numIntVars, source.declaredIntDomains,
                     Array(kept.size) { source.factors[kept[it]] },
                     source.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } },
-                    source.hasSymmetryBreaking, settings = source.settings,
+                    source.hasSymmetryBreaking, settings = source.settings, semantics = source.semantics,
                 ),
                 PolynomialTheoryService(formula, source.numBoolVars, lowering.realCount, fixedReals),
                 integerIds.toMap(),

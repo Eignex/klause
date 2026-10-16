@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.incumbent
 
+import com.eignex.klause.ir.SourceSemanticsOwner
+
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -11,6 +13,8 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 
 internal class ModelIdentity private constructor(private val source: Any, private val objective: Any?) {
+    val semantics = (source as? SourceSemanticsOwner)?.semantics
+
     fun matches(other: ModelIdentity): Boolean = source === other.source && objective === other.objective
 
     fun sameModel(other: ModelIdentity): Boolean = source === other.source
