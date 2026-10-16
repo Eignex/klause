@@ -92,7 +92,8 @@ class QfLiraSolverConflictTest {
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(source.numBoolVars))
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 for (variable in 1 until source.numBoolVars) {
-                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, positive))))
+                    val decision = SearchDecision.Bool(Lit.make(variable, positive))
+                    assertIs<ComponentResult.Consistent>(session.push(decision))
                 }
 
                 assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(0)))
