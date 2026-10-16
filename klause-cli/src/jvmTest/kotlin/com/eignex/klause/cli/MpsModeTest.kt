@@ -438,6 +438,39 @@ class MpsModeTest {
     }
 
     @Test
+    fun `integral real definitions should retain original coordinates beside finite integer backing`() {
+        for ((realFirst, exact) in listOf(false to false, false to true, true to false, true to true)) {
+            val integer = " M0 'MARKER' 'INTORG'\n X DEF -3\n M1 'MARKER' 'INTEND'\n"
+            val real = " Z COST 1 DEF 1\n"
+            val source = File.createTempFile("mps-integral-real-definition", ".mps").apply {
+                writeText(
+                    "ROWS\n N COST\n E DEF\nCOLUMNS\n" +
+                        (if (realFirst) real + integer else integer + real) +
+                        "RHS\n RHS DEF 2\nBOUNDS\n BV B X\n FR B Z\nENDATA\n",
+                )
+                deleteOnExit()
+            }
+
+            val loaded = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { this.exact = exact })
+            val pipeline = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline)
+            val original = assertIs<LinearSourceProblem>(pipeline.invocation.source.originalSource)
+            val backing = pipeline.invocation.finiteShape().problem
+            val point = assertNotNull(original.checkMpsWitness(
+                original.variables.map { if (it.integer) BigFraction.ONE else BigFraction.ofLong(5) },
+            ))
+
+            assertEquals(listOf(realFirst, !realFirst), original.variables.map { !it.integer })
+            assertEquals(2, backing.numIntVars)
+            assertEquals(0, backing.numRealVars)
+            assertEquals(setOf(0L to 1L, 2L to 5L), (0 until backing.numIntVars).map {
+                backing.intBounds.lower(it) to backing.intBounds.upper(it)
+            }.toSet())
+            assertEquals(BigFraction.ofLong(5), point.objective)
+            assertEquals(if (realFirst) "v Z=5 X=1" else "v X=1 Z=5", pipeline.render(point))
+        }
+    }
+
+    @Test
     fun `open MPS indicator regions should retain numerical optima under either certification policy`() {
         val source = File.createTempFile("mps-open-indicator", ".mps").apply {
             writeText(
