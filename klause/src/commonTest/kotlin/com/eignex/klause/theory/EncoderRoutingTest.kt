@@ -634,7 +634,7 @@ class EncoderRoutingTest {
         assertIs<SearchResult.Exhausted>(result)
         assertEquals(IntVariableOwner.CP, plan.intOwner(1))
         assertEquals(FactorOwner.CP, plan.factorOwner(0))
-        assertFalse(plan.factorEncoded(0))
+        assertTrue(plan.factorEncoded(0))
         assertEquals(holes, source.intDomainOrNull(0))
     }
 

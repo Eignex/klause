@@ -268,7 +268,9 @@ repeated coordinates and normalize complemented Boolean terms without changing
 their zero/one values. Coefficients and activities retain arbitrary-width rational
 arithmetic. An optional Boolean activator is equivalent to the whole relation;
 a false activator requires a collision. Remapping preserves repeated operand roles,
-strict coordinate namespaces and activation identity.
+strict coordinate namespaces and activation identity. Structural coloring maps
+identifiers directly, preserving namespaces and exact coefficients under focal
+color markers without constructing a source remap.
 
 Finite propagation checks pinned operands and pins the reifying Boolean only when
 all operand coordinates are known. Local search grades collisions exactly over

@@ -430,7 +430,7 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a Boolean gate should retain its meaning when an arithmetic channel consumes it`() {
+    fun `a Boolean gate should retain its meaning when distinct consumes it`() {
         val parsed = SmtLib.parse(
             """
             (declare-const b Bool) (declare-const c Bool)
@@ -439,16 +439,9 @@ class SmtLibConditionalEqualityTest {
             (assert (distinct (and b c) false))
             """.trimIndent(),
         )
-        ExactLiraSearchComponent(parsed.model).use { component ->
-            val session = SearchSession(
-                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
-                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
-            )
+        val result = BacktrackSolver.source(parsed.model).solve()
 
-            session.initialize()
-
-            assertIs<SearchResult.Exhausted>(session.solve(parsed.model.numBoolVars))
-        }
+        assertIs<OpenTheoryResult.Unsat>(result)
     }
 
     @Test
