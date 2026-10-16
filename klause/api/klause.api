@@ -12507,6 +12507,7 @@ public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$Unsuppor
 public final class com/eignex/klause/solver/pipeline/SourceSetup {
 	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/SourceSetup;
 	public final fun prepare (Lcom/eignex/klause/solver/pipeline/SourceSetupRequest;)Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
+	public final fun prepare (Lcom/eignex/klause/solver/pipeline/SourceSetupRequest;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceSetupRequest {

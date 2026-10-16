@@ -96,8 +96,12 @@ class SourceStrategy internal constructor(
         if (!scope.supportsSource()) return scope.unsupported()
         val route = SourceSetup.prepare(
             SourceSetupRequest(
-                SourceAttachment(source), ExecutionOperation.SATISFY, engine,
-                providers = projectionProviders, cancellation = scope.stop, boundCancellation = scope.stop,
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                engine,
+                providers = projectionProviders,
+                cancellation = scope.stop,
+                boundCancellation = scope.stop,
             ),
             polynomialCancellation = scope.polynomialPreparation(),
         ).route
