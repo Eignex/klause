@@ -22,9 +22,9 @@ class SourceSolvableTest(private val direction: String) {
             writeText(
                 """
                 <instance format="XCSP3" type="COP">
-                  <variables><var id="x">0..2</var></variables>
+                  <variables><var id="x">1999999999..2000000000</var></variables>
                   <objectives><$direction type="sum">
-                    <list>x</list><coeffs>9007199254740993</coeffs>
+                    <list>x</list><coeffs>2000000001</coeffs>
                   </$direction></objectives>
                 </instance>
                 """.trimIndent(),
@@ -44,8 +44,8 @@ class SourceSolvableTest(private val direction: String) {
         }
 
         val output = bytes.toString(Charsets.UTF_8.name())
-        val objective = if (direction == "maximize") "18014398509481986" else "0"
-        val value = if (direction == "maximize") "2" else "0"
+        val objective = if (direction == "maximize") "4000000002000000000" else "3999999999999999999"
+        val value = if (direction == "maximize") "2000000000" else "1999999999"
         assertTrue("o $objective" in output.lines(), output)
         assertTrue("s OPTIMUM FOUND" in output.lines(), output)
         assertTrue("<values> $value </values>" in output, output)
