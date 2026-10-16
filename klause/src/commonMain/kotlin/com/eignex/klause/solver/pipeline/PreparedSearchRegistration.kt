@@ -82,8 +82,12 @@ internal class SearchComponentOpening(
                         return SearchCandidateHints.None
                     }
                     component.partialPointHints(cancellation, defaultOpening = true,
-                        defaultGraphSelections = selections)?.second.also {
-                        if (it != null) component.useDefaultDisjunctionHints()
+                        defaultGraphSelections = selections)?.let { (variables, hints) ->
+                        component.useDefaultDisjunctionHints()
+                        if (source.numIntVars > 0 && source.numRealVars > 0) {
+                            own(DefaultMixedPointHints(source, component, variables, hints, cancellation,
+                                smtStats?.hintUsage))
+                        } else hints
                     }
                 } else null
                 if (direct == null) outcome(HintIndexOutcome.NO_PROVIDER) else accounted = true

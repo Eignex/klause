@@ -128,7 +128,11 @@ completion owner can reuse its completed point for direct primitive preferences.
 Source integers may be fractional in that point; complete integrality checks and
 exhaustive integer branching retain their authority. Registration precedes component
 initialization; evaluation uses a point from an existing numerical check. It
-constructs no source-clause index and draws no Boolean proposal. Custom registered
+draws no Boolean proposal. A complete mixed worker lazily constructs the existing
+bounded source-clause adapter at its first live-point consultation. The adapter
+keeps the same source-size, storage and visit admission and current-point hooks.
+A declined index retains the direct provider. Private queries and pure sources
+keep direct primitive preferences without this construction. Custom registered
 providers retain precedence, and primitive preferences retain their dirty,
 retraction, containing-stop and close lifetime.
 If initialization has already admitted the complete pure-real difference graph under
@@ -142,14 +146,14 @@ live default consultation and supply no preference. Registration and all complet
 capture work retain their spent debit; later checks do not recapture released hints in that
 opening. An unavailable point or a caller preference that bypasses the component does
 not trigger this release. Source checks and graph or LP fallback retain their owners.
-Other built-in exact-linear point guidance and compound source-clause preferences
-use the existing `openHintFlips` opt-in, retaining their real-coordinate producer
+Outside that complete mixed path, compound source-clause preferences and other
+built-in exact-linear point guidance use the existing `openHintFlips` opt-in, retaining their real-coordinate producer
 admission. Explicit zero permits bounded construction observations but supplies no
 component preference to traversal. A positive allowance
 permits indexed guidance after caller or deferred preferences decline. The flip
 ceiling still bounds only the Boolean draw; point and index work retain their
-original owners and limits. Direct preferences supply generic component usage
-observations, without pretending that a source index was admitted.
+original owners and limits. Primitive-only preferences supply generic component usage
+observations; source index observations require actual construction.
 Custom registered providers retain their own existing admission and lifetime.
 The default integer difference opening installs no point hint provider; its ordinary
 Boolean polarity selection is independent of optional internal adapter composition.
@@ -819,8 +823,9 @@ and is not a source witness. These counters exclude private queries.
 Other `smtCompleteSearchStage_*` observations follow existing branch paths: finite choices pending,
 finite and Boolean choices complete, source disjunction or disequality branches,
 and source branchers offering no further choice. `RECOVERY_*` records an actual mixed point attempt
-and its existing return path; equality repair records its own attempt and any
-fully checked point. These are component stages, not full-source acceptance
+and its existing return path; equality repair distinguishes admission limits, paired
+equations, pivots, reconstructed guesses and fully checked points. A reconstructed
+guess can still fail full-row validation. These are component stages, not full-source acceptance
 or explanations for UNKNOWN. A missing recovery attempt cannot identify which earlier
 stage stopped progress without the corresponding observations. Stage recording adds
 no scan, owner poll, numerical query or work allowance. Stages overlap and their
@@ -828,9 +833,10 @@ counts are not a work total. Disjunction and disequality guide observations dist
 points from float guesses and record when a preference changes the original order.
 Disequality observations also identify point ties, source/private registration paths
 and registration declines; they establish no source witness. Complete-caller
-`POINT_HINT_*` stages distinguish successful graph/LP capture and consultations that
-find no live point, no preference for the chosen Boolean, or a preferred polarity.
-They exclude private-query captures and do not explain an unavailable point.
+`POINT_HINT_*` stages distinguish successful graph/LP capture and direct provider calls
+that find no live point, no preference for the requested Boolean, or a preferred polarity.
+Compound consultations can call that provider for several primitives. These stages
+exclude private-query captures and do not explain an unavailable point.
 These observations add no scan, numerical query,
 allowance or result authority and do not explain an UNKNOWN verdict by themselves.
 
