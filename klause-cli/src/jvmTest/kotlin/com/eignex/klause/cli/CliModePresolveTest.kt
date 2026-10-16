@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.util.Cancellation
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -8,6 +9,7 @@ import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -277,6 +279,36 @@ class CliModePresolveTest {
         val (cancel, budget) = SolveCore.presolveAllowance(common, Cancellation.Never)
         assertFalse(cancel())
         assertEquals(presolveWorkFor(6_000L), budget?.remaining())
+    }
+
+    @Test
+    fun `exhausted optional routing allowance should retain SMT complete admission`() {
+        val source = File.createTempFile("routing-admission", ".smt2").apply {
+            writeText("(declare-const x Int) (declare-const y Int) " +
+                "(assert (<= (+ (* 2 x) (* 3 y)) 1)) (check-sat)")
+            deleteOnExit()
+        }
+        val common = CommonOptions().apply { engineParams += "presolve-work-limit=1" }
+
+        val loaded = SmtLibMode.newSession().load(source.absolutePath, common)
+
+        val pipeline = assertIs<SolvablePipeline.OpenTheory>(loaded.pipeline)
+        assertEquals(ProblemPipeline.EXACT_LIRA, pipeline.request.route)
+        assertTrue(common.routingCancellation()())
+        assertFalse(common.routingPreparationCancellation()())
+    }
+
+    @Test
+    fun `required routing admission should retain the containing deadline`() {
+        val common = CommonOptions().apply {
+            deadlineAtMs = nowMillis() - 1L
+            engineParams += "open-bound-proof=false"
+        }
+
+        val stop = common.routingPreparationCancellation()
+
+        assertTrue(stop())
+        assertFalse(common.presolveAllowanceInitialized)
     }
 
     @Test

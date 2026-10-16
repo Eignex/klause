@@ -10,6 +10,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
@@ -104,6 +105,94 @@ class ProblemPipelineTest {
                 assertSame(objective, route.preparedPlan.objective)
             }
         }
+    }
+
+    @Test
+    fun `optional bound work exhaustion should retain complete linear admission`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
+            factors = arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 1)),
+        )
+        val budget = PresolveBudget(1)
+        val optional = budget.orSpent(Cancellation.Never)
+
+        val route = assertIs<SourceProblemRoute.OpenTheory>(model.pipelineRoute(
+            boundCancellation = optional,
+            preparationCancellation = Cancellation.Never,
+        ))
+
+        assertTrue(optional())
+        assertTrue(budget.spent() >= budget.allowance)
+        assertEquals(ProblemPipeline.EXACT_LIRA, route.request.route)
+        assertSame(model, route.preparedPlan.originalSource)
+        assertNull(route.request.model.intDomainOrNull(0))
+        assertNull(route.request.model.intDomainOrNull(1))
+    }
+
+    @Test
+    fun `containing cancellation after optional work should decline complete admission`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
+            factors = arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 1)),
+        )
+        val budget = PresolveBudget(1)
+        val containing = Cancellation { budget.spent() > 0 }
+
+        val route = assertIs<SourceProblemRoute.UnsupportedOpen>(model.pipelineRoute(
+            boundCancellation = budget.orSpent(containing),
+            preparationCancellation = containing,
+        ))
+
+        assertTrue(containing())
+        assertEquals(PreparedPlanDecline.RESOURCE, route.preparedPlan.decline)
+        assertNull(route.preparedPlan.componentPlan)
+    }
+
+    @Test
+    fun `optional stop should retain genuine unsupported source refusal`() {
+        val model = withAllDifferentOverOpenColumn()
+        val budget = PresolveBudget(0)
+
+        val route = assertIs<SourceProblemRoute.UnsupportedOpen>(model.pipelineRoute(
+            boundCancellation = budget.orSpent(Cancellation.Never),
+            preparationCancellation = Cancellation.Never,
+        ))
+
+        assertEquals(1, assertNotNull(route.unplaceable).column)
+        assertEquals("AllDifferent", route.unplaceable?.factorKind)
+        assertTrue(route.preparedPlan.decline != PreparedPlanDecline.RESOURCE)
+        assertFalse(route.problem.intBounds.hasUpper(1))
+    }
+
+    @Test
+    fun `optional stop should retain proved partial bounds for complete admission`() {
+        val open = Bits(3).also { it.set(1); it.set(2) }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(5, 0, 0), null, open),
+            factors = arrayOf(
+                AllDifferent(vars = intArrayOf(0, 1), domainMin = 0, domainSize = 6),
+                Linear(longArrayOf(1), intArrayOf(1), LinearOp.LE, 5),
+            ),
+        )
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val optional = budget.orSpent(Cancellation.Never)
+
+        val route = assertIs<SourceProblemRoute.OpenTheory>(model.pipelineRoute(
+            boundCancellation = optional,
+            preparationCancellation = Cancellation.Never,
+            onLpStats = { budget.charge(budget.remaining()) },
+        ))
+
+        assertTrue(optional())
+        assertEquals(5L, route.request.model.intBounds.upper(1))
+        assertEquals(IntVariableOwner.CP, route.request.componentPlan.intOwner(1))
+        assertEquals(IntVariableOwner.THEORY, route.request.componentPlan.intOwner(2))
+        assertSame(model, route.preparedPlan.originalSource)
     }
 
     @Test

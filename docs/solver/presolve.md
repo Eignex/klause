@@ -81,13 +81,18 @@ fragment; an uncovered nonlinear open composition still declines polynomial admi
 when the source declaration fixes their integer trigger to the enabling value.
 Invocation-local fixings are not permanent source bounds.
 
-Open satisfaction separates optional source passes and bound closing from required
+Source routing and open satisfaction separate optional source passes and bound closing from required
 component installation. The passes and bound closing retain the presolve phase token
 and ledger. Planning the resulting source uses the containing invocation token and
 its meter, so an exhausted presolve phase can forgo reductions while complete search
 still installs every required encoder. An interrupted installation retains its resource
 decline and cannot start search or publish a partial relation. Completed immutable
 planning can be retained after the optional phase stops; it retains no phase token.
+The routing overload with separate bound and preparation tokens uses the containing
+preparation token for initial admission, admission after partial bound closure and
+finite ownership selection. Legacy single-token overloads apply that token to both
+scopes. Optional probe exhaustion neither erases complete linear admission nor
+turns an uncovered source into a supported fragment.
 
 ## Phase allowance and telemetry
 

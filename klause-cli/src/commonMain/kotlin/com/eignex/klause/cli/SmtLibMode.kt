@@ -123,11 +123,12 @@ internal object SmtLibMode : CliMode {
             var routingLpStats = LpStats()
             val routingStart = TimeSource.Monotonic.markNow()
             val route = parsed.model.pipelineRoute(
-                objective,
-                parsed.sense == ObjectiveSense.MAXIMIZE,
+                objective = objective,
+                maximize = parsed.sense == ObjectiveSense.MAXIMIZE,
                 routePureRealToTheory = true,
                 routeLinearToTheory = objective?.requiresExactRoute(parsed.model) == true,
                 boundCancellation = common.routingCancellation(),
+                preparationCancellation = common.routingPreparationCancellation(),
                 onLpStats = { routingLpStats = it },
             )
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
