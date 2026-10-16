@@ -4,6 +4,7 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.MpsCompiled
 import com.eignex.klause.formats.mps.MpsLoweringException
 import com.eignex.klause.formats.mps.MpsSourceWitness
+import com.eignex.klause.formats.mps.mpsSemantics
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.SourceTolerance
@@ -45,13 +46,10 @@ internal object MpsMode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
+            val semanticOverrides = common.sourceOverrides(mpsSemantics)
             val source = Mps.parse(openFileSource(path))
             val settings = common.config.problemSettings()
-            val semanticOverrides = if (common.exact) {
-                common.semanticOverrides.copy(feasibilityTolerance = SourceTolerance())
-            } else {
-                common.semanticOverrides
-            }
+            val exact = checkNotNull(common.sourceSemantics).effective.feasibilityTolerance == SourceTolerance()
             val lowered = try {
                 source.toProblem(settings, semanticOverrides)
             } catch (_: MpsLoweringException) {
@@ -60,7 +58,7 @@ internal object MpsMode : CliMode {
             val exactSource = source.toExactSourceProblem(settings, semanticOverrides)
             val sourceAdmission = NumericalLinearRequest(exactSource.model,
                 cancellation = common.routingCancellation()).numericalRowsSupported()
-            var compiled = if (!sourceAdmission || (common.exact && !lowered.sourceExact)) exactSource else lowered
+            var compiled = if (!sourceAdmission || (exact && !lowered.sourceExact)) exactSource else lowered
             var routingLpStats = LpStats()
             val routingStart = TimeSource.Monotonic.markNow()
             var numerical = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective(),
@@ -75,7 +73,7 @@ internal object MpsMode : CliMode {
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
             if (route != null) common.logRoute(route, routingElapsedMs)
             else common.frontendRouting = CliRoutingStats("numerical-mip", routingElapsedMs)
-            if (common.exact) requireExactMpsSource(compiled)
+            if (exact) requireExactMpsSource(compiled)
             val state = MpsOutputState(compiled.objectiveScale, compiled.toleranceDifference,
                 compiled.sourceExact, compiled.sourceDifference)
             outputState = state
@@ -127,7 +125,7 @@ internal object MpsMode : CliMode {
             return if (route == SourceProblemRoute.Refuted) {
                 refutedSolvable(routingLpStats, routingElapsedMs)
             } else if (finite != null) {
-                mpsLinearSolvable(compiled, common.exact, linearSolvable(
+                mpsLinearSolvable(compiled, exact, linearSolvable(
                     finite.problem,
                     if (compiled.maximize) objective?.negated() else objective,
                     compiled.maximize,
