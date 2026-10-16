@@ -30,6 +30,7 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.util.Cancellation
 
 internal class QfLraSystem(private val model: Problem) {
     fun build(booleanValue: (Int) -> Boolean?): QfLraRelaxation {
@@ -223,6 +224,40 @@ internal class LiveQfLraSystem(
             if (!assertTerms(key, true, row.rhs, row.strict, premise)) return false
         }
         return true
+    }
+
+    fun comparisonRefutation(comparison: ExactComparison, stop: Cancellation): SearchAtomPremise? {
+        if (comparison.terms.isEmpty() || comparison.terms.size > 1024 || comparison.op == LinearOp.NE) return null
+        val state = lp.state ?: return null
+        if (state.conflict != null || stop()) return null
+        val work = MixedPointArithmetic(stop)
+        if (!work.admitted(comparison.bound)) return null
+        fun refuteSide(upper: Boolean): SearchAtomPremise? {
+            var slack = comparison.bound
+            var strict = comparison.strict
+            val premises = ArrayList<SearchAtomPremise>()
+            for ((column, coefficient) in comparison.terms) {
+                stop.charge(1L)
+                if (stop() || column !in 0 until columns || column >= state.model.numVars) return null
+                if (coefficient.isZero) continue
+                val boundUpper = (coefficient < BigFraction.ZERO) == upper
+                val side = state.activeSide(column, boundUpper)?.side ?: return null
+                val premise = lp.activeBoundPremise(column, boundUpper) ?: return null
+                slack = work.subtractProduct(slack, coefficient, side.number.value) ?: return null
+                strict = strict || side.strict
+                premises += premise
+            }
+            val impossible = if (upper) slack < BigFraction.ZERO else slack > BigFraction.ZERO
+            return if ((impossible || (slack.isZero && strict)) && !stop()) {
+                SearchAtomPremise.All(premises)
+            } else null
+        }
+        return when (comparison.op) {
+            LinearOp.LE -> refuteSide(upper = true)
+            LinearOp.GE -> refuteSide(upper = false)
+            LinearOp.EQ -> refuteSide(upper = true) ?: refuteSide(upper = false)
+            LinearOp.NE -> null
+        }
     }
 
     fun disequalitySide(comparison: ExactComparison): DerivedDisequalitySide? {

@@ -27,6 +27,17 @@ those assertions through their decision scope, checks the residual system and
 contributes exact source coordinates at a complete check. Disequalities require
 an applicable direction and remain part of the source check.
 
+A resolved pure-real comparison can also conflict through exact interval activity
+before numerical completion. Each nonzero coefficient selects the current primitive
+source column's lower or upper bound according to its sign. Exact slack and open
+endpoints prove a contradiction only when the entire interval excludes the row;
+equalities check both sides. The conflict clause retains every row and selected
+endpoint antecedent. Missing bounds or explanations, disequalities, private
+coordinates and arithmetic alternatives decline this shortcut. It supplies no
+witness or positive fact. At most 1,024 numeric terms are examined under the
+containing operation token and existing 4,096-bit arithmetic limit. Retraction reads
+live endpoints again, and an interrupted proof publishes no conflict.
+
 For a source containing integer or real coordinates, the exact-linear component can
 reuse the exact source-coordinate prefix of an existing completed LP witness, or
 the point from its existing feasible difference check,

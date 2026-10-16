@@ -209,6 +209,7 @@ class ExactLiraSearchComponent private constructor(
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
+    private var sourceIntervalConflict: SearchExplanation? = null
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
     }
@@ -965,7 +966,25 @@ class ExactLiraSearchComponent private constructor(
         return system.install().also { sourceInstalled = it }
     }
 
+    private fun refuteSourceInterval(
+        comparison: ExactComparison,
+        premise: SearchAtomPremise,
+        context: SearchContext,
+    ): SearchExplanation? {
+        if (graphFirst || hasPrivateReals || model.numIntVars != 0 || model.numRealVars == 0 ||
+            hasSourceDisjunctions || solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
+            node.rowAssertions.isNotEmpty() || node.sourceBranches.isNotEmpty() ||
+            node.disequalityDirections.isNotEmpty() || node.directionPremises.isNotEmpty() ||
+            node.branches.isNotEmpty() || node.reducedBranches.isNotEmpty() ||
+            node.transformedBranches.isNotEmpty() || node.retainedReduction != null
+        ) return null
+        val endpoints = system.comparisonRefutation(comparison, operationStop) ?: return null
+        if (operationStop()) return null
+        return context.explainAtoms(SearchAtomPremise.All(listOf(premise, endpoints)))
+    }
+
     private fun assertSource(context: SearchContext): Boolean {
+        sourceIntervalConflict = null
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((index, prepared) in preparedRows.withIndex()) {
@@ -982,6 +1001,10 @@ class ExactLiraSearchComponent private constructor(
             }.toMutableList<SearchAtomPremise>()
             if (asserted != null) leaves += SearchAtomPremise.Asserted(SearchDecision.Theory(asserted))
             val premise = SearchAtomPremise.All(leaves)
+            refuteSourceInterval(comparison, premise, context)?.let {
+                sourceIntervalConflict = it
+                return true
+            }
             if (comparison.op == LinearOp.NE) {
                 disequalities += Triple(address, comparison, premise)
             } else {
@@ -1162,6 +1185,16 @@ class ExactLiraSearchComponent private constructor(
         val asserted = assertSource(context)
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
+        }
+        sourceIntervalConflict?.let { explanation ->
+            dirty = false
+            candidate = null
+            assignment = null
+            pointHintValues = null
+            outcome = ComponentCheck.Infeasible(explanation)
+            smtStats?.observeConflict(explanation)
+            observeCompleteStage("SOURCE_INTERVAL_CONFLICT")
+            return ComponentResult.Conflict(explanation)
         }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
