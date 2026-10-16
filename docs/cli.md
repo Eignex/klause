@@ -358,7 +358,7 @@ MiniZinc-mode-only flags:
   `solns2out`.
 
 Common source controls resolve against the selected format's declared semantics before lowering.
-A control that does not apply is a usage error, including in formats with no matching declarations.
+A control whose field the format does not declare is a usage error.
 Each endpoint replaces its default independently; an omitted endpoint retains its default. Explicit
 source bounds remain authoritative.
 
