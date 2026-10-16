@@ -136,6 +136,9 @@ withhold all optional preferences. Retraction, dirty state, coordinate limits an
 close retain their point authority; no index limit renews numerical work.
 Hint applicability observations distinguish an initially unavailable point, an
 uncovered selected Boolean and a primitive callback returning no preference.
+Complete-traversal admission observations distinguish dimension and total-entry
+storage declines from a registered primitive table. Registration does not establish
+that a numerical point was captured or that a preference is available.
 They do not distinguish unavailable point state, scalar admission or an individual
 guard's row decline, and they perform no additional producer or owner calls.
 Separate exact-linear observations count completed graph-first openings, completed

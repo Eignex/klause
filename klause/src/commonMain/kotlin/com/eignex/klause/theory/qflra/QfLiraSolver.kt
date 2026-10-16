@@ -317,10 +317,12 @@ class ExactLiraSearchComponent private constructor(
         check(context == null)
         if (model.numRealVars == 0 && (!defaultOpening || model.numIntVars == 0)) return null
         if (model.numBoolVars == 0 || model.numBoolVars > MAX_POINT_HINT_ENTRIES ||
-            preparedRows.size > MAX_POINT_HINT_ENTRIES || stop()
+            preparedRows.size > MAX_POINT_HINT_ENTRIES
         ) {
+            observeCompleteStage("POINT_HINT_DIMENSION_DECLINED")
             return null
         }
+        if (stop()) return null
         var entries = model.numRealVars.toLong() + model.numIntVars + model.numBoolVars
         val rows = ArrayList<PreparedSourceRow>()
         val variables = LinkedHashSet<Int>()
@@ -330,7 +332,10 @@ class ExactLiraSearchComponent private constructor(
             if (prepared.row.activator == LinearRow.ALWAYS) continue
             if (prepared.row.activator !in bools.indices) return null
             entries += prepared.row.size.toLong() + 1L
-            if (entries > MAX_POINT_HINT_ENTRIES) return null
+            if (entries > MAX_POINT_HINT_ENTRIES) {
+                observeCompleteStage("POINT_HINT_ENTRIES_DECLINED")
+                return null
+            }
             rows += prepared
             variables += prepared.row.activator
         }
@@ -338,6 +343,7 @@ class ExactLiraSearchComponent private constructor(
         if (stop() || rows.isEmpty()) return null
         pointHintRows = rows.toList()
         pointHintStop = stop
+        observeCompleteStage("POINT_HINT_REGISTERED")
         return variables.toIntArray() to SearchCandidateHints { variable ->
             observeCompleteStage("POINT_HINT_CONSULTED")
             if (!partialPointHintAvailable()) {

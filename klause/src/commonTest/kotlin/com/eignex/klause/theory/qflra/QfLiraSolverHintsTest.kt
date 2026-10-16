@@ -47,6 +47,33 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `point hint admission observations should identify storage declines`() {
+        val variants = listOf(
+            65_535 to "POINT_HINT_ENTRIES_DECLINED",
+            65_537 to "POINT_HINT_DIMENSION_DECLINED",
+        )
+        for ((booleans, stage) in variants) {
+            val stats = SmtStatsSink()
+            val model = Problem(
+                numBoolVars = booleans,
+                intBounds = openBounds(0),
+                numRealVars = 1,
+                factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0)),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
+
+                assertNull(component.partialPointHints(Cancellation.Never))
+
+                assertEquals(1L, stats.snapshot().completeSearchStages?.get(stage))
+                assertNull(stats.snapshot().completeSearchStages?.get("POINT_HINT_REGISTERED"))
+            }
+        }
+    }
+
+    @Test
     fun `explicit integer point preparation should decline without charging its caller`() {
         var charged = 0L
         val stop = object : Cancellation {
@@ -770,6 +797,7 @@ class QfLiraSolverHintsTest {
                 assertEquals(complete, (observed.completeSearchLinearPoints ?: 0L) > 0L)
                 assertEquals(observed.completeSearchLinearChecks, observed.completeSearchLinearOutcomes?.values?.sum())
                 assertEquals(complete, observed.completeSearchStages != null)
+                assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_REGISTERED"))
                 assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_UNAVAILABLE"))
                 assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_PREFERRED"))
                 assertEquals(complete, (observed.completeSearchStages?.get("POINT_HINT_LP_CAPTURE") ?: 0L) > 0L)
