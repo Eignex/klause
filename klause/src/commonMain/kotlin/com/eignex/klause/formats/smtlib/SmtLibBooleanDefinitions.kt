@@ -14,8 +14,7 @@ internal fun Compiler.Builder.reifyOr(literals: List<Int>): Int =
     retainBooleanDefinition { reifyLogical(literals, conjunction = false) }
 
 internal fun Compiler.Builder.reifyIff(first: Int, second: Int): Int = retainBooleanDefinition {
-    sourceCancellation.charge(2L)
-    if (sourceCancellation()) throw PolynomialSourceInterrupted()
+    booleanWork(2L)
     when {
         first == second -> trueLit()
         first == Lit.negate(second) -> Lit.negate(trueLit())
@@ -29,11 +28,11 @@ internal fun Compiler.Builder.reifyIff(first: Int, second: Int): Int = retainBoo
 }
 
 private fun Compiler.Builder.reifyLogical(literals: List<Int>, conjunction: Boolean): Int {
+    booleanWork(1L)
     val constant = trueLitCache
     val kept = LinkedHashSet<Int>()
     for (literal in literals) {
-        sourceCancellation.charge(1L)
-        if (sourceCancellation()) throw PolynomialSourceInterrupted()
+        booleanWork(1L)
         if (constant >= 0) {
             val value = if (literal == constant) true else if (literal == Lit.negate(constant)) false else null
             if (value == !conjunction) return literal
@@ -47,6 +46,11 @@ private fun Compiler.Builder.reifyLogical(literals: List<Int>, conjunction: Bool
         1 -> kept.single()
         else -> if (conjunction) tseitinAnd(kept.toList()) else tseitinOr(kept.toList())
     }
+}
+
+private fun Compiler.Builder.booleanWork(units: Long) {
+    sourceCancellation.charge(units)
+    if (sourceCancellation()) throw PolynomialSourceInterrupted()
 }
 
 private inline fun Compiler.Builder.retainBooleanDefinition(define: () -> Int): Int {
