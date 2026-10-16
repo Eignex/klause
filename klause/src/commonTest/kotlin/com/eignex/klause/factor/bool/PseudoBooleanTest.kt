@@ -12,6 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 class PseudoBooleanTest {
 
@@ -60,6 +61,17 @@ class PseudoBooleanTest {
         assertEquals(mapped.structuralKey().hashCode(), factor.remapStructuralHash(mapping))
         assertNotEquals(factor.structuralKey(), PseudoBoolean(arrayOf(wide, bigIntOf(-2)),
             factor.literals, PbOp.GE, bigIntOf(0)).structuralKey())
+    }
+
+    @Test
+    fun `wide reified colorings should permit identified indicator and body colors`() {
+        val wide = parseBigInt("18446744073709551616")
+        val factor = ReifiedPseudoBoolean(0, arrayOf(wide), intArrayOf(Lit.make(1, true)), PbOp.EQ, wide)
+        val coloring = VarRemap(intArrayOf(0, 0), intArrayOf())
+
+        val hash = runCatching { factor.remapStructuralHash(coloring) }
+
+        assertTrue(hash.isSuccess)
     }
 
     @Test

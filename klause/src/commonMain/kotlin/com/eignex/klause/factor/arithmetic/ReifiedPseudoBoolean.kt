@@ -34,6 +34,7 @@ class ReifiedPseudoBoolean private constructor(
     override val auxBoolVar: Int,
     override val constants: IntegralConstants,
     literals: IntArray,
+    /** Comparison of the weighted literal sum with its exact right-hand side. */
     val op: PbOp,
 ) : ReifiedFactor, LinearRow {
 
@@ -92,7 +93,10 @@ class ReifiedPseudoBoolean private constructor(
 
     override fun remapStructuralHash(mapping: VarRemap): Int =
         if (integerConstants != null) hashRemappedKey(FactorKind.REIFIED_PSEUDO_BOOLEAN, mapping, ::buildKey)
-        else remap(mapping).structuralKey().hashCode()
+        else materializeKey(FactorKind.REIFIED_PSEUDO_BOOLEAN) { sink ->
+            sink.boolVar(mapping.bool(auxBoolVar))
+            pseudoBooleanKey(sink, constants, mapping.lits(literals), op)
+        }.hashCode()
 
     private fun buildKey(sink: KeySink) {
         sink.boolVar(auxBoolVar)

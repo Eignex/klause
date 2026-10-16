@@ -53,7 +53,8 @@ internal object ExactOpbValidation {
         val expected = value(parsed.objective) + penalties
         if (parsed.optimizing) {
             val reported = objective?.toBigIntegerOrNull()
-                ?: return@runCatching SourceValidation("unknown", "OPB objective requires an exact integral publication")
+                ?: return@runCatching SourceValidation(
+                    "unknown", "OPB objective requires an exact integral publication")
             if (reported != expected) {
                 return@runCatching SourceValidation("invalid", "reported cost differs from original OPB cost")
             }

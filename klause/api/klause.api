@@ -1508,21 +1508,33 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedLinear : com/eigne
 	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/arithmetic/ReifiedPseudoBoolean : com/eignex/klause/factor/ReifiedFactor {
+public final class com/eignex/klause/factor/arithmetic/ReifiedPseudoBoolean : com/eignex/klause/factor/ReifiedFactor, com/eignex/klause/ir/LinearRow {
 	public fun <init> (I[J[ILcom/eignex/klause/model/PbOp;J)V
+	public fun <init> (I[Ljava/math/BigInteger;[ILcom/eignex/klause/model/PbOp;Ljava/math/BigInteger;)V
 	public fun canSubstituteAffine (IIII)Z
+	public fun coeff (I)J
+	public fun getActivator ()I
 	public fun getAuxBoolVar ()I
 	public fun getBoolVars ()[I
-	public final fun getBound ()J
+	public fun getBound ()J
+	public fun getConstants ()Lcom/eignex/klause/ir/IntegralConstants;
+	public synthetic fun getConstants ()Lcom/eignex/klause/ir/LinearConstants;
 	public fun getIntVars ()[I
+	public final fun getIntegerConstants ()Lcom/eignex/klause/ir/IntegerConstants;
 	public fun getLinearForm ()Lcom/eignex/klause/ir/LinearForm;
 	public final fun getLiterals ()[I
 	public final fun getOp ()Lcom/eignex/klause/model/PbOp;
+	public fun getRelation ()Lcom/eignex/klause/ir/LinearOp;
+	public fun getSize ()I
+	public fun getStrict ()Z
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getWeights ()[J
 	public fun holdsNow (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
+	public fun isIntegerOnly ()Z
+	public fun isLongUnconditional ()Z
 	public fun isValueAnonymous ()Z
+	public fun ref (I)I
 	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
 	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
@@ -1635,14 +1647,16 @@ public final class com/eignex/klause/factor/bool/GaussianXor : com/eignex/klause
 
 public final class com/eignex/klause/factor/bool/PseudoBoolean : com/eignex/klause/ir/Factor, com/eignex/klause/ir/LinearRow {
 	public fun <init> ([J[ILcom/eignex/klause/model/PbOp;J)V
+	public fun <init> ([Ljava/math/BigInteger;[ILcom/eignex/klause/model/PbOp;Ljava/math/BigInteger;)V
 	public fun canSubstituteAffine (IIII)Z
 	public fun coeff (I)J
 	public fun getActivator ()I
 	public fun getBoolVars ()[I
 	public fun getBound ()J
-	public fun getConstants ()Lcom/eignex/klause/ir/IntegerConstants;
+	public fun getConstants ()Lcom/eignex/klause/ir/IntegralConstants;
 	public synthetic fun getConstants ()Lcom/eignex/klause/ir/LinearConstants;
 	public fun getIntVars ()[I
+	public final fun getIntegerConstants ()Lcom/eignex/klause/ir/IntegerConstants;
 	public fun getLinearForm ()Lcom/eignex/klause/ir/LinearForm;
 	public final fun getLiterals ()[I
 	public final fun getOp ()Lcom/eignex/klause/model/PbOp;
