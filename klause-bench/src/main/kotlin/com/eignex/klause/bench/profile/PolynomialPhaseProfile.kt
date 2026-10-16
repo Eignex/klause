@@ -74,7 +74,9 @@ internal object PolynomialPhaseProfile {
                 directory.resolve("pipeline.json").writeText(Json.encodeToString(pipeline(text, timeoutMs)))
             } else {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
-                directory.resolve("trace.json").writeText(Json.encodeToString(access.measure(text, timeoutMs = timeoutMs)))
+                directory.resolve("trace.json").writeText(
+                    Json.encodeToString(access.measure(text, timeoutMs = timeoutMs)),
+                )
             }
         }
     }
