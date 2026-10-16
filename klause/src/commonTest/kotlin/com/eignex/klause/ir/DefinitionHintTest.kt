@@ -11,7 +11,9 @@ class DefinitionHintTest {
     fun `remapping should preserve repeated integer roles and source constants`() {
         val hint = DefinitionHint.Linear(
             3, longArrayOf(2, -1, -1), arrayOf(
-                DefinitionHint.Operand.Variable(3), DefinitionHint.Operand.Variable(1), DefinitionHint.Operand.Variable(2),
+                DefinitionHint.Operand.Variable(3),
+                DefinitionHint.Operand.Variable(1),
+                DefinitionHint.Operand.Variable(2),
             ), Long.MIN_VALUE,
         )
         val mapping = VarRemap(intArrayOf(0, 0, 1), intArrayOf(2, 0, 0, 1))

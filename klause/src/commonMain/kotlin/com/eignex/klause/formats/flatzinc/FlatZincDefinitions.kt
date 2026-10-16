@@ -70,7 +70,9 @@ private fun FlatZincCompiler.integerDefinition(c: FznConstraint, output: Int): D
             val inputs = definitionOperands(c.args[1])
             val bound = evalIntConstOrNull(c.args[2])
             if (coefficients == null || inputs == null || bound == null) null
-            else DefinitionHint.Linear(output, LongArray(coefficients.size) { coefficients[it].toLong() }, inputs, bound)
+            else DefinitionHint.Linear(
+                output, LongArray(coefficients.size) { coefficients[it].toLong() }, inputs, bound,
+            )
         }
 
         "bool2int" -> runCatching { resolveBoolLit(c.args[0]) }.getOrNull()?.let {
