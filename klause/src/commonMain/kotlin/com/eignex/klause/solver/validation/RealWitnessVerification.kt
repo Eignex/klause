@@ -8,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.LinearForm
@@ -21,17 +22,18 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
 
 internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification<Sample, Unit> {
-    if (model.factors.any { it is Distinct } &&
+    if (model.factors.any { it is Distinct || it is AllDifferent } &&
         (sample.numIntVars != model.numIntVars || sample.numBoolVars != model.numBoolVars)
-    ) return Verification.Rejected("assignment does not cover distinct operand coordinates")
+    ) return Verification.Rejected("assignment does not cover distinctness coordinates")
     for ((id, factor) in model.factors.withIndex()) {
-        if (factor !is Abs && factor !is AffineAbs &&
+        if (factor !is Abs && factor !is AffineAbs && factor !is AllDifferent &&
             !(factor is Distinct && factor.variables.reals.isEmpty())
         ) continue
         if (sample.numIntVars != model.numIntVars) {
@@ -40,6 +42,7 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
         val valid = when (factor) {
             is Abs -> sample.exactIntValue(factor.operand).abs() == sample.exactIntValue(factor.result)
             is AffineAbs -> factor.isSatisfied(sample::exactIntValue)
+            is AllDifferent -> factor.isSatisfied(sample)
             is Distinct -> factor.isSatisfied(sample::exactIntValue, sample::boolValue) {
                 error("integer distinct operand has a real coordinate")
             }
@@ -155,4 +158,18 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
         if (!valid) return Verification.Rejected("real factor $id refutes the assignment")
     }
     return Verification.Accepted(Candidate(sample, Unit))
+}
+
+private fun AllDifferent.isSatisfied(sample: Sample): Boolean {
+    val seen = HashSet<BigInt>()
+    for (position in vars.indices) {
+        if (presents.isNotEmpty()) {
+            val literal = presents[position]
+            if (!Lit.evaluate(literal, sample.boolValue(Lit.variable(literal)))) continue
+        }
+        val value = sample.exactIntValue(vars[position])
+        if (value.fitsLong() && value.toLongExact() in exceptSet) continue
+        if (!seen.add(value)) return false
+    }
+    return true
 }
