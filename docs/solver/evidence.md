@@ -321,3 +321,15 @@ or checker reports cannot supply that acceptance.
 
 [Admission evidence](../evidence/source-scoped-derivations.md) records the supported
 source controls and the coverage they establish.
+
+## Tolerance claim transfer
+
+`LinearToleranceQualification` checks whether an original-unit linear source's
+accepted set equals its nominal set. Its private row inputs retain individual
+terms, exact declaration bounds and indicator pins; combining cancelling terms
+would change relative slack. It uses accepted single-term intervals and integer
+activity lattices to justify equivalence, and can derive an independent accepted
+objective bound from those intervals. It does not select an engine or turn native
+producer metadata into a source derivation. Frontend adapters retain their source
+number correspondence; [MPS publication](../formats/mps.md#tolerance-publication)
+uses the checked qualification to scope native terminal and bound output.

@@ -131,19 +131,45 @@ This output-only reconstruction changes no search assignment, cutoff or
 optimization-status authority.
 
 `TOLERANCE_OPTIMUM` differs from `ATTAINED_OPTIMUM`. A tolerance-accepted float
-point is not an exact witness. Optimum publication requires no
-`toleranceDifference`; infeasibility and unboundedness require `sourceExact`.
+point need not be an exact witness. Positive slack can also enlarge the feasible
+set even when every nominal row is represented exactly. A nominal refutation or
+optimum requires a checked transfer to the tolerance-accepted set; `sourceExact`
+and exact point feasibility alone supply no such transfer.
+
+`MpsCompiled.exactClaimsCoverTolerance` checks feasible-set equivalence under the
+captured policy. Zero policy preserves the set directly. Positive policy checks
+integer declaration rounding, exact row activity lattices, redundant rows and
+empty accepted intervals. Enabled one-term rows refine accepted bounds using
+original coefficient and RHS units; an indicator contributes only when its exact
+trigger is established. Relative slack includes absolute term activities before
+cancellation. Interrupted or unsupported equivalence checks supply no transfer.
+The mechanism lives in solver evidence; the frontend supplies original source
+numbers independently of normalized working rows.
+
+`MpsCompiled.toleranceObjectiveBound` supplies an independent exact bound from
+accepted declarations and enabled one-term rows, lower for minimization and upper
+for maximization. A checked accepted point attaining that bound establishes an
+attained optimum, including when nominal and accepted feasible sets differ.
+A required open endpoint or interruption withholds the bound. These checks use the
+containing preparation cancellation and work ledger.
+
+CLI output retains accepted points and source objective values when the native
+optimum lacks a transfer. Native proof metadata remains scoped as
+`nominalSourceOptimizationStatus` and `nominalSourceLpRootBound` for an exact
+nominal model, or corresponding `workingModel` keys for an inexact projection.
+The root bound retains its objective scale. Such metadata does not assert a bound
+over the expanded accepted set. An untransferred nominal refutation prints
+`UNKNOWN` with its proof scope. Valid transferred claims retain their terminal
+status; an exact nominal feasible base and ray remain valid in the accepted
+superset. Optimum output identifies `optimizationStatus=attained-optimum` or
+`optimizationStatus=tolerance-optimum` only for its covered accepted set.
+
 `--exact` requires exact source certificates. A hybrid lowering that differs from
 the source is replaced by the exact source adapter for numerical execution.
-Exact adapter witnesses require original decimal feasibility. Working-model
-witnesses on the default finite LP lane retain the separate tolerance guarantee.
-Output comments identify actual exact original-source feasibility or tolerance
-acceptance independently of the optimization status. An exact point alone does not
-upgrade an inexact working-model optimum to an attained source optimum. A float
-point retains tolerance optimum qualification even when its feasibility is exact;
-attainment requires the certified rational point and matching source bound.
-Optimal output includes `optimizationStatus=attained-optimum` or
-`optimizationStatus=tolerance-optimum` for that accepted witness guarantee.
+Output comments identify exact source feasibility or tolerance acceptance
+independently of optimization authority. A float point retains tolerance optimum
+qualification even when its feasibility is exact; attainment requires a certified
+rational point and matching source bound.
 
 ## Routing and result strength
 
