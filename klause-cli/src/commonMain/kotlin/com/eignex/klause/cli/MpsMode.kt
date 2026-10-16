@@ -335,7 +335,8 @@ internal class MpsOutput(
 
         Verdict.UNBOUNDED -> when {
             proofExact && sourceWitnessAccepted() &&
-                (exactSourceWitness() == true || (claimsCoverTolerance && exactSourceWitness() == null)) -> "s UNBOUNDED"
+                (exactSourceWitness() == true ||
+                    (claimsCoverTolerance && exactSourceWitness() == null)) -> "s UNBOUNDED"
             best != null -> "s SATISFIABLE"
             else -> "s UNKNOWN"
         }
