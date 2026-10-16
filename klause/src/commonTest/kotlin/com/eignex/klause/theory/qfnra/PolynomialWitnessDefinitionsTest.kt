@@ -39,6 +39,28 @@ class PolynomialWitnessDefinitionsTest {
     }
 
     @Test
+    fun `unary comparisons preserve rational thresholds and coefficient polarity`() {
+        for (comparison in listOf(
+            "(> x (/ 3 2))", "(< x (/ (- 3) 2))", "(>= (* (- 2) x) 1)",
+            "(<= (+ (* (- 2) x) 1) 0)", "(= (+ (* 2 x) 1) 0)", "(distinct (+ (* 2 x) 1) 3)",
+        )) {
+            val source = SmtLibPolynomial.parse(
+                "(declare-const x Real) (declare-const y Real) (assert (and (= y (* x x)) $comparison))",
+            )
+            val arithmetic = PolynomialArithmetic()
+            val algebraic = AlgebraicArithmetic(arithmetic)
+            val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+                .conjunctiveAtoms(arithmetic, 128))
+
+            val point = assertNotNull(PolynomialWitnessDefinitions(arithmetic, 2048, 8, 4096)
+                .point(atoms, 2, emptyMap()))
+
+            val captured = point.mapValues { algebraic.rational(it.value) }
+            assertTrue(atoms.all { it.holds(algebraic.sign(algebraic.evaluate(it.polynomial, captured))) }, comparison)
+        }
+    }
+
+    @Test
     fun `a nonconstant coefficient cannot define a coordinate`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const y Real) (assert (= (* x y) 1))",
