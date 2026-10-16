@@ -119,18 +119,23 @@ internal object MiniZincMode : CliMode {
                 ),
             )
             if (invocation.floatProjection != null) {
-                val realObjective = sourceObjective?.takeIf { it.realCoefficients.any { coefficient -> coefficient != 0.0 } }
+                val realObjective = sourceObjective?.takeIf {
+                    it.realCoefficients.any { coefficient -> coefficient != 0.0 }
+                }
                 return Solvable(
                     finite = invocation.finiteShape(),
                     render = render,
                     objectiveValue = sourceObjective?.takeIf { realObjective == null }
                         ?.let { linear -> { sample -> linear.evaluateLong(sample) } },
-                    continuousObjectiveValue = realObjective?.let { linear -> { sample -> linear.evaluateExact(sample).toDouble() } },
+                    continuousObjectiveValue = realObjective?.let { linear ->
+                        { sample -> linear.evaluateExact(sample).toDouble() }
+                    },
                 )
             }
             if (floatApproximation) {
                 return preparedSourceSolvable(invocation, render, { assignment ->
-                    applier?.render(original, assignment) ?: writeFlatZincSolution(original, assignment, outputObjective)
+                    applier?.render(original, assignment)
+                        ?: writeFlatZincSolution(original, assignment, outputObjective)
                 })
             }
             return when (val route = invocation.route) {
@@ -245,7 +250,8 @@ internal class MiniZincOutput(
 
     override fun onComplete(verdict: Verdict) {
         if (floatApproximation) {
-            val pointScope = if (checkedGridPoints) "original source points checked" else "source witness check required"
+            val pointScope = if (checkedGridPoints) "original source points checked"
+                else "source witness check required"
             println("% klause-float-claim: grid search; $pointScope; no global source proof")
         }
         if (integerScopeChanged) {

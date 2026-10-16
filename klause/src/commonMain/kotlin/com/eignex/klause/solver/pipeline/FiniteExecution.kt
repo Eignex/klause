@@ -484,7 +484,11 @@ internal fun FinitePipeline.solve(
     val gridPublication = request.shape.sourceInvocation?.floatGrid?.let {
         FloatGridPublication(it, stop, request.toleranceCheck, callbacks)
     }
-    fun result(preparation: FinitePipelinePreparation, elapsed: Duration, outcome: FiniteSolveOutcome): FiniteSolveResult =
+    fun result(
+        preparation: FinitePipelinePreparation,
+        elapsed: Duration,
+        outcome: FiniteSolveOutcome,
+    ): FiniteSolveResult =
         gridPublication?.result(preparation, elapsed, outcome) ?: FiniteSolveResult(preparation, elapsed, outcome)
     if (request.shape.sourceInvocation != null && stop()) {
         return result(

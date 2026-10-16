@@ -54,10 +54,13 @@ internal class FlatZincSourceState(
         if (prepared !is SelectedFloatGridPreparation.Prepared) {
             return FlatZincGridGeometry(null, original.floatRepresentations)
         }
-        return FlatZincGridGeometry(requireNotNull(invocation.floatGrid).projection.mapping.definition(), representations)
+        val definition = requireNotNull(invocation.floatGrid).projection.mapping.definition()
+        return FlatZincGridGeometry(definition, representations)
     }
 
-    private fun selection(cancellation: Cancellation): Pair<Map<String, FloatRepresentation>, List<FloatGridVariable>>? {
+    private fun selection(
+        cancellation: Cancellation,
+    ): Pair<Map<String, FloatRepresentation>, List<FloatGridVariable>>? {
         cancellation.charge(original.problem.numFactors.toLong() + original.problem.numRealVars)
         if (cancellation()) return null
         val representations = selectLegacy()
@@ -88,7 +91,9 @@ internal class FlatZincSourceState(
 
     fun prepare(invocation: PreparedSourceInvocation) {
         val stop = invocation.cancellation
-        if (stop() || original.problem.numRealVars == 0 || original.semantics.effective.floats !is FloatSemantics.Grid) return
+        if (stop() || original.problem.numRealVars == 0 ||
+            original.semantics.effective.floats !is FloatSemantics.Grid
+        ) return
         if (geometryOwner.isInitialized()) {
             geometry.definition?.let {
                 SourceSetup.prepareSelectedFloatGrid(invocation, it, FloatGridConsumerPurpose.FINITE_COMPATIBILITY)
@@ -158,7 +163,8 @@ private fun originalBucketing(value: FloatBucketing, definition: FloatGridDefini
         (0 until definition.source.numRealVars).firstOrNull { definition.retainedReal(it) == value.varId }
     } else definition.columns().firstOrNull { it.coordinate.variable == value.varId }?.source?.index
     id ?: return null
-    return FloatBucketing(id, definition.source.realLower[id], definition.source.realUpper[id], value.buckets, lpOnly = true)
+    return FloatBucketing(id, definition.source.realLower[id], definition.source.realUpper[id], value.buckets,
+        lpOnly = true)
 }
 
 private fun originalArray(array: FlatZincArray, definition: FloatGridDefinition): FlatZincArray? {

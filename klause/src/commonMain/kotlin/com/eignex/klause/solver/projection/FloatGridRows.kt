@@ -157,7 +157,9 @@ internal fun lowerGridElement(
         if (cancellation()) return null
         entries[index] = if (factor.arrIsVars) {
             val input = columns.getValue(factor.entries[index]).coordinate
-            if (input.lower != output.lower || input.upper != output.upper || input.buckets != output.buckets) return null
+            if (input.lower != output.lower || input.upper != output.upper || input.buckets != output.buckets) {
+                return null
+            }
             input.variable.toLong()
         } else output.index(factor.constants[index]) ?: return null
     }

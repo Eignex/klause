@@ -13733,6 +13733,8 @@ final class com.eignex.klause.solver.pipeline/FiniteSolveRequest { // com.eignex
 final class com.eignex.klause.solver.pipeline/FiniteSolveResult { // com.eignex.klause.solver.pipeline/FiniteSolveResult|null[0]
     constructor <init>(com.eignex.klause.solver.pipeline/FinitePipelinePreparation, kotlin.time/Duration, com.eignex.klause.solver.pipeline/FiniteSolveOutcome) // com.eignex.klause.solver.pipeline/FiniteSolveResult.<init>|<init>(com.eignex.klause.solver.pipeline.FinitePipelinePreparation;kotlin.time.Duration;com.eignex.klause.solver.pipeline.FiniteSolveOutcome){}[0]
 
+    final val nativeGridOutcome // com.eignex.klause.solver.pipeline/FiniteSolveResult.nativeGridOutcome|{}nativeGridOutcome[0]
+        final fun <get-nativeGridOutcome>(): com.eignex.klause.solver.pipeline/NativeGridOutcome? // com.eignex.klause.solver.pipeline/FiniteSolveResult.nativeGridOutcome.<get-nativeGridOutcome>|<get-nativeGridOutcome>(){}[0]
     final val outcome // com.eignex.klause.solver.pipeline/FiniteSolveResult.outcome|{}outcome[0]
         final fun <get-outcome>(): com.eignex.klause.solver.pipeline/FiniteSolveOutcome // com.eignex.klause.solver.pipeline/FiniteSolveResult.outcome.<get-outcome>|<get-outcome>(){}[0]
     final val preparation // com.eignex.klause.solver.pipeline/FiniteSolveResult.preparation|{}preparation[0]
@@ -13835,6 +13837,13 @@ final class com.eignex.klause.solver.pipeline/LsResolution { // com.eignex.klaus
         final fun <get-dryRunSolver>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LsResolution.dryRunSolver.<get-dryRunSolver>|<get-dryRunSolver>(){}[0]
     final val pool // com.eignex.klause.solver.pipeline/LsResolution.pool|{}pool[0]
         final fun <get-pool>(): kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>? // com.eignex.klause.solver.pipeline/LsResolution.pool.<get-pool>|<get-pool>(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/NativeGridOutcome { // com.eignex.klause.solver.pipeline/NativeGridOutcome|null[0]
+    final val outcome // com.eignex.klause.solver.pipeline/NativeGridOutcome.outcome|{}outcome[0]
+        final fun <get-outcome>(): com.eignex.klause.solver.pipeline/FiniteSolveOutcome // com.eignex.klause.solver.pipeline/NativeGridOutcome.outcome.<get-outcome>|<get-outcome>(){}[0]
+    final val projection // com.eignex.klause.solver.pipeline/NativeGridOutcome.projection|{}projection[0]
+        final fun <get-projection>(): com.eignex.klause.solver.pipeline/SourceFloatProjection // com.eignex.klause.solver.pipeline/NativeGridOutcome.projection.<get-projection>|<get-projection>(){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams { // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams|null[0]
@@ -14103,6 +14112,8 @@ final class com.eignex.klause.solver.pipeline/PortfolioPlanRequest { // com.eign
 final class com.eignex.klause.solver.pipeline/PreparedSourceInvocation { // com.eignex.klause.solver.pipeline/PreparedSourceInvocation|null[0]
     final val admission // com.eignex.klause.solver.pipeline/PreparedSourceInvocation.admission|{}admission[0]
         final fun <get-admission>(): com.eignex.klause.solver.pipeline/StrategyAdmission? // com.eignex.klause.solver.pipeline/PreparedSourceInvocation.admission.<get-admission>|<get-admission>(){}[0]
+    final val floatProjection // com.eignex.klause.solver.pipeline/PreparedSourceInvocation.floatProjection|{}floatProjection[0]
+        final fun <get-floatProjection>(): com.eignex.klause.solver.pipeline/SourceFloatProjection? // com.eignex.klause.solver.pipeline/PreparedSourceInvocation.floatProjection.<get-floatProjection>|<get-floatProjection>(){}[0]
     final val operation // com.eignex.klause.solver.pipeline/PreparedSourceInvocation.operation|{}operation[0]
         final fun <get-operation>(): com.eignex.klause.solver.pipeline/ExecutionOperation // com.eignex.klause.solver.pipeline/PreparedSourceInvocation.operation.<get-operation>|<get-operation>(){}[0]
     final val preparedPlan // com.eignex.klause.solver.pipeline/PreparedSourceInvocation.preparedPlan|{}preparedPlan[0]
@@ -14269,6 +14280,40 @@ final class com.eignex.klause.solver.pipeline/SourceExecutionRequest { // com.ei
         final fun <get-theory>(): com.eignex.klause.solver.pipeline/TheoryParams // com.eignex.klause.solver.pipeline/SourceExecutionRequest.theory.<get-theory>|<get-theory>(){}[0]
     final val transcendental // com.eignex.klause.solver.pipeline/SourceExecutionRequest.transcendental|{}transcendental[0]
         final fun <get-transcendental>(): com.eignex.klause.solver.pipeline/TranscendentalTheoryParams? // com.eignex.klause.solver.pipeline/SourceExecutionRequest.transcendental.<get-transcendental>|<get-transcendental>(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate { // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate|null[0]
+    final val bucketVariable // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.bucketVariable|{}bucketVariable[0]
+        final fun <get-bucketVariable>(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.bucketVariable.<get-bucketVariable>|<get-bucketVariable>(){}[0]
+    final val buckets // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.buckets|{}buckets[0]
+        final fun <get-buckets>(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.buckets.<get-buckets>|<get-buckets>(){}[0]
+    final val origin // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.origin|{}origin[0]
+        final fun <get-origin>(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.origin.<get-origin>|<get-origin>(){}[0]
+    final val source // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.source|{}source[0]
+        final fun <get-source>(): com.eignex.klause.ir/SourceRealId // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.source.<get-source>|<get-source>(){}[0]
+    final val step // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.step|{}step[0]
+        final fun <get-step>(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate.step.<get-step>|<get-step>(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/SourceFloatProjection { // com.eignex.klause.solver.pipeline/SourceFloatProjection|null[0]
+    final val coordinates // com.eignex.klause.solver.pipeline/SourceFloatProjection.coordinates|{}coordinates[0]
+        final fun <get-coordinates>(): kotlin.collections/List<com.eignex.klause.solver.pipeline/SourceFloatGridCoordinate> // com.eignex.klause.solver.pipeline/SourceFloatProjection.coordinates.<get-coordinates>|<get-coordinates>(){}[0]
+    final val factorOrigins // com.eignex.klause.solver.pipeline/SourceFloatProjection.factorOrigins|{}factorOrigins[0]
+        final fun <get-factorOrigins>(): kotlin/IntArray // com.eignex.klause.solver.pipeline/SourceFloatProjection.factorOrigins.<get-factorOrigins>|<get-factorOrigins>(){}[0]
+    final val maximize // com.eignex.klause.solver.pipeline/SourceFloatProjection.maximize|{}maximize[0]
+        final fun <get-maximize>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceFloatProjection.maximize.<get-maximize>|<get-maximize>(){}[0]
+    final val objectiveOffset // com.eignex.klause.solver.pipeline/SourceFloatProjection.objectiveOffset|{}objectiveOffset[0]
+        final fun <get-objectiveOffset>(): com.eignex.klause.ir/SemanticRational? // com.eignex.klause.solver.pipeline/SourceFloatProjection.objectiveOffset.<get-objectiveOffset>|<get-objectiveOffset>(){}[0]
+    final val objectiveScale // com.eignex.klause.solver.pipeline/SourceFloatProjection.objectiveScale|{}objectiveScale[0]
+        final fun <get-objectiveScale>(): com.eignex.klause.ir/SemanticRational? // com.eignex.klause.solver.pipeline/SourceFloatProjection.objectiveScale.<get-objectiveScale>|<get-objectiveScale>(){}[0]
+    final val originalObjective // com.eignex.klause.solver.pipeline/SourceFloatProjection.originalObjective|{}originalObjective[0]
+        final fun <get-originalObjective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/SourceFloatProjection.originalObjective.<get-originalObjective>|<get-originalObjective>(){}[0]
+    final val policy // com.eignex.klause.solver.pipeline/SourceFloatProjection.policy|{}policy[0]
+        final fun <get-policy>(): com.eignex.klause.ir/FloatSemantics.Grid // com.eignex.klause.solver.pipeline/SourceFloatProjection.policy.<get-policy>|<get-policy>(){}[0]
+    final val privateProblem // com.eignex.klause.solver.pipeline/SourceFloatProjection.privateProblem|{}privateProblem[0]
+        final fun <get-privateProblem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/SourceFloatProjection.privateProblem.<get-privateProblem>|<get-privateProblem>(){}[0]
+    final val source // com.eignex.klause.solver.pipeline/SourceFloatProjection.source|{}source[0]
+        final fun <get-source>(): com.eignex.klause.solver.pipeline/SourceAttachment // com.eignex.klause.solver.pipeline/SourceFloatProjection.source.<get-source>|<get-source>(){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/SourceIncumbentPublication { // com.eignex.klause.solver.pipeline/SourceIncumbentPublication|null[0]
@@ -16547,6 +16592,8 @@ final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample
         final fun <get-algebraicReals>(): kotlin.collections/List<com.eignex.klause.arithmetic.polynomial/AlgebraicReal>? // com.eignex.klause.solver/Sample.algebraicReals.<get-algebraicReals>|<get-algebraicReals>(){}[0]
     final val bools // com.eignex.klause.solver/Sample.bools|{}bools[0]
         final fun <get-bools>(): kotlin/BooleanArray // com.eignex.klause.solver/Sample.bools.<get-bools>|<get-bools>(){}[0]
+    final val coordinateFrame // com.eignex.klause.solver/Sample.coordinateFrame|{}coordinateFrame[0]
+        final fun <get-coordinateFrame>(): kotlin/Any? // com.eignex.klause.solver/Sample.coordinateFrame.<get-coordinateFrame>|<get-coordinateFrame>(){}[0]
     final val exactInts // com.eignex.klause.solver/Sample.exactInts|{}exactInts[0]
         final fun <get-exactInts>(): kotlin.collections/List<com.ionspin.kotlin.bignum.integer/BigInteger>? // com.eignex.klause.solver/Sample.exactInts.<get-exactInts>|<get-exactInts>(){}[0]
     final val exactReals // com.eignex.klause.solver/Sample.exactReals|{}exactReals[0]

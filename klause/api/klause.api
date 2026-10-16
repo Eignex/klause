@@ -10292,6 +10292,7 @@ public final class com/eignex/klause/solver/Sample {
 	public final fun exactIntValue (I)Ljava/math/BigInteger;
 	public final fun getAlgebraicReals ()Ljava/util/List;
 	public final fun getBools ()[Z
+	public final fun getCoordinateFrame ()Ljava/lang/Object;
 	public final fun getExactInts ()Ljava/util/List;
 	public final fun getExactReals ()Ljava/util/List;
 	public final fun getInts ()[J
@@ -11695,6 +11696,7 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveRequest {
 
 public final class com/eignex/klause/solver/pipeline/FiniteSolveResult {
 	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/FinitePipelinePreparation;JLcom/eignex/klause/solver/pipeline/FiniteSolveOutcome;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getNativeGridOutcome ()Lcom/eignex/klause/solver/pipeline/NativeGridOutcome;
 	public final fun getOutcome ()Lcom/eignex/klause/solver/pipeline/FiniteSolveOutcome;
 	public final fun getPreparation ()Lcom/eignex/klause/solver/pipeline/FinitePipelinePreparation;
 	public final fun getPreparationElapsed-UwyO8pc ()J
@@ -11792,6 +11794,11 @@ public final class com/eignex/klause/solver/pipeline/LsResolution {
 	public fun <init> (Ljava/util/List;Z)V
 	public final fun getDryRunSolver ()Z
 	public final fun getPool ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/solver/pipeline/NativeGridOutcome {
+	public final fun getOutcome ()Lcom/eignex/klause/solver/pipeline/FiniteSolveOutcome;
+	public final fun getProjection ()Lcom/eignex/klause/solver/pipeline/SourceFloatProjection;
 }
 
 public final class com/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams {
@@ -12382,6 +12389,7 @@ public final class com/eignex/klause/solver/pipeline/PreparedPlanDecline : java/
 public final class com/eignex/klause/solver/pipeline/PreparedSourceInvocation {
 	public final fun finiteShape ()Lcom/eignex/klause/solver/pipeline/FiniteSolveShape;
 	public final fun getAdmission ()Lcom/eignex/klause/solver/pipeline/StrategyAdmission;
+	public final fun getFloatProjection ()Lcom/eignex/klause/solver/pipeline/SourceFloatProjection;
 	public final fun getOperation ()Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
 	public final fun getPreparedPlan ()Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public final fun getRoute ()Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
@@ -12625,6 +12633,26 @@ public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Refut
 
 public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Transcendental : com/eignex/klause/solver/pipeline/SourceExecutionResult {
 	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceFloatGridCoordinate {
+	public final fun getBucketVariable ()I
+	public final fun getBuckets ()I
+	public final fun getOrigin ()Lcom/eignex/klause/ir/SemanticRational;
+	public final fun getSource-P0Uu7zc ()I
+	public final fun getStep ()Lcom/eignex/klause/ir/SemanticRational;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceFloatProjection {
+	public final fun getCoordinates ()Ljava/util/List;
+	public final fun getFactorOrigins ()[I
+	public final fun getMaximize ()Z
+	public final fun getObjectiveOffset ()Lcom/eignex/klause/ir/SemanticRational;
+	public final fun getObjectiveScale ()Lcom/eignex/klause/ir/SemanticRational;
+	public final fun getOriginalObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun getPolicy ()Lcom/eignex/klause/ir/FloatSemantics$Grid;
+	public final fun getPrivateProblem ()Lcom/eignex/klause/ir/Problem;
+	public final fun getSource ()Lcom/eignex/klause/solver/pipeline/SourceAttachment;
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceIncumbentPublication {
