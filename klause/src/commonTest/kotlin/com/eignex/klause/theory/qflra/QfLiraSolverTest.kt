@@ -792,6 +792,39 @@ class QfLiraSolverTest {
         }
     }
 
+    @Test
+    fun `clause-only Boolean pins should retain final real witness reconstruction`() {
+        for (order in listOf(listOf(0, 1, 2), listOf(0, 2, 1))) {
+            val source = Problem(
+                numBoolVars = 3,
+                intBounds = openBounds(0),
+                numRealVars = 2,
+                realLower = doubleArrayOf(0.0, 0.0),
+                realUpper = doubleArrayOf(0.0, 0.0),
+                factors = arrayOf(
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                        doubleArrayOf(2.0, 1.0), LinearOp.LE, 1.0),
+                    ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                        doubleArrayOf(2.0, 1.0), LinearOp.GE, -1.0),
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                for (variable in order) {
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, variable != 1))))
+                }
+
+                val result = assertIs<SearchResult.Satisfied>(session.solve(0))
+
+                val point = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+                assertContentEquals(booleanArrayOf(true, false, true), point.bools)
+                assertEquals(listOf(BigFraction.ZERO, BigFraction.ZERO), point.reals)
+            }
+        }
+    }
+
     private fun comparisonClauseModel(xUpper: Long) = Problem(
         numBoolVars = 0,
         intBounds = openBounds(2),

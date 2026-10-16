@@ -111,8 +111,8 @@ pure-real LP scope. Newly resolved comparisons are checked exactly against that
 point after their actual LP assertions and premises are installed. Bounded scalar
 checks use the current operation token; an incompatible or declined comparison
 retains ordinary LP solving. The containing check allowance is still consumed.
-This reuse excludes graph openings, source disjunctions, private arithmetic
-branches and disequality direction state. Retraction and restart discard it.
+This reuse excludes graph openings, private real completion coordinates, source
+disjunctions, private arithmetic branches and disequality direction state. Retraction and restart discard it.
 Reusing a partial point supplies no source verdict; a complete Boolean leaf still
 passes the original source-coordinate checks.
 

@@ -971,7 +971,8 @@ class ExactLiraSearchComponent private constructor(
         return system.install().also { sourceInstalled = it }
     }
 
-    private fun canReusePoint(): Boolean = sourceInstalled && !graphFirst && model.numIntVars == 0 && model.numRealVars > 0 &&
+    private fun canReusePoint(): Boolean =
+        sourceInstalled && !graphFirst && !hasPrivateReals && model.numIntVars == 0 && model.numRealVars > 0 &&
         solveContext.certificationPolicy === ProductionLpCertificationPolicy && !hasSourceDisjunctions &&
         node.rowAssertions.isEmpty() && node.sourceBranches.isEmpty() && node.disequalityDirections.isEmpty() &&
         node.directionPremises.isEmpty() && node.branches.isEmpty() && node.reducedBranches.isEmpty() &&
