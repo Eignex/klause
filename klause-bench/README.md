@@ -404,6 +404,11 @@ through normal source routing with default and private equivalent linear encoder
 Pass `inputs=<comma-separated repository-relative or absolute paths> repeats=N warmups=N seed=N`.
 `parser=admission` requires linear factor admission; `parser=factor` exercises the
 existing library SMT factor facade, including representable bounded mixed products.
+`entry=source engine=cp|ls` instead calls the public source-strategy satisfaction
+facade with the same selected providers, containing token and seed. This mode rejects
+objectives and records its actual native backend beside the requested entry and engine;
+`entry=pipeline engine=cp` retains the direct pipeline comparison. Compare matched
+revisions and check the recorded backend to distinguish finite and open controls.
 The original source bytes remain the checking authority. Constant nonzero integer
 `div`/`mod` are checked with their original Euclidean SMT semantics; variable and zero
 divisors decline independent checking. Each input also interrupts
@@ -416,8 +421,8 @@ encoding. Modes alternate in a measured JVM with one active processor, Serial GC
 source/output hashes, installation counts, charged native work, elapsed construction
 and execution time, source revision and runtime/classpath hashes. Each SAT stream is
 independently checked against the original source after measurement; UNSAT agreement
-supplies no independent proof verification. Run the committed profile on AWS through
-the documented lab client. These component/provider measurements include preparation
+supplies no independent proof verification. Run the committed profile with `host=auto`
+through the documented lab client and wait for capacity. These component/provider measurements include preparation
 and differ from ordinary whole-CLI timings; pair them with matched source-checked CLI
 controls before claiming end-to-end parity.
 
