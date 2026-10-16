@@ -52,7 +52,9 @@ internal object NativeVmLiveArgumentReview {
             }
             val tool = File(root, "klause-bench/tools/$name")
             val sources = listOf(name, "native_vm_event_loss.py", "review_native_vm_live_arguments.py") +
-                if (review in setOf("return-sizes", "task-log")) listOf("review_native_vm_log_identities.py") else emptyList()
+                if (review in setOf("return-sizes", "task-log")) {
+                    listOf("review_native_vm_log_identities.py")
+                } else emptyList()
             for (source in sources.distinct()) {
                 File(root, "klause-bench/tools/$source").copyTo(File(out, source))
             }
