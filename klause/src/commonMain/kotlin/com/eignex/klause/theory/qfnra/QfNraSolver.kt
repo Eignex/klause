@@ -509,7 +509,9 @@ internal class WitnessProbe(
     ): QfNraAssignment? {
         if (exhausted || queries == MAX_WITNESS_AXES) return null
         return try {
-            val point = PolynomialWitnessSupports(arithmetic, MAX_WITNESS_TERMS, MAX_WITNESS_DEGREE, MAX_WITNESS_BITS)
+            val point = PolynomialWitnessSupports(
+                arithmetic, MAX_WITNESS_TERMS, MAX_WITNESS_DEGREE, MAX_WITNESS_BITS, MAX_WITNESS_PASSES,
+            )
                 .point(atoms, payloads, realCount, fixed, takeAxis = {
                     arithmetic.step()
                     if (queries == MAX_WITNESS_AXES) false else { queries++; true }

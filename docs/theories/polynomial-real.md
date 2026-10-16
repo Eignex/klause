@@ -488,7 +488,9 @@ CAD point evaluation and the existing query, proposal and phase limits remain in
 After coupled proposals, a complete numeric conjunction can join sparse rational
 proposals from equalities with disjoint unfixed coordinate supports. Each support
 starts with its existing zero seed and isolates original-coordinate roots while
-retaining earlier choices. A source row is checked when its last changing support
+retaining earlier choices. At most the existing four refinement passes expose an
+exact rational root; nonpoint isolating endpoints supply no proposal here.
+A source row is checked when its last changing support
 has been chosen; coordinates outside the supports retain their proposed zero or
 fixed seed. Cached source payloads retain coefficient, degree and total-term
 admission. Specialization checks exact rational coefficients before isolation and
