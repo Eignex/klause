@@ -94,11 +94,13 @@ internal object MpsMode : CliMode {
                     })
                     state.latestSourceObjective = witness.objective
                     state.exactSourceWitness = witness.exact
+                    state.exactSourceOptimum = false
                     renderMpsFloat(compiled, sample)
                 } else {
                     val witness = compiled.sourceWitness(sample.ints, sample.exactReals)
                     state.latestSourceObjective = witness.objective
                     state.exactSourceWitness = witness.exact
+                    state.exactSourceOptimum = compiled.sourceExact && witness.exact
                     renderMpsWitness(compiled, witness)
                 }
             }
@@ -117,7 +119,8 @@ internal object MpsMode : CliMode {
                 }
                 state.sourceWitnessAccepted = witness != null
                 state.latestSourceObjective = witness?.objective
-                if (witness != null) state.exactSourceWitness = witness.exact
+                state.exactSourceWitness = witness?.exact
+                state.exactSourceOptimum = witness?.exact == true && compiled.sourceExact
                 renderMpsOpenModel(compiled, assignment)
             }
             val objective = compiled.objective?.toLinearObjective()
@@ -155,6 +158,7 @@ internal object MpsMode : CliMode {
                 { _ ->
                     if (state.sourceWitnessAccepted) state.latestSourceObjective?.let(SourceValue::Rational) else null
                 },
+                exactSourceOptimum = { state.exactSourceOptimum },
             )
         }
     }
@@ -170,6 +174,7 @@ private class MpsOutputState(
     var sourceWitnessAccepted = true
     var witnessOnly = false
     var exactSourceWitness: Boolean? = null
+    var exactSourceOptimum: Boolean? = null
 }
 
 private fun parseOpenMpsNumber(value: String): BigFraction {
@@ -254,6 +259,7 @@ internal class MpsOutput(
     private val sourceWitnessAccepted: () -> Boolean = { true },
     private val exactSourceWitness: () -> Boolean? = { null },
     private val sourceArithmeticValue: ((SourceValue) -> SourceValue?)? = null,
+    private val exactSourceOptimum: () -> Boolean? = exactSourceWitness,
 ) : BufferedBestOutput() {
     private var bestObjective: Long? = null
 
@@ -325,7 +331,7 @@ internal class MpsOutput(
     override fun completionMetadata(verdict: Verdict): String? {
         if (verdict != Verdict.OPTIMAL || best == null || !sourceExact || !sourceWitnessAccepted()) return null
         val status = when (exactSourceWitness()) {
-            true -> if (proofExact) "attained-optimum" else "tolerance-optimum"
+            true -> if (proofExact && exactSourceOptimum() == true) "attained-optimum" else "tolerance-optimum"
             false -> "tolerance-optimum"
             null -> return null
         }

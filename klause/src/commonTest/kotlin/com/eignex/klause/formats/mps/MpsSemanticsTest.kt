@@ -6,6 +6,8 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.ir.UndeclaredIntegerBounds
+import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
@@ -38,6 +40,34 @@ class MpsSemanticsTest {
         assertFailsWith<IllegalArgumentException> {
             source.toProblem(semanticOverrides = SemanticOverrides(floats = FloatSemantics.Continuous))
         }
+    }
+
+    @Test
+    fun `unsupported source policies should be rejected rather than retained as ignored metadata`() {
+        val source = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA")
+        val policies = listOf(
+            mpsSemantics.copy(format = SourceFormat.SMTLIB),
+            mpsSemantics.copy(numericAuthority = NumericAuthority.RATIONAL_LITERALS),
+            mpsSemantics.copy(feasibilityTolerance = null),
+            mpsSemantics.copy(floats = FloatSemantics.Continuous),
+            mpsSemantics.copy(undeclaredIntegers = UndeclaredIntegerBounds()),
+            mpsSemantics.copy(undeclaredReals = UndeclaredRealBounds()),
+            mpsSemantics.copy(pinAbsentOptionalValues = true),
+        )
+
+        for (policy in policies) {
+            assertFailsWith<IllegalArgumentException> { source.copy(semantics = policy) }
+        }
+    }
+
+    @Test
+    fun `relative bound slack should use the source bound magnitude without an absolute floor`() {
+        val source = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 0\nBOUNDS\n LO B X 0.1\nENDATA")
+        val relative = SourceTolerance(relative = SemanticRational.of(BIG_ONE, bigIntOf(10)))
+        val compiled = source.toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = relative))
+
+        assertTrue(compiled.withinTolerance(LongArray(0), doubleArrayOf(0.095)))
+        assertFalse(compiled.withinTolerance(LongArray(0), doubleArrayOf(0.085)))
     }
 
     @Test
@@ -89,9 +119,11 @@ class MpsSemanticsTest {
 
     @Test
     fun `exact point qualification should not depend on source projection equality`() {
-        val compiled = Mps.parse("ROWS\n N COST\n E R\nCOLUMNS\n X R 0.1\nRHS\n RHS R 0.3\nENDATA").toProblem()
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n X COST 0.10000000000000000001 R 3\nRHS\n RHS R 1\nENDATA",
+        ).toProblem()
 
-        val witness = compiled.sourceWitness(listOf(BigFraction.ofLong(3)))
+        val witness = compiled.sourceWitness(listOf(BigFraction.ofLong(3).reciprocal()))
 
         assertFalse(compiled.sourceExact)
         assertTrue(witness.exact)
@@ -115,7 +147,9 @@ class MpsSemanticsTest {
     @Test
     fun `large tolerance should never relax integer integrality`() {
         val compiled = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 0\nBOUNDS\n BV B X\nENDATA").toProblem(
-            semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ONE)),
+            semanticOverrides = SemanticOverrides(
+                feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ONE),
+            ),
         )
 
         assertFailsWith<MpsLoweringException> {

@@ -223,7 +223,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `default bounded decimal optimization should publish a source tolerance witness`() {
+    fun `default bounded decimal optimization should separate exact feasibility from tolerance optimality`() {
         val source = File.createTempFile("mps-finite-tolerance", ".mps").apply {
             writeText(
                 "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -0.1\n" +
@@ -237,7 +237,7 @@ class MpsModeTest {
 
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
         assertTrue("optimizationStatus=tolerance-optimum" in text, text)
-        assertTrue("MPS source tolerance witness" in text, text)
+        assertTrue("exact original MPS source witness" in text, text)
     }
 
     @Test
@@ -888,6 +888,25 @@ class MpsModeTest {
             assertTrue(qualification in text, text)
             val status = if (exact) "attained-optimum" else "tolerance-optimum"
             assertTrue("c optimizationStatus=$status" in text.lines(), text)
+        }
+    }
+
+    @Test
+    fun `exact feasibility alone should not establish attained optimality`() {
+        for ((proofExact, exactOptimum) in listOf(false to true, true to false)) {
+            val output = MpsOutput(
+                proofExact = proofExact,
+                exactSourceWitness = { true },
+                exactSourceOptimum = { exactOptimum },
+            )
+
+            val text = capture {
+                output.onSolution("v X=1", objective = 1)
+                output.onComplete(Verdict.OPTIMAL)
+            }
+
+            assertTrue("c optimizationStatus=tolerance-optimum" in text.lines(), text)
+            assertTrue("exact original MPS source witness" in text, text)
         }
     }
 

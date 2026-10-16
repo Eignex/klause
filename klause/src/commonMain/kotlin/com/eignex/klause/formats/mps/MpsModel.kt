@@ -2,6 +2,7 @@ package com.eignex.klause.formats.mps
 
 import com.eignex.klause.ir.NumericAuthority
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.simplex.exact.BigFraction
@@ -265,6 +266,17 @@ class MpsModel(
     /** Declared source policy, resolved with caller overrides before lowering. */
     val semantics: SourceSemantics = mpsSemantics.copy(numericAuthority = NumericAuthority.BINARY64_LITERALS),
 ) {
+    init {
+        require(semantics.format == SourceFormat.MPS) { "MPS requires MPS source semantics" }
+        require(semantics.numericAuthority == NumericAuthority.DECIMAL_LITERALS ||
+            semantics.numericAuthority == NumericAuthority.BINARY64_LITERALS
+        ) { "MPS requires decimal or binary64 literal authority" }
+        require(semantics.feasibilityTolerance != null) { "MPS requires an explicit feasibility tolerance" }
+        require(semantics.floats == null && semantics.undeclaredIntegers == null &&
+            semantics.undeclaredReals == null && semantics.pinAbsentOptionalValues == null
+        ) { "MPS does not support grid, undeclared range or optional-value policies" }
+    }
+
     private var parsedSourceNumbers: MpsSourceNumbers? = null
 
     internal fun sourceNumbers(): MpsSourceNumbers {

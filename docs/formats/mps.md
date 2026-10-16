@@ -116,7 +116,9 @@ Exact adapter witnesses require original decimal feasibility. Working-model
 witnesses on the default finite LP lane retain the separate tolerance guarantee.
 Output comments identify actual exact original-source feasibility or tolerance
 acceptance independently of the optimization status. An exact point alone does not
-upgrade an inexact working-model optimum to an attained source optimum.
+upgrade an inexact working-model optimum to an attained source optimum. A float
+point retains tolerance optimum qualification even when its feasibility is exact;
+attainment requires the certified rational point and matching source bound.
 Optimal output includes `optimizationStatus=attained-optimum` or
 `optimizationStatus=tolerance-optimum` for that accepted witness guarantee.
 
