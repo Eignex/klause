@@ -2178,6 +2178,33 @@ no verdict; a component witness still needs ordinary pipeline admission and inde
 original-source checking. Instrumented component timings establish no default-route
 performance gain. Field/method incompatibility fails the diagnostic explicitly.
 
+`com.eignex.klause.bench.profile.PolynomialPhaseProfile` follows a direct polynomial
+query through its containing stop. Its `request64=<base64>` argument encodes up to
+18 `{suite, problem, sha256}` catalog identities, with at most 48 KiB of encoded
+request and 1 MiB per original source. It requires the frozen original hash before
+parsing and retains those bytes. Run the committed profile through the lab on AWS.
+The measured child uses one active processor, Serial GC and a 3 GiB heap, retaining
+its command, streams, actual exit, installed CLI/harness/runtime hashes and options.
+
+Each direct query uses default polynomial representation limits, unlimited native
+work and a 60-second containing deadline. The diagnostic records normalization and
+bounded-probe returns, completed projection and the terminal result/reason/resource.
+At the first containing deadline poll it captures the operation stack. Its constant
+caller meter must exactly match the native query snapshot, excluding separately
+reported parsing charges. A separate bounded normalization records conjunctive
+guidance admission and normalized node kinds; its work does not enter the query.
+No observer supplies a candidate, changes a limit or changes a cancellation result.
+Private optional-producer declines remain distinct from containing termination.
+Missing deadline stacks remain absent, including native work/resource stops.
+
+These traces concern the direct arithmetic query, excluding pipeline scheduling,
+frontend rendering and source publication. A rejected bounded producer has no
+refutation authority. A direct witness needs ordinary pipeline admission and
+independent full-source checking before credit. Timed traces need not have identical
+work prefixes, and their component timings establish no default-route speedup.
+Use the alternating bounded-probe profile for deterministic observed/plain parity;
+pair phase attribution with source-matched ordinary CLI records.
+
 ### Table profiling
 
 ```sh
