@@ -6,7 +6,23 @@ import hashlib
 import json
 import pathlib
 
-from verify_transcendental_source_results import check_witness, evaluate, expressions, symbol
+from verify_transcendental_source_results import Unavailable, check_witness, evaluate, expressions, symbol
+
+
+def model_expression(node):
+    if isinstance(node, str):
+        return node
+    op, *arguments = node
+    if isinstance(op, list):
+        if len(op) != 3 or op[:2] != ['_', 'klause-real']:
+            raise Unavailable('unsupported indexed model operator')
+        name = op[2]
+        if name == 'pi' and not arguments:
+            return 'pi'
+        if name not in ('exp', 'log', 'sin', 'cos') or len(arguments) != 1:
+            raise Unavailable('unsupported symbolic model operator or arity')
+        op = name
+    return [op] + [model_expression(argument) for argument in arguments]
 
 
 def coordinate_text(value):
@@ -38,7 +54,7 @@ def model_coordinates(source, model):
         name = symbol(definition[1])
         assert name in declarations and name not in values, 'foreign or repeated model declaration'
         assert definition[3] == declarations[name], 'model declaration sort differs from source'
-        values[name] = coordinate_text(evaluate(definition[4], {}))
+        values[name] = coordinate_text(evaluate(model_expression(definition[4]), {}))
     check_witness(source, values)
     return values
 

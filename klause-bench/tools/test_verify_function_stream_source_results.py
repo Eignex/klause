@@ -18,6 +18,24 @@ class FunctionStreamSourceTest(unittest.TestCase):
         report = check_stream(source, '(\n  (define-fun x () Real (exp 1.0))\n)\n')
         self.assertEqual(1, len(report['witnesses']))
 
+    def test_native_symbolic_function_carrier_retains_its_exact_identity(self):
+        source = '(declare-const x Real) (assert (= x (exp 1))) (assert (> x 0))'
+        output = '(\n  (define-fun |x| () Real ((_ klause-real exp) 1.0))\n)\n'
+        report = check_stream(source, output)
+        self.assertEqual(1, len(report['witnesses']))
+
+    def test_native_pi_carrier_retains_its_exact_identity(self):
+        source = '(declare-const x Real) (assert (= x pi)) (assert (> x 0))'
+        output = '(\n  (define-fun |x| () Real ((_ klause-real pi)))\n)\n'
+        report = check_stream(source, output)
+        self.assertEqual(1, len(report['witnesses']))
+
+    def test_unknown_indexed_operator_receives_no_function_credit(self):
+        source = '(declare-const x Real) (assert (> x 0))'
+        for operator in ['(_ foreign exp)', '(_ klause-real unknown)', '(_ klause-real pi)']:
+            with self.subTest(operator=operator), self.assertRaises(Unavailable):
+                check_stream(source, '(\n  (define-fun x () Real (' + operator + ' 1.0))\n)\n')
+
     def test_invalid_original_function_domain_rejects_a_candidate(self):
         source = '(declare-const x Real) (assert (= x (log (- 1))))'
         with self.assertRaises(InvalidDomain):
