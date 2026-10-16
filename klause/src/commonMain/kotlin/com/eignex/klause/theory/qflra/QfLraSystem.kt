@@ -21,7 +21,6 @@ import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpScopedRow
-import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.exactComparison
@@ -284,7 +283,12 @@ internal class LiveQfLraSystem(
                 val boundUpper = (coefficient > BigFraction.ZERO) == upper
                 val derived = ExactLpSide(ExactLpNumber.of(threshold), strict)
                 val previous = state.activeSide(column, boundUpper)?.side
-                if (previous != null && !derived.strongerThan(previous, boundUpper)) continue
+                if (previous != null) {
+                    if (!work.admitted(previous.number.value)) continue
+                    val difference = work.subtractProduct(threshold, BigFraction.ONE, previous.number.value) ?: continue
+                    val stronger = if (boundUpper) difference < BigFraction.ZERO else difference > BigFraction.ZERO
+                    if (!stronger && !(difference.isZero && strict && !previous.strict)) continue
+                }
                 stop.charge(reasons.size.toLong() + 1L)
                 if (stop()) return
                 val support = ArrayList<SearchAtomPremise>(reasons.size)

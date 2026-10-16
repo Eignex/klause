@@ -40,6 +40,10 @@ antecedents within 4,096 premise visits, at most 1,024 numeric terms and the exi
 and edit accounting. Retraction removes their assertions and reasons together.
 This is one pass per source assertion operation, with the same token and ordinary
 numerical fallback; it supplies no completed source witness.
+The shared slack scan includes available target endpoints before exactly cancelling
+their contribution for each proposal. Their magnitude can therefore cause arithmetic
+admission to decline, even though they do not justify the derived bound. Comparing
+an improvement against an existing endpoint also retains bounded scalar arithmetic.
 
 For a source containing integer or real coordinates, the exact-linear component can
 reuse the exact source-coordinate prefix of an existing completed LP witness, or
