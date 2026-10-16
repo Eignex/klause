@@ -266,15 +266,19 @@ internal object Compiler {
             val name = e.atomAt(1, "define-fun name")
             val paramList = e.items.getOrNull(2) as? SExpr.SList
                 ?: smtUnsupported("define-fun '$name': bad params")
+            val parameterSorts = ArrayList<Sort>(paramList.items.size)
             val params = paramList.items.map { p ->
                 val param = p as? SExpr.SList
                     ?: smtUnsupported("define-fun '$name': bad parameter")
                 param.requireSize(2, "define-fun '$name' parameter")
                 val paramName = param.atomAt(0, "define-fun '$name' parameter")
-                requireSort(
-                    param.atomAt(1, "define-fun '$name' parameter sort"),
-                    "define-fun '$name' parameter '$paramName'",
-                )
+                val parameterSort = param.atomAt(1, "define-fun '$name' parameter sort")
+                requireSort(parameterSort, "define-fun '$name' parameter '$paramName'")
+                parameterSorts.add(when (parameterSort) {
+                    "Bool" -> Sort.BOOL
+                    "Real" -> Sort.REAL
+                    else -> Sort.INT
+                })
                 paramName
             }
             val retSort = e.atomAt(3, "define-fun '$name' return sort")
@@ -285,6 +289,7 @@ internal object Compiler {
             requireFreshName(name)
             macros[name] = Macro(
                 params,
+                parameterSorts,
                 e.argAt(4, "define-fun '$name' body"),
                 isBool = retSort == "Bool",
                 isReal = retSort == "Real",
@@ -403,5 +408,11 @@ internal object Compiler {
      *  what lets the syntactic real classifier see through a macro reference: a `Real`-returning macro
      *  used in a relation is a real relation even when nothing else in the relation is syntactically
      *  real, so its body is inlined in a real — not integer — context. */
-    internal class Macro(val params: List<String>, val body: SExpr, val isBool: Boolean, val isReal: Boolean)
+    internal class Macro(
+        val params: List<String>,
+        val parameterSorts: List<Sort>,
+        val body: SExpr,
+        val isBool: Boolean,
+        val isReal: Boolean,
+    )
 }

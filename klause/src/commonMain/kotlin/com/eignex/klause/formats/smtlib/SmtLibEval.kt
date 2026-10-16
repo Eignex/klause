@@ -54,6 +54,7 @@ private sealed interface Frame {
     class Combine(val node: SExpr.SList, val sort: Sort, val argc: Int) : Frame
     class MakeScope(val names: List<String>, val bools: BooleanArray, val isolated: Boolean = false) : Frame
     class RestoreBindings(val scope: Compiler.Builder.BindingScope) : Frame
+    object PromoteReal : Frame
     object PopScope : Frame
 }
 
@@ -71,6 +72,8 @@ internal fun Compiler.Builder.evalTerm(root: SExpr, sort: Sort): Res {
     while (work.isNotEmpty()) {
         when (val fr = work.removeLast()) {
             is Frame.PopScope -> popLetScope()
+
+            is Frame.PromoteReal -> vals.addLast(Res.R(vals.removeLast().asReal()))
 
             is Frame.RestoreBindings -> bindingScope = fr.scope
 
@@ -168,19 +171,21 @@ private fun Compiler.Builder.scheduleMacro(node: SExpr.SList, head: String, sort
     if (callArgs.size != m.params.size) {
         smtUnsupported("'$head' applied to ${callArgs.size} args, expected ${m.params.size}")
     }
-    val bools = BooleanArray(callArgs.size) { isBoolExpr(callArgs[it]) }
+    val resultSort = when {
+        m.isBool -> Sort.BOOL
+        m.isReal -> Sort.REAL
+        else -> Sort.INT
+    }
+    if ((sort == Sort.BOOL) != m.isBool || (sort == Sort.INT && m.isReal)) {
+        smtUnsupported("'$head' result has an incompatible sort")
+    }
+    val bools = BooleanArray(callArgs.size) { m.parameterSorts[it] == Sort.BOOL }
     // Arguments see the caller; free names in the body see declarations and its own parameters.
     work.addLast(Frame.RestoreBindings(bindingScope))
-    work.addLast(Frame.Eval(m.body, sort))
+    if (sort == Sort.REAL && resultSort == Sort.INT) work.addLast(Frame.PromoteReal)
+    work.addLast(Frame.Eval(m.body, resultSort))
     work.addLast(Frame.MakeScope(m.params, bools, isolated = true))
-    for (i in callArgs.indices.reversed()) {
-        val argumentSort = when {
-            bools[i] -> Sort.BOOL
-            isRealExpr(callArgs[i]) -> Sort.REAL
-            else -> Sort.INT
-        }
-        work.addLast(Frame.Eval(callArgs[i], argumentSort))
-    }
+    for (i in callArgs.indices.reversed()) work.addLast(Frame.Eval(callArgs[i], m.parameterSorts[i]))
 }
 
 /** The child sub-terms to fold (with their sorts) for a non-`let` list node. */
