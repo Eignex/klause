@@ -23,7 +23,7 @@ import com.eignex.klause.util.WorkMeter
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64
-import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -31,9 +31,13 @@ import kotlinx.serialization.json.Json
 internal object PolynomialPhaseProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..2 && args[0].startsWith("request64="))
-        require(args.size == 1 || args[1] == "pipeline=true")
-        val pipelineMode = args.size == 2
+        require(args.size in 1..3 && args[0].startsWith("request64="))
+        val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
+        require(options.size == args.size - 1 && options.keys.all { it in setOf("pipeline", "timeoutMs") })
+        require(options["pipeline"] == null || options["pipeline"] == "true")
+        val pipelineMode = options["pipeline"] == "true"
+        val timeoutMs = options["timeoutMs"]?.toLong() ?: 60_000L
+        require(timeoutMs > 0)
         val encoded = args[0].substringAfter('=')
         require(encoded.length <= 48 * 1024)
         val request = Base64.getDecoder().decode(encoded)
@@ -51,7 +55,7 @@ internal object PolynomialPhaseProfile {
             "javaVersion" to System.getProperty("java.runtime.version"),
             "javaCores" to Runtime.getRuntime().availableProcessors().toString(),
             "jvmOptions" to ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "),
-            "containingTimeoutMs" to "60000",
+            "containingTimeoutMs" to timeoutMs.toString(),
             "maximumWork" to "null",
             "representationLimits" to "default",
             "route" to if (pipelineMode) "source admission and default MIXED pipeline/P1/seed3"
@@ -67,16 +71,16 @@ internal object PolynomialPhaseProfile {
             directory.resolve("source.smt2").writeBytes(bytes)
             val text = bytes.decodeToString()
             if (pipelineMode) {
-                directory.resolve("pipeline.json").writeText(Json.encodeToString(pipeline(text)))
+                directory.resolve("pipeline.json").writeText(Json.encodeToString(pipeline(text, timeoutMs)))
             } else {
-                directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text)))
-                directory.resolve("trace.json").writeText(Json.encodeToString(access.measure(text)))
+                directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
+                directory.resolve("trace.json").writeText(Json.encodeToString(access.measure(text, timeoutMs = timeoutMs)))
             }
         }
     }
 
-    internal fun pipeline(text: String): PipelinePhaseTrace {
-        val observation = DeadlineObservation()
+    internal fun pipeline(text: String, timeoutMs: Long = 60_000L): PipelinePhaseTrace {
+        val observation = DeadlineObservation(timeoutMs)
         val source = SmtLibAdmission.parse(text, cancellation = observation)
         require(source is SmtLibInput.Polynomial) { "Source did not select polynomial admission: ${source.javaClass}" }
         val request = source.problem.pipelineRequest()
@@ -95,8 +99,8 @@ internal object PolynomialPhaseProfile {
             preparedCharges, observation.charges - preparedCharges, observation.stack)
     }
 
-    private class DeadlineObservation : Cancellation, WorkMeter {
-        private val clock = Cancellation.after(60.seconds)
+    private class DeadlineObservation(timeoutMs: Long) : Cancellation, WorkMeter {
+        private val clock = Cancellation.after(timeoutMs.milliseconds)
         var charges = 0L
             private set
         var stack: List<String>? = null
@@ -160,11 +164,11 @@ internal object PolynomialPhaseProfile {
         private fun parsed(text: String, token: Cancellation): Any =
             parse.invoke(parser.getField("INSTANCE").get(null), text, token, false, false)
 
-        fun gate(text: String): PhaseGate {
+        fun gate(text: String, timeoutMs: Long = 60_000L): PhaseGate {
             var charges = 0L
             val meter = WorkMeter { charges += it }
             val token = object : Cancellation {
-                private val timeout = Cancellation.after(60.seconds)
+                private val timeout = Cancellation.after(timeoutMs.milliseconds)
                 override fun isCancelled(): Boolean = timeout()
                 override fun deadline() = timeout.deadline()
                 override fun workMeter(): WorkMeter = meter
@@ -190,8 +194,8 @@ internal object PolynomialPhaseProfile {
                 atoms.size, guides?.size, kinds, charges)
         }
 
-        fun measure(text: String, maximumWork: Long? = null): PhaseTrace {
-            val clock = Cancellation.after(60.seconds)
+        fun measure(text: String, maximumWork: Long? = null, timeoutMs: Long = 60_000L): PhaseTrace {
+            val clock = Cancellation.after(timeoutMs.milliseconds)
             var charges = 0L
             var stop: List<String>? = null
             val meter = WorkMeter { charges += it }

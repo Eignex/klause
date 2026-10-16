@@ -2520,7 +2520,10 @@ The measured child uses one active processor, Serial GC and a 3 GiB heap, retain
 its command, streams, actual exit, installed CLI/harness/runtime hashes and options.
 
 Each direct query uses default polynomial representation limits, unlimited native
-work and a 60-second containing deadline. The diagnostic records normalization and
+work and a 60-second containing deadline. Optional `timeoutMs=<positive milliseconds>`
+selects the containing deadline for source-matched diagnostics at another budget;
+the saved settings retain the actual value. It does not change native or representation
+limits. The separate gate inspection uses its own deadline of the same duration. The diagnostic records normalization and
 bounded-probe returns, completed projection and the terminal result/reason/resource.
 At the first containing deadline poll it captures the operation stack. Its constant
 caller meter must exactly match the native query snapshot, excluding separately
@@ -2538,11 +2541,12 @@ work prefixes, and their component timings establish no default-route speedup.
 Use the alternating bounded-probe profile for deterministic observed/plain parity;
 pair phase attribution with source-matched ordinary CLI records.
 
-Add `pipeline=true` as a second argument to observe source admission and the same
+Add `pipeline=true` after the request argument to observe source admission and the same
 MIXED/P1/seed3 satisfaction execution used by default CLI polynomial requests.
 That mode records the common termination reason, native/resource and search
 statistics, caller charges and the first containing deadline stack. Its single
-60-second deadline covers admission, preparation and execution. It records a
+deadline, set by `timeoutMs` or the 60-second default, covers admission, preparation
+and execution. It records a
 pipeline trace instead of direct-query checkpoints or a separate gate inspection.
 The source must select polynomial admission; a linear route fails explicitly.
 Pipeline caller charges include source/search preparation and are separate from
