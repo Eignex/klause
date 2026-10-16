@@ -42,8 +42,8 @@ internal class LinearToleranceQualification(
         if (variableBounds.indices.any { index ->
                 val (low, high) = ranges[index]
                 val (nominalLow, nominalHigh) = variableBounds[index]
-                nominalLow != null && (low == null || low < lowerPoint(nominalLow, integers[index])!!) ||
-                    nominalHigh != null && (high == null || high > upperPoint(nominalHigh, integers[index])!!)
+                (nominalLow != null && (low == null || low < lowerPoint(nominalLow, integers[index])!!)) ||
+                    (nominalHigh != null && (high == null || high > upperPoint(nominalHigh, integers[index])!!))
             }
         ) return false
         return rows.indices.all { rowUnchanged(it, ranges) } && !stopped()
@@ -136,7 +136,7 @@ internal class LinearToleranceQualification(
         val row = rows[index]
         if (row.pins.any { (column, value) ->
                 val (low, high) = ranges[column]
-                low != null && value < low || high != null && value > high
+                (low != null && value < low) || (high != null && value > high)
             }
         ) return true
         val lo = row.lower
