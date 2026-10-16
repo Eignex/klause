@@ -112,18 +112,25 @@ class SourceStrategy internal constructor(
         val result = when (route) {
             is SourceProblemRoute.PolynomialTheory -> {
                 if (!scope.supportsPolynomial(engine)) return scope.unsupported()
-                (SourceSetup.execute(SourceExecutionRequest(invocation, polynomial = scope.polynomial))
-                    as SourceExecutionResult.Polynomial).result.result
+                (
+                    SourceSetup.execute(SourceExecutionRequest(invocation, polynomial = scope.polynomial))
+                    as SourceExecutionResult.Polynomial
+                ).result.result
             }
+
             is SourceProblemRoute.Finite -> finiteSolve(route, scope)
+
             is SourceProblemRoute.OpenTheory -> {
                 if (!scope.supportsOpen(engine)) {
                     return scope.unsupported()
                 }
-                val execution = (SourceSetup.execute(SourceExecutionRequest(invocation, theory = scope.theory))
-                    as SourceExecutionResult.Linear).result
+                val execution = (
+                    SourceSetup.execute(SourceExecutionRequest(invocation, theory = scope.theory))
+                    as SourceExecutionResult.Linear
+                ).result
                 (execution as OpenTheoryExecution.Satisfy).result
             }
+
             is SourceProblemRoute.UnsupportedOpen -> {
                 if (route.preparedPlan.decline == PreparedPlanDecline.RESOURCE) {
                     return OpenTheoryResult.Unknown(TerminationReason.BudgetExhausted, SolveStats.EMPTY)
@@ -131,10 +138,13 @@ class SourceStrategy internal constructor(
                 if (!scope.supportsOpen(engine)) {
                     return scope.unsupported()
                 }
-                val execution = (SourceSetup.execute(SourceExecutionRequest(invocation, theory = scope.theory))
-                    as SourceExecutionResult.Linear).result
+                val execution = (
+                    SourceSetup.execute(SourceExecutionRequest(invocation, theory = scope.theory))
+                    as SourceExecutionResult.Linear
+                ).result
                 (execution as OpenTheoryExecution.Satisfy).result
             }
+
             SourceProblemRoute.Refuted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
         }
         return if (scope.stop()) scope.unknown(result.stats) else result

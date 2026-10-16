@@ -66,8 +66,10 @@ internal class Solvable(
         sourceInvocation,
     )
 
-    fun withNumericalCompletion(): Solvable = Solvable(finite, render, objectiveValue,
-        continuousObjectiveValue, pipeline, routingLpStats, routingElapsedMs, toleranceCheck, true, sourceInvocation)
+    fun withNumericalCompletion(): Solvable = Solvable(
+        finite, render, objectiveValue,
+        continuousObjectiveValue, pipeline, routingLpStats, routingElapsedMs, toleranceCheck, true, sourceInvocation,
+    )
 
     constructor(
         /** Finite CP problem. */
@@ -125,15 +127,15 @@ internal class Solvable(
 
     /** Finite CP problem. */
     val problem: Problem? get() = finite?.problem
-    val optimize: Boolean get() = finite?.optimize ?:
-        sourceInvocation?.let { it.operation == ExecutionOperation.OPTIMIZE } ?: (
+    val optimize: Boolean get() = finite?.optimize
+        ?: sourceInvocation?.let { it.operation == ExecutionOperation.OPTIMIZE } ?: (
         openRequest?.objective != null || polynomial?.objective != null || quadratic != null ||
             numerical?.request?.objective != null
-    )
+        )
     val maximize: Boolean get() = finite?.maximize ?: sourceInvocation?.maximizeSourceObjective ?: (
-        openRequest?.maximize ?: polynomial?.maximize ?: numerical?.request?.maximize ?:
-            (quadratic?.sense == ObjectiveSense.MAXIMIZE)
-    )
+        openRequest?.maximize ?: polynomial?.maximize ?: numerical?.request?.maximize
+            ?: (quadratic?.sense == ObjectiveSense.MAXIMIZE)
+        )
     private val numerical: SolvablePipeline.NumericalLinear? get() = pipeline as? SolvablePipeline.NumericalLinear
     private val quadratic: SolvablePipeline.QuadraticTheory? get() = pipeline as? SolvablePipeline.QuadraticTheory
     private val polynomial: SolvablePipeline.PolynomialTheory? get() = pipeline as? SolvablePipeline.PolynomialTheory

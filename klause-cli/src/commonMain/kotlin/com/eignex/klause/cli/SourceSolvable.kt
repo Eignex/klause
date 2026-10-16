@@ -23,25 +23,49 @@ internal fun preparedSourceSolvable(
     return when (SourceSetup.executionKind(invocation)) {
         SourceExecutionKind.FINITE -> {
             val route = invocation.route as SourceProblemRoute.Finite
-            linearSolvable(route.problem, if (maximize) objective?.negated() else objective,
-                maximize, render, routingLpStats = routingLpStats, routingElapsedMs = routingElapsedMs,
-                preparedRoute = route)
+            linearSolvable(
+                route.problem,
+                if (maximize) objective?.negated() else objective,
+                maximize,
+                render,
+                routingLpStats = routingLpStats,
+                routingElapsedMs = routingElapsedMs,
+                preparedRoute = route,
+            )
         }
+
         SourceExecutionKind.LINEAR -> openTheorySolvable(
-            (invocation.route as SourceProblemRoute.OpenTheory).request, renderOpen, routingLpStats, routingElapsedMs,
+            (invocation.route as SourceProblemRoute.OpenTheory).request,
+            renderOpen,
+            routingLpStats,
+            routingElapsedMs,
         ).withSourceInvocation(invocation)
+
         SourceExecutionKind.HEURISTIC -> {
             val model = when (val route = invocation.route) {
                 is SourceProblemRoute.OpenTheory -> route.request.model
                 is SourceProblemRoute.UnsupportedOpen -> route.problem
                 else -> error("heuristic execution requires its source route")
             }
-            openLocalSearchSolvable(model, renderOpen, routingLpStats, routingElapsedMs,
-                if (maximize) objective?.negated() else objective, maximize).withSourceInvocation(invocation)
+            openLocalSearchSolvable(
+                model,
+                renderOpen,
+                routingLpStats,
+                routingElapsedMs,
+                if (maximize) objective?.negated() else objective,
+                maximize,
+            ).withSourceInvocation(invocation)
         }
+
         SourceExecutionKind.POLYNOMIAL -> polynomialSolvable(
-            invocation.route as SourceProblemRoute.PolynomialTheory, renderOpen, routingElapsedMs,
+            invocation.route as SourceProblemRoute.PolynomialTheory,
+            renderOpen,
+            routingElapsedMs,
         ).withSourceInvocation(invocation)
-        SourceExecutionKind.REFUTED -> refutedSolvable(routingLpStats, routingElapsedMs).withSourceInvocation(invocation)
+
+        SourceExecutionKind.REFUTED -> refutedSolvable(
+            routingLpStats,
+            routingElapsedMs,
+        ).withSourceInvocation(invocation)
     }
 }

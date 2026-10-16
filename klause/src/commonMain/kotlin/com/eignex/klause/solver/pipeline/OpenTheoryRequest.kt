@@ -389,8 +389,10 @@ object OpenTheoryPipeline {
     ): OpenTheoryExecution = observed(preparedSource.sourceSemantics, onAccepted) { publication ->
         val stop = params.cancellation or params.timeout
         if (stop() || preparedSource.decline == PreparedPlanDecline.RESOURCE) {
-            incompleteOpenExecution(objective,
-                if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted)
+            incompleteOpenExecution(
+                objective,
+                if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
+            )
         } else {
             val model = requireNotNull(preparedSource.model)
             val values = objective?.let { OpenSourceObjective(it, if (maximize) it.negated() else it, maximize) }

@@ -142,8 +142,11 @@ internal object SmtLibMode : CliMode {
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
             common.logRoute(route, routingElapsedMs)
             return preparedSourceSolvable(
-                invocation, render, { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
-                routingLpStats, routingElapsedMs,
+                invocation,
+                render,
+                { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
+                routingLpStats,
+                routingElapsedMs,
             )
         }
 
