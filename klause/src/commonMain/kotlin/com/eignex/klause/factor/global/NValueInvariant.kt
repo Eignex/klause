@@ -237,7 +237,13 @@ internal class NValueInvariant(
         if (state.assumptions.isFrozenInt(n)) return nvDegree(distinct, state.assignment.intValue(n)) == 0L
         if (target !in nDom) return false
         state.assignment.setInt(n, target)
-        return true
+        if (xs.none { it == n }) return true
+        val updated = LongHashSet()
+        for (i in xs.indices) {
+            val value = state.assignment.intValue(xs[i])
+            if (presentNvInvFn(state, i) && value !in exceptValues) updated.add(value)
+        }
+        return nvDegree(updated.size, target) == 0L
     }
 
     fun nvDegree(distinct: Int, nVal: Long): Long = when (mode) {

@@ -21,6 +21,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -67,6 +68,16 @@ class Xcsp3GlobalsTest {
         assertContentEquals(longArrayOf(0, 2), relation.exceptSet)
         assertContentEquals(intArrayOf(parsed.intVarNames.getValue("x"), parsed.intVarNames.getValue("y")), relation.xs)
         assertEquals(0, parsed.problem.numBoolVars)
+    }
+
+    @Test
+    fun `nValues should decline an unrepresentable except list`() {
+        assertFailsWith<UnsupportedXcsp3Exception> {
+            parse(
+                "<nValues><list>x</list><except>x</except><condition>(eq,0)</condition></nValues>",
+                """<var id="x">0..1</var>""",
+            )
+        }
     }
 
     @Test
