@@ -64,6 +64,25 @@ class MixedPointCompletionTest {
     }
 
     @Test
+    fun `eliminated source equations permit strict completion of free real coordinates`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            exactColumnLower(1, BigFraction.ZERO), exactColumnUpper(1, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
+            ExactRationalInequality(intArrayOf(2), listOf(BigFraction.ONE), BigFraction.ONE, strict = true),
+        )
+
+        val point = assertNotNull(completeMixedPoint(3, 1, doubleArrayOf(0.0, 0.0, 0.0, 1.0),
+            rows, Cancellation.Never))
+
+        assertTrue(point[0] > BigFraction.ZERO && point[0] < BigFraction.ONE)
+        assertTrue(point.satisfiesSourceRows(rows))
+    }
+
+    @Test
     fun `repaired equalities cannot bypass real inequalities`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1, 2),
