@@ -832,7 +832,9 @@ class ExactLiraSearchComponent private constructor(
                     }
                     if (side != null && hintTruth(side, value) == true) {
                         preferred = choice
-                        observeCompleteStage(if (exact == null) "DISEQUALITY_FLOAT_GUIDE" else "DISEQUALITY_EXACT_GUIDE")
+                        observeCompleteStage(
+                            if (exact == null) "DISEQUALITY_FLOAT_GUIDE" else "DISEQUALITY_EXACT_GUIDE",
+                        )
                         break
                     }
                 }
