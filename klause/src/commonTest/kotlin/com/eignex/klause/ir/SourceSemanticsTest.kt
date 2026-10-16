@@ -2,7 +2,6 @@ package com.eignex.klause.ir
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.bigIntOf
-
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -39,6 +38,33 @@ class SourceSemanticsTest {
         )
 
         assertEquals(UndeclaredIntegerBounds(-20, 10), resolved.effective.undeclaredIntegers)
+    }
+
+    @Test
+    fun `real endpoint replacements should retain exact rationals and the other endpoint`() {
+        val lower = BigFraction.of(bigIntOf(1), bigIntOf(10))
+        val declared = SourceSemantics(
+            format = SourceFormat.SMTLIB,
+            undeclaredReals = UndeclaredRealBounds(upper = BigFraction.ONE),
+        )
+
+        val resolved = declared.resolve(
+            SemanticOverrides(undeclaredReals = BoundsOverride(lower = BoundOverride.Value(lower))),
+        )
+
+        assertEquals(UndeclaredRealBounds(lower, BigFraction.ONE), resolved.effective.undeclaredReals)
+    }
+
+    @Test
+    fun `crossed endpoint replacements should be rejected`() {
+        val declared = SourceSemantics(
+            format = SourceFormat.FLATZINC,
+            undeclaredIntegers = UndeclaredIntegerBounds(-10, 10),
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            declared.resolve(SemanticOverrides(undeclaredIntegers = BoundsOverride(lower = BoundOverride.Value(20))))
+        }
     }
 
     @Test
