@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 
@@ -14,16 +15,16 @@ internal fun affineIndexDefinitions(
     factors: Array<Factor>,
     numIntVars: Int,
     definedHints: IntArray,
-): List<AffineIndexDefinition> = AffineIndexInference(factors, numIntVars, definedHints).infer()
+    cancellation: Cancellation = Cancellation.Never,
+): List<AffineIndexDefinition> = AffineIndexInference(factors, numIntVars, definedHints, cancellation).infer()
 
 private class AffineIndexInference(
     private val factors: Array<Factor>,
     numIntVars: Int,
-    definedHints: IntArray,
+    private val definedHints: IntArray,
+    private val cancellation: Cancellation,
 ) {
-    private val hinted = BooleanArray(numIntVars).also { flags ->
-        for (v in definedHints) if (v in flags.indices) flags[v] = true
-    }
+    private val hinted = BooleanArray(numIntVars)
     private val occurrences = arrayOfNulls<IntArrayList>(numIntVars)
     private val indexUse = BooleanArray(numIntVars)
     private val elementUse = BooleanArray(numIntVars)
@@ -34,9 +35,16 @@ private class AffineIndexInference(
     private val definitions = ArrayList<AffineIndexDefinition>()
 
     fun infer(): List<AffineIndexDefinition> {
+        if (cancellation()) return emptyList()
+        for (v in definedHints) {
+            if (cancellation.definitionStopped()) return emptyList()
+            if (v in hinted.indices) hinted[v] = true
+        }
         for (fid in factors.indices) {
+            if (cancellation.definitionStopped()) return emptyList()
             val factor = factors[fid]
             for (v in factor.intVars) {
+                if (cancellation.definitionStopped()) return emptyList()
                 if (!hinted[v]) continue
                 val readers = occurrences[v] ?: IntArrayList().also { occurrences[v] = it }
                 readers.add(fid)
@@ -47,10 +55,12 @@ private class AffineIndexInference(
             }
         }
         for (fid in factors.indices) {
+            if (cancellation.definitionStopped()) return emptyList()
             val factor = factors[fid] as? Linear ?: continue
             if (factor.op != LinearOp.EQ) continue
             val row = factor.integerConstants ?: continue
             val j = factor.vars.indices.firstOrNull {
+                if (cancellation.definitionStopped()) return emptyList()
                 val v = factor.vars[it]
                 hinted[v] && indexUse[v] && nonIndexCount[v] == 1 &&
                     (elementUse[v] || factor.vars.size in 2..3) &&
@@ -59,19 +69,21 @@ private class AffineIndexInference(
             accept(fid, factor, j)
         }
         while (!pending.isEmpty()) {
+            if (cancellation.definitionStopped()) return emptyList()
             val v = pending.removeFirst()
             if (derived[v]) continue
             val candidate = aliasRow(v) ?: continue
             val factor = factors[candidate] as Linear
             accept(candidate, factor, factor.vars.indexOf(v))
         }
-        return definitions
+        return if (cancellation()) emptyList() else definitions
     }
 
     private fun aliasRow(v: Int): Int? {
         val readers = occurrences[v] ?: return null
         var candidate = -1
         for (i in 0 until readers.size) {
+            if (cancellation.definitionStopped()) return null
             val fid = readers[i]
             val factor = factors[fid]
             if (acceptedRows[fid] || factor.isIndexRead(v)) continue
@@ -90,13 +102,21 @@ private class AffineIndexInference(
         acceptedRows[fid] = true
         derived[output] = true
         definitions.add(AffineIndexDefinition(output, factor, j))
-        for (v in factor.vars) if (v != output && hinted[v] && !derived[v]) pending.addLast(v)
+        for (v in factor.vars) {
+            if (cancellation.definitionStopped()) return
+            if (v != output && hinted[v] && !derived[v]) pending.addLast(v)
+        }
     }
 
-    private fun Factor.isIndexRead(v: Int): Boolean = when (this) {
-        is Element -> idx == v && result != v && (!arrIsVars || v.toLong() !in arr)
-        is ReifiedLinear -> op == LinearOp.EQ && vars.size == 1 && vars[0] == v &&
-            integerConstants?.coeff(0) == 1L
-        else -> false
+    private fun Factor.isIndexRead(v: Int): Boolean {
+        return when (this) {
+            is Element -> idx == v && result != v && (!arrIsVars || arr.none {
+                if (cancellation.definitionStopped()) return false
+                it == v.toLong()
+            })
+            is ReifiedLinear -> op == LinearOp.EQ && vars.size == 1 && vars[0] == v &&
+                integerConstants?.coeff(0) == 1L
+            else -> false
+        }
     }
 }
