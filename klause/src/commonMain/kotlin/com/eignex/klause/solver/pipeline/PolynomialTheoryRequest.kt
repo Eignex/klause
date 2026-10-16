@@ -45,6 +45,7 @@ internal fun PreparedSourcePlan.polynomialRequest(): PolynomialTheoryRequest {
         PolynomialRealProblem(
             shared.service.formula, shared.service.realCount, shared.source.numBoolVars,
             sourceRealCount, sourceBoolCount, emptyMap(), emptyMap(),
+            semantics = sourceSemantics ?: shared.source.semantics,
         ),
         this,
     )
@@ -186,6 +187,15 @@ fun OpenTheoryPipeline.minimize(
     params: PolynomialTheoryParams,
     engine: FiniteEngine,
     cores: Int,
+): PolynomialOptimizationExecution = minimizePolynomial(request, objective, params, engine, cores)
+    .withSourceSemantics(request.preparedPlan.sourceSemantics)
+
+private fun minimizePolynomial(
+    request: PolynomialTheoryRequest,
+    objective: LinearObjective,
+    params: PolynomialTheoryParams,
+    engine: FiniteEngine,
+    cores: Int,
 ): PolynomialOptimizationExecution {
     require(cores > 0)
     val stop = params.timeout or params.cancellation
@@ -237,6 +247,14 @@ fun OpenTheoryPipeline.execute(
 
 /** Execute a polynomial source using the requested lane count; FIXED retains one worker. */
 fun OpenTheoryPipeline.execute(
+    request: PolynomialTheoryRequest,
+    params: PolynomialTheoryParams,
+    engine: FiniteEngine,
+    cores: Int,
+): PolynomialTheoryExecution = executePolynomial(request, params, engine, cores)
+    .withSourceSemantics(request.preparedPlan.sourceSemantics)
+
+private fun executePolynomial(
     request: PolynomialTheoryRequest,
     params: PolynomialTheoryParams,
     engine: FiniteEngine,

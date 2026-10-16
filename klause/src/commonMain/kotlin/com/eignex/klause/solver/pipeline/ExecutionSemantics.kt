@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.SourceSemanticsOwner
+import com.eignex.klause.solver.withSourceSemantics as withFiniteSourceSemantics
 
 internal val PreparedSourcePlan.sourceSemantics: EffectiveSourceSemantics?
     get() = (originalSource as? SourceSemanticsOwner)?.semantics
@@ -36,3 +37,16 @@ internal fun QuadraticOptimizationExecution.withSourceSemantics(
     if (this.semantics === semantics) return this
     return copy(semantics = semantics).also { it.retainPublication(acceptedIncumbent) }
 }
+
+internal fun PolynomialTheoryExecution.withSourceSemantics(
+    semantics: EffectiveSourceSemantics?,
+): PolynomialTheoryExecution = if (semantics == null) this else copy(result = result.withSourceSemantics(semantics))
+
+internal fun PolynomialOptimizationExecution.withSourceSemantics(
+    semantics: EffectiveSourceSemantics?,
+): PolynomialOptimizationExecution =
+    if (semantics == null) this else copy(result = result.withFiniteSourceSemantics(semantics))
+
+internal fun TranscendentalTheoryExecution.withSourceSemantics(
+    semantics: EffectiveSourceSemantics,
+): TranscendentalTheoryExecution = copy(result = result.withSourceSemantics(semantics))
