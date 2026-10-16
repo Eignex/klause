@@ -20,9 +20,11 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.sourceRoute
+import com.eignex.klause.util.Cancellation
 import java.io.File
 
 /**
@@ -113,12 +115,20 @@ internal object SmtLibFormat : ProblemFormat {
         require(parsed.quadraticObjective == null) { "finite in-process benchmark requires an affine source objective" }
         val objective = parsed.objective?.toLinearObjective()
         val maximize = parsed.sense == ObjectiveSense.MAXIMIZE
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            parsed.source, if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
-            FiniteEngine.BACKTRACK, objective, maximize,
-        ))
         return Ingested(
-            lazy { invocation.finiteShape().problem.bake() },
+            lazy {
+                val operation = if (objective != null || parsed.source.embeddedObjectiveSense != null) {
+                    ExecutionOperation.OPTIMIZE
+                } else ExecutionOperation.SATISFY
+                val invocation = SourceSetup.prepare(SourceSetupRequest(
+                    parsed.source, operation, FiniteEngine.BACKTRACK, objective, maximize,
+                    boundCancellation = Cancellation { true },
+                ))
+                check(invocation.route is SourceProblemRoute.Finite) {
+                    "${file.name}: in-process benchmarks require finite source bounds; use the CLI for open models"
+                }
+                invocation.finiteShape().problem.bake()
+            },
             if (maximize) objective?.negated() else objective,
             parsed.sense == ObjectiveSense.MAXIMIZE,
         )
