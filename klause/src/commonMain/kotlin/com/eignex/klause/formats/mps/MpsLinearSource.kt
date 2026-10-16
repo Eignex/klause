@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.mps
 
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.LinearSourceIndicator
 import com.eignex.klause.ir.LinearSourceObjective
 import com.eignex.klause.ir.LinearSourceProblem
@@ -19,7 +20,14 @@ fun MpsModel.toLinearSourceProblem(
     cancellation: Cancellation = Cancellation.Never,
 ): LinearSourceProblem? {
     if (cancellation()) return null
-    val policy = semantics.resolve(semanticOverrides)
+    return captureLinearSource(semantics.resolve(semanticOverrides), cancellation)
+}
+
+internal fun MpsModel.captureLinearSource(
+    policy: EffectiveSourceSemantics,
+    cancellation: Cancellation,
+): LinearSourceProblem? {
+    if (cancellation()) return null
     val numbers = sourceNumbers()
     val bounds = effectiveVariableBounds(policy, numbers, cancellation) ?: return null
     val declarations = ArrayList<LinearSourceVariable>(variables.size)
