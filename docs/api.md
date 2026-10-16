@@ -87,8 +87,12 @@ unsupported objective coordinates decline before constructing an executor.
 For explicit finite orchestration, attach a canonical `Problem` with
 `SourceAttachment(problem, definitionHints, searchHints)` and call
 `SourceSetup.prepare(SourceSetupRequest(...))`. The request's `objective` uses original
-source direction and units; `maximize` records its sense. `PreparedSourceInvocation`
-retains the actual selected route, source plan and operation admission. Its
+source direction and units; `maximize` records its sense. Setup prefers exact arithmetic
+for pure-real models and for admitted linear integer objectives whose declared range
+exceeds binary64's exact integral range. Other finite models retain finite execution.
+The same policy serves SMT-LIB linear admission and source-strategy satisfaction;
+the SMT finite adapter retains the selected plan and its existing definition hints.
+`PreparedSourceInvocation` retains the actual selected route, source plan and operation admission. Its
 `finiteShape()` supplies the same captured plan to `FiniteSolveRequest` and
 `FinitePipeline.solve`; it does not select a second route. An explicit enumeration
 operation remains enumeration under a cap of one. Existing nonfinite entry points
@@ -98,7 +102,11 @@ These setup types are part of the experimental composition surface. Source array
 stay borrowed read-only, metadata containers are captured, and the returned shape
 retains that source lifetime. The caller still supplies the existing typed finite
 execution controls. Setup cancellation remains bound through later preparation and
-selected heuristic construction. Result and proof authority continue to come from
+selected heuristic construction. The LP-observing `prepare(request, onLpStats)` overload
+uses the same setup; cancellation observed by its callback prevents a runnable plan.
+Source-strategy satisfaction retains its separate polynomial installation cap within
+the containing allowance. Native optimization entries retain their existing execution
+surfaces and route controls. Result and proof authority continue to come from
 the installed component contracts and checked results.
 
 ### Objective admission

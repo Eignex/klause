@@ -47,8 +47,8 @@ slice deadline. Portfolio construction and the first search segment share the of
 segment deadline. ALNS bootstrap construction uses its shortened phase token; later
 bootstrap slices retain the containing lifetime scope and rearm their invocation clock.
 
-Source strategy routing charges sound bound closure and linear preparation to the
-containing invocation. A polynomial preparation cap applies only after the selected
+Source setup charges integral-objective interval inspection, sound bound closure and
+linear preparation to the containing invocation. A polynomial preparation cap applies only after the selected
 completion requires polynomial installation. A finite completion proved available
 by closure does not consume an unused polynomial phase allowance.
 

@@ -4,6 +4,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.util.Cancellation
 
 /** One operation binding over an attached source and its containing preparation allowance. */
@@ -49,7 +50,22 @@ class SourceSetupRequest(
 /** Captures one source route and retains its operation binding for execution. */
 object SourceSetup {
     /** Prepare from neutral source data without allocating heuristic worker state. */
-    fun prepare(request: SourceSetupRequest): PreparedSourceInvocation {
+    fun prepare(request: SourceSetupRequest): PreparedSourceInvocation = prepareObserved(request, null)
+
+    /** Prepare the same source binding while observing bound-probing LP work. */
+    fun prepare(request: SourceSetupRequest, onLpStats: (LpStats) -> Unit): PreparedSourceInvocation =
+        prepareObserved(request, onLpStats)
+
+    internal fun prepare(
+        request: SourceSetupRequest,
+        polynomialCancellation: Cancellation,
+    ): PreparedSourceInvocation = prepareObserved(request, null, polynomialCancellation)
+
+    private fun prepareObserved(
+        request: SourceSetupRequest,
+        onLpStats: ((LpStats) -> Unit)?,
+        polynomialCancellation: Cancellation = request.cancellation,
+    ): PreparedSourceInvocation {
         val stop = request.cancellation.encodingPreparationScope()
         val problem = request.source.problem
         val projections = (problem as? BakedProblem)?.factorProjections
@@ -60,6 +76,8 @@ object SourceSetup {
             maximize = request.maximize,
             boundCancellation = request.boundCancellation,
             preparationCancellation = stop,
+            polynomialCancellation = polynomialCancellation or stop,
+            onLpStats = onLpStats,
         )
         return PreparedSourceInvocation(request, route, stop)
     }

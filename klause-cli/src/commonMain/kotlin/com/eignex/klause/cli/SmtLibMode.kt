@@ -11,12 +11,15 @@ import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.pipelineRequest
-import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.symbolicRealValue
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.LpStats
@@ -24,7 +27,6 @@ import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
@@ -123,15 +125,21 @@ internal object SmtLibMode : CliMode {
             }
             var routingLpStats = LpStats()
             val routingStart = TimeSource.Monotonic.markNow()
-            val route = parsed.model.pipelineRoute(
-                objective = objective,
-                maximize = parsed.sense == ObjectiveSense.MAXIMIZE,
-                routePureRealToTheory = true,
-                routeLinearToTheory = objective?.requiresExactRoute(parsed.model) == true,
-                boundCancellation = common.routingCancellation(),
-                preparationCancellation = common.routingPreparationCancellation(),
+            val operation = when {
+                objective != null -> ExecutionOperation.OPTIMIZE
+                common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
+                else -> ExecutionOperation.SATISFY
+            }
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
+                    SourceAttachment(parsed.model), operation, common.resolvedEngine(),
+                    objective = objective, maximize = maximize,
+                    boundCancellation = common.routingCancellation(),
+                    cancellation = common.routingPreparationCancellation(),
+                ),
                 onLpStats = { routingLpStats = it },
             )
+            val route = invocation.route
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
             common.logRoute(route, routingElapsedMs)
             return when (route) {
@@ -145,6 +153,7 @@ internal object SmtLibMode : CliMode {
                     render,
                     routingLpStats = routingLpStats,
                     routingElapsedMs = routingElapsedMs,
+                    preparedRoute = route,
                 )
 
                 // An objective the descent can minimize goes to it; any other leaves the theory to local search.
@@ -217,25 +226,6 @@ private fun quadraticSmtSolvable(input: SmtLibInput.Quadratic, admissionElapsedM
         renderOpenTheoryModel(ints, bools, reals, assignment)
     }, admissionElapsedMs)
 }
-
-private fun LinearObjective.requiresExactRoute(model: Problem): Boolean {
-    if (realCoefficients.any { it != 0.0 } || boolWeights.any { it != 0L }) return false
-    var lower = bigIntOf(constant)
-    var upper = lower
-    for (v in intCoefficients.indices) {
-        val coefficient = intCoefficients[v]
-        if (coefficient == 0L) continue
-        val lo = model.intBounds.lowerAsBigInteger(v) ?: return true
-        val hi = model.intBounds.upperAsBigInteger(v) ?: return true
-        val c = bigIntOf(coefficient)
-        lower += c * if (coefficient > 0) lo else hi
-        upper += c * if (coefficient > 0) hi else lo
-    }
-    val limit = bigIntOf(EXACT_INTEGER_MAGNITUDE)
-    return lower < -limit || upper > limit
-}
-
-private const val EXACT_INTEGER_MAGNITUDE = 1L shl 53
 
 // An open model searched by local search alone, minimizing [objective] when there is one.
 @Suppress("LongParameterList")

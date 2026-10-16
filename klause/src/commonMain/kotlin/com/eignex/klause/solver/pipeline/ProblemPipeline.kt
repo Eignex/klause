@@ -181,9 +181,12 @@ internal fun Problem.pipelineRoute(
     maximize: Boolean,
     boundCancellation: Cancellation,
     preparationCancellation: Cancellation,
+    polynomialCancellation: Cancellation = preparationCancellation,
+    onLpStats: ((LpStats) -> Unit)? = null,
 ): SourceProblemRoute = pipelineRouteObserved(
-    objective, maximize, false, boundCancellation, null, false,
-    projections.providers, projections, polynomialCancellation = preparationCancellation,
+    objective, maximize, true, boundCancellation, onLpStats,
+    requiresExactObjectiveRoute(objective, preparationCancellation),
+    projections.providers, projections, polynomialCancellation = polynomialCancellation,
     preparationCancellation = preparationCancellation,
 )
 
