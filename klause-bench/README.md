@@ -1766,6 +1766,29 @@ contract remains separate from transitive callee effects, kernel return probes,
 task generation and live-read validation. Private reads, complete control flow,
 root census, clocks, code size and compiler savings remain unproved.
 
+`com.eignex.klause.bench.profile.NativeVmTaskCallFlowReview` accepts the same four
+fixed saved input URL/hash pairs. It rechecks the complete caller/source and
+canonical entry plan, then reads the pinned JVM library as file bytes. A private
+hash-pinned Capstone 5.0.6 provider runs with detail enabled, skip-data disabled
+and diet mode refused. The target JVM library is never loaded or invoked.
+
+Every fresh instruction must match the original address, bytes, mnemonic and
+operand text. Group IDs/names and typed register, immediate and memory operands
+are retained with every caller alias. Private provider and Python binding files
+are checked against the wheel before and after use. Bounds are 16 MiB per input,
+32 MiB for combined inputs, 32 MiB for output, 20,000 detailed instruction records and a
+90-second child allowance. Failures retain original inputs and partial diagnostics;
+an oversized derived inventory is explicitly withheld without a success claim.
+
+The normal linear model checks direct relative transfer encodings and targets,
+instruction boundaries and every incoming edge to a selected broker continuation.
+Indirect, prefixed, unsupported, incomplete or joined paths decline the guard.
+Complete detailed metadata does not require a successful linear guard. A sole
+incoming edge in this model proves no alternate native entry, transitive callee
+effects, dynamic return or global control flow. Native exclusive-entry and return
+probe authorization flags remain false, as do task generation/lifetime, private
+reads, kernel coverage, compiler roots, clocks, code size and saving claims.
+
 `com.eignex.klause.bench.profile.NativeVmTaskLifecycleAbiReview` accepts five
 saved URL/hash pairs: `context=`, `original-context=`, `layout=`, `entries=` and
 `additional-entries=`, each with its `-sha256` option. Inputs are bounded at 16 MiB

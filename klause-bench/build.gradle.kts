@@ -147,6 +147,18 @@ val checkNativeVmTaskCalls = tasks.register<Exec>("checkNativeVmTaskCalls") {
         "tools/review_native_vm_entry_abi.py", "tools/review_native_vm_dwarf_records.py")
 }
 
+val checkNativeVmTaskCallFlow = tasks.register<Exec>("checkNativeVmTaskCallFlow") {
+    group = "verification"
+    description = "Test detailed decoder records and conservative linear continuation entry guards."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_native_vm_task_call_flow.py")
+    inputs.files("tools/review_native_vm_task_call_flow.py", "tools/test_review_native_vm_task_call_flow.py",
+        "tools/review_native_vm_task_calls.py", "tools/review_native_vm_entry_abi.py",
+        "tools/review_native_vm_dwarf_records.py", "tools/read_native_vm_entries.py",
+        "tools/read_native_vm_symbols.py", "tools/native_vm_entry_decoder.py",
+        "tools/review_native_vm_entry_transfers.py")
+}
+
 val checkNativeVmEntryAbi = tasks.register<Exec>("checkNativeVmEntryAbi") {
     group = "verification"
     description = "Test saved canonical compiler entry and direct DWARF register bindings."
@@ -345,7 +357,8 @@ tasks.named("check") {
         checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkNativeVmEntryTransfers,
         checkNativeVmDebugImage, checkNativeVmDwarfProvider, checkNativeVmDwarfRecords,
         checkNativeVmDwarfRecordReview, checkNativeVmDwarfContext, checkNativeVmDwarfLayoutReview,
-        checkNativeVmEntryAbi, checkNativeVmTaskCalls, checkNativeVmTaskLifecycleAbi, checkNativeVmTaskGeneration,
+        checkNativeVmEntryAbi, checkNativeVmTaskCalls, checkNativeVmTaskCallFlow,
+        checkNativeVmTaskLifecycleAbi, checkNativeVmTaskGeneration,
         checkNativeVmTaskGenerationReview)
 }
 
