@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
@@ -406,6 +407,73 @@ class QfLraSystemTest {
             assertEquals(0, assertNotNull(lp.state).model.m)
             assertTrue(assertNotNull(lp.state).model.column(1).integral)
             assertFalse(assertNotNull(lp.state).model.column(0).integral)
+        }
+    }
+
+    @Test
+    fun `an unresolved guarded term should retain source columns without a numerical definition`() {
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0)
+        val source = source().withFactors(arrayOf(factor))
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp)
+
+            assertTrue(system.install())
+
+            assertEquals(2, assertNotNull(lp.state).model.n)
+            assertEquals(2, assertNotNull(lp.state).model.numVars)
+            assertEquals(0, assertNotNull(lp.state).model.m)
+        }
+    }
+
+    @Test
+    fun `a guarded definition should survive retraction while its strict bound retracts`() {
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 2.0), LinearOp.LE, 0.0, strict = true)
+        val source = source().withFactors(arrayOf(factor))
+        val form = factor.linearRows.single().exactForm(2)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            assertTrue(system.assertComparison(form.comparison(true) { false }, null, premise(0)))
+            val first = assertNotNull(assertNotNull(lp.solve()).exactPrimal)
+            assertTrue(first[0] + BigFraction.ofLong(2) * first[1] < BigFraction.ZERO)
+
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            session.push(SearchDecision.Bool(Lit.make(0, false)))
+            assertTrue(system.assertComparison(form.comparison(false) { false }, null,
+                SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(0, false)))))
+
+            val sibling = assertNotNull(assertNotNull(lp.solve()).exactPrimal)
+            assertTrue(sibling[0] + BigFraction.ofLong(2) * sibling[1] >= BigFraction.ZERO)
+            assertEquals(2, assertNotNull(lp.state).model.n)
+            assertEquals(1, assertNotNull(lp.state).model.m)
+            assertNull(lp.state?.activeSide(2, true))
+        }
+    }
+
+    @Test
+    fun `a deferred definition should retain the numerical row limit across siblings`() {
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0)
+        val source = source().withFactors(arrayOf(factor))
+        val form = factor.linearRows.single().exactForm(2)
+        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 0) }).use { lp ->
+            val system = LiveQfLraSystem(source, lp)
+            assertTrue(system.install())
+            for (truth in listOf(true, false)) {
+                assertTrue(lp.atLevel(1))
+
+                assertFalse(system.assertComparison(form.comparison(truth) { false }, null, axiom))
+
+                assertEquals(2, assertNotNull(lp.state).model.numVars)
+                assertEquals(0, assertNotNull(lp.state).model.m)
+                assertTrue(lp.atLevel(0))
+            }
         }
     }
 
