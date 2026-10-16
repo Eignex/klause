@@ -14,7 +14,7 @@ class SmtLibModeSetupTest(private val engine: String) {
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
-        fun engines(): List<String> = listOf("cp", "ls")
+        fun engines(): List<String> = listOf("cp", "ls", "alns", "mixed")
     }
 
     @Test
@@ -33,8 +33,12 @@ class SmtLibModeSetupTest(private val engine: String) {
             file.delete()
         }
 
+        val invocation = assertNotNull(solvable.finiteShape.sourceInvocation)
         val plan = solvable.finiteShape.preparedPlan
         val sample = Sample(BooleanArray(0), longArrayOf(2))
+        assertSame(invocation, solvable.sourceInvocation)
+        assertSame(invocation.finiteShape(), solvable.finiteShape)
+        assertSame(invocation.preparedPlan, plan)
         assertSame(assertNotNull(plan.componentPlan), solvable.finiteShape.componentPlan)
         assertEquals(11L, assertNotNull(plan.objective).evaluateLong(sample))
         assertEquals(-11L, assertNotNull(solvable.linearObjective).evaluateLong(sample))
