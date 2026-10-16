@@ -220,7 +220,7 @@ private fun checkedIntegralMpsFloat(compiled: MpsCompiled, sample: Sample): MpsS
         }
     }
     val witness = compiled.sourceWitnessOrNull(sample.ints, values, maxEntries = 32768) ?: return null
-    return witness.takeIf { it.objective == compiled.sourceObjective(sample.ints, sample.reals) }
+    return witness.takeIf { it.exact && it.objective == compiled.sourceObjective(sample.ints, sample.reals) }
 }
 
 /** Render an MPS solution line: `v name=value` per column, each value from the exact source witness. */
