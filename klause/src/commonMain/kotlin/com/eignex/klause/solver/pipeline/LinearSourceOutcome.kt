@@ -72,21 +72,27 @@ internal fun PreparedLinearSource.check(sample: Sample, stop: Cancellation): Lin
         } else {
             val id = Term.realVar(reference)
             if (id >= sample.numRealVars) return LinearSourceCheck.Rejected
-            when {
-                sample.exactReals != null -> sample.exactReals[id]
-                sample.algebraicReals != null -> sample.algebraicReals[id].linearRational()
-                sample.symbolicReals != null -> sample.symbolicReals[id].algebraic?.linearRational()
-                else -> BigFraction.ofDouble(sample.approximateRealValue(id))
-            } ?: return LinearSourceCheck.Declined
+            sample.linearSourceReal(id) ?: return LinearSourceCheck.Declined
         }
         values += value
     }
     return checkLinearSourceWitness(view.source, values, stop)
 }
 
-private fun PreparedLinearSource.check(assignment: OpenTheoryAssignment, stop: Cancellation): LinearSourceCheck {
+internal fun PreparedLinearSource.check(assignment: OpenTheoryAssignment, stop: Cancellation): LinearSourceCheck {
     if (assignment is OpenTheoryAssignment.Sampled) return check(assignment.sample, stop)
     if (assignment is OpenTheoryAssignment.Difference) return check(assignment.sample, stop)
+    var realAssignment = assignment
+    while (realAssignment is OpenTheoryAssignment.Rebuilt) {
+        stop.charge(1L)
+        if (stop()) return LinearSourceCheck.Declined
+        realAssignment = realAssignment.base
+    }
+    val realSample = when (realAssignment) {
+        is OpenTheoryAssignment.Sampled -> realAssignment.sample
+        is OpenTheoryAssignment.Difference -> realAssignment.sample
+        else -> null
+    }
     val values = ArrayList<BigFraction>(view.columns.size)
     for (reference in view.columns) {
         stop.charge(1L)
@@ -94,12 +100,18 @@ private fun PreparedLinearSource.check(assignment: OpenTheoryAssignment, stop: C
         val value = if (Term.isInt(reference)) {
             BigFraction.of(parseBigInt(assignment.intValue(Term.intVar(reference))), BIG_ONE)
         } else {
-            val algebraic = assignment.algebraicRealValue(Term.realVar(reference))
+            val id = Term.realVar(reference)
+            if (realSample != null) {
+                if (id >= realSample.numRealVars) return LinearSourceCheck.Rejected
+                values += realSample.linearSourceReal(id) ?: return LinearSourceCheck.Declined
+                continue
+            }
+            val algebraic = realAssignment.algebraicRealValue(id)
             if (algebraic != null) {
                 values += algebraic.linearRational() ?: return LinearSourceCheck.Declined
                 continue
             }
-            val text = assignment.realValue(Term.realVar(reference))
+            val text = realAssignment.realValue(id)
             val parts = text.split('/')
             if (parts.size !in 1..2 || parts.any { !it.matches(Regex("-?[0-9]+")) }) {
                 return LinearSourceCheck.Declined
@@ -109,6 +121,13 @@ private fun PreparedLinearSource.check(assignment: OpenTheoryAssignment, stop: C
         values += value
     }
     return checkLinearSourceWitness(view.source, values, stop)
+}
+
+private fun Sample.linearSourceReal(id: Int): BigFraction? = when {
+    exactReals != null -> exactReals[id]
+    algebraicReals != null -> algebraicReals[id].linearRational()
+    symbolicReals != null -> symbolicReals[id].rational ?: symbolicReals[id].algebraic?.linearRational()
+    else -> BigFraction.ofDouble(approximateRealValue(id))
 }
 
 private fun AlgebraicReal.linearRational(): BigFraction? {

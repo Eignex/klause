@@ -187,6 +187,11 @@ private fun sourceRouteName(route: SourceProblemRoute): String = when (route) {
 
 /** A concrete solve pipeline, selected before [SolveCore] starts its finite CP loop. */
 internal sealed interface SolvablePipeline {
+    data class LinearSource(
+        val invocation: PreparedSourceInvocation,
+        val render: (com.eignex.klause.solver.validation.LinearSourceWitness) -> String,
+    ) : SolvablePipeline
+
     data class NativeSource(val invocation: PreparedSourceInvocation, val render: (OpenTheoryAssignment) -> String) :
         SolvablePipeline
 
