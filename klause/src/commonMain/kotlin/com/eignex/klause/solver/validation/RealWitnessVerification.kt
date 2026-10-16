@@ -27,6 +27,9 @@ import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
 
 internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification<Sample, Unit> {
+    if (model.factors.any { it is Distinct } &&
+        (sample.numIntVars != model.numIntVars || sample.numBoolVars != model.numBoolVars)
+    ) return Verification.Rejected("assignment does not cover distinct operand coordinates")
     for ((id, factor) in model.factors.withIndex()) {
         if (factor !is Abs && factor !is AffineAbs &&
             !(factor is Distinct && factor.variables.reals.isEmpty())

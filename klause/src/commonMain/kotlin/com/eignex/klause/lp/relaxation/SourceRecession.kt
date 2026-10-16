@@ -222,6 +222,7 @@ private fun Distinct.keeps(point: Sample, direction: List<BigFraction>): Boolean
             val rate = rates[first] - rates[second]
             if (wanted) {
                 if (difference.isZero || (!rate.isZero && rate.signum() != difference.signum())) return false
+            // A finite set of affine collisions covers a ray only if a collision is permanent.
             } else if (difference.isZero && rate.isZero) return true
         }
     }
