@@ -329,6 +329,16 @@ atom's original left-minus-right sign and relation. Formula evaluation preserves
 Boolean references and arbitrary `Not`, `And` and `Or` structure. Source parsing
 and frontend routing remain caller responsibilities.
 
+Before projection, the existing bounded probe prefix first checks signs implied by
+unconditional conjunctive atoms. Unary comparisons against zero restrict coordinate
+signs; coefficient signs, monomial parity and exact sign addition/multiplication
+then enclose each polynomial's possible signs. A relation disjoint from that enclosure
+refutes the conjunction. Opposite-sign sums retain cancellation, and non-strict
+premises retain zero. Boolean alternatives supply no unconditional sign premises.
+This check shares the witness producer's coordinate, atom, term and native-work limits;
+a decline retains spent work and leaves witness probing and complete CAD available.
+It introduces no coordinate bounds or finite domains and exports no proof artifact.
+
 Before projection, bounded witness probing checks complete exact points and can
 repair one coordinate at a time using roots of an equality specialized at all other
 coordinates. Repaired points can guide later repairs even when the full check fails.
