@@ -3,12 +3,14 @@ package com.eignex.klause.presolve
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.model.PbOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -25,6 +27,19 @@ class LinearSpecializationTest {
         }
 
         assertNull(factor.equivalentPseudoBoolean())
+    }
+
+    @Test
+    fun `unsafe Boolean residuals should decline through direct and delegated source views`() {
+        val sources = listOf(
+            PseudoBoolean(longArrayOf(Long.MIN_VALUE), intArrayOf(Lit.make(0, false)), PbOp.GE, 0),
+            PseudoBoolean(longArrayOf(1), intArrayOf(Lit.make(0, true)), PbOp.LE, Long.MIN_VALUE),
+        )
+        for (source in sources) {
+            for (factor in listOf(source, object : Factor by source {})) {
+                assertNull(factor.equivalentPseudoBoolean())
+            }
+        }
     }
 
     @Test
