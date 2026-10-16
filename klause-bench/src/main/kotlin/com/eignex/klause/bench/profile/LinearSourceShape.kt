@@ -56,6 +56,7 @@ internal object LinearSourceShape {
         val parsingNs = System.nanoTime() - started
         val model = parsed.model
         val exactRows = model.factors.filterIsInstance<ExactLinear>()
+        val activatedRows = exactRows.filter { it.activator != LinearRow.ALWAYS }
         val predicates = HashSet<StructuralKey>()
         for (row in exactRows) {
             val constants = row.constants
@@ -87,6 +88,12 @@ internal object LinearSourceShape {
                     .forEach { (kind, count) -> put(kind, count) }
             })
             put("exactRows", exactRows.size)
+            put("exactRowTerms", exactRows.sumOf { it.size.toLong() })
+            put("activatedExactRows", activatedRows.size)
+            put("activatedExactRowTerms", activatedRows.sumOf { it.size.toLong() })
+            put("rawExactPredicateEntries", model.numBoolVars.toLong() + model.numIntVars + model.numRealVars +
+                activatedRows.sumOf { it.size.toLong() + 1L })
+            put("entryScope", "Raw source coordinates and activated exact rows; not an internal admission trace")
             put("constantExactRows", exactRows.count { it.size == 0 })
             put("unconditionalExactRows", exactRows.count { it.activator == LinearRow.ALWAYS })
             put("distinctExactPredicatesIgnoringActivators", predicates.size)
