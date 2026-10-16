@@ -42,13 +42,13 @@ class MpsLinearSourceTest {
         val source = assertNotNull(parsed.toLinearSourceProblem())
 
         assertEquals(NumericAuthority.DECIMAL_LITERALS, source.semantics.declared.numericAuthority)
-        assertEquals(BigFraction.of(BIG_ONE, bigIntOf(5)), source.rows.single().terms.single().coefficient)
-        assertEquals(BigFraction.of(bigIntOf(3), bigIntOf(10)), source.rows.single().lower)
+        assertEquals(SemanticRational.of(BIG_ONE, bigIntOf(5)), source.rows.single().terms.single().coefficient)
+        assertEquals(SemanticRational.of(bigIntOf(3), bigIntOf(10)), source.rows.single().lower)
         assertNull(source.rows.single().upper)
         val objective = assertNotNull(source.objective)
         assertEquals(ObjectiveSense.MAXIMIZE, objective.sense)
-        assertEquals("9007199254740993", objective.terms.single().coefficient.toString())
-        assertEquals(BigFraction.of(bigIntOf(-7), bigIntOf(10)), objective.constant)
+        assertEquals(SemanticRational.of(parseBigInt("9007199254740993")), objective.terms.single().coefficient)
+        assertEquals(SemanticRational.of(bigIntOf(-7), bigIntOf(10)), objective.constant)
         assertEquals(mapOf("X" to 0), source.realVarNames)
     }
 
@@ -67,12 +67,12 @@ class MpsLinearSourceTest {
 
         val source = assertNotNull(parsed.toLinearSourceProblem(overrides))
 
-        assertEquals(BigFraction.ofLong(Long.MIN_VALUE), source.variables[0].lower)
-        assertEquals(BigFraction.ofLong(Long.MAX_VALUE), source.variables[0].upper)
-        assertEquals(BigFraction.of(BIG_ONE, bigIntOf(3)), source.variables[1].lower)
+        assertEquals(SemanticRational.ofLong(Long.MIN_VALUE), source.variables[0].lower)
+        assertEquals(SemanticRational.ofLong(Long.MAX_VALUE), source.variables[0].upper)
+        assertEquals(third, source.variables[1].lower)
         assertNull(source.variables[1].upper)
-        assertEquals(BigFraction.ZERO, source.variables[2].lower)
-        assertEquals(BigFraction.ofLong(5), source.variables[2].upper)
+        assertEquals(SemanticRational.ZERO, source.variables[2].lower)
+        assertEquals(SemanticRational.ofLong(5), source.variables[2].upper)
         assertEquals(mapOf("I" to 0), source.intVarNames)
         assertEquals(mapOf("X" to 0, "Y" to 1), source.realVarNames)
         assertEquals(0.0, parsed.variables[1].lower)
@@ -89,7 +89,7 @@ class MpsLinearSourceTest {
 
         val source = assertNotNull(parsed.toLinearSourceProblem(overrides))
 
-        assertEquals(BigFraction.of(bound.numerator, bound.denominator), source.variables[0].upper)
+        assertEquals(bound, source.variables[0].upper)
         assertNull(source.variables[1].upper)
     }
 
@@ -101,11 +101,12 @@ class MpsLinearSourceTest {
         parsed.objective.coeffs[0] = 7.0
         parsed.constraints[0].coeffs[0] = 9.0
 
-        assertEquals(BigFraction.of(BIG_ONE, bigIntOf(10)), assertNotNull(source.objective).terms.single().coefficient)
-        assertEquals(BigFraction.of(BIG_ONE, bigIntOf(5)), source.rows.single().terms.single().coefficient)
+        assertEquals(SemanticRational.of(BIG_ONE, bigIntOf(10)),
+            assertNotNull(source.objective).terms.single().coefficient)
+        assertEquals(SemanticRational.of(BIG_ONE, bigIntOf(5)), source.rows.single().terms.single().coefficient)
         val edited = assertNotNull(parsed.toLinearSourceProblem())
-        assertEquals(BigFraction.ofLong(7), assertNotNull(edited.objective).terms.single().coefficient)
-        assertEquals(BigFraction.ofLong(9), edited.rows.single().terms.single().coefficient)
+        assertEquals(SemanticRational.ofLong(7), assertNotNull(edited.objective).terms.single().coefficient)
+        assertEquals(SemanticRational.ofLong(9), edited.rows.single().terms.single().coefficient)
     }
 
     @Test
@@ -120,7 +121,7 @@ class MpsLinearSourceTest {
 
         val row = source.rows.single()
         assertEquals(listOf(1, 1), row.terms.map { it.column })
-        assertEquals(listOf(BigFraction.ONE, BigFraction.MINUS_ONE), row.terms.map { it.coefficient })
+        assertEquals(listOf(SemanticRational.ONE, SemanticRational.ofLong(-1)), row.terms.map { it.coefficient })
         assertEquals(0, assertNotNull(row.indicator).column)
         assertEquals(false, assertNotNull(row.indicator).whenOne)
         assertNull(source.objective)
@@ -137,8 +138,8 @@ class MpsLinearSourceTest {
 
         assertEquals(policies, sources.map { it.semantics.effective.feasibilityTolerance })
         for (source in sources) {
-            assertEquals(BigFraction.of(BIG_ONE, bigIntOf(5)), source.rows.single().terms.single().coefficient)
-            assertEquals(BigFraction.of(bigIntOf(3), bigIntOf(10)), source.rows.single().lower)
+            assertEquals(SemanticRational.of(BIG_ONE, bigIntOf(5)), source.rows.single().terms.single().coefficient)
+            assertEquals(SemanticRational.of(bigIntOf(3), bigIntOf(10)), source.rows.single().lower)
         }
     }
 
@@ -151,7 +152,8 @@ class MpsLinearSourceTest {
         val captured = assertNotNull(source.toLinearSourceProblem())
 
         assertEquals(source.semantics.numericAuthority, captured.semantics.declared.numericAuthority)
-        assertEquals(BigFraction.ofDouble(0.1), assertNotNull(captured.objective).terms.single().coefficient)
+        val coefficient = assertNotNull(captured.objective).terms.single().coefficient
+        assertEquals(BigFraction.ofDouble(0.1), BigFraction.of(coefficient.numerator, coefficient.denominator))
     }
 
     @Test
