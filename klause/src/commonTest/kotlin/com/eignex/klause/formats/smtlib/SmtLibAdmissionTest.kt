@@ -206,7 +206,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `nested and zero arity helper references should retain lexical fallback`() {
+    fun `nested and zero arity helper references should lower from one captured source`() {
         for ((definition, assertion) in listOf(
             "(define-fun f ((y Real)) Real (+ y 1))" to "(= (f x) 2)",
             "(define-fun f ((y Real)) Real (+ y 1)) (define-fun g ((y Real)) Real (f y))" to
@@ -222,7 +222,7 @@ class SmtLibAdmissionTest {
 
             val source = assertIs<SmtLibInput.Polynomial>(input).problem
             assertEquals(mapOf("x" to 0), source.realVarNames)
-            assertEquals(2, opens)
+            assertEquals(1, opens)
         }
     }
 
@@ -263,54 +263,49 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `polynomial fallback should close its rejected source before reopening`() {
+    fun `polynomial admission should open and close its source once`() {
         val text = "(declare-const x Real) (assert (= (* x x) 2)) (check-sat)"
         var opens = 0
-        var firstClosed = false
+        var closes = 0
 
         val input = SmtLibAdmission.parse({
             opens++
-            if (opens == 1) {
-                val source = StringCharSource(text)
-                object : CharSource, AutoCloseable {
-                    override fun next(): String? = source.next()
-                    override fun close() {
-                        firstClosed = true
-                    }
+            check(opens == 1)
+            val source = StringCharSource(text)
+            object : CharSource, AutoCloseable {
+                override fun next(): String? = source.next()
+                override fun close() {
+                    closes++
                 }
-            } else {
-                assertTrue(firstClosed)
-                StringCharSource(text)
             }
         })
 
         assertIs<SmtLibInput.Polynomial>(input)
-        assertEquals(2, opens)
+        assertEquals(1, opens)
+        assertEquals(1, closes)
     }
 
     @Test
-    fun `fallback should drain a source without a close contract before reopening`() {
+    fun `polynomial admission should exhaust its non closeable source once`() {
         var opens = 0
-        var firstExhausted = false
+        var exhausted = false
 
         val input = SmtLibAdmission.parse({
             opens++
-            if (opens == 1) {
-                val chunks = ArrayDeque(
-                    listOf("(declare-const x Real) (assert (= (* x x) 2))", "(check-sat)"),
-                )
-                object : CharSource {
-                    override fun next(): String? = chunks.removeFirstOrNull().also {
-                        if (it == null) firstExhausted = true
-                    }
+            check(opens == 1)
+            val chunks = ArrayDeque(
+                listOf("(declare-const x Real) (assert (= (* x x) 2))", "(check-sat)"),
+            )
+            object : CharSource {
+                override fun next(): String? = chunks.removeFirstOrNull().also {
+                    if (it == null) exhausted = true
                 }
-            } else {
-                assertTrue(firstExhausted)
-                StringCharSource("(declare-const x Real) (assert (= (* x x) 2)) (check-sat)")
             }
         })
 
         assertIs<SmtLibInput.Polynomial>(input)
+        assertEquals(1, opens)
+        assertTrue(exhausted)
     }
 
     @Test
@@ -376,12 +371,12 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `work exhaustion in lexical fallback should close the source without publishing metadata`() {
+    fun `work exhaustion during source capture should close once without publishing metadata`() {
         var opens = 0
         var closes = 0
         var charged = 0L
         val cancellation = object : Cancellation {
-            override fun isCancelled(): Boolean = opens == 2 && charged >= 1
+            override fun isCancelled(): Boolean = charged >= 1
             override fun workMeter(): WorkMeter = WorkMeter { charged += it }
         }
 
@@ -403,9 +398,108 @@ class SmtLibAdmissionTest {
         )
 
         assertEquals(SmtLibInput.Interrupted, input)
-        assertEquals(2, opens)
-        assertEquals(2, closes)
+        assertEquals(1, opens)
+        assertEquals(1, closes)
         assertEquals(1L, charged)
+    }
+
+    @Test
+    fun `polynomial admission should retain the original commands when a factory cannot replay them`() {
+        var opens = 0
+
+        val input = SmtLibAdmission.parse({
+            opens++
+            StringCharSource(if (opens == 1) {
+                "(declare-const x Real) (assert (= (* x x) 2)) (check-sat)"
+            } else "(assert false) (check-sat)")
+        })
+
+        val source = assertIs<SmtLibInput.Polynomial>(input).problem
+        assertEquals(mapOf("x" to 0), source.realVarNames)
+        assertEquals(1, opens)
+    }
+
+    @Test
+    fun `malformed source syntax should close once without retrying`() {
+        var opens = 0
+        var closes = 0
+
+        assertFailsWith<UnsupportedSmtException> {
+            SmtLibAdmission.parse({
+                opens++
+                check(opens == 1)
+                val source = StringCharSource(")")
+                object : CharSource, AutoCloseable {
+                    override fun next(): String? = source.next()
+                    override fun close() {
+                        closes++
+                    }
+                }
+            })
+        }
+        assertEquals(1, opens)
+        assertEquals(1, closes)
+    }
+
+    @Test
+    fun `an observed transient cancellation should not drain a non closeable source`() {
+        var opens = 0
+        var reads = 0
+        var observed = false
+        val cancellation = Cancellation {
+            (reads == 1 && !observed).also { if (it) observed = true }
+        }
+
+        val input = SmtLibAdmission.parse(
+            {
+                opens++
+                object : CharSource {
+                    override fun next(): String? {
+                        reads++
+                        check(reads == 1)
+                        return "(declare-const x Real)"
+                    }
+                }
+            },
+            cancellation = cancellation,
+        )
+
+        assertEquals(SmtLibInput.Interrupted, input)
+        assertEquals(1, opens)
+        assertEquals(1, reads)
+    }
+
+    @Test
+    fun `work exhaustion after source capture should withhold metadata without reopening`() {
+        var opens = 0
+        var closes = 0
+        var loweringWork = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = loweringWork > 0
+            override fun workMeter(): WorkMeter = WorkMeter { if (closes != 0) loweringWork += it }
+        }
+
+        val input = SmtLibAdmission.parse(
+            {
+                opens++
+                val source = StringCharSource(
+                    "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) " +
+                        "(assert (= (f x) 2)) (check-sat)",
+                )
+                object : CharSource, AutoCloseable {
+                    override fun next(): String? = source.next()
+                    override fun close() {
+                        closes++
+                    }
+                }
+            },
+            cancellation = cancellation,
+        )
+
+        assertEquals(SmtLibInput.Interrupted, input)
+        assertEquals(1, opens)
+        assertEquals(1, closes)
+        assertTrue(loweringWork > 0)
     }
 
     @Test

@@ -16,6 +16,7 @@ import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
+import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.pipeline.requiresPolynomialCompletion
 import com.eignex.klause.util.Cancellation
@@ -79,9 +80,9 @@ object SmtLibAdmission {
     )
 
     /**
-     * Admit a streamed source. [openSource] must recreate the same input for each attempted lowering.
-     * A closeable source is closed after each attempt; a non-closeable one is drained to its end instead.
-     * Cancellation stops draining and prevents reopening.
+     * Open and parse one streamed source, retaining its commands through source lowering.
+     * A closeable source is closed once; a non-closeable one is drained to its end instead.
+     * Cancellation stops draining and withholds admission.
      */
     fun parse(
         openSource: () -> CharSource,
@@ -94,25 +95,26 @@ object SmtLibAdmission {
         val semantics = resolveSmtLibSemantics(unboundedIntLo, unboundedIntHi, semanticOverrides)
         if (cancellation()) return SmtLibInput.Interrupted
         return try {
-            val result = try {
-                val linear = withSource(openSource, cancellation) { source ->
-                    parseLinearAdmission(
-                        AdmissionSource(source, cancellation),
-                        unboundedIntLo,
-                        unboundedIntHi,
-                        settings,
-                        cancellation,
-                        semantics,
-                    )
+            val commands = withSource(openSource, cancellation) { source ->
+                val reader = SExprReader(AdmissionSource(source, cancellation))
+                val commands = ArrayList<SExpr>()
+                while (true) {
+                    cancellation.polynomialSourceCheckpoint()
+                    commands.add(reader.readCommandOrNull() ?: break)
                 }
+                commands
+            }
+            val result = try {
+                val linear = parseLinearAdmission(
+                    commands, unboundedIntLo, unboundedIntHi, settings, cancellation, semantics,
+                )
                 SmtLibInput.Linear(linear)
             } catch (_: UnsupportedSmtException) {
                 if (cancellation()) throw PolynomialSourceInterrupted()
-                val polynomial = withSource(openSource, cancellation) { source ->
-                    SmtLibPolynomial.parse(
-                        source, cancellation, allowIntegers = true, allowFunctions = true, semantics = semantics,
-                    )
-                }
+                val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers = true,
+                    allowFunctions = true, semantics = semantics)
+                for (command in commands) compiler.command(command)
+                val polynomial = compiler.build()
                 if (polynomial.transcendental != null) SmtLibInput.Transcendental(polynomial.transcendental)
                 else {
                 val source = if (polynomial.intVarNames.isNotEmpty()) {
@@ -150,7 +152,7 @@ private class AdmissionSource(private val source: CharSource, private val cancel
 }
 
 private fun parseLinearAdmission(
-    source: CharSource,
+    commands: List<SExpr>,
     unboundedIntLo: Long,
     unboundedIntHi: Long,
     settings: ProblemSettings,
@@ -159,7 +161,6 @@ private fun parseLinearAdmission(
 ): SmtLibProblem {
     val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds = false, settings = settings,
         sourceCancellation = cancellation, semantics = semantics)
-    val reader = SExprReader(source)
     val scope = SmtLibScope(cancellation)
     val declarations = ArrayList<SExpr>()
     var integerHelpers = false
@@ -171,8 +172,7 @@ private fun parseLinearAdmission(
     var functionSyntax = false
     var signedSymbols = false
     var quadraticObjective = false
-    while (true) {
-        val command = reader.readCommandOrNull() ?: break
+    for (command in commands) {
         if (!scope.command(command)) smtUnsupported("source symbol is outside its lexical scope")
         builder.command(command)
         nonlinearSyntax = nonlinearSyntax || hasNonlinearSyntax(command, cancellation)
@@ -317,10 +317,12 @@ private fun <T> withSource(
     val source = openSource()
     var interrupted = false
     val outcome = try {
-        runCatching { read(source) }
+        runCatching { read(source) }.also {
+            if (it.exceptionOrNull() is PolynomialSourceInterrupted) interrupted = true
+        }
     } finally {
         if (source is AutoCloseable) source.close()
-        else while (true) {
+        else while (!interrupted) {
             if (cancellation()) {
                 interrupted = true
                 break
