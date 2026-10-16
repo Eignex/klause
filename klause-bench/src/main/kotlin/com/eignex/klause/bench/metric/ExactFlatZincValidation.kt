@@ -163,6 +163,10 @@ internal object ExactFlatZincValidation {
             val end = text.indexOf(')')
             require(end >= 0) { "unsupported predicate syntax" }
             val args = split(text.substringAfter('(').substringBefore(')')).map { resolve(it) }
+            if (name == "redundant_constraint" || name == "symmetry_breaking_constraint") {
+                require(args.size == 1) { "annotation wrapper arity" }
+                return boolean(args.single())
+            }
             if (name == "bool_clause") {
                 require(args.size == 2)
                 return array(args[0]).any { boolean(it) } || array(args[1]).any { !boolean(it) }
