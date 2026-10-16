@@ -249,7 +249,9 @@ private fun minimizePolynomial(
         result
     } else {
         when (result) {
-        is MinimizeResult.WithSample -> MinimizeResult.BestFound(result.sample, result.objective, reason, result.stats)
+        is MinimizeResult.WithSample -> MinimizeResult.BestFound(
+            result.sample, result.objective, reason, result.stats,
+        )
         else -> MinimizeResult.Unknown(reason, result.stats)
     }
     }

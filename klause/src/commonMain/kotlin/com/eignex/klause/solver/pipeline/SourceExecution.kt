@@ -119,22 +119,19 @@ class SourceExecutionRequest private constructor(
 }
 
 /** Streaming publications retain their native source-coordinate and exact-value contracts. */
-class SourceExecutionCallbacks private constructor(
+class SourceExecutionCallbacks(
     /** Finite source samples and portfolio improvements. */
-    val finite: FiniteSolveCallbacks,
+    val finite: FiniteSolveCallbacks = FiniteSolveCallbacks({}, {}),
     /** Checked exact linear or heuristic source improvements. */
-    val onLinearIncumbent: ((SourceIncumbentPublication) -> Unit)?,
+    val onLinearIncumbent: ((SourceIncumbentPublication) -> Unit)? = null,
     /** Checked exact polynomial source improvements, including algebraic values. */
-    val onQuadraticIncumbent: ((QuadraticIncumbentPublication) -> Unit)?,
-    /** Checked original-unit linear point, emitted before its ordinary engine callback. */
-    val onLinearSourceIncumbent: ((com.eignex.klause.solver.validation.LinearSourceWitness) -> Unit)?,
+    val onQuadraticIncumbent: ((QuadraticIncumbentPublication) -> Unit)? = null,
 ) {
-    /** Retain existing finite and native arithmetic publications. */
-    constructor(
-        finite: FiniteSolveCallbacks = FiniteSolveCallbacks({}, {}),
-        onLinearIncumbent: ((SourceIncumbentPublication) -> Unit)? = null,
-        onQuadraticIncumbent: ((QuadraticIncumbentPublication) -> Unit)? = null,
-    ) : this(finite, onLinearIncumbent, onQuadraticIncumbent, null)
+    private var sourceIncumbent: ((com.eignex.klause.solver.validation.LinearSourceWitness) -> Unit)? = null
+
+    /** Checked original-unit linear point, emitted before its ordinary engine callback. */
+    val onLinearSourceIncumbent: ((com.eignex.klause.solver.validation.LinearSourceWitness) -> Unit)?
+        get() = sourceIncumbent
 
     /** Observe original declaration coordinates and source-unit values after source checking. */
     constructor(
@@ -142,7 +139,9 @@ class SourceExecutionCallbacks private constructor(
         finite: FiniteSolveCallbacks = FiniteSolveCallbacks({}, {}),
         onLinearIncumbent: ((SourceIncumbentPublication) -> Unit)? = null,
         onQuadraticIncumbent: ((QuadraticIncumbentPublication) -> Unit)? = null,
-    ) : this(finite, onLinearIncumbent, onQuadraticIncumbent, onLinearSourceIncumbent)
+    ) : this(finite, onLinearIncumbent, onQuadraticIncumbent) {
+        sourceIncumbent = onLinearSourceIncumbent
+    }
 }
 
 /** Native result of a source operation; adapters retain every producing mechanism's payload. */
@@ -259,6 +258,7 @@ fun SourceSetup.execute(
 private fun executeCapturedSource(
     request: SourceExecutionRequest,
     callbacks: SourceExecutionCallbacks,
+    bindScope: ((Cancellation) -> Unit)? = null,
 ): SourceExecutionResult {
     val invocation = request.invocation
     val kind = SourceSetup.executionKind(invocation)
@@ -290,6 +290,7 @@ private fun executeCapturedSource(
                 ?: throw PipelineConfigException("finite source execution requires its typed finite controls")
             require(finite.shape === shape) { "finite execution belongs to a different source invocation" }
             invocation.requireFiniteExecution(finite.shape, finite.engine, finite.operation)
+            bindScope?.invoke(finite.cancellation or Cancellation { finite.deadlineExceeded() })
             SourceExecutionResult.Finite(invocation, FinitePipeline.solve(finite, callbacks.finite))
         }
 
@@ -311,19 +312,22 @@ private fun executeCapturedSource(
         }
 
         is SourceProblemRoute.PolynomialTheory -> {
+            val prepared = if (invocation.linearSource == null) route.request else PolynomialTheoryRequest(
+                route.request.problem, route.preparedPlan.linearWorkingPlan(),
+            )
             val params = request.polynomial.boundTo(invocation)
             val objective = invocation.workingLinearObjective
             if (objective == null) {
                 SourceExecutionResult.Polynomial(
                     invocation,
-                    OpenTheoryPipeline.execute(route.request, params, engine, request.cores),
+                    OpenTheoryPipeline.execute(prepared, params, engine, request.cores),
                 )
             } else {
                 val sense = if (invocation.maximizeSourceObjective) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
                 SourceExecutionResult.Quadratic(
                     invocation,
                     OpenTheoryPipeline.optimize(
-                        route.request,
+                        prepared,
                         objective,
                         params,
                         engine,

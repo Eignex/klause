@@ -633,6 +633,21 @@ final enum class com.eignex.klause.solver.pipeline/IntVariableOwner : kotlin/Enu
     final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/IntVariableOwner> // com.eignex.klause.solver.pipeline/IntVariableOwner.values|values#static(){}[0]
 }
 
+final enum class com.eignex.klause.solver.pipeline/LinearSourceConclusion : kotlin/Enum<com.eignex.klause.solver.pipeline/LinearSourceConclusion> { // com.eignex.klause.solver.pipeline/LinearSourceConclusion|null[0]
+    enum entry LIMIT // com.eignex.klause.solver.pipeline/LinearSourceConclusion.LIMIT|null[0]
+    enum entry OPTIMAL // com.eignex.klause.solver.pipeline/LinearSourceConclusion.OPTIMAL|null[0]
+    enum entry SATISFIABLE // com.eignex.klause.solver.pipeline/LinearSourceConclusion.SATISFIABLE|null[0]
+    enum entry UNBOUNDED // com.eignex.klause.solver.pipeline/LinearSourceConclusion.UNBOUNDED|null[0]
+    enum entry UNKNOWN // com.eignex.klause.solver.pipeline/LinearSourceConclusion.UNKNOWN|null[0]
+    enum entry UNSATISFIABLE // com.eignex.klause.solver.pipeline/LinearSourceConclusion.UNSATISFIABLE|null[0]
+
+    final val entries // com.eignex.klause.solver.pipeline/LinearSourceConclusion.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.pipeline/LinearSourceConclusion> // com.eignex.klause.solver.pipeline/LinearSourceConclusion.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver.pipeline/LinearSourceConclusion // com.eignex.klause.solver.pipeline/LinearSourceConclusion.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/LinearSourceConclusion> // com.eignex.klause.solver.pipeline/LinearSourceConclusion.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.solver.pipeline/OpenBranching : kotlin/Enum<com.eignex.klause.solver.pipeline/OpenBranching> { // com.eignex.klause.solver.pipeline/OpenBranching|null[0]
     enum entry Activity // com.eignex.klause.solver.pipeline/OpenBranching.Activity|null[0]
     enum entry Automatic // com.eignex.klause.solver.pipeline/OpenBranching.Automatic|null[0]
@@ -667,6 +682,7 @@ final enum class com.eignex.klause.solver.pipeline/PreparedExecutionKind : kotli
     enum entry DECLINED // com.eignex.klause.solver.pipeline/PreparedExecutionKind.DECLINED|null[0]
     enum entry FINITE_LINEAR // com.eignex.klause.solver.pipeline/PreparedExecutionKind.FINITE_LINEAR|null[0]
     enum entry NONLINEAR_INTEGER // com.eignex.klause.solver.pipeline/PreparedExecutionKind.NONLINEAR_INTEGER|null[0]
+    enum entry NUMERICAL // com.eignex.klause.solver.pipeline/PreparedExecutionKind.NUMERICAL|null[0]
     enum entry POLYNOMIAL // com.eignex.klause.solver.pipeline/PreparedExecutionKind.POLYNOMIAL|null[0]
     enum entry TRANSCENDENTAL // com.eignex.klause.solver.pipeline/PreparedExecutionKind.TRANSCENDENTAL|null[0]
 
@@ -724,6 +740,7 @@ final enum class com.eignex.klause.solver.pipeline/SourceExecutionKind : kotlin/
     enum entry HEURISTIC // com.eignex.klause.solver.pipeline/SourceExecutionKind.HEURISTIC|null[0]
     enum entry LINEAR // com.eignex.klause.solver.pipeline/SourceExecutionKind.LINEAR|null[0]
     enum entry NONLINEAR_INTEGER // com.eignex.klause.solver.pipeline/SourceExecutionKind.NONLINEAR_INTEGER|null[0]
+    enum entry NUMERICAL // com.eignex.klause.solver.pipeline/SourceExecutionKind.NUMERICAL|null[0]
     enum entry POLYNOMIAL // com.eignex.klause.solver.pipeline/SourceExecutionKind.POLYNOMIAL|null[0]
     enum entry REFUTED // com.eignex.klause.solver.pipeline/SourceExecutionKind.REFUTED|null[0]
 
@@ -8065,6 +8082,101 @@ final class com.eignex.klause.ir/LinearObjectiveSpec { // com.eignex.klause.ir/L
     final fun toString(): kotlin/String // com.eignex.klause.ir/LinearObjectiveSpec.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.ir/LinearSourceIndicator { // com.eignex.klause.ir/LinearSourceIndicator|null[0]
+    constructor <init>(kotlin/Int, kotlin/Boolean) // com.eignex.klause.ir/LinearSourceIndicator.<init>|<init>(kotlin.Int;kotlin.Boolean){}[0]
+
+    final val column // com.eignex.klause.ir/LinearSourceIndicator.column|{}column[0]
+        final fun <get-column>(): kotlin/Int // com.eignex.klause.ir/LinearSourceIndicator.column.<get-column>|<get-column>(){}[0]
+    final val whenOne // com.eignex.klause.ir/LinearSourceIndicator.whenOne|{}whenOne[0]
+        final fun <get-whenOne>(): kotlin/Boolean // com.eignex.klause.ir/LinearSourceIndicator.whenOne.<get-whenOne>|<get-whenOne>(){}[0]
+
+    final fun component1(): kotlin/Int // com.eignex.klause.ir/LinearSourceIndicator.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.eignex.klause.ir/LinearSourceIndicator.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Boolean = ...): com.eignex.klause.ir/LinearSourceIndicator // com.eignex.klause.ir/LinearSourceIndicator.copy|copy(kotlin.Int;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/LinearSourceIndicator.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/LinearSourceIndicator.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/LinearSourceIndicator.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.ir/LinearSourceObjective { // com.eignex.klause.ir/LinearSourceObjective|null[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.ir/LinearSourceTerm>, com.eignex.klause.ir/SemanticRational = ..., com.eignex.klause.ir/ObjectiveSense = ...) // com.eignex.klause.ir/LinearSourceObjective.<init>|<init>(kotlin.collections.List<com.eignex.klause.ir.LinearSourceTerm>;com.eignex.klause.ir.SemanticRational;com.eignex.klause.ir.ObjectiveSense){}[0]
+
+    final val constant // com.eignex.klause.ir/LinearSourceObjective.constant|{}constant[0]
+        final fun <get-constant>(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/LinearSourceObjective.constant.<get-constant>|<get-constant>(){}[0]
+    final val sense // com.eignex.klause.ir/LinearSourceObjective.sense|{}sense[0]
+        final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.ir/LinearSourceObjective.sense.<get-sense>|<get-sense>(){}[0]
+    final val terms // com.eignex.klause.ir/LinearSourceObjective.terms|{}terms[0]
+        final fun <get-terms>(): kotlin.collections/List<com.eignex.klause.ir/LinearSourceTerm> // com.eignex.klause.ir/LinearSourceObjective.terms.<get-terms>|<get-terms>(){}[0]
+}
+
+final class com.eignex.klause.ir/LinearSourceProblem : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.ir/LinearSourceProblem|null[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.ir/LinearSourceVariable>, kotlin.collections/List<com.eignex.klause.ir/LinearSourceRow>, com.eignex.klause.ir/LinearSourceObjective? = ..., com.eignex.klause.ir/EffectiveSourceSemantics = ...) // com.eignex.klause.ir/LinearSourceProblem.<init>|<init>(kotlin.collections.List<com.eignex.klause.ir.LinearSourceVariable>;kotlin.collections.List<com.eignex.klause.ir.LinearSourceRow>;com.eignex.klause.ir.LinearSourceObjective?;com.eignex.klause.ir.EffectiveSourceSemantics){}[0]
+
+    final val intVarNames // com.eignex.klause.ir/LinearSourceProblem.intVarNames|{}intVarNames[0]
+        final fun <get-intVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/LinearSourceProblem.intVarNames.<get-intVarNames>|<get-intVarNames>(){}[0]
+    final val objective // com.eignex.klause.ir/LinearSourceProblem.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.ir/LinearSourceObjective? // com.eignex.klause.ir/LinearSourceProblem.objective.<get-objective>|<get-objective>(){}[0]
+    final val realVarNames // com.eignex.klause.ir/LinearSourceProblem.realVarNames|{}realVarNames[0]
+        final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/LinearSourceProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
+    final val rows // com.eignex.klause.ir/LinearSourceProblem.rows|{}rows[0]
+        final fun <get-rows>(): kotlin.collections/List<com.eignex.klause.ir/LinearSourceRow> // com.eignex.klause.ir/LinearSourceProblem.rows.<get-rows>|<get-rows>(){}[0]
+    final val semantics // com.eignex.klause.ir/LinearSourceProblem.semantics|{}semantics[0]
+        final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/LinearSourceProblem.semantics.<get-semantics>|<get-semantics>(){}[0]
+    final val variables // com.eignex.klause.ir/LinearSourceProblem.variables|{}variables[0]
+        final fun <get-variables>(): kotlin.collections/List<com.eignex.klause.ir/LinearSourceVariable> // com.eignex.klause.ir/LinearSourceProblem.variables.<get-variables>|<get-variables>(){}[0]
+}
+
+final class com.eignex.klause.ir/LinearSourceRow { // com.eignex.klause.ir/LinearSourceRow|null[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.ir/LinearSourceTerm>, com.eignex.klause.ir/SemanticRational? = ..., com.eignex.klause.ir/SemanticRational? = ..., com.eignex.klause.ir/LinearSourceIndicator? = ...) // com.eignex.klause.ir/LinearSourceRow.<init>|<init>(kotlin.collections.List<com.eignex.klause.ir.LinearSourceTerm>;com.eignex.klause.ir.SemanticRational?;com.eignex.klause.ir.SemanticRational?;com.eignex.klause.ir.LinearSourceIndicator?){}[0]
+
+    final val indicator // com.eignex.klause.ir/LinearSourceRow.indicator|{}indicator[0]
+        final fun <get-indicator>(): com.eignex.klause.ir/LinearSourceIndicator? // com.eignex.klause.ir/LinearSourceRow.indicator.<get-indicator>|<get-indicator>(){}[0]
+    final val lower // com.eignex.klause.ir/LinearSourceRow.lower|{}lower[0]
+        final fun <get-lower>(): com.eignex.klause.ir/SemanticRational? // com.eignex.klause.ir/LinearSourceRow.lower.<get-lower>|<get-lower>(){}[0]
+    final val terms // com.eignex.klause.ir/LinearSourceRow.terms|{}terms[0]
+        final fun <get-terms>(): kotlin.collections/List<com.eignex.klause.ir/LinearSourceTerm> // com.eignex.klause.ir/LinearSourceRow.terms.<get-terms>|<get-terms>(){}[0]
+    final val upper // com.eignex.klause.ir/LinearSourceRow.upper|{}upper[0]
+        final fun <get-upper>(): com.eignex.klause.ir/SemanticRational? // com.eignex.klause.ir/LinearSourceRow.upper.<get-upper>|<get-upper>(){}[0]
+}
+
+final class com.eignex.klause.ir/LinearSourceTerm { // com.eignex.klause.ir/LinearSourceTerm|null[0]
+    constructor <init>(kotlin/Int, com.eignex.klause.ir/SemanticRational) // com.eignex.klause.ir/LinearSourceTerm.<init>|<init>(kotlin.Int;com.eignex.klause.ir.SemanticRational){}[0]
+
+    final val coefficient // com.eignex.klause.ir/LinearSourceTerm.coefficient|{}coefficient[0]
+        final fun <get-coefficient>(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/LinearSourceTerm.coefficient.<get-coefficient>|<get-coefficient>(){}[0]
+    final val column // com.eignex.klause.ir/LinearSourceTerm.column|{}column[0]
+        final fun <get-column>(): kotlin/Int // com.eignex.klause.ir/LinearSourceTerm.column.<get-column>|<get-column>(){}[0]
+
+    final fun component1(): kotlin/Int // com.eignex.klause.ir/LinearSourceTerm.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/LinearSourceTerm.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., com.eignex.klause.ir/SemanticRational = ...): com.eignex.klause.ir/LinearSourceTerm // com.eignex.klause.ir/LinearSourceTerm.copy|copy(kotlin.Int;com.eignex.klause.ir.SemanticRational){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/LinearSourceTerm.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/LinearSourceTerm.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/LinearSourceTerm.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.ir/LinearSourceVariable { // com.eignex.klause.ir/LinearSourceVariable|null[0]
+    constructor <init>(kotlin/String, kotlin/Boolean, com.eignex.klause.ir/SemanticRational? = ..., com.eignex.klause.ir/SemanticRational? = ...) // com.eignex.klause.ir/LinearSourceVariable.<init>|<init>(kotlin.String;kotlin.Boolean;com.eignex.klause.ir.SemanticRational?;com.eignex.klause.ir.SemanticRational?){}[0]
+
+    final val integer // com.eignex.klause.ir/LinearSourceVariable.integer|{}integer[0]
+        final fun <get-integer>(): kotlin/Boolean // com.eignex.klause.ir/LinearSourceVariable.integer.<get-integer>|<get-integer>(){}[0]
+    final val lower // com.eignex.klause.ir/LinearSourceVariable.lower|{}lower[0]
+        final fun <get-lower>(): com.eignex.klause.ir/SemanticRational? // com.eignex.klause.ir/LinearSourceVariable.lower.<get-lower>|<get-lower>(){}[0]
+    final val name // com.eignex.klause.ir/LinearSourceVariable.name|{}name[0]
+        final fun <get-name>(): kotlin/String // com.eignex.klause.ir/LinearSourceVariable.name.<get-name>|<get-name>(){}[0]
+    final val upper // com.eignex.klause.ir/LinearSourceVariable.upper|{}upper[0]
+        final fun <get-upper>(): com.eignex.klause.ir/SemanticRational? // com.eignex.klause.ir/LinearSourceVariable.upper.<get-upper>|<get-upper>(){}[0]
+
+    final fun component1(): kotlin/String // com.eignex.klause.ir/LinearSourceVariable.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.eignex.klause.ir/LinearSourceVariable.component2|component2(){}[0]
+    final fun component3(): com.eignex.klause.ir/SemanticRational? // com.eignex.klause.ir/LinearSourceVariable.component3|component3(){}[0]
+    final fun component4(): com.eignex.klause.ir/SemanticRational? // com.eignex.klause.ir/LinearSourceVariable.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Boolean = ..., com.eignex.klause.ir/SemanticRational? = ..., com.eignex.klause.ir/SemanticRational? = ...): com.eignex.klause.ir/LinearSourceVariable // com.eignex.klause.ir/LinearSourceVariable.copy|copy(kotlin.String;kotlin.Boolean;com.eignex.klause.ir.SemanticRational?;com.eignex.klause.ir.SemanticRational?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/LinearSourceVariable.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/LinearSourceVariable.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/LinearSourceVariable.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.ir/LongConsts : com.eignex.klause.ir/LongConstList { // com.eignex.klause.ir/LongConsts|null[0]
     constructor <init>(kotlin/LongArray) // com.eignex.klause.ir/LongConsts.<init>|<init>(kotlin.LongArray){}[0]
 
@@ -13693,6 +13805,29 @@ final class com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest { // com
         final fun <get-zeroObjectivePricing>(): com.eignex.klause.lp.engine/LpZeroObjectivePricing // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.zeroObjectivePricing.<get-zeroObjectivePricing>|<get-zeroObjectivePricing>(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/LinearSourceOutcome { // com.eignex.klause.solver.pipeline/LinearSourceOutcome|null[0]
+    final val acceptedObjectiveBound // com.eignex.klause.solver.pipeline/LinearSourceOutcome.acceptedObjectiveBound|{}acceptedObjectiveBound[0]
+        final fun <get-acceptedObjectiveBound>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.solver.pipeline/LinearSourceOutcome.acceptedObjectiveBound.<get-acceptedObjectiveBound>|<get-acceptedObjectiveBound>(){}[0]
+    final val claimsCoverTolerance // com.eignex.klause.solver.pipeline/LinearSourceOutcome.claimsCoverTolerance|{}claimsCoverTolerance[0]
+        final fun <get-claimsCoverTolerance>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceOutcome.claimsCoverTolerance.<get-claimsCoverTolerance>|<get-claimsCoverTolerance>(){}[0]
+    final val conclusion // com.eignex.klause.solver.pipeline/LinearSourceOutcome.conclusion|{}conclusion[0]
+        final fun <get-conclusion>(): com.eignex.klause.solver.pipeline/LinearSourceConclusion // com.eignex.klause.solver.pipeline/LinearSourceOutcome.conclusion.<get-conclusion>|<get-conclusion>(){}[0]
+    final val incumbent // com.eignex.klause.solver.pipeline/LinearSourceOutcome.incumbent|{}incumbent[0]
+        final fun <get-incumbent>(): com.eignex.klause.solver.validation/LinearSourceWitness? // com.eignex.klause.solver.pipeline/LinearSourceOutcome.incumbent.<get-incumbent>|<get-incumbent>(){}[0]
+    final val nativeClaimsUnrestricted // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeClaimsUnrestricted|{}nativeClaimsUnrestricted[0]
+        final fun <get-nativeClaimsUnrestricted>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeClaimsUnrestricted.<get-nativeClaimsUnrestricted>|<get-nativeClaimsUnrestricted>(){}[0]
+    final val nativeConclusion // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeConclusion|{}nativeConclusion[0]
+        final fun <get-nativeConclusion>(): com.eignex.klause.solver.pipeline/LinearSourceConclusion // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeConclusion.<get-nativeConclusion>|<get-nativeConclusion>(){}[0]
+    final val nominalConstraintsExact // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nominalConstraintsExact|{}nominalConstraintsExact[0]
+        final fun <get-nominalConstraintsExact>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nominalConstraintsExact.<get-nominalConstraintsExact>|<get-nominalConstraintsExact>(){}[0]
+    final val nominalSourceExact // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nominalSourceExact|{}nominalSourceExact[0]
+        final fun <get-nominalSourceExact>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nominalSourceExact.<get-nominalSourceExact>|<get-nominalSourceExact>(){}[0]
+    final val objectiveScale // com.eignex.klause.solver.pipeline/LinearSourceOutcome.objectiveScale|{}objectiveScale[0]
+        final fun <get-objectiveScale>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/LinearSourceOutcome.objectiveScale.<get-objectiveScale>|<get-objectiveScale>(){}[0]
+    final val source // com.eignex.klause.solver.pipeline/LinearSourceOutcome.source|{}source[0]
+        final fun <get-source>(): com.eignex.klause.ir/LinearSourceProblem // com.eignex.klause.solver.pipeline/LinearSourceOutcome.source.<get-source>|<get-source>(){}[0]
+}
+
 final class com.eignex.klause.solver.pipeline/LsResolution { // com.eignex.klause.solver.pipeline/LsResolution|null[0]
     constructor <init>(kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>?, kotlin/Boolean) // com.eignex.klause.solver.pipeline/LsResolution.<init>|<init>(kotlin.collections.List<kotlin.Function0<com.eignex.klause.localsearch.strategy.LocalSearchRecipe>>?;kotlin.Boolean){}[0]
 
@@ -14009,6 +14144,8 @@ final class com.eignex.klause.solver.pipeline/PreparedSourcePlan { // com.eignex
         final fun <get-sourceBoolCount>(): kotlin/Int // com.eignex.klause.solver.pipeline/PreparedSourcePlan.sourceBoolCount.<get-sourceBoolCount>|<get-sourceBoolCount>(){}[0]
     final val sourceIntCount // com.eignex.klause.solver.pipeline/PreparedSourcePlan.sourceIntCount|{}sourceIntCount[0]
         final fun <get-sourceIntCount>(): kotlin/Int // com.eignex.klause.solver.pipeline/PreparedSourcePlan.sourceIntCount.<get-sourceIntCount>|<get-sourceIntCount>(){}[0]
+    final val sourceLinearObjective // com.eignex.klause.solver.pipeline/PreparedSourcePlan.sourceLinearObjective|{}sourceLinearObjective[0]
+        final fun <get-sourceLinearObjective>(): com.eignex.klause.ir/LinearSourceObjective? // com.eignex.klause.solver.pipeline/PreparedSourcePlan.sourceLinearObjective.<get-sourceLinearObjective>|<get-sourceLinearObjective>(){}[0]
     final val sourceRealCount // com.eignex.klause.solver.pipeline/PreparedSourcePlan.sourceRealCount|{}sourceRealCount[0]
         final fun <get-sourceRealCount>(): kotlin/Int // com.eignex.klause.solver.pipeline/PreparedSourcePlan.sourceRealCount.<get-sourceRealCount>|<get-sourceRealCount>(){}[0]
 
@@ -14071,6 +14208,7 @@ final class com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution { /
 }
 
 final class com.eignex.klause.solver.pipeline/SourceAttachment : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.solver.pipeline/SourceAttachment|null[0]
+    constructor <init>(com.eignex.klause.ir/LinearSourceProblem, com.eignex.klause.ir/ProblemSettings) // com.eignex.klause.solver.pipeline/SourceAttachment.<init>|<init>(com.eignex.klause.ir.LinearSourceProblem;com.eignex.klause.ir.ProblemSettings){}[0]
     constructor <init>(com.eignex.klause.ir/NonlinearIntegerProblem, com.eignex.klause.ir/ProblemSettings) // com.eignex.klause.solver.pipeline/SourceAttachment.<init>|<init>(com.eignex.klause.ir.NonlinearIntegerProblem;com.eignex.klause.ir.ProblemSettings){}[0]
     constructor <init>(com.eignex.klause.ir/PolynomialRealProblem, com.eignex.klause.ir/ProblemSettings) // com.eignex.klause.solver.pipeline/SourceAttachment.<init>|<init>(com.eignex.klause.ir.PolynomialRealProblem;com.eignex.klause.ir.ProblemSettings){}[0]
     constructor <init>(com.eignex.klause.ir/Problem, kotlin.collections/List<com.eignex.klause.ir/DefinitionHint> = ..., com.eignex.klause.ir/SearchHints? = ...) // com.eignex.klause.solver.pipeline/SourceAttachment.<init>|<init>(com.eignex.klause.ir.Problem;kotlin.collections.List<com.eignex.klause.ir.DefinitionHint>;com.eignex.klause.ir.SearchHints?){}[0]
@@ -14092,11 +14230,14 @@ final class com.eignex.klause.solver.pipeline/SourceAttachment : com.eignex.klau
 
 final class com.eignex.klause.solver.pipeline/SourceExecutionCallbacks { // com.eignex.klause.solver.pipeline/SourceExecutionCallbacks|null[0]
     constructor <init>(com.eignex.klause.solver.pipeline/FiniteSolveCallbacks = ..., kotlin/Function1<com.eignex.klause.solver.pipeline/SourceIncumbentPublication, kotlin/Unit>? = ..., kotlin/Function1<com.eignex.klause.solver.pipeline/QuadraticIncumbentPublication, kotlin/Unit>? = ...) // com.eignex.klause.solver.pipeline/SourceExecutionCallbacks.<init>|<init>(com.eignex.klause.solver.pipeline.FiniteSolveCallbacks;kotlin.Function1<com.eignex.klause.solver.pipeline.SourceIncumbentPublication,kotlin.Unit>?;kotlin.Function1<com.eignex.klause.solver.pipeline.QuadraticIncumbentPublication,kotlin.Unit>?){}[0]
+    constructor <init>(kotlin/Function1<com.eignex.klause.solver.validation/LinearSourceWitness, kotlin/Unit>, com.eignex.klause.solver.pipeline/FiniteSolveCallbacks = ..., kotlin/Function1<com.eignex.klause.solver.pipeline/SourceIncumbentPublication, kotlin/Unit>? = ..., kotlin/Function1<com.eignex.klause.solver.pipeline/QuadraticIncumbentPublication, kotlin/Unit>? = ...) // com.eignex.klause.solver.pipeline/SourceExecutionCallbacks.<init>|<init>(kotlin.Function1<com.eignex.klause.solver.validation.LinearSourceWitness,kotlin.Unit>;com.eignex.klause.solver.pipeline.FiniteSolveCallbacks;kotlin.Function1<com.eignex.klause.solver.pipeline.SourceIncumbentPublication,kotlin.Unit>?;kotlin.Function1<com.eignex.klause.solver.pipeline.QuadraticIncumbentPublication,kotlin.Unit>?){}[0]
 
     final val finite // com.eignex.klause.solver.pipeline/SourceExecutionCallbacks.finite|{}finite[0]
         final fun <get-finite>(): com.eignex.klause.solver.pipeline/FiniteSolveCallbacks // com.eignex.klause.solver.pipeline/SourceExecutionCallbacks.finite.<get-finite>|<get-finite>(){}[0]
     final val onLinearIncumbent // com.eignex.klause.solver.pipeline/SourceExecutionCallbacks.onLinearIncumbent|{}onLinearIncumbent[0]
         final fun <get-onLinearIncumbent>(): kotlin/Function1<com.eignex.klause.solver.pipeline/SourceIncumbentPublication, kotlin/Unit>? // com.eignex.klause.solver.pipeline/SourceExecutionCallbacks.onLinearIncumbent.<get-onLinearIncumbent>|<get-onLinearIncumbent>(){}[0]
+    final val onLinearSourceIncumbent // com.eignex.klause.solver.pipeline/SourceExecutionCallbacks.onLinearSourceIncumbent|{}onLinearSourceIncumbent[0]
+        final fun <get-onLinearSourceIncumbent>(): kotlin/Function1<com.eignex.klause.solver.validation/LinearSourceWitness, kotlin/Unit>? // com.eignex.klause.solver.pipeline/SourceExecutionCallbacks.onLinearSourceIncumbent.<get-onLinearSourceIncumbent>|<get-onLinearSourceIncumbent>(){}[0]
     final val onQuadraticIncumbent // com.eignex.klause.solver.pipeline/SourceExecutionCallbacks.onQuadraticIncumbent|{}onQuadraticIncumbent[0]
         final fun <get-onQuadraticIncumbent>(): kotlin/Function1<com.eignex.klause.solver.pipeline/QuadraticIncumbentPublication, kotlin/Unit>? // com.eignex.klause.solver.pipeline/SourceExecutionCallbacks.onQuadraticIncumbent.<get-onQuadraticIncumbent>|<get-onQuadraticIncumbent>(){}[0]
 }
@@ -16302,6 +16443,17 @@ final class com.eignex.klause.solver.search/Vsids : com.eignex.klause.solver.sea
     final fun pick(com.eignex.klause.solver.search/BranchingState, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.solver.search/Vsids.pick|pick(com.eignex.klause.solver.search.BranchingState;kotlin.random.Random){}[0]
 }
 
+final class com.eignex.klause.solver.validation/LinearSourceWitness { // com.eignex.klause.solver.validation/LinearSourceWitness|null[0]
+    final val exact // com.eignex.klause.solver.validation/LinearSourceWitness.exact|{}exact[0]
+        final fun <get-exact>(): kotlin/Boolean // com.eignex.klause.solver.validation/LinearSourceWitness.exact.<get-exact>|<get-exact>(){}[0]
+    final val objective // com.eignex.klause.solver.validation/LinearSourceWitness.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.solver.validation/LinearSourceWitness.objective.<get-objective>|<get-objective>(){}[0]
+    final val source // com.eignex.klause.solver.validation/LinearSourceWitness.source|{}source[0]
+        final fun <get-source>(): com.eignex.klause.ir/LinearSourceProblem // com.eignex.klause.solver.validation/LinearSourceWitness.source.<get-source>|<get-source>(){}[0]
+    final val values // com.eignex.klause.solver.validation/LinearSourceWitness.values|{}values[0]
+        final fun <get-values>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.validation/LinearSourceWitness.values.<get-values>|<get-values>(){}[0]
+}
+
 final class com.eignex.klause.solver/Assignment { // com.eignex.klause.solver/Assignment|null[0]
     constructor <init>(kotlin/Int, kotlin/Int, kotlin/Int = ...) // com.eignex.klause.solver/Assignment.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int){}[0]
 
@@ -17064,6 +17216,8 @@ sealed class com.eignex.klause.solver.pipeline/PortfolioPlan { // com.eignex.kla
 sealed class com.eignex.klause.solver.pipeline/SourceExecutionResult : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.solver.pipeline/SourceExecutionResult|null[0]
     final val invocation // com.eignex.klause.solver.pipeline/SourceExecutionResult.invocation|{}invocation[0]
         final fun <get-invocation>(): com.eignex.klause.solver.pipeline/PreparedSourceInvocation // com.eignex.klause.solver.pipeline/SourceExecutionResult.invocation.<get-invocation>|<get-invocation>(){}[0]
+    final val linearSource // com.eignex.klause.solver.pipeline/SourceExecutionResult.linearSource|{}linearSource[0]
+        final fun <get-linearSource>(): com.eignex.klause.solver.pipeline/LinearSourceOutcome? // com.eignex.klause.solver.pipeline/SourceExecutionResult.linearSource.<get-linearSource>|<get-linearSource>(){}[0]
     open val semantics // com.eignex.klause.solver.pipeline/SourceExecutionResult.semantics|{}semantics[0]
         open fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.solver.pipeline/SourceExecutionResult.semantics.<get-semantics>|<get-semantics>(){}[0]
 
@@ -17080,6 +17234,11 @@ sealed class com.eignex.klause.solver.pipeline/SourceExecutionResult : com.eigne
     final class Linear : com.eignex.klause.solver.pipeline/SourceExecutionResult { // com.eignex.klause.solver.pipeline/SourceExecutionResult.Linear|null[0]
         final val result // com.eignex.klause.solver.pipeline/SourceExecutionResult.Linear.result|{}result[0]
             final fun <get-result>(): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver.pipeline/SourceExecutionResult.Linear.result.<get-result>|<get-result>(){}[0]
+    }
+
+    final class Numerical : com.eignex.klause.solver.pipeline/SourceExecutionResult { // com.eignex.klause.solver.pipeline/SourceExecutionResult.Numerical|null[0]
+        final val result // com.eignex.klause.solver.pipeline/SourceExecutionResult.Numerical.result|{}result[0]
+            final fun <get-result>(): com.eignex.klause.solver.result/LinearOptimizationResult // com.eignex.klause.solver.pipeline/SourceExecutionResult.Numerical.result.<get-result>|<get-result>(){}[0]
     }
 
     final class Polynomial : com.eignex.klause.solver.pipeline/SourceExecutionResult { // com.eignex.klause.solver.pipeline/SourceExecutionResult.Polynomial|null[0]
@@ -17529,6 +17688,8 @@ final val com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS // com.eigne
     final fun <get-BACKTRACK_OVERRIDE_KEYS>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS.<get-BACKTRACK_OVERRIDE_KEYS>|<get-BACKTRACK_OVERRIDE_KEYS>(){}[0]
 final val com.eignex.klause.solver.pipeline/maximizeSourceObjective // com.eignex.klause.solver.pipeline/maximizeSourceObjective|@com.eignex.klause.solver.pipeline.PreparedSourceInvocation{}maximizeSourceObjective[0]
     final fun (com.eignex.klause.solver.pipeline/PreparedSourceInvocation).<get-maximizeSourceObjective>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/maximizeSourceObjective.<get-maximizeSourceObjective>|<get-maximizeSourceObjective>@com.eignex.klause.solver.pipeline.PreparedSourceInvocation(){}[0]
+final val com.eignex.klause.solver.pipeline/sourceLinearObjective // com.eignex.klause.solver.pipeline/sourceLinearObjective|@com.eignex.klause.solver.pipeline.PreparedSourceInvocation{}sourceLinearObjective[0]
+    final fun (com.eignex.klause.solver.pipeline/PreparedSourceInvocation).<get-sourceLinearObjective>(): com.eignex.klause.ir/LinearSourceObjective? // com.eignex.klause.solver.pipeline/sourceLinearObjective.<get-sourceLinearObjective>|<get-sourceLinearObjective>@com.eignex.klause.solver.pipeline.PreparedSourceInvocation(){}[0]
 final val com.eignex.klause.solver.pipeline/sourceObjective // com.eignex.klause.solver.pipeline/sourceObjective|@com.eignex.klause.solver.pipeline.PreparedSourceInvocation{}sourceObjective[0]
     final fun (com.eignex.klause.solver.pipeline/PreparedSourceInvocation).<get-sourceObjective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/sourceObjective.<get-sourceObjective>|<get-sourceObjective>@com.eignex.klause.solver.pipeline.PreparedSourceInvocation(){}[0]
 final val com.eignex.klause.solver.pipeline/sourceQuadraticObjective // com.eignex.klause.solver.pipeline/sourceQuadraticObjective|@com.eignex.klause.solver.pipeline.PreparedSourceInvocation{}sourceQuadraticObjective[0]
