@@ -13,7 +13,9 @@ import com.eignex.klause.solver.projection.prepareFloatGrid
 import com.eignex.klause.solver.projection.projectObjective
 import com.eignex.klause.util.Cancellation
 
-internal enum class FloatGridConsumerPurpose { FINITE_COMPATIBILITY, HEURISTIC_VIEW }
+internal enum class FloatGridConsumerPurpose {
+    FINITE_COMPATIBILITY, HEURISTIC_VIEW, AUTOMATIC_FINITE_COMPATIBILITY,
+}
 
 internal class SelectedFloatGridConsumer(
     val invocation: PreparedSourceInvocation,
@@ -73,6 +75,9 @@ private fun selectFloatGrid(
     if (invocation.route == SourceProblemRoute.Refuted) {
         return SelectedFloatGridPreparation.Declined(SelectedGridDecline.SOURCE_REFUTED)
     }
+    if (purpose == FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY &&
+        invocation.admission?.arms?.contains(ExecutionStrategy.COMPLETE) == true
+    ) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.CONSUMER)
     if (invocation.operation !in setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE,
             ExecutionOperation.ENUMERATE) ||
         (purpose == FloatGridConsumerPurpose.HEURISTIC_VIEW && !invocation.request.engine.pureLocalSearch)

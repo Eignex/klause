@@ -2545,6 +2545,7 @@ public final class com/eignex/klause/formats/flatzinc/FlatZincSolutionWriterKt {
 
 public final class com/eignex/klause/formats/flatzinc/FlatZincSourceStateKt {
 	public static final fun prepareFiniteCompatibility (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/pipeline/SourceSetupRequest;)Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
+	public static final fun prepareSourceExecution (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/pipeline/SourceSetupRequest;)Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
 	public static final fun sourceAttachment (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;)Lcom/eignex/klause/solver/pipeline/SourceAttachment;
 }
 
