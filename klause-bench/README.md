@@ -319,6 +319,35 @@ complementary names under the unchanged registry limit. This is isolated naming
 demand: it neither captures the actual rebound fragment nor reproduces earlier
 component registrations, initializes a solver, or proves the opening's refusal cause.
 
+With `inspect=compiler-expansion`, the tool performs a separate default frontend
+compilation before starting the opening deadline. It requires matching source names,
+bounds, contiguous declared domains and ordered factor keys against canonical admission,
+then records the shared comparison visit limit, usage, caches and definition counts.
+Its row histogram includes defining rows and selection channels, without attributing
+ownership or a refusal cause. This additional compilation supplies no timing,
+CLI-equivalence or verdict claim. Sources that run compiler bound closing repeat
+that normal stage in the separate compilation. Reports mark this additional numerical
+work without claiming an operation count; the canonical opening remains separate.
+
+With `inspect=compiler-ownership`, the separate compilation stages satisfaction-only
+integer lowering through its existing private entry points. It snapshots definition
+owners before compaction, checks its dependency closure against the compiler's actual
+removed columns and factors, and requires the final model to match canonical admission
+by the same source names, bounds and ordered factor keys. It records external numeric
+consumers separately from integer defining factors. This mode declines objectives
+and real columns; it changes no solver code or allowance. It replays the ordinary
+compiler bound-closing stage when required and marks its additional numerical work.
+For each unknown definition image it also calls the existing image calculation once
+against completed child metadata, without storing its result or changing the expansion
+counter. This observes late image availability rather than performing an image fixpoint.
+An independent read-only graph walk records constant and arithmetic leaf identities,
+following bare conditional references and leaving affine expressions opaque. It has
+65,536 diagnostic visits and at most 1,024 leaves per definition; incomplete observations
+remain explicit. These limits and counters belong only to the diagnostic, and do not
+change the compiler's work counter or install an encoding.
+Its additional compilation is before the opening deadline and supplies no timing,
+CLI-equivalence, refusal-cause or source-verdict claim.
+
 `bench.profile.SourceAgreementProfile` compares one combined exact linear owner with
 explicit registered linear peers over original real, wide-integer, strict and guarded
 sources. Pass `repeats=N warmups=N cases=<comma-separated names>`; defaults are three
