@@ -42,6 +42,27 @@ class FlatZincDefinitionsTest {
     }
 
     @Test
+    fun `comparison definition hints should retain wide source coefficients`() {
+        val source = "var 0..1: x; var bool: b; " +
+            "constraint int_lin_le_reif([${Long.MAX_VALUE}], [x], 0, b) :: defines_var(b); solve satisfy;"
+
+        val hint = assertIs<DefinitionHint.Comparison>(parseFlatZinc(source).definitionHints.single())
+
+        assertEquals(listOf(Long.MAX_VALUE), hint.coefficients.toList())
+    }
+
+    @Test
+    fun `element definition hints should retain wide source values`() {
+        val source = "var 1..2: index; var 0..${Long.MAX_VALUE}: result; " +
+            "constraint array_int_element(index, [0, ${Long.MAX_VALUE}], result) :: defines_var(result); " +
+            "solve satisfy;"
+
+        val hint = assertIs<DefinitionHint.Element>(parseFlatZinc(source).definitionHints.single())
+
+        assertEquals(listOf(0L, Long.MAX_VALUE), hint.values?.toList())
+    }
+
+    @Test
     fun `an unrelated integer annotation target should retain only its reference`() {
         val source = "var -2..2: x; var 0..2: y; var 0..2: z; " +
             "constraint int_abs(x, y) :: defines_var(z); solve satisfy;"
