@@ -1,9 +1,9 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.sha256
+import kotlinx.serialization.Serializable
 import java.lang.classfile.Attributes
 import java.lang.classfile.ClassFile
-import kotlinx.serialization.Serializable
 
 internal fun jvmClassMetadata(bytes: ByteArray): JvmClassMetadata {
     val model = ClassFile.of().parse(bytes)

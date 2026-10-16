@@ -1,9 +1,9 @@
 package com.eignex.klause.bench.profile
 
-import java.lang.invoke.MethodType
-import java.util.ArrayList
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.lang.invoke.MethodType
+import java.util.ArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -22,8 +22,11 @@ class JvmClassMetadataTest {
 
         val metadata = jvmClassMetadata(bytes)
 
-        assertEquals(expected.toSet(), metadata.methods.filter { it.name != "<clinit>" }
-            .map { it.name to it.descriptor }.toSet())
+        assertEquals(
+            expected.toSet(),
+            metadata.methods.filter { it.name != "<clinit>" }
+            .map { it.name to it.descriptor }.toSet()
+        )
     }
 
     @Test

@@ -3,12 +3,6 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
-import java.io.File
-import java.io.OutputStream
-import java.net.URI
-import java.security.MessageDigest
-import java.util.Locale
-import java.util.jar.JarFile
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
@@ -17,6 +11,12 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.io.File
+import java.io.OutputStream
+import java.net.URI
+import java.security.MessageDigest
+import java.util.Locale
+import java.util.jar.JarFile
 
 internal object JvmInstalledMethodMetadata {
     private const val MAX_MANIFEST_BYTES = 2 * 1024 * 1024
@@ -39,44 +39,46 @@ internal object JvmInstalledMethodMetadata {
         require(options.getValue("manifest-sha256").matches(Regex("[0-9a-f]{64}")))
         ProfileCaptureArchive.run {
             val out = File(requireNotNull(System.getenv("OUT"))).canonicalFile.apply { mkdirs() }
-            var completed = false
             var distributionMatched = false
-            var failure: String? = null
-            var primaryFailure: Exception? = null
-            try {
+            val execution = runCatching {
                 inspect(options, out) { distributionMatched = true }
-                completed = true
-            } catch (error: Exception) {
-                primaryFailure = error
-                failure = "${error.javaClass.name}: ${error.message}"
-                throw error
-            } finally {
-                val completion = buildJsonObject {
-                    put("completed", completed)
-                    put("error", failure)
+            }
+            val completion = runCatching {
+                val failure = execution.exceptionOrNull()
+                val report = buildJsonObject {
+                    put("completed", execution.isSuccess)
+                    put("error", failure?.let { "${it.javaClass.name}: ${it.message}" })
                     put("requestedSourceHead", options.getValue("head"))
                     put("allInstalledDistributionBytesMatchedBeforeInspection", distributionMatched)
                     put("loadedClassSelectionProven", false)
                     put("runtimeGeneratedClassesBound", false)
                     put("fullSourcePhaseCoverageProven", false)
                     put("acceptedSavingsCredit", false)
-                    put("scope", "Installed class-file metadata only. Inspection does not load or initialize classes; " +
-                        "no solver, source checker, JFR reader or performance analysis runs. Source lines and " +
-                        "descriptors do not establish executed phases, inlining, class-loader selection or costs.")
+                    put(
+                        "scope",
+                        "Installed class-file metadata only. Class inspection does not load or initialize classes; " +
+                            "no solver, source checker, JFR reader or performance analysis runs. Source lines and " +
+                            "descriptors do not establish executed phases, inlining, loaded selection or costs.",
+                    )
                 }
-                try {
-                    Reports.writeJson(File(out, "completion.json").path, completion)
-                } catch (error: Exception) {
-                    primaryFailure?.addSuppressed(error) ?: throw error
-                }
+                Reports.writeJson(File(out, "completion.json").path, report)
             }
+            execution.exceptionOrNull()?.let { original ->
+                completion.exceptionOrNull()?.let(original::addSuppressed)
+            }
+            execution.getOrThrow()
+            completion.getOrThrow()
         }
     }
 
     private fun inspect(options: Map<String, String>, out: File, distributionVerified: () -> Unit) {
         val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
-        val sourceNames = listOf("JvmClassMetadata.kt", "JvmInstalledMethodMetadata.kt",
-            "CompilationStudyBuilds.kt", "ProfileCaptureArchive.kt")
+        val sourceNames = listOf(
+            "JvmClassMetadata.kt",
+            "JvmInstalledMethodMetadata.kt",
+            "CompilationStudyBuilds.kt",
+            "ProfileCaptureArchive.kt",
+        )
         for (name in sourceNames) {
             File(root, "klause-bench/src/main/kotlin/com/eignex/klause/bench/profile/$name")
                 .copyTo(File(out, name))
@@ -93,11 +95,14 @@ internal object JvmInstalledMethodMetadata {
             for (build in builds.values) {
                 val actual = Reports.json.parseToJsonElement(build.provenance.readText()).jsonObject
                     .getValue("provenance").jsonObject.getValue("distribution").jsonObject
-                Reports.writeJson(File(out, "${build.arm}-distribution-match.json").path, buildJsonObject {
+                Reports.writeJson(
+                    File(out, "${build.arm}-distribution-match.json").path,
+                    buildJsonObject {
                     put("matchesOriginal", actual == original)
                     put("expected", original)
                     put("actual", actual)
-                })
+                }
+                )
                 require(actual == original) { "Rebuilt distribution differs from the retained original: ${build.arm}" }
             }
             distributionVerified()
@@ -108,8 +113,10 @@ internal object JvmInstalledMethodMetadata {
 
     private fun capturedManifest(options: Map<String, String>, out: File): JsonObject {
         val uri = URI(options.getValue("manifest"))
-        require(uri.scheme == "https" && uri.host != null && uri.rawUserInfo == null &&
-            uri.rawQuery == null && uri.rawFragment == null && uri.toString().length <= 4096)
+        require(
+            uri.scheme == "https" && uri.host != null && uri.rawUserInfo == null &&
+            uri.rawQuery == null && uri.rawFragment == null && uri.toString().length <= 4096
+        )
         val connection = uri.toURL().openConnection().apply {
             connectTimeout = 20_000
             readTimeout = 20_000
@@ -144,16 +151,22 @@ internal object JvmInstalledMethodMetadata {
                 require(digest(file) == expected && digest(retained) == expected)
             }
         }
-        Reports.writeJson(File(out, "inventory.json").path, buildJsonObject {
+        Reports.writeJson(
+            File(out, "inventory.json").path,
+            buildJsonObject {
             put("jars", jars.size)
             put("classes", counts.classes)
             put("classErrors", counts.errors)
             put("allJarClassEntriesVisited", true)
             put("allDeclaredClassMetadataComplete", counts.errors == 0)
-            put("scope", "Every class entry, including alternate multi-release entries, is retained separately. " +
-                "No runtime version or class-loader choice is inferred. Original jar bytes remain private " +
-                "for further metadata readers; method and attribute order and duplicate line tables are preserved.")
-        })
+            put(
+                "scope",
+                "Every class entry, including alternate multi-release entries, is retained separately. " +
+                    "No runtime version or class-loader choice is inferred. Original jar bytes remain private " +
+                    "for further metadata readers; method and attribute order and duplicate line tables are preserved.",
+            )
+        }
+        )
         check(counts.errors == 0) { "Class metadata errors remain in the complete inventory" }
     }
 
@@ -172,7 +185,7 @@ internal object JvmInstalledMethodMetadata {
                 require(bytes.size <= MAX_CLASS_BYTES)
                 val parsed = try {
                     Result.success(jvmClassMetadata(bytes))
-                } catch (error: Exception) {
+                } catch (error: IllegalArgumentException) {
                     Result.failure(error)
                 }
                 if (parsed.isFailure) counts.errors++
@@ -182,9 +195,12 @@ internal object JvmInstalledMethodMetadata {
                     put("entryIndex", index)
                     put("entry", entry.name)
                     put("classSha256", sha256(bytes))
-                    put("metadata", parsed.getOrNull()?.let {
+                    put(
+                        "metadata",
+                        parsed.getOrNull()?.let {
                         compactJson.encodeToJsonElement(JvmClassMetadata.serializer(), it)
-                    } ?: JsonNull)
+                    } ?: JsonNull
+                    )
                     put("error", parsed.exceptionOrNull()?.let { "${it.javaClass.name}: ${it.message}" })
                 }
                 val line = (compactJson.encodeToString(row) + "\n").encodeToByteArray()
