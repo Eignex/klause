@@ -131,10 +131,11 @@ internal fun Compiler.Builder.isBoolExpr(t: SExpr): Boolean {
     while (true) {
         when (node) {
             is SExpr.Atom -> {
+                lookup(node.text)?.let { return it.isBool }
                 val m = macros[node.text]
                 if (m != null && m.params.isEmpty()) return m.isBool
                 return node.text == "true" || node.text == "false" ||
-                    node.text in boolNames || (lookup(node.text)?.isBool == true)
+                    node.text in boolNames
             }
 
             is SExpr.SList -> when (val head = (node.items.firstOrNull() as? SExpr.Atom)?.text) {

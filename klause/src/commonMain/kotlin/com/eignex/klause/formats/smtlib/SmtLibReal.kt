@@ -57,10 +57,12 @@ internal fun Compiler.Builder.isRealExpr(t: SExpr): Boolean {
     while (work.isNotEmpty()) {
         when (val node = work.removeLast()) {
             is SExpr.Atom -> {
-                if (node.text in realNames || isRealLiteral(node.text) || lookup(node.text)?.isReal == true) {
+                val binding = lookup(node.text)
+                if (binding != null) {
+                    if (binding.isReal) return true
+                } else if (node.text in realNames || isRealLiteral(node.text) || macros[node.text]?.isReal == true) {
                     return true
                 }
-                if (macros[node.text]?.isReal == true) return true
             }
 
             is SExpr.SList -> when (val head = (node.items.firstOrNull() as? SExpr.Atom)?.text) {

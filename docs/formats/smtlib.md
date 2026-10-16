@@ -45,6 +45,10 @@ retain exact rational, polynomial and nested function expressions. Original
 Boolean, integer and real declarations remain in the same source snapshot.
 Lexical helpers and simultaneous `let` bindings preserve their definition scope;
 a user-defined helper with a function name retains its own meaning.
+Factor helper calls evaluate arguments in the caller scope, then isolate parameter
+bindings from caller-local names while evaluating the body. Nested calls restore
+the enclosing scope, and local bindings take precedence over zero-arity helper
+names and their declared sorts.
 
 Exp is the real exponential, log is the natural logarithm on strictly positive
 arguments, and sine/cosine use radians. Every arithmetic atom must have defined
