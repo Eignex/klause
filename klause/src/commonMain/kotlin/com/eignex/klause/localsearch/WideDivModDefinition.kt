@@ -9,6 +9,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
@@ -44,31 +45,47 @@ internal class WideDivModDefinition(
     }
 }
 
-internal fun wideDivModDefinitions(problem: Problem): List<SweepNode> = problem.factors.flatMap { factor ->
-    val relation = factor as? WideDivMod ?: return@flatMap emptyList()
+internal fun wideDivModDefinitions(
+    problem: Problem,
+    cancellation: Cancellation = Cancellation.Never,
+): List<SweepNode> {
     val definitions = ArrayList<SweepNode>()
-    for ((expression, quotient) in listOf(relation.quotient to true, relation.remainder to false)) {
-        val weights = expression.coefficients.entries.sortedWith { left, right -> left.value.compareTo(right.value) }
-        if (weights.firstOrNull()?.value != BIG_ONE) continue
-        val canonical = (0 until weights.lastIndex).all { i ->
-            val (variable, weight) = weights[i]
-            val next = weights[i + 1].value
-            val radix = next / weight
-            radix > BIG_ONE && radix * weight == next &&
-                problem.intBounds.hasLower(variable) && problem.intBounds.hasUpper(variable) &&
-                problem.intBounds.lower(variable) >= 0L && bigIntOf(problem.intBounds.upper(variable)) < radix
-        }
-        if (!canonical) continue
-        for (i in weights.indices) {
-            val (output, weight) = weights[i]
-            val next = weights.getOrNull(i + 1)?.value
-            val radix = next?.div(weight)
-            val validRadix = radix == null || (radix > BIG_ONE && radix * weight == next)
-            if (!validRadix || output in relation.dividend.coefficients ||
-                (output in relation.quotient.coefficients && output in relation.remainder.coefficients) ||
-                !problem.intBounds.hasLower(output) || problem.intBounds.lower(output) == Long.MIN_VALUE) continue
-            definitions += WideDivModDefinition(relation, output, quotient, expression, weight, radix)
+    for (factor in problem.factors) {
+        cancellation.charge(1)
+        if (cancellation()) return emptyList()
+        val relation = factor as? WideDivMod ?: continue
+        for ((expression, quotient) in listOf(relation.quotient to true, relation.remainder to false)) {
+            val count = expression.coefficients.size.toLong()
+            cancellation.charge(count * (1L + count.toString(2).length))
+            if (cancellation()) return emptyList()
+            val weights = expression.coefficients.entries.sortedWith { left, right ->
+                left.value.compareTo(right.value)
+            }
+            if (weights.firstOrNull()?.value != BIG_ONE) continue
+            val canonical = (0 until weights.lastIndex).all { i ->
+                cancellation.charge(1)
+                if (cancellation()) return emptyList()
+                val (variable, weight) = weights[i]
+                val next = weights[i + 1].value
+                val radix = next / weight
+                radix > BIG_ONE && radix * weight == next &&
+                    problem.intBounds.hasLower(variable) && problem.intBounds.hasUpper(variable) &&
+                    problem.intBounds.lower(variable) >= 0L && bigIntOf(problem.intBounds.upper(variable)) < radix
+            }
+            if (!canonical) continue
+            for (i in weights.indices) {
+                cancellation.charge(1)
+                if (cancellation()) return emptyList()
+                val (output, weight) = weights[i]
+                val next = weights.getOrNull(i + 1)?.value
+                val radix = next?.div(weight)
+                val validRadix = radix == null || (radix > BIG_ONE && radix * weight == next)
+                if (!validRadix || output in relation.dividend.coefficients ||
+                    (output in relation.quotient.coefficients && output in relation.remainder.coefficients) ||
+                    !problem.intBounds.hasLower(output) || problem.intBounds.lower(output) == Long.MIN_VALUE) continue
+                definitions += WideDivModDefinition(relation, output, quotient, expression, weight, radix)
+            }
         }
     }
-    definitions
+    return if (cancellation()) emptyList() else definitions
 }

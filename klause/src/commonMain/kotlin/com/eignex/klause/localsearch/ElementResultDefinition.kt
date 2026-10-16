@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.Assignment
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 
 internal class ElementResultDefinition(val factor: Element) : SweepNode {
@@ -36,16 +37,29 @@ internal class ElementResultDefinition(val factor: Element) : SweepNode {
     }
 }
 
-internal fun elementResultDefinitions(problem: Problem, hints: IntArray): List<SweepNode> {
+internal fun elementResultDefinitions(
+    problem: Problem,
+    hints: IntArray,
+    cancellation: Cancellation = Cancellation.Never,
+): List<SweepNode> {
+    if (cancellation()) return emptyList()
     val hinted = BooleanArray(problem.numIntVars)
-    for (v in hints) if (v in hinted.indices) hinted[v] = true
-    return problem.factors.mapNotNull { factor ->
-        val element = factor as? Element ?: return@mapNotNull null
+    for (v in hints) {
+        if (cancellation.definitionStopped()) return emptyList()
+        if (v in hinted.indices) hinted[v] = true
+    }
+    val definitions = ArrayList<SweepNode>()
+    for (factor in problem.factors) {
+        if (cancellation.definitionStopped()) return emptyList()
+        val element = factor as? Element ?: continue
         val output = element.result
         val bounds = problem.intBounds
         // NO_WRITE reserves Long.MIN_VALUE, so that output remains searched.
-        if (!hinted[output] || !bounds.hasLower(output) || bounds.lower(output) == Long.MIN_VALUE) null else {
-            ElementResultDefinition(element)
+        if (!hinted[output] || !bounds.hasLower(output) || bounds.lower(output) == Long.MIN_VALUE) continue
+        if (element.arrIsVars) {
+            for (i in element.arr.indices) if (cancellation.definitionStopped()) return emptyList()
         }
+        definitions += ElementResultDefinition(element)
     }
+    return if (cancellation()) emptyList() else definitions
 }

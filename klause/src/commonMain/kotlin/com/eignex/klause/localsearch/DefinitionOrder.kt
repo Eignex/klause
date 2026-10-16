@@ -65,3 +65,8 @@ internal fun orderedDefinitions(
     }
     return if (cancellation()) emptyList() else ordered
 }
+
+internal fun Cancellation.definitionStopped(): Boolean {
+    charge(1)
+    return this()
+}
