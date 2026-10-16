@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.BoolFoldDefinition
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -142,6 +143,8 @@ private const val OPEN_BOUND_PROOF_KEY = "open-bound-proof"
 internal class CommonOptions {
     var config: KlauseConfig = KlauseConfig.current
     var semanticOverrides: SemanticOverrides = SemanticOverrides()
+    val sourceOptions = SourceOptions()
+    var sourceSemantics: EffectiveSourceSemantics? = null
 
     var engine: String? = null
     var timeLimitMs: Long? = null
@@ -259,7 +262,7 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         listOf("--exact"),
         false,
         FlagGroup.KLAUSE,
-        help = "Preserve continuous FlatZinc floats and require exact MPS certificates",
+        help = "require continuous floats and zero source feasibility tolerance where applicable",
     ) { o.exact = true },
     FlagSpec(
         listOf("-a", "--all-solutions"),
@@ -396,7 +399,7 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         FlagGroup.KLAUSE,
         help = "print the solver version and exit",
     ) { o.showVersion = true },
-)
+) + sourceFlagSpecs(o)
 
 /**
  * Spec-driven, getopt-style argument parser. Walks [args], dispatching each recognised flag to

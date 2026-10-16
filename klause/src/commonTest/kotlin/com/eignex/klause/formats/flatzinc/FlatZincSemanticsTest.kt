@@ -307,4 +307,15 @@ class FlatZincSemanticsTest {
 
         assertTrue("approximation window excludes its effective source bounds" in error.message.orEmpty())
     }
+
+    @Test
+    fun `a float linear scale outside binary64 integer precision should be rejected before lowering`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            parseFlatZinc("solve satisfy;", semanticOverrides = SemanticOverrides(
+                floats = FloatSemantics.Grid(4, 9_007_199_254_740_993L),
+            ))
+        }
+
+        assertTrue("float linear scale cannot be represented exactly in binary64" in error.message.orEmpty())
+    }
 }

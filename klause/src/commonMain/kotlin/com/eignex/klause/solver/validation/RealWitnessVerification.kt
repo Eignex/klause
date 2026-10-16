@@ -8,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearRow
@@ -26,14 +27,22 @@ import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
 
 internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification<Sample, Unit> {
+    if (model.factors.any { it is Distinct } &&
+        (sample.numIntVars != model.numIntVars || sample.numBoolVars != model.numBoolVars)
+    ) return Verification.Rejected("assignment does not cover distinct operand coordinates")
     for ((id, factor) in model.factors.withIndex()) {
-        if (factor !is Abs && factor !is AffineAbs) continue
+        if (factor !is Abs && factor !is AffineAbs &&
+            !(factor is Distinct && factor.variables.reals.isEmpty())
+        ) continue
         if (sample.numIntVars != model.numIntVars) {
             return Verification.Rejected("assignment does not cover the integer variables")
         }
         val valid = when (factor) {
             is Abs -> sample.exactIntValue(factor.operand).abs() == sample.exactIntValue(factor.result)
             is AffineAbs -> factor.isSatisfied(sample::exactIntValue)
+            is Distinct -> factor.isSatisfied(sample::exactIntValue, sample::boolValue) {
+                error("integer distinct operand has a real coordinate")
+            }
             else -> false
         }
         if (!valid) {
@@ -61,6 +70,12 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
     ).holdsAt(witness)
     for ((id, factor) in model.factors.withIndex()) {
         if (factor.variables.reals.isEmpty()) continue
+        if (factor is Distinct) {
+            if (!factor.isSatisfied(sample::exactIntValue, sample::boolValue, reals::get)) {
+                return Verification.Rejected("real factor $id refutes the assignment")
+            }
+            continue
+        }
         if (factor is Power && factor.base is Power.Coordinate.Real && factor.exponent <= 1) {
             val expected = if (factor.exponent == 0) BigFraction.ONE else reals[factor.base.id.index]
             if (expected != reals[(factor.result as Power.Coordinate.Real).id.index]) {

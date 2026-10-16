@@ -51,7 +51,15 @@ internal class FlatZincSemantics(
                 unboundedIntHi ?: defaults.upper,
             ),
         )
-        return EffectiveSourceSemantics(flatZincSemantics, legacy.resolve(overrides).effective)
+        val effective = legacy.resolve(overrides).effective
+        val grid = effective.floats as? FloatSemantics.Grid
+        if (grid != null) {
+            val scale = grid.linearScale.toDouble()
+            require(scale < -Long.MIN_VALUE.toDouble() && scale.toLong() == grid.linearScale) {
+                "float linear scale cannot be represented exactly in binary64"
+            }
+        }
+        return EffectiveSourceSemantics(flatZincSemantics, effective)
     }
 }
 

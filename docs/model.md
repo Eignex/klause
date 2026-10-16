@@ -158,6 +158,30 @@ its finite enforcement intact. The selected exact theory view retains arbitrary-
 constants and reification. [Finite formats](formats/finite.md#opb-and-wbo-lowering)
 defines OPB/WBO objective normalization separately from relation width.
 
+## Affine distinctness
+
+`factor.global.Distinct` retains exact affine operands over tagged integer,
+Boolean and real coordinates. Operands capture their input buffers, coalesce
+repeated coordinates and normalize complemented Boolean terms without changing
+their zero/one values. Coefficients and activities retain arbitrary-width rational
+arithmetic. An optional Boolean activator is equivalent to the whole relation;
+a false activator requires a collision. Remapping preserves repeated operand roles,
+strict coordinate namespaces and activation identity.
+
+Finite propagation checks pinned operands and pins the reifying Boolean only when
+all operand coordinates are known. Local search grades collisions exactly over
+finite integer/Boolean points; real-coordinate scores describe the supplied
+binary64 point and require separate exact source checking. Original-coordinate
+witness checks compare affine values exactly, including arbitrary-width integers
+and rational reals. A checked ray preserves every affine separation; false
+reification requires a permanent affine collision. Distinctness supplies no
+unconditional numerical relaxation.
+
+Caller-selected linear and polynomial encoders expand the retained relation into
+exact pairwise comparisons. Whole-relation reification includes both truth
+directions. Encoding uses the source coordinate namespaces, carries factor
+attribution, and checks cancellation before publishing an enforcing fragment.
+
 ## Published assignments and objectives
 
 `Sample`, exact theory assignments and reconstructed witnesses own immutable
@@ -297,12 +321,13 @@ Qualification preserves the native verdict and the exact accepted-incumbent rece
 the receipt remains separate from a limit or ray certificate's private witness.
 An execution over a source without a semantic owner remains unbound.
 
-These value types define the source carrier contract. FlatZinc captures its
-[effective declaration policy](formats/flatzinc.md#declared-semantics-and-caller-ranges)
-before lowering; other frontends still use their format-specific parameters.
-Frontend migration and the shared result-qualification surface remain incomplete.
-Implemented publication rules remain in [input semantics](formats.md). Capturing
-the value types alone does not establish witness validity or proof authority.
+File frontends resolve the [common CLI source controls](cli.md#flags) against their
+declared policies and pass typed overrides before lowering. FlatZinc retains its
+[effective declaration policy](formats/flatzinc.md#declared-semantics-and-caller-ranges),
+SMT-LIB its exact declaration ranges, and MPS its effective decimal feasibility policy.
+Formats without an applicable field reject its replacement. Result qualification
+and protocol comments preserve the effective interpretation; publication authority
+remains governed by [input semantics](formats.md) and checked source evidence.
 
 ## Engine projections and factor capabilities
 

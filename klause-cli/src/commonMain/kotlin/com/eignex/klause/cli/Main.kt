@@ -58,6 +58,9 @@ internal fun runCli(args: Array<String>): Int = try {
     errPrintln("klause-cli: UNSOUND: ${e.message}")
     errPrintln(e.stackTraceToString())
     EXIT_UNSOUND
+} catch (e: IllegalArgumentException) {
+    errPrintln("klause-cli: ${e.message}")
+    EXIT_ERROR
 }
 
 private fun run(args: Array<String>) {
@@ -104,7 +107,12 @@ private fun run(args: Array<String>) {
     val loadStart = nowMillis()
     val solvable = session.load(path, common)
     common.loadElapsedMs = nowMillis() - loadStart
-    SolveCore.solve(solvable, common, session.output(common))
+    val comment = when (mode) {
+        MiniZincMode -> "%"
+        SmtLibMode -> ";"
+        else -> "c"
+    }
+    SolveCore.solve(solvable, common, session.output(common).sourceQualified(common.sourceSemantics, comment))
 }
 
 private const val USAGE =

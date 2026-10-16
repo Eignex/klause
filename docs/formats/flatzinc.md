@@ -33,6 +33,8 @@ authoritative. A finite default range defines the grid for a bucketed declaratio
 a missing side uses the approximation window. A disjoint window declines that grid
 representation without refuting the source. Rational endpoints must be exactly
 representable under binary64 authority; unsupported endpoints are not rounded.
+Float-linear grid scales must also be exactly representable as binary64 integers;
+unsupported precision is rejected before lowering.
 
 Float grid windows remain separate from continuous source bounds. Typed grid
 settings pass through the same declaration planner and its private placeholder

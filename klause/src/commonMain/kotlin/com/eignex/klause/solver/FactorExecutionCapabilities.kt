@@ -125,6 +125,8 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     is Power -> if (base is Power.Coordinate.Integer) finiteDomains else
         realArithmetic.copy(relaxation = if (exponent <= 1) RelaxationCapability.SOUND else RelaxationCapability.NONE)
     is AffineAbs, is ArrayMinMax, is Product, is Increasing, is ReifiedLinear -> boundRelaxation
+    is Distinct -> if (variables.reals.isEmpty()) finiteFiltering else
+        realArithmetic.copy(relaxation = RelaxationCapability.NONE)
     is ExactLinear -> if (variables.reals.isNotEmpty()) realArithmetic else boundRelaxation
     is LinearIndicator -> if (variables.reals.isNotEmpty()) realArithmetic else filteringRelaxation
     is Linear -> if (constants is RealConstants) realArithmetic else boundRelaxation

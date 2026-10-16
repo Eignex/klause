@@ -97,6 +97,8 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is LexLess -> LexLessPropagator(boolVars, intVars, xs, ys, strict)
 
+    is Distinct -> propagationView()
+
     is ExactLinear -> propagationView()
 
     is LinearIndicator -> propagationView()

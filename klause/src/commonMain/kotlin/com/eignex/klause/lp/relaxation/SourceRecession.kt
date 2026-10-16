@@ -8,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
@@ -21,6 +22,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.bigIntOf
 
 /**
@@ -63,6 +65,7 @@ private fun within(value: BigFraction, lower: Double, upper: Double): Boolean {
 private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): Boolean {
     val reals = checkNotNull(point.exactReals)
     return when (factor) {
+        is Distinct -> factor.keeps(point, direction)
         is ExactLinear -> factor.keeps(point, direction)
         is LinearIndicator -> point.exactIntValue(factor.indicator) != bigIntOf(if (factor.whenOne) 1L else 0L) ||
             factor.row.keeps(point, direction)
@@ -206,4 +209,24 @@ private fun ExactLinear.keeps(point: Sample, direction: List<BigFraction>): Bool
         LinearOp.EQ -> activity == bound && movement.isZero
         LinearOp.NE -> activity != bound && movement.isZero
     }
+}
+
+private fun Distinct.keeps(point: Sample, direction: List<BigFraction>): Boolean {
+    val reals = point.exactReals ?: return false
+    val values = operands.map { it.value(point::exactIntValue, point::boolValue, reals::get) }
+    val rates = operands.map { it.value({ BIG_ZERO }, { false }, direction::get) - it.constant }
+    val wanted = activator == LinearRow.ALWAYS || point.boolValue(activator)
+    for (first in values.indices) {
+        for (second in first + 1 until values.size) {
+            val difference = values[first] - values[second]
+            val rate = rates[first] - rates[second]
+            if (wanted) {
+                if (difference.isZero || (!rate.isZero && rate.signum() != difference.signum())) return false
+            } else {
+                // A finite set of affine collisions covers a ray only if a collision is permanent.
+                if (difference.isZero && rate.isZero) return true
+            }
+        }
+    }
+    return wanted
 }

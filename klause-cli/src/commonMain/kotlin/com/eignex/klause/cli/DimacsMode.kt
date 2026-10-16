@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.formats.dimacs.dimacsSemantics
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.solver.Sample
@@ -21,7 +22,10 @@ internal object DimacsMode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val problem = Dimacs.parse(openFileSource(path)).toProblem(common.config.problemSettings())
+            val overrides = common.sourceOverrides(dimacsSemantics)
+            val problem = Dimacs.parse(openFileSource(path)).toProblem(
+                common.config.problemSettings(), semanticOverrides = overrides,
+            )
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${problem.numBoolVars} factors=${problem.numFactors}"
             }
