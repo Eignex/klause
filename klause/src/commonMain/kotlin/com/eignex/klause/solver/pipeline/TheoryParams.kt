@@ -46,9 +46,8 @@ data class TheoryParams(
      * separates the producer's own cost from the proposal's effect.
      *
      * A null allowance permits direct primitive point preferences for one linear completion owner
-     * with source integer or real coordinates, without a Boolean draw. A complete mixed worker
-     * can lazily reuse the bounded source-clause adapter when its first live point is consulted.
-     * A Boolean-complete mixed worker can also order the current source
+     * with source integer or real coordinates, without a source-clause index
+     * or Boolean draw. A Boolean-complete mixed worker can also order the current source
      * disjunction's rows or a disequality's sides from an existing exact point or optimal float guess;
      * both alternatives remain searched.
      * Other built-in linear point guidance and compound source-clause preferences use
