@@ -368,6 +368,18 @@ Guarded premises, unknown-zero factors, nondivisible terms, growth declines and
 incomplete pairing provide no additional authority. All visits and exact operations
 share the existing native owner and final stop check; the pass exports no proof artifact.
 
+Sources containing Boolean coordinates can also be refuted by a necessary Boolean
+relaxation in the same optional prefix. Every numeric atom becomes an independent
+Boolean predicate; shared source references and complete gate equivalences remain
+correlated. Gate propagation and iterative branching exhaust the relaxation before
+publishing a refutation. A satisfying Boolean assignment supplies no real witness.
+The pass admits the entire normalized source under the existing coordinate, Boolean,
+atom, term and coefficient limits; node and child-reference counts each share the
+term ceiling. Pure numeric sources skip this pass. Decisions, propagation, rollback
+and admission debit the existing native owner, with no allowance per branch.
+Admission decline and incomplete exhaustion provide no refutation. Completed
+refutations retain the containing final stop check and export no proof artifact.
+
 Before projection, bounded witness probing checks complete exact points and can
 repair one coordinate at a time using roots of an equality specialized at all other
 coordinates. Repaired points can guide later repairs even when the full check fails.
