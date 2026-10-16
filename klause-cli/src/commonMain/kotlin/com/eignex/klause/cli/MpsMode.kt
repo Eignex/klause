@@ -125,7 +125,7 @@ internal object MpsMode : CliMode {
             return if (route == SourceProblemRoute.Refuted) {
                 refutedSolvable(routingLpStats, routingElapsedMs)
             } else if (finite != null) {
-                mpsLinearSolvable(compiled, exact, linearSolvable(
+                mpsLinearSolvable(compiled, common.exact, linearSolvable(
                     finite.problem,
                     if (compiled.maximize) objective?.negated() else objective,
                     compiled.maximize,
@@ -184,7 +184,17 @@ private fun mpsLinearSolvable(compiled: MpsCompiled, exact: Boolean, solvable: S
     solvable
 } else {
     solvable.withToleranceCheck { sample ->
-        compiled.withinTolerance(sample.ints, sample.reals)
+        val reals = sample.exactReals
+        if (reals == null) {
+            compiled.withinTolerance(sample.ints, sample.reals)
+        } else {
+            try {
+                compiled.sourceWitness(sample.ints, reals)
+                true
+            } catch (_: IllegalArgumentException) {
+                false
+            }
+        }
     }
 }
 

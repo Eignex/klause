@@ -8,6 +8,7 @@ import com.eignex.klause.formats.opb.opbSemantics
 import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.formats.xcsp3.xcsp3Semantics
 import com.eignex.klause.ir.FloatSemantics
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.util.bigIntOf
@@ -19,6 +20,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 
 class SourceOptionsTest {
     @Test
@@ -139,7 +141,7 @@ class SourceOptionsTest {
             val common = CommonOptions()
             parseArgs(args, commonFlagSpecs(common)) {}
 
-            assertFailsWith<CliUsageException> { common.sourceOverrides(declared) }
+            assertFailsWith<IllegalArgumentException> { common.sourceOverrides(declared) }
         }
     }
 
@@ -158,7 +160,7 @@ class SourceOptionsTest {
             val common = CommonOptions()
             parseArgs(args, commonFlagSpecs(common)) {}
 
-            assertFailsWith<CliUsageException>(mode.names.first()) { mode.newSession().load("unopened", common) }
+            assertFailsWith<IllegalArgumentException>(mode.names.first()) { mode.newSession().load("unopened", common) }
         }
     }
 
@@ -184,4 +186,26 @@ class SourceOptionsTest {
             assertEquals(common.sourceSemantics?.effective, model.semantics.effective)
         }
     }
+
+    @Test
+    fun `exact source requests should replace base policy without mutating caller overrides`() {
+        val policies = listOf(
+            mpsSemantics to SemanticOverrides(
+                feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ONE),
+            ),
+            flatZincSemantics to SemanticOverrides(floats = FloatSemantics.Grid(2, 1000)),
+        )
+        for ((declared, base) in policies) {
+            val common = CommonOptions().apply {
+                exact = true
+                semanticOverrides = base
+            }
+
+            common.sourceOverrides(declared)
+
+            assertSame(base, common.semanticOverrides)
+            assertFalse(assertNotNull(common.sourceSemantics).isApproximate)
+        }
+    }
+
 }

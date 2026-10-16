@@ -32,6 +32,24 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `zero tolerance checking should use exact rational source coordinates when supplied`() {
+        val input = File.createTempFile("mps-zero-rational", ".mps").apply {
+            writeText("ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 0.1\nENDATA\n")
+            deleteOnExit()
+        }
+        val common = CommonOptions().apply {
+            semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+        }
+        val check = assertNotNull(MpsMode.newSession().load(input.absolutePath, common).toleranceCheck)
+        val tenth = BigFraction.ofLong(10).reciprocal()
+        val exact = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.1), exactReals = listOf(tenth))
+        val approximate = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.1))
+
+        assertTrue(check(exact))
+        assertFalse(check(approximate))
+    }
+
+    @Test
     fun `MPS loading should apply shared absolute relative and zero tolerance overrides`() {
         val source = File.createTempFile("mps-shared-tolerance", ".mps").apply {
             writeText("ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 100\nENDATA\n")
