@@ -62,6 +62,46 @@ import kotlin.test.assertTrue
 
 class SourceStrategyTest {
     @Test
+    fun `finite source satisfaction should preserve typed complete decision limits`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(Clause(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+        )))
+        val strategy = BacktrackSolver.source(source)
+
+        val stopped = strategy.solve(BacktrackParams(maxDecisions = 0L, nativeSat = false))
+        val completed = strategy.solve(BacktrackParams(randomSeed = 17L))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(stopped).reason)
+        val point = assertIs<OpenTheoryResult.Sat>(completed).assignment
+        assertTrue(point.boolValue(0) || point.boolValue(1))
+    }
+
+    @Test
+    fun `finite source satisfaction should preserve a supplied heuristic starting point`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 100)), emptyArray())
+        val initial = Sample(booleanArrayOf(), longArrayOf(73))
+        val strategy = LocalSearchSolver.source(source)
+
+        val result = strategy.solve(LocalSearchParams(initialAssignment = initial, maxFlips = 1L, randomSeed = 17L))
+
+        assertEquals("73", assertIs<OpenTheoryResult.Sat>(result).assignment.intValue(0))
+        assertEquals(73L, initial.intValue(0))
+    }
+
+    @Test
+    fun `finite source satisfaction should keep complete assumption scopes isolated`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))))
+        val strategy = BacktrackSolver.source(source)
+        val pinned = BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to false)))
+
+        val refuted = strategy.solve(pinned)
+        val unpinned = strategy.solve(BacktrackParams())
+
+        assertIs<OpenTheoryResult.Unsat>(refuted)
+        assertTrue(assertIs<OpenTheoryResult.Sat>(unpinned).assignment.boolValue(0))
+    }
+
+    @Test
     fun `source optimize should close open integer bounds before exact continuous preparation`() {
         val source = Problem(
             0,
