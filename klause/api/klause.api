@@ -742,10 +742,14 @@ public final class com/eignex/klause/compile/CompiledSchema {
 }
 
 public final class com/eignex/klause/compile/CompilerKt {
-	public static final fun compile (Lcom/eignex/klause/schema/VariableSchema;Lcom/eignex/klause/config/KlauseConfig;)Lcom/eignex/klause/compile/CompiledSchema;
-	public static final fun compile (Lcom/eignex/skema/SchemaDef;Lcom/eignex/klause/config/KlauseConfig;)Lcom/eignex/klause/compile/CompiledSchema;
-	public static synthetic fun compile$default (Lcom/eignex/klause/schema/VariableSchema;Lcom/eignex/klause/config/KlauseConfig;ILjava/lang/Object;)Lcom/eignex/klause/compile/CompiledSchema;
-	public static synthetic fun compile$default (Lcom/eignex/skema/SchemaDef;Lcom/eignex/klause/config/KlauseConfig;ILjava/lang/Object;)Lcom/eignex/klause/compile/CompiledSchema;
+	public static final fun compile (Lcom/eignex/klause/schema/VariableSchema;Lcom/eignex/klause/config/KlauseConfig;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/compile/CompiledSchema;
+	public static final fun compile (Lcom/eignex/skema/SchemaDef;Lcom/eignex/klause/config/KlauseConfig;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/compile/CompiledSchema;
+	public static synthetic fun compile$default (Lcom/eignex/klause/schema/VariableSchema;Lcom/eignex/klause/config/KlauseConfig;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/compile/CompiledSchema;
+	public static synthetic fun compile$default (Lcom/eignex/skema/SchemaDef;Lcom/eignex/klause/config/KlauseConfig;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/compile/CompiledSchema;
+}
+
+public final class com/eignex/klause/compile/SchemaSemanticsKt {
+	public static final fun getSchemaSemantics ()Lcom/eignex/klause/ir/SourceSemantics;
 }
 
 public final class com/eignex/klause/config/BoolConfigSpec : com/eignex/klause/config/ConfigSpec {
@@ -2190,14 +2194,19 @@ public final class com/eignex/klause/formats/dimacs/Dimacs {
 }
 
 public final class com/eignex/klause/formats/dimacs/DimacsDecoderKt {
-	public static final fun toProblem (Lcom/eignex/klause/formats/dimacs/CnfDocument;Lcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/ir/Problem;
-	public static final fun toProblem (Lcom/eignex/klause/formats/dimacs/WcnfDocument;Lcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/formats/dimacs/WcnfProblem;
-	public static synthetic fun toProblem$default (Lcom/eignex/klause/formats/dimacs/CnfDocument;Lcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
-	public static synthetic fun toProblem$default (Lcom/eignex/klause/formats/dimacs/WcnfDocument;Lcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/formats/dimacs/WcnfProblem;
+	public static final fun toProblem (Lcom/eignex/klause/formats/dimacs/CnfDocument;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/ir/Problem;
+	public static final fun toProblem (Lcom/eignex/klause/formats/dimacs/WcnfDocument;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/formats/dimacs/WcnfProblem;
+	public static synthetic fun toProblem$default (Lcom/eignex/klause/formats/dimacs/CnfDocument;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun toProblem$default (Lcom/eignex/klause/formats/dimacs/WcnfDocument;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/formats/dimacs/WcnfProblem;
 }
 
 public final class com/eignex/klause/formats/dimacs/DimacsFormatException : com/eignex/klause/formats/FormatException {
 	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class com/eignex/klause/formats/dimacs/DimacsSemanticsKt {
+	public static final fun getDimacsSemantics ()Lcom/eignex/klause/ir/SourceSemantics;
+	public static final fun getWcnfSemantics ()Lcom/eignex/klause/ir/SourceSemantics;
 }
 
 public final class com/eignex/klause/formats/dimacs/WcnfDocument {
@@ -2219,7 +2228,7 @@ public final class com/eignex/klause/formats/dimacs/WcnfDocument {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/eignex/klause/formats/dimacs/WcnfProblem {
+public final class com/eignex/klause/formats/dimacs/WcnfProblem : com/eignex/klause/ir/SourceSemanticsOwner {
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;I)V
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;ILjava/util/List;)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;ILjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -2236,6 +2245,7 @@ public final class com/eignex/klause/formats/dimacs/WcnfProblem {
 	public final fun getNumOriginalBoolVars ()I
 	public final fun getObjective ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -3113,13 +3123,17 @@ public final class com/eignex/klause/formats/xcsp3/UnsupportedXcsp3Exception : c
 
 public final class com/eignex/klause/formats/xcsp3/Xcsp3 {
 	public static final field INSTANCE Lcom/eignex/klause/formats/xcsp3/Xcsp3;
-	public final fun parse (Lcom/eignex/klause/util/CharSource;Lcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
-	public final fun parse (Ljava/lang/String;Lcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
-	public static synthetic fun parse$default (Lcom/eignex/klause/formats/xcsp3/Xcsp3;Lcom/eignex/klause/util/CharSource;Lcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
-	public static synthetic fun parse$default (Lcom/eignex/klause/formats/xcsp3/Xcsp3;Ljava/lang/String;Lcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
+	public final fun parse (Lcom/eignex/klause/util/CharSource;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
+	public final fun parse (Ljava/lang/String;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
+	public static synthetic fun parse$default (Lcom/eignex/klause/formats/xcsp3/Xcsp3;Lcom/eignex/klause/util/CharSource;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
+	public static synthetic fun parse$default (Lcom/eignex/klause/formats/xcsp3/Xcsp3;Ljava/lang/String;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
 }
 
-public final class com/eignex/klause/formats/xcsp3/Xcsp3Problem {
+public final class com/eignex/klause/formats/xcsp3/Xcsp3Kt {
+	public static final fun getXcsp3Semantics ()Lcom/eignex/klause/ir/SourceSemantics;
+}
+
+public final class com/eignex/klause/formats/xcsp3/Xcsp3Problem : com/eignex/klause/ir/SourceSemanticsOwner {
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[I)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
@@ -3134,6 +3148,7 @@ public final class com/eignex/klause/formats/xcsp3/Xcsp3Problem {
 	public final fun getIntVarNames ()Ljava/util/Map;
 	public final fun getObjective ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -6836,14 +6851,15 @@ public final class com/eignex/klause/model/FloatLinearConstraint$Companion {
 
 public final class com/eignex/klause/model/FloatSpec : com/eignex/klause/model/VarSpec {
 	public static final field Companion Lcom/eignex/klause/model/FloatSpec$Companion;
-	public fun <init> (DDI)V
+	public fun <init> (DDLjava/lang/Integer;)V
+	public synthetic fun <init> (DDLjava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()D
 	public final fun component2 ()D
-	public final fun component3 ()I
-	public final fun copy (DDI)Lcom/eignex/klause/model/FloatSpec;
-	public static synthetic fun copy$default (Lcom/eignex/klause/model/FloatSpec;DDIILjava/lang/Object;)Lcom/eignex/klause/model/FloatSpec;
+	public final fun component3 ()Ljava/lang/Integer;
+	public final fun copy (DDLjava/lang/Integer;)Lcom/eignex/klause/model/FloatSpec;
+	public static synthetic fun copy$default (Lcom/eignex/klause/model/FloatSpec;DDLjava/lang/Integer;ILjava/lang/Object;)Lcom/eignex/klause/model/FloatSpec;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getBuckets ()I
+	public final fun getBuckets ()Ljava/lang/Integer;
 	public final fun getMax ()D
 	public final fun getMin ()D
 	public final fun getScale ()D
@@ -9734,14 +9750,14 @@ public class com/eignex/klause/schema/VariableSchema : com/eignex/skema/Schema {
 	protected final fun constraint (Lcom/eignex/klause/model/BoolExpr;)V
 	protected final fun constraint (Lkotlin/jvm/functions/Function0;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun constraints (Lkotlin/jvm/functions/Function0;)Lkotlin/properties/PropertyDelegateProvider;
-	protected final fun floatVar (DDI)Lkotlin/properties/PropertyDelegateProvider;
-	public static synthetic fun floatVar$default (Lcom/eignex/klause/schema/VariableSchema;DDIILjava/lang/Object;)Lkotlin/properties/PropertyDelegateProvider;
+	protected final fun floatVar (DDLjava/lang/Integer;)Lkotlin/properties/PropertyDelegateProvider;
+	public static synthetic fun floatVar$default (Lcom/eignex/klause/schema/VariableSchema;DDLjava/lang/Integer;ILjava/lang/Object;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun intVar (II)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun multiple ([Ljava/lang/String;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun nominal ([Ljava/lang/String;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun optBoolVar ()Lkotlin/properties/PropertyDelegateProvider;
-	protected final fun optFloatVar (DDI)Lkotlin/properties/PropertyDelegateProvider;
-	public static synthetic fun optFloatVar$default (Lcom/eignex/klause/schema/VariableSchema;DDIILjava/lang/Object;)Lkotlin/properties/PropertyDelegateProvider;
+	protected final fun optFloatVar (DDLjava/lang/Integer;)Lkotlin/properties/PropertyDelegateProvider;
+	public static synthetic fun optFloatVar$default (Lcom/eignex/klause/schema/VariableSchema;DDLjava/lang/Integer;ILjava/lang/Object;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun optIntVar (II)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun optNominal ([Ljava/lang/String;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun setVar (Ljava/util/List;)Lkotlin/properties/PropertyDelegateProvider;

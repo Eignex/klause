@@ -59,7 +59,9 @@ class Xcsp3Test {
             KlauseConfig.current = saved.copy(largeSpanThreshold = 17)
 
             val built = Compiler.Builder().build()
-            val parsed = Xcsp3.parse("""<instance format="XCSP3" type="CSP"/>""")
+            val parsed = Xcsp3.parse(
+                """<instance format="XCSP3" type="CSP"><variables><var id="x">0..2</var></variables></instance>""",
+            )
 
             assertEquals(17L, built.problem.settings.largeSpanThreshold)
             assertEquals(parsed.problem.settings, built.problem.settings)
