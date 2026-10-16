@@ -25,7 +25,8 @@ internal fun BakedProblem.countingScope(assumptions: Assumptions): BakedProblem 
 }
 
 internal fun BakedProblem.scopedApproximateCount(config: ApproxCountConfig): Count =
-    if (rootDeductions is PropagationResult.Unsat) zeroCount.copy(semantics = semantics) else ApproxMC.run(this, config)
+    if (rootDeductions is PropagationResult.Unsat) zeroCount.copy(semantics = semantics)
+    else ApproxMC.run(this, config)
 
 internal fun BakedProblem.scopedExactCount(config: ExactCountConfig): Sequence<Count> =
     if (rootDeductions is PropagationResult.Unsat) sequenceOf(zeroCount.copy(semantics = semantics))
