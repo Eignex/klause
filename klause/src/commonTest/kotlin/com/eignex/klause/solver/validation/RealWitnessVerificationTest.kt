@@ -1,10 +1,16 @@
 package com.eignex.klause.solver.validation
 
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
+import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
@@ -31,6 +37,85 @@ class RealWitnessVerificationTest {
         val checked = verifyRealCoordinates(source, point, stop)
 
         assertIs<Verification.Indeterminate>(checked)
+    }
+
+    @Test
+    fun `power checking should retain exact rational and one bit boundary equalities`() {
+        for ((base, exponent, result) in listOf(
+            Triple(BigFraction.ofLong(2), 3, BigFraction.ofLong(8)),
+            Triple(BigFraction.of(bigIntOf(-2), bigIntOf(3)), 3,
+                BigFraction.of(bigIntOf(-8), bigIntOf(27))),
+            Triple(BigFraction.of(bigIntOf(-2), bigIntOf(3)), 2,
+                BigFraction.of(bigIntOf(4), bigIntOf(9))),
+            Triple(BigFraction.ZERO, 0, BigFraction.ONE),
+            Triple(BigFraction.ZERO, Int.MAX_VALUE, BigFraction.ZERO),
+            Triple(BigFraction.ONE, Int.MAX_VALUE, BigFraction.ONE),
+            Triple(BigFraction.MINUS_ONE, Int.MAX_VALUE, BigFraction.MINUS_ONE),
+            Triple(BigFraction.MINUS_ONE, Int.MAX_VALUE - 1, BigFraction.ONE),
+        )) {
+            val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Power(
+                Power.Coordinate.Real(SourceRealId(0)), exponent, Power.Coordinate.Real(SourceRealId(1)))),
+                numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+            val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(base.toDouble(), result.toDouble()),
+                exactReals = listOf(base, result))
+
+            assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, point, Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `impossible huge power equality should be refuted without materializing the power`() {
+        for (base in listOf(BigFraction.of(bigIntOf(1), bigIntOf(2)), BigFraction.ofLong(2))) {
+            val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Power(
+                Power.Coordinate.Real(SourceRealId(0)), Int.MAX_VALUE, Power.Coordinate.Real(SourceRealId(1)))),
+                numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+            val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(base.toDouble(), base.toDouble()),
+                exactReals = listOf(base, base))
+
+            assertIs<Verification.Rejected>(verifyRealCoordinates(source, point, Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `a power check should withhold its claim when the containing work allowance is spent`() {
+        val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Power(
+            Power.Coordinate.Real(SourceRealId(0)), 3, Power.Coordinate.Real(SourceRealId(1)))), numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0, 8.0),
+            exactReals = listOf(BigFraction.ofLong(2), BigFraction.ofLong(8)))
+        var work = 0L
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = work >= 4L
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+
+        val result = verifyRealCoordinates(source, point, token)
+
+        assertIs<Verification.Indeterminate>(result)
+    }
+
+    @Test
+    fun `interruption while checking an active indicator row should remain indeterminate`() {
+        val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.LE, BigFraction.ZERO)
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(LinearIndicator(0, true, row)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        for (active in listOf(false, true)) {
+            var stopped = false
+            val token = object : Cancellation {
+                override fun isCancelled(): Boolean = stopped
+                override fun workMeter(): WorkMeter = WorkMeter { if (it > 1) stopped = true }
+            }
+            val point = Sample(booleanArrayOf(), longArrayOf(if (active) 1 else 0), doubleArrayOf(1.0),
+                exactReals = listOf(BigFraction.ONE))
+
+            val result = verifyRealCoordinates(source, point, token)
+
+            if (active) assertIs<Verification.Indeterminate>(result)
+            else assertIs<Verification.Accepted<*, *>>(result)
+        }
     }
 
     @Test

@@ -37,3 +37,13 @@ internal fun Problem.requiresExactObjectiveRoute(objective: LinearObjective?, st
     val limit = bigIntOf(1L shl 53)
     return lower < -limit || upper > limit
 }
+
+internal fun SourceSetup.preservesOriginalCompleteArm(invocation: PreparedSourceInvocation): Boolean {
+    val admission = invocation.admission ?: return false
+    if (!admission.runnable || ExecutionStrategy.COMPLETE !in admission.arms) return false
+    val kind = executionKind(invocation)
+    if (kind == SourceExecutionKind.HEURISTIC) return false
+    return invocation.operation == ExecutionOperation.SATISFY ||
+        invocation.operation == ExecutionOperation.OPTIMIZE ||
+        (invocation.operation == ExecutionOperation.ENUMERATE && kind == SourceExecutionKind.FINITE)
+}

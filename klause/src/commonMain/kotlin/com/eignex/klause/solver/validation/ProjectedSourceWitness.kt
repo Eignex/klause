@@ -28,14 +28,19 @@ internal fun verifyProjectedSourceWitness(
         ) return Verification.Rejected("assignment violates an original integer declaration")
     }
     checkProjectedRealBounds(source, sample, cancellation)?.let { return it }
-    if (toleranceCheck == null) {
-        when (val checked = verifyRealCoordinates(source, sample, cancellation)) {
-            is Verification.Accepted -> Unit
-            is Verification.Rejected -> return checked
-            is Verification.Indeterminate -> return checked
-        }
-    } else if (!toleranceCheck(sample)) {
-        return Verification.Rejected("original source acceptance policy refutes the assignment")
+    val policy = source.semantics.effective.feasibilityTolerance
+    val checked = if (policy == null || policy.isExact) verifyRealCoordinates(source, sample, cancellation)
+        else verifyCapturedLinearTolerance(source, sample, policy, cancellation)
+    if (cancellation()) return Verification.Indeterminate("source verification cancelled")
+    when (checked) {
+        is Verification.Accepted -> Unit
+        is Verification.Rejected -> return checked
+        is Verification.Indeterminate -> return checked
+    }
+    if (toleranceCheck != null) {
+        val admitted = toleranceCheck(sample)
+        if (cancellation()) return Verification.Indeterminate("source acceptance callback cancelled")
+        if (!admitted) return Verification.Rejected("additional source acceptance filter refutes the assignment")
     }
     if (cancellation()) return Verification.Indeterminate("source verification cancelled")
     return composedFixpoint(integerChecker, Candidate(sample, Unit), cancellation,
@@ -52,8 +57,9 @@ private fun checkProjectedRealBounds(
         if (cancellation()) return Verification.Indeterminate("source real bounds check cancelled")
         val exact = sample.exactReals?.get(id) ?: sample.algebraicReals?.get(id)?.rational
             ?: sample.symbolicReals?.get(id)?.rational
-        val lower = BigFraction.ofDouble(source.realLower[id])
-        val upper = BigFraction.ofDouble(source.realUpper[id])
+        val policy = source.semantics.effective.feasibilityTolerance
+        val lower = BigFraction.ofDouble(source.realLower[id])?.let { it - capturedSourceSlack(policy, it) }
+        val upper = BigFraction.ofDouble(source.realUpper[id])?.let { it + capturedSourceSlack(policy, it) }
         if (exact != null) {
             if ((lower != null && exact < lower) || (upper != null && exact > upper)) {
                 return Verification.Rejected("assignment violates an original real declaration")

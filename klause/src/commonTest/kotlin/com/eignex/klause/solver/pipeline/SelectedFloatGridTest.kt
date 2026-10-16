@@ -28,6 +28,24 @@ import kotlin.test.assertTrue
 
 class SelectedFloatGridTest {
     @Test
+    fun `nonfinite enumeration metadata should not suppress an available automatic finite compatibility view`() {
+        val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.5)), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            ExecutionOperation.ENUMERATE, FiniteEngine.MIXED))
+        assertIs<SourceProblemRoute.OpenTheory>(invocation.route)
+
+        assertEquals(false, SourceSetup.preservesOriginalCompleteArm(invocation))
+        val selected = SourceSetup.prepareSelectedFloatGrid(invocation, listOf(FloatGridVariable(SourceRealId(0))),
+            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY)
+
+        assertIs<SelectedFloatGridPreparation.Prepared>(selected)
+        assertNotNull(invocation.floatProjection)
+    }
+
+    @Test
     fun `automatic grid selection should preserve an admitted original complete arm for the actual operation`() {
         for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.MIXED)) {
             for (operation in listOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE)) {

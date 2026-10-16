@@ -11,6 +11,7 @@ import com.eignex.klause.solver.projection.FloatGridRequest
 import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.klause.solver.projection.prepareFloatGrid
 import com.eignex.klause.solver.projection.projectObjective
+import com.eignex.klause.solver.validation.hasCapturedLinearTolerance
 import com.eignex.klause.util.Cancellation
 
 internal enum class FloatGridConsumerPurpose {
@@ -76,7 +77,7 @@ private fun selectFloatGrid(
         return SelectedFloatGridPreparation.Declined(SelectedGridDecline.SOURCE_REFUTED)
     }
     if (purpose == FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY &&
-        invocation.admission?.arms?.contains(ExecutionStrategy.COMPLETE) == true
+        preservesOriginalCompleteArm(invocation)
     ) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.CONSUMER)
     if (invocation.operation !in setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE,
             ExecutionOperation.ENUMERATE) ||
@@ -114,10 +115,14 @@ private fun selectFloatGrid(
     val route = SourceProblemRoute.Finite(projection.problem, ownership, plan)
     val source = invocation.source.problem
     val checkedIntegers = ArrayList<Int>()
+    val tolerant = source.semantics.effective.feasibilityTolerance?.isExact == false
     for (id in source.factors.indices) {
         stop.charge(1)
         if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
-        if (source.factors[id].variables.reals.isEmpty()) checkedIntegers += id
+        val factor = source.factors[id]
+        if (factor.variables.reals.isEmpty() && !(tolerant && factor.hasCapturedLinearTolerance())) {
+            checkedIntegers += id
+        }
     }
     val integerView = source.withFactors(checkedIntegers.map { source.factors[it] }.toTypedArray(),
         source.impliedFactorMask?.let { mask -> BooleanArray(checkedIntegers.size) { mask[checkedIntegers[it]] } })

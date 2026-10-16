@@ -36,13 +36,22 @@ indeterminate. Algebraic, symbolic and arbitrary-width source checks retain thei
 existing specialized owners; a finite checker does not reinterpret those values.
 The cancellation-aware overload charges coordinate, factor, row and finite-choice
 visits to its caller. Rational powers use the same containing token and do not open
-another arithmetic allowance. Interruption withholds acceptance.
+another arithmetic allowance. Power equality compares normalized numerator and denominator
+powers against the already-held witness components. Bit-length lower bounds refute
+impossible equalities before allocation; each remaining product can allocate at most
+one bit beyond the corresponding witness component. Zero, units and sign parity are
+handled directly. Unproved representation declines and interruption remain indeterminate.
 
-`verifyProjectedSourceWitness` combines that exact real check, or the caller's full
-effective source acceptance policy, with original integer declarations and a private
-composed fixpoint over the original Boolean/integer-only factors using their captured
-source descriptors. Every real relation is checked against the full original problem
-before this fixpoint; it is not instantiated as a finite propagator. A private-grid relation
+`verifyProjectedSourceWitness` combines library-owned original relation checking with
+original integer declarations and a private composed fixpoint using captured source
+descriptors. A caller callback adds a restriction and cannot replace relation coverage.
+Exact policy uses the full original real graph. Captured nonzero tolerance has a complete
+adapter for unconditional, non-strict linear comparisons and active integer-indicated
+rows, including rational slack and source real bounds. Uncovered real relations, strict
+or reified tolerance semantics remain indeterminate. Numerically checked rows and real
+relations are excluded from the second finite checker; Boolean structure and other
+integer constraints remain enforced. Every admitted original obligation is checked
+before publication; real relations are not instantiated as finite propagators. A private-grid relation
 cannot certify its own original real relation, and a rejected point supplies no
 source refutation. [Private float projections](../model.md#private-float-projections)
 own namespace reconstruction and native-result qualification.
