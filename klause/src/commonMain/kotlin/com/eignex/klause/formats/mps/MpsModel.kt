@@ -39,7 +39,8 @@ internal class MpsSourceNumber private constructor(
         fun parsed(value: BigFraction, projection: Double = value.toDouble()): MpsSourceNumber =
             MpsSourceNumber(value, null, projection.toRawBits())
 
-        fun bound(value: BigFraction): MpsSourceNumber = MpsSourceNumber(value, null, value.toDouble().toRawBits(), true)
+        fun bound(value: BigFraction): MpsSourceNumber =
+            MpsSourceNumber(value, null, value.toDouble().toRawBits(), true)
 
         fun ieee(value: Double): MpsSourceNumber = ieee(value, false)
 
