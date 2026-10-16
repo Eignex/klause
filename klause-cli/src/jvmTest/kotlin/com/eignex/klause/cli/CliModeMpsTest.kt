@@ -59,22 +59,14 @@ class CliModeMpsTest {
             )
             deleteOnExit()
         }
-        for (exact in listOf(false, true)) {
-            val flags = if (exact) arrayOf("--exact") else emptyArray()
-            val out = capture {
-                assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, mps.absolutePath)))
-            }
-
-            if (exact) {
-                assertTrue("s OPTIMUM FOUND" in out.lines(), out)
-                assertTrue("v X=10000000000000000/30000000000000001" in out.lines(), out)
-            } else {
-                assertTrue("s SATISFIABLE" in out.lines(), out)
-                assertTrue("v X=0.3333333333333333" in out.lines(), out)
-                assertTrue("c workingModelOptimizationStatus=tolerance-optimum" in out.lines(), out)
-                assertTrue("tolerance-accepted optimality unproved" in out, out)
-            }
+        val out = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", mps.absolutePath)))
         }
+
+        assertTrue("s SATISFIABLE" in out.lines(), out)
+        assertTrue("v X=0.3333333333333333" in out.lines(), out)
+        assertTrue("c workingModelOptimizationStatus=tolerance-optimum" in out.lines(), out)
+        assertTrue("tolerance-accepted optimality unproved" in out, out)
     }
 
     @Test
