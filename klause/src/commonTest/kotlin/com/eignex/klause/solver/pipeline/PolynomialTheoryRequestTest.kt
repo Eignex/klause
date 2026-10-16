@@ -61,7 +61,9 @@ class PolynomialTheoryRequestTest {
 
     @Test
     fun `mixed polynomial portfolio should find a witness after complete search is capped`() {
-        val input = SmtLibPolynomial.parse("(declare-const b Bool) (declare-const x Real) (assert b) (assert (= (* x x) 2))").realSource()
+        val input = SmtLibPolynomial.parse(
+            "(declare-const b Bool) (declare-const x Real) (assert b) (assert (= (* x x) 2))",
+        ).realSource()
         val params = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(
                 backtrack = BacktrackParams(maxInstructions = 0),
