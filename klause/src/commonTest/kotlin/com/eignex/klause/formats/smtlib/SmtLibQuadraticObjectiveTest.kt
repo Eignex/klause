@@ -1,18 +1,21 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
-import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.evaluateExact
+import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryParams
-import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
-import com.eignex.klause.solver.pipeline.minimize
-import com.eignex.klause.solver.pipeline.pipelineRequest
+import com.eignex.klause.solver.pipeline.SourceExecutionRequest
+import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
@@ -26,7 +29,7 @@ import kotlin.test.assertNotNull
 
 class SmtLibQuadraticObjectiveTest {
     @Test
-    fun `a quadratic macro objective should retain definition scope under caller shadowing`() {
+    fun `an affine macro objective should retain definition scope under caller shadowing`() {
         val input = (
             SmtLib.parse(
                 "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) " +
@@ -39,7 +42,8 @@ class SmtLibQuadraticObjectiveTest {
             exactReals = listOf(BigFraction.ofLong(2)),
         )
 
-        val value = assertNotNull(input.quadraticObjective).evaluateExact(sample, AlgebraicArithmetic())
+        val value = assertNotNull(input.objective).toLinearObjective().toQuadraticObjectiveSpec()
+            .evaluateExact(sample, AlgebraicArithmetic())
 
         assertEquals(BigFraction.ofLong(6), value.rational)
     }
@@ -78,7 +82,7 @@ class SmtLibQuadraticObjectiveTest {
 
         val value = assertNotNull(input.quadraticObjective).evaluateExact(sample, AlgebraicArithmetic())
 
-        assertIs<NonlinearIntegerProblem>((input.source).originalSource)
+        assertIs<Problem>(input.source.originalSource)
         assertEquals(BigFraction.ofLong(9), value.rational)
     }
 
@@ -123,17 +127,14 @@ class SmtLibQuadraticObjectiveTest {
                 "(declare-const x Real) (declare-const i Int) (declare-const b Bool) " +
                     "(minimize (+ (* i i) (^ (- x (ite b 1 0)) 2)))",
             ))
-        val source = assertIs<NonlinearIntegerProblem>((input.source).originalSource)
+        val invocation = SourceSetup.prepare(SourceSetupRequest(input.source, FiniteEngine.BACKTRACK,
+            assertNotNull(input.quadraticObjective), input.sense))
 
-        val execution = OpenTheoryPipeline.minimize(
-            source.pipelineRequest(),
-            assertNotNull(input.quadraticObjective),
-            NonlinearIntegerTheoryParams(polynomial = PolynomialTheoryParams(maximumWork = 100000)),
-            FiniteEngine.BACKTRACK,
-            input.sense,
-        )
+        val execution = assertIs<SourceExecutionResult.Quadratic>(SourceSetup.execute(SourceExecutionRequest(
+            invocation, NonlinearIntegerTheoryParams(polynomial = PolynomialTheoryParams(maximumWork = 100000)),
+        )))
 
-        val result = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
+        val result = assertIs<QuadraticOptimizationResult.Optimal>(execution.result.result)
         assertEquals(BigFraction.ZERO, result.incumbent.value.rational)
         assertEquals(BigFraction.ZERO, result.bound.value.rational)
     }

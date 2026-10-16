@@ -311,15 +311,19 @@ internal object Compiler {
             }
         }
 
-        fun build(): SmtLibProblem {
+        fun build(): SmtLibProblem = build(includeObjective = true)
+
+        internal fun buildSource(): SmtLibProblem = build(includeObjective = false)
+
+        private fun build(includeObjective: Boolean): SmtLibProblem {
             inferBounds()
             retainDeclarationBounds()
             if (hasOpenProductOperand()) closeProductBounds()
             for (a in asserts) assert(a)
             lowerOpenIteChains()
-            val compiledObjective = objectiveSpec?.let { (t, _) ->
+            val compiledObjective = if (includeObjective) objectiveSpec?.let { (t, _) ->
                 if (isRealExpr(t)) realObjective(t, false) else linearObjective(t, false)
-            }
+            } else null
             lowerOpenIteChains() // an objective term can open chains of its own
             conditionalEqualities.expandPending(this)
             val removed = conditionalEqualities.retainNeededDefinitions(
