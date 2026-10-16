@@ -10,8 +10,6 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
-import com.eignex.klause.factor.bool.PseudoBoolean
-import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.table.Element
@@ -49,7 +47,6 @@ internal fun Factor.buildLpRelaxation(builder: RelaxationBuilder, linearProjecti
         emitLpRelaxation(builder)
         return
     }
-    if (this is PseudoBoolean && !permitsLongPseudoBoolean(constants)) return
     if (impliedLinearRows.isNotEmpty()) {
         for (row in impliedLinearRows) row.emitLpRelaxation(builder, linearProjection)
         return

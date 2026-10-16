@@ -3,6 +3,7 @@ package com.eignex.klause.factor.bool.internals
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.ir.WideConsts
 import com.eignex.klause.ir.constsOf
@@ -55,6 +56,7 @@ internal fun pseudoBooleanKey(sink: KeySink, constants: IntegralConstants, liter
 // Long kernels require representable activities, signed flips and residual magnitudes.
 internal fun permitsLongPseudoBoolean(constants: IntegralConstants): Boolean {
     val c = constants as? IntegerConstants ?: return false
+    if (c.coefficients is UnitConsts && c.bound in 0L..c.coefficients.size.toLong()) return true
     return try {
         var lo = 0L
         var hi = 0L
