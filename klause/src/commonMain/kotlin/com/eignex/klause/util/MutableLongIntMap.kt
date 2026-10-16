@@ -82,8 +82,7 @@ internal class MutableLongIntMap(initialCapacity: Int = 8) {
         return delta
     }
 
-    /** Remove [key] and return its prior value, or [default] if absent. One table walk — for
-     *  hot callers that would otherwise pair a [getOrDefault] with a [remove] on the same key. */
+    /** Remove [key] and return its prior value, or [default] if absent, in one table walk. */
     fun removeAndGet(key: Long, default: Int): Int {
         var i = mix(key) and mask
         while (used[i]) {
@@ -133,7 +132,7 @@ internal class MutableLongIntMap(initialCapacity: Int = 8) {
 
     @PublishedApi internal val usedInternal: BooleanArray get() = used
 
-    /** Backward-shift deletion (Knuth 6.4 algorithm R) — identical to [MutableIntIntMap.deleteSlot]. */
+    /** Backward-shift deletion; see [mustStayDuringShift]. */
     private fun deleteSlot(start: Int) {
         var i = start
         used[i] = false

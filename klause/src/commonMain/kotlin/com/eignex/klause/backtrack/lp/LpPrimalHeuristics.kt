@@ -127,7 +127,7 @@ internal fun LpEngine.pinToward(
     }
     for (v in intOrder) {
         val d = session.intDomain(v)
-        if (d.min == d.max) continue // already fixed by propagation
+        if (d.min == d.max) continue
         if (!pinIntTowardLp(session, v, targetOf(relaxation.intColOf[v]), d.min, d.max, rounding)) return null
     }
     val boolOrder = (0 until problem.numBoolVars).sortedByDescending { b ->
@@ -178,7 +178,8 @@ private fun pinIntTowardLp(
 }
 
 /**
- * Feasibility pump on the primal pass: when root rounding ([lpRoundingProbe]) fails to
+ * Feasibility pump (Fischetti, Glover and Lodi, "The feasibility pump", Math. Program. 104, 2005,
+ * https://doi.org/10.1007/s10107-004-0570-3) on the primal pass: when root rounding ([lpRoundingProbe]) fails to
  * land a feasible point, alternate between an LP solution and its integer rounding, each round
  * re-solving the relaxation under an L1-distance objective that pulls the LP toward the current
  * rounding, then retrying the rounding. The distance objective is exact (linear) over variables whose
@@ -186,7 +187,7 @@ private fun pinIntTowardLp(
  * omits interior integer targets, whose `|x − t|` is not linear; this only steers the search, never
  * affects soundness (a returned [Sample] is a fully-pinned, propagation-feasible assignment the caller
  * still re-evaluates). Stops at the first rounding admitted by [accept] or the round cap. A repeated rounding
- * (cycle) triggers a Fischetti–Glover–Lodi perturbation ([perturbRounding]) — flip the most-fractional
+ * (cycle) triggers a perturbation ([perturbRounding]) — flip the most-fractional
  * coordinates and keep pumping — up to [PUMP_MAX_RESTARTS] times before giving up. Re-solves prefer the
  * primal pass ([LpSolver.solvePrimal], phase-1 included) and fall back to the dual
  * [LpSolver.solve]. [initial] supplies only the first discrete target; its real coordinates and
@@ -218,8 +219,6 @@ internal fun LpEngine.lpFeasibilityPump(
             if (step == 0 && seed != null) seed.boolValue(b) else col in 0 until primal.size && primal[col] >= 0.5
         }
         if (!seen.add(pumpKey(intTarget, boolTarget))) {
-            // Cycle: perturb the rounding (flip the most-fractional coordinates) and keep pumping, rather
-            // than giving up. Steering only — a returned [Sample] is still re-checked downstream.
             if (++restarts > PUMP_MAX_RESTARTS) return null
             val flips = PUMP_MIN_FLIP + rng.nextInt(PUMP_MIN_FLIP + 1)
             perturbRounding(relaxation, primal, intTarget, boolTarget, flips, rng)
@@ -254,10 +253,10 @@ private fun pumpKey(intTarget: LongArray, boolTarget: BooleanArray): String =
     intTarget.joinToString(",") + "|" + boolTarget.joinToString(",")
 
 /**
- * Fischetti–Glover–Lodi perturbation: flip the [count] most-fractional structural coordinates of a
+ * Feasibility-pump cycle perturbation: flip the [count] most-fractional structural coordinates of a
  * pump rounding **in place** — a Boolean flips its bit, an integer rounds the other way (toward the LP
- * value, clamped to its domain) — so a cycled pump escapes to a fresh rounding. An integral
- * distance optimum uses seeded live coordinates when fractional support is empty. Pure steering: the pump
+ * value, clamped to its domain) — so a cycled pump escapes to a fresh rounding. When no coordinate is
+ * fractional, a random sample of live coordinates flips instead. Pure steering: the pump
  * only proposes roundings that [pinToward] re-realizes and the caller re-evaluates, so this never
  * affects soundness.
  */

@@ -7,8 +7,8 @@ package com.eignex.klause.portfolio
  * (small intensifying neighbourhoods vs. large diversifying ones) and how freely worsening repairs are
  * accepted (a hot simulated-annealing walk vs. strict hill-climbing).
  *
- * [Curated] is the credit-order-agnostic default pool the [EngineMix.ALNS] engine cycles through, the
- * ALNS analog of the LS/backtrack recipe catalogs.
+ * [Curated] is the pool the [EngineMix.ALNS] engine cycles through, the ALNS analog of the LS/backtrack
+ * recipe catalogs.
  */
 internal data class AlnsProfile(
     val label: String,
@@ -17,9 +17,9 @@ internal data class AlnsProfile(
     /** Upper bound of the per-iteration destroy fraction. */
     val maxDestroyFraction: Double,
     /** Worsening — as a fraction of the initial objective — accepted with ~50% probability at the start
-     *  temperature. `0.0` selects strict hill-climbing ([com.eignex.klause.localsearch.AcceptanceCriterion.Improving]);
-     *  above it the arm
-     *  anneals from a temperature scaled to that worsening and cools by [saCooling] each iteration. */
+     *  temperature. `0.0` selects strict hill-climbing
+     *  ([com.eignex.klause.localsearch.AcceptanceCriterion.Improving]); above it the arm anneals from a
+     *  temperature scaled to that worsening and cools by [saCooling] each iteration. */
     val saInitialWorsening: Double,
     /** Per-iteration geometric cooling rate when annealing; ignored when [saInitialWorsening] is `0.0`. */
     val saCooling: Double,

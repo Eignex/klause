@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 internal object SolverInvocation {
 
-    /** Solver-side knobs. [engine] (`cp`/`ls`/`portfolio`) and [params] (repeatable `--param
+    /** Solver-side knobs. [engine] (`cp`/`ls`/`mixed`/…) and [params] (repeatable `--param
      *  key=value` engine knobs, e.g. `var-selector=vsids`) apply to klause only; references run
      *  their own search. [processors] maps to `-p` — **null means "unset"**: no `-p` is passed and the
      *  solver applies its own default (klause-cli's is single-core), so the bench never duplicates the
@@ -65,8 +65,8 @@ internal object SolverInvocation {
         val objective: Double?,
         val timeToBestMs: Long?,
         /** Wall-clock ms to the *first* feasible solution (the first `----------`), distinct from
-         *  [timeToBestMs] (the last/best). Null when never feasible. Defaulted for backward-compatible
-         *  decode of pre-existing cache blobs. */
+         *  [timeToBestMs] (the last/best). Null when never feasible. Defaulted so cache blobs without the
+         *  field still decode. */
         val timeToFirstFeasibleMs: Long? = null,
         val proven: Boolean,
         val stats: Map<String, String>,
@@ -578,8 +578,8 @@ internal object SolverInvocation {
 /**
  * A portfolio incumbent record parsed from `%%%klause-arm:`. [exactObjective] stores
  * model-oriented discrete cost as decimal text; [continuousObjective] stores the whole
- * cost when a continuous column contributes. [objective] supports numeric persisted
- * records and must not be used for exact comparisons or new output.
+ * cost when a continuous column contributes. [objective] only decodes numeric persisted
+ * records; it is never written and is not exact.
  *
  * Arrival order may differ from improvement order because publication and emission
  * use separate critical sections. Find the best holder with [SolveMetric.best].

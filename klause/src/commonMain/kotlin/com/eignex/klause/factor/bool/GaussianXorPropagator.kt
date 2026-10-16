@@ -10,9 +10,8 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.MutableIntIntMap
 
 /**
- * CP propagator for [GaussianXor]. Constructed by the propagation projection and holds the
- * Gaussian elimination data structures so they are only allocated when a CP engine is
- * initialised.
+ * CP propagator for [GaussianXor]. Holds the Gaussian elimination data structures so they are only
+ * allocated when a CP engine is initialised.
  *
  * Implements incremental Gauss-Jordan elimination over GF(2): substitutes the current partial
  * assignment, maintains a row-echelon form, and pins variables / raises conflicts as the system

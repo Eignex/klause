@@ -12,7 +12,7 @@ import com.eignex.klause.util.IntHashSet
  * range `[baseFactorCount, totalFactorCount)`. Ids are stable and never renumbered; dropping a
  * factor (base or mid-life) tombstones its id ([tombstoned]) and clears its `refPayload` slot.
  * A tombstoned slot is NEVER reused by a later add — reuse would resurrect a stale propagator
- * payload under a new factor id and silently corrupt a deduction (the wrong-optimum guard).
+ * payload under a new factor id and silently corrupt a deduction.
  */
 internal class MidlifeFactors {
     /** The mid-life propagators, appended by `addMidlifeFactor` in factor-id order. */

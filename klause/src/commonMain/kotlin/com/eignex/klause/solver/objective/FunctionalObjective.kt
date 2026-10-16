@@ -120,7 +120,6 @@ internal class FunctionalObjective internal constructor(
         val compute: ((Int) -> Long, (Int) -> Boolean) -> Long,
     )
 
-    /** Reusable dense evaluator for the defining cones; the slot indices are built once here. */
     private val coneMemo = ConeMemo(
         nodes, terms, termCoeffs, constant, boolNodes, boolTerms, boolTermCoeffs, definitions,
     )
@@ -131,13 +130,10 @@ internal class FunctionalObjective internal constructor(
         return if (minimize) v else -v
     }
 
-    // Dense bottom-up evaluator for the defining cone. Each node-output variable owns a slot in a
-    // flat LongArray indexed in the nodes' topological order, so evaluating the cone is array writes
-    // plus O(1) slot lookups rather than a per-evaluation map of boxed values rebuilt on every move
-    // — the dominant per-move allocation, since deltaIfApplied evaluates the cone twice. The slot
-    // index is computed once; the value array is allocated per evaluate, so a single instance stays
-    // safe to share across concurrent local-search workers (the objective is held in
-    // LocalSearchParams).
+    // Dense bottom-up evaluator: each node output owns a slot in a flat LongArray in topological order,
+    // avoiding a boxed per-evaluation map on the per-move path (deltaIfApplied evaluates the cone twice).
+    // The value array is allocated per evaluate, so one instance is safe to share across concurrent
+    // local-search workers.
     private class ConeMemo(
         nodes: List<Node>,
         private val terms: IntArray,

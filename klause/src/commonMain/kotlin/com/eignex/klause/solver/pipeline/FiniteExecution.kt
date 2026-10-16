@@ -96,10 +96,10 @@ class FiniteSolveRequest(
      */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
 ) {
-    /** Captured frontend parameters for compatibility; empty for directly typed options. */
+    /** Captured frontend `key=value` parameters; empty for directly typed options. */
     val engineParams: List<String> get() = executionOptions.originalPairs.toList()
 
-    /** Compatibility constructor for repeatable frontend parameters. */
+    /** Build the request from repeatable frontend `key=value` parameters. */
     constructor(
         shape: FiniteSolveShape,
         engine: FiniteEngine,
@@ -250,7 +250,7 @@ internal class FiniteExecutionRequest(
     val objective: LinearObjective?,
     /** Per-move objective view for local-search workers. */
     val localSearchObjective: IncrementalObjective?,
-    /** Optional FlatZinc definitional sweep for local-search workers. */
+    /** Optional source-level definitional sweep for local-search workers. */
     val definitionalSweep: DefinitionalSweep?,
     /** Optional decoded source search hints. */
     val searchHints: SearchHints?,
@@ -351,9 +351,7 @@ private enum class FiniteExecutionVerdict {
     /** An optimum was proven. */
     OPTIMAL,
 
-    /**
-     * A feasible incumbent was found without an optimality proof.
-     */
+    /** A feasible incumbent was found without an optimality proof. */
     BEST_FOUND,
 
     /** A feasible assignment and a ray along which the objective descends without limit were proven. */

@@ -22,7 +22,7 @@ internal enum class LpEffort {
 
     companion object {
         /** The ladder's ceiling rung for a resolved plan: [CUTS] when during-search cuts are permitted,
-         *  else the bare [BOUND]. The single source of the emphasis→top-rung mapping. */
+         *  else the bare [BOUND]. */
         fun ceiling(cutsPermitted: Boolean): LpEffort = if (cutsPermitted) CUTS else BOUND
     }
 }
@@ -41,8 +41,7 @@ internal enum class LpEffort {
  *
  * Soundness: every rung is a valid bound / infeasibility check / off, so the rung only changes *how
  * much* work is done, never the search's correctness — dropping effort loses pruning, not solutions.
- * The controller is count-based (no wall-clock), so it is deterministic and unit-testable. With
- * `top = BOUND` it reduces exactly to a two-rung auto-off.
+ * With `top = BOUND` it reduces exactly to a two-rung auto-off.
  *
  * @param top          the ceiling rung from the emphasis; the ladder starts here and never exceeds it.
  * @param warmup       passes before the first demotion — never demote during the warmup.
@@ -66,8 +65,8 @@ internal class LpEffortLadder(
     private val reprobeMax: Int = 8192,
 ) {
     companion object {
-        /** Default solves before the first demotion — the ladder's judging window. Shared with the
-         *  [LpEffortGovernor] so its "the ladder has had its chance" guard uses the same threshold. */
+        /** Default solves before the first demotion. [LpEffortGovernor] and [LpPivotBudget] share it as
+         *  their warmup, so all three judge the LP over the same evidence window. */
         const val DEFAULT_WARMUP: Int = 64
 
         /** Default first backoff interval; `Int.MAX_VALUE` instead makes a demotion irreversible. */
@@ -151,9 +150,6 @@ internal class LpEffortLadder(
         windowSolves++
         if (pruned) windowPrunes++
         if (totalSolves >= warmup && windowSolves >= window) {
-            // Reward-driven demotion: a rung holds only if its window prunes clear the floor
-            // scaled by the rung's cost — the bare bound at `minWindowPrunes`, the costlier cut rung at
-            // `minWindowPrunes × cutCostWeight`, so cuts must earn their extra re-solves to stay.
             if (windowPrunes < minWindowPrunes * costWeight(current) && current != LpEffort.OFF) {
                 current = rungs[current.ordinal - 1]
                 sinceLastProbe = 0

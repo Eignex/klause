@@ -4,7 +4,7 @@ package com.eignex.klause.formats.dimacs
 data class CnfDocument(
     /** Number of declared Boolean variables. */
     val numBoolVars: Int,
-    /** Clauses as DIMACS-encoded klause literals. */
+    /** Clauses as klause-encoded literals (0-based variables). */
     val clauses: List<IntArray>,
     /** Whether the source contained an empty clause. */
     val triviallyUnsat: Boolean,

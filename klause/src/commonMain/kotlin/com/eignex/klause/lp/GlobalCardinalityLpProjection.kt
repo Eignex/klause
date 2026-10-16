@@ -8,10 +8,10 @@ import com.eignex.klause.util.LongArrayList
 
 /**
  * One-hot selector model for the count-variable form `counts(k) = #{i : xs(i) = cover(k)}`: a one-hot
- * selector `z_iv ∈ [0,1]` per variable/value over `xs[i]`'s root box with `Σ_v z_iv = 1` and the
+ * selector `z_iv ∈ [0,1]` per variable/value over `xs(i)`'s root box with `Σ_v z_iv = 1` and the
  * channel `Σ_v v·z_iv = xs(i)`, and per cover value the exact count linkage `Σ_i z_{i,cover(k)} =
  * counts(k)` — so a count variable in the objective reads a true LP bound. Large encodings and the
- * constant-bound and optional-presence forms are skipped. HULL.
+ * constant-bound and optional-presence forms are skipped. Rows contribute as [Contribution.HULL].
  *
  * The selectors enumerate each variable's root box and the channel then confines the column to what was
  * enumerated, so over a side the model leaves open the encoding would exclude values the model admits,

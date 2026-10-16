@@ -30,7 +30,9 @@ internal interface ClauseWatchHost {
  * Each retained clause keeps its watched literals at positions zero and one, so an assignment wakes
  * only the clauses watching the literal it falsified. A clause is immutable as a set of literals while
  * its literal *order* is owned by the watch machinery, which is why callers read literals through
- * [literalsAt] and never retain the array.
+ * [literalsAt] and never retain the array. The two-watched-literal scheme follows Moskewicz, Madigan,
+ * Zhao, Zhang and Malik, "Chaff: Engineering an Efficient SAT Solver", DAC 2001,
+ * https://doi.org/10.1145/378239.379017.
  */
 internal class WatchedClauseStore {
     /** Watch entries inspected by [propagate]. */
@@ -182,8 +184,8 @@ internal class WatchedClauseStore {
      * Re-examine every single-literal clause.
      *
      * A unit clause is woken by no assignment, so a caller must run this whenever a retraction may
-     * have unassigned one of their literals. Returns the index that stopped the pass, or -1 when all
-     * units were examined, so the caller can keep the remainder pending.
+     * have unassigned one of their literals. Stops at and returns the first result that is not
+     * [ComponentResult.Consistent], so the caller can keep the units pending.
      */
     fun propagateUnits(host: ClauseWatchHost): ComponentResult {
         unitClauses.forEach { index ->

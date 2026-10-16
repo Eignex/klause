@@ -34,7 +34,7 @@ import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.theory.qflra.exactTheoryOwnable
 import com.eignex.klause.util.BIG_ONE
 
-/** Built-in complete relations with the existing exact, guarded and finite-conditioned semantics. */
+/** Built-in encoders for every factor kind, with exact, guarded and finite-conditioned semantics. */
 object BuiltInEncoderProvider : EncoderProvider {
     private val unsupported = Encoder(EncoderSupport.UNSUPPORTED)
     private val relaxation = Encoder(EncoderSupport.RELAXATION_ONLY)

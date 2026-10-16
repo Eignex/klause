@@ -25,7 +25,7 @@ data class PresolveContext(
     val affineUnderdetermined: Boolean = false,
     /** Configured affine pivot order. */
     val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
-    /** Remaining presolve time budget. */
+    /** The presolve phase's shared work allowance. */
     val presolveBudget: PresolveBudget? = null,
     /** Incremental subsumption state. */
     val subsumeIncremental: SubsumeState? = null,

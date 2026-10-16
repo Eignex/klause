@@ -7,9 +7,9 @@ import com.eignex.klause.bench.source.CorpusFiles
 
 /**
  * Source-text structural features of an instance — filled by [InstanceClassifier] from the raw source
- * (no klause compile, so a whole-corpus pass stays flat in memory). [structure] is the coarse niche
- * class the arm catalog specialises on (globals → CBLS/structured moves, pseudo-boolean/sat → probSAT,
- * linear → LP arms); the counts make it analysable rather than just a label.
+ * (no klause compile, so a whole-corpus pass stays flat in memory). [structure] is a coarse niche class
+ * (`global`, `pseudo-boolean`, `sat`, `linear` or `arithmetic`) that results are sliced by; the counts
+ * make it analysable rather than just a label.
  */
 internal data class InstanceFeatures(
     val format: String,
@@ -30,7 +30,7 @@ internal data class InstanceFeatures(
 /**
  * Classifies an instance from its raw source text — a fast, memory-flat heuristic (regex counts of
  * declarations / constraint keywords), never building the klause `Problem`. Approximate by design: it
- * feeds the stratified sampler and analysis, not the solver.
+ * feeds the reference tables, selection listings and analysis, not the solver.
  */
 internal object InstanceClassifier {
     /** MiniZinc/FlatZinc global-constraint stems (either the `.mzn` name or a flattened `_int` form). */

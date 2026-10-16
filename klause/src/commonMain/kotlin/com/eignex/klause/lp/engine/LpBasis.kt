@@ -1,8 +1,8 @@
 package com.eignex.klause.lp.engine
 
-/** Where a variable sits. Nonbasic variables are pinned to a finite bound; basic ones float. */
+/** Where a variable sits. Nonbasic variables are pinned to a finite bound, or to zero when free. */
 internal enum class VarStatus {
-    /** Basic: the variable floats; its value is read off the basis. */
+    /** The value is read off the basis. */
     BASIC,
 
     /** Nonbasic, pinned to its lower bound. */
@@ -11,23 +11,24 @@ internal enum class VarStatus {
     /** Nonbasic, pinned to its upper bound. */
     AT_UPPER,
 
+    /** Nonbasic with equal bounds. */
     FIXED,
 
+    /** Nonbasic with no bound, held at zero. */
     FREE,
 }
 
 /**
- * A basis: the `m` basic variable columns plus the bound each nonbasic variable is pinned to. The
- * float [RevisedSimplex] returns one for exact certification ([integerCertify]); because
- * branch-and-bound only tightens bounds, a parent basis stays dual-feasible so a child re-optimizes
- * with a few pivots instead of a cold solve.
+ * A basis: the `m` basic variable columns plus the bound each nonbasic variable is pinned to. Branch-and-bound
+ * only tightens bounds, so a parent basis stays dual-feasible and a child re-optimizes with a few pivots instead
+ * of a cold solve.
  */
 internal class Basis(
     /** The ordered `m` variable columns that are basic; position identifies the basis coordinate. */
     val basicVars: IntArray,
-    /** Per-variable status (length `numVars`): [VarStatus.BASIC], [VarStatus.AT_LOWER] or `AT_UPPER`. */
+    /** Per-variable status, length `numVars`. */
     val status: Array<VarStatus>,
-    // A solver projection can be valid while its original status declaration has no v1 wire code.
+    // A solver projection can be valid while its original status declaration has no capture-v1 wire code.
     val captureEligible: Boolean = true,
 )
 
@@ -50,7 +51,8 @@ internal fun Basis.validFor(model: ExactLpModel): Boolean {
     }
 }
 
-// Appended structural columns are zero in old rows; new logicals complete a block triangular basis.
+// Appended structural columns are zero in the previous rows; the appended rows' logicals complete a block
+// triangular basis.
 internal fun Basis.extended(previous: ExactLpModel, next: ExactLpModel): Basis? {
     if (basicVars.size != previous.m || status.size != previous.numVars || next.n < previous.n ||
         next.m < previous.m || basicVars.distinct().size != previous.m ||

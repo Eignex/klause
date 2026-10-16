@@ -45,10 +45,8 @@ class CompiledSchema internal constructor(
     nominalIndicators: Map<String, Map<String, Int>>,
     /** Per-float bucket→real decoders, by schema name. */
     floatDecoders: Map<String, FloatSpec>,
-    /** Default branching params derived from the schema's `search { … }` annotation, if
-     *  any. `null` when the schema didn't declare one — callers should fall back to
-     *  [BacktrackPresets.conflictDriven] in that case. The convenience [backtrackParams] handles that
-     *  fallback. */
+    /** Default branching params derived from the schema's `search { … }` annotation, or `null` when
+     *  the schema declares none; [backtrackParams] falls back to [BacktrackPresets.conflictDriven]. */
     val defaultBacktrackParams: BacktrackParams? = null,
     /** Per-set-var indicator layout: parallel `(universe[i], indicatorBoolId[i])`. Used by
      *  the set decoders to read indicator bools back into a [Set]. Nominal-set vars stash
@@ -58,7 +56,7 @@ class CompiledSchema internal constructor(
      *  int-universe set vars. */
     setNominalLabels: Map<String, List<String>> = emptyMap(),
     /** Real (LP-only continuous) variable id by schema name, for floats lowered as LP-only columns
-     * rather than bucketed; their value is read from [Sample.reals]. Empty when floats
+     *  rather than bucketed; their value is read from [Sample.reals]. Empty when floats
      *  are bucketed (see [floatDecoders]). */
     internal val realVarIdByName: Map<String, Int> = emptyMap(),
     /** Per-component representation and approximation reason by source float name. */
@@ -66,32 +64,32 @@ class CompiledSchema internal constructor(
 ) {
     private val booleanIds: Map<String, Int> = boolVarIdByName.toMap()
 
-    /** Independent source metadata for boolVarIdByName. */
+    /** Boolean variable id by schema name (a defensive copy). */
     val boolVarIdByName: Map<String, Int> get() = booleanIds.toMap()
 
     private val integerIds: Map<String, Int> = intVarIdByName.toMap()
 
-    /** Independent source metadata for intVarIdByName. */
+    /** Integer variable id by schema name (a defensive copy). */
     val intVarIdByName: Map<String, Int> get() = integerIds.toMap()
 
     private val nominalIds: Map<String, Map<String, Int>> = nominalIndicators.mapValues { it.value.toMap() }
 
-    /** Independent source metadata for nominalIndicators. */
+    /** Per-nominal one-hot indicator bool ids by schema name (a defensive copy). */
     val nominalIndicators: Map<String, Map<String, Int>> get() = nominalIds.mapValues { it.value.toMap() }
 
     private val floatSpecs: Map<String, FloatSpec> = floatDecoders.toMap()
 
-    /** Independent source metadata for floatDecoders. */
+    /** Per-float bucket decoders by schema name (a defensive copy). */
     val floatDecoders: Map<String, FloatSpec> get() = floatSpecs.toMap()
 
     private val setLabels: Map<String, List<String>> = setNominalLabels.mapValues { it.value.toList() }
 
-    /** Independent source metadata for setNominalLabels. */
+    /** Label order of each nominal-set variable (a defensive copy). */
     val setNominalLabels: Map<String, List<String>> get() = setLabels.mapValues { it.value.toList() }
 
     private val representations: Map<String, FloatRepresentation> = floatRepresentations.toMap()
 
-    /** Independent source metadata for floatRepresentations. */
+    /** Per-component float representation by source name (a defensive copy). */
     val floatRepresentations: Map<String, FloatRepresentation> get() = representations.toMap()
 
     /** Source Boolean location for a compiled schema handle. */
@@ -107,9 +105,7 @@ class CompiledSchema internal constructor(
     /** Source continuous location, or null for a float represented by an integer bucket. */
     fun sourceRealId(handle: FloatHandle): SourceRealId? = realVarIdByName[handle.name]?.let(::SourceRealId)
 
-    /** Return the schema's declared `BacktrackParams` if any, else a fresh default
-     *  [BacktrackParams]. Convenience for the common
-     *  pattern `BacktrackSolver(p.problem).solve(p.backtrackParams())`. */
+    /** The schema's declared [defaultBacktrackParams] if any, else [BacktrackPresets.conflictDriven]. */
     fun backtrackParams(): BacktrackParams = defaultBacktrackParams ?: BacktrackPresets.conflictDriven()
 
     /** Decode [handle]'s Boolean value from [sample]. */

@@ -6,7 +6,7 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import java.io.File
 
 /**
- * A committed per-instance reference optimum/bound from a strong external solver — cp-sat (MiniZinc,
+ * A per-instance reference optimum/bound from a strong external solver — cp-sat (MiniZinc,
  * XCSP3), clasp (DIMACS, OPB), z3 (SMT-LIB), or SCIP (MPS), per the instance's format
  * ([solver]). The gap-to-optimum BO reward reads this table, and it doubles as a soundness oracle (any
  * solver beating a [proven] optimum is a bug). [objective] is in the model's orientation ([maximize]).
@@ -83,7 +83,6 @@ internal object ReferenceStore {
     private fun referenceFiles(): List<File> =
         referenceDir().listFiles { f -> f.isFile && f.extension == "csv" }?.sortedBy { it.name }.orEmpty()
 
-    /** Table key: (suite, problem) — a bare name is not unique across corpora. */
     private fun key(e: ReferenceEntry) = e.suite to e.problem
 
     /** The [ref]'s corpus id — the [ReferenceEntry.suite] half of the table key: the source collection
@@ -111,7 +110,7 @@ internal object ReferenceStore {
         return merged
     }
 
-    /** Read any reference-table-schema file — a committed oracle table, or a per-run result table
+    /** Read any reference-table-schema file — a per-solver oracle table, or a per-run result table
      *  emitted by `solve` — into entries. The solver is the file's base name (`<solver>.csv` /
      *  `<config>.csv`), not a column. Lets the analysis (`credit`) read results in the same schema. */
     fun readCsv(f: File): List<ReferenceEntry> {
@@ -125,8 +124,7 @@ internal object ReferenceStore {
     }
 
     /** Write [entries] to [f] in the reference-table schema (header + one row per entry, sorted by
-     *  (suite, problem)) — the single-sourced encoding, used for both the committed table and result
-     *  tables. */
+     *  (suite, problem)), used for both reference tables and result tables. */
     fun writeCsv(f: File, entries: List<ReferenceEntry>) {
         f.parentFile?.mkdirs()
         val rows = entries.sortedWith(compareBy({ it.suite }, { it.problem })).map { encode(it) }

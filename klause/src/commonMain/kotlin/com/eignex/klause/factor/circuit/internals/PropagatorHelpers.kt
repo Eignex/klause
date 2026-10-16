@@ -81,8 +81,7 @@ internal open class CpGate {
  * int-event delta. Returns `true` when the propagator should short-circuit — the gate has already
  * fired once and no subscribed variable changed since, so there is nothing new to deduce; the
  * caller returns `true` (fixpoint). Returns `false` on the first fire and whenever a subscribed
- * variable moved, having marked the gate started. Shared by the Circuit / Subcircuit / NValue
- * propagators, which all open with this exact ritual.
+ * variable moved, having marked the gate started.
  */
 internal fun PropagationState.cpGateShouldSkip(factorId: Int): Boolean {
     val gate = (refPayload[factorId] as? CpGate) ?: run {

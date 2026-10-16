@@ -8,9 +8,8 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.util.Cancellation
 
 /**
- * Curated [BacktrackParams] presets — named, ready-to-use configurations that bundle the
- * engine's tuning knobs into a strategy, so callers (the portfolio, the bench, the CLI) don't
- * each reassemble the same combination by hand.
+ * Curated [BacktrackParams] presets: named, ready-to-use configurations that bundle the
+ * engine's tuning knobs into a strategy.
  */
 object BacktrackPresets {
 
@@ -50,8 +49,7 @@ object BacktrackPresets {
 
     /**
      * Free-search preset with last-conflict probing over VSIDS, solution-guided value ordering,
-     * phase saving and Luby restarts. Used by the free-search entry point and
-     * [com.eignex.klause.portfolio.PortfolioBuilder]'s backtrack pool.
+     * phase saving and Luby restarts.
      *
      * [randomSeed] seeds the RNG, or uses a fresh seed when null.
      * [lubyRestartBase] sets the restart unit (default: 256).

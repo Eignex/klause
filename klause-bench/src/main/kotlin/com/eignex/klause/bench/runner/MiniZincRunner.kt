@@ -49,12 +49,12 @@ internal class MiniZincRunner(
         )
     }
 
-    /** Compile [ref]'s `.mzn`(+`.dzn`) to FlatZinc and return the `.fzn` file (used by the
-     *  resolve path and by the coverage / compile-audit metrics that inspect the FZN).
+    /** Compile [ref]'s `.mzn`(+`.dzn`) to FlatZinc and return the `.fzn` file; [fresh] recompiles
+     *  even when a cached compile is up to date.
      *
-     *  The cache binds model/data, compiler identity and solver-library contents to paired FlatZinc and DZN output
-     *  mappings. Each compile publishes the output mapping before the FlatZinc commit marker;
-     *  concurrent compiles use unique temporary files and atomic replacement. */
+     *  The cache binds model/data, compiler identity and solver-library contents to paired FlatZinc and `.ozn`
+     *  output mappings. Each compile publishes the output mapping before the `.fzn`, which acts as the commit
+     *  marker; concurrent compiles use unique temporary files and atomic replacement. */
     fun compileFzn(ref: ProblemRef, fresh: Boolean = false): File {
         require(supports(ref)) { "${ref.name}: MiniZincRunner only resolves MINIZINC problems" }
         val root = CorpusFetcher.workspaceRoot()
@@ -90,8 +90,8 @@ internal class MiniZincRunner(
         }
         val msc = File(root, "klause-mzn-lib/share/minizinc/solvers/klause.msc")
         val libDir = File(root, "klause-mzn-lib/share/minizinc/klause")
-        // Compile to a unique temp, then atomically publish — concurrent compiles of the same
-        // instance each write their own temp and the rename is all-or-nothing (no truncated reads).
+        // Concurrent compiles of the same instance each write their own temp, and the atomic rename
+        // means a reader never sees a truncated file.
         val tmp = File.createTempFile("${out.nameWithoutExtension}-", ".fzn.tmp", out.parentFile)
         val tmpOzn = File.createTempFile("${out.nameWithoutExtension}-", ".ozn.tmp", out.parentFile)
         val cmd = buildList {

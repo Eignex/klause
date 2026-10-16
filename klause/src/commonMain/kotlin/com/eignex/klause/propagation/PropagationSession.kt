@@ -102,7 +102,7 @@ class PropagationSession private constructor(
 
     /** `levelStates[L]` is the [PropagationState.LevelMark] right after level `L`'s
      *  fixpoint. Index 0 = post-bake. Array-backed stack with explicit [levelTop]; grows by
-     *  doubling. Marks are tiny (four ints + rare payload copies) — no pooling needed. */
+     *  doubling. Marks are tiny (five ints + rare payload copies) — no pooling needed. */
     private var levelStates: Array<PropagationState.LevelMark?> = arrayOfNulls(8)
     private var levelTop: Int = 0
     private fun levelLast(): PropagationState.LevelMark = requireNotNull(levelStates[levelTop - 1])
@@ -120,8 +120,8 @@ class PropagationSession private constructor(
     }
 
     // Decision pins, primitive-encoded to keep a push allocation- and boxing-free.
-    // [boolPinned] holds -1 (free) / 0 (false) / 1
-    // (true) per bool var; [intPinnedSet] + [intPinnedVal] hold the int decisions. Only
+    // [boolPinned] holds -1 (free) / 0 (false) / 1 (true) per bool var; [intPinnedSet] + [intPinnedVal]
+    // hold the int decisions. Only
     // *decision* pins live here — propagation-implied facts are read from [state]. [trail]
     // is the decision stack used as a LIFO, each entry encoded as `v` (bool) or
     // `numBoolVars + v` (int), matching PropagationState's level encoding.
@@ -201,9 +201,9 @@ class PropagationSession private constructor(
         }
         rootWork = state.work
         rootPropagationNanos = state.propagationNanos
-        // Bake-time fixpoint above ran with logging off (it never backtracks). Enable undo
-        // logging now, before the first push; the level-0 mark therefore has undoSize 0,
-        // and undoing to it rewinds every search mutation back to this post-bake baseline.
+        // The bake-time fixpoint runs with logging off (it never backtracks). Undo logging starts
+        // before the first push, so the level-0 mark has undoSize 0 and undoing to it rewinds every
+        // search mutation back to this post-bake baseline.
         state.undoLogging = true
         levelPush(preparedMark ?: state.mark())
     }
@@ -390,9 +390,8 @@ class PropagationSession private constructor(
         if (levelTop > 1) levelTruncateAfterRoot()
         clearPins()
 
-        // Seed bool then int pins from the primitive sorted arrays. Iterating directly
-        // (vs. forEachBool / forEachInt) lets us `return` the first Unsat without a
-        // captured-flag dance.
+        // Iterating the primitive arrays directly (vs. forEachBool / forEachInt) lets the first
+        // Unsat `return` without a captured flag.
         val bk = assumptions.boolKeys
         val bv = assumptions.boolValues
         for (i in bk.indices) {
@@ -559,7 +558,7 @@ class PropagationSession private constructor(
      * the clause stays alive for the rest of the session and participates in every
      * future propagation cycle through [BoolWatcherIndex.byLit]. Returns
      * the propagation result of asserting it — typically [PropagationResult.Implied]
-     * with the UIP literal now forced, or [PropagationResult.Unsat] if the assertion
+     * with the UIP literal forced, or [PropagationResult.Unsat] if the assertion
      * cascades into another conflict (the engine handles that as a fresh CDB round).
      *
      * Unlike [pinBool] / [pinInt], this does *not* open a new trail level — the
@@ -922,8 +921,8 @@ class PropagationSession private constructor(
     }
 
     /**
-     * Pop until [decisionLevel] equals [level]. O(decisions popped × numVars) for the
-     * snapshot restore. Used by DFS samplers to backjump.
+     * Pop until [decisionLevel] equals [level]. The restore replays the undo log in
+     * O(changes since that level's mark). Used by DFS samplers to backjump.
      */
     fun popToLevel(level: Int) {
         require(level in 0..trail.size) {

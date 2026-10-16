@@ -112,7 +112,6 @@ internal fun intCombDiff(a: IntComb, b: IntComb, delta: Long): LinRelation {
     val bound = bw.constant - aw.constant + bigIntOf(delta)
     val vars = combined.keys.toIntArray()
     val coeffs = Array(vars.size) { combined.getValue(vars[it]) }
-    // A wide fold whose values all fit Long stays a cheap Long row (only intermediate steps overflowed).
     if (bound.fitsLong() && coeffs.all { it.fitsLong() }) {
         return LinRelation.LongRel(vars, LongArray(vars.size) { coeffs[it].toLongExact() }, bound.toLongExact())
     }

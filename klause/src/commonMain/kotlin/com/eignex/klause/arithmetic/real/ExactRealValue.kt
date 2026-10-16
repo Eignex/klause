@@ -17,7 +17,7 @@ enum class ExactRealFunction {
 
 /** Immutable mathematical expression describing one authoritative real coordinate. */
 sealed interface ExactRealExpression {
-    /** Existing exact rational or algebraic scalar. */
+    /** An exact rational or algebraic scalar. */
     data class Algebraic(
         /** Owned root metadata. */
         val value: AlgebraicReal,
@@ -64,7 +64,7 @@ class ExactRealValue internal constructor(
     /** Immutable defining expression, including exact algebraic leaves. */
     val expression: ExactRealExpression,
 ) {
-    /** Existing algebraic coordinate when the complete value is algebraic. */
+    /** The algebraic value when the whole expression is a single algebraic leaf. */
     val algebraic: AlgebraicReal? get() = (expression as? ExactRealExpression.Algebraic)?.value
 
     /** Exact rational coordinate when the complete value has a point representation. */

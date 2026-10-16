@@ -387,7 +387,8 @@ internal class GlobalCardinalityPropagator(
         // [GccFlowBuilder]): the edge set is built once for the root (widest) domains and the flow lives on
         // the undo trail, so a fire only blocks the var→cover edges whose value left and — since removing a
         // flow-FREE edge cannot lower the (already maximum, still feasible) flow — needs no re-solve. A
-        // removed flow-CARRYING edge (a broken assignment) re-solves the flow on the same structure.
+        // removed flow-CARRYING edge (a broken assignment) is rerouted in place, or re-solved on the same
+        // structure when no alternate path exists.
         val persistentEligible = presents.isEmpty() && countVars == null
         val xToCovEdgeIdx: IntArray
         val xToOtherEdgeIdx: IntArray
@@ -412,7 +413,7 @@ internal class GlobalCardinalityPropagator(
             // Incremental repair: block every newly-absent var→cover edge; a flow-free one just drops out
             // (the flow stays maximum), a flow-carrying one (a broken assignment) is recovered in place by
             // rerouting that variable's unit along an alternate path. Only if a reroute has no alternate do
-            // we fall back to a full re-solve. Either way no O(n) warm-start replay on the common path.
+            // we fall back to a full re-solve.
             var needResolve = false
             var touchedFlow = false
 

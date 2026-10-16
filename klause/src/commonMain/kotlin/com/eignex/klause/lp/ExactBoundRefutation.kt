@@ -28,10 +28,11 @@ import com.eignex.klause.util.unaryMinus
  * and the refutation is abandoned. That is the whole difficulty with an unbounded model — the values it
  * forces are large — so this pass runs first, in arithmetic that does not wrap.
  *
- * Two steps. An equality that *defines* an otherwise unbounded variable is substituted away first, which
- * collapses a chain like `y = 4x, z = 4y, z ≤ x` into the single row `15x ≤ 0`; then interval propagation
- * decides what is left. The order matters: on the chain itself propagation diverges, multiplying the
- * bound by 4 per link per round and never closing, while the eliminated form is refuted at a glance.
+ * An equality that *defines* an otherwise unbounded variable is substituted away first, which collapses a
+ * chain like `y = 4x, z = 4y, z ≤ x` into the single row `15x ≤ 0`; then each equality is checked for
+ * integer divisibility, and interval propagation decides what is left. The order matters: on the chain
+ * itself propagation diverges, multiplying the bound by 4 per link per round and never closing, while the
+ * eliminated form is refuted at a glance.
  *
  * Only the refuting direction is usable: `false` means "no conclusion", never "satisfiable". Every give-up
  * — a spent budget, a work cap, a system that stays open — answers `false`, so this only ever forfeits a

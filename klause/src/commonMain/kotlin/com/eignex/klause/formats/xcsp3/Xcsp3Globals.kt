@@ -27,7 +27,7 @@ import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 
-// XCSP3 global-constraint family emitters (allDifferent excepted).
+// XCSP3 global-constraint family emitters.
 
 internal fun Compiler.Builder.count(e: XmlElement) {
     val vars = listVars(e)
@@ -61,7 +61,7 @@ internal fun Compiler.Builder.element(e: XmlElement) {
     // (arrIsVars = false) so GAC takes the incremental support-count path ([ElementConstState]).
     // Treating each constant as a singleton fixed var instead sends it down the variable-array path,
     // which scans the whole result domain for support and prunes one value at a time — quadratic when
-    // the result domain is wide (Wordpress: a 500-entry table into a 0..976000 result).
+    // the result domain is wide.
     val constArr = parseInts(requireNotNull(e.child("list")).textContent)?.widenToLong()
     val vars = if (constArr == null) listVars(e) else null
     val arr = constArr ?: requireNotNull(vars).widenToLong()
@@ -350,7 +350,7 @@ private fun parseSym(s: String, from: Int, to: Int): Int {
 
 /** Parse `(src,sym,dst)(...)…` in a single scan, interning states to ids as it goes. Neither a
  *  per-transition object nor a `String` per repeated state is allocated — the ingestion time and heap
- *  footprint of a multi-million-transition MDD (WordDesign2) are dominated by exactly those. Whitespace
+ *  footprint of a multi-million-transition MDD are dominated by exactly those. Whitespace
  *  around the fields is tolerated as the grammar allows; the fields themselves carry no separators. */
 private fun internTransitions(text: String, firstState: String? = null): InternedTransitions {
     val n = text.length
@@ -395,9 +395,9 @@ internal class RegularAutomaton(
 )
 
 /** Return the automaton for [text], reusing the last one when [text] is the same object — the case for
- *  every row of a group over one template. [compute] runs only on a miss; a throw is not cached. */
-// Referential equality is the intent: group rows share one `<transitions>` String object, and distinct
-// constraints hold distinct objects, so `===` reuses within a group and never conflates unrelated text.
+ *  every row of a group over one template. [compute] runs only on a miss; a throw is not cached.
+ *  Referential equality is the intent: group rows share one `<transitions>` String object, and distinct
+ *  constraints hold distinct objects, so `===` reuses within a group and never conflates unrelated text. */
 @Suppress("AvoidReferentialEquality")
 private inline fun Compiler.Builder.automatonFor(text: String, compute: () -> RegularAutomaton): RegularAutomaton {
     cachedAutomaton?.let { if (text === cachedAutomatonText) return it }
@@ -429,7 +429,7 @@ internal fun Compiler.Builder.regular(e: XmlElement) {
     val text = requireNotNull(e.child("transitions")).textContent
     val automaton = automatonFor(text) {
         // The start state is interned first (id 1), then the transitions, then any final absent from
-        // them — the original insertion order, so the built automaton (hence the search) matches.
+        // them, so state ids follow first-occurrence order in the source.
         val start = requireNotNull(e.child("start")).textContent.trim()
         val trs = internTransitions(text, start)
         if (trs.symbols.isEmpty()) throw UnsupportedXcsp3Exception("regular/mdd: no transitions")
@@ -706,7 +706,7 @@ internal fun Compiler.Builder.lexOp(e: XmlElement): Pair<Boolean, Boolean> {
     }
 }
 
-/** Post `vectors[i] ⊙ vectors[i+1]` for consecutive vectors as [LexLess] factors. */
+/** Post `vectors(i) ⊙ vectors(i+1)` for consecutive vectors as [LexLess] factors. */
 internal fun Compiler.Builder.postLexChain(vectors: List<IntArray>, strict: Boolean, swap: Boolean) {
     for (i in 0 until vectors.size - 1) {
         val a = vectors[i]
@@ -802,8 +802,8 @@ private fun orderedChain(vars: IntArray, op: LinearOp, delta: Int): Increasing? 
 
 private fun IntArray.reversedCopy(): IntArray = IntArray(size) { this[size - 1 - it] }
 
-/** Chain relation over consecutive list entries: `vars[i] ⟨op⟩ vars[i+1]`, or with `<lengths>`,
- *  `vars[i] + length[i] ⟨op⟩ vars[i+1]` (one length per gap; constants or variables). */
+/** Chain relation over consecutive list entries: `vars(i) ⟨op⟩ vars(i+1)`, or with `<lengths>`,
+ *  `vars(i) + length(i) ⟨op⟩ vars(i+1)` (one length per gap; constants or variables). */
 internal fun Compiler.Builder.ordered(e: XmlElement) {
     val vars = listVars(e)
     val opText = (e.child("operator")?.textContent?.trim() ?: e.attr("operator")).ifBlank { "le" }
@@ -922,7 +922,7 @@ internal fun Compiler.Builder.eqValue01(x: Int, value: Long): Int {
     return litTo01(Lit.make(eq, true))
 }
 
-/** `binPacking`: item `i` goes to bin `list[i]`; each bin's total item size meets the condition. */
+/** `binPacking`: item `i` goes to bin `list(i)`; each bin's total item size meets the condition. */
 @Suppress("ThrowsCount") // one guard per unsupported shape across the loads/limits/condition forms
 internal fun Compiler.Builder.binPacking(e: XmlElement) {
     val items = listVars(e)
@@ -1009,7 +1009,7 @@ internal fun Compiler.Builder.nValues(e: XmlElement) {
 }
 
 /** A fresh int var equal to the count of distinct values taken across [vars], decomposed as
- *  `Σ used[v]` where `used[v] = 1` iff some variable equals `v`. Values in [except] are not
+ *  `Σ used(v)` where `used(v) = 1` iff some variable equals `v`. Values in [except] are not
  *  counted (XCSP3 `nValues` with `<except>`). */
 internal fun Compiler.Builder.distinctCountVar(vars: IntArray, except: Set<Int> = emptySet()): Int {
     val loV = vars.minOf { domains[it].min }
@@ -1177,7 +1177,7 @@ internal fun Compiler.Builder.allDifferent(e: XmlElement) {
  *  nothing. */
 internal fun Compiler.Builder.postAllDifferent(vars: IntArray) {
     // An XCSP3 column always declares a finite domain, so both sides are always present here; the
-    // shared judgement still owns the window, and admits an open column the day the format grows one.
+    // shared judgement still decides whether the window fits the global.
     val window = allDifferentWindow(vars, { domains[it].min }, { domains[it].max })
     if (window == null) {
         for (a in vars.indices) {
@@ -1207,7 +1207,7 @@ internal fun Compiler.Builder.allDifferentLists(lists: List<IntArray>) {
 }
 
 /** `allDifferent` with `<except>`: variables must be pairwise distinct unless they take an exempt
- *  value. Decomposed as `x[i] = x[j] ⟹ x[i] ∈ except` per pair — two equal variables share a value,
+ *  value. Decomposed as `x(i) = x(j) ⟹ x(i) ∈ except` per pair — two equal variables share a value,
  *  so it suffices to require that common value be exempt (one membership guard, symmetric). */
 internal fun Compiler.Builder.allDifferentExcept(vars: IntArray, except: IntArray) {
     // x[i] ∈ except, reused across every pair sharing i.

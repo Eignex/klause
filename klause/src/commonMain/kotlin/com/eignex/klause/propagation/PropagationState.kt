@@ -210,8 +210,6 @@ class PropagationState private constructor(
     var seeded: Boolean = true
         private set
 
-    // Decision-level plumbing.
-
     /** Decision level when each bool was first pinned (-1 = unpinned). */
     val boolLevel: IntArray = prepared?.boolLevel ?: (IntArray(problem.numBoolVars) { -1 })
 
@@ -222,8 +220,8 @@ class PropagationState private constructor(
     // bound was established. [intLevel] is the max of the two. Lets a current-bound order literal
     // `[v ≥ d.min]` / `[v ≤ d.max]` reconstruct its exact (often shallower) level from a single
     // slot, which is why [atomLevelForConflict] is a plain stored-slot read rather than a
-    // bound-history search. -1 = the bound
-    // is still at its root value (a level-0 global fact). Logged/restored by the undo trail.
+    // bound-history search. -1 = the bound is still at its root value (a level-0 global fact).
+    // Logged/restored by the undo trail.
     internal val intMinLevel: IntArray = prepared?.intMinLevel ?: (IntArray(problem.numIntVars) { -1 })
     internal val intMaxLevel: IntArray = prepared?.intMaxLevel ?: (IntArray(problem.numIntVars) { -1 })
 
@@ -393,7 +391,7 @@ class PropagationState private constructor(
 
     /** Reused scratch for [com.eignex.klause.factor.bool.internals.pbFalseFormAntecedents] — a single
      *  wide pseudo-Boolean factor pins many literals per sweep, each rebuilding the same assigned-literal
-     *  antecedent set, so a per-call [IntHashSet] alloc and its regrowth dominated wide-WBO root bake. */
+     *  antecedent set, so a per-call [IntHashSet] alloc and its regrowth would dominate its root bake. */
     internal val pbAntecedentSeen: IntHashSet = IntHashSet()
     internal val pbAntecedentBuf: IntArrayList = IntArrayList()
 
@@ -480,7 +478,7 @@ class PropagationState private constructor(
     /** Mid-life presolve factor overlay for [incremental] mode — see [MidlifeFactors]. */
     internal val midlife: MidlifeFactors = MidlifeFactors()
 
-    /** `problem.numFactors + learnedClauses.size`. Use this instead of `problem.numFactors`
+    /** `problem.numFactors + learnedClauses.size` plus any mid-life factors. Use this instead of `problem.numFactors`
      *  when iterating or sizing per-factor scratch in the engine. */
     val totalFactorCount: Int get() = problem.numFactors + learned.size + midlife.store.size
 
@@ -685,8 +683,8 @@ class PropagationState private constructor(
     internal val undo: UndoLog = UndoLog()
 
     /** Shared empty payload map for marks taken when no [SnapshottablePayload] is live —
-     *  avoids a per-push allocation in the common (no Table/Mdd) case. `emptyMap()` returns
-     *  a singleton, so this never allocates. Read-only: [undoTo] only iterates it. */
+     *  avoids a per-push allocation in the common (no Table/Mdd) case. Read-only: [undoTo] only
+     *  iterates it. */
     internal val emptyPayloads: MutableIntObjectMap<SnapshottablePayload> = MutableIntObjectMap(1)
 
     /** Reusable conflict analyzer for this state — one instance whose scratch buffers
@@ -706,8 +704,8 @@ class PropagationState private constructor(
     //   objective.constant + Σ_b contribution(b) + <integer part>, where
     //   contribution(b) = pinned ? (value ? w : 0) : min(w, 0).
     // Pinning a bool var raises the bound by a nonnegative penalty, so the bool part is maintained on
-    // the reversible trail instead of rescanned every node — that scan dominated CPU on large
-    // pseudo-Boolean optimization (a node visits O(numBoolVars) here otherwise). Installed lazily at the
+    // the reversible trail instead of rescanned every node, which would cost O(numBoolVars) per node on
+    // large pseudo-Boolean optimization. Installed lazily at the
     // root; the integer part (usually empty for pseudo-Boolean) stays the caller's per-node scan.
     private var objBoolWeights: LongArray? = null
     private var objBoolBaseConst: Long = 0L
@@ -819,10 +817,9 @@ class PropagationState private constructor(
     }
 
     /** Install factor [fid]'s static wakeup subscriptions into the per-literal / per-int-event advisor
-     *  indices and its delta-consumer accumulators. Factored out of the constructor loops so an
-     *  incremental presolve session can register a factor added mid-run without rebuilding the whole
-     *  state; the constructor just calls it once per initial factor. Order-preserving: appending in
-     *  factor-id order reproduces the original three-pass construction exactly. */
+     *  indices and its delta-consumer accumulators. Shared by initial construction (once per factor,
+     *  in factor-id order) and by an incremental presolve session registering a factor added mid-run
+     *  without rebuilding the whole state. */
     private fun registerFactor(fid: Int, propagator: Propagator) {
         val watchers = propagator.initialBoolWatchers
         if (watchers != null) {
@@ -877,7 +874,7 @@ class PropagationState private constructor(
     /**
      * Tombstone factor [fid] (base or mid-life): mark it dropped ([factorAt] then returns [NoPropagator],
      * so it never fires again) and clear its [refPayload] slot. The id is retired, never reused — the
-     * slot must stay cleared so a later add can't inherit a stale payload (the wrong-optimum guard). The
+     * slot must stay cleared so a later add can't inherit a stale payload (which can yield a wrong optimum). The
      * factor's entries linger in the watcher indices and occurrence lists; they wake a [NoPropagator],
      * a no-op.
      */
@@ -985,7 +982,7 @@ class PropagationState private constructor(
 
     /**
      * Lightweight per-level marker. Records only the *positions* a pop must rewind to: the
-     * undo-log size and the three append-only stacks' sizes, plus snapshot copies of any
+     * undo-log size and the other append-only stacks' sizes, plus snapshot copies of any
      * [SnapshottablePayload]s (the rare factors — Mdd / Table — whose incremental state
      * isn't recomputed from scratch on each `propagate`). Copying whole per-level state would
      * cost ~12 numVars-sized arrays per level; [undoTo] instead replays the undo log in
@@ -1144,9 +1141,9 @@ class PropagationState private constructor(
         propBegin(factorCount)
         val pollable = cancellation !== Cancellation.Never
         // Full propagation (bakes) is one-shot, not in the per-node BCP loop or a resumable slice, so
-        // it polls from the first fire. Only the incremental per-node path
-        // defers the poll past the fire floor, so a normal small fixpoint — and resumable slicing,
-        // which pauses at decision granularity — is never cut mid-propagation.
+        // it polls from the first fire. Only the incremental per-node path defers the poll past the
+        // fire floor, so a normal small fixpoint — and resumable slicing, which pauses at decision
+        // granularity — is never cut mid-propagation.
         val floor = if (allFactors) 0 else cancelFloor
         seedQueue(allFactors, factorCount, initialFactor, initialFactors)
         return fireQueue(pollable, floor, cancellation, skipExpensiveBake)
@@ -1242,15 +1239,11 @@ class PropagationState private constructor(
     }
 
     /**
-     * Effective decision level for firing factor [f] (id [fid]). A Clause's effective level is the
-     * max decision level over its literals; its `boolVars` is the deduplicated variable set of
-     * those literals and its `intVars` is empty, so [maxLevelForVars] is redundant with
-     * [maxLevelForClause] (a second O(arity) pass over the same variables on every fire — the BCP
-     * hot path). Better still: a *pure-bool* clause only ever fires when a watched bool literal
-     * just went false at the current decision level (bools are only pinned by decisions or clause
-     * propagation, all stamped at the current level), so its effective level is exactly the
-     * current decision level — no scan at all. Atom-lit clauses can fire on an atom that flipped
-     * at a sub-decision level, so they scan their literals, deferred to [settleClauseLevel].
+     * Effective decision level for firing factor [f] (id [fid]). A *pure-bool* clause only fires when
+     * a watched bool literal just went false at the current decision level (bools are only pinned by
+     * decisions or clause propagation, all stamped at the current level), so its level is the current
+     * decision level with no scan on the BCP hot path. Atom-lit clauses can fire on an atom that
+     * flipped at a sub-decision level, so they scan their literals, deferred to [settleClauseLevel].
      */
     private fun effectiveLevelFor(f: Propagator, fid: Int): Int = when {
         f is ClausePropagator -> levelToDecisionVar.size
@@ -1269,9 +1262,9 @@ class PropagationState private constructor(
     }
 
     /**
-     * Add every factor that should fire on `v`'s newly-pinned value to `queue`, using the
+     * Enqueue every factor that should fire on `v`'s newly-pinned value, using the
      * split wakeup paths: occurrence-list for factors that don't watch literals, plus the
-     * per-literal watcher index for those that do (currently Clauses). For watcher-using
+     * per-literal watcher index for those that do. For watcher-using
      * factors only the literal that just transitioned to *false* triggers a fire — true
      * literals satisfy the clause, no propagation needed.
      */

@@ -30,7 +30,6 @@ internal class ComparisonClausePropagator(
             when (status(state, i)) {
                 ENTAILED -> return true
 
-                // clause satisfied — nothing to enforce
                 FALSIFIED -> {}
 
                 else -> {

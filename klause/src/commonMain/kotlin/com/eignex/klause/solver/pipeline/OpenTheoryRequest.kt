@@ -483,7 +483,6 @@ object OpenTheoryPipeline {
         return minimizerFor(request, objective).takeIf { it.decidesEveryRound }
     }
 
-    // The descent minimizing [objective], the request's own in minimized form.
     private fun minimizerFor(request: OpenTheoryRequest, objective: LinearObjective): OpenTheoryMinimizer =
         OpenTheoryMinimizer(
             request.model,

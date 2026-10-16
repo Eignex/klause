@@ -6,12 +6,13 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 
-/** Shared empty seed array for one-sided [recordConeDegrees] calls. */
 private val EMPTY_INTS = EmptyIntArray
 
 /**
- * **Directed ejection-chain proposal**: grow a coordinated multi-variable move by chaining repairs
- * through the break structure. First moves are drawn from two pools with separate budgets:
+ * **Directed ejection-chain proposal** (after F. Glover, "Ejection chains, reference structures and
+ * alternating path methods for traveling salesman problems", Discrete Applied Mathematics 65, 1996,
+ * https://doi.org/10.1016/0166-218X(94)00037-E): grow a coordinated multi-variable move by chaining
+ * repairs through the break structure. First moves are drawn from two pools with separate budgets:
  * [seedFactor]'s own repair proposals (repair-first) and primitives on neighbouring factors'
  * variables (ejection-first — see `neighbourPrimitives`). Each accepted step is applied (with
  * invariant propagation), the factor it *newly regressed* is identified, and that factor's
@@ -96,8 +97,8 @@ internal fun LocalSearchState.sampleChainFirsts(
     return emitted
 }
 
-/** Emit ±1 int steps and bool flips on every variable of every factor adjacent to [fid]
- *  (sharing a variable) — the ejection-step vocabulary for chain firsts. */
+/** Emit adjacent-value and endpoint int steps and bool flips on every variable of every factor
+ *  adjacent to [fid] (sharing a variable) — the ejection-step vocabulary for chain firsts. */
 internal fun LocalSearchState.neighbourPrimitives(fid: Int, sink: MoveSink) {
     val f = problem.factors[fid]
     val seenFactors = IntHashSet()

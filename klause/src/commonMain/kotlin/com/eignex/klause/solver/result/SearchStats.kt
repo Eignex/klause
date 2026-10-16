@@ -11,7 +11,7 @@ import com.eignex.kumulant.stat.summary.WeightedMeanResult
 /**
  * Core tree-search counters — the CDCL / DFS backbone shared by the complete backends: node and
  * failure counts, restarts, propagations, learned clauses, and the depth distribution. Zero for a
- * pure local-search solve. See [SolveStats].
+ * pure local-search solve apart from [restarts]. See [SolveStats].
  */
 data class SearchStats(
     /** Decision nodes visited. */

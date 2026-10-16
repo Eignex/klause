@@ -45,9 +45,7 @@ class StallSwaps(
                 if (nvars.isEmpty()) continue
                 nvars[rng.nextInt(nvars.size)]
             }
-            // The compound bypasses the state sink's assumption filter, so the shared builder checks
-            // frozen vars explicitly; same-shaped domains required, owner check not (any violated-
-            // factor var is fair game here).
+            // Same-shaped domains only; ownership is left to the sink's owner filter.
             val swap = PairSwap.intSwapMove(state, u, w, sameShape = true, checkOwner = false) ?: continue
             sink.addCompound(swap.parts)
             budget--

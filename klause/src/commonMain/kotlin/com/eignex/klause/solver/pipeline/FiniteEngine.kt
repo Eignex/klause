@@ -27,7 +27,10 @@ enum class FiniteEngine(
     /** A portfolio combining backtrack and local-search solvers. */
     MIXED("mixed"),
 
-    /** A hybrid large-neighbourhood portfolio with CP repair. */
+    /**
+     * A hybrid adaptive large-neighbourhood portfolio with CP repair (Ropke and Pisinger, Transportation
+     * Science 40(4), 2006, https://doi.org/10.1287/trsc.1050.0135).
+     */
     ALNS("alns"),
     ;
 

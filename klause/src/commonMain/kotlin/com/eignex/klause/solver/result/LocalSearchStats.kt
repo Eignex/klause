@@ -40,7 +40,6 @@ data class LocalSearchStats(
             o.timeToBestMs < 0L -> timeToBestMs
             else -> minOf(timeToBestMs, o.timeToBestMs)
         },
-        // Keep the incumbent from whichever worker got closer to feasibility (lower violation). NaN defers.
         incumbentObjective = pickByViolation(
             incumbentViolation,
             incumbentObjective,

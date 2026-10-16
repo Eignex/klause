@@ -15,7 +15,7 @@ internal enum class PhaseMode { UNMANAGED, STABLE, FOCUSED }
  * Pluggable restart *schedule* for one backtrack run: the per-run decision budget and the decision of
  * when to cut a run short and pop back to root. Decouples *when* to restart from the restart *action* —
  * popping the trail, replaying nogoods, forgetting, vivifying — which stays with the caller
- * ([com.eignex.klause.solver.search.SearchRun]), so a new schedule can be dropped in without touching traversal.
+ * ([com.eignex.klause.solver.search.SearchRun]).
  *
  * Selected from [BacktrackParams] by [from]; each driver owns its own instance (and thus its own
  * detector state), so the satisfaction path ([BacktrackSolver]) and the branch-and-bound engine
@@ -128,16 +128,17 @@ internal class DiveUntilFeasibleRestartSchedule(private val inner: RestartSchedu
 }
 
 /**
- * The classic Luby (geometric-free) schedule: run `lubyN(idx) · base` decisions, then restart. The
- * per-run budget follows the Luby sequence `1, 1, 2, 1, 1, 2, 4, …` scaled by [base] — universally
- * optimal in expectation for Las Vegas search with an unknown runtime distribution.
+ * Luby schedule: run `lubyN(idx) · base` decisions, then restart. The per-run budget follows the Luby
+ * sequence `1, 1, 2, 1, 1, 2, 4, …` scaled by [base] — universally optimal in expectation for Las Vegas
+ * search with an unknown runtime distribution (Luby, Sinclair and Zuckerman, "Optimal speedup of Las Vegas
+ * algorithms", Inf. Process. Lett. 47, 1993, https://doi.org/10.1016/0020-0190(93)90029-9).
  */
 internal class LubyRestartSchedule(private val base: Long) : RestartSchedule {
     private var lubyIdx = 1L
     private var perRunBudget = Long.MAX_VALUE
 
     override fun beginRun() {
-        // Cap multiplication to avoid overflow on tiny base + huge lubyIdx.
+        // Saturate instead of overflowing on a large lubyIdx.
         val limit = lubyN(lubyIdx)
         perRunBudget = if (limit > Long.MAX_VALUE / base) Long.MAX_VALUE else limit * base
     }

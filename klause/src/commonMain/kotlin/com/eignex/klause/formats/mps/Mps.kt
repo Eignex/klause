@@ -33,7 +33,7 @@ internal fun mpsError(msg: String): Nothing = throw MpsFormatException(msg)
  * common case; fixed-column files whose names embed spaces are not supported.
  *
  * Bound conventions: a variable defaults to `[0, +∞)`. A marker-declared integer column with no
- * `BOUNDS` entry defaults to `[0, 1]`, following the CPLEX convention used by SCIP and HiGHS.
+ * `BOUNDS` entry defaults to `[0, 1]`, following the common MPS convention.
  * Explicit bound entries replace this binary default. `RANGES` and `RHS` follow the standard sign
  * rules (see [applyRange]).
  */
@@ -100,7 +100,7 @@ object Mps {
                 section = openSection(fields).also {
                     if (it == Section.NAME) name = fields.getOrElse(1) { "" }
                 }
-                // ENDATA ends the model: older files append sections after it, such as MIPLIB 3's IMPORTANCES
+                // ENDATA ends the model: some files append sections after it, such as MIPLIB 3's IMPORTANCES
                 // branching priorities, which are no part of the model.
                 if (section == Section.ENDATA) break
                 // OBJSENSE may state MAX/MAXIMIZE on the header line itself.
@@ -160,11 +160,10 @@ object Mps {
     private fun isMaximize(token: String?): Boolean =
         token != null && (token.equals("MAX", true) || token.equals("MAXIMIZE", true))
 
-    /** A ROWS data line: `<type> <name>`, type in `N`(free/objective) `L`(≤) `G`(≥) `E`(=). */
-
-    // Returns whether an objective row exists once this line has been read. The flag is carried by the
-    // caller rather than re-derived: only the FIRST free row is the objective, and rescanning every row
-    // parsed so far to learn that costs O(rows) per free row, which is quadratic on a free-row-heavy file.
+    // A ROWS data line: `<type> <name>`, type in `N`(free/objective) `L`(≤) `G`(≥) `E`(=). Returns whether
+    // an objective row exists once this line has been read. The flag is carried by the caller rather than
+    // re-derived: only the FIRST free row is the objective, and rescanning every row parsed so far to learn
+    // that costs O(rows) per free row, which is quadratic on a free-row-heavy file.
     private fun readRow(
         fields: List<String>,
         rows: MutableList<Row>,

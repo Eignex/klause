@@ -1,17 +1,17 @@
 package com.eignex.klause.backtrack
 
 /**
- * LBD-adaptive restart policy (Audemard-Simon 2009/2012) for the pure-Boolean search path.
- * Instead of a fixed, instance-blind Luby schedule, it restarts when the
- * solver is *learning poorly*: a short exponential window of recent learned-clause LBD running
- * hotter than the long-run global LBD average means the recent clauses are low-quality and the
- * search should re-pick. The complementary trail-size blocking suppresses a restart when the
- * trail is much larger than its recent average — the solver is assigning deep toward a model,
- * so interrupting it would throw away progress.
+ * LBD-adaptive restart policy for the pure-Boolean search path (Audemard and Simon, "Predicting Learnt
+ * Clauses Quality in Modern SAT Solvers", IJCAI 2009, https://www.ijcai.org/Proceedings/09/Papers/074.pdf;
+ * trail blocking from "Refining Restarts Strategies for SAT and UNSAT", CP 2012,
+ * https://doi.org/10.1007/978-3-642-33558-7_11). It restarts when the solver is *learning poorly*: a
+ * short window of recent learned-clause LBD running hotter than the long-run global LBD average means
+ * the recent clauses are low-quality and the search should re-pick. The complementary trail-size
+ * blocking suppresses a restart when the trail is much larger than its recent average — the solver is
+ * assigning deep toward a model, so interrupting it would throw away progress.
  *
- * Both inputs already exist: LBD is computed per learned clause in
- * [com.eignex.klause.propagation.ConflictAnalyzer], and the search trail depth is read
- * straight off the engine.
+ * LBD is computed per learned clause in [com.eignex.klause.propagation.ConflictAnalyzer]; the trail
+ * depth is read off the engine.
  *
  *  - [lbdWindow] — capacity of the recent-LBD window. The restart check is gated on this
  *    window being full, so tiny instances never restart.
@@ -62,16 +62,14 @@ internal class GlucoseRestart(
         pushLbd(lbd)
         pushTrail(trailSize)
 
-        // Blocking: a trail far above its recent average means the solver is driving deep
-        // toward a model — defer the restart and reset the LBD window so it must refill before
-        // it can trigger again.
+        // A trail far above its recent average means the solver is driving deep toward a model:
+        // defer the restart and reset the LBD window so it must refill before it can trigger again.
         if (trailCount == trailWindow && trailSize.toDouble() > blockingFactor * (trailSum.toDouble() / trailCount)) {
             clearTrail()
             clearLbd()
             return false
         }
 
-        // Restart when the recent LBD window is hotter than the long-run average.
         if (lbdCount == lbdWindow) {
             val recentAvg = lbdSum.toDouble() / lbdWindow
             val globalAvg = globalLbdSum.toDouble() / conflicts

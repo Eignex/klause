@@ -24,9 +24,9 @@ internal class LearnedClauseDb(
      *  problem, not trail state); pruned by `forgetLearnedClauses`. */
     val store = ArrayList<LearnedPropagator>()
 
-    /** LBD (Literal Block Distance) per learned clause, parallel to [store]. The standard
-     *  glue metric: lower = more re-usable. Forgetting policies key on this to decide which clauses to
-     *  drop. */
+    /** LBD (literal block distance) per learned clause, parallel to [store]: lower = more re-usable.
+     *  Forgetting policies key on it (G. Audemard, L. Simon, "Predicting Learnt Clauses Quality in
+     *  Modern SAT Solvers", IJCAI 2009, https://www.ijcai.org/Proceedings/09/Papers/074.pdf). */
     val lbds = IntArrayList()
 
     /** 1 for clauses that must survive every forgetting pass, parallel to [store].

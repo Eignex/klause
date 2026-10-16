@@ -1,8 +1,9 @@
 package com.eignex.klause.util
 
-// The Luby–Sinclair–Zuckerman restart sequence 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, …
-// (Luby-Sinclair-Zuckerman 1993) — universally optimal in expectation for Las Vegas algorithms
-// with an unknown runtime distribution. Both solver engines drive their restart cadence from it:
+// The Luby restart sequence 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, … (Luby, Sinclair, Zuckerman,
+// "Optimal speedup of Las Vegas algorithms", IPL 1993, https://doi.org/10.1016/0020-0190(93)90029-9),
+// universally optimal up to a log factor for Las Vegas algorithms with an unknown runtime
+// distribution. Both solver engines drive their restart cadence from it:
 // the backtrack search reads the indexed lubyN against a monotone run counter, while local search
 // steps a LubyIterator. The two access forms produce the identical sequence (lubyN(i) equals the
 // i-th value the iterator yields), pinned by a unit test. Per-engine scaling (a decision budget, a
@@ -16,12 +17,10 @@ package com.eignex.klause.util
 internal fun lubyN(index: Long): Long {
     var i = index
     var k = 1
-    // Find smallest k such that 2^k > i.
     while ((1L shl k) <= i) k++
     while (true) {
         val pow = 1L shl (k - 1)
         if (i == (pow shl 1) - 1) return pow
-        // Otherwise i < (pow << 1) - 1; recurse on (i - pow + 1).
         i = i - pow + 1
         k = 1
         while ((1L shl k) <= i) k++
@@ -29,8 +28,8 @@ internal fun lubyN(index: Long): Long {
 }
 
 /**
- * Stateful O(1)-per-step producer of the Luby sequence — Knuth's reluctant-doubling form
- * (TAOCP): [value] is the current term, [advance] moves to the next in constant time with no
+ * Stateful O(1)-per-step producer of the Luby sequence in Knuth's reluctant-doubling form
+ * (TAOCP Vol. 4B §7.2.2.2): [value] is the current term, [advance] moves to the next in constant time with no
  * index recompute. Start position yields `1` (the first term); each [advance] emits the next.
  */
 internal class LubyIterator {

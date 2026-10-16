@@ -14,9 +14,9 @@ import com.eignex.klause.util.times
 import com.eignex.klause.util.unaryMinus
 
 /**
- * Kannan and Bachem, *Polynomial Algorithms for Computing the Smith and Hermite Normal Forms of an
- * Integer Matrix* (SIAM J. Computing, 1979): the column Hermite form with its unimodular transform, so
- * the change of variables is a bijection of the integer lattice rather than merely of the rationals.
+ * R. Kannan and A. Bachem, *Polynomial Algorithms for Computing the Smith and Hermite Normal Forms of an Integer
+ * Matrix*, SIAM J. Comput. 8(4) (1979), https://doi.org/10.1137/0208040: the column Hermite form with its unimodular
+ * transform, so the change of variables is a bijection of the integer lattice rather than merely of the rationals.
  *
  * A matrix in column Hermite normal form together with the column operations that produced it:
  * `H = A · V`, where [v] is unimodular (integer, determinant ±1) and therefore a bijection of the
@@ -92,7 +92,7 @@ internal fun hermiteNormalForm(
         }
         if (h[row, pivot].isZero()) continue // the whole row is zero from `pivot` right; no pivot here
         if (h[row, pivot].signum() < 0) negateColumn(h, v, pivot)
-        // Reduce the entries left of the pivot into `[0, pivot)`, the canonical form's uniqueness rule.
+        // Reduce the entries left of the pivot into `[0, d)`, the canonical form's uniqueness rule.
         val d = h[row, pivot]
         for (j in ascendingSupport(h, row)) {
             if (j >= pivot) continue

@@ -45,6 +45,9 @@ internal class QuadraticNeighborhoodCursor(
 ) : AutoCloseable {
     private val random = Random(seed)
     private var radius = BigFraction.ONE
+    // Adaptive operator weights follow ALNS: Ropke and Pisinger, "An Adaptive Large Neighborhood Search Heuristic
+    // for the Pickup and Delivery Problem with Time Windows", Transportation Science 2006,
+    // https://doi.org/10.1287/trsc.1050.0135
     private val weights = DoubleArray(3) { 1.0 }
     private val initialMoves = allowance.moves
     private val initialInstructions = allowance.instructions

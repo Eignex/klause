@@ -2,17 +2,9 @@ package com.eignex.klause.solver.objective
 import com.eignex.klause.ir.Problem
 
 /**
- * MiniZinc-style `solve minimize x` builders. Return a [LinearObjective] sized to the
- * caller's `Problem` so backends that index coefficient arrays by variable id (e.g.
- * `WorstObjective` destroy in ALNS) read consistent
- * bounds. The factories live as `Problem` extensions rather than on [LinearObjective]'s
- * companion because they need the variable-count context the Problem already carries —
- * keeping [LinearObjective] a pure data class while the "point at one variable" idiom
- * sits at the layer that knows about variables.
- *
- * For schema-level callers, see the `CompiledSchema.minimize(handle)` overloads which
- * delegate here after resolving handle names to ids and folding float-bucket scaling
- * into real-valued coefficients.
+ * Minimise one integer variable. The objective is sized to this problem, so consumers that index
+ * coefficient arrays by variable id read consistent bounds. The factories are [Problem] extensions
+ * because they need its variable counts, which keeps [LinearObjective] free of problem context.
  */
 fun Problem.minimizeInt(intVar: Int): LinearObjective {
     require(intVar in 0 until numIntVars) { "intVar $intVar out of [0, $numIntVars)" }
@@ -21,7 +13,7 @@ fun Problem.minimizeInt(intVar: Int): LinearObjective {
     return LinearObjective(intCoefficients = arr)
 }
 
-/** Optimizers minimise; a -1 coefficient maximises. */
+/** Maximise one integer variable as a -1 coefficient, since optimizers minimise. */
 fun Problem.maximizeInt(intVar: Int): LinearObjective {
     require(intVar in 0 until numIntVars) { "intVar $intVar out of [0, $numIntVars)" }
     val arr = LongArray(numIntVars)

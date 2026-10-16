@@ -197,7 +197,7 @@ internal class ElementPropagator(
         return true
     }
 
-    /** Full GAC for a variable array. */
+    /** GAC for a variable array; domains wider than the walk cap filter by bounds overlap only. */
     private fun elementPropagateVarArray(state: PropagationState): Boolean {
         state.propagatorFailures.remove(this)
         val len = arr.size

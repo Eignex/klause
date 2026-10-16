@@ -30,12 +30,10 @@ import com.eignex.klause.util.binarySearchInt
  * bake-time probing ride alongside in [deductions] — they are applied together at seed time but never
  * originate from the pin API.
  *
- * Storage is parallel primitive arrays sorted ascending by key — no autoboxing on any
- * read, no `HashMap` allocations on merge, and binary-search lookup for [boolValueOrNull]
- * / [intValueOrNull]. The [bools] / [ints] map views are kept for the bake-time
- * failed-literal probing path in `Problem` and for tests; hot paths should use the
- * primitive accessors ([forEachBool], [forEachInt], [boolValueOrNull], [intValueOrNull],
- * [mergedWith]) which never allocate.
+ * Storage is parallel primitive arrays sorted ascending by key, with binary-search lookup for
+ * [boolValueOrNull] / [intValueOrNull]. The [bools] / [ints] map views allocate on every access; hot
+ * paths should use the primitive accessors ([forEachBool], [forEachInt], [boolValueOrNull],
+ * [intValueOrNull]).
  */
 class Assumptions internal constructor(
     /** Bool var ids, ascending. Public for primitive iteration in [forEachBool]. */
@@ -89,11 +87,10 @@ class Assumptions internal constructor(
 
     /**
      * Merge `this` with [other]; on key overlap, [other]'s value wins (last-write
-     * semantics — the Session abstraction relies on this). Returns a fresh
-     * [Assumptions]; the inputs are untouched.
+     * semantics, which sessions rely on). Returns a fresh [Assumptions]; the inputs are untouched.
      *
-     * Primitive sorted-merge in O(n + m); no `HashMap`, no autoboxing. The [deductions] merge is
-     * delegated to [DeducedRestrictions.mergedWith] under the merged exact-pin set.
+     * Sorted merge in O(n + m). The [deductions] merge is delegated to [DeducedRestrictions.mergedWith]
+     * under the merged exact-pin set.
      */
     fun mergedWith(other: Assumptions): Assumptions {
         if (other.isEmpty && other.deductions.isEmpty) return this
@@ -118,7 +115,7 @@ class Assumptions internal constructor(
             mergedIntKeys,
             mergedIntValues,
         )
-        // Bound/hole/set tightenings drop any var that is now exactly pinned (the pin subsumes).
+        // Bound/hole/set tightenings drop any var the merge pins exactly (the pin subsumes).
         val pinned = IntHashSet()
         for (i in 0 until mergedIntKeys.size) pinned.add(mergedIntKeys[i])
         val mergedDeductions = deductions.mergedWith(other.deductions, pinned)
@@ -187,22 +184,19 @@ class Assumptions internal constructor(
         }
     }
 
-    /** Return a fresh [Assumptions] with [id]'s lower bound tightened to at least [value].
-     *  Used by SAC-at-root to accumulate non-singleton deductions. */
+    /** Return a fresh [Assumptions] with [id]'s lower bound tightened to at least [value]. */
     fun withTightenedMin(id: Int, value: Long): Assumptions = copy(deductions = deductions.withTightenedMin(id, value))
 
     /** Return a fresh [Assumptions] with [id]'s upper bound tightened to at most [value]. */
     fun withTightenedMax(id: Int, value: Long): Assumptions = copy(deductions = deductions.withTightenedMax(id, value))
 
-    /** Return a fresh [Assumptions] with [id ≠ value] punched in as an interior-hole
-     *  assumption. Idempotent if the hole already exists. Caller is responsible for
-     *  ensuring [value] is in the var's current effective domain — the engine will
-     *  raise on attempts to exclude a singleton's sole value, mirroring tighten-on-pin. */
+    /** Return a fresh [Assumptions] with `id ≠ value` added as an interior-hole assumption. Idempotent if
+     *  the hole already exists. The caller ensures [value] is in the var's current effective domain; the
+     *  engine raises on an attempt to exclude a singleton's sole value. */
     fun withIntHole(id: Int, value: Long): Assumptions = copy(deductions = deductions.withIntHole(id, value))
 
-    /** Map view. Allocates a `LinkedHashMap` per access — used by cold paths like
-     *  `Problem`'s failed-literal probing and by tests; hot paths should call
-     *  [forEachBool] / [boolValueOrNull] instead. */
+    /** Map view. Allocates a `LinkedHashMap` per access; hot paths should call [forEachBool] /
+     *  [boolValueOrNull] instead. */
     val bools: Map<Int, Boolean>
         get() = if (boolKeys.isEmpty()) {
             emptyMap()

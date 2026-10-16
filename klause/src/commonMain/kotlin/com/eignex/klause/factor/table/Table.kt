@@ -23,8 +23,8 @@ import com.eignex.klause.util.argsortBy
  * [tuples]. The [tuples] array stores rows row-major: `tuples(i, j)` lives at
  * `tuples(i * arity + j)` in the flat representation, where `arity = xs.size`.
  *
- * Propagation: tighten each `xs(j)` to the union of `tuples(*, j)` values restricted to
- * rows whose every column is still domain-feasible.
+ * Propagation is STR2 simple tabular reduction: tighten each `xs(j)` to the union of `tuples(*, j)`
+ * values restricted to rows whose every column is still domain-feasible.
  *
  * `table_bool` is supported via the same factor by channeling booleans to 0/1 ints upstream.
  */

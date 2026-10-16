@@ -44,9 +44,9 @@ internal class LexLessPropagator(
     }
 
     /**
-     * Frisch–Hnich–Kiziltan–Miguel–Walsh lexicographic filtering ("Global Constraints for
-     * Lexicographic Orderings"). Each call recomputes the two pointers from the current
-     * domains:
+     * Lexicographic filtering after Frisch, Hnich, Kiziltan, Miguel, Walsh, "Global Constraints for
+     * Lexicographic Orderings", CP 2002, https://doi.org/10.1007/3-540-46135-3_7. Each call recomputes
+     * the two pointers from the current domains:
      *
      *  - `α` (`a`): the deciding index — the first position whose `(x, y)` pair is not yet pinned
      *    to a common value, so every earlier position is fixed-equal and the relation hinges here.

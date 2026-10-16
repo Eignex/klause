@@ -31,6 +31,9 @@ import com.eignex.kumulant.stream.lock
  * and the arm-side `seen` key-set makes that re-drain duplicate-free — so eviction costs a stale arm
  * one full (deduped) import, never a missed or double-registered clause. Evicted keys leave the
  * de-dup set, so a re-derived clause can re-enter.
+ *
+ * Glue clauses and the literal block distance (LBD) follow G. Audemard, L. Simon, "Predicting learnt clauses quality
+ * in modern SAT solvers", IJCAI 2009, https://www.ijcai.org/Proceedings/09/Papers/074.pdf.
  */
 internal class SharedClausePool(
     private val lock: Mutex = Concurrency.None.lock(),
@@ -173,10 +176,10 @@ internal class PoolClauseExchange(
     }
 
     override fun onSearchStart(session: PropagationSession) {
-        // Fresh session (a single-threaded portfolio rebuilds the arm's session every segment): its
-        // learned DB is empty, so re-import the whole pool — including this arm's own clauses from
-        // earlier segments, which the persistent-session `seen`/`cursor` would otherwise suppress.
-        // Resetting both makes the import unconditional; the pool de-dups any re-export by key.
+        // Fresh session (a rebuilt or reseeded arm): its learned DB is empty, so re-import the whole
+        // pool — including this arm's own clauses from earlier sessions, which `seen`/`cursor` would
+        // otherwise suppress. Resetting both makes the import unconditional; the pool de-dups any
+        // re-export by key.
         cursor = 0L
         seen.clear()
         onRestart(session)

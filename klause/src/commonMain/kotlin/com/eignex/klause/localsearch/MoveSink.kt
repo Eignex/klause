@@ -10,15 +10,13 @@ import com.eignex.klause.util.LongArrayList
  * an [Assumptions] set so a frozen variable never enters the candidate list. LS-only — the
  * propagation contract doesn't use it.
  *
- * Backs `BoolFlip` / `IntSet` additions with a resizable [LongArray] key lane (one Long per
- * move: bit 63 = kind, bits 0..30 = varId) paired with a value lane (the `IntSet` target value,
- * which spans the full [Long] domain range), so a fill-clear cycle — the dominant pattern during
- * local search — touches no per-move objects. Compound moves are boxed in a small side list (only
- * the AllDifferent and Circuit factors use them, and neither mixes compounds with primitives
- * within a single propose call).
+ * Backs primitive additions with a resizable [LongArray] key lane (one Long per move: bit 63 marks
+ * `IntSet`, bit 62 `RealSet`, bits 0..30 = varId) paired with a value lane (the `IntSet` target, or
+ * the `RealSet` target's raw bits), so a fill-clear cycle — the dominant pattern during local
+ * search — touches no per-move objects. Compound moves are boxed in a small side list.
  *
  * [list] materializes [Move] objects lazily on first read and caches them until the next
- * mutation. Callers that never read [list] on an empty sink pay zero per-add allocation.
+ * mutation; adds themselves allocate nothing per move.
  */
 class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     private val lane = LongArrayList(INITIAL_CAPACITY)
@@ -47,8 +45,8 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         compounds!![index - lane.size]
     }
 
-    /** Replace the [Assumptions] this sink filters against. Called by [LocalSearchState] on
-     *  init / restart so per-call assumptions take effect. */
+    /** Replace the [Assumptions] this sink filters against, so a sink reused across solves honours
+     *  the current call's pins. */
     fun setAssumptions(a: Assumptions) {
         assumptions = a
     }
@@ -100,7 +98,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     internal fun allowsDefinedInt(varId: Int): Boolean =
         !assumptions.isFrozenInt(varId) && !ownedByOther(varId)
 
-    /** Queue a Boolean-flip move on `boolVar`. */
+    /** Queue a Boolean-flip move on [varId]. */
     fun addBoolFlip(varId: Int) {
         if (!allowsBool(varId)) return
         lane.add(encodeBoolFlip(varId))
@@ -117,7 +115,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         LiteralChannelRepair(state, this).proposePredicate(varId, !state.assignment.boolValue(varId))
     }
 
-    /** Queue an int-set move on `intVar`. */
+    /** Queue an int-set move on [varId]. */
     fun addIntSet(varId: Int, newValue: Long) {
         if (!allowsInt(varId)) return
         lane.add(encodeIntSet(varId))
@@ -125,22 +123,22 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         cachedList = null
     }
 
-    /** Queue a real-set move on `realVar`. Real columns are never pinned, defined or owned. */
+    /** Queue a real-set move on [varId]. Real columns are never pinned, defined or owned. */
     fun addRealSet(varId: Int, newValue: Double) {
         lane.add(encodeRealSet(varId))
         valueLane.add(newValue.toRawBits())
         cachedList = null
     }
 
-    /** Add a multi-variable atomic transition. Skips the move entirely if any part
-     *  would touch a frozen variable — a Compound is all-or-nothing. */
+    /** Add a multi-variable atomic transition. Skips the move entirely if any part would touch a
+     *  frozen variable — a Compound is all-or-nothing. Parts on defined or foreign-owned variables are
+     *  dropped individually; a single survivor is added as a primitive move. */
     fun addCompound(parts: List<Move>) {
         if (touchesFrozen(parts)) return
         val kept = withoutRedundantParts(parts)
         if (kept.isEmpty()) return
         if (kept.size == 1) {
-            // A compound reduced to one survivor is just a primitive move (Compound requires
-            // two parts); the part already passed the frozen/defined filters above.
+            // Compound requires two parts; the survivor already passed the frozen/defined filters.
             addPrimitive(kept[0])
             return
         }
@@ -202,7 +200,8 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
      *  sibling indicators need updating, so the cost on non-channeling problems is just
      *  the occurrence-list walk.
      *
-     *  Retained extremum cones backsolve the target into an atomic repair of admissible searched inputs.
+     *  A defined [varId] is not set directly: its definition (abs, element result, literal channel,
+     *  power, affine or extremum) is backsolved into an atomic repair of its searched inputs.
      *
      *  Use this in any factor's `proposeRepairMoves` when proposing an int-set move on a
      *  variable that could be part of a value-to-indicator channeling cluster (the common
@@ -256,7 +255,6 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
 
             is Move.BoolFlip -> addBoolFlip(m.varId)
 
-            // shouldn't happen but stay total
             is Move.RealSet -> addRealSet(m.varId, m.newValue)
         }
         addElementPreservingVariant(state, move)
@@ -300,7 +298,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         return out
     }
 
-    /** Shared [MoveSink] helpers. */
+    /** Move encoding and the [NO_PROPOSER] sentinel. */
     companion object {
         /** [proposer] value for the generic sources that add moves without a proposing factor — no
          *  factor owns their moves, so any owned variable is filtered. */

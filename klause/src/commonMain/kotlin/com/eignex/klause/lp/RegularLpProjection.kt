@@ -12,8 +12,10 @@ import com.eignex.klause.util.LongArrayList
  * Layer-expanded DFA flow hull — the exact convex hull of the automaton's accepting strings. An arc
  * variable `y ∈ [0,1]` per reachable `(position t, state q, symbol s)` whose transition `δ(q, s)` is
  * live. Rows: a source row `Σ y out of (0, q0) = 1`, flow conservation at every interior `(t, q)`, an
- * acceptance row at the last layer, and a channel `Σ_s s·y = seq[t]` per position. The flow polytope is
+ * acceptance row at the last layer, and a channel `Σ_s s·y = seq(t)` per position. The flow polytope is
  * integral, so the LP is the true convex hull. Large arc sets and inputs with no accepting path are skipped.
+ * Côté, Gendron and Rousseau, "Modeling the Regular Constraint with Integer Programming", CPAIOR 2007,
+ * https://doi.org/10.1007/978-3-540-72397-4_3.
  *
  * The layer expansion screens each position's symbols through its root box and the flow rows then confine
  * the column to the arcs built, so over a side the model leaves open an invented endpoint would refute

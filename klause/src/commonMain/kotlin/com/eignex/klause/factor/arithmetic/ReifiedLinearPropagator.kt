@@ -127,13 +127,8 @@ internal class ReifiedLinearPropagator(
             LinearOp.EQ -> sumLo > bnd || sumHi < bnd
             LinearOp.NE -> sumLo == bnd && sumHi == bnd
         }
-        // Aux pin antecedents: union of the int-fact antecedents that drove sumLo/sumHi
-        // into the always/never-holds region. LCG-style transitive reasoning — each int
-        // bound's recorded `intMinAntecedents` / `intMaxAntecedents` traces back to the
-        // bool decisions that established it.
-        // Thread the aux's current pinning as an extra antecedent for every implied int
-        // tighten — the body-propagation path was selected by this pin, so any subsequent
-        // conflict must trace back through it.
+        // Every implied int tightening carries the aux's pin as an extra antecedent: the pin selected the
+        // body direction, so any later conflict must trace back through it.
         return state.reifiedAuxTail(
             auxBoolVar,
             alwaysHolds,

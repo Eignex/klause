@@ -22,20 +22,23 @@ private const val TABLEAU_MIN_VIOLATION = 1e-4
 private const val MAX_DIVISORS = 32
 
 /**
- * Gomory / MIR tableau cuts via integer-multiplier row aggregation, in 128-bit integer
- * arithmetic — the int128 replacement for the rational tableau-cut path.
+ * Gomory / MIR tableau cuts via integer-multiplier row aggregation, in 128-bit integer arithmetic.
  *
  * For each basic structural variable with a fractional LP value, the float tableau row `ρ = B⁻ᵀeᵢ` is
- * rounded to **integer** multipliers at a power-of-two scale ([roundDuals]). Aggregating the original
+ * rounded to integer multipliers at a power-of-two scale ([roundDuals]). Aggregating the original
  * problem rows with those multipliers gives one exact, valid integer constraint
  * `Σₖ gₖ zₖ + Σ_{≤-row r} w_r s_r = H` over the shifted structural columns `zₖ ∈ [0, uₖ]` and the
- * non-negative `≤`-row slacks `s_r` (valid for **any** integer multipliers, since the rows are
+ * non-negative `≤`-row slacks `s_r` (valid for any integer multipliers, since the rows are
  * equalities in slack form). A super-additive rounding function `f` — `⌊·/d⌋` for Chvátal–Gomory, the
  * mixed-integer-rounding function for [mir] — yields the valid inequality `Σ f(gₖ) zₖ + Σ f(w_r) s_r ≤
  * f(H)`; back-substituting `s_r = rhs_r − Σₖ A_{rk} zₖ` (exact, an equality) expresses it over the
  * structural columns alone. The divisor `d` is searched for the one whose cut is most violated at the
  * LP point. Every step is integer / [Int128]; an overflow or a non-violated result drops that
  * candidate, so the returned cuts are always rigorously valid.
+ *
+ * Gomory, "Outline of an algorithm for integer solutions to linear programs", Bull. AMS 64, 1958,
+ * https://doi.org/10.1090/S0002-9904-1958-10224-4; MIR after Marchand and Wolsey, "Aggregation and mixed
+ * integer rounding to solve MIPs", Oper. Res. 49(3), 2001, https://doi.org/10.1287/opre.49.3.363.11211.
  */
 @Suppress("CyclomaticComplexMethod", "LongMethod", "NestedBlockDepth")
 internal fun integerTableauCuts(
@@ -55,8 +58,7 @@ internal fun integerTableauCuts(
     }
     val input = IntegerTableauInput.create(model) ?: return emptyList()
 
-    // Float LU of the basis `B` (its column `t` is the basic column `basic[t]`, which may be a slack);
-    // btran gives the tableau rows.
+    // Column t of the float basis B is basicVars(t), possibly a slack; btran gives the tableau rows.
     val columns = List(m) { t ->
         val col = basis.basicVars[t]
         if (col < n) {
@@ -64,7 +66,7 @@ internal fun integerTableauCuts(
             input.forEachCoefficient(col) { i, v -> entries.add(i to v.toDouble()) }
             entries
         } else {
-            listOf((col - n) to 1.0) // slack column is the unit vector e_{col−n}
+            listOf((col - n) to 1.0)
         }
     }
     val solver = KotlinBasisSolver(SparseMatrix.ofColumns(m, m, columns))
@@ -80,8 +82,8 @@ internal fun integerTableauCuts(
         for (i in 0 until m) {
             if (cuts.size >= maxCuts) break
             val bvar = basis.basicVars[i]
-            if (bvar >= n) continue // cut on fractional structural variables only
-            if (abs(primal[bvar] - round(primal[bvar])) < TABLEAU_FRAC_TOL) continue // integral ⇒ no cut
+            if (bvar >= n) continue
+            if (abs(primal[bvar] - round(primal[bvar])) < TABLEAU_FRAC_TOL) continue
 
             unit.unit(i)
             try {
@@ -198,11 +200,11 @@ private fun bestRoundedCut(
     val m = model.m
     val n = model.n
 
-    // H = Σ_r w_r·rhs_r, and the touched structural columns with their aggregated coefficient.
+    // H = Σ_r w_r·rhs_r.
     val hAgg = Int128()
     for (r in 0 until m) if (w[r] != 0L) hAgg.addProduct(w[r], input.rhs[r])
-    // The aggregated coefficient gₖ for EVERY structural column: a ≤-row slack back-substitution can put
-    // a nonzero coefficient on a column whose gₖ = 0, so the cut loop below must visit all columns.
+    // Every structural column gets gₖ: a ≤-row slack back-substitution can put a nonzero coefficient on a column
+    // whose gₖ = 0, so the cut loop must visit all columns.
     val colG = Array(n) { aggregatedColumn(input, w, it) }
     val divisorSeen = LongHashSet()
     // Trial order is the column order, so membership and order are tracked separately.

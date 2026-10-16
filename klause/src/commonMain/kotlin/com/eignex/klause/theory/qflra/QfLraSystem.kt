@@ -126,6 +126,9 @@ internal fun LinearRow.booleanVariables(): Set<Int> = buildSet {
     }
 }
 
+// Each normalized multi-column term gets one slack column, so every asserted atom is a bound on a single column;
+// Dutertre and de Moura, "A Fast Linear-Arithmetic Solver for DPLL(T)", CAV 2006,
+// https://doi.org/10.1007/11817963_11.
 internal class LiveQfLraSystem(
     private val source: Problem,
     private val lp: LpPropagator,

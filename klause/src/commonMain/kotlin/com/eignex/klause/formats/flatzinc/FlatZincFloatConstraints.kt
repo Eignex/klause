@@ -51,7 +51,7 @@ internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean
     postLinear(scaled.coeffs, scaled.vars, op, scaled.bound, if (reified) resolveBoolLit(c.args[3]) else null)
 }
 
-/** Lower `int2float` as a scaled linear equality on bucket indices. */
+/** Lower `int2float` as a mixed integer/real row, or a scaled linear equality on bucket indices. */
 internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
     expectArity(c, 2)
     val xInt = resolveIntVar(c.args[0])
@@ -124,7 +124,7 @@ internal fun FlatZincCompiler.resolveFloatElement(
     }
 }
 
-/** Lower float comparisons on bucket indices. */
+/** Lower a float comparison as an exact real row, or a scaled linear row on bucket indices. */
 internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp, strict: Boolean, reified: Boolean) {
     expectArity(c, if (reified) 3 else 2)
     val a = resolveFloatVarOrConst(c.args[0])
@@ -208,7 +208,7 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
     postLinear(coeffs, vars, op, finalBound, if (reified) resolveBoolLit(c.args[2]) else null)
 }
 
-/** Strict float linear compare lowered to `<= bound - 1` in scaled space. */
+/** Strict float linear compare: an exact strict real row, or `<= bound - 1` in scaled bucket space. */
 internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: Boolean) {
     expectArity(c, if (reified) 4 else 3)
     val variables = evalFloatVarArray(c.args[1])

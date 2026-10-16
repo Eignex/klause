@@ -5,7 +5,7 @@ import kotlin.random.Random
 /**
  * Dense-int set with O(1) add/remove and O(1) uniform random sampling.
  * Backed by a list of present elements and a parallel index map keyed by element id.
- * Element ids must be in [0, capacity).
+ * Element ids must be in `0 until capacity`.
  */
 class IntSwapSet private constructor(private val elements: IntArrayList, private val position: IntArray) {
     constructor(capacity: Int) : this(IntArrayList(capacity.coerceAtLeast(8)), IntArray(capacity) { -1 })
@@ -27,13 +27,13 @@ class IntSwapSet private constructor(private val elements: IntArrayList, private
     /** Number of elements currently in the set. */
     val size: Int get() = elements.size
 
-    /** True iff the set is empty. */
+    /** Whether the set is empty. */
     fun isEmpty(): Boolean = elements.size == 0
 
-    /** True iff `x` is a member. */
+    /** Whether [id] is a member. */
     fun contains(id: Int): Boolean = position[id] >= 0
 
-    /** Add `x`; no-op if already present. */
+    /** Add [id]; returns false if it was already present. */
     fun add(id: Int): Boolean {
         if (position[id] >= 0) return false
         position[id] = elements.size
@@ -41,7 +41,7 @@ class IntSwapSet private constructor(private val elements: IntArrayList, private
         return true
     }
 
-    /** Remove `x`; no-op if absent. */
+    /** Remove [id]; returns false if it was absent. */
     fun remove(id: Int): Boolean {
         val pos = position[id]
         if (pos < 0) return false
@@ -53,7 +53,7 @@ class IntSwapSet private constructor(private val elements: IntArrayList, private
         return true
     }
 
-    /** Member at dense index `i` (`0 until size`). */
+    /** Member at dense position [index] (`0 until size`). */
     operator fun get(index: Int): Int = elements[index]
 
     /** A uniformly-random member. */

@@ -96,7 +96,7 @@ enum class PreparedPlanDecline {
     /** A continuous source factor has no exact polynomial encoding. */
     POLYNOMIAL_ENCODING,
 
-    /** Legacy objective-only decline; a supported rebind retains the prepared source completion. */
+    /** The linear objective weighs continuous columns; rebinding a supported objective keeps the source completion. */
     CONTINUOUS_LINEAR_OBJECTIVE,
 
     /** An open source column or factor has no complete owner. */

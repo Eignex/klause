@@ -71,8 +71,7 @@ internal object MiniZincMode : CliMode {
         )
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            // The ambient config was installed once in `main`. Unbounded `var int` resolution:
-            // CLI flag → KlauseConfig → built-in default.
+            // Unbounded `var int` resolution: CLI flag → KlauseConfig → built-in default.
             val config = common.config
             // Stream the .fzn straight from disk: the lexer/parser pull characters incrementally, so the
             // whole source is never held as one String. Parsing only reads; the base bake runs as
@@ -174,10 +173,9 @@ internal object MiniZincMode : CliMode {
                         definitionalSweep = executionProgram.definitionalSweep,
                         render = render,
                         // The MiniZinc protocol carries the objective inside the rendered solution, so
-                        // onSolution ignores this value — but the same sign-corrected objective (the
-                        // canonical linear objective in original units, see the generic builder in
-                        // CliMode) feeds arm attribution and the LS incumbent statistic, which the engine
-                        // produces in its internal minimise frame. Reuse one lambda for all three.
+                        // onSolution ignores this value; the sign-corrected objective in original units
+                        // feeds arm attribution and the LS incumbent statistic, which the engine produces
+                        // in its internal minimise frame.
                         objectiveValue = { s -> linear.evaluateLong(s).let { if (maximize) -it else it } },
                         continuousObjectiveValue = if (linear.realCoefficients.any { it != 0.0 }) {
                             { s -> linear.evaluate(s).let { if (maximize) -it else it } }
@@ -270,15 +268,15 @@ internal class MiniZincOutput(private val floatApproximation: Boolean = false) :
         }
     }
 
+    override fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {
+        printStatPairs("%%%mzn-stat:", pairs)
+    }
+
     /**
      * `-s`: MiniZinc-standard `%%%mzn-stat: key=value` lines closed by `%%%mzn-stat-end`.
      * [stats] is [SolveStats.EMPTY] when the verdict reports no engine counters (enumeration /
      * portfolio); the CLI-side time and solution count are always available.
      */
-    override fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {
-        printStatPairs("%%%mzn-stat:", pairs)
-    }
-
     override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
         println("%%%mzn-stat: solveTime=${solveTimeMs / 1000.0}")
         println("%%%mzn-stat: solutions=$solutions")

@@ -247,8 +247,7 @@ internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
         factors += Linear(EmptyIntArray, EmptyDoubleArray, realVars, c.coeffs.copyOf(), realOp, c.bound)
         return
     }
-    // Bucketed-int rewrite for the factor list. Uses the same SCALE as
-    // [com.eignex.klause.schema.FloatExpr.multiHandleBucketCompare], so the two agree.
+    // Bucketed-int rewrite, at the same scale as the grid arithmetic (`GRID_SCALE`) so the two agree.
     val scale = 1_000_000.0
     var scaledBound = c.bound
     val scaledCoeffs = IntArray(n)
@@ -279,9 +278,7 @@ internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
 
 internal fun Lowering.assertAllDifferent(terms: List<IntExpr>) {
     val lifted = terms.map { lift(it) }
-    // Specialisation: when every operand is a bare IntRef (no arithmetic residual), emit
-    // the global factor. Otherwise fall back to pairwise NE through the existing
-    // reification path.
+    // The global factor needs distinct bare IntRefs; anything else falls back to pairwise NE.
     if (lifted.all { it is IntRef }) {
         val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
         if (ids.toSet().size == ids.size) {
@@ -551,7 +548,6 @@ internal fun Lowering.assertIntCompare(expr: IntCompare) {
 
 internal fun Lowering.emitTopLevelCmp(coeffs: Map<String, Int>, op: IntCmpOp, bound: Int) {
     if (coeffs.isEmpty()) {
-        // 0 op bound: trivially true or false at compile time.
         val holds = when (op) {
             IntCmpOp.LE -> 0 <= bound
             IntCmpOp.GE -> 0 >= bound
@@ -581,7 +577,7 @@ internal fun Lowering.emitTopLevelCmp(coeffs: Map<String, Int>, op: IntCmpOp, bo
         IntCmpOp.EQ -> factors += Linear(coeffArr, varIds, LinearOp.EQ, bound)
 
         IntCmpOp.NE -> {
-            // Reify equality and negate: aux ↔ Σ = bound; assert ¬aux.
+            // aux ↔ Σ = bound; assert ¬aux.
             val aux = newBoolVar()
             factors += ReifiedLinear(aux, coeffArr, varIds, LinearOp.EQ, bound)
             factors += Clause(intArrayOf(Lit.make(aux, positive = false)))
@@ -592,14 +588,13 @@ internal fun Lowering.emitTopLevelCmp(coeffs: Map<String, Int>, op: IntCmpOp, bo
 }
 
 internal fun Lowering.emitSingleVar(name: String, coeff: Int, op: IntCmpOp, bound: Int) {
-    // Σ c x ⟨op⟩ b reduces to x ⟨op'⟩ b/c (assuming exact division). Avoid the division
-    // by lowering through the Linear factor when c isn't ±1.
+    // For c ≠ ±1 a Linear factor avoids dividing the bound by c.
     if (coeff == 1) {
         emitSingleVarCanonical(name, op, bound)
         return
     }
     if (coeff == -1) {
-        // -x op b ⟺ x op' -b with op flipped (LE↔GE etc).
+        // -x op b ⟺ x op' -b with op flipped.
         val flipped = when (op) {
             IntCmpOp.LE -> IntCmpOp.GE
             IntCmpOp.GE -> IntCmpOp.LE

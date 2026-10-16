@@ -30,15 +30,15 @@ import com.eignex.klause.util.unaryMinus
 
 /**
  * Turns LP certificates into learned-clause material over absolute variable-bound atoms, read off the
- * integer-multiplier [LpDeductionCertificate], which carries the reduced-cost signs
- * and dual-weight rows the reasons lean on. The artifacts share one
- * shape: a set of *premises* — column bounds the certificate leans on — whose negations form clause
- * literals, with the constraint rows kept implicit. Keeping the rows implicit is what makes the
- * clauses small, and it is sound exactly when every row the certificate leans on holds at every
- * solution of the problem ([LpModel.rowGlobal]). A non-global row with recorded validity premises
- * ([LpModel.rowPremises] — the live-big-M reified rows) is kept implicit by citing those bounds as
- * extra literals instead; a non-global row without premises (a locally separated or Gomory/MIR cut)
- * makes the certificate inexpressible and it is withheld rather than under-cited.
+ * integer-multiplier [LpDeductionCertificate], which carries the reduced-cost signs and dual-weight rows
+ * the reasons lean on. The artifacts share one shape: a set of *premises* — column bounds the
+ * certificate leans on — whose negations form clause literals, with the constraint rows kept implicit.
+ * Keeping the rows implicit is what makes the clauses small, and it is sound exactly when every row the
+ * certificate leans on holds at every solution of the problem ([LpModel.rowGlobal]). A non-global row
+ * with recorded validity premises ([LpModel.rowPremises] — the live-big-M reified rows) is kept implicit
+ * by citing those bounds as extra literals instead; a non-global row without premises (a locally
+ * separated or Gomory/MIR cut) makes the certificate inexpressible and it is withheld rather than
+ * under-cited.
  *
  * A premise is cited from the column's **live LP bound**:
  *  - an integer column contributes `¬(x ≥ lo)` (lower side) or `¬(x ≤ ub)` (upper side) — a
@@ -62,7 +62,7 @@ internal object LpExplanation {
     /** [premiseLit] result: the premise holds over the whole declared box — cite nothing. */
     const val PREMISE_NONE: Int = -1
 
-    /** [premiseLit] result: the premise has no CP bound atom (auxiliary column) — abandon learning. */
+    /** [premiseLit] result: the premise has no expressible CP atom (e.g. an auxiliary column) — abandon. */
     const val PREMISE_AUX: Int = -2
 
     /**
@@ -71,8 +71,8 @@ internal object LpExplanation {
      * LP's live column bounds. Returns [PREMISE_NONE] for a vacuous premise and [PREMISE_AUX] when
      * the column has no backing CP variable. For an *optimal* certificate the side must follow the
      * reduced cost's sign (`d > 0` uses the lower bound, `d < 0` the upper — the seat name is
-     * meaningless for a collapsed column); for a Farkas certificate it follows the recorded seat,
-     * which is what the no-entering-column argument was evaluated against.
+     * meaningless for a collapsed column); for a Farkas ray it follows the sign of `ρ·A_j` (see
+     * [infeasibilityClause]).
      */
     fun premiseLit(relaxation: LpRelaxation, session: PropagationSession, col: Int, lowerSide: Boolean): Int {
         if (col < relaxation.colRealId.size && relaxation.colRealId[col] >= 0) {
@@ -139,12 +139,12 @@ internal object LpExplanation {
     /**
      * Reason atoms certifying the LP's objective lower bound for an OPTIMAL [cert] (the exact
      * basis-certificate), or null when the certificate touches an auxiliary column or a non-global
-     * row carries dual weight. By LP duality `c·x = y·b + Σ_j d_j·x_j` holds row-wise, so for any
-     * point satisfying the rows, `objective ≥ L` follows from `x_j ≥ lo_j` on the columns with
-     * `d_j > 0` and `x_j ≤ ub_j` on those with `d_j < 0` — exactly the premises cited here. Basic
-     * and zero-reduced-cost columns do not move the bound and stay uncited (a basic column's exact
-     * reduced cost is `0`); rows stay implicit, which is why every row with `y_i ≠ 0` must be
-     * globally valid or carry recorded validity premises ([LpModel.rowPremises]) cited alongside.
+     * row without recorded premises carries dual weight. By LP duality `c·x = y·b + Σ_j d_j·x_j` holds
+     * row-wise, so for any point satisfying the rows, `objective ≥ L` follows from `x_j ≥ lo_j` on the
+     * columns with `d_j > 0` and `x_j ≤ ub_j` on those with `d_j < 0` — exactly the premises cited here.
+     * Basic and zero-reduced-cost columns do not move the bound and stay uncited (a basic column's exact
+     * reduced cost is `0`); rows stay implicit, which is why every row with `y_i ≠ 0` must be globally
+     * valid or carry recorded validity premises ([LpModel.rowPremises]) cited alongside.
      */
     fun objectiveBoundReason(
         relaxation: LpRelaxation,

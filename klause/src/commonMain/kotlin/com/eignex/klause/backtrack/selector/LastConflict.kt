@@ -8,7 +8,9 @@ import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
 /**
- * Last-conflict prioritisation (Lecoutre-Saïs-Tabary-Vidal 2009). Wraps any base
+ * Last-conflict prioritisation (Lecoutre, Saïs, Tabary and Vidal, "Reasoning from last conflict(s) in
+ * constraint programming", Artificial Intelligence 173, 2009, https://doi.org/10.1016/j.artint.2009.09.002).
+ * Wraps any base
  * [VariableSelector]: on every pick, returns the variable that triggered the most
  * recent conflict (if it's still unpinned), otherwise delegates to the base. Cleared
  * when the prioritised variable successfully commits (the next pick falls through to
@@ -35,7 +37,7 @@ class LastConflict(private val base: VariableSelector) : VariableSelector {
                 is VarRef.IntVar -> !session.intDomain(candidate.varId).isFixed
             }
             if (stillFree) return candidate
-            pending = null // assigned away (likely via propagation); drop the prioritisation
+            pending = null
         }
         return base.pick(session, rng)
     }

@@ -80,7 +80,7 @@ internal class KnapsackLagrangianBound(
             if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
         }
         // The subproblem knapsack must be a clean capacity row: all positive literals, positive weights,
-        // a DP-bounded capacity. The cleanest, largest such row is kept; the rest are dualized.
+        // a DP-bounded capacity. The largest such row is kept; the rest are dualized.
         var chosen: PseudoBoolean? = null
         for (factor in pbs) {
             var clean = factor.op == PbOp.LE && factor.bound >= 0
@@ -201,11 +201,6 @@ internal class KnapsackLagrangianBound(
     /** A subproblem evaluation at fixed multipliers: feasibility, scaled cost, and the chosen x. */
     private class Eval(val feasible: Boolean, val num: Long, val x: IntArray)
 
-    /**
-     * Compute the Lagrangian bound at the current node. [incumbent] is the best objective to beat
-     * (`+∞` skips the subgradient and reports only the base bound). [startMultipliers] warm-starts λ.
-     * Returns null when the bound is unavailable (not applicable, or arithmetic overflow).
-     */
     override fun computeBound(
         session: PropagationSession,
         incumbent: Double,
@@ -264,7 +259,6 @@ internal class KnapsackLagrangianBound(
         for (i in kItems) inKnap[i] = true
         var num = 0L
         var usedCap = 0L
-        // Pinned and free non-knapsack variables first.
         for (i in varIds.indices) {
             when {
                 pinned[i] == 1 -> {
@@ -274,9 +268,9 @@ internal class KnapsackLagrangianBound(
 
                 pinned[i] == 0 -> x[i] = 0
 
+                // decided by the DP below
                 inKnap[i] -> Unit
 
-                // decided by the DP below
                 w[i] < 0L -> {
                     x[i] = 1
                     num = addExact(num, w[i])
@@ -307,7 +301,7 @@ internal class KnapsackLagrangianBound(
                 }
             }
         }
-        // Reconstruct the selection at full capacity and fold it into x / num.
+        // Reconstruct the selection from the best-value capacity and fold it into x / num.
         var c = rem
         var best = 0L
         var bestC = rem
@@ -329,8 +323,8 @@ internal class KnapsackLagrangianBound(
         return Eval(feasible = true, num = num, x = x)
     }
 
-    /** One deflected (conjugate) subgradient ascent step; false if the subgradient is zero. Mirrors the
-     *  Camerini–Fratta–Maffioli stabilization used by [LagrangianBound]. */
+    /** One deflected subgradient ascent step; false if the subgradient is zero. Same Camerini–Fratta–Maffioli
+     *  deflection and Polyak step as [LagrangianBound]. */
     private fun subgradientStep(
         x: IntArray,
         p: LongArray,

@@ -15,14 +15,14 @@ package com.eignex.klause.solver.result
  * stats summarize a finished solve, events narrate one in flight (e.g. the CLI's `-v`).
  */
 sealed interface SearchEvent {
-    /** The backtrack engine completed a Luby restart. [index] counts restarts from 1
+    /** The backtrack engine completed a restart. [index] counts restarts from 1
      *  within the solve; [steps] is the decisions spent in the run that just ended.
      *  (Local-search restarts are deliberately not reported — they fire on a flip
      *  cadence and would be noise, not signal.) */
     data class Restart(val index: Long, val steps: Long) : SearchEvent
 
-    /** A learned-clause database sweep ran (backtrack engine, on a Luby restart when the
-     *  database is over its cap): [kept] clauses retained, [dropped] forgotten. */
+    /** A learned-clause database sweep ran (backtrack engine, when the database is over its
+     *  cap): [kept] clauses retained, [dropped] forgotten. */
     data class LearnedDbSweep(val kept: Int, val dropped: Int) : SearchEvent
 
     /** A new best incumbent was committed during optimization, with its [objective]. */

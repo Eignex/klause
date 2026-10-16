@@ -47,8 +47,7 @@ class Cardinality(literals: IntArray, val min: Int, val max: Int) : Factor {
 
     override fun remap(mapping: VarRemap): Factor = Cardinality(mapping.lits(literals), min, max)
 
-    // `min == 0 && max == literals.size` accepts every assignment of the literals, so the constraint
-    // is vacuous and drops (propagation never prunes it but keeps the factor around otherwise).
+    // `min == 0 && max == literals.size` accepts every assignment of the literals, so the factor drops.
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
         if (min == 0 && max == literals.size) Rewrite(emptyList()) else Unchanged
 

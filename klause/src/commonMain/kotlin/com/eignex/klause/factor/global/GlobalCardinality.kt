@@ -12,7 +12,7 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.MutableLongIntMap
 
 /**
- * Global Cardinality Constraint (GCC). Covers the four MiniZinc variants in one factor:
+ * Global Cardinality Constraint (GCC). Covers the MiniZinc variants in one factor:
  *
  *  - `global_cardinality(xs, cover, counts)` — `counts(k) = #{i : xs(i) = cover(k)}`. Use
  *    [countVars] (`size = cover.size`) and [closed] = `false`.
@@ -24,12 +24,15 @@ import com.eignex.klause.util.MutableLongIntMap
  * Exactly one of ([countVars], [countLow]+[countHigh]) is non-null — the constructor
  * validates.
  *
- * Propagation: count-bound tightening (definite/possible matchers per cover value) plus
- * max-flow GAC. The flow has lower bounds on `cover_k → sink` (matching the
- * cover lo/hi or current `countVars(k)` domain), is reduced to standard max-flow via the
- * super-source/super-sink trick, solved by Edmonds-Karp, then the residual graph is
- * SCC'd. Any `xᵢ → cover_k` edge with zero flow whose endpoints sit in different SCCs
- * cannot extend to a feasible solution and is pruned from `dom(xᵢ)`.
+ * Propagation: count-bound tightening (definite/possible counts per cover value) plus
+ * max-flow GAC. The flow has lower bounds on `cover_k → sink` (the cover lo/hi or the current
+ * `countVars(k)` domain), is reduced to standard max-flow via the super-source/super-sink
+ * construction, solved by blocking flows (Dinic), then the residual graph is split into SCCs.
+ * Any `xᵢ → cover_k` edge with zero flow whose endpoints sit in different SCCs cannot extend to a
+ * feasible solution and is pruned from `dom(xᵢ)`.
+ *
+ * Régin, "Generalized arc consistency for global cardinality constraint", AAAI 1996,
+ * https://mlanthology.org/aaai/1996/regin1996aaai-generalized
  */
 class GlobalCardinality(
     /** Variable ids the constraint ranges over. */
@@ -74,7 +77,7 @@ class GlobalCardinality(
     // xs is a set (counts are per cover value, order-independent) so xs/presents pairs are sorted by
     // var id; cover triples are sorted by value. Encodes every distinguishing field — fine enough
     // that two non-equivalent GCCs never collide (a coarser key would let a symmetry swap through).
-    // Not migrated to the KeySink allocation-free hash: the `pairsByKey(xs){ presents[it] }` value is a
+    // Built with StructuralKey.of rather than the KeySink hash: the `pairsByKey(xs){ presents[it] }` value is a
     // Boolean literal (remappable), which the sink's constant-value pair methods can't remap.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.GLOBAL_CARDINALITY) {
         bool(closed)

@@ -8,9 +8,8 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
-/** Push every pin in `a` as a fresh decision; return `false` (so [PropagationState.seeded] becomes
- *  `false`) on the first contradiction. Direct primitive-array iteration so the early
- *  exit is a clean `return`. */
+/** Push every pin and deduced restriction in `a` as a fresh decision; return `false` (so
+ *  [PropagationState.seeded] becomes `false`) on the first contradiction. */
 internal fun PropagationState.seedAssumptions(a: Assumptions): Boolean {
     val bk = a.boolKeys
     val bv = a.boolValues
@@ -22,9 +21,8 @@ internal fun PropagationState.seedAssumptions(a: Assumptions): Boolean {
     for (i in ik.indices) {
         if (!setIntAsDecision(ik[i], iv[i])) return false
     }
-    // Non-singleton bound tightenings ride at the same decision level as int pins —
-    // they're seed-time inputs, not propagated conclusions. Each takes its own level
-    // so the conflict analyzer can attribute backjumps to the specific tightening.
+    // Bound tightenings, holes and set restrictions are seed-time inputs, not propagated conclusions.
+    // Each takes its own decision level so the conflict analyzer can attribute backjumps to it.
     val minK = a.deductions.intMinKeys
     val minV = a.deductions.intMinValues
     for (i in minK.indices) {
@@ -279,8 +277,7 @@ private inline fun PropagationState.tightenBoundImpl(
     }
     if (undoLogging) logIntChange(v)
     if (currentFactor >= 0) propagations++
-    // Preserve interior holes via the sparse-aware constructor path. For contiguous
-    // domains this is functionally identical to `IntDomain(bound, d.max)` / `IntDomain(d.min, bound)`.
+    // Preserves interior holes.
     val newDomain = if (isMin) d.withMinAtLeast(bound) else d.withMaxAtMost(bound)
     // A landing value inside a hole snaps the bound further. The snapped bound rests on the requested
     // bound plus the crossed holes. The requested-bound atom is cited only for a *decision* move
@@ -554,8 +551,7 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
     // A batched exclusion can move both endpoints and carve interior holes at once; raise every
     // event kind that actually occurred so typed-event advisors (e.g. a bounds-consistent [Linear]
     // subscribed to LB_RAISED / UB_LOWERED, dropped from this var's occurrence-list wakeup) wake.
-    // Marking only [dirtyInts] without the kind bits under-sets the event and silently drops the
-    // wake — the single-value [excludeIntValueImpl] / [tightenBoundImpl] paths mark the kind too.
+    // A missing kind bit would silently drop that wake.
     var kindMask = 0
     if (newMin != d.min) kindMask = kindMask or IntEvent.LB_RAISED_BIT
     if (newMax != d.max) kindMask = kindMask or IntEvent.UB_LOWERED_BIT

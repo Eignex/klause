@@ -6,9 +6,9 @@ import kotlin.jvm.JvmInline
 
 /**
  * A named, parameterised generator of candidate moves — the single place a given candidate kind is
- * produced (a violated-factor repair, a frontier step, a structured feasibility move). The
- * local-search strategies and the minimize engine all draw their candidates from these shared
- * sources rather than re-implementing the generation loops.
+ * produced (a violated-factor repair, a frontier step, a structured feasibility move). Local-search
+ * strategies draw their candidates from these shared sources rather than re-implementing the
+ * generation loops.
  *
  * Contract:
  *  - Pure with respect to search state. A source reads the assignment, domains, violated set, and

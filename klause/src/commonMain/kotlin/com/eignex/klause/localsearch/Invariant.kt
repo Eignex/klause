@@ -103,9 +103,7 @@ interface Invariant {
      * Default: no proposals. Factors with structural insight (e.g. `Linear EQ`'s "shift
      * between two summed vars" or `Cardinality.exactlyOne`'s "swap a true literal with a
      * false one") override to push self-preserving moves. The engine combines proposals
-     * from all factors and scores each against the objective; the constraint-aware
-     * "structured" set typically dwarfs random pair-swap in hit rate on decomposed CP
-     * models.
+     * from all factors and scores each against the objective.
      */
     fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
     }

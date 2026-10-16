@@ -31,7 +31,7 @@ internal class UndoLog {
     val maxLvl = IntArrayList() // int: prior intMaxLevel
     val minReason = IntArrayList() // int: prior intMinReason
     val maxReason = IntArrayList() // int: prior intMaxReason
-    val carved = LongArrayList() // long: carved value (tags 2/3); padding otherwise
+    val carved = LongArrayList() // long: carved value (tag 2); padding otherwise
     val domain = ArrayList<IntDomain?>() // int: prior intDomains[v]
     val minAnt = ArrayList<IntArray?>() // int: prior intMinAntecedents
     val maxAnt = ArrayList<IntArray?>() // int: prior intMaxAntecedents

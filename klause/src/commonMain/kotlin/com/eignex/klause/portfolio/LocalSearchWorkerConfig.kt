@@ -69,7 +69,9 @@ internal class LocalSearchWorkerConfig private constructor(
     /** Build an LS worker: its [LocalSearchSolver] session (with the per-move invariant network when
      *  a [definitionalSweep] is present and the recipe enables it) + λ-shaped params, exposing the
      *  warm-start seam so a [Portfolio] can resume a segment from the shared incumbent. The
-     *  restart cadence rides on the recipe's `strategy.schedule.restart`. Label is `ls/<label>`. */
+     *  restart cadence rides on the recipe's `strategy.schedule.restart`. Label is `ls/<label>`. A model with
+     *  continuous columns whose discrete part is already fixed gets an exact neighbourhood worker instead,
+     *  unless numerical completion is enabled. */
     override fun materialize(
         problem: BakedProblem,
         index: Int,

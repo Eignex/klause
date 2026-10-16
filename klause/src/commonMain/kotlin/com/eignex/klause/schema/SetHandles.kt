@@ -23,11 +23,10 @@ import com.eignex.klause.model.SetUnion
  * Set variable handle over an integer universe. Internally lowers to one indicator
  * Boolean per universe element; the decoder reads those indicators back to a [Set]<Int>.
  *
- * Use the infix operators in `com.eignex.klause.model.SetOperators` (`inSet`, `subsetOf`,
- * `disjointFrom`, `union`, `intersect`, `diff`, `eq`, `ne`) and the [card] / [size]
- * function for cardinality. Set-valued combinators ([SetUnion] / [SetIntersect] /
- * [SetDiff] / [SetLiteral]) return a [SetExpr] tree that the compiler materialises into
- * fresh indicator bools at lowering time.
+ * Use the infix set operators (`inSet`, `subsetOf`, `disjointFrom`, `union`, `intersect`,
+ * `diff`, `eq`, `ne`) and [card] / [size] for cardinality. Set-valued combinators ([SetUnion] /
+ * [SetIntersect] / [SetDiff] / [SetLiteral]) return a [SetExpr] tree that the compiler
+ * materialises into fresh indicator bools at lowering time.
  */
 class IntSetHandle(
     /** Name of the set variable. */
@@ -82,9 +81,6 @@ fun setOfInts(range: IntRange): IntSetLiteralTerm = IntSetLiteralTerm(range.toLi
 /** Builder for a nominal-set literal. Accepted everywhere a nominal-set handle is. */
 fun setOfLabels(vararg labels: String): NominalSetLiteralTerm = NominalSetLiteralTerm(labels.toList())
 
-// Every set operator is a thin AST constructor — the compiler does the actual lowering
-// against the indicator-bool encoding.
-
 /** `int ∈ set`. */
 infix fun IntTerm.inSet(s: SetTerm): BoolExpr = SetIn(this.toIntExpr(), s.toSetExpr())
 
@@ -115,5 +111,5 @@ infix fun SetTerm.diff(other: SetTerm): SetExpr = SetDiff(this.toSetExpr(), othe
 /** Cardinality `|S|`. */
 fun card(s: SetTerm): IntExpr = SetCard(s.toSetExpr())
 
-/** Alias for [card] matching the README's `size`-style naming used elsewhere. */
+/** Alias for [card]. */
 fun size(s: SetTerm): IntExpr = card(s)

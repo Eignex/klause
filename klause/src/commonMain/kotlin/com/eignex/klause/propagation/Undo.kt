@@ -41,9 +41,9 @@ internal fun PropagationState.logIntChange(v: Int) {
     undo.holeHistLen.add(holeHistVal[v]?.size ?: 0)
 }
 
-/** Journal an interior carve as just the carved value: replay re-inserts it instead
- *  of restoring a retained domain snapshot, whose O(holes) cost per carve made deep
- *  searches on wide hole-list domains quadratic in retained heap (tag 2). Columns:
+/** Journal an interior carve as just the carved value (tag 2): replay re-inserts it instead
+ *  of restoring a retained domain snapshot, which would cost O(holes) per carve and make deep
+ *  searches on wide hole-list domains quadratic in retained heap. Columns:
  *  [UndoLog.carved] = carved value, [UndoLog.level] = prior intLevel,
  *  [UndoLog.maxReason] = prior holeHist length. */
 internal fun PropagationState.logIntCarve(v: Int, value: Long) {
@@ -67,7 +67,7 @@ internal fun PropagationState.undoVarAt(i: Int): Int = undo.varId[i]
 /** True iff undo record `i` is a bool pin (vs. an int-domain change). */
 internal fun PropagationState.undoIsBoolAt(i: Int): Boolean = undo.tag[i] == 0
 
-/** Capture a [PropagationState.LevelMark] at the current state. Cheap: three ints plus a snapshotCopy of
+/** Capture a [PropagationState.LevelMark] at the current state. Cheap: five ints plus a snapshotCopy of
  *  each [PropagationState.SnapshottablePayload]. The map is allocated only when at least one payload is
  *  present (Table / Mdd factors); the common no-payload case shares [PropagationState.emptyPayloads] and
  *  never allocates per push. */
@@ -122,7 +122,7 @@ internal fun PropagationState.prepareMark(): Iterator<PropagationState.LevelMark
 /**
  * Rewind the state to [mark] by replaying the undo log from the top down to
  * [PropagationState.LevelMark.undoSize], then truncating the append-only stacks (decision vars, pin
- * order) and restoring snapshottable payloads. Replays in reverse so a var
+ * order) and restoring reversible cells, snapshottable payloads and atom truths. Replays in reverse so a var
  * narrowed several times since the mark lands on its mark-time value. Transient
  * bookkeeping (dirty queues, conflict seeds, current level/factor) is cleared — the
  * caller only ever marks / undoes between propagation cycles, when those are idle.

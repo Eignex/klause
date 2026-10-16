@@ -17,10 +17,12 @@ import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.MutableLongIntMap
 
 /**
- * Shared domain-consistency filtering for the alldifferent family — `AllDifferent`
- * routes its matching pass through
- * here, so the bipartite matching / reverse-graph free-value reachability / SCC / Hall
- * pruning machinery lives once rather than being copy-pasted (and drifting) per variant.
+ * Shared domain-consistency filtering for the alldifferent family (`AllDifferent`, and both
+ * permutations of `Inverse`): bipartite matching, reverse-graph free-value reachability, SCC and
+ * Hall pruning.
+ *
+ * Régin, "A filtering algorithm for constraints of difference in CSPs", AAAI 1994,
+ * https://mlanthology.org/aaai/1994/regin1994aaai-filtering
  *
  * The graph: variables on the left, distinct in-domain values on the right (matched
  * value→var, unmatched var→value). A value with no support after matching is pruned from the
@@ -35,8 +37,9 @@ import com.eignex.klause.util.MutableLongIntMap
  * pruned (there is always a free copy), and copies inflate the value count so the pigeonhole
  * shortcut never misfires.
  *
- * Prune antecedents are the sharp Hall set (forward-reachable vars from the pruned value-node)
- * with hole-aware [collectHoleAndBoundAntecedents], so learned clauses stay sound under holes.
+ * Prune antecedents come from [hallReason] over the sharp Hall set (forward-reachable vars from the
+ * pruned value-node), citing bounds and holes as [collectHoleAndBoundAntecedents] does, so learned
+ * clauses stay sound under holes.
  *
  * Returns `null` on success (after pruning in place), or the Hall-violator variable ids on
  * infeasibility — the caller stores them as its conflict reason.
@@ -396,11 +399,12 @@ internal class ReginIncrementalState(state: PropagationState, val vars: IntArray
 
 /**
  * Complete the bipartite matching from a (possibly partial, warm-started) seed to a maximum matching
- * using Hopcroft-Karp: O(|E|·√n) instead of the O(n·|E|)
- * one-var-at-a-time augmenting search — the dominant cost when a large `alldifferent` is matched from
- * scratch at the root bake (milliseconds rather than seconds on a 2700-var permutation). Any maximum
- * matching prunes identically (the filtering is matching-independent), so this changes speed, not
- * results.
+ * using Hopcroft-Karp: O(|E|·√n) rather than the O(n·|E|) one-var-at-a-time augmenting search, which
+ * dominates when a large `alldifferent` is matched from scratch at the root bake. Any maximum matching
+ * prunes identically (the filtering is matching-independent).
+ *
+ * Hopcroft, Karp, "An n^5/2 algorithm for maximum matchings in bipartite graphs", SIAM J. Comput. 2(4),
+ * 1973, https://doi.org/10.1137/0202019
  *
  * [matchVar] / [matchVal] are updated in place (var→value-id and value-id→var, `-1` = free). Returns
  * `true` iff the completed matching saturates every variable; on `false` the caller runs one
@@ -508,10 +512,9 @@ internal fun reginTryAugment(
     return false
 }
 
-/** Iterative index/lowlink SCC over [adj] (adjacency lists on `0 until total`). Returns per-vertex
- *  component id. Iterative to avoid recursion-depth blowup on large graphs. SCC membership is
- *  reversal-invariant, so the forward orientation is used here. Shared with `GlobalCardinality`,
- *  which materialises its residual graph and delegates here. */
+/** Iterative index/lowlink SCC (Tarjan, SIAM J. Comput. 1(2), 1972, https://doi.org/10.1137/0201010) over
+ *  [adj] (adjacency lists on `0 until total`). Returns per-vertex component id. Iterative to avoid
+ *  recursion-depth blowup on large graphs. Shared with `NValue`. */
 internal fun reginTarjanScc(adj: Array<IntArrayList>, total: Int): IntArray {
     val sccId = IntArray(total) { -1 }
     val index = IntArray(total) { -1 }

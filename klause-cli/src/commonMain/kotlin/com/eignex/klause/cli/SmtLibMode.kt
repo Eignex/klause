@@ -259,7 +259,7 @@ private fun openLocalSearchSmt(
 }
 
 /** Render an SMT-LIB `(get-model)`-style model: one `(define-fun name () Sort value)` per
- *  declared variable. Real values come from the leaf LP solve. */
+ *  declared variable. Real values are the sample's certified exact reals. */
 internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, reals: Map<String, Int>, s: Sample): String =
     buildString {
         append("(\n")

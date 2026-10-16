@@ -6,7 +6,7 @@ import com.eignex.koblas.koblas
 import kotlin.math.abs
 
 // Dense elimination publishes the same owned triangular representation as sparse LU, so reach,
-// updates, numerical quality checks and exact ordering hints retain their existing contracts.
+// updates, numerical quality checks and exact ordering hints keep the sparse contracts.
 internal class DenseBasisFactors(private val source: SparseMatrix) {
     private val n = source.rows
     private val matrix = DenseMatrix.zero(n)

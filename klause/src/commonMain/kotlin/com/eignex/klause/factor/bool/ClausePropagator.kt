@@ -42,20 +42,17 @@ internal class ClausePropagator(
         if (literals.size == 1) null else intArrayOf(literals[1], literals[0])
 
     /**
-     * Two-watched-literal propagation (Zhang–Stickel). Caches a pair of literal
-     * indices on [PropagationState.refPayload]; each fire checks at most those two before
-     * looking further. Common case (both watches non-false): returns in O(1) regardless of
-     * clause arity. Slow case (a watch turned false): scans for a non-false replacement,
-     * O(arity) worst-case but amortised across many fires since most flips don't disturb
-     * the watches.
+     * Two-watched-literal propagation (Moskewicz et al., "Chaff: engineering an efficient SAT solver",
+     * DAC 2001, https://doi.org/10.1145/378239.379017). Caches a pair of literal indices on
+     * [PropagationState.refPayload]; each fire checks at most those two before looking further. Common
+     * case (both watches non-false): O(1) regardless of clause arity. Slow case (a watch turned false):
+     * scans for a non-false replacement, O(arity) worst-case but amortised across many fires.
      *
-     * Soundness across `PropagationSession` push/pop: watches deliberately aren't
-     * snapshotted (see [PropagationState.refPayload] kdoc). After a pop, watches may
-     * point at literals that are again unassigned at the restored level — perfectly
-     * valid, since the invariant is "watches point at non-false literals" and unassigned
-     * counts as non-false. If a restored state actually makes the watches stale (some
-     * literal at the watch position is somehow false), the first propagate call
-     * re-validates and moves them.
+     * Soundness across `PropagationSession` push/pop: watches deliberately aren't snapshotted (see
+     * [PropagationState.refPayload]). After a pop, watches may point at literals that are again
+     * unassigned at the restored level, which is valid since the invariant is "watches point at
+     * non-false literals". If a restored state leaves a watch on a false literal, the first propagate
+     * call re-validates and moves it.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (literals.size == 1) {

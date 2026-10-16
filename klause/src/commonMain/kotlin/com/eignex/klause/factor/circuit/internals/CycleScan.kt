@@ -4,7 +4,7 @@ import com.eignex.klause.propagation.PropagationState
 
 internal class CycleScan(val numCycles: Int, val nodesInCycles: Int)
 
-/** Tighten each `succ[i]` domain to `[0, n)`. Returns false on contradiction. */
+/** Tighten each `succ(i)` domain to `[0, n)`. Returns false on contradiction. */
 internal fun tightenSuccToRange(state: PropagationState, succ: IntArray, n: Int): Boolean {
     for (i in succ.indices) {
         val v = succ[i]

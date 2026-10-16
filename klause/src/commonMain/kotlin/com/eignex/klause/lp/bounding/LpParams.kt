@@ -19,9 +19,9 @@ class LpParams(
     val lpConfig: LpConfig? = null,
     /** Deadline token polled by every LP solve / fixpoint. */
     val cancellation: Cancellation = Cancellation.Never,
-    /** The whole-solve wall budget in milliseconds, used to bound cumulative LP time; null = uncapped. */
+    /** The whole-solve wall budget in milliseconds, which sizes the cumulative LP work allowance; null = uncapped. */
     val solveBudgetMillis: Long? = null,
-    /** Seed for the feasibility-pump RNG; null picks a fixed default. */
+    /** Seed for the feasibility pump and randomized pricing; null means 0. */
     val randomSeed: Long? = null,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,

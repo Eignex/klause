@@ -2,13 +2,16 @@ package com.eignex.klause.util
 
 /**
  * Permutations over `[0, n)` and the group they generate, for symmetry handling. A permutation is an
- * `IntArray` of length `n` mapping each point to its image; composition is `(a ∘ b)[i] = a[b[i]]`.
+ * `IntArray` of length `n` mapping each point to its image; composition is `(a ∘ b)(i) = a(b(i))`.
  *
  * The whole symmetry group is far too large to enumerate, but a few extra *genuine* group elements
  * beyond the raw generators sharpen lex-leader propagation. [strongGenerators] returns the input
  * generators plus the Schreier generators of the pointwise-stabiliser chain (Schreier's lemma) along
  * a base — every element a real product of generators, so every lex-leader posted from one stays
  * sound. The set is deduplicated and bounded by a cap so per-node propagation cost stays controlled.
+ *
+ * Schreier's lemma and stabiliser chains: Seress, *Permutation Group Algorithms*, Cambridge 2003,
+ * https://doi.org/10.1017/CBO9780511546549.
  */
 object PermutationGroup {
 
@@ -77,7 +80,7 @@ object PermutationGroup {
         }
         for (g in generators) if (!offer(g)) return out
         // Peel the base: at each level, add the Schreier generators of the current group's stabiliser
-        // of the base point, then descend into that stabiliser. Capped depth and width keep it bounded.
+        // of the base point, then descend into that stabiliser, carrying at most [cap] generators.
         var current: List<IntArray> = dedup(generators)
         for (b in base) {
             if (out.size >= cap || current.isEmpty()) break

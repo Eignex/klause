@@ -41,10 +41,10 @@ internal class LpNeighborhood(
 }
 
 /** Row-major adjacency of a model's structural entries (`rows -> columns`), built once in `O(nnz)`
- *  and shared across many [columnNeighborhood] walks. Covers the union of the [Long] core's and the
- *  double view's sparsity — the two patterns may differ on mixed models (real coefficients live only
- *  in the view; differing zero-coalescing can go either way), and the walk's whole-row-support
- *  soundness needs every entry of either. */
+ *  and shared across many [columnNeighborhood] walks. Covers the exact state's nonzeros when present, else
+ *  the union of the [Long] core's and the double view's sparsity — the two patterns may differ on mixed
+ *  models (real coefficients live only in the view; differing zero-coalescing can go either way), and the
+ *  walk's whole-row-support soundness needs every entry of either. */
 internal class LpRowIndex(val rowPtr: IntArray, val colIdx: IntArray)
 
 /** Build the row-major union adjacency of this model's structural columns. */

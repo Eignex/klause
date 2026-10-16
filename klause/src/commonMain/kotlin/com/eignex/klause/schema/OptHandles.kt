@@ -21,7 +21,7 @@ import com.eignex.klause.model.Or
  * evaluates to false rather than dropping out of the constraint.
  *
  * Use [valueOr] to materialise the value into an [IntExpr] that's safe to plug into arithmetic;
- * arithmetic on the bare [value] handle would ignore [present] and is therefore not exposed.
+ * arithmetic on the bare [value] handle ignores [present].
  */
 class OptIntHandle(
     /** Name of the optional variable. */
@@ -221,8 +221,8 @@ class OptFloatHandle(
 }
 
 /**
- * Optional nominal variable: a `(present, value)` pair. Comparisons against a label or another
- * nominal follow MiniZinc opt semantics — absent operands make the comparison false.
+ * Optional nominal variable: a `(present, value)` pair. Comparisons against a label follow
+ * MiniZinc opt semantics — an absent operand makes the comparison false.
  */
 class OptNominalHandle(
     /** Name of the optional variable. */

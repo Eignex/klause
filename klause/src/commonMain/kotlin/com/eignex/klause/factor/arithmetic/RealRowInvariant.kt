@@ -46,7 +46,7 @@ internal class RealRowInvariant(
     /** How far the row may miss its bound and still read as satisfied, and how far a strict side must clear it. */
     private val tolerance: Double = TOLERANCE_PER_SCALE * scale
 
-    // One unit of graded violation: residuals are counted in these before compression.
+    // Residuals are counted in units of this size before compression.
     private val unit: Double = UNIT_PER_SCALE * scale
 
     private fun intCoeff(v: Int): Double = intIndex[v].let { if (it < 0) 0.0 else intCoeffs[it] }
@@ -174,7 +174,7 @@ internal class RealRowInvariant(
             val cur = state.assignment.intValue(v)
             val exact = cur + (goal - sum) / c
             if (!exact.isFinite()) continue
-            // Round toward the side that keeps the goal: down when raising the term lowers the sum enough.
+            // Round so the term overshoots the goal rather than stopping short of it.
             val rounded = if ((goal >= sum) == (c > 0)) ceil(exact) else floor(exact)
             if (abs(rounded) >= Long.MAX_VALUE.toDouble()) continue
             val clamped = state.rootDomains[v].clamp(rounded.toLong())
@@ -194,10 +194,8 @@ internal class RealRowInvariant(
     }
 
     private companion object {
-        // Relative tolerance of a row decided in floating point.
         const val TOLERANCE_PER_SCALE: Double = 1e-9
 
-        // Relative size of one unit of graded violation.
         const val UNIT_PER_SCALE: Double = 1e-6
     }
 }

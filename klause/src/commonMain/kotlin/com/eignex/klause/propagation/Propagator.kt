@@ -5,7 +5,7 @@ import com.eignex.klause.ir.Lit
 /**
  * The deductive contract of a constraint: propagation, watcher subscriptions, and conflict
  * explanation. Constructed from factor data by the CP engine and used by the propagation loop
- * ([com.eignex.klause.backtrack.BacktrackSolver]) when dispatching to factors. Built-in projections can
+ * ([PropagationState]) when dispatching to factors. Built-in projections can
  * serve several states; their mutable work and failure premises belong to [PropagationState].
  * A selected custom factory can open a private mechanism for one live engine state.
  *
@@ -29,11 +29,11 @@ interface Propagator {
      * [com.eignex.klause.propagation.moveBoolWatcher].
      *
      * Used by [com.eignex.klause.factor.bool.Clause] to implement two-watched-literal
-     * propagation (Zhang–Stickel): only the two watched literals trigger
+     * propagation (Moskewicz et al., "Chaff: engineering an efficient SAT solver", DAC 2001,
+     * https://doi.org/10.1145/378239.379017): only the two watched literals trigger
      * wakeups, so a 50-literal clause fires on 2/50 var changes instead of 50/50.
      *
-     * Default is `null` — preserves the current "wake on any boolVars change" semantics
-     * for every factor that hasn't opted in.
+     * Default is `null`: the factor wakes on any boolVars change.
      */
     val initialBoolWatchers: IntArray? get() = null
 
@@ -72,8 +72,8 @@ interface Propagator {
      * subscription silently drops a wake. A variable in `Factor.intVars` but *not* named here keeps
      * its normal occurrence-list wakeup.
      *
-     * Default is `null` — preserves the current "wake on any intVars change" semantics for every
-     * factor that hasn't opted in (and the engine pays nothing when no factor in the problem does).
+     * Default is `null`: the factor wakes on any intVars change (and the engine pays nothing when no
+     * factor in the problem subscribes).
      */
     val initialIntEventWatches: IntArray? get() = null
 

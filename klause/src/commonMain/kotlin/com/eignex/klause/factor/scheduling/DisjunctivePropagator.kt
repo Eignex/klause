@@ -17,9 +17,10 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.argsortBy
 
 /**
- * CP propagator for the no-overlap case of [com.eignex.klause.factor.scheduling.Cumulative]
- * (`unary = true`, built via [com.eignex.klause.factor.scheduling.Cumulative.unary]) and provides
- * time-tabling, detectable precedences, and Θ-tree edge-finding for the unary case.
+ * CP propagator for the no-overlap case of [Cumulative] (`unary = true`, built via [Cumulative.unary]):
+ * time-tabling, pairwise detectable precedences, and Θ-tree edge-finding in both directions (P. Vilím,
+ * "O(n log n) Filtering Algorithms for Unary Resource Constraint", CPAIOR 2004,
+ * https://doi.org/10.1007/978-3-540-24664-0_23).
  *
  * Each deduction cites only the tasks it rests on: a detectable precedence its pair, a time-table shave the
  * tasks whose compulsory parts block the shaved starts, an edge-finding bound the tasks of the overloaded set
@@ -39,8 +40,7 @@ internal class DisjunctivePropagator(
 
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
-    /** Snapshot effective per-task durations. Returns null if any duration var is not
-     *  fixed at this fixpoint pass — propagation defers in that case (sound). */
+    /** Effective per-task durations, or null while any duration var is unfixed (propagation then waits). */
     private fun effDurOrNull(state: PropagationState): LongArray? {
         if (durationVars.isEmpty()) return LongArray(n) { durations[it] }
         val out = LongArray(n)
@@ -96,7 +96,7 @@ internal class DisjunctivePropagator(
         }
     }
 
-    // Tightening [v] failed against its other bound or a hole: the deduction's reason plus [v]'s own domain.
+    // Tightening [task]'s start failed against its other bound or a hole: the deduction's reason plus its own domain.
     private fun failWith(state: PropagationState, task: Int, build: View.() -> Unit): Boolean {
         state.propagatorFailures[this] = now(state).run {
             build()
@@ -107,8 +107,7 @@ internal class DisjunctivePropagator(
     }
 
     /** Build the mandatory profile from each task's `[lst, ect)` compulsory part; fail on
-     *  level > 1; shave any non-fixed task's start endpoints if placement would create
-     *  an additional unit-overlap with the mandatory profile. */
+     *  level > 1; shave any non-fixed task's start endpoints whose placement would overlap the profile. */
     private fun timeTable(state: PropagationState, effDur: LongArray): Boolean {
         val profile = mandatoryProfile(state, effDur)
         if (!profile.build(cap = 1L)) {
@@ -388,7 +387,7 @@ internal class DisjunctivePropagator(
             if (presents.isNotEmpty()) add(Lit.negate(presents[i]))
         }
 
-        /** [before] cannot follow [after]: `after` starts too late to end before `before` must start. */
+        /** [before] precedes [after]: [after] cannot end before [before]'s latest start. */
         fun precedes(before: Int, after: Int) {
             task(before)
             task(after)

@@ -197,7 +197,6 @@ class Bits(size: Int) {
         /** Return a bitset with every valid bit set. */
         fun full(size: Int): Bits {
             val b = Bits(size)
-            // Set every bit up to size, then zero the tail in the last word.
             for (i in b.words.indices) b.words[i] = -1L
             val tail = size and 63
             if (tail != 0) {

@@ -90,10 +90,12 @@ internal fun LpEngine.shaveVariableBounds(token: Cancellation): List<ShavedBound
 }
 
 /**
- * Factor indices of [Linear] `≤` constraints the LP relaxation proves redundant — implied by the *other*
- * constraints, so dropping them preserves the solution set. For each candidate `a·x ≤ b`, the relaxation
- * of the others (a fresh problem omitting this one and any already dropped) is maximised over `a·x`; a
- * Neumaier–Shcherbina *safe upper bound* on that maximum at or below `b` certifies redundancy. The safe
+ * Factor indices of [Linear] `≤`, `≥` and `=` constraints the LP relaxation proves redundant — implied by
+ * the *other* constraints, so dropping them preserves the solution set. For a candidate `a·x ≤ b`, the
+ * relaxation of the others (a fresh problem omitting this one and any already dropped) is maximised over
+ * `a·x`; a *safe upper bound* on that maximum at or below `b` certifies redundancy (Neumaier and
+ * Shcherbina, "Safe bounds in linear and mixed-integer linear programming", Math. Program. 2004,
+ * https://doi.org/10.1007/s10107-003-0433-3). `≥` uses the safe minimum, and `=` needs both. The safe
  * bound over-estimates the true maximum, so `≤ b` guarantees no feasible point can violate the constraint
  * — sound; a too-loose bound only misses a removal, never makes a wrong one. Sound regardless of the
  * folded domains: the harvested problem keeps them (shaving only tightens), so a dropped row's effect
@@ -124,10 +126,6 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
         val a = LongArray(problem.numIntVars)
         for (k in f.vars.indices) a[f.vars[k]] += row.coeff(k)
         val b = row.bound.toDouble()
-        // `≤ b` is redundant when the others' max of a·x is already ≤ b; `≥ b` when their min is ≥ b; an
-        // `=` only when both hold. Safe bounds (over-/under-estimates) keep it sound — a loose bound just
-        // misses a removal. Each drop is judged against the kept set, so two mutually-implied rows are
-        // never both removed (implication is transitive).
         val redundant = when (f.op) {
             LinearOp.LE -> safeMax(others, a, token)?.let { it <= b } ?: false
 
@@ -290,9 +288,7 @@ internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation, minimumSpan: Long 
  * The free integer variables, widest declared domain first, so [rootLpBoundsNoBake]'s [OBBT_MAX_VARS]
  * solves land where a bound is worth proving. Index order spends the whole allowance on whichever
  * variables happen to come first, which on a model whose open columns sit late is every variable but
- * the ones OBBT exists for: measured, `neos-3046601-motu` and `Rulemining-hab-07-3-30` shaved nothing
- * in index order and 8 and 7 bounds respectively in this one. A domain that overflows [Long] sorts
- * first — it is the most open there is.
+ * the ones OBBT exists for. A domain that overflows [Long] sorts first — it is the most open there is.
  */
 private fun LpEngine.widestFirst(n: Int, minimumSpan: Long): List<Int> {
     val width = LongArray(n) { v ->
@@ -337,7 +333,7 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
     )
     return simplex.use {
         // A non-null solve is a feasible optimum; null is infeasible or an inconclusive failure. Only a
-        // dual-unbounded ray that survives exact 128-bit Farkas certification proves genuine infeasibility.
+        // dual-unbounded ray that survives exact Farkas certification proves genuine infeasibility.
         val result = try {
             simplex.solve()
         } finally {
@@ -361,7 +357,7 @@ internal class RootRelaxationSize(val cols: Int, val rows: Int, val nnz: Int) {
 }
 
 /** Size of [LpEngine]'s root relaxation, or null when none is built / the root is already infeasible /
- *  the build overflows — used to gate the harvest's per-candidate probes on the real LP dimensions. */
+ *  the build overflows. Gates the harvest's per-candidate probes on the real LP dimensions. */
 internal fun LpEngine.rootRelaxationSize(): RootRelaxationSize? {
     val relaxer = lpRelaxer ?: return null
     val session = PropagationSession(problem)
@@ -384,7 +380,8 @@ private fun LpEngine.infeasibleUnder(v: Int, bound: Long, atMost: Boolean, token
     return assumed is PropagationResult.Unsat || pruneNode(s, Double.POSITIVE_INFINITY, -1, true)
 }
 
-/** Max upward probes for objective shaving before it stops (each probe is one propagation + LP solve). */
+/** Probe cap for each shaving, redundancy and implied-equality pass (each probe is one propagation or LP
+ *  solve). */
 private const val SHAVE_MAX_ITERS = 64
 
 /** Max integer variables the no-bake OBBT ([rootLpBoundsNoBake]) tightens — two LP solves each. Caps the

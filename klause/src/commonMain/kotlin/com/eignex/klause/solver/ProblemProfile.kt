@@ -44,7 +44,7 @@ data class ProblemProfile(
     val problemClass: ProblemClass,
     /** Whether the model has an objective. */
     val optimizing: Boolean,
-    /** Whether a value or row constant leaves the 32-bit range. */
+    /** Whether an integer column lacks a side, or a bound or row constant leaves the 32-bit range. */
     val wide: Boolean,
     /** Whether a cumulative or placement constraint is present. */
     val scheduling: Boolean,

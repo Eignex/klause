@@ -301,6 +301,9 @@ private class LuConstruction(
             magnitude >= policy.relativeThreshold * columnMax[column]
     }
 
+    // Markowitz pivot selection with threshold pivoting: minimise (r - 1)(c - 1) over a bounded search of the
+    // sparsest columns and rows. H. M. Markowitz, "The elimination form of the inverse and its application to
+    // linear programming", Management Science 3(3), 1957, https://doi.org/10.1287/mnsc.3.3.255.
     private fun markowitz(): LuPivot? {
         var best: LuPivot? = null
         var bestMerit = Long.MAX_VALUE
@@ -382,7 +385,7 @@ private class LuConstruction(
         return true
     }
 
-    // The rows below pivot row [i] in pivot column [j], sorted into [affectedRows].
+    // The rows other than pivot row [i] in pivot column [j], sorted into [affectedRows].
     private fun collectAffectedRows(i: Int, j: Int): Int {
         var count = 0
         columns[j].forEach { row, _ -> if (row != i) affectedRows[count++] = row }

@@ -6,7 +6,9 @@ import com.eignex.klause.localsearch.proposeRepairChains
 
 /**
  * Stall-gated ejection-chain proposals. Grows up to [cap] directed repair chains from random
- * violated seed factors, each chain entering the score-only race as one atomic compound.
+ * violated seed factors, each chain entering the score-only race as one atomic compound. F. Glover,
+ * "Ejection chains, reference structures and alternating path methods for traveling salesman
+ * problems", Discrete Applied Mathematics 65, 1996, https://doi.org/10.1016/0166-218X(94)00037-E.
  * Construction is delegated to [proposeRepairChains]: apply a violated factor's repair, find the
  * factor it newly regressed, append that factor's best eligible repair, and repeat to [maxDepth] —
  * emitting the walk's best two-or-more-part prefix.

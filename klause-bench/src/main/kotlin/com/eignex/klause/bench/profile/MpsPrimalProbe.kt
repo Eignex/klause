@@ -26,7 +26,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** Compare explicit finite mixed MPS tree probing through the prepared public backtracking API. */
+/** Compares LP tree-search primal probing against a control arm on finite mixed MPS models via the backtracking API. */
 object MpsPrimalProbe {
     /** Capture paired API invocations and every original-coordinate incumbent for the MPS paths in [args]. */
     @JvmStatic

@@ -1,9 +1,9 @@
 package com.eignex.klause.backtrack
 
 /**
- * Polarity source for a fresh decision's first-tried value. The B&B stepper rotates
- * through these every `rephaseInterval` conflicts via [next], so search periodically samples
- * a different phase bias without popping to root.
+ * Polarity source for a fresh decision's first-tried value. [PhaseSaving] rotates through these every
+ * [BacktrackParams.rephaseInterval] conflicts via [next], so search periodically samples a different phase
+ * bias without popping to root.
  */
 internal enum class RephaseMode {
     /** Bias toward the deepest conflict-free assignment seen (falls back to saved). */

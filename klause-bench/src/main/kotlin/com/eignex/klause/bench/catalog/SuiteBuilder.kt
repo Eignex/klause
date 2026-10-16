@@ -55,7 +55,7 @@ internal class SuiteBuilder(val id: String, val description: String) {
         license: String = this.license,
     ) = problem(name, corpus(relPath), format, category, expected, tags = tags, license = license)
 
-    /** A MiniZinc model + optional `.dzn`, both vendored under `corpus/minizinc/`. */
+    /** A MiniZinc model + optional `.dzn`, both vendored under `klause-bench/smoke-corpus/`. */
     fun vendoredMzn(
         name: String,
         category: Category = this.category,
@@ -149,7 +149,7 @@ internal class SuiteBuilder(val id: String, val description: String) {
 internal fun suite(id: String, description: String, block: SuiteBuilder.() -> Unit): Suite =
     SuiteBuilder(id, description).apply(block).build()
 
-/** Default corpus sub-directory for a format (matches the `corpus/<dir>/` layout). */
+/** Default `klause-bench/smoke-corpus/` sub-directory for a format. */
 val Format.dir: String
     get() = when (this) {
         Format.DIMACS -> "dimacs"

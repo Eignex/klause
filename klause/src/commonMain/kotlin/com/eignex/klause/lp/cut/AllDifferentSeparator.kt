@@ -44,8 +44,10 @@ internal fun allDifferentGroups(problem: Problem): List<IntArray> {
  * values, so `Σ_{i∈S} x_i` is bounded below by the sum of the |S| smallest distinct values available
  * across their domains, and above by the sum of the |S| largest — Hall-set bounds. Treating each
  * domain as its `[min, max]` interval (ignoring holes) only widens the value pool, so the bounds stay
- * valid (a sound under-/over-estimate). The full variable set is the |S| = n Hall set; this first
- * implementation separates that set (the dominant cut) when the LP point violates it.
+ * valid (a sound under-/over-estimate). Only the full variable set (the |S| = n Hall set, the dominant
+ * cut) is separated, when the LP point violates it. See Williams and Yan, "Representations of the
+ * all_different predicate of constraint satisfaction in integer programming", INFORMS J. Comput. 2001,
+ * https://doi.org/10.1287/ijoc.13.2.96.10515.
  *
  * The set S is any group from [allDifferentGroups], so this also covers [SymmetricAllDifferent] and
  * each side of [Inverse] — all injective, hence all-different.

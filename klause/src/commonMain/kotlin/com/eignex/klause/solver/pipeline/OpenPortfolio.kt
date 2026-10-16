@@ -532,8 +532,7 @@ internal class OpenPortfolio(
         // The descent's least share of an optimizing run: half, the rest to local search.
         const val DESCENT_SHARE: Double = 0.5
 
-        // The theory's least share of a satisfaction run: enough that a refutation the theory alone finishes in
-        // three fifths of the budget still finishes, the rest to local search.
+        // The theory's least share of a satisfaction run, the rest to local search: only the theory can refute.
         const val THEORY_SHARE: Double = 0.75
 
         // Wall-clock ceiling on the seed LP, a small slice beside any portfolio budget.

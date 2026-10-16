@@ -49,6 +49,9 @@ internal open class SuccessorCycleInvariant(
      * over the affected successor variables. Feasibility-preserving (reversing a segment of a valid
      * cycle yields a valid cycle), so callers use it for structured moves; [CircuitInvariant] passes
      * the whole tour and [SubcircuitInvariant] the active sub-tour.
+     *
+     * Croes, "A method for solving traveling-salesman problems", Operations Research 6(6), 1958,
+     * https://doi.org/10.1287/opre.6.6.791
      */
     protected fun proposeReversals(state: LocalSearchState, order: IntArray, sink: MoveSink, cap: Int, stride: Int) {
         val len = order.size

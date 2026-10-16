@@ -90,7 +90,7 @@ internal fun saturatingMul(a: Long, b: Long): Long = when {
  *
  * [ascending] = `true` orders smallest-residual first (Impact); `false` orders largest-
  * residual first (MaxSd). For int domains larger than [maxProbes], a random subset is
- * probed; the un-probed remainder is appended at the end so DFS coverage is preserved.
+ * probed and the rest of the domain follows the ordered values so DFS coverage is preserved.
  */
 internal fun probeAndOrder(
     session: PropagationSession,
@@ -199,7 +199,6 @@ internal fun domainValuesAscending(d: IntDomain): Sequence<Long> =
 
 /** Descending sequence; same skip-holes semantics. */
 internal fun domainValuesDescending(d: IntDomain): Sequence<Long> = sequence {
-    // Backwards walk: iterate from max down to min, skip holes via membership check.
-    // For sparse domains this is O((max - min) + holes); for contiguous it's O(span).
+    // O(max - min) membership walk, holes included.
     for (v in d.max downTo d.min) if (v in d) yield(v)
 }

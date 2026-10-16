@@ -117,8 +117,8 @@ object FinitePipeline {
             request.cancellation,
             request.presolveBudget,
         )
-        // A source rewrite moves factor ownership with the factors, so the routing plan no longer indexes
-        // the model the engine is built from; an untouched model keeps the plan routing already built.
+        // A source rewrite moves factor ownership with the factors, so the routing plan does not index the
+        // model the engine is built from; an untouched model keeps the plan routing already built.
         val plan = if (prepared.changed) {
             requireNotNull(prepared.problem.prepareExecutionPlan(
                 request.preparedPlan.factorProjections?.providers ?: FactorProjectionProviders.Default,

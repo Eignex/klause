@@ -8,10 +8,9 @@ import kotlin.random.Random
 /**
  * Decides whether a freshly-reached local optimum (or candidate solution) replaces the
  * incumbent it's being compared against. Used by both [IteratedLocalSearchRestart] and
- * the ALNS meta-optimizer; the same policy menu shows up in the literature.
+ * the ALNS meta-optimizer.
  *
- *  - [Improving] — only strictly better candidates are accepted. Simplest, sometimes
- *    called "ILS-Better".
+ *  - [Improving] — only strictly better candidates are accepted ("ILS-Better").
  *  - [BetterOrEqual] — also accepts ties; useful on plateaus.
  *  - [RandomWalk] — always accept (no rejection). Maximises diversification, simulates a
  *    pure random walk through local optima.
@@ -50,7 +49,9 @@ sealed interface AcceptanceCriterion {
      * should get its own.
      *
      * The default [Geometric] schedule (start 1.0, cooling 0.999, floor 1e-3) is pure cool-only;
-     * pass an adaptive-cooling or reheating schedule for a stronger trajectory.
+     * pass an adaptive-cooling or reheating schedule for a stronger trajectory. S. Kirkpatrick,
+     * C. D. Gelatt, M. P. Vecchi, "Optimization by simulated annealing", Science 220, 1983,
+     * https://doi.org/10.1126/science.220.4598.671.
      */
     class SimulatedAnnealing(private val schedule: Schedule) : AcceptanceCriterion {
         /** Fixed geometric cooling — the default schedule. */

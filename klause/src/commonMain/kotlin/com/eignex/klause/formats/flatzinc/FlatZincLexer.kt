@@ -175,7 +175,7 @@ internal class FlatZincLexer(private val reader: CharReader) {
         throw FlatZincParseException(message, line, column)
 
     private fun readString(startLine: Int, startCol: Int): FznToken {
-        advance() // opening "
+        advance()
         val sb = StringBuilder()
         while (!reader.eof() && reader.peek() != '"'.code) {
             if (reader.peek() == '\\'.code && reader.peek(1) >= 0) {
@@ -198,7 +198,7 @@ internal class FlatZincLexer(private val reader: CharReader) {
             }
         }
         if (reader.eof()) throw FlatZincParseException("unterminated string", startLine, startCol)
-        advance() // closing "
+        advance()
         return FznToken.StringLit(sb.toString(), startLine, startCol)
     }
 

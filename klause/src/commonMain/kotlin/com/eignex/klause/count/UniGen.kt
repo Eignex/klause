@@ -9,9 +9,12 @@ import kotlin.math.roundToInt
 import kotlin.random.Random
 
 /**
- * Near-uniform XOR-hashed sampling (UniGen2; Chakraborty, Meel & Vardi) over a Boolean sampling
- * set. An *accuracy-validation* tool: it produces (almost) uniform draws to measure how biased the
- * cheap sampling path is. Far more expensive than the cheap path.
+ * Near-uniform XOR-hashed sampling (UniGen2) over the sampling set resolved by [CellContext]. An
+ * *accuracy-validation* tool: it produces (almost) uniform draws to measure how biased the cheap
+ * sampling path is. Far more expensive than the cheap path.
+ *
+ * S. Chakraborty, D. J. Fremont, K. S. Meel, S. A. Seshia, M. Y. Vardi, "On Parallel Scalable
+ * Uniform SAT Witness Generation", TACAS 2015, https://doi.org/10.1007/978-3-662-46681-0_25
  *
  * XOR hashes range over the projection's bits (see [cellCount]). Strategy: estimate the projected model
  * count `C` once (via [ApproxMC]); if `C` already fits a target cell band, enumerate all models and
@@ -33,7 +36,6 @@ internal object UniGen {
         val loThresh = floor(pivot / (1.0 + kappa)).toInt().coerceAtLeast(1)
         val hiThresh = ceil(1.0 + (1.0 + kappa) * pivot).toInt()
 
-        // One-shot count estimate to pick the number of hashes.
         val estimate = ApproxMC.run(
             problem,
             ApproxCountConfig(
@@ -77,7 +79,6 @@ internal object UniGen {
                 yield(s)
             } else if (++consecutiveRejects >= MAX_CONSECUTIVE_REJECTS) {
                 // Hashing can't find an in-band cell (highly skewed count or hard slices).
-                // Fall back to the cheap path rather than spin forever.
                 yieldAll(cheapFallback())
             }
         }

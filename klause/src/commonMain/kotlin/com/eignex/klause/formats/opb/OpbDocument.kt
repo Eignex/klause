@@ -38,7 +38,7 @@ sealed interface OpbStatement {
 data class OpbTerm(
     /** Integer coefficient. */
     val coefficient: BigInt,
-    /** Conjoined DIMACS-encoded literals. */
+    /** Conjoined literals in `Lit` encoding over zero-based variable ids. */
     val literals: IntArray,
 )
 

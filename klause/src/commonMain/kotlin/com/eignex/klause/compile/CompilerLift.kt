@@ -24,8 +24,8 @@ import com.eignex.klause.model.SetCard
 /**
  * Affine-fragment lift for [Lowering]. Rewrites a tree of [IntExpr] so the
  * residual is affine (sums of [IntScale] over [IntRef] plus [IntLit] constants) — every
- * non-affine subexpression ([IntMul], [IntDiv], [IntMod], [IntElement], [IntIfThenElse],
- * [IntMax] / [IntMin], [IntAbs]) is replaced with a fresh aux [IntRef], and auxiliary
+ * non-affine subexpression ([IntMul], [IntPower], [IntDiv], [IntMod], [IntElement], [IntIfThenElse],
+ * [IntMax] / [IntMin], [IntAbs], [SetCard]) is replaced with a fresh aux [IntRef], and auxiliary
  * constraints are emitted that pin the aux to the correct value. After lifting, the
  * top-level assertion path (`CompilerAssertions`) and the reification path
  * (`Compiler.kt`) deal only with linear forms.
@@ -76,7 +76,6 @@ internal fun Lowering.liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Bo
 internal fun Lowering.liftMul(left: IntExpr, right: IntExpr): IntExpr {
     val l = lift(left)
     val r = lift(right)
-    // Constant folding: const * x or x * const → IntScale.
     if (l is IntLit) return IntScale(l.value, r)
     if (r is IntLit) return IntScale(r.value, l)
     val aRef = materializeIntVar(l)

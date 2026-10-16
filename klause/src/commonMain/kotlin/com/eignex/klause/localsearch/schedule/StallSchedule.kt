@@ -13,11 +13,11 @@ package com.eignex.klause.localsearch.schedule
  *    [NoiseSchedule] it steers the WalkSAT-style noise of the acceptance axis exactly like the
  *    adaptive controllers.
  *
- * The window resets on a strict cost drop and on a restart (rewound step); it is *not* reset by a
- * weight bump, so it measures true no-progress, distinct from the weight schedule's own stall. The
- * driver advances it once per pick via [update]; the [NoiseSchedule.observe] hooks are inert (the
- * stall window needs the step, which only [update] carries).
- * A lower unweighted repair fraction at equal integer cost also resets the window.
+ * The window resets on a strict cost drop, on a lower unweighted repair fraction at equal integer
+ * cost, and on a restart (rewound step); it is *not* reset by a weight bump, so it measures true
+ * no-progress, distinct from the weight schedule's own stall. The driver advances it once per pick
+ * via [update]; the [NoiseSchedule.observe] hooks are inert (the stall window needs the step, which
+ * only [update] carries).
  */
 internal class StallSchedule(
     private val afterStall: Int,

@@ -7,8 +7,9 @@ import kotlin.math.exp
 import kotlin.random.Random
 
 /**
- * Reusable candidate-set filter that removes moves whose variable was touched within the last
- * [tenure] accepted moves, with two extensions:
+ * Reusable tabu-search candidate-set filter that removes moves whose variable was touched within the
+ * last [tenure] accepted moves (F. Glover, "Tabu Search—Part I", ORSA Journal on Computing 1, 1989,
+ * https://doi.org/10.1287/ijoc.1.3.190), with two extensions:
  *
  *   - [aspiration] decides whether a tabu move can still be admitted. The default ("when *every*
  *     candidate is tabu, drop the filter") preserves liveness when the tabu would otherwise starve
@@ -26,9 +27,10 @@ data class TabuFilter(
     val aspiration: AspirationCriterion = AspirationCriterion.AllowAllWhenAllTabu,
     val dynamicTenure: ((step: Long) -> Int)? = null,
 ) {
-    /** Filter `moves`, dropping tabu ones (subject to aspiration). */
+    /** Filter [raw], dropping tabu moves (subject to aspiration). */
     fun filter(state: LocalSearchState, raw: List<Move>): List<Move> = filter(state, raw, null)
 
+    /** [completedImprovement] replaces the [AspirationCriterion.OrImproving] test with a completed-move score. */
     internal fun filter(
         state: LocalSearchState,
         raw: List<Move>,
@@ -37,7 +39,7 @@ data class TabuFilter(
         val effective = dynamicTenure?.invoke(state.step) ?: tenure
         if (effective <= 0 || raw.isEmpty()) return raw
 
-        // Pass 1: detect whether any move is tabu (skips allocation when nothing is).
+        // Skips the allocation when nothing is tabu.
         var anyTabu = false
         for (m in raw) {
             if (state.tabu.isTaboo(m, effective)) {
@@ -47,7 +49,6 @@ data class TabuFilter(
         }
         if (!anyTabu) return raw
 
-        // Pass 2: collect the admitted set under the configured aspiration rule.
         val admitted = ArrayList<Move>(raw.size)
         for (m in raw) {
             val tabu = state.tabu.isTaboo(m, effective)
@@ -59,8 +60,8 @@ data class TabuFilter(
         return when {
             admitted.isNotEmpty() -> admitted
 
-            // Final fallback: every candidate was tabu and none met the aspiration; drop
-            // the filter entirely rather than starve the strategy.
+            // Every candidate was tabu and none met the aspiration: drop the filter rather than
+            // starve the strategy.
             else -> raw
         }
     }
@@ -73,8 +74,9 @@ data class TabuFilter(
         /**
          * Dynamic-tenure preset: pick a fresh tenure uniformly at random in `[low, high]`
          * on every call. Adds diversification without making the average tenure drift — the
-         * "robust tabu" pattern, useful when a single fixed tenure either traps the search (too
-         * short) or starves it (too long).
+         * robust tabu pattern of É. D. Taillard, "Robust taboo search for the quadratic assignment
+         * problem", Parallel Computing 17, 1991, https://doi.org/10.1016/S0167-8191(05)80147-4 —
+         * useful when a single fixed tenure either traps the search (too short) or starves it (too long).
          *
          * The randomness comes from a private [Random] seeded by [seed]; pass a stable
          * seed for reproducible runs, leave null for `Random.Default`.
@@ -87,7 +89,7 @@ data class TabuFilter(
 
         /**
          * Dynamic-tenure preset: grow tenure linearly with `state.step` from [base] up to
-         * [max], saturating after [maxAtStep] flips. Slow start (short tabu, encourages
+         * [max], saturating after [maxAtStep] steps. Slow start (short tabu, encourages
          * local progress) then plateau (longer tabu, forces diversification). Inverse of
          * the literature "decaying tabu" — useful when the search benefits from increasing
          * diversification as it stalls.
@@ -107,13 +109,12 @@ data class TabuFilter(
 }
 
 /**
- * Per-move criterion that admits a tabu move despite the tenure check. The standard
- * literature aspiration is "tabu move M is permitted if M leads to a state strictly better
- * than the best known so far"; we approximate that with [OrImproving], which admits a
- * tabu move that lowers violations or strictly improves the objective while preserving feasibility.
+ * Per-move criterion that admits a tabu move despite the tenure check. [OrImprovesBestEver] is the
+ * standard aspiration (the move leads to a state strictly better than the best known so far);
+ * [OrImproving] is the weaker test against the current state.
  */
 sealed interface AspirationCriterion {
-    /** True iff [move] is currently tabu. */
+    /** True iff the tabu [move] should be admitted anyway. */
     fun admitsTabu(state: LocalSearchState, move: Move): Boolean
 
     /** No per-move admission — only the [TabuFilter] "everything tabu" fallback applies. */
@@ -139,8 +140,7 @@ sealed interface AspirationCriterion {
      *  at, not merely improve over the current epoch's plateau. */
     data object OrImprovesBestEver : AspirationCriterion {
         override fun admitsTabu(state: LocalSearchState, move: Move): Boolean {
-            // bestCostSeen starts at Int.MAX_VALUE; any move trivially beats that on the
-            // first call, which gracefully degrades to "allow tabu" until the watermark
+            // bestCostSeen starts at Long.MAX_VALUE, so any move is admitted until the watermark
             // has been seeded by at least one apply.
             val predicted = state.cost + state.netDelta(move)
             return predicted < state.bestCostSeen

@@ -16,8 +16,8 @@ import com.eignex.klause.solver.isClausal
 import com.eignex.klause.util.Cancellation
 
 /**
- * Cost tier of a presolve pass. A
- * [PresolveEmphasis] enables a set of tiers, so the level dial is "how expensive a pass may be".
+ * Cost tier of a presolve pass. A [PresolveEmphasis] enables a set of tiers, so the level dial is "how
+ * expensive a pass may be".
  */
 enum class PresolveTiming {
     /** Cheap, run every round (bound/coefficient reductions, substitution). */
@@ -226,7 +226,7 @@ object Presolver {
 
         // Incremental path for the default FAST+MEDIUM rounds: one persistent [PresolveSession] absorbs
         // each pass's delta instead of rebuilding a `Problem` per firing pass. Scoped away from any
-        // EXHAUSTIVE (SAC / LP-harvest) pass, whose order-sensitive probing keeps the fresh-rebuild path.
+        // EXHAUSTIVE pass (probing, implication graph, BVE / BCE), which keeps the fresh-rebuild path.
         if (passes.none { it.timing == PresolveTiming.EXHAUSTIVE }) {
             return runIncremental(problem, passes, maxRounds, ctx, cancellation, config.abortFraction)
         }
@@ -364,8 +364,7 @@ object Presolver {
         }
         val rounds = PresolveRoundEngine.run(passes, maxRounds, cancellation, ctx.presolveBudget, host, abortFraction)
 
-        // No pass fired: presolve is a no-op, so return the input problem itself (identity) exactly like
-        // the fresh path returns `current === problem` — several callers assertSame on a fixpoint.
+        // No pass fired: return the input problem itself, matching the fresh path's identity on a no-op.
         if (rounds.fired.isEmpty()) return Presolved(problem, { it }, emptyList())
 
         val transformed = session.materialize()

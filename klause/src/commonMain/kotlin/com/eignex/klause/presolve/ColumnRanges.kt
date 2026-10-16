@@ -11,8 +11,7 @@ import com.eignex.klause.ir.IntDomain
  * [hasUpper] answer separately. A column the model leaves open has no width to charge, so [isClosed] answers false
  * for it and [min] / [max] say nothing. A caller reads every column its row mentions and declines the row
  * when any of them is open, which is what lets a row over closed columns reduce on a model that is open
- * somewhere else. Reading the model as a whole instead — open anywhere, so charge nothing — is what kept
- * these reductions off the source lane entirely.
+ * somewhere else.
  *
  * Deliberately primitive: a column's range is read once per term per row, and [IntDomain] is a real object
  * with several representations, so handing one back per access would allocate down the hot path.

@@ -253,7 +253,7 @@ data class LpStats(
     val ms: Long = 0L,
     /** Domain reductions applied by LP reduced-cost fixing. */
     val fixed: SumResult = ZERO_COUNT,
-    /** Total dual-simplex pivots across all node LP solves; drops sharply with warm-starting. */
+    /** Total simplex pivots across all node LP solves. */
     val pivots: SumResult = ZERO_COUNT,
     /**
      * Total deterministic LP work (floating-point operations) across all node LP solves.
@@ -289,8 +289,7 @@ data class LpStats(
     /** Node LP solves that started from a prior basis instead of the slack cold start — the warm-start
      *  hit rate. A warm basis saves pivots but not the factorization; [refactorizations] is that cost. */
     val seeded: SumResult = ZERO_COUNT,
-    /** Sparse LU factorizations built across all node LP solves. While each node constructs its own
-     *  engine the floor is one per solve, so this measures what carrying one across nodes would save. */
+    /** Sparse LU factorizations built across all node LP solves, for any reason. */
     val refactorizations: SumResult = ZERO_COUNT,
     /** Persistent solves that considered a warm basis. */
     val warmStartAttempts: SumResult = ZERO_COUNT,
@@ -371,13 +370,13 @@ data class LpStats(
     /**
      * Basis factorizations across all node LP solves that came back singular.
      *
-     * Each one cost a warm start: the engine falls back to the slack basis and refactorizes again, so
+     * Each one goes to basis repair, and a warm basis that stays singular falls back to the slack start, so
      * the [seeded] hit rate above overstates how many solves actually kept their warm basis. Against
      * [refactorizations] this is the rate at which the relaxation's columns defeat the factorization.
      */
     val singularRefactorizations: SumResult = ZERO_COUNT,
-    /** Node LP solves abandoned mid-pivot because the pivot element was numerically too small. The
-     *  engine does not refactorize and retry, so each is a solve lost outright. */
+    /** Node LP pivots abandoned because the pivot element was numerically too small. A scaled solve
+     *  retries once unscaled; otherwise the bail loses the solve. */
     val smallPivotBails: SumResult = ZERO_COUNT,
     /** Smallest structural `|a_ij|` in the root relaxation, or NaN when never measured. With
      *  [rootMatrixMaxValue] this is what a scaling decision is made on. */
@@ -577,7 +576,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         if (probeRoute == LpRoute.NODE) nodePasses++
     }
 
-    /** One node LP solve. This remains the cost denominator; [observeNodePass] is the node count. */
+    /** One node LP solve, the cost denominator; [observeNodePass] is the node count. */
     fun observeSolve() {
         if (probeRoute == LpRoute.NODE) solves.update(1.0)
     }
@@ -764,7 +763,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         if (probeRoute == LpRoute.NODE) fixed.update(1.0)
     }
 
-    /** Record [count] dual-simplex pivots from one node LP solve. */
+    /** Record [count] simplex pivots from one node LP solve. */
     fun observePivots(count: Int) {
         repeat(count) { pivots.update(1.0) }
     }
@@ -819,9 +818,8 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
      * Record the numerical trouble one node LP solve met: [singular] factorizations and [smallPivot]
      * pivots abandoned as too small.
      *
-     * Read off the engine rather than a [com.eignex.klause.lp.engine.FloatLpResult], on the same
-     * grounds as [observePivots]: a solve lost to either has no result, and those are precisely the
-     * solves worth counting here.
+     * Read off the engine's metrics rather than its result: a solve lost to either has no result, and
+     * those are precisely the solves worth counting here.
      */
     fun observeNumericalTrouble(singular: Int, smallPivot: Int) {
         repeat(singular) { singularRefactorizations.update(1.0) }

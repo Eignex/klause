@@ -275,8 +275,10 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
      * source whose out-arcs are node 0's candidate successors, and compute that source's dominator
      * tree over the candidate digraph. If value `y` dominates node `x` — every path from the source
      * to `x` passes through `y` — then `succ(x) = y` would close a loop `y ⇝ x → y` that bypasses
-     * the source, a premature subtour; so `y` is removed from `succ(x)`. Dominators via the
-     * Cooper–Harvey–Kennedy iterative algorithm (same tree as Lengauer–Tarjan, simpler to verify).
+     * the source, a premature subtour; so `y` is removed from `succ(x)`. Dominators via the iterative
+     * algorithm of Cooper, Harvey and Kennedy, "A Simple, Fast Dominance Algorithm", Softw. Pract. Exper.
+     * 2001, https://www.cs.tufts.edu/comp/150FP/archive/keith-cooper/dom14.pdf (same tree as
+     * Lengauer–Tarjan, simpler to verify).
      */
     private fun dominatorFilter(state: PropagationState): Boolean {
         val total = n + 1
@@ -336,7 +338,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         return seen
     }
 
-    /** Cooper–Harvey–Kennedy iterative dominators from [source]; `idom[source]=source`, `-1` for
+    /** Cooper–Harvey–Kennedy iterative dominators from [source]; `idom(source) = source`, `-1` for
      *  nodes the source cannot reach. */
     private fun computeDominators(
         succAdj: Array<IntArrayList>,

@@ -18,12 +18,12 @@ import kotlin.random.Random
  * perturbation. Compared to [AdaptivePerturbationRestart], which always anchors to the
  * global best-feasible-so-far, ILS allows the search to drift through sub-optimal
  * regions: an [AcceptanceCriterion] decides whether a new local optimum joins the
- * population (Lourenço–Martin–Stützle 2003).
+ * population. See Lourenço, Martin and Stützle, "Iterated Local Search", Handbook of
+ * Metaheuristics (2003), https://doi.org/10.1007/0-306-48056-5_11.
  *
  *  - [populationSize] — number of incumbents tracked. Default 1 = classic single-anchor
  *    ILS. Larger values give a population-based variant: each restart picks a random
  *    member, and when a new optimum is accepted it replaces the population's worst.
- *    Worth bumping to 3-5 on problems with multiple promising basins.
  *
  *  - [acceptance] — when [onLocalOptimum] fires with a new local optimum, this decides
  *    whether the new sample joins the population (replacing the worst member if at
@@ -31,9 +31,9 @@ import kotlin.random.Random
  *    that beats only the weakest member is admitted; under single-incumbent mode this
  *    reduces to comparing against the lone incumbent.
  *
- *  - [adaptivePerturbation] — when true, ramps [perturbationStrength] up on stalls (no
- *    improvement over the population for [adaptiveStallThreshold] consecutive local
- *    optima) and decays it on improvement. Bounded by [maxPerturbationStrength].
+ *  - [adaptivePerturbation] — when true, ramps [perturbationStrength] up on stalls
+ *    ([adaptiveStallThreshold] consecutive rejected local optima) and decays it when an
+ *    optimum is accepted. Bounded by [maxPerturbationStrength].
  *
  *  - Falls back to a full random restart when the population is empty — same behaviour
  *    as [AdaptivePerturbationRestart] before the first feasible.
@@ -50,8 +50,7 @@ class IteratedLocalSearchRestart(
     val populationSize: Int = 1,
     /** Probability per restart of generating the anchor via crossover of two random
      *  population members instead of single-anchor perturbation. Ignored when
-     *  `populationSize < 2`. 0.0 disables crossover (default). 0.2-0.4 is a reasonable
-     *  range when running with a populated incumbent set. */
+     *  `populationSize < 2`; 0.0 disables crossover. */
     val crossoverRate: Double = 0.0,
     /** How crossover combines two parents' values per variable. [CrossoverBias.Uniform]
      *  (default) flips a fair coin; [CrossoverBias.BetterBiased] weights toward the
@@ -65,8 +64,7 @@ class IteratedLocalSearchRestart(
     val perturbationKind: PerturbationKind = PerturbationKind.Uniform,
     /** When true, crossover transfers entire factor scopes at once instead of mixing
      *  per-variable, preserving co-adapted assignments that uniform recombination would
-     *  shred. Off by default (uniform crossover) to keep behaviour stable for callers
-     *  that don't opt in. */
+     *  shred. */
     val linkageAware: Boolean = false,
     /** Optional contextual-bandit acceptance: when non-null, the accept/reject of a new local
      *  optimum is decided by any 2-arm kumulant [ContextualBandit] (arm 0 = accept, 1 = reject) over
@@ -82,8 +80,7 @@ class IteratedLocalSearchRestart(
         require(crossoverRate in 0.0..1.0) { "crossoverRate must be in [0, 1], got $crossoverRate" }
     }
 
-    /** Population of (sample, objective) entries, sorted-ish: index 0 is the best by
-     *  objective, last is the worst. Kept compact (no nulls) up to [populationSize]. */
+    /** Incumbents sorted by ascending objective (index 0 best, last worst), at most [populationSize]. */
     private val population: MutableList<Incumbent> = ArrayList(populationSize)
     var perturbationStrength: Int = initialPerturbationStrength
         private set
@@ -95,7 +92,7 @@ class IteratedLocalSearchRestart(
     private var pendingContext: DoubleArray? = null
     private var pendingBestBefore: Double = Double.POSITIVE_INFINITY
 
-    /** Read-only view for tests / diagnostics. */
+    /** Read-only view of the population. */
     val incumbents: List<Incumbent> get() = population
 
     /** A population incumbent: an assignment and its objective. */
@@ -243,11 +240,9 @@ class IteratedLocalSearchRestart(
     }
 
     /** Linkage-aware crossover: copy entire factor scopes from one parent at a time.
-     *  Each factor's bool+int scope is the linkage group; we pick a parent for the group
-     *  and copy all its variables together, preserving co-adapted assignments that uniform
-     *  crossover would shred. Variables touched by multiple factors get assigned by the
-     *  *last* factor processed (later factors override). Vars touched by no factor fall
-     *  back to a per-variable coin flip. */
+     *  Each factor's bool+int scope is the linkage group, copied together from one parent.
+     *  A variable in several scopes takes the last factor's pick; a variable in no scope
+     *  falls back to a per-variable coin flip. */
     private fun linkageAwareCrossover(
         state: LocalSearchState,
         a: Sample,
@@ -296,8 +291,6 @@ class IteratedLocalSearchRestart(
         state.recompute()
     }
 
-    /** Insertion-sort by ascending objective. Population is small (typical 1-5) so the
-     *  O(N) cost is negligible compared to the LS work this restart triggers. */
     private fun insertSortedByObjective(item: Incumbent) {
         var idx = 0
         while (idx < population.size && population[idx].objective <= item.objective) idx++

@@ -43,10 +43,9 @@ internal class LinearPropagator(
     /** Reason set when [propagate] returns false. The conflict comes from exactly one sum
      *  extreme breaching `bound`: `LE` / `EQ`-with-`sumLo>bound` from the lo side (`Σ rLo`),
      *  `GE` / `EQ`-with-`sumHi<bound` from the hi side (`Σ rHi`). Cite only that side's
-     *  driving bounds (see [collectLinearDirAntecedents]) — those alone prove infeasibility,
-     *  so the nogood is sharper and more reusable than citing both bounds of every var.
-     *  `NE` (sum pinned to `bound`) needs both bounds, so it keeps the dense reason. Sound;
-     *  analyzer 1UIP minimisation trims any remaining redundancy. */
+     *  driving bounds, weakened by the excess over `bound` (see [collectLinearLiftedAntecedents]) —
+     *  those alone prove infeasibility, so the nogood is sharper and more reusable than citing both
+     *  bounds of every var. `NE` (sum pinned to `bound`) needs both bounds, so it keeps the dense reason. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         if (op == LinearOp.NE) return collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = 0)
         val range = linearSumRange(state, coeffs, vars) // [sumLo, sumHi]

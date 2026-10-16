@@ -3,8 +3,8 @@ package com.eignex.klause.lowering
 /**
  * Bucketing metadata for one float variable lowered to an integer bucket index: a float in `[lo, hi]`
  * is discretised into [buckets] uniformly-spaced values, and the solver reasons over the backing int
- * variable [varId] (domain `[0, buckets - 1]`). Shared across the front-ends (FlatZinc, MPS) so a float
- * discretises identically regardless of format, under the same `floatBuckets` / `floatScale` config.
+ * variable [varId] (domain `[0, buckets - 1]`), sized by the `floatBuckets` / `floatScale` config.
+ * An [lpOnly] float skips the grid and is backed by an LP-only real variable instead.
  */
 data class FloatBucketing(
     /** Backing variable id: an integer bucket-index var (domain `[0, buckets - 1]`) when [lpOnly] is

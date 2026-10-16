@@ -22,8 +22,7 @@ internal data class CellResult(
 
 /**
  * Count distinct projections of the cell carved out by [hashes] from [ctx]'s problem, up to
- * `cap + 1`. Delegates to [CellContext.countCell]; the counting strategy (DFS enumeration for a
- * Boolean projection, projected solve-under-assumptions for an integer projection) lives there.
+ * `cap + 1`, under the default per-cell decision budget [CELL_DECISION_BUDGET].
  */
 internal fun cellCount(ctx: CellContext, hashes: List<Xor>, cap: Int): CellResult = ctx.countCell(hashes, cap)
 

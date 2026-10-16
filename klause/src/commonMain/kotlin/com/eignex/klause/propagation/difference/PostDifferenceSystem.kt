@@ -36,6 +36,6 @@ internal fun BakedProblem.withDifferenceSystem(): BakedProblem {
                 !rootIntDomain(edge.source).isFixed && !rootIntDomain(edge.target).isFixed
         }) return this
     // The system is redundant with the rows it reads, so it changes nothing the base fold derived:
-    // `alreadyFolded` reuses that fold and `seedDeductions` carries the proven deductions forward.
+    // [withAppendedFactor] reuses that fold and carries the proven root deductions forward.
     return withAppendedFactor(DifferenceSystem(fragment.edges))
 }

@@ -46,10 +46,10 @@ import kotlin.time.ComparableTimeMark
  *
  *  - [solve] — first witness as [SolveResult.Sat], [SolveResult.Unsat] when the tree is
  *    fully explored, [SolveResult.Unknown] on [BacktrackParams.maxDecisions] exhaustion.
- *  - [samples] — yields every SAT leaf reached during traversal (each one distinct).
- *  - [enumerate] — same as [samples] plus the rolling-window Hamming-distance filter.
- *  - [minimize] — enumerates feasible assignments and returns the lowest-scoring one.
- *    Complete but exponential.
+ *  - [samples] — independent randomized solves, one model per yield; duplicates are possible.
+ *  - [enumerate] — distinct models from one DFS traversal, with an optional rolling-window
+ *    Hamming-distance filter.
+ *  - [minimize] — branch-and-bound over a [LinearObjective]. Complete but exponential.
  *
  *  Complete enumeration on `n` unpinned bools walks up to `2^n` branches. Use
  *  [BacktrackParams.maxDecisions] to cap exploration on large problems.

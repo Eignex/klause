@@ -1,9 +1,8 @@
 package com.eignex.klause.bench.report
 
 /**
- * Minimal Markdown report builder so metrics emit a human-readable summary alongside their
- * JSON. Centralizes table / section / heading formatting; metrics build a [Markdown] and call
- * [Reports.writeMarkdown].
+ * Minimal Markdown builder for the human-readable summary metrics emit alongside their JSON;
+ * metrics build a [Markdown] and call [Reports.writeMarkdown].
  */
 class Markdown {
     private val sb = StringBuilder()

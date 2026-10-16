@@ -8,9 +8,13 @@ import kotlin.random.Random
 /**
  * Phase-saving and target-phasing state for one backtrack run: the saved polarity of each
  * Boolean/integer variable, the target phase (the deepest conflict-free Boolean prefix), and the
- * rephasing schedule that rotates which polarity source a fresh decision tries first. Shared by both
- * the satisfaction path ([BacktrackSolver] `driveSearch`) and the branch-and-bound engine
- * ([ResumableMinimize]); all state persists across restarts.
+ * rephasing schedule that rotates which polarity source a fresh decision tries first. Owned by
+ * [BacktrackBrancher], so both the satisfaction path ([CpSatisfactionTraversal]) and the branch-and-bound
+ * engine ([ResumableMinimize]) use it; all state persists across restarts.
+ *
+ * Phase saving follows Pipatsrisawat and Darwiche, "A Lightweight Component Caching Scheme for
+ * Satisfiability Solvers", SAT 2007 (https://doi.org/10.1007/978-3-540-72788-0_28); target phases follow
+ * Biere and Fleury, "Chasing Target Phases", POS 2020 (https://fmv.jku.at/papers/BiereFleury-POS20.pdf).
  *
  * Arrays are allocated only for the enabled features — the Boolean saves whenever
  * [BacktrackParams.phaseSaving] or [BacktrackParams.targetPhasing] is on (target phasing's `SAVED`
@@ -95,7 +99,7 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
             val vi = varRef.varId
             val sols = solutionInts
             // Stable / SOLUTION mode dives on the incumbent's value (objective-good); otherwise the plain
-            // saved value. Out-of-domain values are harmless — [IntNode] clamps the split into the domain.
+            // saved value. Out-of-domain values are harmless — [splitIntAlternatives] clamps the split into the domain.
             val useSolution = managedMode == PhaseMode.STABLE ||
                 (managedMode == PhaseMode.UNMANAGED && rephaseMode == RephaseMode.SOLUTION)
             val preferred: Long? = when {

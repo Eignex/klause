@@ -142,7 +142,8 @@ internal class ResumableMinimize(
 
     // The LP-relaxation family is resolved from [BacktrackParams.lpConfig] inside [LpEngine]
     // (the single intent→plan home), so this carries the caller's params verbatim — only the slice
-    // cancellation and Hamming knobs are fixed here; the per-slice deadline is re-armed in runSlice.
+    // cancellation and the Hamming/recent-window knobs are fixed here; the per-slice deadline is re-armed in
+    // runSlice.
     // One-shot calls retain their invocation token. Resumed calls replace it while keeping a bound lifetime scope.
     private val baseCancellation: Cancellation = params0.cancellation
     private var params: BacktrackParams = params0.copy(
@@ -1051,8 +1052,8 @@ internal class ResumableMinimize(
      * `LpPlan.rootBudgetFraction` of the time remaining (capped at `LpPlan.rootBudgetMillis`). The time
      * remaining is read from the current slice deadline when one is armed, else from
      * [BacktrackParams.solveBudgetMillis] and [startMark] on the non-pausable one-shot path — so
-     * the cap tracks the real deadline on the FD track too instead of degrading to the absolute ceiling,
-     * which exceeds a short budget and would let root work consume the whole solve. Only the absolute cap
+     * the cap tracks the real deadline on both paths rather than the absolute ceiling, which exceeds a
+     * short budget and would let root work consume the whole solve. Only the absolute cap
      * applies when neither the slice end nor the budget is known. It also stops once the LP has spent
      * `LpPlan.rootMaxWork` or the LP work allowance the node solves share. A non-positive fraction
      * disables the cap.
@@ -1276,9 +1277,7 @@ internal class ResumableMinimize(
 
         // Two allowances, and a decision is charged against both. [decisionLimit] bounds one slice and is
         // refilled whenever a driver re-enters — a restart, an arm resuming, an LNS repair — so it never
-        // bounds a solve. [BacktrackParams.nodeBudget] is the solve-spanning one, and an optimize run that
-        // read only the slice allowance ignored `node-limit` entirely: capping `flugpl` at 1000, 5000 and
-        // 20000 all visited the same 920695 nodes.
+        // bounds a solve. [BacktrackParams.nodeBudget] is the solve-spanning one that enforces a node limit.
         override val decisionBudget = SearchDecisionBudget {
             val withinSlice = --decisionLimit >= 0L
             val budget = params.nodeBudget?.allowance ?: return@SearchDecisionBudget withinSlice

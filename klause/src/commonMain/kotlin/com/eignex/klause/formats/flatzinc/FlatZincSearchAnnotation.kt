@@ -2,7 +2,7 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.util.IntArrayList
 
-/** Build a `FlatZincSearchHints` view from one `solve` annotation block. */
+/** Build [FlatZincSearchHints] from the search annotations on the `solve` item. */
 internal fun FlatZincCompiler.compileSearchAnnotation(): FlatZincSearchHints? {
     val blocks = model.solve.annotations.filter(::isSearchAnnotation).flatMap(::searchBlocksOf)
     val tiers = blocks.mapNotNull(::compileSearchBlock)

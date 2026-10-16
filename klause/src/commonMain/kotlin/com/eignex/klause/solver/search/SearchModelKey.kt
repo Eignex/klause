@@ -12,7 +12,6 @@ import kotlin.reflect.KClass
 /**
  * A contribution key tied to its value type. Equality and hash must be stable and agree on [valueType].
  * [snapshot] captures borrowed producer state once during assembly; its result must be immutable.
- * The contract remains open for extension-defined arrays, functions and source symbols.
  */
 interface TypedSearchValueKey<V : Any> : SearchValueKey {
     /** Runtime check for untyped contribution paths; generic arguments remain the extension's contract. */

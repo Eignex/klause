@@ -15,6 +15,9 @@ import com.eignex.klause.util.mulExact
  * invented to close the search box: the product may leave that box at a genuine solution, and the row
  * built on it would cut the solution off. So the four are emitted individually, each only over the two
  * sides the model states — a square with one open side keeps the single envelope tangent to it.
+ *
+ * McCormick, "Computability of global solutions to factorable nonconvex programs: Part I — Convex
+ * underestimating problems", Mathematical Programming 10 (1976), https://doi.org/10.1007/BF01580665.
  */
 internal fun Product.emitLpRelaxation(builder: RelaxationBuilder) {
     if (!builder.hullEnabled()) return

@@ -41,13 +41,11 @@ internal fun PropagationState.maxLevelForVars(boolVars: IntArray, intVars: IntAr
     // currentLevel and every pin stamped from it.
     val cap = levelToDecisionVar.size
     var max = 0
-    // `max` starts at the floor `0`; when `cap` is `0` (no decisions pushed — the whole root bake and
-    // presolve) the result is already pinned to `cap`, so skip the O(arity) scan entirely. This is the
-    // same clamp the per-var short-circuit applies, hoisted ahead of the loop.
+    // With no decisions pushed (root bake, presolve) the result is pinned to `cap`: skip the O(arity) scan.
     if (max >= cap) return cap
     for (v in boolVars) {
         work++
-        // boolVars may include atom-var ids when a Clause has atom-lits; dispatch.
+        // boolVars may include atom-var ids when a Clause has atom-lits.
         val l = if (v < problem.numBoolVars) {
             boolLevel[v]
         } else {
@@ -76,7 +74,7 @@ internal fun PropagationState.maxLevelForClause(literals: IntArray): Int {
     // Clamped to the live decision count for the same reason as [maxLevelForVars].
     val cap = levelToDecisionVar.size
     var max = 0
-    if (max >= cap) return cap // no decisions pushed → result pinned to cap; skip the scan (see maxLevelForVars)
+    if (max >= cap) return cap
     for (lit in literals) {
         work++
         val v = Lit.variable(lit)
@@ -96,10 +94,8 @@ internal fun PropagationState.maxLevelForClause(literals: IntArray): Int {
  *  Atom-lit dispatch: `boolVars` may legitimately contain virtual atom-var ids when the
  *  failing factor is a learned Clause whose literals reference atom-lits (encoded as
  *  `Lit.make(v, ...)` with `v >= problem.numBoolVars`). Those resolve via [atomLevelForConflict],
- *  not [PropagationState.boolLevel] — mirrors the [maxLevelForVars] dispatch a few lines above. */
+ *  not [PropagationState.boolLevel]. */
 internal fun PropagationState.collectLevelsForVars(boolVars: IntArray, intVars: IntArray): IntArray {
-    // Dedup levels in a reused primitive set (no per-conflict HashSet / Int boxing), then
-    // materialize a plain IntArray — this is on the per-conflict path.
     levelScratch.clear()
     val numBool = problem.numBoolVars
     for (v in boolVars) {
@@ -163,8 +159,7 @@ internal fun PropagationState.extractConflictFactors(): IntArray {
     }
     var head = 0
     while (head < frontier.size) {
-        // factorAt routes learned-clause ids (≥ problem.numFactors) to the session's clause
-        // registry — conflicts can name a learned clause as their failing factor.
+        // Conflicts can name a learned clause as their failing factor; tail ids route like [factorBoolVars].
         val fid = frontier.get(head++)
         val native = nativeEngine
         if (fid >= baseFactorCount && !incremental && native != null) {

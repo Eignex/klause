@@ -22,7 +22,7 @@ internal class LongArrayList(initialCapacity: Int = 8) {
 
     /** Insert [value] at [index], shifting the tail right. */
     fun insertAt(index: Int, value: Long) {
-        add(0L) // grow by one (value irrelevant; overwritten by the shift)
+        add(0L)
         for (i in size - 1 downTo index + 1) data[i] = data[i - 1]
         data[index] = value
     }
@@ -32,8 +32,7 @@ internal class LongArrayList(initialCapacity: Int = 8) {
         data[index] = data[--size]
     }
 
-    /** Find the first occurrence of [value] and swap-remove it (O(1) removal, O(n) find);
-     *  returns true if found. */
+    /** Find the first occurrence of [value] and swap-remove it; returns true if found. */
     fun removeValue(value: Long): Boolean {
         val d = data
         val n = size
@@ -58,8 +57,7 @@ internal class LongArrayList(initialCapacity: Int = 8) {
 
     fun toLongArray(): LongArray = data.copyOf(size)
 
-    /** Snapshot the current contents as a `Set<Long>` (deduplicating). Boxes — intended for
-     *  occasional use, not hot loops. */
+    /** Snapshot the current contents as a `Set<Long>`. Boxes, so not for hot loops. */
     fun toSet(): Set<Long> {
         val s = HashSet<Long>(size)
         for (i in 0 until size) s.add(data[i])
@@ -77,9 +75,8 @@ internal class LongArrayList(initialCapacity: Int = 8) {
 
     fun last(): Long = data[size - 1]
 
-    /** Sort the live elements in place, delegating to stdlib [LongArray.sort]; [descending]
-     *  reverses the result. (Unlike [IntArrayList.sortByIntKey] there is no key-packing variant —
-     *  a 64-bit element leaves no room for a key in the same word.) */
+    /** Sort the live elements in place; [descending] reverses the result. A 64-bit element leaves
+     *  no room to pack a key, so there is no counterpart to [IntArrayList.sortByIntKey]. */
     fun sort(descending: Boolean = false) {
         data.sort(0, size)
         if (descending) {

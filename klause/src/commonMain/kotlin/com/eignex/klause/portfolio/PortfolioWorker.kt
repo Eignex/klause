@@ -31,8 +31,7 @@ class PortfolioWorker private constructor(
     /** Human-readable id for progress / telemetry (e.g. "ls/cbls/fixed", "bt/domwdeg"). */
     val label: String,
     /** Index of this worker's arm in the composed pool; replicas of the same arm — extra lanes when
-     *  arms < cores — share it, so per-arm credit pools across them. Distinct from [label], which a
-     *  backtrack replica index-numbers. */
+     *  arms < cores — share it, so per-arm credit pools across them. */
     val armId: Int,
     private val solveFn: (Cancellation, Long?) -> SolveResult,
     private val improvementsFn: (() -> Double, Sample?, Cancellation, Long?) -> Sequence<MinimizeResult>,
@@ -120,7 +119,7 @@ class PortfolioWorker private constructor(
     /**
      * Open a fresh pause/resume handle over this worker's optimisation, or `null` when the engine
      * can't be paused/resumed. [readBound] exposes the portfolio's shared best objective so the resumable backtrack
-     * search prunes on it, exactly like [improvements]'s `withBound` seam. A [Portfolio]
+     * search prunes on it, through the same `withBound` seam of [of] that [improvements] uses. A [Portfolio]
      * holds one handle per resumable arm and resumes it each segment, so the arm never cold-restarts between
      * slices. */
     fun newResumableSearch(readBound: () -> Double): ResumableSearch? = resumableFn?.invoke(readBound, null, null)
@@ -144,8 +143,8 @@ class PortfolioWorker private constructor(
     /** Stream improving incumbents against this worker's *own* objective representation (the one
      *  it was built with — see [of]). [readBound] exposes the portfolio's shared best objective
      *  scalar; workers that prune on it (backtrack) read it via their injected bound supplier,
-     *  workers that don't (LS) simply ignore it. The two representations stay comparable because
-     *  both minimise the same FlatZinc objective var, so [MinimizeResult.objectiveValue] is one
+     *  workers that don't (LS) ignore it. The representations stay comparable because all of them
+     *  minimise the same canonical [LinearObjective], so [MinimizeResult.objectiveValue] is one
      *  scalar the portfolio can fold across a heterogeneous pool.
      *
      *  [warmStart] is the portfolio's current incumbent assignment, handed to workers that can

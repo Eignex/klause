@@ -34,8 +34,8 @@ import com.eignex.klause.util.ArmCatalog
  */
 object BacktrackCatalog {
 
-    /** The strong CDCL/SAT stack (adaptive restarts, target phasing, 3-tier learned DB, vivification);
-     *  the pigeonhole guard. Kept at rank 0 for both kinds. */
+    /** The CDCL/SAT stack (adaptive restarts, target phasing, tiered learned DB, vivification); the
+     *  pigeonhole guard, ranked first in both orders. */
     private fun satOptimized() = BacktrackRecipe("satOptimized") { seed, onEvent ->
         BacktrackPresets.satOptimized(randomSeed = seed, onEvent = onEvent)
     }
@@ -231,8 +231,6 @@ object BacktrackCatalog {
         return rest.take(2) + BacktrackArm.LpDefault + rest.drop(2)
     }
 
-    /** The shared string-boundary / order-driven accessors (see [ArmCatalog]); this catalog supplies
-     *  the per-[Kind] order ([rankedArms]) to the pool builders. */
     private val catalog = ArmCatalog(BacktrackArm.entries, BacktrackArm::label, ::make)
 
     /** Every arm label across both kinds (COP is the superset), for validation and error messages. */
@@ -251,8 +249,9 @@ object BacktrackCatalog {
     /** One fresh recipe for every arm of [kind] the model behind [facts] offers the needs of, in credit order. */
     internal fun ranked(kind: Kind, facts: ProblemFacts): List<BacktrackRecipe> {
         val order = rankedArms(kind, facts.profile.realColumns)
-        // A small finite optimization pool needs a relaxation beside its SAT guard: the LP arm finds
-        // witnesses that the two LP-free cores miss, without probing an entire intensity palette.
+        // Clausal satisfaction leads with its clause-only proof recipe. A finite-CP optimization pool over
+        // non-binary integers ranks LP second, beside its SAT guard: the LP arm finds witnesses the LP-free
+        // cores miss, without probing an entire intensity palette.
         val ranked = if (kind == Kind.CSP && facts.profile.problemClass == ProblemClass.Sat) {
             listOf(BacktrackArm.ClausalBalanced) + order.filter { it != BacktrackArm.ClausalBalanced }
         } else if (kind == Kind.COP && facts.profile.problemClass == ProblemClass.FiniteCp &&

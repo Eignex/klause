@@ -29,7 +29,8 @@ internal class GuardEquality(val variable: Int, val value: Long, val equal: Bool
  * A term `(ite (= i k0) v0 (ite (= i k1) v1 … d))` over a single selector `i` with distinct constants
  * `k` is a table lookup written as a decision list. Reading it back as the extensional relation
  * `result = arr(i)` is the case-analysis-to-`element` reformulation (Van Hentenryck and Carillon,
- * *Generality versus Specificity: an Experience with AI and OR Techniques*, AAAI 1988): the chain
+ * *Generality versus Specificity: an Experience with AI and OR Techniques*, AAAI 1988,
+ * https://cdn.aaai.org/AAAI/1988/AAAI88-117.pdf): the chain
  * infers `result` from `i` only by traversing one reified equality per arm, where the extensional form
  * does it in a single propagation step.
  *

@@ -71,27 +71,27 @@ sealed interface Expected {
 
 /** How an [ExternalCollection] is materialized into the local cache. */
 internal sealed interface FetchMethod {
-    /** Shallow git clone of [url]. [sparsePath], when set, restricts checkout to that subtree. */
+    /** Shallow git clone of [ExternalCollection.url]. [sparsePath], when set, restricts checkout to that subtree. */
     data class GitClone(val depth: Int = 1, val sparsePath: String? = null) : FetchMethod
 
-    /** Download a `.tar.gz` from [url] and extract it. */
+    /** Download a `.tar.gz` from [ExternalCollection.url] and extract it. */
     data object Tarball : FetchMethod
 
-    /** Download a plain (uncompressed) `.tar` from [url] and extract it. Instances may stay
+    /** Download a plain (uncompressed) `.tar` from [ExternalCollection.url] and extract it. Instances may stay
      *  individually compressed inside (e.g. the PB competition's `*.opb.xz`). */
     data object Tar : FetchMethod
 
-    /** Download a `.tar.zst` (zstd-compressed tar) from [url] and extract it — the format the
+    /** Download a `.tar.zst` (zstd-compressed tar) from [ExternalCollection.url] and extract it — the format the
      *  SMT-LIB Zenodo releases ship per-logic archives in. */
     data object TarballZst : FetchMethod
 
-    /** Download a `.zip` from [url] and extract it (instances may stay individually
+    /** Download a `.zip` from [ExternalCollection.url] and extract it (instances may stay individually
      *  compressed inside, e.g. XCSP3 `*.xml.lzma`). */
     data object Zip : FetchMethod
 
-    /** Download each of [names] from under [url] and [convert] it, (file name, text) to (instance name, file text)
-     *  pairs written as `<instance>.<extension>`, for a library whose instances need translating, such as
-     *  OR-Library's own text formats into MPS. */
+    /** Download each of [names] from under [ExternalCollection.url] and [convert] it, (file name, text) to
+     *  (instance name, file text) pairs written as `<instance>.<extension>`, for a library whose instances need
+     *  translating, such as OR-Library's own text formats into MPS. */
     data class Files(
         val names: List<String>,
         val extension: String,
@@ -111,8 +111,8 @@ internal data class ExternalCollection(
     val includeDirs: List<String> = emptyList(),
     /** Maximum compressed file size in MB. Larger extracted files are dropped before decompression. */
     val maxFileMb: Int? = null,
-    /** When set, a fetched file with no extension whose text begins with [extensionless]'s marker gains its
-     *  extension, so every reader recognises it: MIPLIB 3 ships its MPS files bare. */
+    /** A (marker, extension) pair: a fetched file with no extension whose text begins with the marker gains the
+     *  extension, so every reader recognises it. MIPLIB 3 ships its MPS files bare. */
     val extensionless: Pair<String, String>? = null,
 )
 
@@ -199,7 +199,7 @@ internal object Catalog {
 
     /**
      * All problems of suite [id], without its default per-family cap. Explicit
-     * `-Dklause.bench.select.*` selection settings apply to legacy providers. Suites
+     * `-Dklause.bench.select.*` selection settings apply to providers without an admission policy. Suites
      * with admission policies discover every original identity without admission or caps.
      */
     fun uncapped(id: String): Suite {

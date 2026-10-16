@@ -30,7 +30,12 @@ import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 
-/** Incremental difference-logic search component. */
+/**
+ * Incremental difference-logic search component: consistency is a feasible potential over the active edges,
+ * a conflict is a negative cycle, and guards closing a negative cycle are propagated false, following
+ * Cotton and Maler, "Fast and Flexible Difference Constraint Propagation for DPLL(T)", SAT 2006,
+ * https://doi.org/10.1007/11814948_19.
+ */
 class DifferenceSearchComponent private constructor(
     private val model: Problem,
     private val modelIntVars: IntArray,

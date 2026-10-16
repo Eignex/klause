@@ -118,7 +118,6 @@ internal object ComparisonClauseFold {
             val v = Lit.variable(lit)
             // A repeated indicator in one clause would drop its reified def twice; decline conservatively.
             if (!seen.add(v)) return null
-            // Sole use: referenced only by its reified definition and this clause.
             if (uses[v] != 2) return null
             // An objective weight prices the indicator, which the fold would leave unconstrained.
             if (v in objectiveBoolVars) return null
@@ -150,19 +149,18 @@ internal object ComparisonClauseFold {
             for (i in 0 until r.size) {
                 val v = Term.intVar(r.ref(i))
                 if (ranges.isFixed(v)) {
-                    bound = subExact(bound, mulExact(row.coeff(i), ranges.min(v))) // move the fixed term to the RHS
+                    bound = subExact(bound, mulExact(row.coeff(i), ranges.min(v)))
                 } else if (freeVar < 0) {
                     freeVar = v
                     freeCoeff = row.coeff(i)
                 } else {
-                    return null // a second free variable — not a single-variable literal
+                    return null
                 }
             }
         } catch (_: CheckedLongOverflowException) {
             return null
         }
-        // freeVar < 0: every term was fixed (a constant relation, not a comparison literal). A free
-        // coefficient other than ±1 is not foldable into a bare `x op const` literal.
+        // Every term fixed (freeVar < 0) is a constant relation, not a comparison literal.
         return when {
             freeVar < 0 -> null
             freeCoeff == 1L -> Triple(freeVar, r.relation, bound)

@@ -7,9 +7,9 @@ import com.eignex.klause.localsearch.MoveSink
 
 /**
  * Greedy-repair restart initializer. Walks variables in randomized order; for each, commits the
- * value (bool: true/false; int: any value for ≤16-size domains, otherwise up to 16 sampled) that
- * minimizes the current `state.cost`, ties broken by keeping the current value. A single forward
- * pass — no fixed-point loop, idempotent on already-feasible states.
+ * value that minimizes the current `state.cost`: a bool flip is kept unless it raises the cost; an int
+ * var tries every value of a domain of at most 16 values, otherwise 16 sampled ones, and a tie keeps
+ * the current value. A single forward pass with no fixed-point loop; it never raises the cost.
  *
  * Unlike the candidate generators in this package, this is not a [MoveSource]: it mutates the
  * assignment in place rather than producing a scored candidate pool (each variable's commit changes
@@ -81,7 +81,6 @@ class GreedyInit {
             val d = state.rootDomains[intId]
             val cur = state.assignment.intValue(intId)
             if (d.isFixed) return
-            // Sweep tiny domains exhaustively; sample larger ones to bound per-pass cost.
             val maxTries = 16
             var bestCost = state.cost
             var bestVal = cur

@@ -18,8 +18,7 @@ import com.eignex.klause.util.compareTo
  * and no `unknown` degrade: the row is enforced exactly, including at a fully pinned leaf.
  *
  * The integer variables keep their ordinary `Long` domains and are branched normally; this propagator is
- * the only place the wide coefficients are read, and the wide value never reaches the domains, the trail,
- * or the LP relaxation (a wide row is excluded from the relaxation projection).
+ * the only CP reader of the wide coefficients, and the wide values never reach the domains or the trail.
  */
 internal class WideLinearPropagator(
     val intVars: IntArray,

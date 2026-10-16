@@ -26,7 +26,7 @@ data class WcnfProblem(
     constructor(problem: Problem, objective: LinearObjectiveSpec, numOriginalBoolVars: Int) :
         this(problem, objective, numOriginalBoolVars, emptyList())
 
-    /** Copy legacy fields while retaining [boolFolds]. */
+    /** Copy the core fields while retaining [boolFolds]. */
     fun copy(
         problem: Problem = this.problem,
         objective: LinearObjectiveSpec = this.objective,

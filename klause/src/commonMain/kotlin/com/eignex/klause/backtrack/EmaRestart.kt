@@ -4,7 +4,8 @@ import com.eignex.kumulant.stat.decay.EwmaMeanStat
 
 /**
  * EMA-based adaptive restart: the exponential-moving-average counterpart of [GlucoseRestart]'s bounded
- * LBD/trail windows.
+ * LBD/trail windows (Biere and Fröhlich, "Evaluating CDCL Restart Schemes", POS 2015,
+ * https://doi.org/10.29007/89dw).
  * Two bias-corrected EWMAs of learned-clause LBD stand in for the recent/global averages: a fast one
  * tracking the last handful of conflicts and a slow one tracking the long run. When the fast average
  * runs hotter than the slow one the recent clauses are low-quality and the search should re-pick. A
@@ -53,11 +54,9 @@ internal class EmaRestart(
         globalTrail.update(trailSize.toDouble(), timestampNanos = 0L, weight = 1.0)
         if (conflicts < warmup) return false
 
-        // Blocking: a trail far above its average means the solver is driving deep toward a model —
-        // defer the restart.
+        // A trail far above its average means the solver is driving deep toward a model.
         if (trailSize > blockingFactor * globalTrail.read(0L).mean) return false
 
-        // Restart when the recent LBD average runs hotter than the long-run average.
         return recentLbd.read(0L).mean * restartMargin > globalLbd.read(0L).mean
     }
 }

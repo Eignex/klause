@@ -36,7 +36,7 @@ class SExprReader(private val reader: CharReader) {
         return readExpr()
     }
 
-    /** Parse all top-level forms. Kept for the in-memory callers; it just drains [readCommandOrNull]. */
+    /** Parse all top-level forms by draining [readCommandOrNull]. */
     fun readAll(): List<SExpr> {
         val out = ArrayList<SExpr>()
         while (true) out.add(readCommandOrNull() ?: return out)

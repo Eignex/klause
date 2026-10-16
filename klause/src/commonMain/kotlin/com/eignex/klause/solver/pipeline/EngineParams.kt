@@ -75,14 +75,13 @@ fun pipelineConfigError(message: String): Nothing = throw PipelineConfigExceptio
  *    one arm, one knob moved — where an override alone spreads that knob across the curated pool and
  *    dilutes it with arms that cannot express it; plus the portfolio knobs below
  *  - `ls`: `strategy` (base `auto` (curated pool, default) | `cbls|feasibilityjump|walksat|probsat|sa`
- *    | `bare` | `sweep`, the full recipe cross-product, which takes no edits),
- *    or `arm=<catalog-label>` to run one curated arm in isolation,
+ *    | `bare`), or `arm=<catalog-label>` to run one curated arm in isolation,
  *    plus per-axis edits applied across the pool — `sources` (bare force-exactly list or
  *    `+`/`-` add/remove), `scoring` (`weighted|raw|break`), `acceptance`
  *    (`greedy|walksat|probsat|skew|sa`), `restart` (`fixed|luby|perturb`); any token may carry an
  *    arm-family selector (`cbls.break`). Axis numerics `noise`/`cb`/`skew-alpha`/`initial-temp`/
  *    `cooling-rate`/`min-temp`/`smooth-prob`/`smooth-factor`/`tabu-tenure`; portfolio knobs `arms`,
- *    `ls`, `bt`, `seed`, `lambda`; `dry-run` lists the resolved arms instead of solving
+ *    `ls`, `bt`, `seed`, `lambda`; `dry-run-solver` lists the resolved arms instead of solving
  *  - `portfolio`: `arms`, `ls`, `bt`, `seed`, `lambda`; `bt-arm=label,label` (cp/mixed only) pins the
  *    backtrack pool to named catalog arms, the backtrack analogue of `ls`'s `arm=`
  */
@@ -167,8 +166,6 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "var-selector", "val-selector",
 )
 
-// Named rather than sliced positionally off BACKTRACK_OVERRIDE_KEYS (a `dropLast(2)` would silently
-// drop the wrong keys if the list above is ever reordered or grown past these two).
 private val BACKTRACK_SELECTOR_KEYS = setOf("var-selector", "val-selector")
 
 /** Read the backtrack `--param` overrides in [BACKTRACK_OVERRIDE_KEYS] **once** (consuming them) into a
@@ -796,8 +793,8 @@ enum class ValSelectorKind(val id: String) {
     SOLUTION_GUIDED("solution-guided"),
     ;
 
-    /** A **fresh** value selector instance (constructed per worker so parallel arms never share
-     *  mutable state, e.g. the random selector's RNG). */
+    /** The value selector for this kind; the stateful [SolutionGuided] is constructed fresh per call so
+     *  parallel arms never share it. */
     fun selector(): ValueSelector = when (this) {
         RANDOM -> IndomainRandom
         MIN -> IndomainMin

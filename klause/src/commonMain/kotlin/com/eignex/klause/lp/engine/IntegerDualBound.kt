@@ -19,24 +19,21 @@ import kotlin.math.log2
 import kotlin.math.roundToLong
 
 /**
- * Integer-multiplier exact lower bound on the minimized objective `cᵀz`, in portable Kotlin-Multiplatform
- * 128-bit integer arithmetic. It is the integer-exact twin of the
- * floating-point [safeObjectiveLowerBound]: instead of solving the dual system exactly in rationals it
- * takes the *approximate* float duals [y], **rounds them to integer multipliers** at a power-of-two
- * scale `2ᵏ`, and evaluates the Lagrangian
- * `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ` exactly with a 128-bit accumulator ([Int128]).
+ * Integer-multiplier exact lower bound on the minimized objective `cᵀz`, in 128-bit integer arithmetic; the
+ * integer-valued counterpart of [safeObjectiveLowerBound]. Instead of solving the dual system exactly it rounds
+ * the approximate float duals [y] to integer multipliers at a power-of-two scale `2ᵏ` and evaluates the
+ * Lagrangian `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ` exactly with an [Int128] accumulator.
  *
- * Soundness rests on the fact that the slack-form constraints are equalities, so `L(y)` is a valid
- * lower bound on the optimum for **any** `y` — there is no need to solve for, or even approximate, the
- * optimal dual. Rounding the duals only weakens the bound; it can never make it unsound. Every error
- * path returns null (the caller keeps the node), exactly like the rational certifier:
+ * The slack-form constraints are equalities, so `L(y)` bounds the optimum for any `y`; rounding the duals only
+ * weakens the bound. This is the safe-bound argument of Neumaier and Shcherbina, "Safe bounds in linear and
+ * mixed-integer linear programming", Math. Program. 99, 2004, https://doi.org/10.1007/s10107-003-0433-3.
+ * Every error path returns null (the caller keeps the node):
  *  - a non-finite dual, or a multiplier that escapes the exactly-representable range;
  *  - a reduced cost too large to evaluate in 64 bits, or a 128-bit accumulator overflow;
  *  - a strictly-negative reduced cost on a variable with no finite upper bound (unbounded Lagrangian).
  *
- * The result is `⌈L⌉` when the source objective has a verified integer lattice; otherwise it declines.
- * Because the scale is a power of two, the final
- * division is an arithmetic shift ([Int128.ceilDivPow2]); no 128÷64 division is needed.
+ * The result is `⌈L⌉` when the source objective has a verified integer lattice; otherwise it declines. The scale
+ * is a power of two, so the final division is an arithmetic shift ([Int128.ceilDivPow2]).
  *
  * @param model the slack-form relaxation (`A z = rhs`, `0 ≤ z ≤ upper`) whose objective is bounded.
  * @param y approximate dual vector over the `m` rows (e.g. from [RevisedSimplex]); length `≥ model.m`.
@@ -59,9 +56,8 @@ internal fun integerDualLowerBoundCeil(
  * `⌈L⌉` on a **continuous** model's true minimized objective, certified over its scaled-integer
  * rationalization: the integer certificate bounds the scaled objective `s·(cᵀz + objConstant)` exactly,
  * and the scale divides back out through `⌈⌈N / 2ᵏ⌉ / s⌉ = ⌈N / (2ᵏ·s)⌉`, so the result is a sound
- * lower bound only for a verified integer source objective lattice. The float duals need no rescaling —
- * row-scaling by `s`
- * leaves the optimal duals unchanged, and any multipliers are sound regardless. Null when the model
+ * lower bound only for a verified integer source objective lattice. The float duals need no rescaling:
+ * scaling by `s` leaves the optimal duals unchanged, and any multipliers are sound regardless. Null when the model
  * does not rationalize (an exactly-scaled objective constant included) or the certification overflows.
  */
 internal fun rationalizedDualLowerBoundCeil(
@@ -91,8 +87,7 @@ internal class RoundedDuals(val scaleBits: Int, val scale: Long, val mult: LongA
 
 /** Round the float duals `y` to integer multipliers at a capped power-of-two scale `2ᵏ`, or null when a
  *  dual is non-finite or its scaled value escapes the exactly-representable range (so [roundToLong]
- *  recovers the true nearest integer). Shared by the bound, the [IntegerCertificate], the Farkas ray
- *  and the [integerTableauCuts] aggregation. */
+ *  recovers the true nearest integer). */
 internal fun roundDuals(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): RoundedDuals? {
     val m = model.m
     if (y.size != m) return null
@@ -116,10 +111,9 @@ internal fun roundDuals(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT
 }
 
 /**
- * The integer-multiplier Lagrangian data a node deduction needs (objective lower bound, per-column
- * reduced cost, dual-row support), carried as exact
- * scaled integers from rounded duals at scale `2ᵏ`. Every quantity is a valid deduction for **any**
- * integer multipliers, so rounding only weakens it — never makes it unsound (see [integerCertify]).
+ * The integer-multiplier Lagrangian data a node deduction needs (objective lower bound, per-column reduced cost,
+ * dual-row support), carried as exact scaled integers from rounded duals at scale `2ᵏ`. Every quantity is a valid
+ * deduction for any integer multipliers, so rounding only weakens it (see [integerCertify]).
  */
 internal class IntegerCertificate(
     model: LpModel,
@@ -166,10 +160,8 @@ internal class IntegerCertificate(
 
     override fun exactMultiplier(row: Int): BigFraction = BigFraction.of(bigIntOf(mult[row]), bigIntOf(scale))
 
-    /** Whether row [row] carries nonzero dual weight (for non-global-row premise citation). */
     override fun dualNonzeroRow(row: Int): Boolean = mult[row] != 0L
 
-    /** Sign of column [col]'s reduced cost (`-1`/`0`/`+1`). */
     override fun reducedCostSign(col: Int): Int = reduced[col].let {
         if (it > 0L) {
             1
@@ -180,16 +172,13 @@ internal class IntegerCertificate(
         }
     }
 
-    /** `⌈ objective + extraConstant ⌉` as a `Long`, or null when it does not fit (the caller keeps the
-     *  node / falls back). [extraConstant] is the relaxation-level objective constant the caller folds in. */
     override fun objectiveBoundCeil(extraConstant: Long): Long? {
         val n = numerator.copy()
         n.addProduct(extraConstant, scale)
         return n.ceilDivPow2(scaleBits)
     }
 
-    /** The scaled source-objective improving gap
-     * `G = improvingMax·2ᵏ − (N + sourceConstant·2ᵏ)`. */
+    /** The scaled source-objective improving gap `G = improvingMax·2ᵏ − (N + sourceConstant·2ᵏ)`. */
     private fun gapNumerator(improvingMax: Long, sourceConstant: Long): Int128 {
         val g = Int128()
         g.addProduct(improvingMax, scale)
@@ -200,7 +189,6 @@ internal class IntegerCertificate(
         return g
     }
 
-    /** Whether `improvingMax ≥ objective + sourceConstant`, i.e. the fixing gap is non-negative. */
     override fun improvingGapNonNegative(improvingMax: Long, sourceConstant: Long): Boolean =
         gapNumerator(improvingMax, sourceConstant).isNonNegative()
 
@@ -248,18 +236,14 @@ internal class IntegerCertificate(
 }
 
 /**
- * Certify a node LP optimum from the float duals [y] (e.g. [RevisedSimplex] `duals`), as an
- * [IntegerCertificate] over exact scaled integers. Rounds the duals to integer multipliers and evaluates
- * the Lagrangian
- * `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ` and every reduced cost in a 128-bit accumulator. Sound for
- * **any** integer multipliers (the slack-form constraints are equalities), so this never needs the
- * optimal dual; rounding only weakens the bound / reduced costs. Every error path returns null (the
- * caller keeps the node / falls back), exactly like the rational certifier:
+ * Certify a node LP optimum from the float duals [y] as an [IntegerCertificate] over exact scaled integers:
+ * rounds the duals to integer multipliers and evaluates the Lagrangian `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ`
+ * and every reduced cost in a 128-bit accumulator. Sound for any integer multipliers, since the slack-form
+ * constraints are equalities. Null (the caller keeps the node) on:
  *  - a non-finite dual or a multiplier outside the exactly-representable range;
  *  - a reduced cost too large to evaluate in 64 bits, or a 128-bit accumulator overflow;
  *  - a strictly-negative reduced cost on a column with no finite upper bound (unbounded Lagrangian).
  */
-
 internal fun integerCertify(
     model: LpModel,
     y: DoubleArray,
@@ -296,7 +280,7 @@ internal fun integerCertifyUnchecked(
         if (!allowMixed && !integers.integralColumn(j)) return null
         dAcc.clear()
         dot.clear()
-        dAcc.addProduct(integers.cost(j) ?: return null, scale) // 2ᵏ·cⱼ
+        dAcc.addProduct(integers.cost(j) ?: return null, scale)
         if (j >= n) {
             dot.addLong(mult[j - n]) // slack column j is the unit vector e_{j−n}
         } else {
@@ -317,10 +301,10 @@ internal fun integerCertifyUnchecked(
     return IntegerCertificate(model, rd.scaleBits, scale, mult, reduced, acc)
 }
 
-// Each logical is a unit column, so its reduced cost is scaledCost - multiplier. Moving a
-// multiplier to scaledCost makes a free logical harmless, and repairs a one-sided logical only
-// when its reduced cost points toward an absent endpoint. The complete Lagrangian is evaluated
-// with the repaired vector; no tolerance or feasibility claim is involved.
+// Each logical is a unit column, so its reduced cost is scaledCost − multiplier. Moving a multiplier to scaledCost
+// makes a free logical harmless, and repairs a one-sided logical only when its reduced cost points toward an absent
+// endpoint. The complete Lagrangian is evaluated with the repaired vector; no tolerance or feasibility claim is
+// involved.
 private fun repairedMultipliers(
     model: IntegerLpView, mult: LongArray, scale: Long, scan: (() -> Unit)? = null,
 ): LongArray? {
@@ -331,12 +315,11 @@ private fun repairedMultipliers(
         val lower = model.hasLower(slack)
         val upper = model.hasUpper(slack)
         if (lower && upper) continue
-        // A slack column is the unit column eᵢ, so its scaled reduced cost is `2ᵏ·c_slack − mᵢ`.
         val scaled = Int128()
         scaled.addProduct(model.cost(slack) ?: return null, scale)
         if (!scaled.fitsLong()) continue // the moved multiplier is not expressible; leave it to decline
         val target = scaled.toLong()
-        // `target − mult[i] < 0` without risking the subtraction overflowing.
+        // Compares rather than subtracts, so `target − mult[i]` cannot overflow.
         if ((lower && target >= mult[i]) || (upper && target <= mult[i]) || target == mult[i]) continue
         val fix = repaired ?: mult.copyOf().also { repaired = it }
         fix[i] = target
@@ -416,15 +399,13 @@ internal class IntegerLpView private constructor(private val model: LpModel) {
 internal enum class FarkasRoute { RECONSTRUCTED, EXACT_BASIS, ROUNDED, NONE }
 
 /**
- * Exact Farkas infeasibility certificate as an **integer** ray. [ray] is the float `ρ = B⁻ᵀeᵣ` the
- * dual-unbounded termination
- * produced ([RevisedSimplex.infeasibleRay]); it is rounded to integer multipliers and both signs are
- * checked against the exact Farkas condition `ρ·rhs > Σⱼ max(0, ρ·Aⱼ)·uⱼ` in 128-bit arithmetic. The
- * returned integer ray (whichever sign certifies) proves infeasibility for **any** integer ρ, so a
- * float-misled ray simply fails the check and the node is kept — the prune is sound regardless. Null
- * when neither sign certifies, the rounding fails, or a 128-bit term overflows.
+ * Exact Farkas infeasibility certificate as an integer ray. [ray] is the float `ρ = B⁻ᵀeᵣ` the dual-unbounded
+ * termination produced ([RevisedSimplex.infeasibleRay]). It is tried, in order, through rational reconstruction,
+ * an exact basis solve of [basis] at [basisRow], and rounding to integer multipliers; each candidate and its
+ * negation are checked against the exact Farkas condition `ρ·rhs > Σⱼ max(0, ρ·Aⱼ)·uⱼ`. The check holds for any
+ * integer ρ, so a float-misled ray simply fails it and the node is kept. Null when no route certifies or on
+ * cancellation.
  */
-
 internal fun integerFarkasRay(
     model: LpModel,
     ray: DoubleArray,
@@ -449,8 +430,8 @@ internal fun integerFarkasRay(
         return null
     }
     if (model.doubleView != null && model.exactState == null) {
-        // A real model is certified over its scaled-integer rationalization (the existing 128-bit Farkas);
-        // scaling by a positive 2ᵏ preserves feasibility, so an infeasibility proof carries back exactly.
+        // A real model is certified over its scaled-integer rationalization; scaling by a positive 2ᵏ preserves
+        // feasibility, so an infeasibility proof carries back exactly.
         scans?.scan()
         val integral = rationalizeToIntegerModel(
             model,
@@ -479,8 +460,8 @@ internal fun integerFarkasRay(
         }
     }
     // Reconstruction first: the ray's entries are ratios of minors of B, so they are small rationals, and
-    // recovering them exactly annihilates the open columns the same way a basis solve does — without the
-    // basis, and with no bound on the dimension. See [reconstructIntegerVector].
+    // recovering them exactly annihilates the open columns the same way a basis solve does, without the basis
+    // and with no bound on the dimension.
     reconstructIntegerVector(ray)?.let { exact ->
         if (certifies(exact)) {
             onRoute?.invoke(FarkasRoute.RECONSTRUCTED)
@@ -539,9 +520,8 @@ private fun farkasCertifies(model: LpModel, rho: LongArray): Boolean {
         val aj = ajAcc.toLong()
         if (aj < 0L && j < model.n && model.probeClampedLo[j]) return false
         if (aj > 0L) {
-            // A probe-clamped side stands in for `+∞`, so its `upper` is an artefact of the encoding
-            // rather than a bound of the model: folding it into the box max would certify against a
-            // box the model never had. Treated as unbounded, exactly like a column with no upper.
+            // A probe-clamped side stands in for `+∞`: its `upper` is an artefact of the encoding, not a bound
+            // of the model, so it counts as unbounded.
             if (!model.hasUpper[j] || (j < model.n && model.probeClampedHi[j])) return false
             boxMax.addProduct(aj, model.upper[j])
         }

@@ -10,7 +10,7 @@ import java.io.File
 import kotlin.random.Random
 
 /**
- * First-class, reusable corpus-selection machinery. It discovers `(model, optional data)` instances
+ * Corpus selection. It discovers `(model, optional data)` instances
  * from a corpus root under a known [Layout], then applies family-aware selection so a capped
  * run yields a spread across problem families rather than all of the first family:
  *
@@ -70,8 +70,7 @@ internal object CorpusSelection {
             }
         }
 
-        /** The whole `mzn-challenge` archive: every year directory (`2008`, `2009`, … — discovered
-         *  dynamically, so a new challenge year is picked up without a code change) is itself a
+        /** The whole `mzn-challenge` archive: every year directory (`2008`, `2009`, …) is itself a
          *  [MznChallenge] layout. Names and family keys are year-prefixed (`2013/cargo`) since the
          *  same problem name recurs across years (`black-hole` in both 2013 and 2025) and a bare
          *  name would silently merge two different problems into one family. */

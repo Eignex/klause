@@ -35,10 +35,9 @@ import com.eignex.klause.util.Cancellation
 /**
  * Per-call params for [BacktrackSolver].
  *
- *  - [maxDecisions] — abort after this many decisions are pushed (Unknown). `Long.MAX_VALUE`
- *    by default — let the search run to completion. It bounds one *slice*: a driver that re-enters
- *    the engine starts a fresh allowance, so it does not bound a solve. [nodeBudget] is the one that
- *    does, and the two count the same unit.
+ *  - [maxDecisions] — abort after this many decisions are pushed (Unknown). Unbounded by default.
+ *    It bounds one *slice*: a driver that re-enters the engine starts a fresh allowance. [nodeBudget]
+ *    bounds the whole solve in the same unit.
  *  - [nodeBudget] — a decision-node cap spanning the whole solve, for measurement; see [NodeBudget].
  *  - [randomSeed] — seeds the engine RNG that's threaded into [variableSelector] and
  *    [valueSelector]. `null` picks a fresh seed per call.
@@ -66,16 +65,15 @@ data class BacktrackParams(
     /**
      * Decisions one slice of the search may push before it gives up (Unknown). A restart, a resuming
      * portfolio arm or an ALNS repair re-enters the engine with the allowance renewed, so this bounds a
-     * slice and not a solve. Reach for [nodeBudget] when the whole solve is what needs bounding, which
-     * is what holding two builds to identical work requires.
+     * slice and not a solve; [nodeBudget] bounds the whole solve.
      */
     val maxDecisions: Long = Long.MAX_VALUE,
     /**
      * Wall-clock-independent operation budget across all backends. For [BacktrackSolver]
      * one instruction = one decision attempt (the same unit [maxDecisions] counts). When
      * both are set, the smaller wins. `null` = no instruction-budget cap; use [maxDecisions]
-     * alone. Makes the same params object portable across backends without each one needing
-     * to know its primary-budget field name (LS sees flips, Brute sees steps, etc.).
+     * alone. Each backend maps it onto its own primary unit (flips for local search, steps for
+     * brute force).
      */
     val maxInstructions: Long? = null,
     /**
@@ -96,7 +94,9 @@ data class BacktrackParams(
      * fresh from level 0. Phase-saving (see [phaseSaving]) and the B&B bound (in
      * [com.eignex.klause.solver.Optimizer.minimize]) survive the restart, so each
      * restart resumes with strictly more information than the previous run. Disabled
-     * by default; set a unit (for example `256`) to enable Luby restarts.
+     * by default; set a unit (for example `256`) to enable Luby restarts (M. Luby, A. Sinclair,
+     * D. Zuckerman, "Optimal speedup of Las Vegas algorithms", Inf. Process. Lett. 47(4), 1993,
+     * https://doi.org/10.1016/0020-0190(93)90029-9).
      */
     val lubyRestartBase: Long? = null,
     /**
@@ -106,8 +106,7 @@ data class BacktrackParams(
      * blocking that suppresses the restart when the solver is driving deep toward a model.
      * See [GlucoseRestart]. Selectable *alongside* [lubyRestartBase] rather than replacing it:
      * when adaptive restarts are on the Luby budget is ignored, so SAT-heavy configs opt into
-     * data-driven restarts while the CP optimization path keeps Luby. Disabled by default. On
-     * larger random instances near the phase transition this usually beats Luby.
+     * data-driven restarts while the CP optimization path keeps Luby. Disabled by default.
      */
     val adaptiveRestart: Boolean = false,
     /**
@@ -119,10 +118,10 @@ data class BacktrackParams(
      */
     val emaRestart: Boolean = false,
     /**
-     * Stable/focused mode-switching restarts — the mixing default. Within a
-     * single run the search alternates a focused proving mode (frequent adaptive restarts) with a stable
-     * dive mode (no restarts, driving deep and holding a good assignment via phase saving), so it is
-     * robust on optimization without hand-tuning a Luby base. See [ModeSwitchingRestartSchedule]. Takes
+     * Stable/focused mode-switching restarts. The search dives without restarting until a first
+     * feasible solution, then alternates a stable mode (sparse Luby restarts, diving on the saved phase)
+     * with focused proving modes (frequent adaptive restarts), so it is robust on optimization without
+     * hand-tuning a Luby base. See [ModeSwitchingRestartSchedule]. Takes
      * precedence over [emaRestart], [adaptiveRestart], and [lubyRestartBase] when set. Disabled by
      * default.
      */
@@ -131,8 +130,8 @@ data class BacktrackParams(
      * Phase-saving: cache the last value the search committed to for each variable.
      * On a fresh descent (after a backtrack or restart) the cached value is tried
      * first, so the search doesn't lose the work spent narrowing down the right
-     * polarity each time. Standard CDCL-derived heuristic; combines naturally with
-     * [lubyRestartBase]. Disabled by default.
+     * polarity each time (K. Pipatsrisawat, A. Darwiche, "A lightweight component caching scheme for
+     * satisfiability solvers", SAT 2007, https://doi.org/10.1007/978-3-540-72788-0_28). Disabled by default.
      */
     val phaseSaving: Boolean = false,
     /**
@@ -161,11 +160,12 @@ data class BacktrackParams(
      */
     val solutionPhasing: Boolean = false,
     /**
-     * Cap on the learned-clause database size. When non-null, a restart-driven
-     * forgetting pass runs on every Luby restart (gated by [lubyRestartBase]): clauses
-     * with LBD ≤ [lbdGlueThreshold] are kept regardless ("glue clauses"); among the
-     * rest, the lowest-LBD clauses are kept up to the cap and higher-LBD clauses are
-     * dropped. `null` (default) disables forgetting so clauses accumulate indefinitely.
+     * Cap on the learned-clause database size. When non-null, a forgetting pass runs at every
+     * restart once the database exceeds the cap: permanent clauses and clauses with
+     * LBD ≤ [lbdGlueThreshold] ("glue clauses") are kept regardless; among the rest, the
+     * lowest-LBD clauses are kept up to the cap and higher-LBD clauses are dropped (G. Audemard,
+     * L. Simon, "Predicting learnt clauses quality in modern SAT solvers", IJCAI 2009,
+     * https://www.ijcai.org/Proceedings/09/Papers/074.pdf). `null` (default) disables forgetting.
      */
     val maxLearnedClauses: Int? = null,
     /**
@@ -179,9 +179,7 @@ data class BacktrackParams(
      * permanent core (LBD ≤ [lbdGlueThreshold]), a mid tier (LBD ≤ [midLbdThreshold]) kept
      * across reductions but demoted when idle, and a local tier deleted aggressively. Clauses
      * that participate in a later conflict (detect it or force a unit) are promoted on the
-     * next reduction; mid-tier clauses idle across a reduction are demoted. This gives more
-     * selective deletion than the binary glue split and helps proof-search families
-     * where useful clauses are otherwise forgotten. Disabled by default.
+     * next reduction; mid-tier clauses idle across a reduction are demoted. Disabled by default.
      */
     val tieredLearnedDb: Boolean = false,
     /**
@@ -196,9 +194,9 @@ data class BacktrackParams(
      * bounded slice of the learned-clause database and strengthens each clause by tentatively
      * asserting the negations of its literals under propagation: a remaining literal already
      * falsified is dropped; one forced true (or a conflict) shortens the clause to the
-     * literals tried so far. Pure-Boolean; atom-literal clauses are skipped. Disabled by
-     * default. One of the highest-value inprocessing techniques on hard UNSAT instances like
-     * the pigeonhole family. Only honoured when [assumptions] is empty.
+     * literals tried so far (C. Piette, Y. Hamadi, L. Saïs, "Vivifying propositional clausal formulae",
+     * ECAI 2008, https://doi.org/10.3233/978-1-58603-891-5-525). Pure-Boolean; atom-literal clauses are
+     * skipped. Disabled by default. Only honoured when [assumptions] is empty.
      */
     val vivification: Boolean = false,
     /**
@@ -355,8 +353,8 @@ data class BacktrackParams(
      * Optional cross-arm global-cut exchange; see [com.eignex.klause.lp.cut.CutExchange].
      * Invoked at each restart boundary so a portfolio can import the globally-valid LP cuts other arms
      * harvested and export this arm's own. `null` (default) means no cut sharing. Like [clauseExchange]
-     * it requires every arm to be built from the same problem; only [com.eignex.klause.lp.cut
-     * .Cut.global] cuts cross arms, so importing one only tightens a relaxation.
+     * it requires every arm to be built from the same problem; only globally valid cuts cross arms, so
+     * importing one only tightens a relaxation.
      */
     val cutExchange: CutExchange? = null,
     /**
@@ -371,10 +369,11 @@ data class BacktrackParams(
      * Whether to learn pseudo-Boolean cutting-planes nogoods on conflicts over pseudo-Boolean / cardinality
      * constraints: conflict analysis runs a division-based resolvent seeded
      * from the violated bound, with a clause-resolvent fallback, and stores learned PB constraints
-     * alongside clauses. `null` (default) auto-dispatches — on for pure-Boolean problems, where it is a
-     * decisive win on counting structure (pigeonhole: polynomial vs the exponential a clause solver
-     * needs) and net-neutral-to-positive elsewhere. `true`/`false` force it; ignored on problems with
-     * integer variables (order-literal atoms carry no PB reason).
+     * alongside clauses. `null` (default) auto-dispatches — on for pure-Boolean problems, where cutting
+     * planes refute counting structure that resolution cannot (pigeonhole has polynomial cutting-planes
+     * proofs but only exponential resolution proofs: A. Haken, "The intractability of resolution",
+     * Theor. Comput. Sci. 39, 1985, https://doi.org/10.1016/0304-3975(85)90144-6). `true`/`false` force
+     * it; ignored on problems with integer variables (order-literal atoms carry no PB reason).
      */
     val pbLearning: Boolean? = null,
     /**
@@ -393,12 +392,10 @@ data class BacktrackParams(
      * Objective-guided value selection on the minimisation path: try each decision variable's
      * objective-improving polarity first (for `min Σ w·x`, `x=0` when `w ≥ 0`, `x=1` when `w < 0`; the
      * cost-minimising domain end for any integer coefficient). Dives toward cheap solutions so the
-     * incumbent improves fast — the standard cost-based value ordering of a branch-and-bound optimiser,
-     * and general to any linear objective (not just pseudo-Boolean). A no-op for a pure-satisfaction
+     * incumbent improves fast; applies to any linear objective. A no-op for a pure-satisfaction
      * problem (every coefficient is zero). **Off by default and enabled per arm**: as a uniform default it
-     * collapses the portfolio's value-order diversity, so it ships as one objective-guided diversity arm
-     * rather than a blanket override. When on, replaces the value selector on the optimize path, kept
-     * incumbent-guided by the phase heuristic on top.
+     * would collapse the portfolio's value-order diversity. When on, replaces the value selector on the
+     * optimize path, kept incumbent-guided by the phase heuristic on top.
      */
     val objectiveGuidedValues: Boolean = false,
 ) : SolverParams {

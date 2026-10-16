@@ -30,7 +30,12 @@ internal fun CnfLowering.trueLit(): Int {
     return trueLitCache
 }
 
-/** Tseitin gate for conjunction, reified onto a fresh positive literal. */
+/**
+ * Tseitin gate for conjunction, reified onto a fresh positive literal.
+ *
+ * G. S. Tseitin, "On the complexity of derivation in propositional calculus", 1968; reprinted in
+ * Automation of Reasoning 2, Springer 1983. https://doi.org/10.1007/978-3-642-81955-1_28
+ */
 internal fun CnfLowering.tseitinAnd(lits: List<Int>): Int = tseitinAnd(lits, Lit.make(newBool(), true))
 
 /** Tseitin gate for conjunction reified onto the caller-provided [target] literal. */
@@ -69,8 +74,7 @@ internal fun CnfLowering.reifyLinear(coeffs: IntArray, vars: IntArray, op: Linea
     return Lit.make(aux, true)
 }
 
-/** [reifyLinear] over 64-bit coefficients/bound — the SMT-LIB front-end carries arbitrary-precision
- *  integer literals as [Long], which may exceed the 32-bit range. */
+/** [reifyLinear] over 64-bit coefficients and bound, for relations past the 32-bit range. */
 internal fun CnfLowering.reifyLinear(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long): Int {
     if (vars.isEmpty()) return if (constRelationHolds(op, bound)) trueLit() else Lit.negate(trueLit())
     val aux = newBool()
@@ -78,8 +82,7 @@ internal fun CnfLowering.reifyLinear(coeffs: LongArray, vars: IntArray, op: Line
     return Lit.make(aux, true)
 }
 
-/** [reifyLinear] over arbitrary-precision coefficients/bound — a reified relation from the SMT-LIB
- *  front-end whose coefficients or bound exceed the 64-bit range, enforced by a wide [ReifiedLinear]. */
+/** [reifyLinear] over arbitrary-precision coefficients and bound, enforced by a wide [ReifiedLinear]. */
 internal fun CnfLowering.reifyLinear(coeffs: Array<BigInt>, vars: IntArray, op: LinearOp, bound: BigInt): Int {
     if (vars.isEmpty()) {
         val holds = when (op) {
@@ -119,8 +122,8 @@ internal fun CnfLowering.reifyDifferenceLinear(coeffs: LongArray, vars: IntArray
 }
 
 /**
- * Channel [auxBoolVar] onto the 0/1 integer [intVar] using [ReifiedLinear]: it holds iff the
- * integer is 1 ([whenTrue]) or 0. The caller allocates [intVar] with domain `{0, 1}`.
+ * Channel [auxBoolVar] onto the 0/1 integer [intVar] using [ReifiedLinear]: it holds iff [intVar]
+ * is 1 when [whenTrue], else 0. The caller allocates [intVar] with domain `{0, 1}`.
  */
 internal fun channelBoolTo01(factors: MutableList<Factor>, auxBoolVar: Int, intVar: Int, whenTrue: Boolean = true) {
     factors.add(
@@ -142,7 +145,7 @@ internal fun constRelationHolds(op: LinearOp, bound: Int): Boolean = when (op) {
     LinearOp.NE -> 0 != bound
 }
 
-/** [constRelationHolds] over a 64-bit bound (SMT-LIB carries arbitrary-precision integer bounds). */
+/** [constRelationHolds] over a 64-bit bound. */
 internal fun constRelationHolds(op: LinearOp, bound: Long): Boolean = when (op) {
     LinearOp.LE -> 0L <= bound
     LinearOp.GE -> 0L >= bound

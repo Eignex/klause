@@ -4,13 +4,11 @@ import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.ir.LinearOp
 
 /**
- * LP relaxation: the always-emitted envelope (`result ≥ xs[i]` for max, `result ≤ xs[i]` for min) as
- * CORE rows, plus the tight convex-hull face as HULL — one-hot selectors `z_i` with `Σ z_i = 1` and a
- * per-operand big-M row forcing `result = xs[i]` when `z_i = 1`. Each `M_i` comes from the root boxes of
+ * LP relaxation: the always-emitted envelope (`result ≥ xs(i)` for max, `result ≤ xs(i)` for min) as
+ * CORE rows, plus the tight convex-hull face as HULL — one-hot selectors `z(i)` with `Σ z(i) = 1` and a
+ * per-operand big-M row forcing `result = xs(i)` when `z(i) = 1`. Each `M(i)` comes from the root boxes of
  * the two columns it spans, and is emitted only where the model states both — there it bounds
- * `|result − xs[i]|` globally and the row holds at every integer solution.
- *
- * The envelope leans on no endpoint and is always emitted.
+ * `|result − xs(i)|` globally and the row holds at every integer solution.
  */
 internal fun ArrayMinMax.emitLpRelaxation(builder: RelaxationBuilder) {
     val resultCol = builder.intColumn(result)
@@ -40,8 +38,8 @@ private fun ArrayMinMax.emitTightFace(builder: RelaxationBuilder, resultCol: Int
     if (bigM.none { it >= 0L }) return
     // Σ z_i = 1 keeps a selector for every operand, linked or not: dropping the unlinked ones would
     // force the extremum onto an operand that carries a row, which the factor never says.
-    val sel = IntArray(n) { builder.auxColumn(0L, 1L) } // free binaries z_i ∈ [0,1]
-    builder.row(sel, LongArray(n) { 1L }, LinearOp.EQ, 1L, Contribution.HULL) // Σ z_i = 1
+    val sel = IntArray(n) { builder.auxColumn(0L, 1L) }
+    builder.row(sel, LongArray(n) { 1L }, LinearOp.EQ, 1L, Contribution.HULL)
     for (i in 0 until n) {
         val m = bigM[i]
         if (m < 0L) continue

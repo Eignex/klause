@@ -20,11 +20,10 @@ import com.eignex.klause.util.mulExact
  * `y = B + Σ_j A_j·x_j` (unit pivot on `y`, at least two partner terms), any other [Linear] row that
  * contains that whole sub-sum with a common integer multiplier `k` — every `x_j` at coefficient `k·A_j`
  * — has `k·Σ_j A_j·x_j` rewritten to the single term `k·y` (the bound absorbing `k·B`). The partner
- * terms collapse into one variable, shrinking the row's arity and tightening the LP relaxation's density.
+ * terms collapse into one variable, shrinking the row's arity and the LP relaxation's density.
  *
- * Solution-set exact and needs no reconstruction: the defining equality is retained, so `Σ_j A_j·x_j =
- * y − B` holds in every solution and the rewritten row is equivalent term-for-term. No variable is
- * eliminated — `y` already exists — so unlike affine elimination this is solution-set *preserving*.
+ * Solution-set preserving and needs no reconstruction: the defining equality is retained, so
+ * `Σ_j A_j·x_j = y − B` holds in every solution and the rewritten row is equivalent term-for-term.
  */
 internal object LinearSubSumAggregation {
 

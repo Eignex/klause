@@ -150,8 +150,8 @@ internal class ObjectiveBoundInvariant(
     private val bound: MutableObjectiveBound,
 ) : Invariant {
 
-    // Each objective variable's position: a move reads its one weight, not a scan of the objective, which on a
-    // MaxSAT model with thousands of soft literals made every flip cost as much as the objective is long.
+    // Each objective variable's position, so a move reads its one weight instead of scanning the objective, which
+    // on a MaxSAT model with thousands of soft literals would make every flip cost as much as the objective is long.
     private val boolIndex = IntIntMap.build(boolVars, IntArray(boolVars.size) { it }, absent = -1)
     private val intIndex = IntIntMap.build(intVars, IntArray(intVars.size) { it }, absent = -1)
 

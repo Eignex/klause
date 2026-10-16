@@ -13,11 +13,12 @@ import com.eignex.klause.util.times
 import com.eignex.klause.util.unaryMinus
 
 /**
- * Bareiss, *Sylvester's Identity and Multistep Integer-Preserving Gaussian Elimination* (Mathematics of
- * Computation, 1968) for the fraction-free identity, with the row content stripped after each step as in
- * Nakos, Turner and Williams, *Fraction-free algorithms for linear and polynomial equations* (ACM SIGSAM
- * Bulletin 31(3), 1997): an integer matrix stays integer throughout and the entries stay small, without
- * the whole-matrix rescaling that makes the plain Bareiss sweep dense.
+ * E. H. Bareiss, *Sylvester's Identity and Multistep Integer-Preserving Gaussian Elimination*, Math. Comp.
+ * 22 (1968), https://doi.org/10.1090/S0025-5718-1968-0226829-0, for the fraction-free identity, with the
+ * row content stripped after each step as in G. C. Nakos, P. R. Turner and R. M. Williams, *Fraction-free
+ * algorithms for linear and polynomial equations*, ACM SIGSAM Bulletin 31(3) (1997),
+ * https://doi.org/10.1145/271130.271133: an integer matrix stays integer throughout and the entries stay
+ * small, without the whole-matrix rescaling that makes the plain Bareiss sweep dense.
  *
  * A system reduced to row echelon form by fraction-free elimination, with the pivot column of each row.
  *

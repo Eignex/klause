@@ -17,10 +17,12 @@ import com.eignex.klause.util.subExact
  * folding each literal onto its variable (a negative literal `¬x` contributes `w·(1−x)`, i.e. `−w` on
  * `x` and `+w` to the right-hand side after moving the constant).
  *
- * Cutting-planes conflict analysis derives new constraints by *generalized resolution*: scale two `≥`
- * constraints by positive multipliers so a pivot variable's coefficients cancel, add them, and
- * saturate. Every such step is a non-negative linear combination plus Chvátal-Gomory rounding, so the
- * result is implied by the inputs — the learned constraint is always sound. All arithmetic is
+ * Cutting-planes conflict analysis derives new constraints by *generalized resolution* (Hooker,
+ * "Generalized resolution and cutting planes", Ann. Oper. Res. 12, 1988,
+ * https://doi.org/10.1007/BF02186368): scale two `≥` constraints by positive multipliers so a pivot
+ * variable's coefficients cancel, add them, and saturate. Every such step is a non-negative linear
+ * combination plus Chvátal-Gomory rounding, so the result is implied by the inputs — the learned
+ * constraint is always sound. All arithmetic is
  * overflow-guarded; an operation that would exceed [Long] range returns false so the caller can fall
  * back to clause resolution instead of producing a corrupt constraint.
  *
@@ -106,7 +108,6 @@ internal class PbAccumulator {
      * accumulator in a partially-updated state the caller must discard).
      */
     fun addScaled(other: PbAccumulator, mulSelf: Long, mulOther: Long): Boolean {
-        // Scale existing terms.
         if (mulSelf != 1L) {
             var overflowed = false
             // Rewriting a stored value never rehashes, so this updates in place rather than over a

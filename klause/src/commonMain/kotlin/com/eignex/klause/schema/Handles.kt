@@ -62,9 +62,8 @@ interface FloatTerm {
 
 /**
  * DSL handle for a declared float variable. Combines and compares via the shared [FloatTerm]
- * operators, lowering to a [FloatLinearConstraint] AST node (the compiler turns that into a
- * `com.eignex.klause.factor.FloatLinear` factor). Bucketing is a per-backend solve-time concern and
- * lives on the variable's spec, not on this handle.
+ * operators, lowering to a [FloatLinearConstraint] AST node that the compiler turns into a linear
+ * factor. Bucketing lives on the variable's spec, not on this handle.
  */
 class FloatHandle(
     /** Name of the underlying float variable. */
@@ -133,8 +132,6 @@ class FloatExpr internal constructor(internal val terms: Map<FloatHandle, Double
         IntCompare(IntLit(0), IntCmpOp.NE, IntLit(0))
     }
 }
-
-// FloatTerm operators: defined once so handles, exprs, and Double constants compose uniformly.
 
 /** `this + other`. */
 operator fun FloatTerm.plus(other: FloatTerm): FloatExpr = toFloatExpr().mergedWith(other.toFloatExpr())

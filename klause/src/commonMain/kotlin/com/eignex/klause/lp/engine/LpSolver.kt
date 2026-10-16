@@ -6,8 +6,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
 
-/** Exact checks that may decline a float candidate.  This is deliberately engine-local: consumers
- * adapt it into their own statistics rather than making the kernel depend on solver results. */
+/** Exact checks that may decline a float candidate. Engine-local: consumers adapt it into their own
+ * statistics rather than making the kernel depend on solver results. */
 internal enum class LpCertifier { INTEGER, SAFE_OBJECTIVE, EXACT_BASIS, EXACT_FARKAS, EXACT_POINT, RATIONAL }
 
 /** Where one certifier invocation's modeled work is accounted. Each call site states it, so no certifier's work is
@@ -48,8 +48,8 @@ internal class LpScanCount(private val model: LpModel) {
 internal fun exactBits(values: Iterable<BigFraction>): Int =
     values.fold(1) { widest, value -> maxOf(widest, value.num.magnitudeBitLength(), value.den.magnitudeBitLength()) }
 
-/** Why a simplex solve rebuilt its factors.  The reasons are emitted by the engine, not inferred from
- * aggregate counts by a consumer. */
+/** Why a simplex solve rebuilt its factors, as emitted by the engine rather than inferred from aggregate
+ * counts. */
 internal enum class LpRefactorReason {
     INITIAL,
     WARM_START,
@@ -84,7 +84,7 @@ internal interface LpCertificationObserver {
     fun observeContinuationRejection(key: String, count: Long) {}
 }
 
-/** Primitive cost reading from one engine invocation.  It can cross the engine boundary without
+/** Primitive cost reading from one engine invocation. It can cross the engine boundary without
  * importing model-facing result types, and component engines add it even when a later block fails. */
 internal data class LpSolveMetrics(
     val pivots: Int = 0,
@@ -135,10 +135,11 @@ internal data class LpSolveMetrics(
  * The engine that solves an [LpModel] to a float optimum and the artifacts an exact certifier needs
  * from it. The seam is deliberately engine-agnostic: everything here is producible by any LP method,
  * simplex or not (e.g. a first-order primal–dual method) — the [FloatLpResult] carries the primal
- * point and the dual vector for the Neumaier–Shcherbina safe bound, and [infeasibleRay] carries the
- * candidate Farkas ray for exact infeasibility certification. Basis warm-starting and cut generation
- * are simplex-specific and live on [TableauCutSolver], not here, so a basis-free engine implements
- * only this interface.
+ * point and the dual vector for the safe bound of Neumaier and Shcherbina ("Safe bounds in linear and
+ * mixed-integer linear programming", Math. Program. 99, 2004, https://doi.org/10.1007/s10107-003-0433-3),
+ * and [infeasibleRay] carries the candidate Farkas ray for exact infeasibility certification. Basis
+ * warm-starting and cut generation are simplex-specific and live on [TableauCutSolver], not here, so a
+ * basis-free engine implements only this interface.
  *
  * All returned values are double-precision guides; the authoritative bound always comes from exactly
  * certifying the result downstream ([integerCertify] / [integerFarkasRay]), never from these.
@@ -373,8 +374,7 @@ internal fun newLpSolver(
  *
  * [iterationLimit] and [workLimit] bound the dual solve, each 0 leaving it to the engine; a truncated
  * dual iterate supplies only a candidate to certify against the true objective. [trackDegeneracy]
- * turns on the dual-degeneracy measurement
- * an adaptive budget reads back.
+ * turns on the dual-degeneracy measurement an adaptive budget reads back.
  */
 internal fun newTableauCutSolver(
     model: LpModel,

@@ -34,9 +34,10 @@ internal object SymmetryBreaking {
      * is broken only when swapping the two variables maps the factor multiset onto itself — verified by
      * remapping every factor and comparing `Factor.structuralKey` counts, so it is sound by
      * construction. Candidate groups come from Weisfeiler–Leman colour refinement (only same-colour
-     * variables can be interchangeable); each candidate swap is then checked. Ordering a verified orbit
-     * (`x₀ ≤ x₁ ≤ …` for ints, `¬gⱼ ∨ gⱼ₊₁` for bools) keeps exactly one representative per orbit —
-     * sound (never removes the last solution of an orbit).
+     * variables can be interchangeable) and individualization–refinement (McKay and Piperno, "Practical
+     * graph isomorphism, II", J. Symbolic Computation 60, 2014, https://doi.org/10.1016/j.jsc.2013.09.003);
+     * each candidate is then checked. Ordering a verified orbit (`x₀ ≤ x₁ ≤ …` for ints, `¬gⱼ ∨ gⱼ₊₁` for
+     * bools) keeps exactly one representative per orbit.
      *
      * Variables in [objectiveIntVars] / [objectiveBoolVars] are excluded so an asymmetric objective
      * can't be cut — keep those sets empty for pure feasibility. Enabled by default except in a pure
@@ -106,27 +107,20 @@ internal object SymmetryBreaking {
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation,
     ): List<Factor> {
-        // Symmetry breaking is a one-shot transformation: once a [SymmetryHandling] factor is present
-        // the generators have been found and posted. The presolve round engine re-enables this pass
-        // whenever another pass changes the problem, but re-running would (a) re-search from scratch and
-        // (b) have to remap (conjugate every generator) and re-key the heavy [SymmetryHandling] factor it
-        // just added — an O(rounds) blow-up that dominated presolve on symmetric models. So detect once.
+        // One-shot: once a [SymmetryHandling] factor is present the generators have been posted. The round
+        // engine re-enables this pass whenever another pass changes the problem, and re-running would
+        // re-search from scratch and re-key the heavy [SymmetryHandling] factor it just added.
         if (problem.factors.any { it is SymmetryHandling }) return emptyList()
 
         // A model too large for even one generator-refinement round ([GENERATOR_ROUND_COST_BUDGET]) is
-        // skipped outright — not just for the generator search, but for the value / scalar heuristics too.
-        // Such models empirically carry no verifiable symmetry of any kind, and the value-orbit keying and
-        // the round-cost scan itself are each O(factors); paying them only to post nothing dominates
-        // presolve on the largest models (a 245k-factor routing model spends hundreds of ms here). Sound —
-        // skipping symmetry breaking only ever forgoes a reduction, never changes a solution.
+        // skipped outright, value / scalar heuristics included: such models rarely carry verifiable
+        // symmetry, and the value-orbit keying alone is O(factors). Skipping only forgoes a reduction.
         if (generatorRoundCost(problem) > GENERATOR_ROUND_COST_BUDGET) return emptyList()
 
-        // Generator-based detection: individualization–refinement over the unified variable+factor
-        // colouring yields verified automorphism generators (catching composite and bool/int-mixed
-        // symmetries the per-kind heuristics miss). The whole group is handled dynamically by one
-        // [SymmetryHandling] factor whose [SymmetryPropagator] enforces every generator's lex-leader
-        // `V ≤lex σ(V)` at each search node — sound (the orbit lex-minimum satisfies it) and with no
-        // static enumeration of group elements.
+        // The whole group is handled dynamically by one [SymmetryHandling] factor whose SymmetryPropagator
+        // enforces every generator's lex-leader `V ≤lex σ(V)` at each search node, sound because the orbit
+        // lex-minimum satisfies it (Crawford, Ginsberg, Luks and Roy, "Symmetry-breaking predicates for
+        // search problems", KR 1996).
         val generators = findGenerators(problem, columns, objectiveIntVars, objectiveBoolVars, cancellation)
         // For an orbit whose members are *individually* interchangeable (each single transposition is
         // itself an automorphism — a scalar symmetric group, not a lockstep matrix), the full total
@@ -262,10 +256,9 @@ internal object SymmetryBreaking {
      * solution can always be relabeled within the orbit so that variable takes the minimum).
      *
      * When every factor is value-anonymous (`Factor.isValueAnonymous` — AllDifferent), verification is
-     * skipped: anonymity means every relabeling is a symmetry, so the whole incidence group is one
-     * orbit (the anonymity fast path). Otherwise verification widens detection to problems with
-     * value-relabelable factors (GlobalCardinality, Table, …) that the anonymity gate switched off; a
-     * factor that is unkeyed or returns `null` from `Factor.remapValues` conservatively blocks it.
+     * skipped: every relabeling is a symmetry, so the whole incidence group is one orbit. Otherwise
+     * verification covers value-relabelable factors (GlobalCardinality, Table, …); a factor that is
+     * unkeyed or returns `null` from `Factor.remapValues` blocks it.
      */
     private fun breakValueSymmetry(
         problem: Problem,
@@ -282,10 +275,9 @@ internal object SymmetryBreaking {
             val internal = (0 until problem.numIntVars)
                 .filter { it !in objectiveIntVars && domainWithin(columns.finite(it), orbitSet) }
             when {
-                // Law–Lee value precedence (the default value break): introduce the orbit's values in
-                // sorted order across the interchangeable variables — one representative per value-symmetry
-                // class survives, strictly stronger than pinning a single variable. Needs ≥ 2 variables to
-                // chain; with one it degrades to the single-variable pin (the only sound break available).
+                // Value precedence (see [breakValuePrecedence]): one representative per value-symmetry class
+                // survives, strictly stronger than pinning a single variable. With one variable it degrades
+                // to the single-variable pin.
                 chainPrecedence && internal.size >= 2 -> {
                     val sortedValues = orbit.sorted()
                     val seq = internal.toIntArray()
@@ -371,31 +363,21 @@ internal object SymmetryBreaking {
     }
 
     /**
-     * Law–Lee value precedence, the strong value-symmetry break, posted with the native
-     * [ValuePrecede] propagator. For the value-anonymous case (every factor is
-     * `Factor.isValueAnonymous`, so any value relabeling is a symmetry), each orbit of interchangeable
-     * values is forced to be *introduced in sorted order*: the first occurrence of the orbit's `j`-th
-     * smallest value precedes the first occurrence of its `(j+1)`-th, over the variables whose domain
-     * is that orbit. This is a `value_precede_chain` — one [ValuePrecede] per consecutive value pair.
-     * Every solution can be relabeled within the orbit to this canonical "restricted-growth" form, so
-     * exactly one representative per symmetry class survives — strictly stronger than pinning a single
-     * variable ([breakValueSymmetry]).
+     * Value precedence, the strong value-symmetry break, posted with the native [ValuePrecede]
+     * propagator (Law and Lee, "Global Constraints for Integer and Set Value Precedence", CP 2004,
+     * https://doi.org/10.1007/978-3-540-30201-8_28). Each verified orbit of interchangeable values is
+     * forced to be *introduced in sorted order*: the first occurrence of the orbit's `j`-th smallest value
+     * precedes the first occurrence of its `(j+1)`-th, over the variables whose domain lies within the
+     * orbit. This is a `value_precede_chain`, one [ValuePrecede] per consecutive value pair. Every solution
+     * can be relabeled within the orbit to this canonical form, so exactly one representative per symmetry
+     * class survives — strictly stronger than pinning a single variable ([breakValueSymmetry]). The
+     * variable space is unchanged and no reconstruction is required.
      *
-     * Only the value-anonymous setting is handled: there an orbit equals a value-incidence class, so
-     * every fully-internal variable's domain is *exactly* the orbit (incidence-equality forces it),
-     * which is what makes ordering the first occurrences sound. Non-anonymous problems keep the
-     * verified single-variable pin. The native factor reasons over arbitrary value pairs without
-     * auxiliary variables, so
-     * the variable space is unchanged and no reconstruction is required.
-     *
-     * Variables in [objectiveIntVars] are excluded (ordering them would change the optimum). Returns
-     * the original problem unchanged when nothing is eligible.
+     * Variables in [objectiveIntVars] are excluded (ordering them would change the optimum). Returns an
+     * empty delta when nothing is eligible.
      */
     fun breakValuePrecedence(problem: BakedProblem, objectiveIntVars: Set<Int> = emptySet()): PassDelta {
         val n = problem.numIntVars
-        // A verified orbit is interchangeable; ordering its first occurrences is sound. A
-        // fully-internal variable (domain ⊆ orbit) exists only when the orbit equals the whole
-        // incidence group, so a split orbit simply posts nothing — never unsound.
         val columns = FiniteColumns(problem)
         val orbits = verifiedValueOrbits(problem, columns) ?: return PassDelta()
         val extra = ArrayList<Factor>()
@@ -558,19 +540,10 @@ internal object SymmetryBreaking {
 
     /** Domain signature so only variables with the *same* domain (bounds and holes) can group. */
     private fun domainSeed(d: IntDomain): RefineKey {
-        // Build the word array directly — this is computed for every int variable on every symmetry
-        // search, and a boxed `ArrayList<Long>` per variable (one box per bound and per hole) was a
-        // measurable cost on wide, holey domains. Holes collect into a primitive list first.
-        //
-        // Fingerprint by whichever of the holes or the survivors is the smaller set: a wide-but-sparse
-        // domain (few survivors over a span reaching millions) has O(span) holes but O(size) survivors, so
-        // the hole form would allocate and hash an O(span) key on every refinement step. The two forms
-        // carry a distinct marker word so they never collide; within a form, equal domains yield equal keys
-        // and distinct domains distinct keys, so the colour partition — and thus every generator found — is
-        // identical to the all-holes seed, at O(min(holes, survivors)) rather than O(span).
-        // Only the survivor form for a domain that can hand over its values: a wide domain has no
-        // span to walk, so it takes the hole form below (forEachHole is empty/small for the wide
-        // reps), never allocating a span-sized array.
+        // Fingerprint by whichever of the holes or the survivors is the smaller set, so a wide-but-sparse
+        // domain costs O(min(holes, survivors)) rather than O(span). The two forms carry distinct marker
+        // words so they never collide; within a form equal domains yield equal keys. A wide domain with no
+        // span to hand over takes the hole form.
         val survivors = d.spanOrNull()
         if (survivors != null && survivors.size <= d.holeCount) {
             val words = LongArray(4 + survivors.size)
@@ -609,8 +582,8 @@ internal object SymmetryBreaking {
      * incident factor, that factor's `Factor.structuralKey` computed with the focal variable
      * remapped to [WL_FOCAL] and every other variable to its current colour — the refinement "edge"
      * signature, derived generically for any keyed factor with no per-type code. Iterated to a
-     * fixpoint (partition stops refining). Soundness never rests on this: the pairwise/block verifier
-     * re-checks every candidate, so a wrong colouring can only miss symmetries, never invent one.
+     * fixpoint. Soundness never rests on this: every candidate is re-verified against the factors, so a
+     * wrong colouring can only miss symmetries, never invent one.
      */
     private fun refineColours(
         problem: Problem,
@@ -692,14 +665,10 @@ internal object SymmetryBreaking {
      *  factor-key *hashes*, each computed with [v] remapped to [WL_FOCAL] (the focal marker) and every
      *  other variable to its current colour (already loaded into [intMap]/[boolMap]).
      *
-     *  Each port contributes a single hash word rather than its full [StructuralKey] words. A factor
-     *  with large constant data (a table's tuple set, an element's array) has a large key, and
-     *  embedding it verbatim into every incident variable's signature each round made the copy/hash of
-     *  those long arrays dominate presolve. The hash is sufficient for refinement — colour refinement
-     *  only needs to tell ports apart, and a hash collision merely merges two colours (a coarser
-     *  partition, never a finer one). Soundness never rests on the colouring: every candidate the search
-     *  produces is re-checked by [isAutomorphism], so a collision can only cost extra verification, never
-     *  admit a false symmetry. */
+     *  Each port contributes a single hash word rather than its full [StructuralKey] words, since a factor
+     *  with large constant data (a table's tuple set) has a large key. A hash collision merely merges two
+     *  colours (a coarser partition); every candidate is re-checked by [isAutomorphism], so a collision
+     *  can only cost extra verification, never admit a false symmetry. */
     private fun portSignature(
         problem: Problem,
         incident: IntArrayList,
@@ -724,7 +693,7 @@ internal object SymmetryBreaking {
             portHashes[n++] = problem.factors[fi].remapStructuralHash(mapping).toLong()
             if (isBool) boolMap[v] = saved else intMap[v] = saved
         }
-        portHashes.sort() // canonical order: the signature is the multiset of port hashes
+        portHashes.sort()
         // space | SIG_PORT | oldColour | port count | each port's key hash, in canonical order.
         val words = LongArray(4 + portHashes.size)
         words[0] = if (isBool) SPACE_BOOL else SPACE_INT
@@ -770,10 +739,7 @@ internal object SymmetryBreaking {
      *  factor once per incident variable and rebuilds its `Factor.structuralKey`, so a factor of degree
      *  `d` and key weight `w` costs `Θ(d·w)` per round and the round costs `Σ_f d_f·w_f` (for a plain
      *  factor `w ≈ d`, so this reduces to `Σ d²`; a data-heavy factor like a wide table has `w ≫ d`).
-     *  Per-arc work here is a structural-key rebuild rather than a graph-edge walk, so the realistic
-     *  guard is on that weighted work rather than a raw node/arc count. Above this even the first
-     *  round consumes too much of [GENERATOR_WORK_BUDGET], so the search is skipped.
-     *  Skipping is sound and only reduces the symmetries found. */
+     *  Skipping only reduces the symmetries found. */
     private const val GENERATOR_ROUND_COST_BUDGET = 500_000L
 
     /** Deterministic work budget for the whole generator search, charged per refinement arc visited
@@ -781,21 +747,16 @@ internal object SymmetryBreaking {
      *  reproducible across machines; when it runs out the search bails with what it has found. */
     private const val GENERATOR_WORK_BUDGET = 200_000
 
-    /** Size skip for value-symmetry detection (the same idea as the generator-search skip, applied to
-     *  the other half of the pass): the value-incidence scan is `O((maxValue − minValue) · numIntVars)`,
-     *  so a model with a wide value span across many variables is skipped rather than scanned. Sound —
-     *  skipping only forgoes value-symmetry pins, never adds an unsound one. */
+    /** Size skip for value-symmetry detection: the value-incidence scan is
+     *  `O((maxValue − minValue) · numIntVars)`, so a wide value span across many variables is skipped. */
     private const val VALUE_ORBIT_SCAN_BUDGET = 50_000_000L
 
     /** Skip value-symmetry verification when keying the factor set (summed `Factor.structuralKeyWeight`)
-     *  would exceed this — a wide-table model where the per-swap re-keying dominates and a value symmetry
-     *  is almost never found, the value-side analog of [GENERATOR_ROUND_COST_BUDGET]. Sound: skipping
-     *  only forgoes value pins. */
+     *  would exceed this, the value-side analog of [GENERATOR_ROUND_COST_BUDGET]. */
     private const val VALUE_ORBIT_KEY_BUDGET = 1_000_000L
 
     // Estimated cost of one refinement round: each factor is remapped and re-keyed once per incident
-    // variable, at its Factor.structuralKeyWeight. The [GENERATOR_ROUND_COST_BUDGET] gate on this value is
-    // what breakSymmetries uses to skip the whole pass on a model too large to carry symmetry.
+    // variable, at its Factor.structuralKeyWeight.
     private fun generatorRoundCost(problem: Problem): Long {
         var roundCost = 0L
         for (f in problem.factors) {
@@ -807,11 +768,10 @@ internal object SymmetryBreaking {
 
     /**
      * Generators of the constraint-graph automorphism group, found by individualization–refinement
-     * over the unified variable+factor colouring. Unlike the
-     * transposition/same-shape-block heuristics this catches composite symmetries and — because the
-     * automorphism is verified on the whole factor multiset ([isAutomorphism]) rather than per-kind
-     * factor rows — symmetries whose factors mix bool and int variables (e.g. lowered set/list
-     * structure). Every returned permutation `(intMap, boolMap)` is a *verified* automorphism, so the
+     * over the unified variable+factor colouring. Unlike single transpositions this catches composite
+     * symmetries and, because the automorphism is verified on the whole factor multiset ([isAutomorphism]),
+     * symmetries whose factors mix bool and int variables (e.g. lowered set/list structure). Every
+     * returned permutation `(intMap, boolMap)` is a *verified* automorphism, so the
      * downstream orbit/lex breaking is sound by construction; an imperfect search only finds fewer.
      */
     private fun findGenerators(
@@ -825,13 +785,6 @@ internal object SymmetryBreaking {
         val nBool = problem.numBoolVars
         if (nInt + nBool == 0) return emptyList()
 
-        // Cost skip: estimate one refinement round's work as Σ_f degree·keyWeight — a factor is remapped
-        // and re-keyed once per incident variable, and each rebuild costs its `Factor.structuralKeyWeight`
-        // (the variables for a plain factor, plus the constant payload for a data-heavy one like a wide
-        // table). Bail before starting when a single round cannot fit [GENERATOR_WORK_BUDGET]. A
-        // wide-but-shallow model stays cheap; a model whose factors carry large constant data — where the
-        // search would burn the budget rebuilding huge keys without finding a verifiable symmetry — is
-        // skipped.
         if (generatorRoundCost(problem) > GENERATOR_ROUND_COST_BUDGET) return emptyList()
 
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
@@ -842,8 +795,6 @@ internal object SymmetryBreaking {
             if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else columns.boolSeed(v)
         }
 
-        // One deterministic work budget for the whole search; every refinement draws from it and the
-        // search stops (keeping the generators found so far) when it is spent.
         val budget = intArrayOf(GENERATOR_WORK_BUDGET)
 
         // Cells of the base equitable partition: only same-colour variables can be interchangeable.
@@ -892,9 +843,10 @@ internal object SymmetryBreaking {
     /**
      * Individualize the global vertex [firstIndiv] (int `v` is id `v`; bool `v` is id `nInt+v`) and
      * refine to a discrete partition, individualizing the lowest vertex of the lowest non-singleton
-     * cell at each subsequent step. Both the seed marker (`"@step"`) and the target rule are canonical,
-     * so two calls that individualize structurally-equal vertices produce comparable labelings. Returns
-     * `leaf[rank] = globalVertex` (the canonical colour is the rank), or `null` if the budget runs out.
+     * cell at each subsequent step. Both the seed marker (the individualization step) and the target rule
+     * are canonical, so two calls that individualize structurally-equal vertices produce comparable
+     * labelings. Returns `leaf(rank) = globalVertex` (the canonical colour is the rank), or `null` if the
+     * budget runs out.
      */
     @Suppress("ReturnCount")
     private fun refineToDiscrete(
@@ -943,8 +895,7 @@ internal object SymmetryBreaking {
                     break
                 }
             }
-            if (target == -1) return leaf // discrete
-            // Lowest global vertex in the target cell.
+            if (target == -1) return leaf
             var chosen = Int.MAX_VALUE
             for (v in 0 until nInt) if (ic[v] == target && v < chosen) chosen = v
             for (v in 0 until nBool) if (bc[v] == target && nInt + v < chosen) chosen = nInt + v
@@ -984,9 +935,7 @@ internal object SymmetryBreaking {
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
     ): List<Factor> {
-        // Orbits come only from the generators' variable unions, so with no generators there is nothing
-        // to order — return before building the (potentially expensive, e.g. wide-table) structural-key
-        // multiset that the per-swap automorphism check would need.
+        // Skips building the (potentially expensive) structural-key multiset when there is nothing to order.
         if (generators.isEmpty()) return emptyList()
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val dsInt = IntDisjointSet(problem.numIntVars)
@@ -1051,9 +1000,8 @@ internal object SymmetryBreaking {
     ) {
         for (i in scope.indices) {
             for (j in i + 1 until scope.size) {
-                // Each pair re-keys the whole factor set; on a wide orbit this is the dominant symmetry
-                // cost, so bail on a fired budget with the unions found so far (sound — fewer merged
-                // orbits). Polled per pair, not per row, so the bail is prompt on a wide candidate.
+                // Each pair may re-key the whole factor set, so the budget is polled per pair; bailing keeps
+                // the unions found so far.
                 if (cancellation()) return
                 val u = scope[i]
                 val v = scope[j]
@@ -1066,19 +1014,15 @@ internal object SymmetryBreaking {
 }
 
 /**
- * A `LongArray`-backed colour-refinement signature — the non-string analog of
- * [com.eignex.klause.ir.StructuralKey]. WL refinement composes signatures by appending integer
- * words (variable colours and folded-in factor keys) rather than building and hashing decimal
- * strings, which dominated presolve CPU and allocation on large structured models. Structural
- * [equals]/[hashCode] make it a hash key; [compareTo] gives the canonical total order colour ids are
- * assigned in.
+ * A `LongArray`-backed colour-refinement signature, composed of integer words (variable colours and
+ * folded-in factor key hashes). Structural [equals]/[hashCode] make it a hash key; [compareTo] gives the
+ * canonical total order colour ids are assigned in.
  */
 internal class RefineKey(private val words: LongArray) : Comparable<RefineKey> {
     override fun equals(other: Any?): Boolean =
         this === other || (other is RefineKey && words.contentEquals(other.words))
 
-    // Immutable, so the content hash is memoised — a colour signature is hashed once per `assignColours`
-    // HashSet/HashMap pass and re-hashed every WL round. `0` is the not-yet-computed sentinel.
+    // Immutable, so the content hash is memoised. `0` is the not-yet-computed sentinel.
     private var cachedHash = 0
 
     override fun hashCode(): Int {

@@ -4,12 +4,11 @@ import com.eignex.klause.ir.Problem
 import kotlin.reflect.KClass
 
 /**
- * Per-invariant dynamic weights for weighted-violation strategies (DDFW, SAPS). Not read by the LS
- * engine itself; strategies that bias toward repairing persistently-violated invariants read and
- * mutate [factorWeights] between picks.
+ * Per-invariant dynamic weights for weighted-violation strategies. Strategies that bias toward repairing
+ * persistently-violated invariants read and mutate [factorWeights] between picks; the engine also bumps
+ * the factors an exact completion refutes.
  *
- * Lazily allocated on first [factorWeights] access. Weight-blind strategies (WalkSat / ProbSat / SA)
- * never touch it and pay no allocation; only CBLS triggers the `DoubleArray(numFactors)`.
+ * Lazily allocated on first [factorWeights] access, so weight-blind strategies pay no allocation.
  * [WarmState.captureFrom] probes [allocated] first to avoid forcing the allocation to capture
  * all-1.0 defaults.
  */
@@ -49,8 +48,7 @@ class FactorWeightBook(private val problem: Problem) {
             return _baseFactorWeights ?: error("baseFactorWeights is assigned when factorWeights is allocated")
         }
 
-    /** True iff [factorWeights] has been touched (allocated). Reading is free; allows callers to
-     *  probe without forcing the lazy allocation. */
+    /** True iff [factorWeights] has been allocated; probing it does not force the allocation. */
     val allocated: Boolean get() = _factorWeights != null
 
     internal fun preparation(): Sequence<Unit> = sequence {

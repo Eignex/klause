@@ -526,7 +526,7 @@ internal fun printStatPairs(prefix: String, pairs: List<Pair<String, String>>) {
     for ((k, v) in pairs) println("$prefix $k=$v")
 }
 
-/** Round to four decimals for the rate lines; integral values render without a fraction. */
+/** Round to four decimals for the rate and ratio lines; integral values render without a fraction. */
 private fun round4(x: Double): String {
     val r = round(x * 10000.0) / 10000.0
     return if (r == r.toLong().toDouble()) "${r.toLong()}" else "$r"

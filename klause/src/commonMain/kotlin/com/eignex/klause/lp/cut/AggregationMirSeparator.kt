@@ -24,14 +24,15 @@ import com.eignex.klause.util.mulExact
  * each coefficient down can only shrink the left side, and the left side is integral so the right may
  * be floored). MIR with `f₀ = ½` is exactly this rounding; aggregating two rows before it is the
  * "multi-row" step. Variables are shifted to `y_j = x_j − lo_j ≥ 0` by their declared lower bounds, so
- * the cut reads only factor structure and declared domains and is globally valid.
+ * the cut reads only factor structure and declared domains and is globally valid. See Caprara and
+ * Fischetti, "{0,½}-Chvátal–Gomory cuts", Math. Program. 1996, https://doi.org/10.1007/BF02592196.
  *
  * Separation enumerates single rows and pairs, emitting a combination only when the LP point violates
  * the resulting cut (an even combination reproduces a scaled original row and never separates). Rows
  * and emitted cuts are capped so the root harvest stays bounded. [Linear] rows over integers and
  * [PseudoBoolean] / [Cardinality] rows over 0/1 literals are both mined (a negated literal `¬x` enters
- * as `1 − x`, its constant folded into the rhs), and a pair may mix the two. Flow-cover cuts are
- * intentionally absent: they need variable-upper-bound / continuous structure this relaxation lacks.
+ * as `1 − x`, its constant folded into the rhs), and a pair may mix the two. Flow-cover cuts live in
+ * [FlowCoverSeparator].
  */
 internal class AggregationMirSeparator : CutSeparator {
     private val tol = 1e-6
@@ -227,7 +228,7 @@ internal class AggregationMirSeparator : CutSeparator {
     }
 
     private companion object {
-        /** Cap on `Linear` rows mined per separation, bounding the `O(rows²)` pair sweep. */
+        /** Cap on rows mined per separation, bounding the `O(rows²)` pair sweep. */
         const val MAX_ROWS = 48
 
         /** Cap on cuts emitted per separation round. */

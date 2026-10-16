@@ -126,8 +126,8 @@ private fun FlatZincCompiler.buildExecutionMetadata(solve: SolveDirective): Flat
 }
 
 /** Build an exact [FunctionalObjective] from `defines_var` annotations when possible: a bool-count
- *  objective `Σ w_i·bool2int(and_i)` (`array_bool_and` / `_or` indicators, whose defining sweep already
- *  excludes them from search) when it matches, else the general int cone. */
+ *  objective `Σ w_i·bool2int(b_i)` over `array_bool_and` / `_or` indicators when it matches, else the
+ *  general int cone. */
 internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize: Boolean): FunctionalObjective? =
     buildBoolCountObjective(objName, minimize) ?: buildIntFunctionalObjective(objName, minimize)
 
@@ -135,8 +135,8 @@ internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize
  * Recognize `objective = Σ w_i·bool2int(b_i)` where each `b_i` is an `array_bool_and` / `array_bool_or`
  * indicator, and mirror it as a bool-term [FunctionalObjective] over those indicators' literals. The
  * indicators are functionally defined (their sweep excludes them from search), so a plain
- * [com.eignex.klause.solver.objective.LinearObjective] gives moves on the literals a zero gradient; this
- * evaluates each `and_i` from its literals so a literal flip yields the true objective delta. Returns
+ * [LinearObjective] gives moves on the literals a zero gradient; this evaluates each `b_i` from its
+ * literals so a literal flip yields the true objective delta. Returns
  * null on any shape it can't mirror exactly, falling back to [buildIntFunctionalObjective].
  */
 internal fun FlatZincCompiler.buildBoolCountObjective(objName: String, minimize: Boolean): FunctionalObjective? {

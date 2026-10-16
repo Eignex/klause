@@ -67,6 +67,9 @@ internal class ExactNeighborhood(
     val stats: SolveStats get() = sink.snapshot().mergedWith(completionStats())
     val work: Long get() = charged
 
+    // Adaptive mode draws the neighborhood size by roulette over decaying operator weights, as in adaptive
+    // large neighborhood search (S. Ropke and D. Pisinger, Transportation Science 40(4), 2006,
+    // https://doi.org/10.1287/trsc.1050.0135).
     private fun operator(): Int {
         if (!adaptive) return if (round % (centers.size + boolCount + 1) == 0L) 2 else 0
         if (round < weights.size) return round.toInt()

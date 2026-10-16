@@ -103,7 +103,10 @@ private fun bitLenU(a: U128): Int = if (a.hi != 0uL) {
     64 - a.lo.countLeadingZeroBits()
 }
 
-/** Binary (Stein) gcd of two magnitudes; either may be zero. Result overwrites [a]. */
+/**
+ * Binary gcd of two magnitudes; either may be zero. Result overwrites [a]. J. Stein, "Computational problems
+ * associated with Racah algebra", J. Comput. Phys. 1(3), 1967, https://doi.org/10.1016/0021-9991(67)90047-2.
+ */
 private fun gcdU(a: U128, b: U128) {
     if (a.isZero()) {
         a.set(b)
@@ -152,7 +155,7 @@ private fun divModU(a: U128, b: U128, q: U128) {
 /** Full 256-bit product of two 128-bit magnitudes into four 64-bit limbs (little-endian).
  *  Classic schoolbook with a running carry: each 64×64 partial product `(pHi, pLo)` adds its low
  *  word (plus the carry so far) at position `i + j`, and the next carry is `pHi` plus the add's
- *  carry-outs — which cannot wrap, since a 64×64 product's high word is at most 2⁶⁴ − 2³³. */
+ *  carry-outs — which cannot wrap, since `p + out[i + j] + carry ≤ (2⁶⁴ − 1)² + 2(2⁶⁴ − 1) = 2¹²⁸ − 1`. */
 @OptIn(ExperimentalUnsignedTypes::class)
 private fun mul256(a: U128, b: U128, out: ULongArray) {
     out.fill(0uL)

@@ -15,8 +15,8 @@ private const val IMPLICATION_GRAPH_MAX_CANDIDATES = 2_048
  *
  * @property id serializable form for [PresolveConfig.parse] and the CLI `--presolve` flag.
  * @property stage [Stage.PROBLEM] passes are run by the [Presolver] round engine; [Stage.CONSTRUCTION]
- *  passes (SAC probing) are folded into `Problem.baked` at build time; [Stage.EXTERNAL] passes (the LP
- *  harvest) run in the CLI's presolve↔harvest fixpoint — both are only read via [PresolveConfig.resolved].
+ *  passes (SAC probing) are folded into `Problem.baked` at build time; [Stage.EXTERNAL] passes run in
+ *  [PresolvePipeline] around the round engine — both are only read via [PresolveConfig.resolved].
  * @property capability the least input representation the pass needs. [Capability.SOURCE] passes may run
  *  before a finite projection is materialized; [Capability.FINITE] passes require finite-domain state.
  * @property timing cost tier — a [PresolveEmphasis] enables a set of tiers.
@@ -309,7 +309,9 @@ enum class PresolvePass(
         )
     },
 
-    /** Law–Lee value precedence — the strong value-symmetry break. Opt-in: stacking it
+    /** Value precedence (Y. C. Law and J. H. M. Lee, "Global Constraints for Integer and Set Value
+     *  Precedence", CP 2004, https://doi.org/10.1007/978-3-540-30201-8_28) — the strong value-symmetry
+     *  break. Opt-in: stacking it
      *  with [BREAK_SYMMETRIES] interacts (each pass's added factors disable the other's detection), so
      *  it is enabled only by an explicit override, as an alternative to the single-variable value pin. */
     VALUE_PRECEDENCE(
@@ -503,13 +505,11 @@ enum class PresolvePass(
     ),
 
     /** LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals, root
-     *  infeasibility and implied equalities into the problem. Run outside this enum's round engine (it
-     *  needs the backtrack-layer LP engine, which `solver/presolve` may not depend on), so the round engine
-     *  never runs it and the work lives in the CLI's presolve↔harvest fixpoint, gated on this entry.
-     *  `EXHAUSTIVE` (it does an LP solve per shave/redundancy probe), so the aggressive level turns it on.
-     *  The harvest itself then self-limits on the *built relaxation's* size (cols/rows/nnz): on a large
-     *  relaxation, where the per-candidate cost would lose instances the search would otherwise solve, it
-     *  no-ops — its gains are on small/medium models. */
+     *  infeasibility and implied equalities into the problem. Run outside this enum's round engine, in
+     *  [PresolvePipeline]'s presolve↔harvest fixpoint, gated on this entry. `EXHAUSTIVE` (it does an LP
+     *  solve per shave/redundancy probe), so the aggressive level turns it on. The harvest itself then
+     *  self-limits on the *built relaxation's* size (cols/rows/nnz): on a large relaxation, where the
+     *  per-candidate cost would eat the search's time budget, it no-ops. */
     LP_HARVEST(
         "lp-harvest",
         Stage.EXTERNAL,
@@ -562,7 +562,7 @@ enum class PresolvePass(
      *
      * A [Capability.SOURCE] pass runs its source form here unless it overrides — the finite lane hands
      * it the same declarations plus root domains it has no use for. [Stage.CONSTRUCTION] (bake-time SAC)
-     * and [Stage.EXTERNAL] (LP harvest) passes are eligibility markers whose work runs elsewhere, so
+     * and [Stage.EXTERNAL] passes are eligibility markers whose work runs elsewhere, so
      * calling this on one is a programming error.
      */
     internal open fun applyFinite(problem: BakedProblem, ctx: PresolveContext): PassDelta = when {
@@ -583,8 +583,8 @@ enum class PresolvePass(
         /** A problem-to-problem transform run before solving, via [Presolver.run]. */
         PROBLEM,
 
-        /** Run outside [Presolver.run] — by the CLI's presolve↔LP-harvest fixpoint, which alone bridges
-         *  to the backtrack-layer LP engine; this enum only carries the config toggle. */
+        /** Run outside [Presolver.run], by [PresolvePipeline] around the round engine; this enum only
+         *  carries the config toggle. */
         EXTERNAL,
     }
 

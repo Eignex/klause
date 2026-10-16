@@ -2,8 +2,8 @@ package com.eignex.klause.lp
 
 /**
  * A gated convex-hull family a factor's LP relaxation can belong to. A factor names its family once via
- * [lpHullFamily]; the relaxation driver gates it with [HullFlags] and the
- * LP auto-config groups factors by it — so neither pattern-matches the concrete factor type.
+ * [lpHullFamily]; the relaxation driver gates it with [HullFlags] and the LP auto-config groups
+ * factors by it — so neither pattern-matches the concrete factor type.
  */
 enum class HullFamily {
     /** Constant-array Element one-hot selector hull. */
@@ -68,8 +68,7 @@ class HullFlags(
     }
 }
 
-/** The LP columns and rows an LP hull estimate predicts its
- *  hull adds (upper bounds). */
+/** Upper bounds on the LP columns and rows a factor's optional hull adds. */
 class LpSizeEstimate(
     /** Upper bound on the LP columns the hull contribution adds. */
     val cols: Long,

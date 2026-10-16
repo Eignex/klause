@@ -23,9 +23,8 @@ data object BoolSpec : VarSpec
 /**
  * Presence marker for an optional variable: a Boolean that gates the value variable named
  * [valueName]. Compiles to an ordinary Boolean var, but its dedicated type lets the optional
- * machinery (notably absent-value pinning) recognise the (presence, value) pairing
- * *explicitly* — by type and the carried [valueName] — rather than by a fragile name
- * convention that could misfire on an unrelated bool that merely shares a suffix.
+ * machinery (notably absent-value pinning) recognise the (presence, value) pairing by type
+ * and the carried [valueName], never by name.
  */
 @Serializable
 @SerialName("presence")

@@ -41,7 +41,6 @@ internal class ExactComparison(
     val terms: Map<Int, BigFraction>,
     /** The right-hand side [terms] is compared against. */
     val bound: BigFraction,
-    /** The comparison itself. */
     val op: LinearOp,
     /** Whether the comparison is strict, which a row read against its own statement also is. */
     val strict: Boolean,

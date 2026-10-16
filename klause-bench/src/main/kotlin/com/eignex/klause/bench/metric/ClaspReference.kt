@@ -24,9 +24,8 @@ internal object ClaspReference {
     /** Label on every reference container, so stragglers can be reaped (`docker kill --filter label`). */
     const val CONTAINER_LABEL = "klause-clasp-ref"
 
-    /** Hard per-container memory ceiling — mirrors the cp-sat oracle so no single clasp run (a huge SAT
-     *  instance's clause DB can balloon) can exhaust the host; docker OOM-kills it and the instance is
-     *  scored undecided. */
+    /** Hard per-container memory ceiling, so no single clasp run (a huge SAT instance's clause DB can
+     *  balloon) can exhaust the host; docker OOM-kills it and the instance is scored undecided. */
     private const val MEMORY_LIMIT = "6g"
     private const val DOCKER_INSPECT_WAIT_MS = 5_000L
 
@@ -145,8 +144,8 @@ internal object ClaspReference {
             else -> null
         }
         // clasp is complete, so a decision instance (no `o` lines ⇒ it wasn't optimising) is *decided* by
-        // a model — SAT is proven, mirroring cp-sat reporting a satisfied CSP as OPTIMAL. A `SATISFIABLE`
-        // with `o` lines is an optimisation that found an incumbent but timed out before proving optimum.
+        // a model: SAT is proven. A `SATISFIABLE` with `o` lines is an optimisation that found an incumbent
+        // but timed out before proving optimum.
         val optimising = bestObjective != null
         val proven = when (status) {
             "OPTIMUM FOUND", "UNSATISFIABLE" -> true

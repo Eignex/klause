@@ -260,9 +260,8 @@ internal object Suites {
                     format = Format.OPB,
                 )
             },
-            // `PB25` subdir mirrors PB24's tar layout (`PB<year>/...`) by analogy — same publisher,
-            // same archive tooling — but is unverified against an actual extraction; if the archive
-            // shape moved, this discovers zero and the fix is a one-line subDir change.
+            // The `PB25` subdir assumes the PB24 tar layout (`PB<year>/...`); an archive with another
+            // shape discovers zero instances.
             DynamicSuite(
                 "pb-comp-2025",
                 "Pseudo-Boolean Competition 2025 selected OPB set (fetched; 1/family by default)",
@@ -346,13 +345,13 @@ internal object Suites {
         )
     }
 
-    // Slack all_different (Hall-prone; for explanation / clause-learning A/B).
-
     /**
      * Golomb-ruler feasibility: ordered marks with pairwise differences in `1..maxLen`,
      * constrained all-different. The excess values create slack Hall sets and multiple
-     * Regin SCCs, exercising responsible-subset conflict explanations. SAT when
-     * `maxLen` is at least the optimum length.
+     * strongly connected components in the matching graph of Régin's filtering (J.-C. Régin,
+     * "A filtering algorithm for constraints of difference in CSPs", AAAI 1994,
+     * https://mlanthology.org/aaai/1994/regin1994aaai-filtering), exercising responsible-subset
+     * conflict explanations. SAT when `maxLen` is at least the optimum length.
      */
     private fun golomb(m: Int, maxLen: Int): Problem {
         val pairs = buildList { for (i in 0 until m) for (j in i + 1 until m) add(i to j) }
@@ -365,7 +364,6 @@ internal object Suites {
                 // Remaining marks; mark[0] is pinned to 0 above to break translation symmetry.
                 idx < m -> IntDomain(0, maxLen.toLong())
 
-                // Pairwise differences, strictly positive.
                 else -> IntDomain(1, maxLen.toLong())
             }
         }
@@ -390,8 +388,6 @@ internal object Suites {
             inCode("golomb_${m}_$maxLen", Category.CSP, Expected.Sat) { golomb(m, maxLen) }
         }
     }
-
-    // In-code SAT/CSP.
 
     private val handwrittenCore = suite("handwritten-core", "Small hand-built SAT/CSP instances") {
         license = "internal"
@@ -626,8 +622,6 @@ internal object Suites {
         }
     }
 
-    // Vendored smoke-corpus suites (klause-bench/smoke-corpus/).
-
     private val dimacsCore = suite("dimacs-core", "Curated small DIMACS CNF (SAT + UNSAT)") {
         format = Format.DIMACS
         license = "SATLIB-style (public benchmarks)"
@@ -859,8 +853,8 @@ internal object ExternalCollections {
     val all = listOf(minizincChallenge, libminizincTests, hakank, satlibUf20, satlibUuf50)
 
     // XCSP3 competition library (instance archives, xcsp.org / CRIL).
-    // Instances ship as individually `.xml.lzma`-compressed files inside each zip; the
-    // coverage tool decompresses them on the fly. Per-year full archives cover 2017–2019 (no
+    // Instances ship as individually `.xml.lzma`-compressed files inside each zip, decompressed
+    // on fetch. Per-year full archives cover 2017–2019 (no
     // competition in 2020–2021); the 2022–2025 range is taken from the two curated main-track
     // aggregates published at xcsp.org/instances (COP22to25, CSP22to25) rather than the
     // overlapping per-year archives — same range, deduplicated to the CSP/COP tracks klause targets.
@@ -882,7 +876,7 @@ internal object ExternalCollections {
         fetch = FetchMethod.Zip,
     )
 
-    /** The curated 2022–2025 main-track aggregates: the [xcsp3-cop]/[xcsp3-csp] dynamic suites select
+    /** The curated 2022–2025 main-track aggregates: the `xcsp3-cop`/`xcsp3-csp` dynamic suites select
      *  from these (each ships as `COP22to25/`/`CSP22to25/` dirs of `*.xml.lzma`, decompressed on fetch). */
     val xcsp3Cop = xcspAggregate("COP", 1000)
     val xcsp3Csp = xcspAggregate("CSP", 800)
@@ -1011,7 +1005,7 @@ internal object ExternalCollections {
     /** PB'07 evaluation "other" benchmarks: 487 native (crafted, not MIP-translated) pseudo-Boolean
      *  instances across the competition categories (optimization/decision, small/big integer, linear
      *  and non-linear), each a `.opb.bz2` under `normalized-PB07/`. Standard OPB headers, klause-scale.
-     *  (The archive lists 598, but 111 long factor-mod paths exceed the old tar 100-char name limit.) */
+     *  (The archive lists 598, but 111 long factor-mod paths exceed the ustar 100-char name limit.) */
     val pb07Other = ExternalCollection(
         id = "pb07-other",
         url = "http://www.cril.univ-artois.fr/PB07/benchs/PB07-OTHER.tar",

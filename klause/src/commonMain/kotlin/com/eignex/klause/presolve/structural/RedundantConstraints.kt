@@ -39,11 +39,10 @@ private const val BOOL_VAR_MARK = 1L shl 40
 internal object RedundantConstraints {
 
     /**
-     * Subsumption entry point. On the fresh path (no [incremental]) it recomputes from scratch. Given a
+     * Subsumption entry point. Without [incremental] it recomputes from scratch. Given a
      * [SubsumeIncremental] it maintains the phase-1/2 indices across rounds in [SubsumeIncremental.memo],
-     * reprocessing only the factors added / dropped since the pass last ran — the whole-set rescan of a
-     * fruitless re-run becomes O(delta). The later phases run over the phase-2
-     * survivor list either way.
+     * reprocessing only the factors added / dropped since the pass last ran, so a fruitless re-run costs
+     * O(delta). The later phases run over the phase-2 survivor list either way.
      *
      * [ranges] is how wide each column is to the activity-based phases: a finite projection's folded
      * domains, or what a source model states (see [removeRedundantSourceConstraints]).
@@ -76,9 +75,8 @@ internal object RedundantConstraints {
     fun removeRedundantSourceConstraints(problem: Problem, cancellation: Cancellation): SourceDelta =
         computeFull(problem, ColumnRanges.of(problem.intBounds), cancellation).asSourceDelta()
 
-    // Flip on to validate the incremental path: every firing also recomputes the full delta and asserts
-    // the two agree, so a divergence throws on the exact instance/round instead of surfacing as a wrong
-    // presolve output. Off in production (the full recompute defeats the incremental win).
+    // Debug switch: every incremental firing also recomputes the full delta and asserts the two agree, so a
+    // divergence throws on the exact instance/round. Off in production (the full recompute defeats the point).
     private const val SUBSUME_DIFFERENTIAL_CHECK = false
 
     private fun assertMatchesFull(problem: Problem, ranges: ColumnRanges, delta: PassDelta) {
@@ -90,7 +88,8 @@ internal object RedundantConstraints {
 
     /**
      * Constraint subsumption / redundant-constraint removal: drop a constraint implied by
-     * another retained one, preserving the feasible set exactly. Two mechanisms:
+     * another retained one, preserving the feasible set exactly. Phases 1 and 2 run here, the rest in
+     * [finishAfterPhase2]:
      *
      *  1. **Exact duplicates** — any factor whose `Factor.structuralKey` equals an earlier kept one is
      *     redundant (the keys are collision-free up to variable identity, so an equal key means an
@@ -104,6 +103,8 @@ internal object RedundantConstraints {
      *     support is a strict subset of another's, with coefficients a positive multiple of it on the
      *     shared variables and a bound that implies the larger row's (after charging the extra terms
      *     their maximal activity), drops the larger row across *different* supports.
+     *  4. **Clique-implied knapsacks** ([dropCliqueImpliedKnapsacks]).
+     *  5. **Vacuous globals** ([isVacuousGlobal]).
      *
      * The GCD reduction in step 2 makes the pass effective standalone — proportional rows match even
      * when coefficient strengthening hasn't run first. Self-redundant rows
@@ -116,12 +117,10 @@ internal object RedundantConstraints {
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
         val factors = problem.factors
-        // Phase 1: exact-duplicate removal by structural key, two-tier so the full key — which for a
-        // Table embeds its entire sorted tuple set and dominates presolve time on table-heavy models —
-        // is built only when it can matter. A cheap shallow key (factor type + arity + variable ids,
-        // never the tuple payload) buckets the factors; the full `Factor.structuralKey` is computed and
-        // compared only for factors that collide on the shallow key (true duplicates always do). A
-        // factor with a unique shallow key — the common case — is kept without ever building its key.
+        // Phase 1: exact-duplicate removal by structural key, two-tier so the full key (which for a
+        // Table embeds its entire sorted tuple set) is built only when it can matter. A cheap
+        // [shallowKey] buckets the factors; the full `Factor.structuralKey` is computed and compared only
+        // for factors that collide on it (true duplicates always do).
         val deduped = ArrayList<Factor>(factors.size)
         val firstByShallow = HashMap<Long, Factor>()
         val keysByShallow = HashMap<Long, HashSet<StructuralKey>>()
@@ -129,14 +128,11 @@ internal object RedundantConstraints {
             val sk = shallowKey(f)
             val first = firstByShallow[sk]
             if (first == null) {
-                // First factor with this shallow key — no kept factor can be a duplicate of it, so keep
-                // it without ever building its (possibly huge) full key.
                 firstByShallow[sk] = f
                 deduped.add(f)
                 continue
             }
-            // Shallow collision: now the full keys decide. Seed the set with the first factor's key
-            // (built once here, not on every comparison), then keep f only if its key is new.
+            // Shallow collision: the full keys decide. The first factor's key is built once, here.
             val keys = keysByShallow.getOrPut(sk) { hashSetOf(first.structuralKey()) }
             if (keys.add(f.structuralKey())) deduped.add(f)
         }
@@ -176,11 +172,10 @@ internal object RedundantConstraints {
             val keep = when {
                 n.bound > tightest -> false
 
-                // dominated by a tighter constraint
                 bucketEqAtMin[n.key] == true -> false
 
-                // an `=` over the same vector implies this
-                else -> keptRep.add(n.key) // keep the first representative at the tightest bound; drop dups
+                // The first representative at the tightest bound stays.
+                else -> keptRep.add(n.key)
             }
             if (keep) out.add(f)
         }
@@ -188,7 +183,7 @@ internal object RedundantConstraints {
     }
 
     /** Phases 3–5 over the phase-1/2 survivor list [out] (in `Problem.factors` order), recovering the
-     *  dropped input indices. Shared by the fresh recompute and the incremental path. */
+     *  dropped input indices. Shared by the from-scratch and the incremental path. */
     private fun finishAfterPhase2(
         problem: Problem,
         ranges: ColumnRanges,
@@ -196,9 +191,7 @@ internal object RedundantConstraints {
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
         val factors = problem.factors
-        // Phase 3: variable-subset / proportional domination across different supports.
         val out3 = dropSubsetDominated(ranges, out, cancellation)
-        // Phase 4: clique-aware redundancy — a 0/1 knapsack implied by at-most-one cliques.
         val out4 = dropCliqueImpliedKnapsacks(out3, cancellation)
         // Phase 5: drop globals the current ranges make vacuously satisfied; removing one frees
         // a variable contained only in it, which the affine pass then projects out (implied-free).
@@ -230,7 +223,7 @@ internal object RedundantConstraints {
      * Phase 2 keeps at most one representative `≤`-row per coefficient-vector bucket, so per bucket the
      * only live drop-candidate is that representative — a re-run reconciles it against the delta in O(1).
      *
-     * A dropped drop-candidate keeps its bucket offer the round it is dropped (the from-scratch pass
+     * A dropped drop-candidate keeps its bucket offer the round it is dropped (the from-scratch path
      * offers every deduped row *before* deciding drops), so it is retracted only on the next firing:
      * other passes' drops arrive via [SubsumeIncremental.droppedFactors]; subsume's own drops fall before
      * the next change-mark and are carried over to the next firing internally.
@@ -310,10 +303,8 @@ internal object RedundantConstraints {
                 bailedRebuild = false
                 val factors = problem.factors
                 for (i in factors.indices) {
-                    // The from-scratch rebuild is O(factors) — on a multi-million-row model (Coprime-30) it
-                    // must honor the presolve deadline. Bailing leaves a cleared (consistent) memo and forces
-                    // a clean rebuild next firing; this firing subsumes nothing (returns the live set), which
-                    // is sound (a partial pass only forgoes reduction).
+                    // The rebuild is O(factors), so it honors the presolve deadline. Bailing leaves a cleared
+                    // (consistent) memo and forces a rebuild next firing; this firing subsumes nothing.
                     if ((i and REBUILD_CANCEL_POLL_MASK) == 0 && cancellation()) {
                         clearIndices()
                         pendingSelfDrops = emptyList()
@@ -390,11 +381,8 @@ internal object RedundantConstraints {
                 dups.add(f)
                 return
             }
-            // A factor with no linear/PB row (every Clause, Xor, plain global) offers nothing to the
-            // phase-2 dominator buckets, so allocate the touched-key set — and re-derive the row form —
-            // only once it actually offers. On a clause-heavy SAT model phase 2 stays a no-op (clause rows
-            // are skipped by [rowForm]), so this drops one HashSet allocation and one normal-form
-            // derivation per offer-free factor.
+            // Most factors (every Clause, Xor, plain global) offer nothing to the phase-2 buckets, so the
+            // touched-key set and the row form are derived only once a factor actually offers.
             @Suppress("DoubleMutabilityForCollection") // deliberately lazily created on the first offer
             var touched: HashSet<TermKey>? = null
             forEachOffer(f) { key, bound, eq ->
@@ -422,7 +410,7 @@ internal object RedundantConstraints {
 
         // Reconcile a bucket's representative against the (at most one) new drop-candidate [cand]: the
         // earliest row at the tightest bound survives when no equality dominates the bucket, mirroring the
-        // from-scratch `keptRep` rule. The old representative predates [cand], so it wins ties.
+        // from-scratch `keptRep` rule. The existing representative predates [cand], so it wins ties.
         private fun resolve(bucket: Bucket, cand: Factor?, candBound: Long, drops: HashSet<Factor>) {
             val t = bucket.tightest() ?: return
             val dominatedByEq = bucket.eqAtMin()
@@ -442,7 +430,7 @@ internal object RedundantConstraints {
     }
 
     /** Replay the from-scratch phase-2 offer sequence for [f]: each exact `≤`-row (a `≥` folded to `≤`,
-     *  an `=` contributing both directions). Mirrors the fresh path's [offerForms] loop. */
+     *  an `=` contributing both directions). Mirrors the from-scratch [offerForms] loop. */
     private inline fun forEachOffer(f: Factor, action: (key: TermKey, bound: Long, eq: Boolean) -> Unit) {
         for (n in offerForms(f)) {
             action(n.key, n.bound, n.fromEq)
@@ -451,10 +439,10 @@ internal object RedundantConstraints {
     }
 
     /** Whether [factor] is a global constraint that the current [ranges] make *vacuously* satisfied —
-     *  it can never prune, so dropping it preserves the feasible set exactly. Currently detects
-     *  an [AllDifferent] whose variables have pairwise-disjoint domains (no two can ever be equal, so
-     *  distinctness always holds — for the plain, opt, and `_except` variants alike, since absence and
-     *  excepted values only relax the constraint). Disjointness is tested on the `[min, max]` intervals
+     *  it can never prune, so dropping it preserves the feasible set exactly. Detects an [AllDifferent]
+     *  whose variables have pairwise-disjoint domains (no two can ever be equal, so distinctness always
+     *  holds — for the plain, opt, and `_except` variants alike, since absence and excepted values only
+     *  relax the constraint). Disjointness is tested on the `[min, max]` intervals
      *  (a sound sufficient condition; hole-induced disjointness is conservatively not claimed). */
     private fun isVacuousGlobal(factor: Factor, ranges: ColumnRanges): Boolean {
         if (factor !is AllDifferent || factor.vars.size < 2) return false
@@ -463,10 +451,10 @@ internal object RedundantConstraints {
         if (!ranges.allClosed(factor.vars)) return false
         var prevMax = Long.MIN_VALUE
         for (v in factor.vars.sortedBy { ranges.min(it) }) {
-            if (ranges.min(v) <= prevMax) return false // intervals overlap → a collision is possible
+            if (ranges.min(v) <= prevMax) return false
             if (ranges.max(v) > prevMax) prevMax = ranges.max(v)
         }
-        return true // every pair of intervals is disjoint → all-different holds for every assignment
+        return true
     }
 
     /** Cap on the `≤`-rows Phase 3 compares pairwise, to keep the domination scan from going quadratic
@@ -483,9 +471,7 @@ internal object RedundantConstraints {
      *  comparison can't wrap (real bounds are far below this). */
     private const val OVERFLOW_GUARD = 1_000_000_000_000_000L
 
-    /** A `Σ coeffs·x ≤ bound` row as a reduced per-variable coefficient map (GCD-normalised), or `null`
-     *  for non-(`≤`/`≥`) Linear factors. The map keys are variable ids; the value is the reduced
-     *  coefficient. */
+    /** A `Σ coeffs·x ≤ bound` row as a GCD-reduced coefficient map keyed by variable id. */
     private class LeRow(val factorIndex: Int, val coeffByVar: MutableIntLongMap, val bound: Long)
 
     /** A `≤`-normalised, GCD-reduced [LeRow] for an exact [LinearRow] (from any factor's
@@ -552,9 +538,8 @@ internal object RedundantConstraints {
         if (candidates.isEmpty() || dominators.size > SUBSET_DOMINATION_ROW_CAP) return factors
         val dropped = IntHashSet()
         for ((bi, b) in candidates.withIndex()) {
-            // Poll the presolve deadline: this pairwise scan is O(candidates · dominators) and dominates
-            // subsume on large proportional-row models (Coprime). Bailing keeps the drops found so far —
-            // sound, since each is an independently-valid domination (a partial pass only drops fewer rows).
+            // This pairwise scan is O(candidates · dominators). Bailing keeps the drops found so far, each
+            // an independently valid domination.
             if ((bi and SUBSET_CANCEL_POLL_MASK) == 0 && cancellation()) break
             cancellation.charge(SUBSUME_WORK_WEIGHT * dominators.size)
             for (a in dominators) {
@@ -574,11 +559,11 @@ internal object RedundantConstraints {
     private fun dominates(ranges: ColumnRanges, a: LeRow, b: LeRow): Boolean {
         var k = 0L
         a.coeffByVar.forEach { v, ca ->
-            if (!b.coeffByVar.containsKey(v)) return false // a's support must be ⊆ b's
+            if (!b.coeffByVar.containsKey(v)) return false
             val cb = b.coeffByVar.getOrDefault(v, 0L)
             if (cb % ca != 0L) return false
             val ratio = cb / ca
-            if (ratio <= 0L) return false // k must be a single positive multiple
+            if (ratio <= 0L) return false
             if (k == 0L) {
                 k = ratio
             } else if (k != ratio) {
@@ -759,8 +744,8 @@ internal object RedundantConstraints {
     }
 
     /** A cheap discriminator for Phase-1 duplicate bucketing: a commutative splitmix sum of the variable
-     *  ids (bool ids marked into a disjoint range) plus the arity-derived `Factor.structuralKeyWeight` —
-     *  never a Table's tuple payload, the whole point of the two-tier dedup. It is **order-invariant** so
+     *  ids (bool ids marked into a disjoint range) plus the arity-derived `Factor.structuralKeyWeight`,
+     *  never a Table's tuple payload. It is **order-invariant** so
      *  it is implied by full structural-key equality (a [Linear]'s key compares its terms as a var→coeff
      *  map, not positionally, so an order-sensitive hash would split genuine duplicates into different
      *  buckets and miss them). True duplicates therefore always share it; unrelated collisions are

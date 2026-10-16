@@ -19,7 +19,8 @@ internal interface NoiseSchedule : AdaptivePolicy {
 }
 
 /**
- * Adaptive parameter controller in the spirit of Hoos 2002's adaptive WalkSAT noise.
+ * Adaptive parameter controller in the spirit of H. H. Hoos, "An adaptive noise mechanism for WalkSAT",
+ * AAAI 2002, https://aaai.org/papers/00655-an-adaptive-noise-mechanism-for-walksat/.
  *
  * Observes the constraint-violation cost over time. When the search stalls (no improvement
  * for [theta] consecutive observations) the controller bumps [level] up toward 1.0 by
@@ -35,10 +36,8 @@ internal interface NoiseSchedule : AdaptivePolicy {
  *    landscape. `ewmaAlpha` ∈ (0, 1]; smaller = longer effective window.
  *
  * Strategies map [level] to their own knob: WalkSat sets `noise = level`, ProbSat scales
- * its `cb` exponent down, DDFW scales `increment` up. Level 0 = baseline (most greedy);
+ * its `cb` exponent down. Level 0 = baseline (most greedy);
  * level toward 1 = more diversification.
- *
- * phi defaults to 0.2; [theta] is exposed directly so callers can tune.
  */
 internal class NoiseController(
     initial: Double,
@@ -73,11 +72,9 @@ internal class NoiseController(
 
     private fun observeCost(cost: Double) {
         val improving = if (ewma != null) {
-            // EWMA-trend mode: latest cost strictly below the smoothed average.
             ewma.update(cost, timestampNanos = 0L, weight = 1.0)
             cost < ewma.read(0L).mean
         } else {
-            // Best-cost mode: ratchet against the all-time low.
             val better = cost < bestCostSeen
             if (better) bestCostSeen = cost
             better
@@ -182,8 +179,10 @@ internal class BanditNoiseController(
     }
 
     companion object {
-        /** Three (aggressive / moderate / patient) bump-on-stall profiles under UCB1, all anchored
-         *  to [baseline] so the strategy's baseline noise/cb is preserved. */
+        /** Three (aggressive / moderate / patient) bump-on-stall profiles under UCB1 (P. Auer,
+         *  N. Cesa-Bianchi, P. Fischer, "Finite-time analysis of the multiarmed bandit problem",
+         *  Machine Learning 47, 2002, https://doi.org/10.1023/A:1013689704352), all anchored to
+         *  [baseline] so the strategy's baseline noise/cb is preserved. */
         fun default(baseline: Double = 0.2, seed: Long = 0L, window: Int = 200): BanditNoiseController {
             val profiles = listOf(
                 NoiseController(initial = baseline, theta = 20, phi = 0.3, minLevel = baseline),

@@ -17,8 +17,11 @@ import com.eignex.klause.ir.materializeKey
  * and accepting set [accepting]. A transition value of `0` denotes rejection (the
  * "dead state").
  *
- * Decomposed propagation: when every `seq(i)` is singleton, simulate the run and verify
- * acceptance.
+ * Propagation is GAC over the layered unrolling of the DFA (Pesant, "A Regular Language Membership
+ * Constraint for Finite Sequences of Variables", CP 2004, https://doi.org/10.1007/978-3-540-30201-8_36):
+ * a symbol `s ∈ dom(seq(i))` survives iff some state forward-reachable from [q0] at layer `i`
+ * transitions on it to a state at `i+1` that can still reach an accepting state. Layer bitsets are
+ * trailed, and a fire recomputes only the layers a changed position reaches.
  */
 class Regular(
     /** Input symbol sequence variable ids. */
@@ -89,13 +92,4 @@ class Regular(
     }
 
     override val variables: VarList = SpanIntVars(seq)
-
-    /*
-     * Reversible, delta-driven layered-DAG GAC (see `RegularIncrementalState`):
-     * per layer a state-bitset records forward-reachability from q0 and backward-co-reachability to
-     * an accepting state, both on the engine undo trail. A symbol `s ∈ dom(seq[i])` survives iff some
-     * forward-reachable state at `i` transitions on it to a co-reachable state at `i+1`; the conflict
-     * is the initial state losing co-reachability at layer 0. A fire recomputes only the layers a
-     * changed position reaches, instead of the whole `O(n · Q · |Σ|)` DFA each time.
-     */
 }

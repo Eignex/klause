@@ -204,7 +204,7 @@ class SourceStrategy internal constructor(
     }
 
     /**
-     * Optimize a supported open-integer linear source through the existing native linear execution.
+     * Optimize a supported open-integer linear source through the native linear execution.
      * Native costs and bounds retain minimization sense; [sense] selects the source objective direction.
      * Unsupported fragment or invocation controls return the native incomplete result, without finite boxing.
      */

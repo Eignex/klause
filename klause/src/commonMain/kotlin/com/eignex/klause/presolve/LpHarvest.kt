@@ -24,19 +24,19 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 
 /**
- * Fold the LP relaxation's proven domain tightenings into [problem] permanently — the
- * relaxation-harvest idea in the one place it pays off in klause. Two harvests share the one root-LP
+ * Fold the LP relaxation's proven reductions into [problem] permanently. The harvests share one root-LP
  * build:
+ *  - a certified-infeasible root relaxation turns [problem] into a proven contradiction;
  *  - [LpEngine.shaveVariableBounds] proves, by LP + propagation infeasibility, that some integer
- *    variables cannot reach their declared bounds; their proven bounds intersect into the domains.
+ *    variables cannot reach their declared bounds; their proven bounds intersect into the domains;
  *  - [LpEngine.shaveObjectiveLb] proves a lower bound on a single ascending (minimised) objective
- *    variable; it intersects into that variable's domain.
+ *    variable; it intersects into that variable's domain;
+ *  - [LpEngine.redundantConstraints] are dropped and [LpEngine.impliedEqualities] are appended.
  *
- * Unlike `BacktrackSolver`'s root shave — which raises bounds only on its own search session, and only
- * for the backtrack backend — this is a `Problem -> Problem` transform run during presolve, so the
- * tightened domains reach **every** backend (local search included) and feed any later presolve pass.
- * Sound: every shaved bound is backed by an infeasibility proof, so intersecting it removes only
- * values no solution can take.
+ * Unlike the backtrack search's root shave — which raises bounds only on its own search session — this
+ * is a `Problem -> Problem` transform run during presolve, so the tightened domains reach **every**
+ * backend (local search included) and feed any later presolve pass. Sound: every shaved bound is backed
+ * by an infeasibility proof, so intersecting it removes only values no solution can take.
  *
  * Reduced-cost fixing (`applySparseReducedCostFixing`) is deliberately *not* harvested here. It is
  * incumbent-relative — a fixing is valid only for solutions strictly better than a known incumbent, so
@@ -46,9 +46,10 @@ import com.eignex.klause.util.Cancellation
  * incumbent is optimal, the fixing bound `objective <= incumbent - 1` makes the problem infeasible). It
  * stays in the search loop, where branch-and-bound keeps the incumbent separately.
  *
- * Gated to the LP relaxation actually being built (`bounding` on) and at least one of variable / objective
- * shaving being enabled; otherwise, or when nothing shaves, [problem] is returned unchanged. Each shave is
- * internally bounded by `SHAVE_MAX_ITERS`, and [cancellation] caps it further.
+ * Gated to the LP relaxation actually being built; the probes beyond root infeasibility additionally need
+ * variable or objective shaving enabled and a relaxation within `LP_HARVEST_MAX_RELAXATION_COST`. When
+ * nothing applies, [problem] is returned unchanged. Each shave is internally bounded by `SHAVE_MAX_ITERS`,
+ * and [cancellation] caps it further.
  */
 fun lpHarvest(
     problem: BakedProblem,
@@ -227,9 +228,8 @@ fun lpHarvestReporting(
 
     // Self-limit on the built relaxation's size. The shave / redundancy / equality probes each rebuild and
     // re-solve the relaxation (up to SHAVE_MAX_ITERS of each), so on a large relaxation that per-candidate
-    // cost dominates the time budget and loses instances the search would otherwise solve. Measure the root
-    // relaxation once (cols / rows / nnz) and, above the budget, skip the probe work — the harvest's gains
-    // are on small / medium models.
+    // cost dominates the time budget the search needs. Measure the root relaxation once (cols / rows / nnz)
+    // and, above the budget, skip the probe work.
     val size = engine.rootRelaxationSize()
     if (size != null && size.cost > LP_HARVEST_MAX_RELAXATION_COST) {
         val report = LpHarvestReport(

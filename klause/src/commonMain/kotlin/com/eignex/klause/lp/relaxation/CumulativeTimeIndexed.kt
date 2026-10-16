@@ -18,6 +18,9 @@ import com.eignex.klause.util.LongArrayList
  * skipped (only loosens). Column and row emission order is warm-start load-bearing — the layout
  * must be reproducible across nodes, so nothing here may reorder by live state.
  *
+ * Pritsker, Watters and Wolfe, "Multiproject scheduling with limited resources: a zero-one programming
+ * approach", Management Science 16 (1969), https://doi.org/10.1287/mnsc.16.1.93.
+ *
  * ## Open-sided starts
  * The layout gives each task one column per start in its root box and `Σ_t x_{i,t} = 1` then pins it
  * there. Over a start side the model left open that box is a search restriction, so the rows would
@@ -27,14 +30,11 @@ import com.eignex.klause.util.LongArrayList
  * ## No separate makespan row
  * There is deliberately no disaggregated makespan row here. The makespan links through the
  * start channel and the model's own `M ≥ startᵢ + durᵢ` `Linear`s, so the LP makespan is
- * `Σ_t t·x_{i,t} + durᵢ` — the *expected* completion under a fractional `x`. The disaggregated
- * disaggregated `M ≥ (t+durᵢ)·x_{i,t}` rows (and the completion-indicator step variant)
- * cannot tighten that: any makespan lower bound linear in one task's `x` is dominated by the
- * expected-completion value, which `M ≥ startᵢ + durᵢ` already attains exactly (verified — the
- * disaggregated rows raised the bound on 0 of 2623 structured instances). The only makespan
- * lever is the *cross-task* resource coupling above, which already lifts the bound past the
- * energetic windowed row on multi-capacity profiles. So the model is not redundant with the
- * energetic makespan row, but the disaggregated strengthening would be.
+ * `Σ_t t·x_{i,t} + durᵢ` — the *expected* completion under a fractional `x`. Disaggregated
+ * `M ≥ (t+durᵢ)·x_{i,t}` rows (and the completion-indicator step variant) cannot tighten that: any
+ * makespan lower bound linear in one task's `x` is dominated by the expected-completion value, which
+ * `M ≥ startᵢ + durᵢ` already attains exactly. The makespan lever is the *cross-task* resource
+ * coupling above, which lifts the bound past the energetic windowed row on multi-capacity profiles.
  */
 internal fun RelaxationBuilder.buildCumulativeTimeIndexed(view: SchedulingView) {
     if (!statesBothBounds(view.starts)) return

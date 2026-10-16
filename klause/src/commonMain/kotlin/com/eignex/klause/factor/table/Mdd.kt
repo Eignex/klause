@@ -22,17 +22,19 @@ import com.eignex.klause.util.LongArrayList
  * sequence of `(srcState, value, dstState[, weight])` rows; [layerStarts] indexes into it
  * (layer i spans `layerStarts(i) until layerStarts(i+1)`).
  *
- * When `weights` is non-null, each transition has a 4th field (weight) and [cost] must be
+ * When [recordStride] is 4, each transition has a 4th field (weight) and [cost] must be
  * provided — the sum of edge weights along the accepted path equals [cost].
  *
- * Propagation:
+ * Propagation (after Cheng and Yap, "An MDD-based generalized arc consistency algorithm for positive
+ * and negative table constraints and some global constraints", Constraints 15(2), 2010,
+ * https://doi.org/10.1007/s10601-009-9087-y) reads each symbol variable's bounds only:
  *  - Forward sweep: state `s` at layer `i` is forward-reachable iff some forward-reachable
- *    state at layer `i-1` has a transition on a feasible (in-domain) symbol leading to `s`.
+ *    state at layer `i-1` has a transition on a symbol within `seq(i-1)`'s bounds leading to `s`.
  *  - Backward sweep symmetric from accepting states.
  *  - Prune `seq(i)` values that have no transition between forward∩backward reachable states.
  *  - Fail if no forward-reachable state at layer `n` is accepting.
- *  - For cost variant: tighten [cost] bounds by min/max weighted-sum path through the
- *    forward-backward reachable lattice.
+ *  - For cost variant: tighten [cost] bounds by the min/max weighted path through the
+ *    forward-reachable lattice.
  */
 class Mdd(
     /** Sequence variable ids, one per layer. */

@@ -16,8 +16,9 @@ import com.eignex.klause.ir.materializeKey
  * occurs). The building block of `value_precede_chain` (one per consecutive value pair) and of the
  * interchangeable-value symmetry break.
  *
- * Native GAC propagator; the per-index reified-equality + clause prefix-OR decomposition it stands in
- * for is only sub-GAC. The constraint is "no [t] before the first feasible [s]", so GAC is an
+ * Native GAC propagator (Y. C. Law and J. H. M. Lee, "Global Constraints for Integer and Set Value
+ * Precedence", CP 2004, https://doi.org/10.1007/978-3-540-30201-8_28); the reified-equality prefix-OR
+ * decomposition is only sub-GAC. The constraint is "no [t] before the first feasible [s]", so GAC is an
  * O(n) scan:
  *  - **Prune [t] early.** Let `α` be the first index where [s] is still possible. No position `≤ α`
  *    can be [t] (nothing before it can be [s]); prune [t] there. If [s] is impossible everywhere,
@@ -29,14 +30,12 @@ import com.eignex.klause.ir.materializeKey
  *
  * Only [t] is ever removed and only the unique pre-forced-[t] candidate is fixed to [s] — [s] is
  * never forbidden and other values are never touched, which is exactly GAC for this constraint.
- * Value precedence is pure symmetry breaking, so there is no LP relaxation — propagation only.
  */
 class ValuePrecede(val s: Long, val t: Long, val xs: IntArray) : Factor {
 
     override fun remap(mapping: VarRemap): Factor = ValuePrecede(s, t, mapping.ints(xs))
 
-    // Positional: the sequence order decides "before", so xs is not sorted. Encodes the values and
-    // the full var sequence — collision-free up to variable identity (sound for symmetry checks).
+    // Positional: the sequence order decides "before", so xs is not sorted.
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.VALUE_PRECEDE, ::buildKey)
 
     override fun remapStructuralHash(mapping: VarRemap): Int =
@@ -48,8 +47,7 @@ class ValuePrecede(val s: Long, val t: Long, val xs: IntArray) : Factor {
         sink.intVars(xs)
     }
 
-    /** Relabel the two named values (value-symmetry verification): `value_precede(s,t)` maps to
-     *  `value_precede(π(s), π(t))` under a value permutation π. */
+    /** Maps `value_precede(s, t)` to `value_precede(π(s), π(t))` under a value permutation π. */
     override fun remapValues(valueMap: (Long) -> Long): Factor = ValuePrecede(valueMap(s), valueMap(t), xs)
 
     override val variables: VarList = SpanIntVars(xs)

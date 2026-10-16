@@ -47,9 +47,8 @@ data class LocalSearchParams(
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**
-     * Optional live-event listener; see [SearchEvent]. Called
-     * inline on the search thread at coarse points only (restarts, learned-DB sweeps,
-     * incumbents). `null` (default) disables observation entirely.
+     * Optional live-event listener; see [SearchEvent]. Called inline on the search thread at
+     * coarse points only, such as new incumbents. `null` disables observation.
      */
     val onEvent: ((SearchEvent) -> Unit)? = null,
     /** How [LocalSearchSolver.minimize] combines constraint violations with the objective
@@ -59,23 +58,19 @@ data class LocalSearchParams(
     val costShaping: CostShaping = CostShaping.FeasibilityFirst,
     /**
      * Optional per-move *gradient view* of the objective for [LocalSearchSolver.minimize] /
-     * `improvements`: when non-null, the descent scores and evaluates against this
-     * [com.eignex.klause.solver.objective.IncrementalObjective] instead of the [LinearObjective]
-     * passed to `minimize`. The canonical use is a functionally-defined objective whose linear form
-     * has zero gradient on decision moves; this view recomputes the defined var from the leaves,
-     * giving CBLS the gradient that matters (see
-     * [com.eignex.klause.solver.objective.FunctionalObjective]). It agrees with the linear objective only where
-     * the defined variables sit on their definitions, so it is used only by a solver whose per-move invariants
-     * keep them there; any other descends the linear objective. `null` (default) descends the linear objective
-     * directly. Ignored by `solve` / `samples` / `enumerate`.
+     * `improvements`: when non-null, the descent scores moves against this [IncrementalObjective]
+     * instead of the [LinearObjective] passed to `minimize`; every incumbent is still valued by the
+     * linear objective. The canonical use is a functionally-defined objective whose linear form
+     * has zero gradient on decision moves; this view recomputes the defined var from the leaves. It
+     * agrees with the linear objective only where the defined variables sit on their definitions, so it
+     * is used only by a solver whose per-move invariants keep them there; any other descends the linear
+     * objective. Ignored by `solve` / `samples` / `enumerate`.
      */
     val lsObjective: IncrementalObjective? = null,
     /**
-     * Optional warm-start *assignment* for [LocalSearchSolver.minimize] / `improvements`: when
-     * non-null, the descent begins from this assignment instead of a random restart, then optimises
-     * from there. Intended for a hybrid pipeline handing a CP/backtrack-found feasible point to LS.
-     * Size-mismatched samples are ignored. `null` (default) keeps pure local search free of any CP
-     * dependency. Ignored by `solve` / `samples` / `enumerate`.
+     * Optional warm-start *assignment*: when non-null, the search begins from this assignment instead
+     * of its first random restart; later restarts follow the restart policy. Intended for a hybrid
+     * pipeline handing a CP/backtrack-found feasible point to LS. Size-mismatched samples are ignored.
      */
     val initialAssignment: Sample? = null,
     /**

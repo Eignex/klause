@@ -166,7 +166,7 @@ internal class InverseInvariant(
         }
     }
 
-    /** Emit the compound setting `f[indices[k]] = targets[k] + gOffset`, or skip (return false) if any
+    /** Emit the compound setting `f(indices(k)) = targets(k) + gOffset`, or skip (return false) if any
      *  target is out of its variable's domain. Indices are distinct by construction. */
     private fun emitInvolution(state: LocalSearchState, sink: MoveSink, indices: IntArray, targets: IntArray): Boolean {
         val parts = ArrayList<Move>(indices.size)

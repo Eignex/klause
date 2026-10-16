@@ -17,12 +17,11 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.Cancellation
 
 /**
- * The cross-arm sharing channels handed to every backtrack arm of one portfolio: the learned-clause
- * pool ([clauses], present with multiple backtrack workers), the global-cut pool ([cuts], gated by
- * [PortfolioScenario.shareCuts], on by default), the objective lower-bound manager ([bounds]), the
- * globally-valid level-0 variable-bound manager ([varBounds]), and the verified-incumbent exchange
- * ([solutions]) — the last three present for an optimising portfolio. Each may be null when its sharing
- * does not apply; an LS-only portfolio gets no [SharedPools] at all.
+ * The cross-arm sharing channels handed to every arm of one portfolio: the learned-clause pool ([clauses],
+ * present with multiple backtrack workers), the global-cut pool ([cuts], gated by [PortfolioScenario.shareCuts],
+ * on by default), the objective lower-bound manager ([bounds]), the globally-valid level-0 variable-bound manager
+ * ([varBounds]), and the verified-incumbent exchange ([solutions]). Only optimising arms feed the last three. Each
+ * may be null when its sharing does not apply; an LS-only portfolio gets no [SharedPools] at all.
  */
 internal class SharedPools(
     val clauses: SharedClausePool?,

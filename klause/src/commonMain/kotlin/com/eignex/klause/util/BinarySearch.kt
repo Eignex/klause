@@ -25,8 +25,7 @@ internal fun IntArray.binarySearchInt(element: Int, fromIndex: Int = 0, toIndex:
     return if (lo < toIndex && this[lo] == element) lo else -(lo + 1)
 }
 
-/** [binarySearchInt] for a sorted [LongArray] — same return contract. Used by the wide-value
- *  `SurvivorsDomain` whose present values may exceed 32-bit range. */
+/** [binarySearchInt] for a sorted [LongArray], with the same return contract. */
 internal fun LongArray.binarySearchLong(element: Long, fromIndex: Int = 0, toIndex: Int = size): Int {
     var lo = fromIndex
     var len = toIndex - fromIndex

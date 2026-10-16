@@ -313,8 +313,8 @@ object BenchCli {
         println("${record.problem}: feasible=${record.feasible} objective=${record.objective} proven=${record.proven}")
     }
 
-    /** Harvest per-instance reference optima/bounds into the committed table (see [ReferenceStore]) —
-     *  the gap-to-optimum BO reward + a soundness oracle. Runs the reference solver (`backend=`, default
+    /** Harvest per-instance reference optima/bounds into the committed table (see [ReferenceStore]),
+     *  used for gap-to-optimum scoring and as a soundness oracle. Runs the reference solver (`backend=`, default
      *  `cp-sat`) over the selection — cache-replayed if already solved — then merges each instance's
      *  `{objective, proven}` into its solver's `klause-bench/reference/<solver>.csv` (virtual-best).
      *  For optima pass `kind=cop`; match the cached run's `timeout=` to replay it. */
@@ -412,7 +412,6 @@ object BenchCli {
         counter: AtomicInteger,
         total: Int,
     ): ReferenceEntry = runCatching {
-        // Every row records the format-specific solver that produced it.
         val run = ReferenceSolve.run(ref, backend, settings, budget)
         val solverId = run.solver
         val r = run.result
@@ -493,8 +492,7 @@ object BenchCli {
         )
     }
 
-    /** Map an `engine=` alias to a klause-cli `-e` value. The cli owns the model (fixed | cp | mixed |
-     *  ls | alns); the bench just forwards. */
+    /** Map an `engine=` alias to a klause-cli `-e` value (fixed | cp | mixed | ls | alns). */
     private fun parseEngine(name: String): String = when (name.lowercase()) {
         "cp", "backtrack", "bt" -> "cp"
         "ls", "localsearch", "local-search" -> "ls"

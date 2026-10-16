@@ -14,7 +14,7 @@ internal fun PropagationState.markAtomWatched(atomId: Int) {
     val idx = atoms.watchedByVar[v] ?: VarAtomIndex().also { atoms.watchedByVar[v] = it }
     // A membership test, so it goes through the merge-free lookup: reading the ordered array here would
     // fold the staging buffer on every watch installation, which is the whole cost this index avoids.
-    if (idx.find(kind, k) >= 0) return // already tracked
+    if (idx.find(kind, k) >= 0) return
     idx.insert(kind, k, atomId)
 }
 
@@ -112,11 +112,13 @@ internal fun PropagationState.allocAtom(intVar: Int, kind: AtomKind, threshold: 
 }
 
 /**
- * Queue the LCG channeling clauses linking the just-materialized atom [newAtomId] to its already-
- * materialized same-var neighbours: order monotonicity between adjacent GE (resp. LE) thresholds
- * (`[x≥kt]→[x≥k]`, `[x≥k]→[x≥kl]`), and the eq↔bound links (`[x=k]→[x≥k]`, `[x=k]→[x≤k]`). Only
- * immediate neighbours are linked; transitivity across the chain covers the rest. Each atom is
- * materialized once, so each pair is queued once (no dedup needed). The clauses are appended to
+ * Queue the lazy-clause-generation channeling clauses (O. Ohrimenko, P. J. Stuckey, M. Codish, "Propagation
+ * via lazy clause generation", Constraints 14(3), 2009, https://doi.org/10.1007/s10601-008-9064-x) linking the
+ * just-materialized atom [newAtomId] to its already-materialized same-var neighbours: order monotonicity
+ * between adjacent GE (resp. LE) thresholds (`[x≥kt]→[x≥k]`, `[x≥k]→[x≥kl]`), and the eq↔bound links
+ * (`[x=k]→[x≥k]`, `[x=k]→[x≤k]`). Only immediate neighbours are linked; transitivity across the chain
+ * covers the rest. Each atom is materialized once, so each pair is queued once (no dedup needed). The
+ * clauses are appended to
  * [PropagationState.pendingChanneling] and registered as permanent clauses by
  * [flushPendingChanneling] at the next safe propagation boundary — never here, since [allocAtom]
  * also runs inside conflict analysis where the clause store must not be mutated.
@@ -299,11 +301,7 @@ internal fun PropagationState.atomTruthOf(v: Int, kind: AtomKind, k: Long): Bool
 
         AtomKind.EQ -> when {
             d.min == d.max && d.min == k -> true
-
-            // singleton {k} → eq true
             k !in d -> false
-
-            // k absent → eq false
             else -> null
         }
     }
@@ -376,16 +374,11 @@ internal fun PropagationState.propagateAtomsForVar(
     oldMax: Long,
     carved: Long = NO_CARVE,
 ) {
-    // Iterate all materialized atoms so every crossed order literal becomes a chronological
-    // trail fact (see [wakeAtom]), with the move's reason recorded on its slot. A move carries
-    // two reason sets: [antNear] justifies the *requested* bound (a factor reason over other
-    // variables), [antFar] additionally carries the hole-crossing chain when the landed bound
-    // snapped past holes. Each crossed literal takes the weakest set that still implies its
-    // truth, split by its threshold against the requested [reqMin] / [reqMax]: a literal implied
-    // by the requested bound alone gets [antNear]; one that needs the further snap gets [antFar].
-    // Critically the requested-bound atom itself ([v ≥ reqMin] / [v ≤ reqMax]) takes [antNear],
-    // which does NOT list that atom — [antFar] does (via [antecedentsAcrossHoles]), so giving it
-    // [antFar] would be the same-var cycle 1UIP cannot collapse.
+    // Each crossed order literal takes the weakest reason set that still implies its truth: [antNear]
+    // justifies the requested bound, [antFar] adds the hole-crossing chain for a bound that snapped past
+    // holes. The requested-bound atom itself ([v ≥ reqMin] / [v ≤ reqMax]) must take [antNear], which does
+    // NOT list that atom; [antFar] does (via [antecedentsAcrossHoles]), so giving it [antFar] would be
+    // the same-var cycle 1UIP cannot collapse.
     val idx = atoms.byIntVar[v] ?: return
     val d = intDomains[v]
     val newMin = d.min
@@ -596,8 +589,7 @@ internal fun PropagationState.wakeAtom(atomId: Int, newT: Boolean) {
         // valid standalone clause the analyzer can resolve through.
         else -> channelingReasonAtWake(atomId, newT)
     }
-    // Wake watchers of the now-false literal: index = atomId*2 + (positive?0:1); the false
-    // literal's polarity is `!newT`, so its slot is `atomId*2 + (!newT ? 0 : 1)`.
+    // The false literal has polarity `!newT`; see [atomLitWatchIndex] for the slot layout.
     val w = atoms.watchersByLit[(atomId shl 1) or (if (!newT) 0 else 1)] ?: return
     for (j in 0 until w.size) atoms.dirtyFactors.addLast(w[j])
 }

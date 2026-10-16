@@ -105,7 +105,8 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
 
     /**
      * Cancel [pivot] between the running conflict [acc] and the constraint that forced it, using the
-     * RoundingSat division rule (Elffers-Nordström) rather than classic generalized resolution: divide
+     * division rule of Elffers and Nordström ("Divide and Conquer: Towards Faster Pseudo-Boolean Solving",
+     * IJCAI 2018, https://doi.org/10.24963/ijcai.2018/180) rather than classic generalized resolution: divide
      * the *reason* by its pivot coefficient rounding up (a Chvátal-Gomory cut, so still implied) to make
      * that coefficient ±1, then add `acc + |coefₐ(pivot)|·reason`. The conflict constraint itself is never
      * scaled up, so coefficients stay bounded and the learned cut stays strong — the property classic

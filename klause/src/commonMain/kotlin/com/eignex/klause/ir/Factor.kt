@@ -4,8 +4,7 @@ package com.eignex.klause.ir
  * Structural contract for a constraint in `Problem`: variable membership, remapping, and
  * structural identity. Payload arrays are borrowed read-only for the lifetime of every model using
  * the factor; custom implementations must keep membership and structural keys stable.
- * Engine-specific projections are allocated by their respective engines from
- * this immutable data. Engine-specific relaxation projections are allocated by their engines.
+ * Engine-specific projections, relaxations included, are allocated by their engines from this immutable data.
  *
  * Variables touched by a factor split into two id spaces: Boolean vars in [boolVars] and
  * integer vars in [intVars]. Pure-Boolean factors leave [intVars] empty; pure-integer factors

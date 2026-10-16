@@ -75,7 +75,8 @@ class BruteForceSolver(override val problem: BakedProblem) :
     }
 
     /**
-     * Lowest-objective assignment found within `params.maxSteps` iterations of the walker.
+     * Lowest-objective assignment found within the walker's step cap ([BruteForceParams.maxSteps] /
+     * [BruteForceParams.maxInstructions]).
      * If the cap is generous enough to exhaust the assignment space, the result is the
      * exact global minimum; otherwise it's the best-seen-so-far.
      */
@@ -129,10 +130,8 @@ class BruteForceSolver(override val problem: BakedProblem) :
     }
 
     /**
-     * Walk the assignment space, capped at `params.maxSteps` total assignments visited.
-     * Yields satisfying assignments in kpermute-shuffled order across nested chunk
-     * permutations. When `params.maxSteps` is [Long.MAX_VALUE] (the default) the walk is
-     * effectively unbounded.
+     * Walk the assignment space, capped at [BruteForceParams.effectiveStepCap] assignments visited.
+     * Yields satisfying assignments in kpermute-shuffled order across nested chunk permutations.
      */
     private fun walk(params: BruteForceParams): Sequence<Sample> =
         walkWithBudget(params, StepBudget(params.effectiveStepCap))

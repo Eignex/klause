@@ -1,9 +1,12 @@
 package com.eignex.klause.bench.source
 
 /**
- * OR-Library (J.E. Beasley, people.brunel.ac.uk/~mastjjb/jeb/orlib) problem classes as MIPs: each class's own text
- * format read and written out as MPS, one model per instance. A converter returns (instance name, MPS) pairs; a file
- * that holds several instances names them `<file>-<k>`. The formats are those of the library's `<class>info.html`.
+ * OR-Library problem classes as MIPs: each class's own text format read and written out as MPS, one model per
+ * instance. A converter returns (instance name, MPS) pairs; a file that holds several instances names them
+ * `<file>-<k>`. The formats are those of the library's `<class>info.html`.
+ *
+ * J. E. Beasley, "OR-Library: distributing test problems by electronic mail", J. Oper. Res. Soc. 41(11), 1990,
+ * https://doi.org/10.1057/jors.1990.166; library at https://people.brunel.ac.uk/~mastjjb/jeb/orlib/.
  */
 internal object OrLibrary {
     /** Set covering (`scp*`): `m n`, the cost of each column, then for each row the number of columns covering it and
@@ -128,7 +131,9 @@ internal object OrLibrary {
     /** Aircraft landing (`airland1`…`airland13`), one runway, the static case: `p` and the freeze time, then for each
      *  plane its appearance, earliest, target and latest landing times, its early and late penalties per unit, and
      *  the separation it needs before each plane. Each pair of planes lands in one order, the separation enforced by a
-     *  big-M on the order chosen. An instance of more than [MAX_PLANES] planes is left out. */
+     *  big-M on the order chosen. An instance of more than [MAX_PLANES] planes is left out. The model follows
+     *  Beasley, Krishnamoorthy, Sharaiha and Abramson, "Scheduling aircraft landings: the static case",
+     *  Transportation Science 34(2), 2000, https://doi.org/10.1287/trsc.34.2.180.12302. */
     fun aircraftLanding(file: String, text: String): List<Pair<String, String>> {
         val t = Tokens(text)
         val p = t.int()

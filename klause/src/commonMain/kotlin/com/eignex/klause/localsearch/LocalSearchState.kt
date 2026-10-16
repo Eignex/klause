@@ -156,7 +156,7 @@ class LocalSearchState private constructor(
     }
     internal var phaseTimer: LocalSearchPhaseTimer? = null
 
-    /** DDFW-style per-invariant dynamic weights and their class-normalised baseline. */
+    /** Per-invariant dynamic constraint weights and their class-normalised baseline. */
     val weights: FactorWeightBook = FactorWeightBook(problem)
 
     /** Optimize-phase objective view: the injected objective, shaping lambda, and objective-hot-spot
@@ -220,9 +220,11 @@ class LocalSearchState private constructor(
     var violationSoftCap: Int = DEFAULT_VIOLATION_SOFT_CAP
         internal set
 
-    /** Configuration-Checking flag per Boolean variable. `true` means a neighboring variable has
-     *  been touched since this var was last flipped (or since restart), so CCASat-style strategies
-     *  treat it as eligible to re-flip; `false` means re-flipping it would be a no-progress cycle. */
+    /** Configuration-checking flag per Boolean variable. `true` means a neighboring variable has
+     *  been touched since this var was last flipped (or since restart), so it is eligible to re-flip;
+     *  `false` means re-flipping it would be a no-progress cycle. S. Cai, K. Su, "Local search for
+     *  Boolean Satisfiability with configuration checking and subscore", Artificial Intelligence 204,
+     *  2013, https://doi.org/10.1016/j.artint.2013.09.001. */
     val boolConfChange: BooleanArray = buffers.boolConfChange
 
     /** Configuration-Checking flag per integer variable. See [boolConfChange]. */
@@ -391,9 +393,8 @@ class LocalSearchState private constructor(
         return d.clamp(target)
     }
 
-    /** Clear tabu / CCA bookkeeping without touching the assignment. Used by
-     *  optimization-side warm-up passes (e.g. greedy-repair) that mutate the assignment
-     *  via [apply] but should leave the LS engine a fresh tabu epoch afterwards. */
+    /** Clear tabu / configuration-checking bookkeeping without touching the assignment, for warm-up
+     *  passes that mutate the assignment via [apply] but should leave the search a fresh tabu epoch. */
     fun resetStepCounters() {
         tabu.reset()
         for (i in boolConfChange.indices) boolConfChange[i] = true
@@ -592,8 +593,8 @@ class LocalSearchState private constructor(
     /**
      * Lambda-multiplied objective delta for shaping any per-move score: `shapingLambda *
      * objectiveDelta(move)`. Returns `0.0` when shaping is off (no objective, lambda = 0) or the
-     * objective supports no incremental delta. Strategies composing objective-aware scores (DDFW's
-     * weighted break, ProbSat's exponent input) add this to their base metric.
+     * objective supports no incremental delta. Strategies add this to a base metric to make it
+     * objective-aware.
      */
     fun shapedObjectiveDelta(move: Move): Double {
         val obj = shaping.objective ?: return 0.0
@@ -1072,8 +1073,7 @@ class LocalSearchState private constructor(
     }
 
     /** Pick a uniformly-random violated factor, ask it for repair-move suggestions, and return the
-     *  raw list. `null` when no factor is violated or the chosen factor proposed no moves. The shared
-     *  opener of every WalkSAT-family `Strategy.pickMove`. */
+     *  raw list. `null` when no factor is violated or the chosen factor proposed no moves. */
     fun proposeMovesFromRandomViolated(): List<Move>? {
         if (violated.isEmpty()) return null
         moveSink.clear()
@@ -1083,8 +1083,7 @@ class LocalSearchState private constructor(
     }
 
     /** Greedy reservoir-sampled pick: the move with the smallest [shapedBreakScore]
-     *  (ties broken uniformly at random). Used by WalkSat / ProbSat after candidate
-     *  filtering. Returns `null` on an empty input. */
+     *  (ties broken uniformly at random). Returns `null` on an empty input. */
     fun greedyPickByShapedBreak(moves: List<Move>): Move? {
         if (moves.isEmpty()) return null
         var bestBreak = Double.POSITIVE_INFINITY

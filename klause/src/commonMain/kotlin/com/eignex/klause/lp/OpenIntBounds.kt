@@ -47,10 +47,9 @@ internal class TightenedIntBounds(val bounds: Array<OpenIntBounds>, val refuted:
  * The tightening is sound over genuine ±∞ because an open side enters the LP genuinely open — open
  * above as a probe-flagged free upper ([LpBuilder.addFreeVar]), open below as the zero-shift split
  * `x = x⁺ − x⁻` — so a derived bound holds over the true unbounded region, not a pre-clamped box.
- * This is why it must run before a `Problem`'s finite
- * `IntDomain`s are committed — once a side is clamped the "genuinely infinite"
- * information is gone. Only [LinearOp.LE]/[LinearOp.GE]/[LinearOp.EQ] constraints enter; any other
- * relation is skipped (dropping a constraint only loosens the relaxation, never unsound).
+ * This is why it must run before a `Problem`'s finite `IntDomain`s are committed — once a side is clamped
+ * the "genuinely infinite" information is gone. Only [LinearOp.LE]/[LinearOp.GE]/[LinearOp.EQ]
+ * constraints enter; any other relation is skipped (dropping a constraint only loosens the relaxation).
  *
  * A cheap [feasibility-based prefilter][fbbtTightenOpenIntBounds] runs first: interval bound propagation
  * closes every side a single row already implies (`O(nnz)` per pass, no LP), so those cost no LP solve
@@ -60,10 +59,11 @@ internal class TightenedIntBounds(val bounds: Array<OpenIntBounds>, val refuted:
  * a single ±1 cost swapped onto its column ([LpModel.withSingleColumnObjective]) — the matrix, rows and
  * bounds never change, so the previous optimal basis stays primal-feasible and each retained numerical
  * owner reuses its factorization across objectives. Each side's LP bound is derived over the prefiltered
- * (but not further-OBBT-tightened)
- * bounds, so — unlike a sequential pass that feeds each closed side into later solves — an LP bound is
- * never sharpened by an earlier LP bound; every bound is still individually sound (the relaxation contains
- * every solution), only potentially looser, which never removes a feasible point.
+ * bounds only, never sharpened by an earlier LP bound; every bound is individually sound (the relaxation
+ * contains every solution), only potentially looser.
+ *
+ * Gleixner, Berthold, Müller and Weltge, "Three enhancements for optimization-based bound tightening",
+ * J. Global Optimization 67 (2017), https://doi.org/10.1007/s10898-016-0450-4.
  *
  * @param bounds current per-variable bounds, indexed by variable id.
  * @param constraints the linear constraints over those variable ids (an objective is not a constraint;
@@ -96,8 +96,6 @@ internal fun tightenOpenIntBounds(
     for (f in realConstraints) for (rv in f.realVars) if (rv + 1 > maxReal) maxReal = rv + 1
     val rLo = DoubleArray(maxReal) { realLower.getOrNull(it) ?: Double.NEGATIVE_INFINITY }
     val rUp = DoubleArray(maxReal) { realUpper.getOrNull(it) ?: Double.POSITIVE_INFINITY }
-    // Cheap feasibility-based prefilter first: interval propagation closes every side a single row already
-    // implies, so those cost no LP solve; the LP-solving pass below only handles what survives.
     val prefiltered = fbbtTightenOpenIntBounds(bounds, constraints, cancellation, realConstraints, rLo, rUp)
     if (prefiltered.refuted) return prefiltered // the system has no solution; there is nothing to bound
     val work = prefiltered.bounds
@@ -444,9 +442,8 @@ internal fun propagateRow(coeffs: LongArray, vars: IntArray, bound: Long, sign: 
             val restMin = when {
                 numInf == 0 -> subExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
 
-                infIdx == idx -> minActivity
+                infIdx == idx -> minActivity // this term was the sole −∞; the rest is finite
 
-                // this term was the sole −∞; the rest is finite
                 else -> continue // the sole −∞ is a different term ⇒ no bound for this one
             }
             val num = subExact(effBound, restMin)

@@ -43,8 +43,7 @@ internal class LpEffortGovernor(
         ops += opsSpent
         solves++
         if (pruned) {
-            // A prune invalidates a ratio demotion, but starts a new evidence window so a later
-            // expensive relaxation can be demoted again.
+            // A prune lifts a ratio demotion (not an allowance one) and restarts the evidence window.
             demoted = allowanceSpent
             ops = 0L
             nodes = 0L

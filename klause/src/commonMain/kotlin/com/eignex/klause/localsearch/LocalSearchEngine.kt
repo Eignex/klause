@@ -325,12 +325,8 @@ internal class LocalSearchEngine(
         val sink = SolveStatsSink(backend = "ls")
         sink.start()
         if (!localSearchSupports(model, completion != null)) {
-            // LP-only continuous variables are resolved by the LP relaxation, which local search does not
-            // run; their linear rows carry no invariant, so LS would ignore them and could report a
-            // solution that violates them. Domain values past the 32-bit range make the incremental
-            // violation/objective sums wrap, so a reported "solution" may violate factors too. A wide
-            // (over-64-bit-coefficient) factor carries only a saturated Long payload, so its invariant is
-            // inert and LS would ignore it — the same unsoundness. Decline rather than return an unsound verdict.
+            // Decline a model local search cannot score soundly (see [localSearchSupports]) rather than
+            // report a "solution" that may violate it.
             sink.stop()
             return SolveResult.Unknown(TerminationReason.Unsupported, sink.snapshot())
         }
@@ -356,9 +352,7 @@ internal class LocalSearchEngine(
 
     /** Stream independent solutions, syncing learned weights through [warm] when it is non-null. */
     fun samples(params: LocalSearchParams, warm: WarmState?): Sequence<Sample> {
-        // LP-only continuous variables, wide int domains, and wide-coefficient factors are not soundly
-        // evaluated by local search (see [solve]); stream nothing rather than assignments that
-        // may violate factors.
+        // Same soundness boundary as [solve]: stream nothing rather than assignments that may violate factors.
         if (!localSearchSupports(model, completion != null)) return emptySequence()
         val eff = model.pinsUnder(params.assumptions) ?: return emptySequence()
         return guarded(streamImpl(params, eff, warm).filterNotNull())
@@ -467,9 +461,7 @@ internal class LocalSearchEngine(
     ): Sequence<MinimizeResult?> = sequence {
         sink.start()
         if (!localSearchSupports(model, completion != null)) {
-            // Same soundness boundary as [solve]: LP-only continuous variables, wide int
-            // domains, and wide-coefficient factors are not evaluated by local search, so it could
-            // optimize an incumbent that ignores — and may violate — them. Decline.
+            // Same soundness boundary as [solve]: an incumbent could violate factors local search cannot score.
             sink.stop()
             onFinished()
             yield(MinimizeResult.Unknown(TerminationReason.Unsupported, sink.snapshot()))
@@ -695,11 +687,9 @@ internal class LocalSearchEngine(
      * Streaming body of the LS minimize loop. Yields a [MinimizeResult.BestFound] on
      * every strict improvement; yields exactly one terminal verdict
      * ([MinimizeResult.BestFound] with reason, or [MinimizeResult.Unknown]) on exit.
-     * Two-phase per restart attempt: WalkSat-style fight to feasibility, then a greedy
-     * descent on the objective restricted to feasibility-preserving moves. When the
-     * descent reaches a local minimum (no neighbour both keeps `cost == 0` and lowers
-     * the objective), restart and try again. Best-feasible-objective state lives across
-     * restarts so we monotonically improve.
+     * Two-phase per restart attempt: the strategy fights to feasibility, then descends on the
+     * objective per its [FeasibleDescent] mode. At a local optimum it restarts; the best feasible
+     * objective persists across restarts, so reported incumbents improve monotonically.
      */
     // [guide] scores moves; [objective] values every incumbent this stream reports.
     @Suppress("LongParameterList")
@@ -759,7 +749,7 @@ internal class LocalSearchEngine(
         // drives, and the optimize phase follows the strategy's own [FeasibleDescent] mode.
         val descentStrategy = optimizeStrategy
         val unified = descentStrategy != null
-        // Capture the ratchet handle once: set at construction, read in the feasible-incumbent hook.
+        // Read the ratchet handle once per stream; the feasible-incumbent hook uses this capture.
         val ratchetBound = objectiveBound
         // The explicit feasible-phase descent mode — the optimize strategy's when present, else the
         // satisfy strategy's. The cost==0 branch dispatches on it exhaustively (no fall-through), so an
@@ -828,7 +818,7 @@ internal class LocalSearchEngine(
                 // Auto-tune the next poll window to ~[CANCEL_CHECK_TARGET_MS] of wall-clock: cheap flips
                 // keep the full interval (negligible overhead), while expensive move sources
                 // (flip-propagate / clique-swap / ejection chains) shrink it, so a slow flip window can't
-                // overrun the `-t` deadline by more than that margin.
+                // overrun the deadline by more than that margin.
                 val nowMs = sink.elapsedMs()
                 val gapMs = maxOf(nowMs - lastCheckMs, 1L)
                 cancelCountdown = (CANCEL_CHECK_INTERVAL.toLong() * CANCEL_CHECK_TARGET_MS / gapMs)
@@ -940,8 +930,6 @@ internal class LocalSearchEngine(
                     }
                 }
                 if (totalFlips >= maxFlips) break
-                // Explicit feasible-phase dispatch — exhaustive, no else: every strategy declares its
-                // [FeasibleDescent], so nothing falls into a default descent by accident.
                 when (feasibleMode) {
                     // Violation-native: the objective is an `objective ≤ incumbent` factor the portfolio
                     // overlaid on a COP. Reaching cost==0 means it already holds — tighten the bound below
@@ -1251,14 +1239,7 @@ internal class LocalSearchEngine(
         return true
     }
 
-    /**
-     * Greedy-repair pass over [state] right after a restart. Walks vars in randomized order;
-     * for each, picks the value that minimizes the current `state.cost` (ties keep the current
-     * value). Single forward pass, idempotent on already-feasible states.
-     *
-     * The point isn't to reach feasibility (LS strategies handle that) but to start from a
-     * low-violation pose so the feasibility-fight phase has fewer hard constraints to chase.
-     */
+    /** Run one [GreedyInit] repair pass over [state] right after a restart, pausing at checkpoints. */
     private suspend fun <T> SequenceScope<T?>.greedyRepairPass(
         state: LocalSearchState,
         params: LocalSearchParams,
@@ -1281,8 +1262,6 @@ internal class LocalSearchEngine(
     private fun revertMove(state: LocalSearchState, move: Move, baselineSnap: Sample) {
         when (move) {
             is Move.BoolFlip -> state.apply(move)
-
-            // self-inverse
 
             is Move.IntSet -> {
                 val old = baselineSnap.intValue(move.varId)
@@ -1352,11 +1331,11 @@ internal class LocalSearchEngine(
     private companion object {
         const val INITIAL_FACTOR_BATCH: Int = 256
 
-        /** Polling interval for cooperative cancellation; see Cancellation.kt. */
+        /** Steps between cooperative cancellation polls. */
         const val CANCEL_CHECK_INTERVAL: Int = 1024
 
         /** Wall-clock target between cancellation polls (ms): the optimize loop auto-tunes its flip
-         *  window down toward this when moves are expensive, so a solve honours its `-t` deadline within
+         *  window down toward this when moves are expensive, so a solve honours its deadline within
          *  roughly this margin regardless of per-flip cost. */
         const val CANCEL_CHECK_TARGET_MS: Long = 50
 

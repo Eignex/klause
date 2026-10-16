@@ -54,10 +54,9 @@ internal enum class Sense { MINIMIZE, MAXIMIZE }
 internal const val LP_UNBOUNDED_PROBE: Long = Long.MAX_VALUE / 4
 
 /**
- * A bounded-variable LP in the normalized form the revised simplex consumes. All input coefficients,
- * bounds and right-hand sides are integers — this is the "integer based" core: it exploits that every
- * klause datum is integral (the float [RevisedSimplex] solves, the integer-multiplier [integerCertify]
- * certifies) rather than carrying a general-purpose floating LP.
+ * A bounded-variable LP in the normalized form the revised simplex consumes. The [Long] core holds integer
+ * coefficients, bounds and right-hand sides: the float [RevisedSimplex] solves it and the integer-multiplier
+ * [integerCertify] certifies it. Real data rides in [doubleView], and exact rational data in [exactState].
  *
  * Build instances with [LpBuilder], which performs three normalizations so the engine sees a
  * uniform shape:
@@ -84,9 +83,8 @@ internal class LpModel(
     override val n: Int,
     /** Number of constraint rows, equivalently the number of slack variables. */
     override val m: Int,
-    /** Sparse CSC of the structural columns — the sole coefficient store (the sparse revised simplex
-     *  is the only LP engine). Read column-wise through [forEachInColumn]; slack columns are the
-     *  implicit unit vectors and are never stored. */
+    /** Sparse CSC of the structural columns, read column-wise through [forEachInColumn]; slack columns
+     *  are the implicit unit vectors and are never stored. */
     val csc: Csc,
     /** Right-hand side per row, after the lower-bound shift. */
     override val rhs: LongArray,
@@ -146,10 +144,9 @@ internal class LpModel(
     val colContinuous: BooleanArray = BooleanArray(n),
     /**
      * The double-precision form the LP engine solves when real coefficients are present, else null (the
-     * pure-integer core, where the engine reads the [Long] fields directly). It is the single uniform
-     * matrix any engine — sparse simplex, dense, or a first-order GPU solver — consumes; the integer/real
-     * split matters only to certification, which declines while it is present. Its coefficients, bounds,
-     * costs and shift are all `Double`; the CSC mirrors [csc] (structural columns only, slacks implicit).
+     * pure-integer core, where the engine reads the [Long] fields directly). The integer/real split matters
+     * only to certification, which declines while it is present. The CSC mirrors [csc] (structural columns
+     * only, slacks implicit).
      */
     override val doubleView: LpDoubleView? = null,
     val exactState: LpExactState? = null,
@@ -157,8 +154,8 @@ internal class LpModel(
     /** Total variable count: structural plus slack. */
     override val numVars: Int get() = n + m
 
-    /** Whether the model carries real coefficients, so it is solved through [doubleView] and the exact
-     *  128-bit integer certification declines (a real coefficient is not integrally certifiable here). */
+    /** Whether the model carries real or exact rational data ([doubleView] or [exactState]), so the 128-bit
+     *  integer certification declines. */
     val hasContinuous: Boolean get() = exactState != null || doubleView != null
 
     /** Bit length of the widest exact structural coefficient: what one exact pass over the matrix multiplies by. */
@@ -484,13 +481,10 @@ internal class LpExactShifts(
  * Builds an [LpModel] from structural variables and constraint rows. Coefficients are accumulated
  * sparsely during construction and emitted as the CSC core at [build]. The builder owns the
  * normalizations documented on [LpModel]; callers add variables and rows in natural `<=`/`>=`/`=`
- * form with integer data.
- *
- * Structural variables must have a finite lower bound (every klause integer variable does);
- * an infinite lower bound is rejected because the lower-shift normalization requires it.
+ * form. The lower-shift normalization needs a finite lower bound, so an open side is realized by the
+ * [LP_UNBOUNDED_PROBE] stand-in ([addFreeVar], [addRealVar]).
  */
 internal class LpBuilder {
-    // Primitive-specialized accumulators: one Long/Int per variable, no per-element boxing.
     private val lo = LongArrayList()
     private val hi = LongArrayList()
     private val cost = LongArrayList()
@@ -694,10 +688,9 @@ internal class LpBuilder {
     }
 
     /**
-     * Materialize the normalized [LpModel] for the given [sense]. Only the CSC core of the structural
-     * columns is built — the sparse revised simplex is the only LP engine, so the dense `m × n` matrix
-     * is never allocated. Maximization is converted to minimization by negating the objective; the
-     * reported objective re-applies the sign.
+     * Materialize the normalized [LpModel] for the given [sense]. Only the sparse CSC core of the structural
+     * columns is built; the dense `m × n` matrix is never allocated. Maximization is converted to minimization
+     * by negating the objective; the reported objective re-applies the sign.
      */
     fun build(sense: Sense): LpModel {
         val n = lo.size
@@ -709,7 +702,6 @@ internal class LpBuilder {
         val loShift = LongArray(n) { lo[it] }
 
         for ((i, row) in rows.withIndex()) {
-            // Normalize >= to <= by negating both sides; == stays put (its slack is fixed at zero).
             val flip = row.rel == Relation.GE
             var b = if (flip) -row.rhs else row.rhs
             flippedRhs[i] = b
@@ -948,8 +940,8 @@ private fun Long.roundsInBinary64(): Boolean {
     return d >= TWO_POW_63 || d.toLong() != this
 }
 
-// This foundation deliberately does not implement ExactSimplexModel: legacy solvers require a
-// checked projection before they can see any of its values.
+// The exact model types deliberately do not implement ExactSimplexModel: the Long-valued simplex sees their
+// values only through a checked projection.
 internal class ExactLpNumber private constructor(
     val value: BigFraction,
     val ieeeBits: Long?,
@@ -1287,9 +1279,11 @@ private fun ExactLpBounds.recentered(delta: BigFraction): ExactLpBounds {
 
 /**
  * Binary64 sums and products that record whether any of them rounded, through the error-free transformations:
- * Knuth's TwoSum, and Dekker's TwoProduct over a Veltkamp split. Common code has no fused multiply-add to do it
- * in one step. A split that would overflow counts as rounded, which only ever sends a value to the exact rational
- * recomputation.
+ * Knuth's TwoSum (D. E. Knuth, The Art of Computer Programming, Vol. 2, §4.2.2,
+ * https://www-cs-faculty.stanford.edu/~knuth/taocp.html) and Dekker's TwoProduct over a Veltkamp split (T. J. Dekker,
+ * A floating-point technique for extending the available precision, Numer. Math. 18, 1971,
+ * https://doi.org/10.1007/BF01397083). Common code has no fused multiply-add to do it in one step. A split that
+ * would overflow counts as rounded, which only ever sends a value to the exact rational recomputation.
  */
 internal class ExactDoubleArithmetic {
     var rounded = false

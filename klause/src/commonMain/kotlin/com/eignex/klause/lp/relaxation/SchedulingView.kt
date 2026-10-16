@@ -15,15 +15,14 @@ import com.eignex.klause.lp.statesUpperBound
  * (declared) capacity. Using the min demand and max capacity keeps every derived constraint a sound
  * relaxation — it can only loosen, never cut off a feasible schedule.
  *
- * Only the cases all three scheduling relaxations ([CumulativeRelaxation], the time-indexed builder in
- * [CpToLpRelaxation], and [CumulativeFlowBound]) can soundly handle are surfaced: constant durations
- * (a variable duration is not a two-variable makespan link and changes the resource window) and
- * non-optional tasks (a presence literal makes every derived obligation conditional). Both are simply
- * dropped, which only weakens the bound.
+ * Only the cases all three scheduling relaxations ([CumulativeRelaxation], [buildCumulativeTimeIndexed]
+ * and [CumulativeFlowBound]) can soundly handle are surfaced: constant durations (a variable duration is
+ * not a two-variable makespan link and changes the resource window) and non-optional tasks (a presence
+ * literal makes every derived obligation conditional). Other factors are dropped, which only weakens the bound.
  */
 internal class SchedulingView(
     val starts: IntArray,
-    /** Constant per-task durations (`durations[i] == 0` tasks consume no resource). */
+    /** Constant per-task durations; a zero-duration task consumes no resource. */
     val durations: LongArray,
     /** Per-task minimum resource demand. */
     val resources: LongArray,

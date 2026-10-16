@@ -144,12 +144,8 @@ internal object AffineSingletons {
         // Membership is tested per candidate variable, so the caller's boxed set is unpacked once here
         // rather than boxing an Int on every check.
         val objVars = IntHashSet().apply { for (v in objectiveIntVars) add(v) }
-        // On instances with millions of factors the pass scans the whole set for candidates and can run
-        // for several seconds while barely simplifying (e.g. Coprime/ItemsetMining: ~10M factors, net
-        // factor change in the tens). Skipping it there keeps presolve bounded; it is sound (the
-        // affine-defined variables simply stay and are solved directly) and, per a solve A/B over the
-        // hakank suite, disabling affine did not change whether any instance solved. The threshold sits
-        // far above what any non-giant model reaches, so ordinary instances are unaffected (byte-identical).
+        // On multi-million-factor models the candidate scan alone can run for seconds while barely
+        // simplifying. Skipping is sound: the affine-defined variables stay and are solved directly.
         if (problem.factors.size > maxFactors) return null
         val eliminated = BooleanArray(problem.numIntVars)
         // Once `x` is gone only its range survives, as the bound rows on its terms, so a pivot with interior
@@ -287,11 +283,10 @@ internal object AffineSingletons {
     // Cap on how many folds a single linear row may absorb, applied in every model. Folding a pivot into a
     // row rebuilds and re-coalesces the whole row; a row that keeps absorbing folds from successive pivots
     // grows monotonically, so the k-th fold into it costs O(k) — O(folds²) churn that also hands the solver a
-    // denser problem rather than a simpler one. Once a row has absorbed this many folds, leave any
-    // further pivot that would rewrite it unfolded
-    // (sound — the variable stays and is solved directly), which bounds each row's growth. Set well above the
-    // handful of folds a productively-eliminated variable draws so ordinary models are untouched; only a row
-    // that is a fold sink — the pathological accumulator — is capped.
+    // denser problem rather than a simpler one. Once a row has absorbed this many folds, leave any further
+    // pivot that would rewrite it unfolded (sound — the variable stays and is solved directly), which bounds
+    // each row's growth. Set well above the handful of folds a productively-eliminated variable draws, so
+    // only a row that is a fold sink is capped.
     private const val FOLD_ABSORB_CAP = 16
 
     /** Cumulative substitution-fill-in budget across the whole pass (Σ pivot-degree · substituted-terms).
@@ -301,8 +296,7 @@ internal object AffineSingletons {
 
     /** Skip the whole affine pass on instances with more than this many factors: the O(factors) candidate
      *  scan dominates presolve on multi-million-factor giants (where it also barely simplifies), and the
-     *  pass is optional (skipping is sound). Far above any non-giant model, so ordinary instances run it
-     *  unchanged. */
+     *  pass is optional (skipping is sound). */
     private const val AFFINE_MAX_FACTORS = 1_000_000
 
     /** A residue-class doubleton `a·x + b·y = c` (no unit pivot) at [defIdx]: `x` is contained and
@@ -444,14 +438,13 @@ internal object AffineSingletons {
         // The scan walks the live factors in stable-id order — the same order a fresh compacted list would
         // present — so it picks candidates in the identical sequence a full rebuild would. Give up after
         // [AFFINE_SCAN_ABORT] consecutive non-candidates: on a huge factor set with no exploitable affine
-        // structure here (e.g. DiamondFree's ~490k decomposed constraints, none a foldable equality — the
-        // pass folds nothing), scanning to the end is pure fruitless cost. Sound: an unfound pivot stays.
+        // structure, scanning to the end is pure fruitless cost. Sound: an unfound pivot stays.
         val limit = minOf(ws.size.toLong(), start.toLong() + AFFINE_SCAN_ABORT).toInt()
         var polled = 0
         var di = ws.nextEqId(start)
         while (di < limit) {
             // Poll the presolve deadline inside the scan, not only between folds: a single scan over a large
-            // wide-row factor set (Coprime) can run for seconds, so without this the budget cannot bound it.
+            // wide-row factor set can run for seconds, so without this the budget cannot bound it.
             // Count iterations (a dense counter) rather than keying on [di], which a candidate index makes
             // sparse. Giving up returns the folds made so far — sound (an unfound pivot simply stays).
             if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
@@ -834,8 +827,7 @@ internal object AffineSingletons {
      * `[0, base.size)` are the pristine inputs; each appended factor takes the next id. A dropped id is
      * tombstoned (its slot becomes `null`) and never reused, so a live factor keeps its id — and hence
      * its position in stable-id order — for the whole run. The candidate scan walks the slots in id
-     * order, which is exactly the order a fresh compacted list would present, so it selects the same
-     * candidates in the same sequence the full-rebuild path did.
+     * order, which is exactly the order a fresh compacted list would present.
      *
      * Alongside the slots it holds a per-variable occurrence index over the stable ids of the
      * live factors whose `Factor.intVars` contains a variable, one entry per occurrence (mirroring a CSR
@@ -1083,10 +1075,9 @@ internal object AffineSingletons {
         }
 
         /**
-         * Apply the alias rename `x → y` to every live factor via `Factor.remap` (any factor type),
-         * dropping the defining equality and appending the domain-bound rows. Rewriting the whole set is
-         * intrinsic to a rename — `Factor.remap` returns a fresh object for every factor — so this stays
-         * O(live factors); only `x`'s occurrences migrate to `y`, so the index is patched, not rebuilt.
+         * Apply the alias rename `x → y` via `Factor.remap` (any factor type) to the live factors that
+         * mention `x`, dropping the defining equality and appending the domain-bound rows. Only `x`'s
+         * occurrences migrate to `y`, so the occurrence index is patched, not rebuilt.
          */
         fun alias(problem: Problem, ranges: ColumnRanges, c: AffineCandidate): Int {
             val boolMap = IntArray(problem.numBoolVars) { it }
@@ -1103,8 +1094,7 @@ internal object AffineSingletons {
             for (id in touched) if (id < minTouched) minTouched = id
             // Remap only the factors that mention `x`: the rename map is identity except `x → y`, so a
             // factor without `x` remaps to an equal object — leaving it untouched is content-identical and
-            // keeps the pass O(occurrences of `x`) instead of O(live factors) per alias (the KMedian /
-            // DiamondFree alias-remap hotspot).
+            // keeps the pass O(occurrences of `x`) instead of O(live factors) per alias.
             for (id in touched) {
                 if (id == c.defIdx) continue
                 val f = slots[id] ?: continue
@@ -1128,10 +1118,9 @@ internal object AffineSingletons {
             drop(c.defIdx)
             atCapCount[c.x] = 0
             for (bound in domainBoundsOnTerms(ranges, c)) append(bound)
-            // Only the rewritten factors (`x`'s occurrences, now renamed to `y`) change content, so — as in
+            // Only the rewritten factors (`x`'s occurrences, renamed to `y`) change content, so — as in
             // [fold] — no factor below their minimum can newly become a candidate; the scan resumes from
-            // here instead of restarting at 0. (The occurrence-scoped remap above is what makes this valid:
-            // when the rename touched every live factor, any factor's candidacy could change.)
+            // here instead of restarting at 0. This relies on the remap above being occurrence-scoped.
             return minTouched
         }
     }
@@ -1140,7 +1129,7 @@ internal object AffineSingletons {
     // every other factor via Factor.remap (any factor type); otherwise fold `x = constTerm +
     // Σ termCoeffs·termVars` into every other Linear mentioning `x`. In both cases bounds on the term
     // vars keep `x` within its domain. Returns the lowest stable id whose candidacy the fold can newly
-    // establish — the point the candidate scan may safely resume from (0 for the whole-set alias rename).
+    // establish — the point the candidate scan may safely resume from.
     private fun foldOutVariable(problem: Problem, ranges: ColumnRanges, ws: WorkingSet, c: AffineCandidate): Int =
         if (c.isAlias) ws.alias(problem, ranges, c) else ws.fold(ranges, c)
 
@@ -1221,9 +1210,9 @@ internal object AffineSingletons {
 }
 
 /** A single affine elimination `x = (constTerm + Σ termCoeffs·termVars) / divisor` recorded by
- *  [Presolve]. [divisor] is `1` for the unit-pivot cases and the
- *  pivot coefficient for a residue-class doubleton, where the division is always exact on the
- *  values the partner's restricted domain admits. */
+ *  [AffineSingletons] during [Presolve]. [divisor] is `1` for the unit-pivot cases and the pivot coefficient for a
+ *  residue-class doubleton, where the division is always exact on the values the partner's restricted
+ *  domain admits. */
 internal class AffineSub(
     val x: Int,
     val constTerm: Long,
@@ -1246,7 +1235,7 @@ internal fun List<AffineSub>.asRebuilds(): SourceRebuilds = SourceRebuilds(
 /** Whether folding `x = constTerm + Σ termCoeffs·termVars` into the Linear row [f] would overflow
  *  64-bit arithmetic in the shifted bound or any folded coefficient. Each product/sum runs through the
  *  checked helpers, so an overflow surfaces as [CheckedLongOverflowException]; a `true` result lets the caller
- *  leave `x` un-eliminated (sound) rather than wrap a coefficient (e.g. DeBruijn-sequence instances). */
+ *  leave `x` un-eliminated (sound) rather than wrap a coefficient. */
 private fun foldRowOverflowsLong(
     f: Linear,
     x: Int,
@@ -1255,11 +1244,10 @@ private fun foldRowOverflowsLong(
     constTerm: Long,
     termsSmall: Boolean,
 ): Boolean {
-    // Fast path, no `indexOf`: when the pivot's own terms are all below 2^31 ([termsSmall], pivot-global so
-    // the caller hoists it) and this row's magnitudes are too, no product `cX·c` reaches 2^62 and no sum
-    // reaches 2^63 — the pivot coefficient `cX ≤ maxAbsCoeff`, so `fitsHalfLong(maxAbsCoeff)` already
-    // bounds it and `cX` is never needed. So x's position is not looked up, which is the whole
-    // small-coefficient bulk (Coprime/FAPP). The exact path below runs only when some magnitude is huge.
+    // Fast path, no `indexOf`: when the pivot's own terms are all below 2^31 ([termsSmall], hoisted by the
+    // caller) and this row's magnitudes are too, no product `cX·c` reaches 2^62 and no sum reaches 2^63 —
+    // `|cX| ≤ maxAbsCoeff`, so `cX` itself is never needed. The exact path runs only when some magnitude
+    // is huge.
     val row = f.integerConstants ?: return true
     if (termsSmall && fitsHalfLong(row.bound) && fitsHalfLong(row.maxAbsCoeff)) return false
     val xi = f.vars.indexOf(x)

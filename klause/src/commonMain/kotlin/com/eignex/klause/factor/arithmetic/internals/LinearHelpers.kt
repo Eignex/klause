@@ -39,8 +39,9 @@ internal class LinearCoeffIndex(private val coeffs: LongArray, vars: IntArray) {
 }
 
 /**
- * Hole-aware antecedent collection for propagators that prune interior values (AllDifferent,
- * GlobalCardinality, Regular, AllDifferentExceptZero, Inverse, Member, AllEqual). Cites:
+ * Hole-aware antecedent collection for propagators that prune interior values (matching-based
+ * AllDifferent, GlobalCardinality, Regular, Table, Inverse, Element and others). When any variable sits
+ * above the root, only those variables are cited. Cites:
  *   - bound atoms when current min/max are tighter than initial,
  *   - positive `[v == value]` atom-lits (the negation of the `v ≠ value` premise) for every
  *     value in the original domain that's currently excluded from the live domain.
@@ -526,12 +527,12 @@ private fun addOverflows(a: Long, b: Long): Boolean = ((a xor (a + b)) and (b xo
 private fun subOverflows(a: Long, b: Long): Boolean = ((a xor b) and (a xor (a - b))) < 0L
 
 /**
- * Shared bounds-propagation routine for `Σ coeffs[i] * vars[i] ⟨op⟩ bound`. Used by `Linear`
+ * Shared bounds-propagation routine for `Σ coeffs(i)·vars(i) ⟨op⟩ bound`. Used by `Linear`
  * directly and by `ReifiedLinear` when its aux Boolean is pinned. Returns `false` iff the
  * domains became jointly infeasible.
  *
  * Overflow-safe on wide (up to full-`Long`) domains: a coefficient-times-bound product that wraps
- * skips the factor's propagation for the round, and a directional sum that wraps disables only that
+ * reduces the round to the exact 128-bit feasibility check, and a directional sum that wraps disables only that
  * side's infeasibility test and tightenings. Wrapped arithmetic must never *strengthen* a bound or
  * declare a conflict — either would be unsound — so every overflow degrades to weaker propagation.
  * Bound-split search stays complete regardless: the skipped pruning re-runs on narrower domains.
@@ -724,7 +725,7 @@ private fun tightenLinearTerms(
 
 
 /**
- * Range `[sumLo, sumHi]` reachable by `Σ coeffs[i] * vars[i]` given current domains.
+ * Range `[sumLo, sumHi]` reachable by `Σ coeffs(i)·vars(i)` given current domains.
  */
 internal fun linearSumRange(state: PropagationState, coeffs: LongArray, vars: IntArray): LongArray {
     var lo = 0L

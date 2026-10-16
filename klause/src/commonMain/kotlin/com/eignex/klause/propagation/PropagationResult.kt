@@ -24,8 +24,7 @@ sealed interface PropagationResult {
      * `HashMap` allocations when combining with [Assumptions].
      *
      * Primitive APIs ([forEachBool], [forEachInt], [boolValueOrNull], [intValueOrNull])
-     * are the hot path; the [bools] / [ints] map views serve cold call-sites (the
-     * bake-time failed-literal probing path in `Problem`, tests, debug printing).
+     * are the hot path; the [bools] / [ints] map views serve cold call sites.
      */
     class Implied internal constructor(
         /** Bool var ids in ascending order. */
@@ -128,9 +127,8 @@ sealed interface PropagationResult {
             }
         }
 
-        /** Reinterpret this implied set as an [Assumptions].
-         *  Both share the same key-sorted parallel-array layout, so the conversion is
-         *  three [copyOf] calls (one per primitive array) — no rebuild, no boxing. */
+        /** Reinterpret this implied set as an [Assumptions]. Both share the same key-sorted
+         *  parallel-array layout, so the conversion copies each primitive array without rebuilding. */
         fun toAssumptions(): Assumptions = Assumptions(
             boolKeys = boolKeys.copyOf(),
             boolValues = boolValues.copyOf(),
@@ -149,8 +147,7 @@ sealed interface PropagationResult {
             ),
         )
 
-        /** Map view. Allocates a `LinkedHashMap` per access — used by cold paths like
-         *  failed-literal probing in `Problem` and by tests; hot paths should use
+        /** Map view. Allocates a `LinkedHashMap` per access; hot paths should use
          *  [forEachBool] / [boolValueOrNull] instead. */
         val bools: Map<Int, Boolean>
             get() = if (boolKeys.isEmpty()) {
@@ -227,8 +224,7 @@ sealed interface PropagationResult {
             // Set-restrictions accumulate by INTERSECTION: v ∈ S and v ∈ T both hold, so v ∈ S ∩ T.
             // A var restricted on only one side keeps that side's survivors; an empty intersection is
             // left as-is (an empty survivor set signals infeasibility on apply, exactly as a crossed
-            // min/max bound already does). Preserving these keeps the wide-sparse fold from being
-            // silently discarded when root-probing seeds a merge.
+            // min/max bound does).
             val sets = HashMap<Int, LongArray>()
             forEachIntSet { id, s -> sets[id] = s }
             other.forEachIntSet { id, t ->
@@ -440,9 +436,8 @@ sealed interface PropagationResult {
      */
     // Conflict id/level sets are primitive IntArrays, not Set<Int>: they're produced once per
     // conflict (a hot path on conflict-heavy instances) and consumers only iterate / membership-
-    // test / `isEmpty` them — all of which work allocation-free on IntArray. Producers dedup via
-    // a primitive IntHashSet before materializing. Equality is by reference (no consumer compares
-    // a whole Unsat by value), so the data-class default is fine.
+    // test / `isEmpty` them — all of which work allocation-free on IntArray. Array fields compare
+    // by reference under the data-class equality; no consumer compares a whole Unsat by value.
     @ConsistentCopyVisibility
     data class Unsat internal constructor(
         val conflictBools: IntArray = EmptyIntArray,

@@ -39,7 +39,7 @@ internal class RunsDomain(
         s
     }
 
-    // Saturates at Int.MAX_VALUE (a run may span more than 32 bits); such a domain is never enumerated.
+    // Declines past Int range (a run may span more than 32 bits); such a domain is never enumerated.
     override fun spanOrNull(maxValues: Long): IntSpan? =
         if (exactSize <= minOf(maxValues, Int.MAX_VALUE.toLong())) this else null
 

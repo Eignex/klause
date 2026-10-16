@@ -33,7 +33,7 @@ import java.time.Instant
  * are compared offline with `output/compare.sh`.
  */
 internal data class KlauseSearch(
-    // fixed | cp | mixed | ls — forwarded verbatim to klause-cli `-e` (the cli owns the
+    // fixed | cp | mixed | ls | alns — forwarded verbatim to klause-cli `-e` (the cli owns the
     // engine model). null = unset: no `-e` is passed, so the bench follows the cli's own default
     // engine (the bench deliberately has no engine default of its own).
     val engine: String? = null,
@@ -63,7 +63,7 @@ internal data class KlauseSearch(
 internal data class SolveRecord(
     val problem: String,
     val solver: String, // solver id (klause | choco | gecode | yuck | …)
-    val engine: String?, // klause engine (cp/ls/portfolio); null for references
+    val engine: String?, // klause engine (cp/ls/mixed/…); null for references
     val processors: Int,
     val search: String, // "free" | "fixed"
     val seed: Long,
@@ -150,8 +150,8 @@ internal object SolveMetric {
         println("=== solve ($tag; ${budget.timeoutMillis}ms budget) -> output/$tag/ ===")
         var feasible = 0
         var proved = 0
-        // Feature columns (structure/format/…) are joined onto each result row from the committed
-        // oracle table, so `output/<tag>.csv` is analysable by structure/size out of the box.
+        // Feature columns (structure/format/…) are joined onto each result row from the reference
+        // tables, so `output/<tag>.csv` is analysable by structure/size out of the box.
         val features = ReferenceStore.load()
         val resultRows = ArrayList<ReferenceEntry>()
         for (entry in entries) {
@@ -450,7 +450,7 @@ internal object SolveMetric {
 
     /** This run's result for one instance as a reference-table-schema row: `solver` is the config [tag],
      *  `elapsedMs` the time-used proxy (incumbent, solve time, or wall clock when decided; budget otherwise),
-     *  matching the `compare.sh` convention, and the source-text features are joined from the committed table
+     *  matching the `compare.sh` convention, and the source-text features are joined from the reference tables
      *  ([ref], null when the instance has no oracle entry). */
     internal fun resultRow(suite: String, rec: SolveRecord, tag: String, ref: ReferenceEntry?): ReferenceEntry {
         val solved = rec.feasible != null

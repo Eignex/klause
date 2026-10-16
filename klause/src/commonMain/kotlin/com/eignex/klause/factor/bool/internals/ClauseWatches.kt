@@ -20,7 +20,7 @@ internal fun findNonFalseLitExcept(state: PropagationState, literals: IntArray, 
     return -1
 }
 
-/** Unit-propagate `literals[unitIdx]` to true, with every other literal as antecedent. */
+/** Unit-propagate `literals(unitIdx)` to true, with every other literal as antecedent. */
 internal fun pinUnitLit(state: PropagationState, literals: IntArray, unitIdx: Int): Boolean {
     val unitLit = literals[unitIdx]
     val antecedents: IntArray? = if (literals.size <= 1) {
@@ -40,8 +40,7 @@ internal fun litTrueInLsState(state: LocalSearchState, literals: IntArray, idx: 
     return Lit.evaluate(lit, state.assignment.boolValue(Lit.variable(lit)))
 }
 
-/** Pre-flip evaluation: value of `literals[idx]` reconstructed from the post-flip assignment.
- *  When the literal's variable is [flippedVar], the pre-flip value is the negation of current. */
+/** Pre-flip value of `literals(idx)`, reconstructed from the post-flip assignment. */
 internal fun wasLitTrueInLsState(state: LocalSearchState, literals: IntArray, idx: Int, flippedVar: Int): Boolean {
     if (idx < 0) return false
     val lit = literals[idx]

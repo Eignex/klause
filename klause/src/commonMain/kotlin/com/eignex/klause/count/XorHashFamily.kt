@@ -16,9 +16,10 @@ import kotlin.random.Random
  * shared by ApproxMC counting ([ApproxMC]) and UniGen2 sampling ([UniGen]).
  *
  * Each hash is `XOR(subset) == parityBit` where every var in [samplingSet] is included with
- * probability ½ and `parityBit` is a fair coin. This is the standard random 3-independent-ish
- * affine hash family from Chakraborty, Meel & Vardi. Hashes are realised as native [Xor]
- * factors, so the [com.eignex.klause.backtrack.BacktrackSolver] propagates them directly.
+ * probability ½ and `parityBit` is a fair coin: the 3-wise independent `H_xor` family of
+ * S. Chakraborty, K. S. Meel, M. Y. Vardi, "A Scalable Approximate Model Counter", CP 2013,
+ * https://doi.org/10.1007/978-3-642-40627-0_18. Hashes are [Xor] values that `withHashes` bundles
+ * into one [GaussianXor] system.
  *
  * Construction is reproducible: the same [seed] (and the same `m` and draw order) yields the
  * same hashes.
@@ -35,8 +36,8 @@ class XorHashFamily(
      * Draw [m] independent parity hashes over [samplingSet]. Returns an empty list when
      * `m == 0` (the trivial single-cell partition). Each hash includes at least one variable:
      * an all-excluded draw would degenerate to a constant `0 == parityBit` constraint, so one
-     * sampling variable is force-included to keep the hash non-trivial (this preserves the
-     * uniform-hash distribution over the non-empty subsets actually used by the algorithms).
+     * uniformly chosen sampling variable is force-included instead. This slightly over-weights
+     * singleton subsets relative to the ideal family.
      */
     fun draw(m: Int): List<Xor> {
         require(m >= 0) { "m must be non-negative, was $m" }
@@ -52,7 +53,6 @@ class XorHashFamily(
             if (rng.nextBoolean()) chosen.add(Lit.make(v, positive = true))
         }
         if (chosen.isEmpty()) {
-            // Avoid the degenerate constant constraint: include one uniformly-random var.
             val v = samplingSet[rng.nextInt(samplingSet.size)]
             chosen.add(Lit.make(v, positive = true))
         }

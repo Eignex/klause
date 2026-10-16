@@ -49,8 +49,8 @@ interface VariableSelector : VariableBranching<PropagationSession> {
     /**
      * Called after every successful propagation step (pin + fixpoint). [implied] carries
      * the variables newly forced into singletons during this step. Activity-Based Search
-     * (Michel-Van Hentenryck 2012) bumps per-variable activity here; pure / activity-
-     * agnostic heuristics ignore. Default no-op.
+     * (Michel and Van Hentenryck, CPAIOR 2012, https://doi.org/10.1007/978-3-642-29828-8_15) bumps
+     * per-variable activity here. Default no-op.
      */
     fun onPropagation(implied: PropagationResult.Implied) {}
 }
@@ -76,7 +76,7 @@ internal fun pickByActivityWithDomDivider(
     while (heap.size > 0) {
         val topId = heap.peekMax()
         val activity = heap.keyOf(topId)
-        // Upper bound on the score of any remaining var: activity / 2 (dom is ≥ 2 when free).
+        // dom ≥ 2 when free, so activity / 2 bounds every remaining score.
         if (activity / 2.0 <= bestScore) break
         heap.extractMax()
         skip.add(topId)

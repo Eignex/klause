@@ -75,7 +75,9 @@ internal class BasisWorkspace(val size: Int) {
 }
 
 // Owns reach scratch and structural copies; numerical values belong to the enclosing factor cache.
-// CSC edges run from a solved column to its dependent rows. Reverse DFS postorder is a solve order.
+// CSC edges run from a solved column to its dependent rows. Reverse DFS postorder is a solve order: the
+// symbolic reach of J. R. Gilbert and T. Peierls, "Sparse partial pivoting in time proportional to arithmetic
+// operations", SIAM J. Sci. Stat. Comput. 9(5), 1988, https://doi.org/10.1137/0909058.
 internal class HyperSparseSolve(
     private val matrix: BasisTriangularMatrix,
     private val lower: Boolean,

@@ -4,9 +4,10 @@ import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
 
 /**
- * Read-only logical model and the canonical source of solver projections. Variables come in two id spaces:
+ * Read-only logical model and the canonical source of solver projections. Variables come in three id spaces:
  *  - Boolean vars: ids `[0, numBoolVars)`, packed bits in [com.eignex.klause.solver.Assignment].
- *  - Integer vars: ids `[0, numIntVars)`, raw [Int] values in [com.eignex.klause.solver.Assignment].
+ *  - Integer vars: ids `[0, numIntVars)`, raw [Long] values in [com.eignex.klause.solver.Assignment].
+ *  - Real vars: ids `[0, numRealVars)`, a separate namespace with no finite domain.
  *
  * An integer variable declares the values it may take — a range, possibly with an explicit value set
  * inside it ([declaredIntDomains]). Which engine owns the column is not part of the model:
@@ -18,11 +19,6 @@ import com.eignex.klause.util.EmptyDoubleArray
  * for this model's lifetime, including lazy or resumable searches and plans derived from it.
  * Rewrites construct a fresh model and invalidate source-scoped plans and evidence. Assignment
  * publications and objective coefficients instead own their captured buffers.
- * Occurrence lists are split per kind so `flip(boolVar)` and `setInt(intVar)` only walk the
- * factors mentioning that specific variable.
- *
- * Float variables, when the schema or front-end uses them, are bucketed to integer
- * variables in the factor system (so [factors] stays pure int+bool).
  */
 open class Problem(
     /** Number of Boolean variables; ids occupy `[0, numBoolVars)`. */
@@ -198,11 +194,7 @@ open class Problem(
         settings = settings,
     )
 
-    /**
-     * Convenience overload taking factors as a [List]. Internally stored as an [Array] for
-     * tighter hot-loop iteration; callers building a [MutableList] and then constructing the
-     * problem can use this overload without converting first.
-     */
+    /** Overload taking factors as a [List]; they are stored as an [Array]. */
     constructor(
         numBoolVars: Int,
         numIntVars: Int,

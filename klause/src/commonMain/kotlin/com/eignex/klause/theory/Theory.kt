@@ -47,14 +47,14 @@ sealed interface TheoryCheck<out A> {
      *
      * [explanation] is a clause over source Boolean literals that is false under the checked
      * assignment. It lets a checking service share a conflict certificate with the common search
-     * engine; absent certificates preserve the existing chronological fallback.
+     * engine; without one, the search falls back to chronological backtracking.
      */
     data class Infeasible(val explanation: SearchExplanation? = null) : TheoryCheck<Nothing>
 
     /**
-     * The fragment remains undecided because of cancellation, limits or an incomplete service.
-     * The compatibility name does not restrict this result to external cancellation. It supplies
-     * neither a witness nor a refutation and must not be cached as a decided answer.
+     * The fragment remains undecided because of cancellation, limits or an incomplete service, not only
+     * external cancellation. It supplies neither a witness nor a refutation and must not be cached as a
+     * decided answer.
      */
     data object Cancelled : TheoryCheck<Nothing>
 }

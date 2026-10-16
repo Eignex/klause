@@ -88,14 +88,10 @@ internal class AlnsWorkerConfig private constructor(
         val evidenceModel = ModelIdentity.of(problem, objective)
         val matchedPools = pools?.takeIf { it.identity?.matches(evidenceModel) != false }
         val workerLabel = "alns/${profile.label}"
-        // Cross-repair clause sharing: one pool persists globally-valid learned clauses across
-        // fragments so later repairs re-descend under earlier repairs' learning. Gated for soundness —
-        // the repair learns under assumptions/an incumbent, so its permanent (objective-bound, blocking)
-        // clauses and LP Farkas nogoods hold only under its pins and must not be shared.
+        // One pool carries globally-valid learned clauses across repair fragments. A repair learns under
+        // pins and an incumbent, so its permanent (objective-bound, blocking) clauses and LP Farkas nogoods
+        // hold only under those pins and are not shared.
         val repairClauses = SharedClausePool()
-        // Bidirectional cross-engine flow: publish accepted incumbents into the shared exchange and, at
-        // the top of each iteration, destroy from its verified global best — so ALNS both feeds and follows
-        // the incumbents backtrack and LS arms find.
         val alns = Alns(
             inner = LocalSearchSolver(
                 problem,
@@ -157,7 +153,7 @@ internal class AlnsWorkerConfig private constructor(
     }
 
     companion object {
-        /** What an ALNS arm needs from a model: an incumbent to optimise, and local search for its inner loop. */
+        /** What an ALNS arm needs from a model: an objective to optimise. */
         val NEEDS: Set<ArmNeed> = setOf(ArmNeed.Objective)
 
         /** [count] diverse ALNS arms cycling the curated regimes ([AlnsProfile.Curated]) — the ALNS analog

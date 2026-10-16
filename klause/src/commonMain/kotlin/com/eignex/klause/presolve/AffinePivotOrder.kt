@@ -12,6 +12,8 @@ enum class AffinePivotOrder {
     STABLE_ID,
 
     /** Cheapest estimated fill first (Markowitz), the default. Prioritizing sparse folds preserves
-     *  the cumulative fill-in budget for more eliminations. */
+     *  the cumulative fill-in budget for more eliminations. H. M. Markowitz, "The elimination form of the
+     *  inverse and its application to linear programming", Management Science 3(3), 1957,
+     *  https://doi.org/10.1287/mnsc.3.3.255. */
     MARKOWITZ,
 }

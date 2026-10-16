@@ -108,9 +108,9 @@ internal class FamilyPolicy(
     }
 
     /**
-     * Record one segment of [family]: whether it [progressed], and whether a segment that did not counts as a
-     * [plateau]. Before an incumbent exists, local-search violation reductions are observable progress;
-     * complete-search deductions supply no evidence that its family is closer to a witness.
+     * Record one segment of [family]: whether it [progressed], and [plateau] once an incumbent exists, when a
+     * segment without progress counts against an observable family. Before that, only an observable family's
+     * progress counts; complete-search deductions supply no evidence that its family is closer to a witness.
      */
     fun record(family: ArmFamily, progressed: Boolean, plateau: Boolean) {
         val retained = 2.0.pow(-1.0 / halfLife)
@@ -138,7 +138,8 @@ internal fun Random.nextBeta(alpha: Double, beta: Double): Double {
     return if (x + y > 0.0) x / (x + y) else 0.5
 }
 
-// Marsaglia and Tsang's method; a shape below one is boosted by one and scaled back by u^(1/shape).
+// G. Marsaglia, W. W. Tsang, "A simple method for generating gamma variables", ACM TOMS 26(3), 2000,
+// https://doi.org/10.1145/358407.358414. A shape below one is boosted by one and scaled back by u^(1/shape).
 private fun Random.nextGamma(shape: Double): Double {
     if (shape < 1.0) return nextGamma(shape + 1.0) * nextDouble().pow(1.0 / shape)
     val d = shape - 1.0 / 3.0
@@ -152,7 +153,8 @@ private fun Random.nextGamma(shape: Double): Double {
     }
 }
 
-// Box-Muller.
+// G. E. P. Box, M. E. Muller, "A note on the generation of random normal deviates", Ann. Math. Statist. 29(2),
+// 1958, https://doi.org/10.1214/aoms/1177706645.
 private fun Random.nextGaussian(): Double {
     val u = 1.0 - nextDouble()
     val v = nextDouble()

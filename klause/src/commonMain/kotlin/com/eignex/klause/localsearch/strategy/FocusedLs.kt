@@ -21,21 +21,23 @@ import com.eignex.klause.localsearch.scoring.MoveScoring
  * rule (and, for the adaptive variants, the schedule axis's noise dimension):
  *
  *  - [WalkSat] — [AcceptanceRule.WalkSatNoise]; [WalkSat.adaptive] steers the noise off a noise
- *    schedule (Hoos-2002 adaptive WalkSAT).
+ *    schedule (adaptive WalkSAT, see [NoiseController]).
  *  - [ProbSat] — [AcceptanceRule.ProbSat]; [ProbSat.adaptive] / [ProbSat.bandit] steer the break
  *    exponent off a noise / bandit schedule.
  *  - [SimulatedAnnealing] — [AcceptanceRule.Metropolis] under a temperature schedule.
  *
- * Configuration checking (CCASat) is opt-in on every factory: it restricts candidates to variables
- * whose configuration changed since their last flip, falling back to the full set when all are
- * CC-blocked.
+ * Configuration checking is opt-in on every factory: it restricts candidates to variables whose
+ * configuration changed since their last flip, falling back to the full set when all are CC-blocked
+ * (S. Cai, K. Su, "Configuration checking with aspiration in local search for SAT", AAAI 2012,
+ * https://doi.org/10.1609/aaai.v26i1.8133).
  */
 private fun focusedSources() = listOf(ConfiguredSource(ViolatedRepairs.SINGLE))
 
 /**
- * WalkSAT factory (Selman 1994). `WalkSat(...)` builds the fixed-noise recipe; [adaptive] builds the
- * Hoos-2002 adaptive-noise variant, whose noise level is steered each pick by a [NoiseController] on
- * the schedule axis's noise dimension.
+ * WalkSAT factory (B. Selman, H. Kautz, B. Cohen, "Noise strategies for improving local search",
+ * AAAI 1994, https://mlanthology.org/aaai/1994/selman1994aaai-noise). `WalkSat(...)` builds the
+ * fixed-noise recipe; [adaptive] builds the adaptive-noise variant, whose noise level is steered each
+ * pick by a [NoiseController] on the schedule axis's noise dimension.
  */
 object WalkSat {
     /** Fixed-noise WalkSAT recipe. */
@@ -53,7 +55,7 @@ object WalkSat {
     )
 
     /**
-     * Adaptive-noise WalkSAT (Hoos 2002): noise starts at [baselineNoise] and is steered in
+     * Adaptive-noise WalkSAT (see [NoiseController]): noise starts at [baselineNoise] and is steered in
      * `[baselineNoise, 1.0]` — climbs on stalls, decays on improvement.
      */
     fun adaptive(
@@ -84,10 +86,11 @@ object WalkSat {
 }
 
 /**
- * probSAT factory (Balint and Schöning 2012). `ProbSat(...)` builds the fixed-`cb` recipe; [adaptive] /
- * [bandit] build the variants whose break exponent is steered each pick by a noise / bandit schedule
- * on the schedule axis. Configuration checking is opt-in on all (probSAT + CC is a strong combo on
- * structured instances).
+ * probSAT factory (A. Balint, U. Schöning, "Choosing probability distributions for stochastic local
+ * search and the role of make versus break", SAT 2012, https://doi.org/10.1007/978-3-642-31612-8_3).
+ * `ProbSat(...)` builds the fixed-`cb` recipe; [adaptive] / [bandit] build the variants whose break
+ * exponent is steered each pick by a noise / bandit schedule on the schedule axis. Configuration
+ * checking is opt-in on all.
  */
 object ProbSat {
     /** Fixed-`cb` probSAT recipe. */
@@ -154,7 +157,9 @@ object ProbSat {
 
 /**
  * Simulated-annealing factory: a [SourceDrivenStrategy] recipe with [AcceptanceRule.Metropolis] over
- * a temperature schedule on the schedule axis. Configuration checking is opt-in.
+ * a temperature schedule on the schedule axis (S. Kirkpatrick, C. D. Gelatt, M. P. Vecchi, "Optimization
+ * by simulated annealing", Science 220, 1983, https://doi.org/10.1126/science.220.4598.671).
+ * Configuration checking is opt-in.
  */
 object SimulatedAnnealing {
     /** SA recipe under a fixed geometric cooling schedule. */
@@ -192,8 +197,7 @@ object SimulatedAnnealing {
      * SA as a COP objective-optimizer: the focused feasibility opener plus the feasible-phase objective
      * sources ([ObjectiveSeed] + [SatisfiedStructured]) so [AcceptanceRule.Metropolis] keeps annealing
      * at `cost == 0`, stepping through worse-objective feasible states, instead of bailing to the
-     * engine's greedy descent. Uses [FeasibleDescent.SelfOwned] so its own Metropolis acceptance owns
-     * the feasible walk, stepping through worse-objective feasible states.
+     * engine's greedy descent ([FeasibleDescent.SelfOwned]).
      */
     fun optimizer(
         schedule: Schedule,

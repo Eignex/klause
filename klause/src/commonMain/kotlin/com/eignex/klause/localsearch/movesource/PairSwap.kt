@@ -10,10 +10,8 @@ import com.eignex.klause.localsearch.MoveSink
  * like knapsack / packing). The pair set is Θ(n²), so candidates are drawn at random.
  *
  * The candidate construction — pick two variables, validate (distinct, unfrozen, value-compatible
- * domains), build the two-part [Move.Compound] — lives in [drawBoolSwap] / [drawIntSwap]. The
- * minimize engine consults those directly inside its own lazy first-improving loop; [generate] is
- * the eager fill-the-sink view (up to [cap] of each kind) for any strategy that wants pair swaps as
- * scored candidates.
+ * domains), build the two-part [Move.Compound] — lives in [drawBoolSwap] / [drawIntSwap];
+ * [generate] fills the sink with up to [cap] of each kind.
  *
  * [Phase.Feasible] / [Pool.ScoreOnly]: pair swaps are an objective-descent move over the feasible
  * region, selected by score, never by the noise draw.
@@ -23,9 +21,8 @@ class PairSwap(
     private val cap: Int,
     /** When true, the first endpoint of each int swap is drawn from the objective hot-spot
      *  ([com.eignex.klause.localsearch.ObjectiveShaping.objectiveHotSpotIntVar]) so swaps concentrate on
-     *  objective-relevant
-     *  variables; false keeps the uniform-random draw. No effect once the objective exposes no int
-     *  gradient (the draw falls back to uniform). */
+     *  objective-relevant variables; false keeps the uniform-random draw. No effect when the objective
+     *  exposes no int gradient (the draw falls back to uniform). */
     private val hotSpot: Boolean = false,
 ) : MoveSource {
     init {
@@ -47,8 +44,7 @@ class PairSwap(
         }
     }
 
-    /** Construction + identity. Each draw consumes exactly two RNG ints, so a caller threading these
-     *  through its own loop preserves RNG behaviour. */
+    /** Catalog identity and the pair-swap constructions. */
     companion object {
         /** Catalog id for this source. */
         val ID: MoveSourceId = MoveSourceId("pair-swap")
@@ -74,9 +70,9 @@ class PairSwap(
         }
 
         /** Draw one random int-pair swap (two int vars with different values that fit in each other's
-         *  domain, values exchanged), or null if the drawn pair is degenerate. Consumes two RNG ints.
-         *  When [hotSpot] is set, the first endpoint is drawn from the objective hot-spot (falling back
-         *  to uniform when the objective exposes no int gradient). */
+         *  domain, values exchanged), or null if the drawn pair is degenerate. Consumes two RNG ints,
+         *  plus one for the hot-spot draw when [hotSpot] is set; that draw picks the first endpoint from
+         *  the objective hot-spot, falling back to uniform when the objective exposes no int gradient. */
         fun drawIntSwap(state: LocalSearchState, hotSpot: Boolean = false): Move.Compound? {
             val nInt = state.problem.numIntVars
             if (nInt < 2) return null
@@ -89,8 +85,8 @@ class PairSwap(
 
         /**
          * The value-exchange move for a chosen int-var pair `(u, w)` — the single construction point
-         * for an int pair-swap ([drawIntSwap]'s uniform draw and [StallSwaps]' violated-factor draw
-         * both call it after their own selection, so the RNG sequence stays with the caller). Returns
+         * for an int pair-swap, called after the caller's own selection so the RNG sequence stays with
+         * the caller. Returns
          * null (reject) when the pair is equal, either var is frozen, [checkOwner] and either is owned
          * by an implicitly-solved global, [sameShape] and the domains differ in `[min, max]`, the
          * values are equal, or a swapped value falls outside the other's domain. None of these draw

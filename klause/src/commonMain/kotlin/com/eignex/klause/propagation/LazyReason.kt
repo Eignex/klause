@@ -7,8 +7,9 @@ import com.eignex.klause.ir.Lit
 // the trail position and level it was made at, and a propagator-specific payload. Conflict analysis reads every
 // reason through [reasonOf], which asks the propagator to build that one ([Propagator.explain]) only when the
 // analysis resolves through it, so a reason that costs O(arity) to build costs nothing on deductions no conflict
-// reaches. Layout: [LAZY_MARKER, factorId, trail position, level, payload...]. Literals are never negative, so
-// the marker cannot be mistaken for one.
+// reaches (I. P. Gent, I. Miguel, N. C. A. Moore, "Lazy Explanations for Constraint Propagators", PADL 2010,
+// https://doi.org/10.1007/978-3-642-11503-5_19). Layout: [LAZY_MARKER, factorId, trail position, level,
+// payload...]. Literals are never negative, so the marker cannot be mistaken for one.
 
 private const val LAZY_MARKER = -2
 private const val HEADER = 4

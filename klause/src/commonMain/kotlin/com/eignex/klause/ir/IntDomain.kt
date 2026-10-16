@@ -4,10 +4,9 @@ import com.eignex.klause.ir.intdomain.AbstractIntDomain
 import com.eignex.klause.ir.intdomain.ContiguousDomain
 import kotlin.random.Random
 
-/** Primitive-`Int` visitor for the `IntDomain` iteration methods. A `fun interface` (not
- *  `(Int) -> Unit`) so `action(v)` passes a primitive `int` with no `Integer` boxing on the
- *  per-value propagation hot paths; lambdas still convert at the call site via SAM conversion, so
- *  `d.forEach { … }` is unchanged. */
+/** Primitive-`Long` visitor for the `IntDomain` iteration methods. A `fun interface` (not
+ *  `(Long) -> Unit`) so each value is passed as a primitive `long` with no boxing on the per-value
+ *  propagation hot paths; lambdas convert at the call site via SAM conversion. */
 fun interface IntConsumer {
     /** Receive one domain [value] from an `IntDomain` iteration. */
     fun accept(value: Long)
@@ -17,7 +16,7 @@ fun interface IntConsumer {
  * Integer-variable domain: conceptually a finite set of integers. Physically it is one of a small,
  * fixed family of concrete representations (in `com.eignex.klause.ir.intdomain`), each chosen at
  * construction so storage and the hot membership / iteration paths stay compact regardless of how
- * wide the declared span is (spans here reach into the tens of millions):
+ * wide the declared span is:
  *
  *  - [com.eignex.klause.ir.intdomain.ContiguousDomain] — `(min..max)` with no holes; everything
  *    is O(1).
@@ -39,7 +38,8 @@ fun interface IntConsumer {
  * **Representation choice** — construct via the factories (`IntDomain(min, max)` for the contiguous
  * case; the internal `intDomainFrom*` factories pick the wide rep): a single run ⇒ contiguous; span
  * `<=` [DomainStorageSettings.bitsetThreshold] ⇒ bitset; otherwise the run list when
- * it is at least as compact as the survivor list (`2·runs <= survivors`), else the survivor list.
+ * it is at least as compact as the survivor list (`2·runs <= survivors`); a bitset when no larger than
+ * the survivor list (`2·words <= survivors`); else the survivor list.
  * Domains are immutable, so every mutation returns a fresh value and re-picks — no flip-flop cost.
  *
  * Callers depend only on this interface and `IntDomain(min, max)`; the concrete reps are an

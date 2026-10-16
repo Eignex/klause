@@ -17,8 +17,9 @@ import com.eignex.klause.util.MutableIntLongMap
 import kotlin.math.max
 
 /**
- * Single-node flow-cover cuts (Padberg–Van Roy–Wolsey). Two structural forms are read directly from the
- * integer model, both reducing to the same cover separation over LP columns:
+ * Single-node flow-cover cuts (Padberg, Van Roy and Wolsey, "Valid linear inequalities for fixed charge
+ * problems", Oper. Res. 1985, https://doi.org/10.1287/opre.33.4.842). Two structural forms are read
+ * directly from the integer model, both reducing to the same cover separation over LP columns:
  *
  *  - **Explicit flow**: a capacity row `Σⱼ yⱼ ≤ b` whose flow variables each carry a variable-upper-bound
  *    `yⱼ ≤ uⱼ·xⱼ` (a 2-term [Linear] `yⱼ − uⱼ·xⱼ ≤ 0`, `xⱼ ∈ {0,1}`).
@@ -30,7 +31,7 @@ import kotlin.math.max
  * For a cover `C` whose capacity exceeds the demand by `λ = Σ_C capⱼ − b > 0`, every feasible point
  * satisfies `Σ_C flowⱼ + Σ_C max(0, capⱼ − λ)·(1 − xⱼ) ≤ b`. The cover is chosen greedily from the arcs
  * the LP opens most (largest `xⱼ*`), and the inequality is emitted only when the LP point violates it.
- * Sound: it holds at every integer-feasible point (brute-validated for both forms), so it only tightens
+ * Sound: it holds at every integer-feasible point, so it only tightens
  * the relaxation. Cuts from globally valid rows are [Cut.global].
  */
 internal class FlowCoverSeparator : CutSeparator {
@@ -51,7 +52,7 @@ internal class FlowCoverSeparator : CutSeparator {
             val row = f.integerConstants ?: continue
             if (row.bound != 0L) continue
             val (y, x, u) = matchVub(f.vars, row) ?: continue
-            if (!problem.statesBinary(x)) continue // xⱼ ∈ {0,1}
+            if (!problem.statesBinary(x)) continue
             // The cover inequality reads capⱼ as a ceiling on the flow, and it is emitted globally. Over a
             // flow the model leaves open above the root box supplies that ceiling, which bounds the search
             // and not the model — so the arc is declined rather than capped there.

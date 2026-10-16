@@ -13,12 +13,11 @@ import com.eignex.klause.solver.result.UnsoundnessException
  * Each invocation solves one instance.
  */
 
-/** Front-end registry. Order matters only for the default fallback (MiniZinc is the default
- *  because MiniZinc invokes this binary with `.fzn` files and standard flags). */
+/** Front-end registry, matched in order by `--format` name or file extension. MiniZinc is the fallback
+ *  because MiniZinc invokes this binary with `.fzn` files and standard flags. */
 internal val MODES: List<CliMode> = listOf(MiniZincMode, Xcsp3Mode, SmtLibMode, DimacsMode, OpbMode, WcnfMode, MpsMode)
 
-/** Parse args once, select the front-end mode, load the instance and run the shared driver.
- *  See the file header for the full flow. */
+/** Parse args once, select the front-end mode, load the instance and run the shared driver. */
 fun main(args: Array<String>) {
     val code = runCli(args)
     if (code != EXIT_OK) exitCli(code)
@@ -64,8 +63,8 @@ internal fun runCli(args: Array<String>): Int = try {
 private fun run(args: Array<String>) {
     val common = CommonOptions()
     // One parse over the union of common + every mode's flags. Each mode's flags mutate that
-    // mode's own session; we keep every session and use only the one finally selected. (Mode
-    // flag names must be unique across modes — they are: only MiniZinc adds `--ozn` etc.)
+    // mode's own session; only the finally selected session is used, so mode flag names must be
+    // unique across modes.
     val sessions = MODES.associateWith { it.newSession() }
     val specs = commonFlagSpecs(common) + sessions.values.flatMap { it.flags() }
     parseArgs(args, specs) { positional ->

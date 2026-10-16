@@ -16,10 +16,10 @@ import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 
-/**
+/*
  * Exact arbitrary-precision reasoning for a linear row `Σ coeffs·vars ⟨op⟩ bound` whose coefficients or
- * bound exceed the 64-bit range. Shared by the bare [com.eignex.klause.factor.arithmetic.WideLinearPropagator]
- * and the reified [com.eignex.klause.factor.arithmetic.WideReifiedLinearPropagator], so the soundness-critical
+ * bound exceed the 64-bit range. Shared by the bare `WideLinearPropagator` and the reified
+ * `WideReifiedLinearPropagator`, so the soundness-critical
  * interval and division logic lives in one place. Every operand is a [BigInt], so there is no overflow to
  * guard against; only a derived variable bound is narrowed to `Long`, and only when it fits — a bound beyond
  * the `Long` range cannot constrain a `Long` domain, so skipping it is exact.

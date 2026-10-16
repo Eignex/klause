@@ -5,8 +5,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Runs a reference solver shipped as a native binary (cvc5, kissat, HiGHS): its own [ProcessBuilder], the instance on
- * stdin when [input] is set, and a watchdog that force-kills a run that ignores its own time limit, so one solve can
- * never hang a sweep. Returns the solver's stdout and the wall-clock elapsed.
+ * stdin when an input writer is given, and a watchdog that force-kills a run that ignores its own time limit, so one
+ * solve can never hang a sweep. Returns the solver's stdout and the wall-clock elapsed.
  */
 internal object NativeReference {
     private const val EXIT_WAIT_MS = 5_000L

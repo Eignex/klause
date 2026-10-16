@@ -289,8 +289,8 @@ data class MddExpr(
 
 /**
  * Cost-regular: regular-DFA acceptance with edge weights accumulating into [cost].
- * Compatible with klause's existing Regular factor on (seq, Q, S, transitions, q0, accepting)
- * plus a parallel weights array indexed by (state, symbol).
+ * Same layout as the regular constraint (seq, Q, S, transitions, q0, accepting) plus a parallel
+ * weights array indexed by (state, symbol).
  */
 @Serializable
 @SerialName("cost_regular")
@@ -388,9 +388,8 @@ data class SubcircuitExpr(
 
 /**
  * Cumulative scheduling: at every integer time point the sum of resource use of tasks
- * running at that point stays under [capacity]. [starts] are integer-variable expressions;
- * [durations] and [resources] are constants (variable-duration / variable-resource
- * cumulative is not supported by the current klause factor).
+ * running at that point is at most [capacity]. [starts] are integer-variable expressions;
+ * [durations] and [resources] are constants.
  */
 @Serializable
 @SerialName("cumulative")

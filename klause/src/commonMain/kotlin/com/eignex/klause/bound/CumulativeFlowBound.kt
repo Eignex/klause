@@ -24,7 +24,9 @@ import com.eignex.klause.util.subExact
  *   source ──Eᵢ──► task i ──resᵢ·|J|──► time-interval J ──capacity·|J|──► sink
  * ```
  * (the `task i → J` arc exists only when `J ⊆ [estᵢ, lstᵢ + durᵢ)`). Any real non-preemptive schedule
- * induces a feasible flow, so **max-flow `< Σ Eᵢ` proves the node infeasible** — a sound prune.
+ * induces a feasible flow, so **max-flow `< Σ Eᵢ` proves the node infeasible** — a sound prune. The
+ * network is the preemptive-scheduling flow of Horn, "Some simple scheduling algorithms", Naval
+ * Research Logistics Quarterly 1974 (https://doi.org/10.1002/nav.3800210113).
  *
  * This is strictly stronger than the pairwise-window [CumulativeEnergeticBound] scan (which checks
  * one window at a time): the flow balances all release/deadline windows simultaneously. It is also
@@ -88,7 +90,7 @@ internal class CumulativeFlowBound(
         }
         if (totalWork == 0L) return 0L
 
-        // Breakpoint-compressed time intervals: the distinct release/deadline values.
+        // Breakpoint-compressed time intervals keep the network horizon-independent.
         val bps = breakpoints(est, deadline, active)
         if (bps.size < 2) return 0L
         val intervals = bps.size - 1
@@ -151,8 +153,8 @@ internal class CumulativeFlowBound(
 }
 
 /**
- * Dinic max-flow over a small dense scheduling network (`O(n)` nodes). Capacities are [Long]; the
- * networks are gated tiny, so a textbook Dinic with BFS levels + DFS blocking flow is ample.
+ * Dinic (1970) max-flow over a small dense scheduling network (`O(n)` nodes): BFS levels plus DFS
+ * blocking flow, ample for networks gated to [CumulativeFlowBound.MAX_TASKS] tasks.
  */
 private class MaxFlow(private val numNodes: Int) {
     private val to = IntArrayList()

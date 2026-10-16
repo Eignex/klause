@@ -42,10 +42,10 @@ class PortfolioPlanRequest(
     /** Source tolerance semantics for every arm's continuous completion; see [BacktrackParams.toleranceCheck]. */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
 ) {
-    /** Captured frontend parameters for compatibility; empty for directly typed options. */
+    /** Frontend parameter strings these options were parsed from; empty for directly typed options. */
     val engineParams: List<String> get() = executionOptions.originalPairs.toList()
 
-    /** Compatibility constructor for repeatable frontend parameters. */
+    /** Build from repeatable frontend parameter strings. */
     constructor(
         engine: FiniteEngine,
         optimize: Boolean,
@@ -119,10 +119,10 @@ class FixedBacktrackPlanRequest(
     /** Optional engine event sink supplied by the frontend. */
     val onEvent: ((SearchEvent) -> Unit)?,
 ) {
-    /** Captured frontend parameters for compatibility; empty for directly typed options. */
+    /** Frontend parameter strings these options were parsed from; empty for directly typed options. */
     val engineParams: List<String> get() = executionOptions.originalPairs.toList()
 
-    /** Compatibility constructor for repeatable frontend parameters. */
+    /** Build from repeatable frontend parameter strings. */
     constructor(
         annotatedParams: BacktrackParams?,
         engineParams: List<String>,

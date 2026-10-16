@@ -36,11 +36,10 @@ import com.eignex.klause.util.plus
 import com.eignex.klause.util.unaryMinus
 
 /**
- * `Σ coeffs(i) * intVars(i) ⟨op⟩ bound`. Payload at `intPayload(factorId)` is the current
- * weighted sum, kept in sync incrementally by [Invariant.applyIntSet]. Repair moves propose, for each
- * variable, the integer value that on its own would put the sum on the right side of `bound`,
- * clamped to the variable's domain. Terms pair [vars] with the coefficients in [constants]; the sum is
- * compared by [op] against that shape's bound.
+ * `Σ coeffs(i)·vars(i) ⟨op⟩ bound`. Terms pair [vars] with the coefficients in [constants]; the sum is
+ * compared by [op] against that shape's bound. Local search keeps the current weighted sum as the
+ * factor's payload, updated incrementally by [Invariant.applyIntSet], and repairs a violation by moving
+ * one variable to the value that on its own would put the sum on the right side of `bound`.
  */
 class Linear private constructor(
     terms: CoalescedTerms,
@@ -50,8 +49,7 @@ class Linear private constructor(
     realCoeffsIn: DoubleArray = EmptyDoubleArray,
     // Double forms used only by an LP-only (real-bearing) row, where coefficients and the bound need not
     // be integral: the double coefficient of each integer term (index-aligned with [vars]) and the double
-    // right-hand side. The [Long] `coeffs`/`bound` are then rounded placeholders the never-read integer
-    // consumers keep well-formed. Empty / 0 for the integer core.
+    // right-hand side. Empty / 0 for integer and wide rows.
     intCoeffsRealIn: DoubleArray = EmptyDoubleArray,
     realBoundIn: Double = 0.0,
     strictRealIn: Boolean = false,
@@ -64,8 +62,8 @@ class Linear private constructor(
 
     // Canonicalise inequalities to ≤ at construction — the LP/MIP convention the cut separators
     // (FlowCoverSeparator, knapsack cover) expect. A ≥ becomes ≤ by negating the coefficients and bound;
-    // = / ≠ keep their orientation. So an inequality [Linear] always reports [op] `LE`, and a constraint
-    // and its negation share a structural key (so the two dedup as one).
+    // = / ≠ keep their orientation. So an inequality [Linear] always reports [op] `LE`, and a ≥ row and
+    // its negated ≤ form share a structural key (so the two dedup as one).
     val op: LinearOp = if (rawOp == LinearOp.GE) LinearOp.LE else rawOp
     val vars: IntArray = terms.vars
 
@@ -320,11 +318,6 @@ class Linear private constructor(
     // A value-anonymous factor names no value as a constant, so a relabeling maps it to itself.
     override fun remapValues(valueMap: (Long) -> Long): Factor? = if (isBinaryValueRelation()) this else null
 
-    // A continuous row is LP-only: it does not propagate in CP ([NoPropagator], so the occurrence index
-    // never wakes it) — its feasibility is enforced by the LP relaxation and the search leaf. The
-    // local-search engine is gated off for problems with real variables, so its invariant is never
-    // consulted; an inert one keeps the factory total without pretending to evaluate the real terms.
-
     override val size: Int get() = vars.size + realVars.size
     override val relation: LinearOp get() = op
     override val isIntegerOnly: Boolean get() = realVars.isEmpty()
@@ -336,15 +329,12 @@ class Linear private constructor(
     override val linearForm: LinearForm = LinearForm.Conjunction(listOf(this))
 }
 
-/** True when every coefficient and the bound fit 32-bit range — the precondition for the Int-coefficient
- *  reasoning a consumer keeps (ReifiedLinear's big-M rows, GCD modulus fixing, coefficient strengthening). */
+/** True when every coefficient and the bound fit 32-bit range. */
 internal fun fitsInt32(coeffs: LongArray, bound: Long): Boolean =
     bound in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
         coeffs.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }
 
-/** True when every value in [values] fits 32-bit range. The value-symmetry relabel (`remapValues`) is
- *  `(Int)`-typed, so a value-carrying global (GCC cover, Table tuples, Mdd symbols, AllDifferent
- *  except-set) declines value symmetry (`null`) when wide, to avoid truncating two values into one. */
+/** True when every value in [values] fits 32-bit range. */
 internal fun fitsInt32(values: LongArray): Boolean = values.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }
 
 // Wide coefficients are exact, so callers must not lose a duplicate term before construction.

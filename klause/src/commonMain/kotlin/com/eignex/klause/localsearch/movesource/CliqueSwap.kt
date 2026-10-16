@@ -81,7 +81,7 @@ class CliqueSwap(
         return when {
             onB >= 0 -> emitFlips(state, Lit.variable(onA), Lit.variable(onB), sink)
             onA >= 0 -> emitSwap(state, lits, onA, sink)
-            else -> false // no member on: nothing to swap out
+            else -> false
         }
     }
 
@@ -93,8 +93,8 @@ class CliqueSwap(
     }
 
     /** Build the two-flip compound, rejecting same-variable pairs (a self-cancelling no-op) and
-     *  frozen variables (the compound bypasses the sink's per-part frozen filter only for the size
-     *  check, so guard explicitly). */
+     *  frozen variables; the sink would drop the latter too, but checking here keeps a rejected pair
+     *  from spending the caller's budget. */
     private fun emitFlips(state: LocalSearchState, varOff: Int, varOn: Int, sink: MoveSink): Boolean {
         if (varOff == varOn) return false
         if (state.assumptions.isFrozenBool(varOff) || state.assumptions.isFrozenBool(varOn)) return false

@@ -251,9 +251,9 @@ private fun Compiler.Builder.equalityDisjunctionBounds(t: SExpr.SList, out: Arra
 }
 
 /** Whether [t] contains a subterm whose lowering has side effects (fresh vars and clauses): `ite`,
- *  `abs`, `div`, `mod`, or a `define-fun` call (whose body may contain any of these). The read-only
- *  bound-inference pass must not descend into such a relation, since evaluating it would allocate
- *  variables the fixpoint's bound arrays aren't sized for. The scan is iterative (explicit stack) so
+ *  `abs`, `div`, `mod`, `to_int`, or a `define-fun` call (whose body may contain any of these). The
+ *  read-only bound-inference pass must not descend into such a relation, since evaluating it would
+ *  allocate variables its bound arrays aren't sized for. The scan is iterative (explicit stack) so
  *  a deep term can't overflow the call stack. */
 internal fun Compiler.Builder.hasSideEffectingTerm(t: SExpr): Boolean {
     val work = ArrayDeque<SExpr>()

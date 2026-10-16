@@ -43,8 +43,7 @@ internal class IntHashSet(initialCapacity: Int = 8) {
         return true
     }
 
-    /** Remove [value]; returns true if it was present. (On the shared empty table slot 0 reads
-     *  as unoccupied, so this returns false without ever writing through the shared backing.) */
+    /** Remove [value]; returns true if it was present. Never writes through the shared empty table. */
     fun remove(value: Int): Boolean {
         var i = mix(value) and mask
         while (used[i]) {
@@ -71,7 +70,7 @@ internal class IntHashSet(initialCapacity: Int = 8) {
     }
 
     fun clear() {
-        if (used !== EMPTY_USED) used.fill(false) // never write through the shared empty table
+        if (used !== EMPTY_USED) used.fill(false)
         size = 0
     }
 
@@ -92,7 +91,7 @@ internal class IntHashSet(initialCapacity: Int = 8) {
         mask = initialCap - 1
     }
 
-    /** Backward-shift deletion — see [MutableIntIntMap.deleteSlot] for the algorithm. */
+    /** Backward-shift deletion; see [mustStayDuringShift]. */
     private fun deleteSlot(start: Int) {
         var i = start
         used[i] = false
@@ -128,9 +127,8 @@ internal class IntHashSet(initialCapacity: Int = 8) {
     private fun mix(x: Int): Int = mixIntKey(x)
 
     private companion object {
-        // Shared immutable empty table: a single slot that is permanently unoccupied. Every fresh
-        // set aliases it until its first add, so empty-lifetime sets allocate nothing and the read
-        // paths probe it like any table (mask 0 → slot 0 → unoccupied). Never written through.
+        // A permanently unoccupied single slot shared by every set until its first add, so sets
+        // that stay empty allocate nothing and reads probe it like any table (mask 0 → slot 0).
         val EMPTY_KEYS = IntArray(1)
         val EMPTY_USED = BooleanArray(1)
     }

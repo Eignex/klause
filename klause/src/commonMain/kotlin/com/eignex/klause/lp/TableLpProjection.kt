@@ -8,7 +8,8 @@ import com.eignex.klause.util.IntArrayList
  * Convex-hull LP relaxation: a selector column `y_t ∈ [0,1]` per allowed tuple with `Σ_t y_t = 1` and a
  * per-column channel `xs[j] = Σ_t tuple_t[j]·y_t` — the projection onto `xs` is exactly the convex hull
  * of the allowed tuples. A tuple's column exists when every entry is in the root box of its
- * variable and is pinned to 0 when any entry left the live domain. Large tables are skipped. HULL.
+ * variable and is pinned to 0 when any entry left the live domain. Large tables are skipped. Rows count
+ * as [Contribution.HULL].
  *
  * A root box screens the tuples, so over a side the model leaves open an invented endpoint would drop
  * tuples the model allows and the one-hot rows would then refute them — declined there.
@@ -85,8 +86,7 @@ internal suspend fun SequenceScope<Unit>.prepareLpHull(factor: Table, boxes: Roo
     if (hi != null) return null
     if (numTuples > MAX_TUPLES) return null
     if (!prepareStatesBothBounds(boxes, xs)) return null
-    // One selector per tuple (upper bound on the root-feasible ones) + Σ y = 1 + one channel
-    // per column.
+    // Counts every tuple's selector, an upper bound on the root-feasible ones.
     return LpSizeEstimate(cols = numTuples.toLong(), rows = 1L + arity)
 }
 

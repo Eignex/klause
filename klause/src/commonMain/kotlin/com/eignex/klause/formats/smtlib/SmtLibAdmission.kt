@@ -22,7 +22,7 @@ import com.eignex.klause.util.StringCharSource
 
 /** The source representation admitted before the pipeline selects an arithmetic theory. */
 sealed interface SmtLibInput {
-    /** Source accepted by the existing linear lowering. */
+    /** Source accepted by the linear lowering. */
     data class Linear(
         /** Exact source model and output identities. */
         val problem: SmtLibProblem,
@@ -75,7 +75,7 @@ object SmtLibAdmission {
 
     /**
      * Admit a streamed source. [openSource] must recreate the same input for each attempted lowering.
-     * Owned closeable sources are closed on rejection; active non-closeable sources drain before fallback.
+     * A closeable source is closed after each attempt; a non-closeable one is drained to its end instead.
      * Cancellation stops draining and prevents reopening.
      */
     fun parse(

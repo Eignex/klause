@@ -18,7 +18,7 @@ import com.eignex.klause.util.toDouble
  * This is **not** the optimizer API type: [com.eignex.klause.solver.Optimizer.minimize] is statically typed
  * [LinearObjective] — the one canonical objective every front-end produces — so backends enable
  * their objective machinery (LP bounding, branch-and-bound bounds, native translations) from
- * params alone, with no objective-shape dispatch. This interface remains as the local-search
+ * params alone, with no objective-shape dispatch. This interface is the local-search
  * engine's *internal* abstraction over the two scoring views it can descend: the linear
  * objective itself and an optional [IncrementalObjective] gradient view of it
  * (`LocalSearchParams.lsObjective`).
@@ -81,7 +81,7 @@ class LinearObjective(
      * Objective coefficient of each LP-only continuous (real) variable, indexed by real var id (size
      * `problem.numRealVars`; empty for the integer/Boolean core). The real part of the objective is
      * resolved by the LP at nodes and leaves, not by [evaluateLong] — the integer/Boolean methods here
-     * cover only the discrete part. See the LP-only-columns hybrid engine.
+     * cover only the discrete part.
      */
     realCoefficients: DoubleArray = EmptyDoubleArray,
 ) : Objective {

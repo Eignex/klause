@@ -31,7 +31,7 @@ class FactorProjectionProviders(
     constructor() : this(BuiltInPropagationProjectionProvider, BuiltInScoringProjectionProvider,
         BuiltInRelaxationProjectionProvider, BuiltInEncoderProvider)
 
-    /** Preserve the original provider constructor and its built-in theory selection. */
+    /** Select custom projection providers with the built-in encoder provider. */
     constructor(
         propagation: PropagationProjectionProvider = BuiltInPropagationProjectionProvider,
         scoring: ScoringProjectionProvider = BuiltInScoringProjectionProvider,
@@ -43,7 +43,7 @@ class FactorProjectionProviders(
     /** Consumer languages captured at preparation, including every built-in target. */
     val encodingTargets: Set<EncodingTarget> get() = selectedEncodingTargets.toSet()
 
-    /** Built-in mechanisms with their existing source behavior and numerical gates. */
+    /** Built-in provider selection. */
     companion object {
         /** Shared stateless selectors; selected mutable work belongs to each engine. */
         val Default: FactorProjectionProviders = FactorProjectionProviders()

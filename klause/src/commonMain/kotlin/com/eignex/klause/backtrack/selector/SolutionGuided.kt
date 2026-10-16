@@ -6,25 +6,22 @@ import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
 /**
- * Solution-guided value selection (Demoen-Garcia-de-la-Banda 2009 / Beck-Davenport). Wraps
- * a [base] value heuristic: once a SAT leaf is observed
- * via [onSolution], the heuristic snapshots the assignment, and on every subsequent pick it
- * tries the snapshot's value for the var first (falling back to [base]'s order for everything
- * else). The snapshot is
- * refreshed on each new solution — typical use is optimisation, where successive incumbents
- * are similar and a search biased to stay near the previous incumbent finds the next one
- * faster than starting from scratch.
+ * Solution-guided value selection: wraps a [base] value heuristic and, once a solution is observed
+ * via [onSolution], tries the snapshot's value for each variable first, falling back to [base]'s
+ * order for the rest. The snapshot is refreshed on each new solution; in optimisation successive
+ * incumbents are similar, so staying near the last one finds the next one faster. See Beck,
+ * "Solution-Guided Multi-Point Constructive Search for Job Shop Scheduling", JAIR 2007
+ * (https://doi.org/10.1613/jair.2169), and Demirović, Chu and Stuckey, "Solution-Based Phase Saving
+ * for CP", CP 2018 (https://doi.org/10.1007/978-3-319-98334-9_7).
  *
- *  - First descent (before any solution) is purely [base] — no bias.
- *  - After a solution: saved value tried first; if the saved value is no longer in the
- *    current domain (the search has propagated it away), falls through to [base] in full.
- *  - Snapshots **persist** across [onRestart] — that's the whole point: cross-restart
- *    bias toward the last-seen incumbent. The base's `onRestart` is still forwarded so
- *    activity-based wrappers like [Vsids] still decay as expected.
+ *  - Before any solution the order is purely [base].
+ *  - After a solution: the saved value is tried first; if propagation has removed it from the
+ *    current domain, [base]'s order is used in full.
+ *  - Snapshots **persist** across [onRestart], so the bias toward the last incumbent survives
+ *    restarts. The base's `onRestart` is still forwarded so stateful base heuristics see it.
  *
- * Composes naturally with [Impact] / [MaxSd] / [IndomainRandom] / phase-saving as the
- * inner choice — the engine still runs through the saved value first, but if that branch
- * proves infeasible, the inner heuristic's order takes over.
+ * Composes with [Impact] / [MaxSd] / [IndomainRandom] as the inner choice: if the saved-value
+ * branch proves infeasible, the inner heuristic's order takes over.
  */
 class SolutionGuided(private val base: ValueSelector) : ValueSelector {
 

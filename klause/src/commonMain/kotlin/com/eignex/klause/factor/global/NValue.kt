@@ -94,11 +94,9 @@ class NValue(
         return Rewrite(listOf(AllDifferent(xs, domainMin = lo, domainSize = span.toInt())))
     }
 
-    /** The distinct-value count ignores the order of [xs], so the counted vars are sorted (paired with
-     *  their presence literal to keep an opt position with its presence); [n] (the count var) and
-     *  [mode] are positional constants. */
-    // Not migrated to the KeySink allocation-free hash: the `pairsByKey(xs){ presents… }` value is a
-    // Boolean literal (remappable), which the sink's constant-value pair methods can't remap.
+    // The distinct-value count ignores the order of [xs], so the counted vars are sorted, each paired with its
+    // presence literal; [n] and [mode] are positional. The allocating builder is used because the pair value is
+    // a remappable Boolean literal, which the KeySink constant-value pair methods cannot remap.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.NVALUE) {
         enum(mode)
         int(n)

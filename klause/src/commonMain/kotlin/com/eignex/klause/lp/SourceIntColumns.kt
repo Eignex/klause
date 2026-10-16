@@ -32,8 +32,8 @@ internal fun Problem.rootDomainsOf(): Array<IntDomain> = finiteIntDomains()
  *
  * The question is whether the side is stated at all, not whether [rootDomainOf] sits exactly on it: the
  * root fold and presolve narrow the box below the stated bound by proof, and a bound proved over the
- * model is as much the model's as one it declared. The reading a narrowing by invention cannot be told
- * from one by proof is `Problem.withIntDomains`, which boxes a wide column while keeping the wide bound;
+ * model is as much the model's as one it declared. `Problem.withIntDomains` is where a narrowing by
+ * invention cannot be told from one by proof: it boxes a wide column while keeping the wide bound, and
  * separating those needs provenance the source model does not carry.
  */
 internal fun Problem.statesLowerBound(v: Int): Boolean = intBounds.hasLower(v)

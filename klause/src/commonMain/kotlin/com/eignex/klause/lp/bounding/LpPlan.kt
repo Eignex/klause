@@ -1,10 +1,10 @@
 package com.eignex.klause.lp.bounding
 
 /**
- * The resolved per-technique LP-relaxation plan for a `BacktrackSolver` call. Grouped off
- * `BacktrackParams` so the params' LP surface is just the intent (`BacktrackParams.lpConfig`) plus
- * this plan. [LpAutoConfig.resolve] OR-es the structurally-applicable techniques onto a base plan;
- * a caller can also set fields here directly to force a technique on regardless of structure.
+ * The resolved per-technique LP-relaxation plan for a backtracking solve, carried as [LpParams.lpPlan]
+ * beside the intent [LpParams.lpConfig]. [LpAutoConfig.resolve] OR-es the structurally-applicable
+ * techniques onto a base plan; a caller can also set fields here directly to force a technique on
+ * regardless of structure.
  */
 data class LpPlan(
     /**
@@ -43,10 +43,8 @@ data class LpPlan(
      * ladder's warmup window of prunable solves without a single prune, and any prune lifts it
      * permanently ([LpPivotBudget]).
      *
-     * Off by default. A cap of 500 cuts an unproductive node LP's pivots several-fold where it applies,
-     * but no automatic rule measured so far both fires where that pays and stays off where it does not:
-     * the models with the most to gain are the ones that never find an incumbent, and those are exactly
-     * the ones a prune-based gate cannot distinguish from a model whose LP has not started pruning yet.
+     * Off by default: the models with the most to gain are the ones that never find an incumbent, and a
+     * prune-based gate cannot distinguish those from a model whose LP has not started pruning yet.
      */
     val boundMaxPivots: Int = 0,
     /**
@@ -56,13 +54,7 @@ data class LpPlan(
      *
      * Budgets in work rather than pivots, since a pivot costs an order of magnitude more on a dense
      * basis than a sparse one, and adapts on the solve itself rather than on prune counts, which cannot
-     * separate a useless relaxation from a search that has not yet found an incumbent.
-     *
-     * On by default. Over one instance from each of 16 XCSP3 COP families at a fixed decision budget it
-     * improved 6, tied 9, and lost 1 — and the loss is a family whose objective moves by more than that
-     * between repeats of the same arm. It spends between 6× and 2500× less LP work wherever the
-     * relaxation does real work, and on two families it reaches a first solution that an unbudgeted LP
-     * never gets to at all, having spent the search's time proving bounds instead.
+     * separate a useless relaxation from a search that has not yet found an incumbent. On by default.
      */
     val boundAdaptiveWork: Boolean = true,
     /**
@@ -81,8 +73,7 @@ data class LpPlan(
      * spend on cut harvesting, the root bound and primal probes, or `0` to bound it by the clock alone.
      *
      * The root harvest decides which cuts every later node inherits, so time-boxing it makes the whole
-     * search a function of machine speed — the single largest remaining source of run-to-run drift once
-     * the per-node budget is deterministic. `rootBudgetFraction` stays as the backstop.
+     * search a function of machine speed. [rootBudgetFraction] remains the wall-clock backstop.
      */
     val rootMaxWork: Long = 200_000_000L,
     /**
@@ -101,9 +92,6 @@ data class LpPlan(
      * search-order guidance — it changes which solutions are found first, never the optimum or
      * feasibility — so it is correctness-neutral. A no-op for variables with no fresh LP value, and
      * for any emphasis that leaves [bounding] off, since there is then no LP value to steer by.
-     *
-     * Branching on the relaxation makes an LP solve useful for MIP search. It only changes which solution
-     * search finds first.
      */
     val branching: Boolean = true,
     /**
@@ -111,11 +99,10 @@ data class LpPlan(
      * fractional point into a feasible assignment by pinning each discrete variable toward its LP value
      * and propagating. Publication requires the composed witness check, source-accepted continuous
      * coordinates or certified completion, and improvement over the available incumbent cutoff.
-     * A declined mixed proposal permits
-     * peer-target and directed rounding of the same LP point before bounded feasibility pumping under
-     * the same root allowance. The relaxation point supplies only a target, so it cannot establish
-     * source feasibility on its own. Requires a LinearObjective;
-     * off by default; never changes the complete search's feasible region.
+     * A declined mixed proposal permits peer-target and directed rounding of the same LP point before
+     * bounded feasibility pumping under the same root allowance. The relaxation point supplies only a
+     * target, so it cannot establish source feasibility on its own. Requires a LinearObjective; off by
+     * default; never changes the complete search's feasible region.
      */
     val probe: Boolean = false,
     /**
@@ -131,7 +118,7 @@ data class LpPlan(
      * globally-valid cuts join the persistent pool so descendants inherit them, while node-local cuts
      * tighten only that node's solve (they never leak to siblings, so the bound stays sound). The depth
      * gate keeps the effort root-dominant — the relaxation is loosest and the cuts most valuable near
-     * the root. `0` runs the root harvest only (the prior behaviour). Requires [cuts].
+     * the root. `0` runs the root harvest only. Requires [cuts].
      */
     val cutSearchMaxDepth: Int = 16,
     /**
@@ -152,7 +139,7 @@ data class LpPlan(
      * Genuine subtour-elimination cuts for Circuit globals. When true and [bounding] holds,
      * each Circuit gets an arc-indicator relaxation (degree + channelling rows) and a max-flow
      * separator adds the directed cutset inequalities that fractional/subtour LP points violate.
-     * Adds O(n²) columns per circuit (skipped above a node-count cap), so it is opt-in and off by
+     * Adds one column per candidate arc (skipped above an arc-count cap), so it is opt-in and off by
      * default; a no-op when no Circuit exists.
      */
     val circuit: Boolean = false,
@@ -161,7 +148,7 @@ data class LpPlan(
      * [bounding] holds, each Element over a constant table gets selector columns and channelling
      * rows — its exact convex hull `result = Σ arr[p]·[idx=p]` — so the LP sees `result`'s dependence
      * on `idx`. Adds O(len) columns per Element (skipped above a length cap), so it is opt-in and off
-     * by default; a no-op when no constant-array Element exists. Variable-array Element is deferred.
+     * by default; a no-op when no constant-array Element exists.
      */
     val element: Boolean = false,
     /**
@@ -224,18 +211,17 @@ data class LpPlan(
     /**
      * Whether the adaptive LP auto-off may **re-probe** a disabled per-node LP on exponential
      * backoff to recover subtrees where the relaxation becomes useful again. `true` is the adaptive
-     * default; `false` makes a disable irreversible — a static one-shot behaviour, kept as a
-     * toggle for measuring the re-probe's value. No effect when [bounding] is off.
+     * default; `false` makes a disable irreversible. No effect when [bounding] is off.
      */
     val autoOffReprobe: Boolean = true,
     /**
      * Wall-clock budget for the one-shot pre-search root LP work: the cut harvest, the root
      * relaxation-bound capture, and the LP-rounding [probe] all share one deadline so a pathological
-     * root relaxation cannot consume the whole time budget before branch-and-bound gets its first node
-     * (the liner-sf failure mode). The budget is [rootBudgetFraction] of the time remaining when search
+     * root relaxation cannot consume the whole time budget before branch-and-bound gets its first node.
+     * The budget is [rootBudgetFraction] of the time remaining when search
      * starts — so search keeps the rest of every slice — capped at [rootBudgetMillis]. Each root step is
      * cooperatively cancelled at the budget and degrades gracefully (a half-harvested cut pool, a `NaN`
-     * root bound, no probe seed), never unsoundly. `0.0` disables the cap (unbudgeted, the prior behaviour).
+     * root bound, no probe seed), never unsoundly. `0.0` disables the cap.
      */
     val rootBudgetFraction: Double = 0.5,
     /** Absolute ceiling in milliseconds on the [rootBudgetFraction] pre-search root-LP budget; also the
@@ -346,11 +332,10 @@ data class LpPlan(
      * row and bound premises, and energetic reasoning produces over-subscription nogoods. The
      * bounded LP pool admits row implications for immediate registration, so sibling subtrees can
      * reuse them before restart. Restart shares these implications without registering them again;
-     * other queued clauses retain restart-time registration.
-     * LP sources require [bounding]; energetic sources require [energeticReasoning].
-     * When a conflict certificate resolves to an asserting
-     * 1UIP clause the engine backjumps and learns immediately, so this helps even with
-     * restarts off; non-asserting certificates still fall back to restart-time registration. A
+     * other queued clauses retain restart-time registration. LP sources require [bounding]; energetic
+     * sources require [energeticReasoning]. When a conflict certificate resolves to an asserting 1UIP
+     * clause the engine backjumps and learns immediately, so this helps even with restarts off;
+     * non-asserting certificates fall back to restart-time registration. A
      * certificate leaning on a live-big-M reified row cites the bounds that justify the M alongside its
      * column seats; one leaning on a node-local cut is not expressible as a globally valid bound-atom
      * clause and is withheld — the prune itself still happens. Off by default.
@@ -387,14 +372,17 @@ data class LpPlan(
      */
     val lbTreeSearch: Boolean = false,
     /**
-     * Add the Anderson big-M tight face of each [com.eignex.klause.factor.arithmetic.ArrayMinMax]
-     * on top of the envelope, bounding the extremum from the tight side. Sound relaxation; gated.
-     * Off by default.
+     * Add the big-M tight face of each [com.eignex.klause.factor.arithmetic.ArrayMinMax] on top of the
+     * envelope, bounding the extremum from the tight side (Anderson, Huchette, Ma, Tjandraatmadja and
+     * Vielma, "Strong mixed-integer programming formulations for trained neural networks", Math. Program.
+     * 2020, https://doi.org/10.1007/s10107-020-01474-5). Sound relaxation; gated. Off by default.
      */
     val linMaxTightFace: Boolean = false,
     /**
      * Relax each [com.eignex.klause.factor.arithmetic.Product] `result = a·b` with its McCormick
-     * envelope (the square case degenerates to secant/tangent). Sound relaxation; gated. Off by default.
+     * envelope (the square case degenerates to secant/tangent) — McCormick, "Computability of global
+     * solutions to factorable nonconvex programs: Part I", Math. Program. 1976,
+     * https://doi.org/10.1007/BF01580665. Sound relaxation; gated. Off by default.
      */
     val productMcCormick: Boolean = false,
     /**
@@ -405,8 +393,10 @@ data class LpPlan(
     val impliedBoundCuts: Boolean = false,
     /**
      * Separate single-node flow-cover cuts: detect a capacity row `Σ yⱼ ≤ b` whose flows
-     * carry variable-upper-bounds `yⱼ ≤ uⱼ·xⱼ` (`xⱼ ∈ {0,1}`) and add the violated Padberg–Van Roy–Wolsey
-     * flow-cover inequality. Sound (valid at every integer solution); requires [cuts]. Off by default.
+     * carry variable-upper-bounds `yⱼ ≤ uⱼ·xⱼ` (`xⱼ ∈ {0,1}`) and add the violated flow-cover inequality
+     * (Padberg, Van Roy and Wolsey, "Valid linear inequalities for fixed charge problems", Oper. Res. 1985,
+     * https://doi.org/10.1287/opre.33.4.842). Sound (valid at every integer solution); requires [cuts].
+     * Off by default.
      */
     val flowCoverCuts: Boolean = false,
     /**

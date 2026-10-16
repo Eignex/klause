@@ -183,7 +183,7 @@ internal class ComposedSampleVerifier(
     }
 }
 
-// Preserve the legacy JVM static descriptors while consumers use the shared owner.
+// Package-local forwarders to the shared composed-fixpoint validation.
 internal fun <V> composedFixpoint(
     problem: Problem,
     candidate: Candidate<Sample, V>,

@@ -5,7 +5,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.util.IntArrayList
 
 /**
- * LP relaxation. A constant array gives the exact convex hull: a one-hot selector `y_p ∈ [0,1]` per
+ * Element's LP relaxation. A constant array gives the exact convex hull: a one-hot selector `y_p ∈ [0,1]` per
  * position whose index value is in `idx`'s root box (pinned to 0 when that value left the live
  * domain), with rows `Σ_p y_p = 1`, the index channel `Σ_p (p + off)·y_p = idx`, and the result channel
  * `Σ_p arr[p]·y_p = result`. A variable array keeps the selectors and index channel but relaxes the
@@ -105,7 +105,7 @@ private fun Element.emitResultChannel(builder: RelaxationBuilder, selCols: IntAr
     val resVals = LongArray(k + 1)
     for (t in 0 until k) {
         resCols[t] = selCols[t]
-        resVals[t] = arr[positions[t]] // constant value, already Long
+        resVals[t] = arr[positions[t]]
     }
     resCols[k] = builder.intColumn(result)
     resVals[k] = -1L

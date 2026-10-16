@@ -13,9 +13,10 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 
 /**
- * CP propagator for [Diffn]. Constructed by the propagation projection and holds pairwise
- * compulsory-parts / disjunctive propagation for the constant-size case, plus a
- * sound-only infeasibility check for the variable-size case.
+ * CP propagator for [Diffn]: a compulsory-part sweep over both axes for the constant-size case
+ * (after N. Beldiceanu and M. Carlsson, "Sweep as a Generic Pruning Technique Applied to the
+ * Non-overlapping Rectangles Constraint", CP 2001, https://doi.org/10.1007/3-540-45578-7_26), plus a
+ * pairwise infeasibility check for the variable-size case.
  */
 internal class DiffnPropagator(
     val intVars: IntArray,
@@ -148,11 +149,9 @@ internal class DiffnPropagator(
     }
 
     /**
-     * Pairwise compulsory-parts / disjunctive propagation (constant-size only). When any
-     * dimension is variable the size-dependent bound reasoning does not hold, so we fall
-     * back to the sound check: with the *minimum* possible sizes, if a pair must still overlap
-     * on both axes the constraint is infeasible; otherwise no pruning. This keeps propagation
-     * sound (never removes a feasible value) while LS does the heavy lifting on var-size diffn.
+     * Compulsory-part sweep (constant-size only). When any dimension is variable the size-dependent
+     * bound reasoning does not hold, so only the pairwise check runs: with the *minimum* possible sizes,
+     * if a pair must still overlap on both axes the constraint is infeasible; otherwise no pruning.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         state.propagatorFailures.remove(this)

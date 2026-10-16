@@ -94,6 +94,9 @@ internal class ExactDualsOutcome(
  * in integers times powers of two. Once y has gained enough bits, continued fractions recover y* with a shared
  * denominator and Bᵀy* = c_B is checked in exact arithmetic. [start] seeds y; steps, bits, metered allocation and
  * time are capped, and a stop through [cancellation] or any cap declines.
+ *
+ * Refinement and reconstruction follow Gleixner, Steffy and Wolter, "Iterative Refinement for Linear Programming",
+ * INFORMS J. Comput., 2016, https://doi.org/10.1287/ijoc.2016.0692.
  */
 @Suppress("ReturnCount")
 internal fun exactBasisDuals(

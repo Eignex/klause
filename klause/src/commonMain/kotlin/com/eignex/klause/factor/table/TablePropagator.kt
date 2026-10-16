@@ -70,8 +70,7 @@ internal class TablePropagator(
 
     /** Advisor subscription: STR2 is hole-aware GAC (tuple feasibility tests membership, the
      *  prune drops interior values), so subscribe to every kind on every column variable and consume
-     *  the dirty-variable delta — a fire re-sweeps only when a column actually changed, instead
-     *  of the per-fire O(arity) domain-ref scan. */
+     *  the dirty-variable delta, so a fire re-sweeps only when a column actually changed. */
     override val initialIntEventWatches: IntArray = allEventWatches(xs)
 
     override val consumesIntEventDelta: Boolean = true
@@ -283,9 +282,10 @@ internal class TablePropagator(
     }
 
     /**
-     * Simple tabular reduction, STR2 (Lecoutre 2011). The propagator maintains a sparse set of currently-feasible
-     * tuple indices in [TableStr2State] across propagator calls; on each fire it sweeps only
-     * the live prefix to drop newly-infeasible tuples and gather column supports.
+     * Simple tabular reduction, STR2 (Lecoutre, "STR2: optimized simple tabular reduction for table
+     * constraints", Constraints 16(4), 2011, https://doi.org/10.1007/s10601-011-9107-6). The propagator
+     * maintains a sparse set of currently-feasible tuple indices in [TableStr2State] across propagator
+     * calls; on each fire it sweeps only the live prefix to drop newly-infeasible tuples and gather column supports.
      * Backtrack correctness comes from [TableStr2State.numValid] being a reversible cell on the engine's
      * undo trail: a pop restores the live-set size (hence the live set) in O(1).
      *

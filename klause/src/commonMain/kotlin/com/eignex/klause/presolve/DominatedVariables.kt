@@ -29,7 +29,7 @@ internal object DominatedVariables {
      *  - **up-safe**: the mirror (`≤`/negative or `≥`/positive, and `cⱼ ≤ 0`) → pin to the upper bound.
      *
      * Integers: a variable whose every occurrence is a monotone `≤`/`≥` row exposed by
-     * `Factor.linearRows` (an `=`/`≠` row, or a factor with no exact linear form, makes the safety
+     * `Factor.impliedLinearRows` (an `=`/`≠` row, or a factor with no exact linear form, makes the safety
      * undecidable, so it is excluded) is pinned by tightening its domain to a singleton.
      * Booleans: the pure-literal mirror, extended past [Clause] to every
      * *monotone* pseudo-Boolean row — a [Cardinality] `min ≤ Σ ≤ max` (each active side fixes a safe
@@ -40,7 +40,7 @@ internal object DominatedVariables {
      * the pass idempotent). Coefficients come from [objectiveIntCoeffs] / [objectiveBoolCoeffs]
      * (minimize sense, absent ⇒ 0).
      *
-     * The integer side reasons only over monotone `≤`/`≥` rows from `Factor.linearRows` — plain linear
+     * The integer side reasons only over monotone `≤`/`≥` rows from `Factor.impliedLinearRows` — plain linear
      * comparators and the increasing chain both qualify; reified rows are full biconditionals (their
      * inner vars affect feasibility both ways) and other globals expose no exact linear rows, so they
      * exclude their vars.
@@ -52,6 +52,9 @@ internal object DominatedVariables {
      * This is the finite form: it pins into root-propagated domains, which are narrower than the model
      * states, so it reaches columns the declaration alone leaves too wide to fix.
      * [fixDominatedSourceVariables] is the same reduction over a source model.
+     *
+     * Dual fixing as in E. D. Andersen, K. D. Andersen, "Presolving in linear programming", Mathematical
+     * Programming 71, 1995, https://doi.org/10.1007/BF01586000.
      */
     fun fixDominatedVariables(
         problem: BakedProblem,

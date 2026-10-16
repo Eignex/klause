@@ -25,8 +25,8 @@ import com.eignex.klause.model.PbOp
 import kotlin.concurrent.Volatile
 
 /**
- * `Σ weights(i) * lit(i) ⟨op⟩ bound` over Boolean literals (each contributing its weight when
- * true, 0 when false). Payload at `intPayload(factorId)` is the current weighted sum. Terms pair
+ * `Σ weights(i)·literals(i) ⟨op⟩ bound` over Boolean literals (each contributing its weight when
+ * true, 0 when false). Payload at `longPayload(factorId)` is the current weighted sum. Terms pair
  * [weights] with [literals]; the sum is compared by [op] against [bound].
  */
 class PseudoBoolean(weights: LongArray, literals: IntArray, val op: PbOp, override val bound: Long) :
@@ -66,22 +66,22 @@ class PseudoBoolean(weights: LongArray, literals: IntArray, val op: PbOp, overri
         val n = literals.size
         return when (op) {
             PbOp.LE -> when {
+                // #true ≤ n always holds
                 bound >= n -> Rewrite(emptyList())
 
-                // #true ≤ n always holds
+                // infeasible; leave to propagation
                 bound < 0 -> Unchanged
 
-                // infeasible; leave to propagation
                 else -> Rewrite(listOf(Cardinality(literals, min = 0, max = bound.toInt())))
             }
 
             PbOp.GE -> when {
+                // #true ≥ 0 always holds
                 bound <= 0 -> Rewrite(emptyList())
 
-                // #true ≥ 0 always holds
+                // infeasible
                 bound > n -> Unchanged
 
-                // infeasible
                 else -> Rewrite(listOf(Cardinality(literals, min = bound.toInt(), max = n)))
             }
 
@@ -94,7 +94,7 @@ class PseudoBoolean(weights: LongArray, literals: IntArray, val op: PbOp, overri
     }
 
     // The factor *is* its own exact linear row over its Boolean literals, read by presolve with no
-    // allocation. [relation] maps the native [PbOp] onto the row's [LinearOp] (the two never clash).
+    // allocation.
     override val relation: LinearOp = when (op) {
         PbOp.LE -> LinearOp.LE
         PbOp.GE -> LinearOp.GE

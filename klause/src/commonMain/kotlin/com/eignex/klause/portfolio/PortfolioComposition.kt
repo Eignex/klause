@@ -20,8 +20,7 @@ import com.eignex.klause.solver.result.SearchEvent
 import kotlin.math.roundToInt
 
 /** Whether the problem is a constraint *optimization* (an objective to minimise) or a pure
- *  *satisfaction* problem. One of the three portfolio axes; drives which arms are eligible and how
- *  a mixed pool is split. */
+ *  *satisfaction* problem. A portfolio axis; drives which arms are eligible and how a mixed pool is split. */
 enum class Kind {
     /** Constraint optimization — the model carries an objective to minimise. */
     COP,
@@ -30,7 +29,7 @@ enum class Kind {
     CSP,
 }
 
-/** Which engine family the portfolio draws arms from — the second portfolio axis. */
+/** Which engine family the portfolio draws arms from — a portfolio axis. */
 enum class EngineMix {
     /** Local-search arms only (no complete search, no CP dependency). */
     LOCAL_SEARCH,
@@ -48,7 +47,7 @@ enum class EngineMix {
 /**
  * A point in the portfolio configuration space. Its axes are **cores** (compute width) and **arms**
  * (pool size) — kept separate so they don't conflate — plus **kind** (COP vs CSP) and
- * **engine** (LS / backtrack / mixed). [PortfolioComposition.compose] turns a scenario into an ordered
+ * **engine** (LS / backtrack / mixed / ALNS). [PortfolioComposition.compose] turns a scenario into an ordered
  * list of configured and applicable auxiliary arms, and [PortfolioBuilder.build] materialises it into runnable
  * [PortfolioWorker]s — so every scenario flows through one construction path.
  *
@@ -70,7 +69,7 @@ data class PortfolioScenario(
     val arms: Int,
     /** Whether the problem optimizes (COP) or only satisfies (CSP). */
     val kind: Kind,
-    /** Which engine family supplies the arms (LS / backtrack / mixed). */
+    /** Which engine family supplies the arms (LS / backtrack / mixed / ALNS). */
     val engine: EngineMix,
     /** Base RNG seed; worker `i` offsets it so the pool explores distinct trajectories. */
     val seed: Long = 0L,
@@ -83,7 +82,8 @@ data class PortfolioScenario(
     val lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
     /** Entering-column policy used by every backtrack arm's zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
-    /** Source tolerance semantics for every arm's continuous completion; see [BacktrackParams.toleranceCheck]. */
+    /** Source tolerance semantics for the backtrack, local-search and ALNS arms' continuous completion;
+     *  see [BacktrackParams.toleranceCheck]. */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
     /** Optional override of the local-search arm pool — per-arm factories (a fresh recipe per slot).
      *  `null` uses the curated `LocalSearchCatalog` pool unchanged; a non-null pool is the CLI's resolved
@@ -175,10 +175,8 @@ data class PortfolioScenario(
 }
 
 /**
- * A composed-but-not-yet-materialised portfolio arm — one entry of either catalog
- * ([LocalSearchWorkerConfig] / [BacktrackWorkerConfig]). Each arm knows how to build its own
- * [PortfolioWorker] over a problem, so [PortfolioBuilder] is a thin `map` and there is no
- * engine-specific switch: the two engines stay symmetric ("arms in one spot").
+ * A composed-but-not-yet-materialised portfolio arm. Each arm builds its own [PortfolioWorker] over a problem,
+ * so [PortfolioBuilder] needs no engine-specific switch.
  */
 internal sealed interface WorkerConfig {
     fun withNodeBudget(budget: NodeBudget): WorkerConfig
@@ -195,8 +193,7 @@ internal sealed interface WorkerConfig {
      * [LinearObjective] every optimising worker minimises; [lsObjective] is the optional LS gradient view of the same
      * objective (backtrack ignores it). [lsLambda]/[definitionalSweep] are LS-only (backtrack
      * ignores them). [onEvent] is the shared [SearchEvent] sink, tagged here with the worker's
-     * label. [pools], when non-null, wires the cross-arm clause and cut exchanges (backtrack arms
-     * only; LS ignores it).
+     * label. [pools], when non-null, wires the cross-arm exchanges the arm's engine takes part in.
      */
     fun materialize(
         problem: BakedProblem,
@@ -224,10 +221,7 @@ internal object PortfolioComposition {
      *  COP leans LS (it streams good incumbents fast while backtrack tightens the bound); CSP leans
      *  backtrack (only complete search proves UNSAT / reliably reaches a first feasible). */
     fun lsShare(kind: Kind): Double = when (kind) {
-        // COP leans LS — it streams good incumbents while backtrack tightens the bound (≈ 4 LS : 2 BT).
         Kind.COP -> 2.0 / 3.0
-
-        // CSP leans backtrack — only complete search proves UNSAT / reliably reaches a first feasible.
         Kind.CSP -> 1.0 / 3.0
     }
 

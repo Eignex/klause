@@ -23,8 +23,8 @@ enum class TerminationReason {
 
     /**
      * The backend cannot handle a feature this problem uses, so it declines rather than returning a
-     * possibly-unsound verdict — e.g. local search over a model with LP-only continuous variables, whose
-     * linear rows it does not evaluate. The caller falls back to a backend that supports the feature.
+     * possibly-unsound verdict — e.g. local search over a model it cannot score soundly. The caller falls
+     * back to a backend that supports the feature.
      */
     Unsupported,
 
@@ -82,9 +82,8 @@ sealed interface SampleResult {
 /**
  * Result of [com.eignex.klause.solver.Optimizer.minimize], distinguishing feasible incumbents
  * from proven optimality.
- * Only complete backends (`BacktrackSolver`, `BruteForceSolver`) can
- * ever return [Optimal] or [Infeasible], and only the backtrack backend [Unbounded];
- * the local-search backend returns [BestFound] or [Unknown].
+ * Only complete backends (such as `BacktrackSolver`, `BruteForceSolver` and the open-theory route)
+ * return [Optimal], [Infeasible] or [Unbounded]; the local-search backend returns [BestFound] or [Unknown].
  *
  *  - [Optimal] — sample and objective; search exhausted (or the bound is tight enough
  *    to prove optimality without exhausting).

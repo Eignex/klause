@@ -8,16 +8,14 @@ import com.eignex.klause.util.argsortBy
 import kotlin.math.max
 
 /**
- * LS invariant for the no-overlap case of [com.eignex.klause.factor.scheduling.Cumulative]
- * (`unary = true`) and delegates all cost / delta / repair logic to an internal [CumulativeInvariant]
- * backing at capacity = 1, unit resources.
+ * LS invariant for the no-overlap case of [Cumulative] (`unary = true`). Cost, delta and move logic
+ * delegate to a unit-capacity [CumulativeInvariant]; only the feasible seeding is its own.
  */
 internal class DisjunctiveInvariant(
     private val starts: IntArray,
     private val durations: LongArray,
     private val presents: IntArray,
     private val durationVars: IntArray,
-    /** Unit-capacity CumulativeInvariant backing for LS cost and repair moves. */
     private val cumulativeBacking: CumulativeInvariant,
 ) : Invariant {
 
@@ -26,8 +24,7 @@ internal class DisjunctiveInvariant(
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         cumulativeBacking.isViolated(state, factorId)
 
-    /** Graded violation: delegates to the unit-capacity [CumulativeInvariant] backing, so the degree is
-     *  the total time-overlap energy `Σ_t max(0, concurrency_t − 1)` — a real gradient. */
+    /** The total time-overlap energy `Σ_t max(0, concurrency(t) − 1)`. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
         cumulativeBacking.violationDegree(state, factorId)
 
@@ -48,8 +45,7 @@ internal class DisjunctiveInvariant(
 
     override val providesImplicitNeighbourhood: Boolean get() = true
 
-    /** Feasibility-preserving neighbourhood: delegates to the unit-capacity [CumulativeInvariant] backing,
-     *  which swaps equal-duration, equal-resource (unit) task pairs. */
+    /** Swaps of equal-duration task pairs, from the unit-capacity backing. */
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) =
         cumulativeBacking.proposeStructuredMoves(state, factorId, sink)
 
@@ -81,7 +77,6 @@ internal class DisjunctiveInvariant(
         return true
     }
 
-    /** Current duration of task [i]: the constant, or the duration variable's value. */
     private fun durationOf(state: LocalSearchState, i: Int): Long =
         if (durationVars.isEmpty()) durations[i] else state.assignment.intValue(durationVars[i])
 }

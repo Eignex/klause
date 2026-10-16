@@ -13,7 +13,9 @@ import com.eignex.klause.util.IntHashSet
  * adjacent. Each base clique is greedily extended with the highest-fractional variables that are
  * adjacent to every current member — keeping it a true clique — and the cut is emitted when the
  * extended clique's LP value exceeds 1. The base constraint alone is already in the relaxation; the
- * value is the extension across constraints.
+ * value is the extension across constraints. See Atamtürk, Nemhauser and Savelsbergh, "Conflict graphs
+ * in solving integer programming problems", Eur. J. Oper. Res. 2000,
+ * https://doi.org/10.1016/S0377-2217(99)00015-6.
  */
 internal class CliqueCutSeparator : CutSeparator {
     private val tol = 1e-6

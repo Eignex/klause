@@ -143,7 +143,11 @@ internal class ExactRationalInequality(
 /** One source row together with the finite lower activity that makes it double-bounded. */
 internal class ExactDoubleBoundedRow(val index: Int, val inequality: ExactRationalInequality, val lower: BigFraction)
 
-/** Exact Double-Bounded Reduction split before its mixed-echelon/Hermite column transformation. */
+/**
+ * Exact Double-Bounded Reduction split before its mixed-echelon/Hermite column transformation. M. Bromberger,
+ * "A reduction from unbounded linear mixed arithmetic problems into bounded problems", IJCAR 2018,
+ * https://doi.org/10.1007/978-3-319-94205-6_22.
+ */
 internal sealed interface ExactDoubleBoundedSplit {
     data object Infeasible : ExactDoubleBoundedSplit
 
