@@ -26,8 +26,11 @@ internal fun schemaSemantics(config: KlauseConfig, overrides: SemanticOverrides)
     val effective = legacy.resolve(overrides).effective
     val grid = effective.floats as? FloatSemantics.Grid
     require(grid == null || grid.buckets >= 2) { "schema float grids require at least two buckets" }
-    require(grid == null || grid.linearScale == DEFAULT_FLOAT_SCALE) {
-        "schema float-linear lowering requires the default scale"
+    if (grid != null) {
+        val scale = grid.linearScale.toDouble()
+        require(scale < -Long.MIN_VALUE.toDouble() && scale.toLong() == grid.linearScale) {
+            "schema float-linear scale cannot be represented exactly in binary64"
+        }
     }
     return EffectiveSourceSemantics(schemaSemantics, effective)
 }

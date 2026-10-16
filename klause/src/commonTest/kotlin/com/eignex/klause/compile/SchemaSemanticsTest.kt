@@ -7,6 +7,8 @@ import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.model.ContinuousRealEquality
+import com.eignex.klause.model.ContinuousRealExpr
 import com.eignex.klause.model.FloatLinearConstraint
 import com.eignex.klause.model.FloatSpec
 import com.eignex.klause.model.IntCmpOp
@@ -132,13 +134,75 @@ class SchemaSemanticsTest {
     }
 
     @Test
-    fun `schema compilation should decline an unsupported float linear scale`() {
+    fun `float linear precision should change the interpreted grid assignments`() {
+        val source = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, buckets = 2),
+            "grid" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -0.5)),
+            "limited" to NamedConstraint(
+                FloatLinearConstraint(doubleArrayOf(2.49e-7), listOf("x"), IntCmpOp.LE, 1e-7),
+            ),
+        ))
+        for (scale in listOf(1_000_000L, 10_000_000L)) {
+            val compiled = source.compile(
+                semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(2, scale)),
+            )
+
+            val assignments = BacktrackSolver(compiled.problem.bake()).enumerate(BacktrackParams(randomSeed = 0))
+                .map { it.intValue(compiled.intVarIdByName.getValue("x")) }.toSet()
+
+            assertEquals(if (scale == 1_000_000L) setOf(0L, 1L) else setOf(0L), assignments)
+        }
+    }
+
+    @Test
+    fun `grid affine equalities should use the effective float linear scale`() {
+        val source = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, buckets = 2),
+            "z" to FloatSpec(0.0, 1.0, buckets = 2),
+            "grid" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -0.5)),
+            "zero" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("z"), IntCmpOp.EQ, 0.0)),
+            "affine" to NamedConstraint(ContinuousRealEquality(
+                ContinuousRealExpr.Affine(mapOf("z" to 1.0)),
+                ContinuousRealExpr.Affine(mapOf("x" to 2.49e-7)),
+            )),
+        ))
+        for (scale in listOf(1_000_000L, 10_000_000L)) {
+            val compiled = source.compile(
+                semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(2, scale)),
+            )
+
+            val assignments = BacktrackSolver(compiled.problem.bake()).enumerate(BacktrackParams(randomSeed = 0))
+                .map { it.intValue(compiled.intVarIdByName.getValue("x")) }.toSet()
+
+            assertEquals(if (scale == 1_000_000L) setOf(0L, 1L) else setOf(0L), assignments)
+        }
+    }
+
+    @Test
+    fun `wide float linear scales should preserve a feasible grid row`() {
+        val source = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, buckets = 2),
+            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, 0.5)),
+        ))
+        val compiled = source.compile(
+            semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(2, 3_000_000_000L)),
+        )
+
+        val result = BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 0))
+
+        assertEquals(1L, assertIs<SolveResult.Sat>(result).assignment.intValue(compiled.intVarIdByName.getValue("x")))
+    }
+
+    @Test
+    fun `schema compilation should decline a float linear scale that would be rounded`() {
         val source = SchemaDef<SchemaEntry>(emptyMap())
 
         val error = assertFailsWith<IllegalArgumentException> {
-            source.compile(semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(7, 10)))
+            source.compile(
+                semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(7, 9_007_199_254_740_993L)),
+            )
         }
 
-        assertTrue("requires the default scale" in error.message.orEmpty())
+        assertTrue("cannot be represented exactly in binary64" in error.message.orEmpty())
     }
 }

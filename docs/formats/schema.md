@@ -37,8 +37,10 @@ canonicalization. Both schema compile entries resolve `SemanticOverrides` before
 lowering and retain the result on `Problem.semantics`. Integer and real declarations
 require explicit ranges, so undeclared-range overrides are inapplicable. The legacy
 configuration arguments adapt their float bucket and absent-value choices into the
-same capture; resource settings remain separate. The float-linear scale currently
-supports its declared default only and rejects replacements.
+same capture; resource settings remain separate. Float-linear constraints and
+grid-affine equalities use the captured linear scale. The scale must be exactly
+representable in binary64, and quantized rows must fit signed 64-bit coefficients
+and bounds; unsupported values decline before they can wrap.
 
 An omitted `FloatSpec.buckets` or DSL bucket argument remains unspecified until
 compilation, which applies the effective grid default. An explicit count retains

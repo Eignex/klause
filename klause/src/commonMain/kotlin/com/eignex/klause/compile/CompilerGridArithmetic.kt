@@ -31,11 +31,11 @@ internal fun Lowering.assertGridContinuousEquality(equality: ContinuousRealEqual
             val (coordinate, coefficient) = coordinates[index]
             val step = if (coordinate.buckets > 1) (coordinate.upper - coordinate.lower) / (coordinate.buckets - 1)
                 else 0.0
-            gridCoefficient(coefficient * step * GRID_SCALE)
+            gridCoefficient(coefficient * step * floatLinearScale)
         }
         val bound = -constant - coordinates.sumOf { (coordinate, coefficient) -> coefficient * coordinate.lower }
         factors += Linear(coefficients, coordinates.map { it.first.variable }.toIntArray(), LinearOp.EQ,
-            gridCoefficient(bound * GRID_SCALE))
+            gridCoefficient(bound * floatLinearScale))
     }
     fun lift(expression: ContinuousRealExpr): GridCoordinate = columns.getOrPut(expression) {
         when (expression) {
@@ -100,5 +100,3 @@ private fun gridCoefficient(value: Double): Long {
     }
     return rounded.toLong()
 }
-
-private const val GRID_SCALE = 1_000_000.0
