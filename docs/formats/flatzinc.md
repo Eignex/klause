@@ -31,10 +31,11 @@ Continuous columns retain their effective finite or open sides, including bounds
 outside the grid window. Explicit source ranges and their aliases remain
 authoritative. A finite default range defines the grid for a bucketed declaration;
 a missing side uses the approximation window. A disjoint window declines that grid
-representation without refuting the source. Rational endpoints must be exactly
-representable under binary64 authority; unsupported endpoints are not rounded.
-Float-linear grid scales must also be exactly representable as binary64 integers;
-unsupported precision is rejected before lowering.
+representation without refuting the source. Rational source-bound endpoints must
+be exactly representable under binary64 authority; unsupported source endpoints
+are not rounded. Private grid windows retain rational origins and steps separately
+from their native approximate coordinates. Unsupported private scales or geometry
+decline the view while preserving the original model and independently admitted routes.
 
 Float grid windows remain separate from continuous source bounds. Typed grid
 settings pass through the same declaration planner and its private placeholder

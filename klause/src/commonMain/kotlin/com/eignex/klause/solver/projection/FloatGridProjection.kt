@@ -17,6 +17,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.lowering.approximateGridValue
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.util.Cancellation
@@ -198,10 +199,11 @@ internal fun floatGridColumn(
     val buckets = if (origin == upper) 1 else variable.buckets ?: inheritedBuckets ?: policy.buckets
     val step = if (buckets == 1) BigFraction.ZERO
     else (upper - origin) * BigFraction.ofLong(buckets - 1L).reciprocal()
-    val lo = origin.toDouble()
-    val hi = upper.toDouble()
+    val lo = approximateGridValue(origin)
+    val hi = approximateGridValue(upper)
     if (!lo.isFinite() || !hi.isFinite() || !(hi - lo).isFinite() ||
-        (!step.isZero && (!step.toDouble().isFinite() || step.toDouble() == 0.0))
+        (!origin.isZero && lo == 0.0) || (!upper.isZero && hi == 0.0) ||
+        (!step.isZero && (!approximateGridValue(step).isFinite() || approximateGridValue(step) == 0.0))
     ) return null
     if ((source.realLower[id].isFinite() && lo != source.realLower[id]) ||
         (source.realUpper[id].isFinite() && hi != source.realUpper[id])

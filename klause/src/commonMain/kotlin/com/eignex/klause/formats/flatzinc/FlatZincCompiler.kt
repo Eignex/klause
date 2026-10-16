@@ -42,7 +42,7 @@ internal class FlatZincCompiler(
     private val settings: ProblemSettings = KlauseConfig.current.problemSettings(),
     internal val floatChoiceLimit: Int = DEFAULT_FLOAT_CHOICE_LIMIT,
     internal val booleanZeroSumClauseLimit: Int = 32_768,
-    private val forFloatPlanning: Boolean = false,
+    internal val forFloatPlanning: Boolean = false,
     private val semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ) : CnfLowering {
     internal val sourceSemantics = FlatZincSemantics(
@@ -64,8 +64,8 @@ internal class FlatZincCompiler(
     internal val floatScale = gridSemantics.linearScale
     internal val unboundedIntLo = integerSemantics.lower ?: Long.MIN_VALUE
     internal val unboundedIntHi = integerSemantics.upper ?: Long.MAX_VALUE
-    internal val unboundedFloatLo = checkNotNull(gridSemantics.unrangedBounds.lower).gridFloat()
-    internal val unboundedFloatHi = checkNotNull(gridSemantics.unrangedBounds.upper).gridFloat()
+    internal val unboundedFloatLo: Double get() = checkNotNull(gridSemantics.unrangedBounds.lower).gridFloat()
+    internal val unboundedFloatHi: Double get() = checkNotNull(gridSemantics.unrangedBounds.upper).gridFloat()
     internal val exactFloats = sourceSemantics.effective.floats == FloatSemantics.Continuous
     private val openIntegerLower = IntHashSet()
     private val openIntegerUpper = IntHashSet()
@@ -75,11 +75,6 @@ internal class FlatZincCompiler(
         require(floatScale > 0) { "floatScale must be positive" }
         require(booleanZeroSumClauseLimit >= 0) { "booleanZeroSumClauseLimit must be nonnegative" }
         require(floatChoiceLimit > 0) { "floatChoiceLimit must be positive" }
-        if (!this.exactFloats) {
-            require(
-                this.unboundedFloatLo <= this.unboundedFloatHi,
-            ) { "unbounded float search bounds must be finite and ordered" }
-        }
     }
 
     internal val params = HashMap<String, ParamValue>()
@@ -142,14 +137,14 @@ internal class FlatZincCompiler(
         forLocalSearch = forLocalSearch,
         unboundedIntLo = unboundedIntLo,
         unboundedIntHi = unboundedIntHi,
-        unboundedFloatLo = unboundedFloatLo,
-        unboundedFloatHi = unboundedFloatHi,
+        unboundedFloatLo = DEFAULT_UNBOUNDED_FLOAT_LO,
+        unboundedFloatHi = DEFAULT_UNBOUNDED_FLOAT_HI,
         exactFloats = exactFloats,
         settings = settings,
         floatChoiceLimit = floatChoiceLimit,
         booleanZeroSumClauseLimit = booleanZeroSumClauseLimit,
         forFloatPlanning = true,
-        semanticOverrides = semanticOverrides,
+        semanticOverrides = semanticOverrides.copy(floats = sourceSemantics.effective.floats),
     ).also { it.processDeclarations() }
 
     internal fun processDeclarations() {
@@ -225,9 +220,8 @@ internal class FlatZincCompiler(
             semantics = sourceSemantics,
             definitionHints = definitionHints,
         ).also { program ->
-            program.retainSource(FlatZincSourceState(program.suppliedCopy(), declaredRealCount) {
-                selectFloatRepresentations()
-            })
+            program.retainSource(FlatZincSourceState(program.suppliedCopy(), declaredRealCount,
+                selectLegacy = { selectFloatRepresentations() }))
         }
     }
 
@@ -549,9 +543,6 @@ internal class FlatZincCompiler(
         }
         val lower = if (realSemantics.lower == null) unboundedFloatLo else sourceRealLower
         val upper = if (realSemantics.upper == null) unboundedFloatHi else sourceRealUpper
-        if (lower > upper) {
-            unsupportedHere("float variable `$name`: approximation window excludes its effective source bounds")
-        }
         return allocFloat(name, lower, upper).also {
             if (forFloatPlanning) floatSearchWindowIds.add(it)
         }
