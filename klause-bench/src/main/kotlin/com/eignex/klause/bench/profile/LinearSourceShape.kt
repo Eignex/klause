@@ -52,6 +52,10 @@ internal object LinearSourceShape {
         var scanned = 0
         var eligible = 0
         var completed = 0
+        var oriented = 0L
+        var bothPolarities = 0
+        var openClasses = 0
+        var closedClasses = 0
         var scalarDeclined = 0
         var emptyDeclined = 0
         var interrupted = false
@@ -123,9 +127,23 @@ internal object LinearSourceShape {
                 interrupted = true
                 break
             }
-            classes[key] = (classes[key] ?: 0) or if (negative) 2 else 1
+            val previous = classes[key] ?: 0
+            val next = previous or if (negative) 2 else 1
+            classes[key] = next
+            if (previous == 0) {
+                if (key.strict) openClasses++ else closedClasses++
+                oriented++
+            } else if (next != previous) {
+                bothPolarities++
+                oriented++
+            }
             completed++
+            if (stop()) {
+                interrupted = true
+                break
+            }
         }
+        if (stop()) interrupted = true
         val complete = scanned == rows.size && completed == eligible &&
             !interrupted && !inputLimit && scalarDeclined == 0 && emptyDeclined == 0
         put("inputRows", rows.size)
@@ -139,11 +157,11 @@ internal object LinearSourceShape {
         put("scalarDeclinedRows", scalarDeclined)
         put("emptyDeclinedRows", emptyDeclined)
         put("inputEntries", entries)
-        put("distinctScaledOrientedPredicates", classes.values.sumOf { if (it == 3) 2L else 1L })
+        put("distinctScaledOrientedPredicates", oriented)
         put("distinctComplementPredicateClasses", classes.size)
-        put("classesWithBothLiteralPolarities", classes.values.count { it == 3 })
-        put("openCanonicalClasses", classes.keys.count { it.strict })
-        put("closedCanonicalClasses", classes.keys.count { !it.strict })
+        put("classesWithBothLiteralPolarities", bothPolarities)
+        put("openCanonicalClasses", openClasses)
+        put("closedCanonicalClasses", closedClasses)
         put("scope", "Activated compiled real inequalities; exact ratio/sign/strict complement classes")
         put("coordinateOrder", "Ascending resolved tagged Term references")
         put("limits", "65536 cumulative row/term entries;4096-bit integer operands;shared parse/analysis token")
