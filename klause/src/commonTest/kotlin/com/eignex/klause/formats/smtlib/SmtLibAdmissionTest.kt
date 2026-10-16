@@ -827,7 +827,10 @@ class SmtLibAdmissionTest {
 
             assertIs<NonlinearIntegerProblem>((captured.source).originalSource)
             assertEquals(sense, captured.sense)
-            assertEquals(QuadraticCoefficient.of(bigIntOf(7), bigIntOf(3)), assertNotNull(captured.quadraticObjective).constant)
+            assertEquals(
+                QuadraticCoefficient.of(bigIntOf(7), bigIntOf(3)),
+                assertNotNull(captured.quadraticObjective).constant,
+            )
             assertEquals(
                 listOf(
                     QuadraticObjectiveTerm(

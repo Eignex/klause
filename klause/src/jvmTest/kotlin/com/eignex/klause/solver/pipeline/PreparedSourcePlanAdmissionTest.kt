@@ -106,8 +106,8 @@ class PreparedSourcePlanAdmissionTest(private val engine: FiniteEngine) {
 
     @Test
     fun `admitted strategy should solve a nonlinear integer source`() {
-        val input = assertIs<NonlinearIntegerProblem>((
-            SmtLib.parse("(declare-const n Int) (assert (= (* n n) 4))")).source.originalSource)
+        val captured = SmtLib.parse("(declare-const n Int) (assert (= (* n n) 4))")
+        val input = assertIs<NonlinearIntegerProblem>(captured.source.originalSource)
 
         val execution = OpenTheoryPipeline.execute(input.pipelineRequest(), engine = engine)
 

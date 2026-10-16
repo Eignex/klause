@@ -123,11 +123,11 @@ internal object TranscendentalSourceProbe {
                                 }) }
                             })
                             if (result is OpenTheoryResult.Sat) put("witness", buildJsonObject {
-                                problem.boolVarNames.forEach { (name, id) ->
+                                parsed.boolVarNames.forEach { (name, id) ->
                                     put(name, result.assignment.boolValue(id))
                                 }
-                                problem.intVarNames.forEach { (name, id) -> put(name, result.assignment.intValue(id)) }
-                                problem.realVarNames.forEach { (name, id) ->
+                                parsed.intVarNames.forEach { (name, id) -> put(name, result.assignment.intValue(id)) }
+                                parsed.realVarNames.forEach { (name, id) ->
                                     put(name, result.assignment.realValue(id))
                                 }
                             })

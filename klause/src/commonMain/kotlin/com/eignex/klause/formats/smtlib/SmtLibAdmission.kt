@@ -57,30 +57,34 @@ internal fun parseSmtLibSource(
         }
         val result = try {
             parseLinearAdmission(commands, unboundedIntLo, unboundedIntHi, settings, cancellation, semantics)
-        } catch (_: UnsupportedSmtException) {
+        } catch (factorFailure: UnsupportedSmtException) {
             if (cancellation()) throw PolynomialSourceInterrupted()
-            val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers = true,
-                allowFunctions = true, semantics = semantics)
-            for (command in commands) compiler.command(command)
-            val captured = compiler.build()
-            val functions = captured.transcendental
-            if (functions != null) {
-                SmtLibProblem(SourceAttachment(functions, settings), null,
-                    sourceNames(functions.intVarNames), sourceNames(functions.boolVarNames),
-                    sourceNames(functions.realVarNames), functions.objectiveSense)
-            } else if (captured.intVarNames.isNotEmpty()) {
-                val source = NonlinearIntegerProblem(
-                    captured.formula, captured.realCount, captured.boolCount,
-                    captured.intVarNames, captured.realVarNames, captured.boolVarNames, semantics,
-                )
-                SmtLibProblem(SourceAttachment(source, settings), null,
-                    sourceNames(source.intVarNames), sourceNames(source.boolVarNames), sourceNames(source.realVarNames),
-                    captured.objectiveSense, captured.objective)
-            } else {
-                val source = captured.realSource(semantics)
-                SmtLibProblem(SourceAttachment(source, settings), null,
-                    emptyMap(), sourceNames(source.boolVarNames), sourceNames(source.realVarNames),
-                    captured.objectiveSense, captured.objective)
+            try {
+                val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers = true,
+                    allowFunctions = true, semantics = semantics)
+                for (command in commands) compiler.command(command)
+                val captured = compiler.build()
+                val functions = captured.transcendental
+                if (functions != null) {
+                    SmtLibProblem(SourceAttachment(functions, settings), null,
+                        sourceNames(functions.intVarNames), sourceNames(functions.boolVarNames),
+                        sourceNames(functions.realVarNames), functions.objectiveSense)
+                } else if (captured.intVarNames.isNotEmpty()) {
+                    val source = NonlinearIntegerProblem(
+                        captured.formula, captured.realCount, captured.boolCount,
+                        captured.intVarNames, captured.realVarNames, captured.boolVarNames, semantics,
+                    )
+                    SmtLibProblem(SourceAttachment(source, settings), null,
+                        sourceNames(source.intVarNames), sourceNames(source.boolVarNames), sourceNames(source.realVarNames),
+                        captured.objectiveSense, captured.objective)
+                } else {
+                    val source = captured.realSource(semantics)
+                    SmtLibProblem(SourceAttachment(source, settings), null,
+                        emptyMap(), sourceNames(source.boolVarNames), sourceNames(source.realVarNames),
+                        captured.objectiveSense, captured.objective)
+                }
+            } catch (_: UnsupportedSmtException) {
+                throw factorFailure
             }
         }
         if (cancellation()) null else result
@@ -114,11 +118,12 @@ private fun parseLinearAdmission(
     var exited = false
     var invalidNonlinearSession = false
     var nonlinearSyntax = false
+    var invalidScope = false
     var signedSymbols = false
     var quadraticObjective = false
     for (command in commands) {
-        if (!scope.command(command)) smtUnsupported("source symbol is outside its lexical scope")
         builder.command(command)
+        if (!scope.command(command)) invalidScope = true
         nonlinearSyntax = nonlinearSyntax || hasNonlinearSyntax(command, cancellation)
         signedSymbols = signedSymbols || hasSignedNumberSymbol(command, cancellation)
         val head = ((command as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text
@@ -144,12 +149,13 @@ private fun parseLinearAdmission(
     if (pureRealHelpers || nonlinearHelpers) {
         val referenced = builder.asserts.any { referencesHelper(it, builder.macros.keys, cancellation) } ||
             builder.objectiveSpec?.first?.let { referencesHelper(it, builder.macros.keys, cancellation) } == true
-        if (referenced) smtUnsupported("referenced helpers require lexical source lowering")
-        // Unused definitions still have to satisfy lexical body and return-sort validation.
+        if (nonlinearHelpers && referenced) smtUnsupported("nonlinear helpers require lexical source lowering")
+        // Definitions must satisfy lexical body and return-sort validation even when unused.
         val validation = SmtLibPolynomialCompiler(cancellation, allowIntegers = true)
         for (declaration in declarations) validation.command(declaration)
     }
     val problem = builder.build()
+    if (invalidScope) smtUnsupported("source symbol is outside its lexical scope")
     if (builder.objectiveSpec != null && problem.model.factors.any {
             it is ContinuousProduct || it is RealProduct || (it is Power && it.base is Power.Coordinate.Real)
         }
