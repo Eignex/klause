@@ -255,7 +255,9 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
         minimizeScoped(objective, applyStack(params)).withSourceSemantics(solver.problem.semantics)
 
     override fun improvements(objective: LinearObjective, params: P): Sequence<MinimizeResult> =
-        guarded(improvementsScoped(objective, applyStack(params)).map { it.withSourceSemantics(solver.problem.semantics) })
+        guarded(improvementsScoped(objective, applyStack(params)).map {
+            it.withSourceSemantics(solver.problem.semantics)
+        })
 
     override fun openSamples(params: P): SearchStream<Sample> = own(openSamplesScoped(applyStack(params))) {
         it.withSourceSemantics(solver.problem.semantics)

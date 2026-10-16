@@ -52,7 +52,10 @@ class ResultSemanticsTest {
         val results = verdicts.map { it.withSourceSemantics(semantics) }
 
         for (result in results) assertSame(semantics, result.semantics)
-        assertSame(semantics, assertIs<SolveResult.Sat>(results.first()).assignment.semantics)
+        assertSame(
+            assertIs<SolveResult.Sat>(verdicts.first()).assignment,
+            assertIs<SolveResult.Sat>(results.first()).assignment,
+        )
     }
 
     @Test
@@ -71,7 +74,7 @@ class ResultSemanticsTest {
 
         for (result in results) {
             assertSame(semantics, result.semantics)
-            result.assignment?.let { assertSame(semantics, it.semantics) }
+            result.assignment?.let { assertSame(point, it) }
         }
     }
 
@@ -124,7 +127,6 @@ class ResultSemanticsTest {
         for (result in results) {
             val witness = assertIs<SolveResult.Sat>(result)
             assertSame(semantics, witness.semantics)
-            assertSame(semantics, witness.assignment.semantics)
         }
     }
 
@@ -171,7 +173,6 @@ class ResultSemanticsTest {
         for (result in results) {
             val incumbent = assertIs<MinimizeResult.WithSample>(result)
             assertSame(semantics, incumbent.semantics)
-            assertSame(semantics, incumbent.sample.semantics)
             assertEquals(8.0, incumbent.objective)
         }
     }
@@ -202,7 +203,7 @@ class ResultSemanticsTest {
         assertSame(semantics, assertIs<MinimizeResult.Optimal>(result).semantics)
         assertSame(result, repeated)
         assertTrue(callbacks.isNotEmpty())
-        for (incumbent in callbacks) assertSame(semantics, incumbent.sample.semantics)
+        for (incumbent in callbacks) assertSame(semantics, incumbent.semantics)
     }
 
     @Test
@@ -216,7 +217,7 @@ class ResultSemanticsTest {
 
         assertSame(semantics, assertIs<MinimizeResult.Optimal>(result).semantics)
         assertTrue(callbacks.isNotEmpty())
-        for (incumbent in callbacks) assertSame(semantics, incumbent.sample.semantics)
+        for (incumbent in callbacks) assertSame(semantics, incumbent.semantics)
     }
 
     @Test
@@ -225,7 +226,9 @@ class ResultSemanticsTest {
         val model = Problem(1, 0, emptyArray(), emptyArray(), semantics = semantics).bake()
         val solver = Alns(LocalSearchSolver(model), maxIterations = 0)
 
-        val result = solver.minimize(LinearObjective(longArrayOf(1)), LocalSearchParams(cancellation = Cancellation { true }))
+        val result = solver.minimize(
+            LinearObjective(longArrayOf(1)), LocalSearchParams(cancellation = Cancellation { true }),
+        )
 
         assertSame(semantics, assertIs<MinimizeResult.Unknown>(result).semantics)
     }
@@ -257,7 +260,9 @@ class ResultSemanticsTest {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), semantics = semantics).bake()
         val solver = BacktrackSolver(model)
 
-        val point = solver.samples(SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0), BacktrackParams()).first()
+        val point = solver.samples(
+            SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0), BacktrackParams(),
+        ).first()
 
         assertSame(semantics, point.semantics)
         assertEquals(0, point.numBoolVars)

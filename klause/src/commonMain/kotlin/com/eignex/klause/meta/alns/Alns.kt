@@ -432,10 +432,11 @@ internal class Alns(
         }
 
         fun result() = MinimizeResult.BestFound(
-            sample = bestSample.withSourceSemantics(problem.semantics),
+            sample = bestSample,
             objective = bestObj,
             reason = TerminationReason.BudgetExhausted,
             stats = SolveStats(alns = telemetry.snapshot()),
+            semantics = problem.semantics,
         )
 
         override fun close() {

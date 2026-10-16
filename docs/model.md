@@ -265,17 +265,18 @@ accepts the capture before emitting a model. `SemanticSource<M>` pairs other
 immutable or borrowed-read-only source payloads with the same contract. The IR
 types select no route, theory, engine or resource policy.
 
-Source-bound result values and accepted witness certificates retain the model's
-semantic capture through `Sample.semantics`. An unbound sample has no qualification;
-changing witness
-coordinates discards both the old certificate and its qualification. An unchanged
+Finite enumeration and sampling streams, and accepted witness certificates, retain
+the model's semantic capture through `Sample.semantics`. An unbound sample has no
+qualification; changing witness coordinates discards both the old certificate and
+its qualification. An unchanged
 copy preserves them. This metadata adds no checking, claim authority or independent
 proof to the existing witness admission contract.
 
 Satisfaction, sampling, optimization and assumption verdicts expose nullable
 `semantics` independently of their assignments. A result without an assignment can
 retain its interpretation, including an interrupted operation. Binding preserves
-counters, exact values, cores, rays and evidence; a foreign interpretation cannot
+the assignment object, counters, exact values, cores, rays and evidence. An imported
+point can remain unbound inside a qualified result; a foreign interpretation cannot
 silently replace an existing capture. The interpretation does not establish point
 validity or promote the verdict's proof authority.
 

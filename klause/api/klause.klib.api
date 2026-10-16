@@ -3858,49 +3858,60 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
 }
 
 sealed interface com.eignex.klause.solver.pipeline/OpenTheoryResult { // com.eignex.klause.solver.pipeline/OpenTheoryResult|null[0]
+    abstract val semantics // com.eignex.klause.solver.pipeline/OpenTheoryResult.semantics|{}semantics[0]
+        abstract fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryResult.semantics.<get-semantics>|<get-semantics>(){}[0]
     abstract val stats // com.eignex.klause.solver.pipeline/OpenTheoryResult.stats|{}stats[0]
         abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryResult.stats.<get-stats>|<get-stats>(){}[0]
 
     final class Sat : com.eignex.klause.solver.pipeline/OpenTheoryResult { // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.solver.result.SolveStats){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val assignment // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.assignment.<get-assignment>|<get-assignment>(){}[0]
+        final val semantics // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.stats.<get-stats>|<get-stats>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.component1|component1(){}[0]
         final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.component2|component2(){}[0]
-        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun component3(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryResult.Sat.toString|toString(){}[0]
     }
 
     final class Unknown : com.eignex.klause.solver.pipeline/OpenTheoryResult { // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown|null[0]
-        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val reason // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.reason|{}reason[0]
             final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.reason.<get-reason>|<get-reason>(){}[0]
+        final val semantics // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.stats.<get-stats>|<get-stats>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.component1|component1(){}[0]
         final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.component2|component2(){}[0]
-        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun component3(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unknown.toString|toString(){}[0]
     }
 
     final class Unsat : com.eignex.klause.solver.pipeline/OpenTheoryResult { // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat|null[0]
-        constructor <init>(com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat.<init>|<init>(com.eignex.klause.solver.result.SolveStats){}[0]
+        constructor <init>(com.eignex.klause.solver.result/SolveStats, com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat.<init>|<init>(com.eignex.klause.solver.result.SolveStats;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
+        final val semantics // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat.stats.<get-stats>|<get-stats>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat.copy|copy(com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun component2(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat.copy|copy(com.eignex.klause.solver.result.SolveStats;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryResult.Unsat.toString|toString(){}[0]
@@ -3996,6 +4007,8 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
         abstract fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.evidence.<get-evidence>|<get-evidence>(){}[0]
     abstract val objectiveValue // com.eignex.klause.solver.result/MinimizeResult.objectiveValue|{}objectiveValue[0]
         abstract fun <get-objectiveValue>(): kotlin/Double? // com.eignex.klause.solver.result/MinimizeResult.objectiveValue.<get-objectiveValue>|<get-objectiveValue>(){}[0]
+    abstract val semantics // com.eignex.klause.solver.result/MinimizeResult.semantics|{}semantics[0]
+        abstract fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/MinimizeResult.semantics.<get-semantics>|<get-semantics>(){}[0]
     abstract val stats // com.eignex.klause.solver.result/MinimizeResult.stats|{}stats[0]
         abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.stats.<get-stats>|<get-stats>(){}[0]
 
@@ -4011,7 +4024,7 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
     }
 
     final class BestFound : com.eignex.klause.solver.result/MinimizeResult.WithSample { // com.eignex.klause.solver.result/MinimizeResult.BestFound|null[0]
-        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver.result/MinimizeResult.BestFound.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/MinimizeResult.BestFound.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val evidence // com.eignex.klause.solver.result/MinimizeResult.BestFound.evidence|{}evidence[0]
             final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.BestFound.evidence.<get-evidence>|<get-evidence>(){}[0]
@@ -4021,6 +4034,8 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
             final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/MinimizeResult.BestFound.reason.<get-reason>|<get-reason>(){}[0]
         final val sample // com.eignex.klause.solver.result/MinimizeResult.BestFound.sample|{}sample[0]
             final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/MinimizeResult.BestFound.sample.<get-sample>|<get-sample>(){}[0]
+        final val semantics // com.eignex.klause.solver.result/MinimizeResult.BestFound.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/MinimizeResult.BestFound.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver.result/MinimizeResult.BestFound.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.BestFound.stats.<get-stats>|<get-stats>(){}[0]
 
@@ -4029,14 +4044,15 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
         final fun component3(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/MinimizeResult.BestFound.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.BestFound.component4|component4(){}[0]
         final fun component5(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.BestFound.component5|component5(){}[0]
-        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver.result/MinimizeResult.BestFound // com.eignex.klause.solver.result/MinimizeResult.BestFound.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        final fun component6(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/MinimizeResult.BestFound.component6|component6(){}[0]
+        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/MinimizeResult.BestFound // com.eignex.klause.solver.result/MinimizeResult.BestFound.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.BestFound.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.BestFound.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.BestFound.toString|toString(){}[0]
     }
 
     final class Infeasible : com.eignex.klause.solver.result/MinimizeResult { // com.eignex.klause.solver.result/MinimizeResult.Infeasible|null[0]
-        constructor <init>(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver.result/MinimizeResult.Infeasible.<init>|<init>(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        constructor <init>(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/MinimizeResult.Infeasible.<init>|<init>(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val assignment // com.eignex.klause.solver.result/MinimizeResult.Infeasible.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.result/MinimizeResult.Infeasible.assignment.<get-assignment>|<get-assignment>(){}[0]
@@ -4046,20 +4062,23 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
             final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Infeasible.evidence.<get-evidence>|<get-evidence>(){}[0]
         final val objectiveValue // com.eignex.klause.solver.result/MinimizeResult.Infeasible.objectiveValue|{}objectiveValue[0]
             final fun <get-objectiveValue>(): kotlin/Double? // com.eignex.klause.solver.result/MinimizeResult.Infeasible.objectiveValue.<get-objectiveValue>|<get-objectiveValue>(){}[0]
+        final val semantics // com.eignex.klause.solver.result/MinimizeResult.Infeasible.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/MinimizeResult.Infeasible.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver.result/MinimizeResult.Infeasible.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Infeasible.stats.<get-stats>|<get-stats>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.result/UnsatCore? // com.eignex.klause.solver.result/MinimizeResult.Infeasible.component1|component1(){}[0]
         final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Infeasible.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Infeasible.component3|component3(){}[0]
-        final fun copy(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver.result/MinimizeResult.Infeasible // com.eignex.klause.solver.result/MinimizeResult.Infeasible.copy|copy(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        final fun component4(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/MinimizeResult.Infeasible.component4|component4(){}[0]
+        final fun copy(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/MinimizeResult.Infeasible // com.eignex.klause.solver.result/MinimizeResult.Infeasible.copy|copy(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.Infeasible.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.Infeasible.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.Infeasible.toString|toString(){}[0]
     }
 
     final class Optimal : com.eignex.klause.solver.result/MinimizeResult.WithSample { // com.eignex.klause.solver.result/MinimizeResult.Optimal|null[0]
-        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver.result/MinimizeResult.Optimal.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/MinimizeResult.Optimal.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val evidence // com.eignex.klause.solver.result/MinimizeResult.Optimal.evidence|{}evidence[0]
             final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Optimal.evidence.<get-evidence>|<get-evidence>(){}[0]
@@ -4067,6 +4086,8 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
             final fun <get-objective>(): kotlin/Double // com.eignex.klause.solver.result/MinimizeResult.Optimal.objective.<get-objective>|<get-objective>(){}[0]
         final val sample // com.eignex.klause.solver.result/MinimizeResult.Optimal.sample|{}sample[0]
             final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/MinimizeResult.Optimal.sample.<get-sample>|<get-sample>(){}[0]
+        final val semantics // com.eignex.klause.solver.result/MinimizeResult.Optimal.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/MinimizeResult.Optimal.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver.result/MinimizeResult.Optimal.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Optimal.stats.<get-stats>|<get-stats>(){}[0]
 
@@ -4074,14 +4095,15 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
         final fun component2(): kotlin/Double // com.eignex.klause.solver.result/MinimizeResult.Optimal.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Optimal.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Optimal.component4|component4(){}[0]
-        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver.result/MinimizeResult.Optimal // com.eignex.klause.solver.result/MinimizeResult.Optimal.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        final fun component5(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/MinimizeResult.Optimal.component5|component5(){}[0]
+        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/MinimizeResult.Optimal // com.eignex.klause.solver.result/MinimizeResult.Optimal.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.Optimal.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.Optimal.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.Optimal.toString|toString(){}[0]
     }
 
     final class Unbounded : com.eignex.klause.solver.result/MinimizeResult.WithSample { // com.eignex.klause.solver.result/MinimizeResult.Unbounded|null[0]
-        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver.result/MinimizeResult.Unbounded.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/MinimizeResult.Unbounded.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val direction // com.eignex.klause.solver.result/MinimizeResult.Unbounded.direction|{}direction[0]
             final fun <get-direction>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.result/MinimizeResult.Unbounded.direction.<get-direction>|<get-direction>(){}[0]
@@ -4091,6 +4113,8 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
             final fun <get-objective>(): kotlin/Double // com.eignex.klause.solver.result/MinimizeResult.Unbounded.objective.<get-objective>|<get-objective>(){}[0]
         final val sample // com.eignex.klause.solver.result/MinimizeResult.Unbounded.sample|{}sample[0]
             final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/MinimizeResult.Unbounded.sample.<get-sample>|<get-sample>(){}[0]
+        final val semantics // com.eignex.klause.solver.result/MinimizeResult.Unbounded.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/MinimizeResult.Unbounded.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver.result/MinimizeResult.Unbounded.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Unbounded.stats.<get-stats>|<get-stats>(){}[0]
 
@@ -4099,14 +4123,15 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
         final fun component3(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component4|component4(){}[0]
         final fun component5(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component5|component5(){}[0]
-        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver.result/MinimizeResult.Unbounded // com.eignex.klause.solver.result/MinimizeResult.Unbounded.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        final fun component6(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component6|component6(){}[0]
+        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/MinimizeResult.Unbounded // com.eignex.klause.solver.result/MinimizeResult.Unbounded.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.Unbounded.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.Unbounded.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.Unbounded.toString|toString(){}[0]
     }
 
     final class Unknown : com.eignex.klause.solver.result/MinimizeResult { // com.eignex.klause.solver.result/MinimizeResult.Unknown|null[0]
-        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver.result/MinimizeResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/MinimizeResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val assignment // com.eignex.klause.solver.result/MinimizeResult.Unknown.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.result/MinimizeResult.Unknown.assignment.<get-assignment>|<get-assignment>(){}[0]
@@ -4116,13 +4141,16 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
             final fun <get-objectiveValue>(): kotlin/Double? // com.eignex.klause.solver.result/MinimizeResult.Unknown.objectiveValue.<get-objectiveValue>|<get-objectiveValue>(){}[0]
         final val reason // com.eignex.klause.solver.result/MinimizeResult.Unknown.reason|{}reason[0]
             final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/MinimizeResult.Unknown.reason.<get-reason>|<get-reason>(){}[0]
+        final val semantics // com.eignex.klause.solver.result/MinimizeResult.Unknown.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/MinimizeResult.Unknown.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver.result/MinimizeResult.Unknown.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Unknown.stats.<get-stats>|<get-stats>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/MinimizeResult.Unknown.component1|component1(){}[0]
         final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Unknown.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Unknown.component3|component3(){}[0]
-        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver.result/MinimizeResult.Unknown // com.eignex.klause.solver.result/MinimizeResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        final fun component4(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/MinimizeResult.Unknown.component4|component4(){}[0]
+        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/MinimizeResult.Unknown // com.eignex.klause.solver.result/MinimizeResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.Unknown.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.Unknown.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.Unknown.toString|toString(){}[0]
@@ -4302,47 +4330,58 @@ sealed interface com.eignex.klause.solver.result/QuadraticOptimizationResult { /
 sealed interface com.eignex.klause.solver.result/SampleResult { // com.eignex.klause.solver.result/SampleResult|null[0]
     abstract val assignment // com.eignex.klause.solver.result/SampleResult.assignment|{}assignment[0]
         abstract fun <get-assignment>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.result/SampleResult.assignment.<get-assignment>|<get-assignment>(){}[0]
+    abstract val semantics // com.eignex.klause.solver.result/SampleResult.semantics|{}semantics[0]
+        abstract fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SampleResult.semantics.<get-semantics>|<get-semantics>(){}[0]
 
     final class Found : com.eignex.klause.solver.result/SampleResult { // com.eignex.klause.solver.result/SampleResult.Found|null[0]
-        constructor <init>(com.eignex.klause.solver/Sample) // com.eignex.klause.solver.result/SampleResult.Found.<init>|<init>(com.eignex.klause.solver.Sample){}[0]
+        constructor <init>(com.eignex.klause.solver/Sample, com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/SampleResult.Found.<init>|<init>(com.eignex.klause.solver.Sample;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val assignment // com.eignex.klause.solver.result/SampleResult.Found.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/SampleResult.Found.assignment.<get-assignment>|<get-assignment>(){}[0]
         final val sample // com.eignex.klause.solver.result/SampleResult.Found.sample|{}sample[0]
             final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/SampleResult.Found.sample.<get-sample>|<get-sample>(){}[0]
+        final val semantics // com.eignex.klause.solver.result/SampleResult.Found.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SampleResult.Found.semantics.<get-semantics>|<get-semantics>(){}[0]
 
         final fun component1(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/SampleResult.Found.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.solver/Sample = ...): com.eignex.klause.solver.result/SampleResult.Found // com.eignex.klause.solver.result/SampleResult.Found.copy|copy(com.eignex.klause.solver.Sample){}[0]
+        final fun component2(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SampleResult.Found.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver/Sample = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/SampleResult.Found // com.eignex.klause.solver.result/SampleResult.Found.copy|copy(com.eignex.klause.solver.Sample;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/SampleResult.Found.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/SampleResult.Found.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/SampleResult.Found.toString|toString(){}[0]
     }
 
     final class Infeasible : com.eignex.klause.solver.result/SampleResult { // com.eignex.klause.solver.result/SampleResult.Infeasible|null[0]
-        constructor <init>(com.eignex.klause.solver.result/UnsatCore? = ...) // com.eignex.klause.solver.result/SampleResult.Infeasible.<init>|<init>(com.eignex.klause.solver.result.UnsatCore?){}[0]
+        constructor <init>(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/SampleResult.Infeasible.<init>|<init>(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val assignment // com.eignex.klause.solver.result/SampleResult.Infeasible.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.result/SampleResult.Infeasible.assignment.<get-assignment>|<get-assignment>(){}[0]
         final val core // com.eignex.klause.solver.result/SampleResult.Infeasible.core|{}core[0]
             final fun <get-core>(): com.eignex.klause.solver.result/UnsatCore? // com.eignex.klause.solver.result/SampleResult.Infeasible.core.<get-core>|<get-core>(){}[0]
+        final val semantics // com.eignex.klause.solver.result/SampleResult.Infeasible.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SampleResult.Infeasible.semantics.<get-semantics>|<get-semantics>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.result/UnsatCore? // com.eignex.klause.solver.result/SampleResult.Infeasible.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.solver.result/UnsatCore? = ...): com.eignex.klause.solver.result/SampleResult.Infeasible // com.eignex.klause.solver.result/SampleResult.Infeasible.copy|copy(com.eignex.klause.solver.result.UnsatCore?){}[0]
+        final fun component2(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SampleResult.Infeasible.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/SampleResult.Infeasible // com.eignex.klause.solver.result/SampleResult.Infeasible.copy|copy(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/SampleResult.Infeasible.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/SampleResult.Infeasible.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/SampleResult.Infeasible.toString|toString(){}[0]
     }
 
     final class Unknown : com.eignex.klause.solver.result/SampleResult { // com.eignex.klause.solver.result/SampleResult.Unknown|null[0]
-        constructor <init>(com.eignex.klause.solver.result/TerminationReason) // com.eignex.klause.solver.result/SampleResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason){}[0]
+        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/SampleResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val assignment // com.eignex.klause.solver.result/SampleResult.Unknown.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.result/SampleResult.Unknown.assignment.<get-assignment>|<get-assignment>(){}[0]
         final val reason // com.eignex.klause.solver.result/SampleResult.Unknown.reason|{}reason[0]
             final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/SampleResult.Unknown.reason.<get-reason>|<get-reason>(){}[0]
+        final val semantics // com.eignex.klause.solver.result/SampleResult.Unknown.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SampleResult.Unknown.semantics.<get-semantics>|<get-semantics>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/SampleResult.Unknown.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.solver.result/TerminationReason = ...): com.eignex.klause.solver.result/SampleResult.Unknown // com.eignex.klause.solver.result/SampleResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason){}[0]
+        final fun component2(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SampleResult.Unknown.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/SampleResult.Unknown // com.eignex.klause.solver.result/SampleResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/SampleResult.Unknown.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/SampleResult.Unknown.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/SampleResult.Unknown.toString|toString(){}[0]
@@ -4350,53 +4389,68 @@ sealed interface com.eignex.klause.solver.result/SampleResult { // com.eignex.kl
 }
 
 sealed interface com.eignex.klause.solver.result/SatisfyResult { // com.eignex.klause.solver.result/SatisfyResult|null[0]
+    abstract val semantics // com.eignex.klause.solver.result/SatisfyResult.semantics|{}semantics[0]
+        abstract fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SatisfyResult.semantics.<get-semantics>|<get-semantics>(){}[0]
+
     final class GloballyUnsat : com.eignex.klause.solver.result/SatisfyResult { // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat|null[0]
-        constructor <init>(com.eignex.klause.solver.result/UnsatCore? = ...) // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat.<init>|<init>(com.eignex.klause.solver.result.UnsatCore?){}[0]
+        constructor <init>(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat.<init>|<init>(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val core // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat.core|{}core[0]
             final fun <get-core>(): com.eignex.klause.solver.result/UnsatCore? // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat.core.<get-core>|<get-core>(){}[0]
+        final val semantics // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat.semantics.<get-semantics>|<get-semantics>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.result/UnsatCore? // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.solver.result/UnsatCore? = ...): com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat.copy|copy(com.eignex.klause.solver.result.UnsatCore?){}[0]
+        final fun component2(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat.copy|copy(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/SatisfyResult.GloballyUnsat.toString|toString(){}[0]
     }
 
     final class Sat : com.eignex.klause.solver.result/SatisfyResult { // com.eignex.klause.solver.result/SatisfyResult.Sat|null[0]
-        constructor <init>(com.eignex.klause.solver/Sample) // com.eignex.klause.solver.result/SatisfyResult.Sat.<init>|<init>(com.eignex.klause.solver.Sample){}[0]
+        constructor <init>(com.eignex.klause.solver/Sample, com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/SatisfyResult.Sat.<init>|<init>(com.eignex.klause.solver.Sample;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val sample // com.eignex.klause.solver.result/SatisfyResult.Sat.sample|{}sample[0]
             final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/SatisfyResult.Sat.sample.<get-sample>|<get-sample>(){}[0]
+        final val semantics // com.eignex.klause.solver.result/SatisfyResult.Sat.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SatisfyResult.Sat.semantics.<get-semantics>|<get-semantics>(){}[0]
 
         final fun component1(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/SatisfyResult.Sat.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.solver/Sample = ...): com.eignex.klause.solver.result/SatisfyResult.Sat // com.eignex.klause.solver.result/SatisfyResult.Sat.copy|copy(com.eignex.klause.solver.Sample){}[0]
+        final fun component2(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SatisfyResult.Sat.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver/Sample = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/SatisfyResult.Sat // com.eignex.klause.solver.result/SatisfyResult.Sat.copy|copy(com.eignex.klause.solver.Sample;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/SatisfyResult.Sat.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/SatisfyResult.Sat.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/SatisfyResult.Sat.toString|toString(){}[0]
     }
 
     final class Unknown : com.eignex.klause.solver.result/SatisfyResult { // com.eignex.klause.solver.result/SatisfyResult.Unknown|null[0]
-        constructor <init>(com.eignex.klause.solver.result/TerminationReason) // com.eignex.klause.solver.result/SatisfyResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason){}[0]
+        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/SatisfyResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val reason // com.eignex.klause.solver.result/SatisfyResult.Unknown.reason|{}reason[0]
             final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/SatisfyResult.Unknown.reason.<get-reason>|<get-reason>(){}[0]
+        final val semantics // com.eignex.klause.solver.result/SatisfyResult.Unknown.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SatisfyResult.Unknown.semantics.<get-semantics>|<get-semantics>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/SatisfyResult.Unknown.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.solver.result/TerminationReason = ...): com.eignex.klause.solver.result/SatisfyResult.Unknown // com.eignex.klause.solver.result/SatisfyResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason){}[0]
+        final fun component2(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SatisfyResult.Unknown.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/SatisfyResult.Unknown // com.eignex.klause.solver.result/SatisfyResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/SatisfyResult.Unknown.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/SatisfyResult.Unknown.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/SatisfyResult.Unknown.toString|toString(){}[0]
     }
 
     final class UnsatUnderAssumptions : com.eignex.klause.solver.result/SatisfyResult { // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions|null[0]
-        constructor <init>(com.eignex.klause.propagation/Assumptions) // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions.<init>|<init>(com.eignex.klause.propagation.Assumptions){}[0]
+        constructor <init>(com.eignex.klause.propagation/Assumptions, com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions.<init>|<init>(com.eignex.klause.propagation.Assumptions;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val core // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions.core|{}core[0]
             final fun <get-core>(): com.eignex.klause.propagation/Assumptions // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions.core.<get-core>|<get-core>(){}[0]
+        final val semantics // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions.semantics.<get-semantics>|<get-semantics>(){}[0]
 
         final fun component1(): com.eignex.klause.propagation/Assumptions // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.propagation/Assumptions = ...): com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions.copy|copy(com.eignex.klause.propagation.Assumptions){}[0]
+        final fun component2(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions.copy|copy(com.eignex.klause.propagation.Assumptions;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/SatisfyResult.UnsatUnderAssumptions.toString|toString(){}[0]
@@ -4934,49 +4988,57 @@ sealed interface com.eignex.klause.solver.search/VarRef { // com.eignex.klause.s
 sealed interface com.eignex.klause.solver/SolveResult { // com.eignex.klause.solver/SolveResult|null[0]
     abstract val evidence // com.eignex.klause.solver/SolveResult.evidence|{}evidence[0]
         abstract fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.evidence.<get-evidence>|<get-evidence>(){}[0]
+    abstract val semantics // com.eignex.klause.solver/SolveResult.semantics|{}semantics[0]
+        abstract fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver/SolveResult.semantics.<get-semantics>|<get-semantics>(){}[0]
     abstract val stats // com.eignex.klause.solver/SolveResult.stats|{}stats[0]
         abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/SolveResult.stats.<get-stats>|<get-stats>(){}[0]
 
     final class Sat : com.eignex.klause.solver/SolveResult { // com.eignex.klause.solver/SolveResult.Sat|null[0]
-        constructor <init>(com.eignex.klause.solver/Sample, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver/SolveResult.Sat.<init>|<init>(com.eignex.klause.solver.Sample;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        constructor <init>(com.eignex.klause.solver/Sample, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver/SolveResult.Sat.<init>|<init>(com.eignex.klause.solver.Sample;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val assignment // com.eignex.klause.solver/SolveResult.Sat.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver/SolveResult.Sat.assignment.<get-assignment>|<get-assignment>(){}[0]
         final val evidence // com.eignex.klause.solver/SolveResult.Sat.evidence|{}evidence[0]
             final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.Sat.evidence.<get-evidence>|<get-evidence>(){}[0]
+        final val semantics // com.eignex.klause.solver/SolveResult.Sat.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver/SolveResult.Sat.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver/SolveResult.Sat.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/SolveResult.Sat.stats.<get-stats>|<get-stats>(){}[0]
 
         final fun component1(): com.eignex.klause.solver/Sample // com.eignex.klause.solver/SolveResult.Sat.component1|component1(){}[0]
         final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/SolveResult.Sat.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.Sat.component3|component3(){}[0]
-        final fun copy(com.eignex.klause.solver/Sample = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver/SolveResult.Sat // com.eignex.klause.solver/SolveResult.Sat.copy|copy(com.eignex.klause.solver.Sample;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        final fun component4(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver/SolveResult.Sat.component4|component4(){}[0]
+        final fun copy(com.eignex.klause.solver/Sample = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver/SolveResult.Sat // com.eignex.klause.solver/SolveResult.Sat.copy|copy(com.eignex.klause.solver.Sample;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/SolveResult.Sat.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver/SolveResult.Sat.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver/SolveResult.Sat.toString|toString(){}[0]
     }
 
     final class Unknown : com.eignex.klause.solver/SolveResult { // com.eignex.klause.solver/SolveResult.Unknown|null[0]
-        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver/SolveResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver/SolveResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val evidence // com.eignex.klause.solver/SolveResult.Unknown.evidence|{}evidence[0]
             final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.Unknown.evidence.<get-evidence>|<get-evidence>(){}[0]
         final val reason // com.eignex.klause.solver/SolveResult.Unknown.reason|{}reason[0]
             final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver/SolveResult.Unknown.reason.<get-reason>|<get-reason>(){}[0]
+        final val semantics // com.eignex.klause.solver/SolveResult.Unknown.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver/SolveResult.Unknown.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver/SolveResult.Unknown.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/SolveResult.Unknown.stats.<get-stats>|<get-stats>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver/SolveResult.Unknown.component1|component1(){}[0]
         final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/SolveResult.Unknown.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.Unknown.component3|component3(){}[0]
-        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver/SolveResult.Unknown // com.eignex.klause.solver/SolveResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        final fun component4(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver/SolveResult.Unknown.component4|component4(){}[0]
+        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver/SolveResult.Unknown // com.eignex.klause.solver/SolveResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/SolveResult.Unknown.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver/SolveResult.Unknown.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver/SolveResult.Unknown.toString|toString(){}[0]
     }
 
     final class Unsat : com.eignex.klause.solver/SolveResult { // com.eignex.klause.solver/SolveResult.Unsat|null[0]
-        constructor <init>(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.propagation/Assumptions? = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver/SolveResult.Unsat.<init>|<init>(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.propagation.Assumptions?;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        constructor <init>(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.propagation/Assumptions? = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver/SolveResult.Unsat.<init>|<init>(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.propagation.Assumptions?;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val assumptionCore // com.eignex.klause.solver/SolveResult.Unsat.assumptionCore|{}assumptionCore[0]
             final fun <get-assumptionCore>(): com.eignex.klause.propagation/Assumptions? // com.eignex.klause.solver/SolveResult.Unsat.assumptionCore.<get-assumptionCore>|<get-assumptionCore>(){}[0]
@@ -4984,6 +5046,8 @@ sealed interface com.eignex.klause.solver/SolveResult { // com.eignex.klause.sol
             final fun <get-core>(): com.eignex.klause.solver.result/UnsatCore? // com.eignex.klause.solver/SolveResult.Unsat.core.<get-core>|<get-core>(){}[0]
         final val evidence // com.eignex.klause.solver/SolveResult.Unsat.evidence|{}evidence[0]
             final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.Unsat.evidence.<get-evidence>|<get-evidence>(){}[0]
+        final val semantics // com.eignex.klause.solver/SolveResult.Unsat.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver/SolveResult.Unsat.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver/SolveResult.Unsat.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/SolveResult.Unsat.stats.<get-stats>|<get-stats>(){}[0]
 
@@ -4991,7 +5055,8 @@ sealed interface com.eignex.klause.solver/SolveResult { // com.eignex.klause.sol
         final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/SolveResult.Unsat.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.propagation/Assumptions? // com.eignex.klause.solver/SolveResult.Unsat.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.Unsat.component4|component4(){}[0]
-        final fun copy(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.propagation/Assumptions? = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver/SolveResult.Unsat // com.eignex.klause.solver/SolveResult.Unsat.copy|copy(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.propagation.Assumptions?;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
+        final fun component5(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver/SolveResult.Unsat.component5|component5(){}[0]
+        final fun copy(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.propagation/Assumptions? = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver/SolveResult.Unsat // com.eignex.klause.solver/SolveResult.Unsat.copy|copy(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.propagation.Assumptions?;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/SolveResult.Unsat.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver/SolveResult.Unsat.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver/SolveResult.Unsat.toString|toString(){}[0]

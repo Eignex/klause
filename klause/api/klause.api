@@ -10107,36 +10107,41 @@ public final class com/eignex/klause/solver/Session$DefaultImpls {
 
 public abstract interface class com/eignex/klause/solver/SolveResult {
 	public abstract fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public abstract fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 }
 
 public final class com/eignex/klause/solver/SolveResult$Sat : com/eignex/klause/solver/SolveResult {
-	public fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
-	public final fun copy (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/SolveResult$Sat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/SolveResult$Sat;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult$Sat;
+	public final fun component4 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/SolveResult$Sat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/SolveResult$Sat;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult$Sat;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAssignment ()Lcom/eignex/klause/solver/Sample;
 	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/SolveResult$Unknown : com/eignex/klause/solver/SolveResult {
-	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
-	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/SolveResult$Unknown;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/SolveResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult$Unknown;
+	public final fun component4 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/SolveResult$Unknown;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/SolveResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult$Unknown;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -10144,18 +10149,20 @@ public final class com/eignex/klause/solver/SolveResult$Unknown : com/eignex/kla
 
 public final class com/eignex/klause/solver/SolveResult$Unsat : com/eignex/klause/solver/SolveResult {
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/UnsatCore;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component3 ()Lcom/eignex/klause/propagation/Assumptions;
 	public final fun component4 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
-	public final fun copy (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/SolveResult$Unsat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/SolveResult$Unsat;Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult$Unsat;
+	public final fun component5 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/SolveResult$Unsat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/SolveResult$Unsat;Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult$Unsat;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAssumptionCore ()Lcom/eignex/klause/propagation/Assumptions;
 	public final fun getCore ()Lcom/eignex/klause/solver/result/UnsatCore;
 	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -11795,41 +11802,51 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryRequest {
 }
 
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryResult {
+	public abstract fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryResult$Sat : com/eignex/klause/solver/pipeline/OpenTheoryResult {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Sat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Sat;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Sat;
+	public final fun component3 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Sat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Sat;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Sat;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAssignment ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryResult$Unknown : com/eignex/klause/solver/pipeline/OpenTheoryResult {
-	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unknown;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unknown;
+	public final fun component3 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unknown;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unknown;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat : com/eignex/klause/solver/pipeline/OpenTheoryResult {
-	public fun <init> (Lcom/eignex/klause/solver/result/SolveStats;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat;
+	public final fun component2 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat;
 	public fun equals (Ljava/lang/Object;)Z
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -13074,19 +13091,21 @@ public abstract interface class com/eignex/klause/solver/result/MinimizeResult {
 	public abstract fun getAssignment ()Lcom/eignex/klause/solver/Sample;
 	public abstract fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public abstract fun getObjectiveValue ()Ljava/lang/Double;
+	public abstract fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 }
 
 public final class com/eignex/klause/solver/result/MinimizeResult$BestFound : com/eignex/klause/solver/result/MinimizeResult$WithSample {
-	public fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
 	public final fun component2 ()D
 	public final fun component3 ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun component4 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component5 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
-	public final fun copy (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/result/MinimizeResult$BestFound;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$BestFound;Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$BestFound;
+	public final fun component6 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/result/MinimizeResult$BestFound;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$BestFound;Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$BestFound;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
 	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
@@ -13094,6 +13113,7 @@ public final class com/eignex/klause/solver/result/MinimizeResult$BestFound : co
 	public fun getObjectiveValue ()Ljava/lang/Double;
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -13101,53 +13121,58 @@ public final class com/eignex/klause/solver/result/MinimizeResult$BestFound : co
 
 public final class com/eignex/klause/solver/result/MinimizeResult$Infeasible : com/eignex/klause/solver/result/MinimizeResult {
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/UnsatCore;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
-	public final fun copy (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/result/MinimizeResult$Infeasible;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Infeasible;Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Infeasible;
+	public final fun component4 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/result/MinimizeResult$Infeasible;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Infeasible;Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Infeasible;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
 	public final fun getCore ()Lcom/eignex/klause/solver/result/UnsatCore;
 	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public fun getObjectiveValue ()Ljava/lang/Double;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/result/MinimizeResult$Optimal : com/eignex/klause/solver/result/MinimizeResult$WithSample {
-	public fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
 	public final fun component2 ()D
 	public final fun component3 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component4 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
-	public final fun copy (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;
+	public final fun component5 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
 	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public fun getObjective ()D
 	public fun getObjectiveValue ()Ljava/lang/Double;
 	public fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/result/MinimizeResult$Unbounded : com/eignex/klause/solver/result/MinimizeResult$WithSample {
-	public fun <init> (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
 	public final fun component2 ()D
 	public final fun component3 ()Ljava/util/List;
 	public final fun component4 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component5 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
-	public final fun copy (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;
+	public final fun component6 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
 	public final fun getDirection ()Ljava/util/List;
@@ -13155,24 +13180,27 @@ public final class com/eignex/klause/solver/result/MinimizeResult$Unbounded : co
 	public fun getObjective ()D
 	public fun getObjectiveValue ()Ljava/lang/Double;
 	public fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/result/MinimizeResult$Unknown : com/eignex/klause/solver/result/MinimizeResult {
-	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
-	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/result/MinimizeResult$Unknown;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Unknown;
+	public final fun component4 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/result/MinimizeResult$Unknown;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Unknown;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
 	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public fun getObjectiveValue ()Ljava/lang/Double;
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -13655,91 +13683,112 @@ public final class com/eignex/klause/solver/result/RunStats {
 
 public abstract interface class com/eignex/klause/solver/result/SampleResult {
 	public abstract fun getAssignment ()Lcom/eignex/klause/solver/Sample;
+	public abstract fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 }
 
 public final class com/eignex/klause/solver/result/SampleResult$Found : com/eignex/klause/solver/result/SampleResult {
-	public fun <init> (Lcom/eignex/klause/solver/Sample;)V
+	public fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
-	public final fun copy (Lcom/eignex/klause/solver/Sample;)Lcom/eignex/klause/solver/result/SampleResult$Found;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SampleResult$Found;Lcom/eignex/klause/solver/Sample;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SampleResult$Found;
+	public final fun component2 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/result/SampleResult$Found;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SampleResult$Found;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SampleResult$Found;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
 	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/result/SampleResult$Infeasible : com/eignex/klause/solver/result/SampleResult {
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/UnsatCore;
-	public final fun copy (Lcom/eignex/klause/solver/result/UnsatCore;)Lcom/eignex/klause/solver/result/SampleResult$Infeasible;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SampleResult$Infeasible;Lcom/eignex/klause/solver/result/UnsatCore;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SampleResult$Infeasible;
+	public final fun component2 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/result/SampleResult$Infeasible;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SampleResult$Infeasible;Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SampleResult$Infeasible;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
 	public final fun getCore ()Lcom/eignex/klause/solver/result/UnsatCore;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/result/SampleResult$Unknown : com/eignex/klause/solver/result/SampleResult {
-	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/TerminationReason;
-	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;)Lcom/eignex/klause/solver/result/SampleResult$Unknown;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SampleResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SampleResult$Unknown;
+	public final fun component2 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/result/SampleResult$Unknown;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SampleResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SampleResult$Unknown;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class com/eignex/klause/solver/result/SatisfyResult {
+	public abstract fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 }
 
 public final class com/eignex/klause/solver/result/SatisfyResult$GloballyUnsat : com/eignex/klause/solver/result/SatisfyResult {
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/UnsatCore;
-	public final fun copy (Lcom/eignex/klause/solver/result/UnsatCore;)Lcom/eignex/klause/solver/result/SatisfyResult$GloballyUnsat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SatisfyResult$GloballyUnsat;Lcom/eignex/klause/solver/result/UnsatCore;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SatisfyResult$GloballyUnsat;
+	public final fun component2 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/result/SatisfyResult$GloballyUnsat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SatisfyResult$GloballyUnsat;Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SatisfyResult$GloballyUnsat;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCore ()Lcom/eignex/klause/solver/result/UnsatCore;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/result/SatisfyResult$Sat : com/eignex/klause/solver/result/SatisfyResult {
-	public fun <init> (Lcom/eignex/klause/solver/Sample;)V
+	public fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
-	public final fun copy (Lcom/eignex/klause/solver/Sample;)Lcom/eignex/klause/solver/result/SatisfyResult$Sat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SatisfyResult$Sat;Lcom/eignex/klause/solver/Sample;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SatisfyResult$Sat;
+	public final fun component2 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/result/SatisfyResult$Sat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SatisfyResult$Sat;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SatisfyResult$Sat;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/result/SatisfyResult$Unknown : com/eignex/klause/solver/result/SatisfyResult {
-	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/TerminationReason;
-	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;)Lcom/eignex/klause/solver/result/SatisfyResult$Unknown;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SatisfyResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SatisfyResult$Unknown;
+	public final fun component2 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/result/SatisfyResult$Unknown;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SatisfyResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SatisfyResult$Unknown;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/result/SatisfyResult$UnsatUnderAssumptions : com/eignex/klause/solver/result/SatisfyResult {
-	public fun <init> (Lcom/eignex/klause/propagation/Assumptions;)V
+	public fun <init> (Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/propagation/Assumptions;
-	public final fun copy (Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/solver/result/SatisfyResult$UnsatUnderAssumptions;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SatisfyResult$UnsatUnderAssumptions;Lcom/eignex/klause/propagation/Assumptions;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SatisfyResult$UnsatUnderAssumptions;
+	public final fun component2 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/result/SatisfyResult$UnsatUnderAssumptions;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SatisfyResult$UnsatUnderAssumptions;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SatisfyResult$UnsatUnderAssumptions;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCore ()Lcom/eignex/klause/propagation/Assumptions;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
