@@ -280,6 +280,12 @@ point can remain unbound inside a qualified result; a foreign interpretation can
 silently replace an existing capture. The interpretation does not establish point
 validity or promote the verdict's proof authority.
 
+Open and quadratic optimization execution envelopes capture the original prepared
+source owner's interpretation, including early interruption and admission declines.
+Qualification preserves the native verdict and the exact accepted-incumbent receipt;
+the receipt remains separate from a limit or ray certificate's private witness.
+An execution over a source without a semantic owner remains unbound.
+
 These value types define the source carrier contract. FlatZinc captures its
 [effective declaration policy](formats/flatzinc.md#declared-semantics-and-caller-ranges)
 before lowering; other frontends still use their format-specific parameters.

@@ -155,7 +155,7 @@ fun OpenTheoryPipeline.minimize(
                 native.declinedResource
             } else native.resource,
         ).also { it.retainPublication(publication.latest) }
-    }
+    }.withSourceSemantics(request.preparedPlan.sourceSemantics)
 }
 
 internal class QuadraticIntegerOptimization(
