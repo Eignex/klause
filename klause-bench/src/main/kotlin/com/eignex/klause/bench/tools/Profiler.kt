@@ -3,6 +3,7 @@ package com.eignex.klause.bench.tools
 import jdk.jfr.Recording
 import jdk.jfr.consumer.RecordedEvent
 import jdk.jfr.consumer.RecordingFile
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import java.time.Duration
@@ -69,6 +70,7 @@ internal object Profiler {
     fun summarizeCli(file: File) = summarizeCli(file, System.out)
 
     fun summarizeCli(file: File, output: PrintStream) {
+        val appendContexts = CliAppendContexts()
         val cpu = HashMap<String, Long>()
         val phases = HashMap<String, Long>()
         val allocation = HashMap<String, Long>()
@@ -83,6 +85,10 @@ internal object Profiler {
                 val event = recording.readEvent()
                 when (event.eventType.name) {
                     "jdk.ExecutionSample" -> {
+                        val frames = event.stackTrace?.frames.orEmpty()
+                        appendContexts.record(frames.size) {
+                            frames.map { "${it.method.type.name}.${it.method.name}" }
+                        }
                         topMethod(event)?.let { cpu.merge(it, 1L, Long::plus) }
                         phases.merge(cliPhase(event), 1L, Long::plus)
                         cpuCallers.merge(cliOperationCallers(event), 1L, Long::plus)
@@ -91,6 +97,10 @@ internal object Profiler {
                     }
                     "jdk.ObjectAllocationSample" -> {
                         val weight = event.getLong("weight")
+                        val frames = event.stackTrace?.frames.orEmpty()
+                        appendContexts.record(frames.size, weight) {
+                            frames.map { "${it.method.type.name}.${it.method.name}" }
+                        }
                         allocation.merge(cliPhase(event), weight, Long::plus)
                         allocationCallers.merge(cliOperationCallers(event), weight, Long::plus)
                         allocationModelCallers.merge(cliModelCallers(event), weight, Long::plus)
@@ -115,6 +125,12 @@ internal object Profiler {
                 "model-facing callers (estimated bytes)",
             allocationContexts, Int.MAX_VALUE, output,
         )
+        val appendix = ByteArrayOutputStream()
+        PrintStream(appendix, false, Charsets.UTF_8).use { stream ->
+            for ((title, counts) in appendContexts.tables) printTable(title, counts, Int.MAX_VALUE, stream)
+        }
+        check(appendix.size() <= 256 * 1024) { "Append context output exceeded its limit" }
+        output.write(appendix.toByteArray())
     }
 
     private fun cliContextCallers(event: RecordedEvent): String {

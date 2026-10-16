@@ -1560,6 +1560,19 @@ prove complete public traversal. Each event contributes once to each context tab
 all context/caller groups are printed. Tables are overlapping facets of the same
 samples and allocation weights, so their totals must not be added together.
 
+Append-ancestry tables join captured `LpPropagator.append` paths with the same
+context markers. An ordered `definitionColumn`, `assertTerms`, `assertComparison`
+chain distinguishes observed `assertDisequalities` from an observed `assertSource`
+ancestor. Nested disequality assertions retain that label when both are present.
+A captured `assertSource` without `assertDisequalities` does not prove that the
+assertion was ordinary: missing or inlined ancestors remain unknown. Other append
+paths and missing ancestors have explicit labels. This facet inspects at most
+one million CPU/allocation events, 256 frames per event and ten seconds of parser
+time. Later or deeper events retain their count/weight in explicit unknown groups.
+Each table has at most 256 fixed-family/context groups; their combined output is
+limited to 256 KiB. Existing nine tables retain their original grouping. The new
+tables overlap those facets and supply no invocation, timing or proof authority.
+
 `com.eignex.klause.bench.profile.CliRecordingSummary` replays retained recordings
 on the remote lab host. Pass one positive `sourceJob=<id>` and one to eight
 `recording=<case>:<measurementUUID>:<rawSHA256>` arguments. It derives sibling jobs
