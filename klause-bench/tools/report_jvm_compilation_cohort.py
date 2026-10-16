@@ -53,6 +53,15 @@ def referenced_pairs(pairs, rows):
     return result
 
 
+def observation_summaries(rows):
+    return [{**{key: row.get(key) for key in ('case', 'family', 'arm', *CONTEXT_KEYS,
+                'originalSourceStatus', 'observedDeclaredPhaseAndSourceEligible', 'exclusions')},
+             'observedAllTierMetrics': {key: row['observedMetrics'].get(key) for key in ('rootEventCount', *METRICS)},
+             'observedC2Metrics': {key: row['observedC2Metrics'].get(key) for key in ('rootEventCount', *METRICS)},
+             'fullSourcePhaseCoverageProven': False, 'runtimeSourceBindingProven': False,
+             'acceptedSavingsCredit': False} for row in rows]
+
+
 def source_status(metadata, checks):
     problem = metadata.get('problem', {})
     if problem.get('format') in ('MINIZINC', 'XCSP3'):
@@ -417,6 +426,11 @@ def main():
         summary['phaseMappingIdentity'] = result.get('phaseMappingIdentity')
         mapped = result.get('phaseMapping')
         summary['mappedComparisonSummaries'] = mapped['observedComparisonSummaries'] if mapped is not None else None
+        summary['familyObservationSummaries'] = observation_summaries(result.get('familyCaseObservations', []))
+        summary['mappedFamilyObservationSummaries'] = observation_summaries(mapped['familyCaseObservations']) \
+            if mapped is not None else None
+        summary['observationSummaryScope'] = 'Complete descriptive reported root quantities, including excluded contexts; '
+        summary['observationSummaryScope'] += 'not paired eligibility, exhaustive source costs or current-source benefit.'
         raw = (json.dumps(summary, indent=2) + '\n').encode()
         if len(raw) > cohort.MAX_INDEX_BYTES:
             raise ValueError('Complete observed comparison summary exceeds bounds')

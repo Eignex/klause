@@ -2318,6 +2318,11 @@ identities. Pair keys include engine, input index, repetition, mode and recipe.
 `compilation-cost-summary.json` and the child stdout retain every family/engine/
 mode/recipe summary and excluded pair context. Summary maxima are sums of paired
 per-recording maxima, with a retained difference range; they are not cohort maxima.
+`familyObservationSummaries` and `mappedFamilyObservationSummaries` also retain
+the already computed all-tier and C2 scalar quantities for every family/recording,
+including excluded contexts. Their source/phase exclusions and missing quantities
+stay explicit. These descriptive observations do not qualify a comparison or
+establish exhaustive source work or a current source change's benefit.
 Missing, duplicate or unexpected arms, mismatched problem identities, invalid or
 unknown original source outcomes, incomplete cohorts, missing declared ordinary
 phases, unresolved roots, XML gaps, data-loss events and ambiguous IDs remain

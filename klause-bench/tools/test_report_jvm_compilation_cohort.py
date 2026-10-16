@@ -252,6 +252,26 @@ class ReportJvmCompilationCohortTest(unittest.TestCase):
             self.assertEqual([-3, -3], summary['metrics']['reportedElapsedNanos']['pairDifferenceRange'])
             self.assertFalse(result['acceptedSavingsCredit'])
 
+    def test_observation_summaries_keep_unqualified_reported_costs_and_missing_values_without_comparison_credit(self):
+        row = {'case': 'c', 'family': 'f', 'arm': 'candidate', 'engine': 'ls', 'index': 1, 'repetition': 0,
+               'mode': 'profile', 'recipe': None, 'originalSourceStatus': 'unknown',
+               'observedDeclaredPhaseAndSourceEligible': False, 'exclusions': ['Original source outcome is unknown'],
+               'observedMetrics': {'rootEventCount': 2, 'reportedElapsedNanos': 17,
+                                   'maxReportedElapsedNanos': 12, 'reportedSuccessfulCodeBytes': None},
+               'observedC2Metrics': {'reportedElapsedNanos': None}}
+
+        result = review.observation_summaries([row, row])
+
+        self.assertEqual(2, len(result))
+        for value in result:
+            self.assertEqual(row['observedMetrics'], value['observedAllTierMetrics'])
+            self.assertTrue(all(amount is None for amount in value['observedC2Metrics'].values()))
+            self.assertEqual(row['exclusions'], value['exclusions'])
+            self.assertFalse(value['observedDeclaredPhaseAndSourceEligible'])
+            self.assertFalse(value['fullSourcePhaseCoverageProven'])
+            self.assertFalse(value['runtimeSourceBindingProven'])
+            self.assertFalse(value['acceptedSavingsCredit'])
+
     def test_compact_xml_indices_restore_every_reference_without_changing_roots_metrics_or_exclusions(self):
         for references in [[], [{'collection': collection, 'index': index}
                                for collection in review.XML_COLLECTIONS for index in (0, 3, 3, 99)]]:
