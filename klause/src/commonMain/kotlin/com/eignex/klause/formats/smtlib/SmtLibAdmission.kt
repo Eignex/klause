@@ -177,3 +177,30 @@ private fun hasNonlinearSyntax(expression: SExpr, cancellation: Cancellation): B
     }
     return false
 }
+
+private fun <T> withSource(
+    openSource: () -> CharSource,
+    cancellation: Cancellation,
+    read: (CharSource) -> T,
+): T {
+    val source = openSource()
+    var interrupted = false
+    val outcome = try {
+        runCatching { read(source) }.also {
+            if (it.exceptionOrNull() is PolynomialSourceInterrupted ||
+                it.exceptionOrNull() is CancellationException
+            ) interrupted = true
+        }
+    } finally {
+        if (source is AutoCloseable) source.close()
+        else while (!interrupted) {
+            if (cancellation()) {
+                interrupted = true
+                break
+            }
+            if (source.next() == null) break
+        }
+    }
+    if (interrupted) throw PolynomialSourceInterrupted()
+    return outcome.getOrThrow()
+}
