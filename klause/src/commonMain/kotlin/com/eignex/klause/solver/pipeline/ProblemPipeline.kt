@@ -194,7 +194,9 @@ private fun Problem.pipelineRouteObserved(
         return SourceProblemRoute.UnsupportedOpen(null, this, initial)
     }
     val lpStats = onLpStats?.let { LpStatsSink(LpRoute.STANDALONE) }
-    val bounded = proveBounded(boundCancellation or preparationCancellation, lpStats)
+    val boundsStop = if (boundCancellation === preparationCancellation) boundCancellation else
+        boundCancellation or preparationCancellation
+    val bounded = proveBounded(boundsStop, lpStats)
     if (lpStats != null) onLpStats(lpStats.snapshot())
     val routed = when (bounded) {
         BoundedRouting.Refuted -> return SourceProblemRoute.Refuted
