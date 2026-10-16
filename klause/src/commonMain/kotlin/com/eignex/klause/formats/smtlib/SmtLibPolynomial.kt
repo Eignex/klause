@@ -62,14 +62,18 @@ internal object SmtLibPolynomial {
         cancellation: Cancellation,
         allowIntegers: Boolean,
         allowFunctions: Boolean,
-    ): SmtLibPolynomialProblem = parse(text, cancellation, allowIntegers, allowFunctions, smtLibSemantics.resolve())
+    ): SmtLibPolynomialProblem = parse(
+        text, cancellation, allowIntegers, allowFunctions, smtLibSemantics.resolve(),
+    )
 
     fun parse(
         source: CharSource,
         cancellation: Cancellation,
         allowIntegers: Boolean,
         allowFunctions: Boolean,
-    ): SmtLibPolynomialProblem = parse(source, cancellation, allowIntegers, allowFunctions, smtLibSemantics.resolve())
+    ): SmtLibPolynomialProblem = parse(
+        source, cancellation, allowIntegers, allowFunctions, smtLibSemantics.resolve(),
+    )
 
     fun parse(
         text: String,
