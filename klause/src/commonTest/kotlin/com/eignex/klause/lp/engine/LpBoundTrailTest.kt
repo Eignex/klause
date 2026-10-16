@@ -93,7 +93,7 @@ class LpBoundTrailTest {
             val before = trail.state
             var polls = 0
             val token = Cancellation { cancelled && ++polls >= 3 }
-            val row = LpScopedRow(0L, listOf(0 to if (cancelled) one else huge), one,
+            val row = LpScopedRow(0L, listOf(0 to one), if (cancelled) one else huge,
                 ExactLpColumn(ExactLpBounds()))
 
             assertFalse(trail.append(row, scoped = false, token = token))
