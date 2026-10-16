@@ -1,10 +1,12 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
 
 @Suppress("LongParameterList")
@@ -18,6 +20,7 @@ internal class LocalSearchSolveRun(
     sink: SolveStatsSink,
     control: LocalSearchRunControl,
     release: () -> Unit,
+    private val semantics: EffectiveSourceSemantics,
 ) : LocalSearchRun<SolveResult>(sink, control, release), InstructionSlicedSolve {
     override val work: Long get() = control.work
 
@@ -42,7 +45,7 @@ internal class LocalSearchSolveRun(
         if (!hasEffectiveAssumptions) {
             return if (refutesModel) {
                 sink.stop()
-                finish(SolveResult.Unsat(stats = stats))
+                finish(SolveResult.Unsat(stats = stats).withSourceSemantics(semantics))
             } else {
                 unknown(TerminationReason.Unsupported)
             }
@@ -59,13 +62,13 @@ internal class LocalSearchSolveRun(
             null
         }
         sink.stop()
-        return finish(SolveResult.Sat(sample, stats))
+        return finish(SolveResult.Sat(sample, stats).withSourceSemantics(semantics))
     }
 
     private fun unknown(reason: TerminationReason): SolveResult {
         sink.timedOut = reason == TerminationReason.BudgetExhausted
         sink.stop()
-        return finish(SolveResult.Unknown(reason, stats))
+        return finish(SolveResult.Unknown(reason, stats).withSourceSemantics(semantics))
     }
 
     override fun close() = super<LocalSearchRun>.close()

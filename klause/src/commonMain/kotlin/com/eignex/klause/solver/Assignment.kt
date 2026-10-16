@@ -181,12 +181,22 @@ class Sample private constructor(
     val numIntVars: Int get() = exactInts?.size ?: integerValues.size
 
     internal var witnessCertificate: EvidenceCertificate? = null
+    private var capturedSemantics: EffectiveSourceSemantics? = null
 
     /**
-     * Effective source policy retained by an accepted witness, or null for an unbound sample.
+     * Effective source policy retained by a source-bound result, or null for an unbound sample.
      * The policy describes interpretation; it establishes no additional proof authority.
      */
-    val semantics: EffectiveSourceSemantics? get() = witnessCertificate?.model?.semantics
+    val semantics: EffectiveSourceSemantics? get() = capturedSemantics ?: witnessCertificate?.model?.semantics
+
+    internal fun withSourceSemantics(semantics: EffectiveSourceSemantics): Sample {
+        val previous = this.semantics
+        require(previous == null || previous.declared == semantics.declared && previous.effective == semantics.effective) {
+            "sample belongs to a different source interpretation"
+        }
+        if (capturedSemantics === semantics) return this
+        return copy().also { it.capturedSemantics = semantics }
+    }
 
     /** Certified real values indexed by real variable id, when a residual LP supplied them. */
     val exactReals: List<BigFraction>? = exactReals?.let { snapshotValues(it) }
@@ -252,7 +262,10 @@ class Sample private constructor(
         if (bools.contentEquals(booleanValues) && ints.contentEquals(integerValues) &&
             reals.contentEquals(approximateReals) && exactInts == this.exactInts && exactReals == this.exactReals &&
             algebraicReals == this.algebraicReals && symbolicReals == this.symbolicReals
-        ) it.witnessCertificate = witnessCertificate
+        ) {
+            it.witnessCertificate = witnessCertificate
+            it.capturedSemantics = capturedSemantics
+        }
     }
 
     /** Number of Boolean and integer values that differ from [other]. */

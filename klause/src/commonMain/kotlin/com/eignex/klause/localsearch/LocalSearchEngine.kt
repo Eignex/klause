@@ -32,6 +32,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
+import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -319,7 +320,7 @@ internal class LocalSearchEngine(
     /** Search once for a solution, syncing learned weights through [warm] when it is non-null. */
     fun solve(params: LocalSearchParams, warm: WarmState?): SolveResult = exclusiveSearch {
         solveExclusive(params, warm)
-    }
+    }.withSourceSemantics(problem.semantics)
 
     private fun solveExclusive(params: LocalSearchParams, warm: WarmState?): SolveResult {
         val sink = SolveStatsSink(backend = "ls")
@@ -355,7 +356,7 @@ internal class LocalSearchEngine(
         // Same soundness boundary as [solve]: stream nothing rather than assignments that may violate factors.
         if (!localSearchSupports(model, completion != null)) return emptySequence()
         val eff = model.pinsUnder(params.assumptions) ?: return emptySequence()
-        return guarded(streamImpl(params, eff, warm).filterNotNull())
+        return guarded(streamImpl(params, eff, warm).filterNotNull().map { it.withSourceSemantics(problem.semantics) })
     }
 
     fun openSamples(
@@ -369,7 +370,8 @@ internal class LocalSearchEngine(
             val effective = if (supported) model.pinsUnder(params.assumptions) else null
             val sequence = if (effective == null) emptySequence()
             else streamImpl(params, effective, warm).filterNotNull()
-            transform(sequence).asSearchStream(release = ownership::release)
+            transform(sequence).map { it.withSourceSemantics(problem.semantics) }
+                .asSearchStream(release = ownership::release)
         }.getOrElse {
             ownership.release()
             throw it
@@ -406,7 +408,7 @@ internal class LocalSearchEngine(
         }
         return LocalSearchSolveRun(
             params, supported, effective != null, model.refutesModel, maxInstructions,
-            cursor, sink, control, ownership::release,
+            cursor, sink, control, ownership::release, problem.semantics,
         )
     }
 
@@ -431,7 +433,8 @@ internal class LocalSearchEngine(
         params: LocalSearchParams,
         warm: WarmState?,
     ): Sequence<MinimizeResult> = guarded(
-        minimizeStream(objective, params, warm, SolveStatsSink(backend = "ls")).filterNotNull(),
+        minimizeStream(objective, params, warm, SolveStatsSink(backend = "ls")).filterNotNull()
+            .map { it.withSourceSemantics(problem.semantics) },
     )
 
     fun openImprovements(
@@ -443,7 +446,7 @@ internal class LocalSearchEngine(
         val sink = SolveStatsSink(backend = "ls")
         var finished = false
         return minimizeStream(objective, params, warm, sink, onFinished = { finished = true })
-            .filterNotNull().asSearchStream(
+            .filterNotNull().map { it.withSourceSemantics(problem.semantics) }.asSearchStream(
                 release = { try { if (!finished) sink.stop() } finally { ownership.release() } },
                 terminal = { finished },
             )
@@ -515,7 +518,7 @@ internal class LocalSearchEngine(
             control,
             onFinished = control::finishStream,
         ).iterator()
-        return LocalSearchOptimizeRun(params, cursor, sink, control, ownership::release)
+        return LocalSearchOptimizeRun(params, cursor, sink, control, ownership::release, problem.semantics)
     }
 
     // The moves one run may make: its own caps, and what is left of the solve's node budget.

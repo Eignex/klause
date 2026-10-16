@@ -39,6 +39,7 @@ import com.eignex.klause.solver.pipeline.optimize
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.polynomialRequest
 import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
+import com.eignex.klause.solver.pipeline.withSourceSemantics
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -81,6 +82,11 @@ class SourceStrategy internal constructor(
     fun solve(
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
         theory: TheoryParams = TheoryParams(),
+    ): OpenTheoryResult = solveSource(polynomial, theory).withSourceSemantics(source.semantics)
+
+    private fun solveSource(
+        polynomial: PolynomialTheoryParams,
+        theory: TheoryParams,
     ): OpenTheoryResult {
         val scope = scope(polynomial, theory)
         if (scope.stop()) return scope.unknown()

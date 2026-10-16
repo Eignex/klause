@@ -1,9 +1,11 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
 
 internal class LocalSearchOptimizeRun(
@@ -12,6 +14,7 @@ internal class LocalSearchOptimizeRun(
     sink: SolveStatsSink,
     control: LocalSearchRunControl,
     release: () -> Unit,
+    private val semantics: EffectiveSourceSemantics,
 ) : LocalSearchRun<MinimizeResult>(sink, control, release), InstructionSlicedSearch {
     private var started = false
 
@@ -53,7 +56,8 @@ internal class LocalSearchOptimizeRun(
             if (!started) {
                 sink.timedOut = true
                 sink.stop()
-                return finish(MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats))
+                return finish(MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
+                    .withSourceSemantics(semantics))
             }
             // The suspended loop checks its containing allowance before making another move.
             control.allowCompletion()
@@ -61,7 +65,7 @@ internal class LocalSearchOptimizeRun(
         started = true
         val live = checkNotNull(cursor)
         while (live.hasNext()) {
-            val result = live.next() ?: return null
+            val result = live.next()?.withSourceSemantics(semantics) ?: return null
             if (control.finished) return finish(result)
             if (result is MinimizeResult.WithSample) onIncumbent(result)
         }

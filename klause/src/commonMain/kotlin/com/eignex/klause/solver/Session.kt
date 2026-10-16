@@ -61,8 +61,9 @@ interface Session<P : SolverParams> : AutoCloseable {
     /** Draw one sample under the captured scope and close the draw's state. */
     fun sample(params: P): SampleResult {
         val sample = openSamples(params).use { it.firstOrNull() }
-        return if (sample != null) SampleResult.Found(sample)
+        val result = if (sample != null) SampleResult.Found(sample)
         else SampleResult.Unknown(TerminationReason.BudgetExhausted)
+        return result.withSourceSemantics(problem.semantics)
     }
 
     /** Sample sequence under a scope captured at invocation; consume sequentially. */
@@ -189,9 +190,9 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
         }
     }
 
-    private fun <T : Any> own(source: SearchStream<T>): SearchStream<T> {
+    private fun <T : Any> own(source: SearchStream<T>, transform: (T) -> T = { it }): SearchStream<T> {
         val owned = PullSearchStream(
-            pull = { if (source.hasNext()) source.next() else null },
+            pull = { if (source.hasNext()) transform(source.next()) else null },
             release = { try { source.close() } finally { active = null } },
             terminal = { source.isDone },
         )
@@ -199,7 +200,8 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
         return owned
     }
 
-    override fun solve(params: P): SolveResult = solveScoped(applyStack(params))
+    override fun solve(params: P): SolveResult =
+        solveScoped(applyStack(params)).withSourceSemantics(solver.problem.semantics)
 
     override fun resumableSolve(params: P): ResumableSolve? {
         val source = resumableSolveScoped(applyStack(params)) ?: return null
@@ -211,12 +213,14 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
         return ownSearch(source) { active = null }.also { active = it }
     }
 
-    override fun samples(params: P): Sequence<Sample> = guarded(samplesScoped(applyStack(params)))
-    override fun enumerate(params: P): Sequence<Sample> = guarded(enumerateScoped(applyStack(params)))
+    override fun samples(params: P): Sequence<Sample> =
+        guarded(samplesScoped(applyStack(params)).map { it.withSourceSemantics(solver.problem.semantics) })
+    override fun enumerate(params: P): Sequence<Sample> =
+        guarded(enumerateScoped(applyStack(params)).map { it.withSourceSemantics(solver.problem.semantics) })
 
     override fun samples(config: SamplingConfig, params: P): Sequence<Sample> {
         val scoped = applyStack(params)
-        return guarded(qualitySamples(config, scoped))
+        return guarded(qualitySamples(config, scoped).map { it.withSourceSemantics(solver.problem.semantics) })
     }
 
     private fun qualitySamples(config: SamplingConfig, params: P): Sequence<Sample> = when (config.quality) {
@@ -248,18 +252,22 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
     }
 
     override fun minimize(objective: LinearObjective, params: P): MinimizeResult =
-        minimizeScoped(objective, applyStack(params))
+        minimizeScoped(objective, applyStack(params)).withSourceSemantics(solver.problem.semantics)
 
     override fun improvements(objective: LinearObjective, params: P): Sequence<MinimizeResult> =
-        guarded(improvementsScoped(objective, applyStack(params)))
+        guarded(improvementsScoped(objective, applyStack(params)).map { it.withSourceSemantics(solver.problem.semantics) })
 
-    override fun openSamples(params: P): SearchStream<Sample> = own(openSamplesScoped(applyStack(params)))
+    override fun openSamples(params: P): SearchStream<Sample> = own(openSamplesScoped(applyStack(params))) {
+        it.withSourceSemantics(solver.problem.semantics)
+    }
 
-    override fun openEnumerate(params: P): SearchStream<Sample> = own(openEnumerateScoped(applyStack(params)))
+    override fun openEnumerate(params: P): SearchStream<Sample> = own(openEnumerateScoped(applyStack(params))) {
+        it.withSourceSemantics(solver.problem.semantics)
+    }
 
     override fun openSamples(config: SamplingConfig, params: P): SearchStream<Sample> {
         val scoped = applyStack(params)
-        return own(openQualitySamplesScoped(config, scoped))
+        return own(openQualitySamplesScoped(config, scoped)) { it.withSourceSemantics(solver.problem.semantics) }
     }
 
     override fun openExactCount(config: ExactCountConfig): SearchStream<Count> {
@@ -270,7 +278,7 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
     }
 
     override fun openImprovements(objective: LinearObjective, params: P): SearchStream<MinimizeResult> =
-        own(openImprovementsScoped(objective, applyStack(params)))
+        own(openImprovementsScoped(objective, applyStack(params))) { it.withSourceSemantics(solver.problem.semantics) }
 
     internal open fun solveScoped(params: P): SolveResult = solver.solve(params)
     internal open fun resumableSolveScoped(params: P): ResumableSolve? =

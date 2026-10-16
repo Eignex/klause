@@ -72,6 +72,7 @@ import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.solver.validation.composedFixpoint
 import com.eignex.klause.solver.validation.verifyRealCoordinates
+import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
 import kotlin.coroutines.cancellation.CancellationException
@@ -640,13 +641,15 @@ internal class ResumableMinimize(
                     sink.search.clausalPrimalInfeasible = primal.infeasible
                     sink.search.clausalPrimalIncomplete = primal.incomplete
                 }
-                publishClausePrimalCandidate()?.let { return StepEvent.Incumbent(it) }
+                publishClausePrimalCandidate()?.let {
+                    return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
+                }
                 if (!primal.isDone && pausable && sliceCancelled()) return StepEvent.Paused
                 if (primal.isDone) primal.close()
             }
             if (firstRun) {
                 firstRun = false
-                firstRunWork()?.let { return StepEvent.Incumbent(it) }
+                firstRunWork()?.let { return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics)) }
             }
             unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
             if (treeBudgetExhausted) return terminal(terminalBudget())
@@ -655,7 +658,7 @@ internal class ResumableMinimize(
                     unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
                     val incumbent = checkNotNull(pendingIncumbent)
                     pendingIncumbent = null
-                    StepEvent.Incumbent(incumbent)
+                    StepEvent.Incumbent(incumbent.withSourceSemantics(problem.semantics))
                 }
 
                 SearchRunEvent.Exhausted -> terminal(terminalExhausted(null))
@@ -666,7 +669,8 @@ internal class ResumableMinimize(
                     sawIndeterminateLeaf -> {
                         val incumbent = pendingIncumbent
                         pendingIncumbent = null
-                        if (incumbent != null) StepEvent.Incumbent(incumbent) else terminal(terminalExhausted(null))
+                        if (incumbent != null) StepEvent.Incumbent(incumbent.withSourceSemantics(problem.semantics))
+                        else terminal(terminalExhausted(null))
                     }
 
                     pausable && sliceCancelled() -> StepEvent.Paused
@@ -684,9 +688,10 @@ internal class ResumableMinimize(
     }
 
     private fun terminal(result: MinimizeResult): StepEvent {
-        done = result
+        val qualified = result.withSourceSemantics(problem.semantics)
+        done = qualified
         if (!rebindable) close()
-        return StepEvent.Terminal(result)
+        return StepEvent.Terminal(qualified)
     }
 
     private fun terminalExhausted(core: UnsatCore?): MinimizeResult {
