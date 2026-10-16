@@ -1,7 +1,7 @@
 package com.eignex.klause.presolve
 
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -49,11 +49,7 @@ internal class SourceMapping(
         return if (source === target) lifted else lifted.copy().also { it.witnessCertificate = null }
     }
 
-    fun requireObjectivePreserved(
-        sourceObjective: LinearObjective,
-        targetObjective: LinearObjective,
-        sample: Sample,
-    ) {
+    fun requireObjectivePreserved(sourceObjective: LinearObjective, targetObjective: LinearObjective, sample: Sample) {
         require(guarantees.objective && guarantees.reconstructability)
         val reconstructed = reconstructFrom(target, sample)
         val expected = objectiveAdjustment.sourceValue(targetObjective.evaluateExact(sample))
@@ -84,7 +80,9 @@ internal fun SourceMapping.retainedCoordinates(cancellation: Cancellation = Canc
             stage.target.numBoolVars < stage.source.numBoolVars ||
             stage.target.numIntVars < stage.source.numIntVars ||
             stage.target.numRealVars != stage.source.numRealVars
-        ) return null
+        ) {
+            return null
+        }
     }
     val bools = IntArray(source.numBoolVars)
     val ints = IntArray(source.numIntVars)
@@ -105,11 +103,15 @@ internal fun SourceMapping.retainedCoordinates(cancellation: Cancellation = Canc
             if (cancellation()) return null
             when (step) {
                 is RebuildStep.CopyLiteral -> if (step.variable in bools.indices) bools[step.variable] = -1
+
                 is RebuildStep.SatisfyClauses -> if (step.variable in bools.indices) bools[step.variable] = -1
+
                 is RebuildStep.RepairClause -> Lit.variable(step.literal).let {
                     if (it in bools.indices) bools[it] = -1
                 }
+
                 is RebuildStep.AffineValue -> if (step.variable in ints.indices) ints[step.variable] = -1
+
                 is RebuildStep.QuotientValue -> if (step.variable in ints.indices) ints[step.variable] = -1
             }
         }

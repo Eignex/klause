@@ -15,10 +15,10 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.pipelineRoute
@@ -102,8 +102,12 @@ internal object MiniZincMode : CliMode {
                         applier?.render(program, assignment)
                             ?: writeFlatZincSolution(program, assignment, outputObjective)
                     })
+
                     is SourceProblemRoute.Finite -> linearSolvable(
-                        route.problem, minimized, maximize, render,
+                        route.problem,
+                        minimized,
+                        maximize,
+                        render,
                         searchHints = program.searchHints?.toSearchHints(),
                     )
 
@@ -132,7 +136,8 @@ internal object MiniZincMode : CliMode {
                 common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
                 else -> ExecutionOperation.SATISFY
             }
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
                 SourceAttachment(program.problem, program.definitionHints, program.searchHints?.toSearchHints()),
                 operation,
                 common.resolvedEngine(),
@@ -140,25 +145,32 @@ internal object MiniZincMode : CliMode {
                 maximize = maximize,
                 cancellation = common.routingPreparationCancellation(),
                 boundCancellation = common.routingCancellation(),
-            ))
+            )
+            )
             return when (val route = invocation.route) {
                 is SourceProblemRoute.Finite -> Solvable(
                     finite = invocation.finiteShape(),
                     render = render,
                     objectiveValue = sourceObjective?.let { linear -> { sample -> linear.evaluateLong(sample) } },
                 )
+
                 SourceProblemRoute.Refuted -> refutedSolvable()
+
                 is SourceProblemRoute.UnsupportedOpen -> if (
                     route.preparedPlan.decline == PreparedPlanDecline.RESOURCE
                 ) {
                     Solvable(null, render, null, pipeline = SolvablePipeline.Interrupted(TerminationReason.Cancelled))
                 } else {
-                    throw UnsupportedFlatZincException("FlatZinc source has no finite execution route", 0, 0)
+                    unsupportedFiniteSource("FlatZinc source has no finite execution route")
                 }
+
                 is SourceProblemRoute.OpenTheory, is SourceProblemRoute.PolynomialTheory ->
-                    throw UnsupportedFlatZincException("FlatZinc source requires an arithmetic execution route", 0, 0)
+                    unsupportedFiniteSource("FlatZinc source requires an arithmetic execution route")
             }
         }
+
+        private fun unsupportedFiniteSource(message: String): Nothing =
+            throw UnsupportedFlatZincException(message, 0, 0)
 
         override fun output(common: CommonOptions): OutputProtocol = MiniZincOutput(floatApproximation, sourceSemantics)
     }

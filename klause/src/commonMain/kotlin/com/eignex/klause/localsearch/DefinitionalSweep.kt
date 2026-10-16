@@ -292,8 +292,11 @@ class DefinitionalSweep internal constructor(
             if (objective.boolWeightValues[id] != 0L) booleans += id
         }
         return functionalObjective(
-            integers.toIntArray(), LongArray(integers.size) { objective.intCoefficientValues[integers[it]] },
-            objective.constant, true, booleans.toIntArray(),
+            integers.toIntArray(),
+            LongArray(integers.size) { objective.intCoefficientValues[integers[it]] },
+            objective.constant,
+            true,
+            booleans.toIntArray(),
             LongArray(booleans.size) { objective.boolWeightValues[booleans[it]] },
             cancellation,
         )
@@ -313,7 +316,13 @@ class DefinitionalSweep internal constructor(
         boolTerms: IntArray = EmptyIntArray,
         boolTermCoeffs: LongArray = EmptyLongArray,
     ): IncrementalObjective? = functionalObjective(
-        terms, termCoeffs, constant, minimize, boolTerms, boolTermCoeffs, Cancellation.Never,
+        terms,
+        termCoeffs,
+        constant,
+        minimize,
+        boolTerms,
+        boolTermCoeffs,
+        Cancellation.Never,
     )
 
     private fun functionalObjective(
@@ -370,7 +379,9 @@ class DefinitionalSweep internal constructor(
             if (definition !is SweepNode.IntDef && definition !is SweepNode.BoolFold &&
                 definition !is LiteralIntDefinition && definition !is UnaryPredicateDefinition &&
                 definition !is CapturedBooleanDefinition
-            ) return null
+            ) {
+                return null
+            }
             for (input in definition.intInputs) {
                 cancellation.charge(1)
                 if (cancellation()) return null
@@ -389,17 +400,22 @@ class DefinitionalSweep internal constructor(
             if (node.out !in (if (node.outIsBool) reachableBools else reachableInts)) continue
             val compute: ((Int) -> Long, (Int) -> Boolean) -> Long = when (node) {
                 is SweepNode.IntDef -> { intOf, _ -> node.node.compute(intOf) }
+
                 is SweepNode.BoolFold -> {
                     val fold = FunctionalObjective.BoolFold(node.out, node.ins, node.isAnd)
                     val evaluator: ((Int) -> Long, (Int) -> Boolean) -> Long =
                         { _, boolOf -> if (fold.compute(boolOf)) 1L else 0L }
                     evaluator
                 }
+
                 is LiteralIntDefinition -> { _, boolOf ->
                     if (boolOf(Lit.variable(node.literal)) == Lit.isPositive(node.literal)) 1L else 0L
                 }
+
                 is UnaryPredicateDefinition -> { intOf, _ -> if (node.holds(intOf(node.input))) 1L else 0L }
+
                 is CapturedBooleanDefinition -> { intOf, _ -> if (node.holds(intOf)) 1L else 0L }
+
                 else -> return null
             }
             cone.add(FunctionalObjective.Definition(node.out, node.outIsBool, compute))
@@ -757,11 +773,13 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
             for (part in readerPreparation(nodeArr, numBoolVars) { it.boolInputs }) {
                 if (part == null) yield(null) else boolReaders = part
             }
-            yield(DefinitionIndex(
+            yield(
+                DefinitionIndex(
                 nodeArr, definedInt, definedBool, intDefinitions, literalChannels,
                 unaryPredicates, booleanLiterals, elementResults, extremumRepairs,
                 checkNotNull(intReaders), checkNotNull(boolReaders),
-            ))
+            )
+            )
         }
 
         private fun readerPreparation(
@@ -838,8 +856,7 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
      * read-cone, computed by a marked worklist walk. Negative var ids are ignored so callers
      * can reuse fixed-size scratch arrays.
      */
-    fun affectedNodes(seedInts: IntArray, seedBools: IntArray): IntArray =
-        findAffectedNodes(seedInts, seedBools, null)
+    fun affectedNodes(seedInts: IntArray, seedBools: IntArray): IntArray = findAffectedNodes(seedInts, seedBools, null)
 
     internal fun affectedNodes(seedInts: IntArray, seedBools: IntArray, assignment: Assignment): IntArray =
         findAffectedNodes(seedInts, seedBools, assignment)
@@ -874,7 +891,12 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
         assignment: Assignment,
         traversal: DefinitionTraversal,
     ): IntArrayList = findAffectedNodes(
-        seedInts.backingData, seedInts.size, seedBools.backingData, seedBools.size, assignment, traversal,
+        seedInts.backingData,
+        seedInts.size,
+        seedBools.backingData,
+        seedBools.size,
+        assignment,
+        traversal,
     )
 
     private fun findAffectedNodes(
@@ -909,7 +931,6 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
         work.backingData.sort(0, work.size)
         return work
     }
-
 }
 
 private class DefinitionIndex(

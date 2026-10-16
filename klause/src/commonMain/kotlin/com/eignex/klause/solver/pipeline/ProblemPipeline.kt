@@ -143,8 +143,15 @@ fun Problem.pipelineRoute(
     boundCancellation: Cancellation = Cancellation.Never,
     routeLinearToTheory: Boolean = false,
     onLpStats: ((LpStats) -> Unit)? = null,
-): SourceProblemRoute = pipelineRouteObserved(objective, maximize, routePureRealToTheory,
-    boundCancellation, onLpStats, routeLinearToTheory, providers)
+): SourceProblemRoute = pipelineRouteObserved(
+    objective,
+    maximize,
+    routePureRealToTheory,
+    boundCancellation,
+    onLpStats,
+    routeLinearToTheory,
+    providers,
+)
 
 /**
  * Select a route with separate optional bound probing and required admission allowances.
@@ -162,9 +169,11 @@ fun Problem.pipelineRoute(
     routeLinearToTheory: Boolean = false,
     providers: FactorProjectionProviders = FactorProjectionProviders.Default,
     onLpStats: ((LpStats) -> Unit)? = null,
-): SourceProblemRoute = pipelineRouteObserved(objective, maximize, routePureRealToTheory,
+): SourceProblemRoute = pipelineRouteObserved(
+    objective, maximize, routePureRealToTheory,
     boundCancellation, onLpStats, routeLinearToTheory, providers,
-    polynomialCancellation = preparationCancellation, preparationCancellation = preparationCancellation)
+    polynomialCancellation = preparationCancellation, preparationCancellation = preparationCancellation,
+)
 
 internal fun Problem.pipelineRoute(
     projections: PreparedFactorProjections,
@@ -172,17 +181,21 @@ internal fun Problem.pipelineRoute(
     maximize: Boolean,
     boundCancellation: Cancellation,
     preparationCancellation: Cancellation,
-): SourceProblemRoute = pipelineRouteObserved(objective, maximize, false, boundCancellation, null, false,
+): SourceProblemRoute = pipelineRouteObserved(
+    objective, maximize, false, boundCancellation, null, false,
     projections.providers, projections, polynomialCancellation = preparationCancellation,
-    preparationCancellation = preparationCancellation)
+    preparationCancellation = preparationCancellation,
+)
 
 internal fun Problem.pipelineRoute(
     projections: PreparedFactorProjections,
     routePureRealToTheory: Boolean,
     boundCancellation: Cancellation,
     polynomialCancellation: Cancellation = boundCancellation,
-): SourceProblemRoute = pipelineRouteObserved(null, false, routePureRealToTheory, boundCancellation, null, false,
-    projections.providers, projections, polynomialCancellation)
+): SourceProblemRoute = pipelineRouteObserved(
+    null, false, routePureRealToTheory, boundCancellation, null, false,
+    projections.providers, projections, polynomialCancellation,
+)
 
 private fun Problem.pipelineRouteObserved(
     objective: LinearObjective?,
@@ -197,15 +210,21 @@ private fun Problem.pipelineRouteObserved(
     preparationCancellation: Cancellation = boundCancellation,
 ): SourceProblemRoute {
     val selection = projectionCapture ?: providers.prepare(this)
-    val source = if (requiresPolynomialCompletion(selection)) null else
+    val source = if (requiresPolynomialCompletion(selection)) {
+        null
+    } else {
         prepareExecutionPlan(this, null, false, false, providers, selection, preparationCancellation)
+    }
     val initial = source?.let { objective?.let { objective -> it.withObjective(objective, maximize) } ?: it }
     if (initial?.decline == PreparedPlanDecline.RESOURCE) {
         return SourceProblemRoute.UnsupportedOpen(null, this, initial)
     }
     val lpStats = onLpStats?.let { LpStatsSink(LpRoute.STANDALONE) }
-    val boundsStop = if (boundCancellation === preparationCancellation) boundCancellation else
+    val boundsStop = if (boundCancellation === preparationCancellation) {
+        boundCancellation
+    } else {
         boundCancellation or preparationCancellation
+    }
     val bounded = proveBounded(boundsStop, lpStats)
     if (lpStats != null) onLpStats(lpStats.snapshot())
     val routed = when (bounded) {
@@ -223,15 +242,33 @@ private fun Problem.pipelineRouteObserved(
         routed.requiresPolynomialCompletion(projections) && routed.finiteRealCompletionSupported(projections)
     val arithmeticStop = if (routed.requiresPolynomialCompletion(projections, preferFinite = finiteCompletion)) {
         polynomialCancellation
-    } else preparationStop
-    val arithmetic = if (reuseInitial && !stopped) requireNotNull(initial) else routed.prepareExecutionPlan(
-        this, objective, maximize, preferFinite = finiteCompletion, providers, projections, arithmeticStop)
+    } else {
+        preparationStop
+    }
+    val arithmetic = if (reuseInitial && !stopped) {
+        requireNotNull(initial)
+    } else {
+        routed.prepareExecutionPlan(
+        this,
+        objective,
+        maximize,
+        preferFinite = finiteCompletion,
+        providers,
+        projections,
+        arithmeticStop,
+    )
+    }
     val arithmeticExecution = when (val execution = arithmetic.execution) {
         is PreparedExecution.Declined -> return SourceProblemRoute.UnsupportedOpen(null, routed, arithmetic)
+
         is PreparedExecution.Polynomial -> return SourceProblemRoute.PolynomialTheory(
-            arithmetic.polynomialRequest(), objective, maximize,
+            arithmetic.polynomialRequest(),
+            objective,
+            maximize,
         )
+
         is PreparedExecution.FiniteLinear -> execution
+
         is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental ->
             error("factor source requires factor execution")
     }
@@ -241,8 +278,19 @@ private fun Problem.pipelineRouteObserved(
     val preferFinite = finiteIntegerRanges && !preferExact &&
         (!routePureRealToTheory || arithmeticRoute != ProblemPipeline.EXACT_LRA) &&
         routed.finiteRealCompletionSupported(projections)
-    val prepared = if (preferFinite) routed.prepareExecutionPlan(this, objective, maximize,
-        preferFinite = true, providers, projections, preparationStop) else arithmetic
+    val prepared = if (preferFinite) {
+        routed.prepareExecutionPlan(
+        this,
+        objective,
+        maximize,
+        preferFinite = true,
+        providers,
+        projections,
+        preparationStop,
+    )
+    } else {
+        arithmetic
+    }
     val selected = when (val execution = prepared.execution) {
         is PreparedExecution.Declined -> return SourceProblemRoute.UnsupportedOpen(null, routed, prepared)
         is PreparedExecution.FiniteLinear -> execution

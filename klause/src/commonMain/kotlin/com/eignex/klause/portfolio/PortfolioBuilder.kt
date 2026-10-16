@@ -61,7 +61,9 @@ object PortfolioBuilder {
         val quotas = if (scenario.cores > 1) scenario.nodeBudget?.quotas(count) else null
         return materializeBound(count, binding) { index ->
             factories[index % factories.size].materialize(
-                index, scenario.seed, quotas?.get(index) ?: scenario.nodeBudget,
+                index,
+                scenario.seed,
+                quotas?.get(index) ?: scenario.nodeBudget,
             )
         }
     }
@@ -74,8 +76,16 @@ object PortfolioBuilder {
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         profile: ProblemProfile,
-    ): List<FinitePortfolioFactory> = factories(problem, scenario, objective, lsObjective, definitionalSweep,
-        onEvent, profile, false)
+    ): List<FinitePortfolioFactory> = factories(
+        problem,
+        scenario,
+        objective,
+        lsObjective,
+        definitionalSweep,
+        onEvent,
+        profile,
+        false,
+    )
 
     internal fun factories(
         problem: BakedProblem,
@@ -91,19 +101,26 @@ object PortfolioBuilder {
         val plan = PortfolioComposition.plan(scenario, ProblemFacts.of(problem, profile, scenario.lpCeiling, objective))
         val residuals = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
         val configs = if (scenario.reportLsPhaseTimes) residuals.map { it.withLsPhaseTimes() } else residuals
-        val strategies = configs.mapNotNull { config -> when (config) {
-            is LocalSearchWorkerConfig -> ExecutionStrategy.LOCAL_SEARCH
-            is AlnsWorkerConfig -> ExecutionStrategy.ALNS
-            is BacktrackWorkerConfig, is CoreGuidedWorkerConfig -> null
-        } }.toSet()
+        val strategies = configs.mapNotNull { config ->
+            when (config) {
+                is LocalSearchWorkerConfig -> ExecutionStrategy.LOCAL_SEARCH
+                is AlnsWorkerConfig -> ExecutionStrategy.ALNS
+                is BacktrackWorkerConfig, is CoreGuidedWorkerConfig -> null
+            }
+        }.toSet()
         val views = if (strategies.isEmpty()) null else sourceHints?.invoke(strategies)
         val selectedSweep = views?.sweep ?: definitionalSweep
         val selectedObjective = views?.objective ?: lsObjective
         val count = maxOf(configs.size, scenario.cores)
         val deferCore = scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&
             scenario.btPool == null && configs.any { it is BacktrackWorkerConfig }
-        val pools = poolsFor(scenario, problem, selectedSweep, objective,
-            clausePeers = (0 until count).count { configs[it % configs.size] is BacktrackWorkerConfig } > 1)
+        val pools = poolsFor(
+            scenario,
+            problem,
+            selectedSweep,
+            objective,
+            clausePeers = (0 until count).count { configs[it % configs.size] is BacktrackWorkerConfig } > 1,
+        )
         return configs.mapIndexed { armId, config ->
             val family = when (config) {
                 is BacktrackWorkerConfig, is CoreGuidedWorkerConfig -> ArmFamily.Backtrack
@@ -113,12 +130,18 @@ object PortfolioBuilder {
             FinitePortfolioFactory(armId, family) { index, seed, budget ->
                 val admitted = if (config is CoreGuidedWorkerConfig && deferCore) {
                     config.withActiveTimeLimit()
-                } else config
-                val completion = if (numericalCompletion) when (admitted) {
+                } else {
+                    config
+                }
+                val completion = if (numericalCompletion) {
+                    when (admitted) {
                     is LocalSearchWorkerConfig -> admitted.withNumericalCompletion()
                     is AlnsWorkerConfig -> admitted.withNumericalCompletion()
                     else -> admitted
-                } else admitted
+                }
+                } else {
+                    admitted
+                }
                 val bounded = budget?.let(completion::withNodeBudget) ?: completion
                 bounded.materialize(
                     problem, index, armId, seed, scenario.lsLambda, objective, selectedObjective,
@@ -167,14 +190,25 @@ object PortfolioBuilder {
         )
     }
 
-    private fun runtimeBinding(problem: BakedProblem, objective: LinearObjective?): EngineInvocation =
-        EngineInvocation(problem.prepareExecutionPlan(objective, preferFinite = true),
-            ModelIdentity.of(problem, objective), objective)
+    private fun runtimeBinding(problem: BakedProblem, objective: LinearObjective?): EngineInvocation = EngineInvocation(
+        problem.prepareExecutionPlan(objective, preferFinite = true),
+        ModelIdentity.of(problem, objective),
+        objective,
+    )
 
     private fun bindRuntime(worker: PortfolioWorker, binding: EngineInvocation): PortfolioWorker =
-        worker.bindSource(SourceWorkerBinding(EngineInvocation(binding.preparedPlan, binding.model,
-            binding.executionObjective, executionAssumptions = worker.executionAssumptions ?: Assumptions.None),
-            sharingInvocation = binding, provesResults = worker.permitsSourceProofs))
+        worker.bindSource(
+            SourceWorkerBinding(
+            EngineInvocation(
+                binding.preparedPlan,
+                binding.model,
+                binding.executionObjective,
+                executionAssumptions = worker.executionAssumptions ?: Assumptions.None,
+            ),
+            sharingInvocation = binding,
+            provesResults = worker.permitsSourceProofs,
+        )
+        )
 
     /** Materialise each arm of [buildExplicit] via its own [WorkerConfig.materialize]. The arm index offsets
      *  the seed; [armIds] carries each lane's arm identity purely as attribution metadata; [pools], when
@@ -247,11 +281,15 @@ object PortfolioBuilder {
         // The bound managers are the dual of the shared incumbent: harmless for a CSP pool (no arm
         // publishes), so they are always present and only an optimising arm feeds them.
         return SharedPools(
-            if (clausePeers) SharedClausePool(
+            if (clausePeers) {
+                SharedClausePool(
                 concurrency.lock(),
                 shareMaxLbd = scenario.clauseShareMaxLbd,
                 shareMaxLen = scenario.clauseShareMaxLen,
-            ) else null,
+            )
+            } else {
+                null
+            },
             cuts,
             SharedObjectiveBound(concurrency.lock(), identity),
             SharedVarBounds(problem.numIntVars, concurrency.lock(), identity.forObjective(null)),
@@ -265,7 +303,9 @@ object PortfolioBuilder {
                             is Verification.Accepted -> Verification.Accepted(
                                 Candidate(candidate.assignment, candidate.objective),
                             )
+
                             is Verification.Rejected -> checked
+
                             is Verification.Indeterminate -> checked
                         }
                     }
@@ -274,10 +314,15 @@ object PortfolioBuilder {
             ContributionTally(concurrency.lock()),
             nativeProjection = PropagationProblem(problem).takeIf { it.isNativeSatEligible },
             localSearchProjection = LocalSearchPreparation(
-                problem, LocalSearchModel.of(problem).domains, concurrency.lock(),
+                problem,
+                LocalSearchModel.of(problem).domains,
+                concurrency.lock(),
             ).takeIf { it.shareable },
             localSearchInvariants = InvariantNetworkPreparation(
-                definitionalSweep, problem.numIntVars, problem.numBoolVars, concurrency.lock(),
+                definitionalSweep,
+                problem.numIntVars,
+                problem.numBoolVars,
+                concurrency.lock(),
             ),
             identity = identity,
         )

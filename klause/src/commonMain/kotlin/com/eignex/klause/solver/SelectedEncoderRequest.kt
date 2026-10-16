@@ -94,8 +94,16 @@ internal class SelectedEncoderRequest private constructor(
                 selectedEncoders += encoder
             }
             if (stop()) return decline(EncoderDecline.RESOURCE)
-            return SelectedEncoderRequest(selection, target, selectedIndices, selectedEncoders,
-                integers, booleans, stop, completeFiniteConditions)
+            return SelectedEncoderRequest(
+                selection,
+                target,
+                selectedIndices,
+                selectedEncoders,
+                integers,
+                booleans,
+                stop,
+                completeFiniteConditions,
+            )
         }
     }
 }

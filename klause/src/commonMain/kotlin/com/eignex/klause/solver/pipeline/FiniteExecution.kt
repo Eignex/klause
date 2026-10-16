@@ -108,8 +108,10 @@ class FiniteSolveRequest(
 
     init {
         shape.sourceInvocation?.requireFiniteExecution(shape, engine, operation)
-        require(shape.sourceInvocation == null || shape.optimize || operation != ExecutionOperation.SATISFY ||
-            (!allSolutions && (solutionCap ?: 1L) <= 1L)) { "enumeration needs its captured source operation" }
+        require(
+            shape.sourceInvocation == null || shape.optimize || operation != ExecutionOperation.SATISFY ||
+                (!allSolutions && (solutionCap ?: 1L) <= 1L),
+        ) { "enumeration needs its captured source operation" }
     }
 
     /** Captured frontend `key=value` parameters; empty for directly typed options. */
@@ -403,11 +405,13 @@ internal fun FinitePipeline.solve(
     val stop = request.shape.sourceInvocation?.let {
         (request.cancellation or it.cancellation).encodingPreparationScope()
     } ?: request.cancellation
-    if (request.shape.sourceInvocation != null && stop()) return FiniteSolveResult(
+    if (request.shape.sourceInvocation != null && stop()) {
+        return FiniteSolveResult(
         FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
         Duration.ZERO,
         FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
     )
+    }
     val preparationStart = TimeSource.Monotonic.markNow()
     val preparation = prepare(
         FinitePipelineRequest(
@@ -420,8 +424,11 @@ internal fun FinitePipeline.solve(
             explicitPresolveConfig = request.explicitPresolveConfig,
             solutionSetSensitive = request.solutionSetSensitive ||
                 (request.shape.sourceInvocation != null && request.operation == ExecutionOperation.ENUMERATE),
-            cancellation = if (request.shape.sourceInvocation == null) request.presolveCancellation
-                else request.presolveCancellation or stop,
+            cancellation = if (request.shape.sourceInvocation == null) {
+                request.presolveCancellation
+            } else {
+                request.presolveCancellation or stop
+            },
             solveCancellation = stop,
             presolveBudget = request.presolveBudget,
             zeroObjectivePricing = request.zeroObjectivePricing,
@@ -444,7 +451,9 @@ internal fun FinitePipeline.solve(
         )
     }
     val executionPlan = preparation.executionPlan ?: request.shape.preparedPlan
-    val searchHints = if (request.shape.sourceInvocation == null) request.shape.searchHints else {
+    val searchHints = if (request.shape.sourceInvocation == null) {
+        request.shape.searchHints
+    } else {
         request.shape.searchHints?.let { hints ->
             preparation.sourceMapping?.retainedCoordinates(stop)?.let { hints.remapped(it, stop) }
         }
@@ -807,8 +816,16 @@ private fun executePortfolio(
         cancellation = request.cancellation,
         numericalCompletion = request.executionOptions.numericalCompletion,
         sourceHints = request.sourceInvocation?.let { invocation ->
-            { strategies -> invocation.heuristicHints(request.problem, request.objective,
-                request.sourceMapping, request.cancellation, strategies, request.preparedPlan.capabilities) }
+            { strategies ->
+                invocation.heuristicHints(
+                    request.problem,
+                    request.objective,
+                    request.sourceMapping,
+                    request.cancellation,
+                    strategies,
+                    request.preparedPlan.capabilities,
+                )
+            }
         },
     )
     val start = TimeSource.Monotonic.markNow()
@@ -836,7 +853,9 @@ internal fun clausalDefaultScenario(
     if (scenario.cores != 1 || scenario.kind != Kind.CSP || scenario.engine != EngineMix.MIXED) return scenario
     if (profile.problemClass != ProblemClass.Sat || scenario.btPool != null || scenario.lsPool != null ||
         scenario.btEdit != null || scenario.annotationArm != null
-    ) return scenario
+    ) {
+        return scenario
+    }
     return scenario.copy(arms = 2)
 }
 

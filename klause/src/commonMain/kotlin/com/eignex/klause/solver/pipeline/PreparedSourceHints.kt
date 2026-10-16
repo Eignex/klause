@@ -3,18 +3,15 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
-import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.retainedCoordinates
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 
-internal class PreparedSourceHints(
-    val sweep: DefinitionalSweep?,
-    val objective: IncrementalObjective?,
-)
+internal class PreparedSourceHints(val sweep: DefinitionalSweep?, val objective: IncrementalObjective?)
 
 internal fun PreparedSourceInvocation.heuristicHints(
     problem: Problem,
@@ -28,10 +25,14 @@ internal fun PreparedSourceInvocation.heuristicHints(
     val route = this.route as? SourceProblemRoute.Finite ?: return null
     val projection = requireNotNull(mapping) { "hint projection requires its source mapping" }
     require(projection.source === route.problem) { "hint projection belongs to a different source model" }
-    require(problem === projection.target || (problem is BakedProblem &&
+    require(
+        problem === projection.target || (
+            problem is BakedProblem &&
         problem.numBoolVars == projection.target.numBoolVars && problem.numIntVars == projection.target.numIntVars &&
         problem.numRealVars == projection.target.numRealVars && problem.numFactors == projection.target.numFactors &&
-        problem.factors.indices.all { problem.factors[it] === projection.target.factors[it] })) {
+        problem.factors.indices.all { problem.factors[it] === projection.target.factors[it] }
+        )
+    ) {
         "hint projection belongs to a different execution model"
     }
     if (strategies.none { it != ExecutionStrategy.COMPLETE && capabilities.admission(it, operation).runnable }) {

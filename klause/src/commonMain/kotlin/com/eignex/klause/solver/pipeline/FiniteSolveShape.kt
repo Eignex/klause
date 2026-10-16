@@ -28,7 +28,9 @@ class FiniteSolveShape(
     val componentPlan: ComponentPlan = problem.componentPlan(preferFinite = true),
     /** Original source identity and completion requirements selected by routing. */
     val preparedPlan: PreparedSourcePlan = problem.preparedWithComponents(
-        componentPlan, objective = linearObjective, maximize = maximize,
+        componentPlan,
+        objective = linearObjective,
+        maximize = maximize,
     ),
 ) {
     private var invocation: PreparedSourceInvocation? = null
