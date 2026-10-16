@@ -51,6 +51,10 @@ def inspect_text(text):
         raise ValueError('Saved task log has an unsupported document root')
     logs = identities.parse_log(text)
     auxiliary = auxiliary_records(root, logs)
+    return inspect_records(logs, auxiliary)
+
+
+def inspect_records(logs, auxiliary):
     task_ids, queued_ids, published_ids = {}, {}, {}
     for rows, index in [(logs['tasks'], task_ids), (logs['queued'], queued_ids), (logs['nmethods'], published_ids)]:
         for position, row in enumerate(rows):

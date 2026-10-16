@@ -2179,24 +2179,34 @@ the archive binding. Duplicate manifest JSON keys are rejected.
 Complete raw logs are retained losslessly as `raw-logs/log-NNNNNN.xml.gz` and
 per-log reports as `log-reviews/log-NNNNNN.json.gz`. `cohort-review.json` maps
 original members and case directories to those files, including their compressed
-identities and every missing, malformed, oversized or unresolved log. The existing
-single-log parser, decimal-stamp checks and proof denials remain unchanged. A
-successful inventory does not establish the expected study's full case universe,
-runtime source binding, full compiler roots, exact elapsed time or code size.
+identities and every missing, malformed, oversized or unresolved log. The cohort
+reader streams XML into the existing metadata schema without retaining its full
+tree. It preserves document ordinals, thread/task ownership, direct completions,
+queues, publications, fragments, failures and unknown fields. Its metadata enters
+the same decimal-stamp and proof-denial checks as the bounded single-log reader;
+that reader retains its separate input/output bounds. A successful inventory does
+not establish the expected study's full case universe, runtime source binding,
+full compiler roots, exact elapsed time or code size.
 
 Resource bounds are 100,000 original members, 4,096 archived case directories,
-8,192 logs, 16 GiB expanded member bytes, 128 MiB retained raw bytes per log and
-512 MiB stored compressed case evidence. Each log retains the unchanged 16 MiB
-interpretation and 64 MiB derived-report bounds; the cohort index is bounded to
-64 MiB. A raw log above its retention bound remains identified in its complete
-original archive, without a truncated replacement. Per-log failures keep negative
-reports and raw provenance; cohort authentication or storage failure prevents a
-complete review claim. No omitted or oversized input becomes zero work, and
-valid logs do not rescue missing cases or rejected logs.
+8,192 logs, 16 GiB expanded member bytes, 128 MiB retained and interpreted raw
+bytes per log, and 2 GiB stored compressed case evidence. Streaming XML is bounded
+to 16 million elements, one million retained metadata rows and depth 1,024.
+UTF-8 decoding and the complete uncompressed size/SHA-256 are checked across all
+chunks; declarations and entities are rejected. Derived reports stream directly
+into gzip under a 512 MiB uncompressed per-log bound, without an expanded report
+file or whole-report JSON string. Each complete gzip is round-trip authenticated;
+an over-budget report is replaced by an explicit negative with raw provenance.
+The cohort index is bounded to 64 MiB. A raw log above its retention bound remains
+identified in its complete original archive, without a truncated replacement.
+Per-log failures keep negative reports and raw provenance; cohort authentication
+or storage failure prevents a complete review claim. No omitted or oversized input
+becomes zero work, and valid logs do not rescue missing cases or rejected logs.
 
-The profile retains its input origins, raw manifest, archive digest, five-file
-reader import closure, output/error/exit files and complete owned capture. It
-performs no captured target/JVM/solver replay, observer attachment or field read.
+The profile retains its input origins, raw manifest, archive digest, six-file
+reader import closure, output/error/exit files and complete owned capture. Its
+child allowance is 2,400 seconds. It performs no captured target/JVM/solver replay,
+observer attachment or field read.
 Full ordinary/private phases, callers/helpers/synthetics, queued, failed,
 unfinished, OSR, replaced and source-excluded work, source outcomes and independent
 runtime/allocation/RNG/work controls require separate evidence. Nominal printed
