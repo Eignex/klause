@@ -96,6 +96,39 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
+    fun `default complete mixed points guide compound Boolean choices while private openings retain polarity`() {
+        val model = Problem(
+            numBoolVars = 3, intBounds = openBounds(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, false))),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 1.0),
+            ),
+        )
+        for ((complete, flips) in listOf(false to null, true to null, true to 0L)) {
+            model.componentPlan().search(model, emptyMap(), Long.MAX_VALUE, Cancellation.Never,
+                SearchLearnedDbParams(), null, openHintFlips = flips).use { planned ->
+                val component = assertIs<ExactLiraSearchComponent>(planned.theory)
+                if (complete) {
+                    component.observeCompleteTraversal()
+                    component.useMixedPointCompletion()
+                }
+                assertIs<ComponentResult.Consistent>(planned.session.initialize())
+
+                val result = planned.session.solve(3, candidateHints = planned.candidateHints)
+
+                val witness = assertNotNull(assertIs<SearchResult.Satisfied>(result).model
+                    .valueOf<ExactLiraAssignment>(component))
+                assertEquals(complete && flips == null, witness.boolValue(0))
+            }
+        }
+    }
+
+    @Test
     fun `default mixed disequality choices prefer a side satisfied by the current point`() {
         val model = Problem(
             numBoolVars = 2,

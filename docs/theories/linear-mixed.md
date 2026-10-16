@@ -39,8 +39,11 @@ reuse completed partial LP points for the same direct primitive Boolean preferen
 providers retain precedence; explicit zero and positive allowances retain their
 existing real-coordinate producer admission and opt-in behavior. Integer-only
 sources use the same default path under [linear-integer semantics](linear-integer.md).
-No source-clause index, Boolean draw or extra LP check is created by the default
-path. Preferences remain guesses about branch order; a
+A complete worker can lazily build the existing bounded source-clause adapter at
+its first consultation with a live point, extending primitive preferences to compound
+Boolean choices. Private queries retain direct primitive preferences; source and
+storage limits retain their existing bounded admission. An index decline keeps the
+direct provider. No Boolean draw or extra LP check is created. Preferences remain guesses about branch order; a
 fractional source integer is not a model value and integrality remains a
 complete-check requirement. Integer branches, retraction, stops and opening close
 retain the component point lifetime and existing work owners.

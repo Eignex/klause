@@ -97,7 +97,7 @@ internal fun completeMixedPoint(
     }
     if (residual.any { it.columns.size > 2 }) {
         onStage?.invoke("RECOVERY_EQUALITY_REPAIR_ATTEMPT")
-        val repaired = realGuess?.let { repairMixedEqualities(it, residual, stop) }
+        val repaired = realGuess?.let { repairMixedEqualities(it, residual, stop, onStage) }
         if (stop()) return declined("RECOVERY_STOPPED")
         if (repaired != null) {
             val point = repaired + integers
@@ -106,6 +106,7 @@ internal fun completeMixedPoint(
                 onStage?.invoke("RECOVERY_EQUALITY_POINT")
                 return point
             }
+            onStage?.invoke("RECOVERY_EQUALITY_REJECTED")
         }
         if (stop()) return declined("RECOVERY_STOPPED")
         return declined("RECOVERY_NON_DIFFERENCE")
