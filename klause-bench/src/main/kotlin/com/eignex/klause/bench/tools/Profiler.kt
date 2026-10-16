@@ -42,6 +42,30 @@ internal object Profiler {
         "com.eignex.klause.arithmetic.",
     )
 
+    private val contextEntries = linkedMapOf(
+        "open-theory entry" to listOf(
+            "com.eignex.klause.solver.pipeline.ResumableOpenTheory.runSlice",
+            "com.eignex.klause.solver.pipeline.OpenTheoryEngine.OpenTheoryRun.advance",
+        ),
+        "retained-query entry" to listOf(
+            "com.eignex.klause.solver.pipeline.RetainedLinearQueries.check",
+            "com.eignex.klause.solver.pipeline.RetainedLinearQueries.decide",
+            "com.eignex.klause.solver.pipeline.RetainedLinearQueries.prepared",
+            "com.eignex.klause.solver.pipeline.RetainedLinearQueries.prepareBooleanCenter",
+        ),
+        "neighborhood entry" to listOf(
+            "com.eignex.klause.solver.pipeline.ExactNeighborhood.advance",
+            "com.eignex.klause.solver.pipeline.OpenExactNeighborhood.check",
+        ),
+        "presolve probe entry" to listOf(
+            "com.eignex.klause.lp.LpProbeSolver.probe",
+        ),
+        "source preparation entry" to listOf(
+            "com.eignex.klause.theory.qflra.QfLiraSolverKt.sharedExactLiraSource",
+            "com.eignex.klause.solver.pipeline.PreparedSearchComponents.prepareSource",
+        ),
+    )
+
     fun summarizeCli(file: File) = summarizeCli(file, System.out)
 
     fun summarizeCli(file: File, output: PrintStream) {
@@ -52,6 +76,8 @@ internal object Profiler {
         val allocationCallers = HashMap<String, Long>()
         val cpuModelCallers = HashMap<String, Long>()
         val allocationModelCallers = HashMap<String, Long>()
+        val cpuContexts = HashMap<String, Long>()
+        val allocationContexts = HashMap<String, Long>()
         RecordingFile(file.toPath()).use { recording ->
             while (recording.hasMoreEvents()) {
                 val event = recording.readEvent()
@@ -61,12 +87,14 @@ internal object Profiler {
                         phases.merge(cliPhase(event), 1L, Long::plus)
                         cpuCallers.merge(cliOperationCallers(event), 1L, Long::plus)
                         cpuModelCallers.merge(cliModelCallers(event), 1L, Long::plus)
+                        cpuContexts.merge(cliContextCallers(event), 1L, Long::plus)
                     }
                     "jdk.ObjectAllocationSample" -> {
                         val weight = event.getLong("weight")
                         allocation.merge(cliPhase(event), weight, Long::plus)
                         allocationCallers.merge(cliOperationCallers(event), weight, Long::plus)
                         allocationModelCallers.merge(cliModelCallers(event), weight, Long::plus)
+                        allocationContexts.merge(cliContextCallers(event), weight, Long::plus)
                     }
                 }
             }
@@ -80,6 +108,27 @@ internal object Profiler {
         printTable("whole CLI: CPU samples by captured model-facing callers", cpuModelCallers, 60, output)
         printTable("whole CLI: sampled allocation weight by captured model-facing callers (estimated bytes)",
             allocationModelCallers, 60, output)
+        printTable("whole CLI: CPU samples by captured context markers and model-facing callers",
+            cpuContexts, Int.MAX_VALUE, output)
+        printTable("whole CLI: sampled allocation weight by captured context markers and model-facing callers (estimated bytes)",
+            allocationContexts, Int.MAX_VALUE, output)
+    }
+
+    private fun cliContextCallers(event: RecordedEvent): String {
+        val stack = event.stackTrace?.frames.orEmpty().map { "${it.method.type.name}.${it.method.name}" }
+        return "${cliContextMarkers(stack)} | ${cliModelCallers(stack)}"
+    }
+
+    internal fun cliContextMarkers(stack: List<String>): String {
+        val methods = stack.map { it.replace('$', '.') }
+        val markers = contextEntries.filterValues { entries ->
+            entries.any { entry -> methods.any { it == entry || it.startsWith("$entry.") } }
+        }.keys
+        return when (markers.size) {
+            0 -> "unknown: no captured context marker"
+            1 -> "observed: ${markers.single()}"
+            else -> "multiple observed: ${markers.joinToString(" + ")}"
+        }
     }
 
     private fun cliOperationCallers(event: RecordedEvent): String =

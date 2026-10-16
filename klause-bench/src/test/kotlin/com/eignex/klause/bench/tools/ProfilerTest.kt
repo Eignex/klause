@@ -5,6 +5,93 @@ import kotlin.test.assertEquals
 
 class ProfilerTest {
     @Test
+    fun `context markers should recognize concrete entry frames`() {
+        for ((frame, expected) in listOf(
+            "solver.pipeline.ResumableOpenTheory.runSlice" to "open-theory entry",
+            "solver.pipeline.OpenTheoryEngine\$OpenTheoryRun.advance" to "open-theory entry",
+            "solver.pipeline.RetainedLinearQueries.check" to "retained-query entry",
+            "solver.pipeline.RetainedLinearQueries.decide" to "retained-query entry",
+            "solver.pipeline.RetainedLinearQueries.prepared" to "retained-query entry",
+            "solver.pipeline.RetainedLinearQueries.prepareBooleanCenter" to "retained-query entry",
+            "solver.pipeline.ExactNeighborhood.advance" to "neighborhood entry",
+            "solver.pipeline.OpenExactNeighborhood.check" to "neighborhood entry",
+            "lp.LpProbeSolver.probe" to "presolve probe entry",
+            "theory.qflra.QfLiraSolverKt.sharedExactLiraSource" to "source preparation entry",
+            "solver.pipeline.PreparedSearchComponents.prepareSource" to "source preparation entry",
+        )) {
+            val markers = Profiler.cliContextMarkers(listOf("com.eignex.klause.$frame"))
+
+            assertEquals("observed: $expected", markers, frame)
+        }
+    }
+
+    @Test
+    fun `missing or truncated context ancestors should remain unknown`() {
+        for (stack in listOf(emptyList(), listOf("java.util.HashMap.getNode"), listOf(
+            "com.eignex.klause.lp.LpPropagator.solve",
+            "com.eignex.klause.solver.search.ExactLiraSearchComponent.relax",
+        ))) {
+            val markers = Profiler.cliContextMarkers(stack)
+
+            assertEquals("unknown: no captured context marker", markers)
+        }
+    }
+
+    @Test
+    fun `context markers should preserve nested method frames`() {
+        for (frame in listOf(
+            "com.eignex.klause.solver.pipeline.ExactNeighborhood\$advance\$1.invokeSuspend",
+            "com.eignex.klause.solver.pipeline.ExactNeighborhood.advance\$default",
+        )) {
+            val markers = Profiler.cliContextMarkers(listOf(frame))
+
+            assertEquals("observed: neighborhood entry", markers, frame)
+        }
+    }
+
+    @Test
+    fun `repeated context frames should contribute one marker`() {
+        val markers = Profiler.cliContextMarkers(listOf(
+            "com.eignex.klause.solver.pipeline.RetainedLinearQueries.check",
+            "com.eignex.klause.solver.pipeline.RetainedLinearQueries.decide",
+            "com.eignex.klause.solver.pipeline.RetainedLinearQueries.check",
+        ))
+
+        assertEquals("observed: retained-query entry", markers)
+    }
+
+    @Test
+    fun `common engine ancestors should preserve multiple captured contexts`() {
+        val stack = listOf(
+            "com.eignex.klause.solver.pipeline.ExactNeighborhood.advance",
+            "com.eignex.klause.solver.pipeline.RetainedLinearQueries.decide",
+            "com.eignex.klause.solver.pipeline.ResumableOpenTheory.runSlice",
+        )
+
+        for (frames in listOf(stack, stack.reversed())) {
+            val markers = Profiler.cliContextMarkers(frames)
+
+            assertEquals("multiple observed: open-theory entry + retained-query entry + neighborhood entry", markers)
+        }
+    }
+
+    @Test
+    fun `context matching should reject similar package class and method prefixes`() {
+        for (frame in listOf(
+            "other.com.eignex.klause.solver.pipeline.ExactNeighborhood.advance",
+            "com.eignex.klause.solver.pipeline.ExactNeighborhoodExtra.advance",
+            "com.eignex.klause.solver.pipeline.ExactNeighborhood.advanceExtra",
+            "com.eignex.klause.solver.pipeline.OtherExactNeighborhood.advance",
+            "com.eignex.klause.solver.pipeline.OpenTheoryEngine\$OpenTheoryRun.advanceExtra",
+            "com.eignex.klause.lp.LpProbeSolver.probeExtra",
+        )) {
+            val markers = Profiler.cliContextMarkers(listOf(frame))
+
+            assertEquals("unknown: no captured context marker", markers, frame)
+        }
+    }
+
+    @Test
     fun `model caller paths should retain source ancestors beyond mechanism packages`() {
         val callers = Profiler.cliModelCallers(listOf(
             "java.util.HashMap.getNode",
