@@ -169,14 +169,12 @@ private fun parseLinearAdmission(
     var exited = false
     var invalidNonlinearSession = false
     var nonlinearSyntax = false
-    var functionSyntax = false
     var signedSymbols = false
     var quadraticObjective = false
     for (command in commands) {
         if (!scope.command(command)) smtUnsupported("source symbol is outside its lexical scope")
         builder.command(command)
         nonlinearSyntax = nonlinearSyntax || hasNonlinearSyntax(command, cancellation)
-        functionSyntax = functionSyntax || hasFunctionSource(listOf(command), cancellation)
         signedSymbols = signedSymbols || hasSignedNumberSymbol(command, cancellation)
         val head = ((command as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text
         if (head == "minimize" || head == "maximize") {
@@ -205,9 +203,6 @@ private fun parseLinearAdmission(
         // Unused definitions still have to satisfy lexical body and return-sort validation.
         val validation = SmtLibPolynomialCompiler(cancellation, allowIntegers = true)
         for (declaration in declarations) validation.command(declaration)
-    }
-    if (functionSyntax) {
-        smtUnsupported("real function source requires exact function lowering")
     }
     val problem = builder.build()
     if (builder.objectiveSpec != null && problem.model.factors.any {
@@ -275,7 +270,7 @@ private fun hasNonlinearSyntax(expression: SExpr, cancellation: Cancellation): B
         if (cancellation()) throw PolynomialSourceInterrupted()
         val node = work.removeLast() as? SExpr.SList ?: continue
         val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
-        if (head in setOf("^", "exp", "log", "sin", "cos", "pi")) return true
+        if (head == "^") return true
         if (head == "*" && node.items.drop(1).count { argument ->
                 val text = (argument as? SExpr.Atom)?.text
                 text == null || text.isEmpty() || text.any { it !in '0'..'9' && it != '.' }
@@ -332,21 +327,4 @@ private fun <T> withSource(
     }
     if (interrupted) throw PolynomialSourceInterrupted()
     return outcome.getOrThrow()
-}
-
-private fun hasFunctionSource(assertions: List<SExpr>, cancellation: Cancellation): Boolean {
-    val pending = ArrayDeque<SExpr>()
-    pending.addAll(assertions)
-    while (pending.isNotEmpty()) {
-        if (cancellation()) throw PolynomialSourceInterrupted()
-        when (val node = pending.removeLast()) {
-            is SExpr.Atom -> if (node.text == "pi") return true
-            is SExpr.SList -> {
-                val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
-                if (head in setOf("exp", "log", "sin", "cos", "pi")) return true
-                pending.addAll(node.items)
-            }
-        }
-    }
-    return false
 }

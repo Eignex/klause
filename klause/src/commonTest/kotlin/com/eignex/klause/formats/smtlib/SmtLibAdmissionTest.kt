@@ -656,6 +656,76 @@ class SmtLibAdmissionTest {
     }
 
     @Test
+    fun `declared pi should retain its original sort and factor admission`() {
+        for ((sort, value) in listOf("Int" to "2", "Real" to "2", "Bool" to "true")) {
+            val input = SmtLibAdmission.parse("(declare-const pi $sort) (assert (= pi $value)) (check-sat)")
+            val source = assertIs<SmtLibInput.Linear>(input).problem
+
+            val result = BacktrackSolver.source(source.model).solve()
+
+            val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
+            val actual = when (sort) {
+                "Int" -> witness.intValue(source.intVarNames.getValue("pi"))
+                "Real" -> witness.realValue(source.realVarNames.getValue("pi"))
+                else -> witness.boolValue(source.boolVarNames.getValue("pi")).toString()
+            }
+            assertEquals(value, actual)
+        }
+    }
+
+    @Test
+    fun `function names should retain linear integer helper meanings`() {
+        for (name in listOf("exp", "log", "sin", "cos", "pi")) {
+            val input = SmtLibAdmission.parse(
+                "(define-fun $name ((n Int)) Int (+ n 1)) (declare-const x Int) " +
+                    "(assert (<= 0 x 3)) (assert (= ($name x) 3)) (check-sat)",
+            )
+            val source = assertIs<SmtLibInput.Linear>(input).problem
+
+            val result = BacktrackSolver.source(source.model).solve()
+
+            val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
+            assertEquals("2", witness.intValue(source.intVarNames.getValue("x")))
+        }
+    }
+
+    @Test
+    fun `zero arity pi helpers should retain their integer meaning`() {
+        val input = SmtLibAdmission.parse(
+            "(define-fun pi () Int 2) (declare-const x Int) (assert (= x pi)) (check-sat)",
+        )
+        val source = assertIs<SmtLibInput.Linear>(input).problem
+
+        val result = BacktrackSolver.source(source.model).solve()
+
+        val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertEquals("2", witness.intValue(source.intVarNames.getValue("x")))
+    }
+
+    @Test
+    fun `local pi bindings should retain their Boolean meaning`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const b Bool) (assert (= b (let ((pi true)) pi))) (check-sat)",
+        )
+        val source = assertIs<SmtLibInput.Linear>(input).problem
+
+        val result = BacktrackSolver.source(source.model).solve()
+
+        val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertTrue(witness.boolValue(source.boolVarNames.getValue("b")))
+    }
+
+    @Test
+    fun `unused Boolean let bindings should retain actual log domains`() {
+        val input = SmtLibAdmission.parse("(assert (let ((b (= (log 0) 1))) true)) (check-sat)")
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+
+        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
     fun `source objectives should be retained when exact function optimization is unavailable`() {
         val input = SmtLibAdmission.parse(
             "(declare-const x Real) (assert (> (exp x) 0)) (minimize (* x x)) (check-sat)",
