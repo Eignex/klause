@@ -385,8 +385,10 @@ internal class WitnessProbe(
                     )
                 }
                 try {
-                    coupledPhase { coupled(conjunctive, point, fixed, guideIndices, guideTermCounts) }
-                        ?.let { return it }
+                    coupledPhase {
+                        definitionWitness(conjunctive, realCount, fixed)
+                            ?: coupled(conjunctive, point, fixed, guideIndices, guideTermCounts)
+                    }?.let { return it }
                 } finally {
                     admittedTerms = null
                 }
@@ -458,6 +460,26 @@ internal class WitnessProbe(
             admittedTerms = null
             coupledTerms = null
         }
+    }
+
+    private fun definitionWitness(
+        atoms: List<PolynomialAtom>,
+        realCount: Int,
+        fixed: Map<Int, BigFraction>,
+    ): QfNraAssignment? {
+        if (exhausted) return null
+        val point = try {
+            PolynomialWitnessDefinitions(arithmetic, MAX_WITNESS_TERMS, MAX_WITNESS_DEGREE, MAX_WITNESS_BITS)
+                .point(atoms, realCount, fixed)
+        } catch (_: PolynomialResourceLimit) {
+            null
+        } ?: return null
+        val captured = LinkedHashMap<Int, AlgebraicReal>()
+        for ((variable, value) in point) {
+            arithmetic.step()
+            captured[variable] = algebraic.rational(value)
+        }
+        return candidate(captured)
     }
 
     fun candidate(point: Map<Int, AlgebraicReal>): QfNraAssignment? = candidate(point, null)
