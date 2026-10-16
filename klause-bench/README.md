@@ -2454,6 +2454,11 @@ gzip identities and both recorded expected/actual heads must match. The family
 universe and every original supporting method selector must be retained. Each
 family declares `methods`, `ordinaryPhase` and `ordinaryPhaseAll`; required phases
 must be declared for their arm. Empty declarations retain their exclusions.
+An ordinary phase may name a method as `holder.method` or include its complete
+JVM descriptor, such as `holder.method(I)V`. Name-only phases match any overload;
+descriptor phases require that exact parameter and return descriptor. Both forms
+accept direct successful non-OSR compilations or resolved successful inlining into
+a successful non-OSR root. Missing overloads remain missing required phases.
 
 The observer authenticates the complete retained XML metadata and reforms mapped
 families from all saved compilation and inlining rows, including successful

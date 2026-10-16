@@ -239,13 +239,15 @@ class Census:
                 raise ValueError('Malformed original ordinary phase declaration')
             ordinary = {root['eventIndex'] for root in selected if root['osr'] is False and root['succeeded'] is True}
             phase_roots = {phase: {root['eventIndex'] for root in selected if root['eventIndex'] in ordinary and
-                                  root['method'] is not None and root['method'].split('(')[0] == phase} for phase in phases}
+                                  root['method'] is not None and
+                                  phase in (root['method'], root['method'].split('(')[0])} for phase in phases}
             for row in succeeded:
                 if row['eventIndex'] in resolved and row['callee'] is not None:
                     root = resolved[row['eventIndex']]
-                    phase = row['callee'].split('(')[0]
-                    if phase in phase_roots and root['eventIndex'] in ordinary:
-                        phase_roots[phase].add(root['eventIndex'])
+                    if root['eventIndex'] in ordinary:
+                        for phase in (row['callee'], row['callee'].split('(')[0]):
+                            if phase in phase_roots:
+                                phase_roots[phase].add(root['eventIndex'])
             unmeasured, conflicting = [], []
             for collection in ('queued', 'tasks', 'nmethods'):
                 for index, snapshot in enumerate(snapshots.get(collection, [])):

@@ -208,6 +208,55 @@ class JvmCompilationEventsTest(unittest.TestCase):
         self.assertFalse(result['fullSourcePhaseCoverageProven'])
         self.assertFalse(result['acceptedSavingsCredit'])
 
+    def test_descriptor_phases_keep_unobserved_overloads_missing_for_direct_and_inlined_work(self):
+        for inlined in (False, True):
+            for arm in ('control', 'candidate'):
+                with self.subTest(inlined=inlined, arm=arm):
+                    census = review.Census()
+                    observed = {'type': 'p/C', 'name': 'work', 'descriptor': '(I)V'}
+                    root = {'type': 'outside/Caller', 'name': 'whole', 'descriptor': '()V'} if inlined else observed
+                    census.add(0, {'type': 'jdk.Compilation', 'values': {'compileId': 8,
+                        'method': root, 'compileLevel': 1, 'isOsr': False, 'succeeded': True,
+                        'duration': 'PT1S', 'codeSize': 1}})
+                    if inlined:
+                        census.add(1, {'type': 'jdk.CompilerInlining', 'values': {'compileId': 8,
+                            'caller': root, 'callee': observed, 'succeeded': True}})
+                    phases = ['p.C.work', 'p.C.work(I)V', 'p.C.work()V', 'p.C.work(I)I']
+                    definition = {'methods': ['p.C.work'], 'ordinaryPhase': {arm: phases},
+                                  'ordinaryPhaseAll': {arm: phases}}
+
+                    result = census.finish({'f': definition}, arm, {})['families']['f']
+
+                    self.assertEqual({'p.C.work': [0], 'p.C.work(I)V': [0],
+                                      'p.C.work()V': [], 'p.C.work(I)I': []},
+                                     result['ordinaryPhaseMethodRootEventIndices'])
+                    self.assertEqual(['p.C.work()V', 'p.C.work(I)I'], result['missingRequiredOrdinaryPhases'])
+                    self.assertEqual([0], result['inclusiveRootEventIndices'])
+                    self.assertFalse(result['fullSourcePhaseCoverageProven'])
+                    self.assertFalse(result['acceptedSavingsCredit'])
+
+    def test_descriptor_phases_exclude_failed_and_osr_roots_for_direct_and_inlined_work(self):
+        for inlined in (False, True):
+            for osr, succeeded in ((True, True), (False, False)):
+                with self.subTest(inlined=inlined, osr=osr, succeeded=succeeded):
+                    census = review.Census()
+                    observed = {'type': 'p/C', 'name': 'work', 'descriptor': '(I)V'}
+                    root = {'type': 'outside/Caller', 'name': 'whole', 'descriptor': '()V'} if inlined else observed
+                    census.add(0, {'type': 'jdk.Compilation', 'values': {'compileId': 8,
+                        'method': root, 'compileLevel': 4, 'isOsr': osr, 'succeeded': succeeded,
+                        'duration': 'PT1S', 'codeSize': 1}})
+                    if inlined:
+                        census.add(1, {'type': 'jdk.CompilerInlining', 'values': {'compileId': 8,
+                            'caller': root, 'callee': observed, 'succeeded': True}})
+                    definition = {'methods': ['p.C.work'], 'ordinaryPhase': {'control': ['p.C.work(I)V']},
+                                  'ordinaryPhaseAll': {'control': ['p.C.work(I)V']}}
+
+                    result = census.finish({'f': definition}, 'control', {})['families']['f']
+
+                    self.assertEqual({'p.C.work(I)V': []}, result['ordinaryPhaseMethodRootEventIndices'])
+                    self.assertEqual(['p.C.work(I)V'], result['missingRequiredOrdinaryPhases'])
+                    self.assertEqual([0], result['inclusiveRootEventIndices'])
+
     def test_missing_units_code_size_and_conflicting_success_fields_remain_unknown(self):
         census = review.Census()
         census.add(0, {'type': 'jdk.Compilation', 'values': {'compileId': True, 'compileLevel': True,
