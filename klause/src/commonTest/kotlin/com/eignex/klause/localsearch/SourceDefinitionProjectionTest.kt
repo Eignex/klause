@@ -58,7 +58,7 @@ class SourceDefinitionProjectionTest {
     fun `strict endpoint comparisons should not wrap their source bound`() {
         for ((endpoint, relation) in listOf(Long.MIN_VALUE to LinearOp.LE, Long.MAX_VALUE to LinearOp.GE)) {
             val problem = Problem(
-                numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain.range(endpoint, endpoint)),
+                numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(endpoint, endpoint)),
                 factors = arrayOf(Clause(intArrayOf(Lit.make(0, false)))),
             )
             val hint = DefinitionHint.Comparison(
@@ -100,7 +100,7 @@ class SourceDefinitionProjectionTest {
     @Test
     fun `Boolean literal polarity should survive native objective materialization`() {
         val problem = Problem(
-            1, 1, arrayOf(IntDomain.range(0, 1)),
+            1, 1, arrayOf(IntDomain(0, 1)),
             arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)),
         )
         val hint = DefinitionHint.BooleanValue(0, Lit.make(0, false))
@@ -174,7 +174,7 @@ class SourceDefinitionProjectionTest {
     @Test
     fun `reverse ordered source definitions should evaluate in dependency order`() {
         val count = 1024
-        val domain = IntDomain.range(0, count.toLong())
+        val domain = IntDomain(0, count.toLong())
         val factors = Array<Factor>(count) { k ->
             Linear(intArrayOf(1, -1), intArrayOf(k + 1, k), LinearOp.EQ, 1)
         }

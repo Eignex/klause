@@ -190,7 +190,9 @@ sealed interface DefinitionHint {
 }
 
 private fun DefinitionHint.Operand.remapped(mapping: VarRemap): DefinitionHint.Operand? = when (this) {
-    is DefinitionHint.Operand.Variable -> mapping.int(id).takeIf { it >= 0 }?.let { DefinitionHint.Operand.Variable(it) }
+    is DefinitionHint.Operand.Variable -> mapping.int(id).takeIf { it >= 0 }?.let {
+        DefinitionHint.Operand.Variable(it)
+    }
     is DefinitionHint.Operand.Constant -> this
 }
 
