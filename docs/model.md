@@ -170,8 +170,10 @@ model settings. Search effort stays in the existing per-call backend parameters.
 default undeclared ranges, source feasibility tolerance and absent optional-value
 canonicalization. Optional policies state applicability: an absent policy cannot
 be introduced by a caller override. `SemanticOverrides` replaces applicable policies
-before lowering. Range replacements can widen, narrow or explicitly open endpoints;
-they are not intersections with the format defaults. Bounds on declarations with
+before lowering. `BoundsOverride` replaces either endpoint independently, using
+`BoundOverride.Open` to explicitly remove a default endpoint. An omitted endpoint
+retains its default. Replacements can widen or narrow ranges; they are not
+intersections with format defaults. Bounds on declarations with
 an explicit range remain source data.
 
 `FloatSemantics.Grid` retains its approximation window separately from undeclared
