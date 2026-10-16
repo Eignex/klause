@@ -3,7 +3,6 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.magnitudeBitLength
 
 internal fun prepareMixedEqualityRepair(
     columns: Int,
@@ -16,7 +15,7 @@ internal fun prepareMixedEqualityRepair(
         return null
     }
     if (stop()) return null
-    val work = MixedRepairWork(stop)
+    val work = MixedPointArithmetic(stop)
     val directions = HashMap<MixedEqualityKey, Int>()
     val equalities = ArrayList<MixedEqualityKey>()
     var entries = 0L
@@ -92,7 +91,7 @@ internal class MixedEqualityRepair(
     private val stop: Cancellation,
     private val onStage: ((String) -> Unit)?,
 ) {
-    private val work = MixedRepairWork(stop)
+    private val work = MixedPointArithmetic(stop)
 
     fun point(guess: List<BigFraction>): List<BigFraction>? {
         stop.charge(2L * guess.size)
@@ -173,36 +172,5 @@ internal class MixedEqualityRepair(
 
 private data class MixedEqualityKey(val terms: List<Pair<Int, BigFraction>>, val bound: BigFraction)
 
-private class MixedRepairWork(private val stop: Cancellation) {
-    fun admitted(value: BigFraction): Boolean {
-        val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
-        stop.charge(1L + bits / Long.SIZE_BITS)
-        return bits <= MAX_REPAIR_BITS && !stop()
-    }
-
-    private fun preflight(left: BigFraction, right: BigFraction): Boolean {
-        val bits = maxOf(left.num.magnitudeBitLength(), left.den.magnitudeBitLength()).toLong() +
-            maxOf(right.num.magnitudeBitLength(), right.den.magnitudeBitLength()) + 2L
-        if (bits > MAX_REPAIR_BITS * 2L + 2L) return false
-        val words = bits / Long.SIZE_BITS + 1L
-        stop.charge(bits + words * words)
-        return !stop()
-    }
-
-    fun quotient(value: BigFraction, divisor: BigFraction): BigFraction? {
-        if (divisor.isZero) return null
-        val inverse = divisor.reciprocal()
-        if (!preflight(value, inverse)) return null
-        return (value * inverse).takeIf(::admitted)
-    }
-
-    fun subtractProduct(value: BigFraction, left: BigFraction, right: BigFraction): BigFraction? {
-        if (!preflight(left, right)) return null
-        val product = left * right
-        if (!admitted(product) || !preflight(value, product)) return null
-        return (value - product).takeIf(::admitted)
-    }
-}
 
 private const val MAX_REPAIR_ENTRIES = 65536L
-private const val MAX_REPAIR_BITS = 4096

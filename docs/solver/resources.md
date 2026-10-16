@@ -207,7 +207,9 @@ Complete mixed witness recovery uses the current exact-linear operation token fo
 integer guesses, source-prefix reconstruction, selected-row substitution, equation
 repair, graph construction and full-row validation. Equation repair admits at most
 65,536 input entries, pivot cells and projected entries and 4,096-bit scalars; pairing,
-sparse elimination and substitution charge the same token before bounded arithmetic.
+sparse elimination, integer substitution and full-row checks charge the same token
+before bounded arithmetic. Oversized intermediate products withhold a guess even
+when later terms could cancel them.
 Retained pivots can reduce inequalities to a difference graph over free real coordinates;
 this reuses the same decomposition and token without a second elimination. A general
 residual is partitioned under that token. Difference components use the graph checker;
