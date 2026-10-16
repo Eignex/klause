@@ -18,6 +18,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.Cancellation
+import kotlin.time.TimeSource
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -121,7 +122,8 @@ private class LinearCliAccess(private val loader: ClassLoader) {
         val config = loader.loadClass(prefix + "PlatformKt").getDeclaredMethod("installCliConfig").invoke(null)
         set(common, "config", requireNotNull(config))
         set(common, "timeLimitMs", 60000L)
-        set(common, "deadlineAtMs", System.currentTimeMillis() + 60000L)
+        val cliNow = loader.loadClass(prefix + "PlatformKt").getDeclaredMethod("nowMillis").invoke(null) as Long
+        set(common, "deadlineAtMs", cliNow + 60000L)
         set(common, "randomSeed", source.seed)
         set(common, "parallel", 1)
         set(common, "statistics", true)
@@ -155,6 +157,8 @@ private class LinearCliAccess(private val loader: ClassLoader) {
         val deadline = coreType.getDeclaredMethod("deadlineCancellation", optionsType).apply { isAccessible = true }
             .invoke(core, common) as Pair<*, *>
         val containing = LinearObservedStop(deadline.second as Cancellation, observed)
+        val remaining = requireNotNull(containing.deadline()) - TimeSource.Monotonic.markNow()
+        require(remaining.inWholeMilliseconds <= 60000L) { "CLI deadline uses a different clock" }
         val allowance = coreType.declaredMethods.single { it.name.startsWith("presolveAllowance") }
             .apply { isAccessible = true }.invoke(core, common, containing) as Pair<*, *>
         val preparation = LinearObservedStop(allowance.first as Cancellation, observed)
@@ -214,6 +218,7 @@ private class LinearCliAccess(private val loader: ClassLoader) {
             put("pipeline", pipeline.javaClass.simpleName)
             put("declaredRoute", request?.route?.name)
             put("frontendNs", frontendNs)
+            put("remainingMsAtExecution", remaining.inWholeMilliseconds)
             put("routingSpent", routingSpent)
             put("presolveSpent", (allowance.second as? PresolveBudget)?.spent())
             put("presolveAllowance", (allowance.second as? PresolveBudget)?.allowance)
