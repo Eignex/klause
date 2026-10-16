@@ -334,6 +334,9 @@ removed columns and factors, and requires the final model to match canonical adm
 by the same source names, bounds and ordered factor keys. It records external numeric
 consumers separately from integer defining factors. This mode declines objectives,
 real columns and open product operands; it changes no solver code or allowance.
+For each unknown definition image it also calls the existing image calculation once
+against completed child metadata, without storing its result or changing the expansion
+counter. This observes late image availability rather than performing an image fixpoint.
 Its additional compilation is before the opening deadline and supplies no timing,
 CLI-equivalence, refusal-cause or source-verdict claim.
 

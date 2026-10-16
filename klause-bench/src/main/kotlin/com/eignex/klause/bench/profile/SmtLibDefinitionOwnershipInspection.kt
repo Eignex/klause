@@ -23,6 +23,7 @@ internal object SmtLibDefinitionOwnershipInspection {
         val integerOwners: Map<Int, Owner>,
         val booleanOwners: Map<Int, Owner>,
         val definitions: Map<Int, Any>,
+        val lateImages: Map<Int, Int>,
     )
 
     fun compile(builder: Any, state: Any, canonical: SmtLibProblem, out: File): SmtLibProblem {
@@ -67,6 +68,15 @@ internal object SmtLibDefinitionOwnershipInspection {
         val definitions = field(state, "definitions") as Map<Int, Any>
         require(definitions.isNotEmpty()) { "ownership inspection requires conditional definitions" }
         val predicates = field(state, "booleanDefinitions") as Map<Int, List<Factor>>
+        val work = field(state, "work")
+        val lateImages = definitions.mapNotNull { (variable, definition) ->
+            if (field(definition, "image") != null) return@mapNotNull null
+            val image = method(state, "constantImage", field(definition, "arms"),
+                field(definition, "default"), field(definition, "guardTests")) as? Set<*>
+            require(field(definition, "image") == null)
+            image?.let { variable to it.size }
+        }.toMap()
+        require(field(state, "work") == work)
         val owners = HashMap<Factor, Owner>()
         val integerOwners = definitions.keys.associateWith { Owner(it, integer = true) }
         val booleanOwners = HashMap<Int, Owner>()
@@ -106,7 +116,7 @@ internal object SmtLibDefinitionOwnershipInspection {
         bools.forEach { need(booleanOwners[it]) }
         for (factor in factors) if (factor !in owners) read(factor)
         while (pending.isNotEmpty()) parts.getValue(pending.removeFirst()).forEach(::read)
-        return Snapshot(owners, retained, integerOwners, booleanOwners, definitions)
+        return Snapshot(owners, retained, integerOwners, booleanOwners, definitions, lateImages)
     }
 
     private fun report(
@@ -140,6 +150,10 @@ internal object SmtLibDefinitionOwnershipInspection {
             put("retainedKnownImageDefinitions", retainedDefinitions.count {
                 field(snapshot.definitions.getValue(it), "image") != null
             })
+            put("lateKnownImagesFromCurrentCompletedChildren", snapshot.lateImages.size)
+            put("retainedLateKnownImages", retainedDefinitions.count { it in snapshot.lateImages })
+            put("lateImageSizes", histogram(snapshot.lateImages.values.map(Int::toString)))
+            put("lateImageScope", "one read-only call to existing constantImage per unknown definition; no fixpoint or mutation")
             put("retainedFactorKinds", histogram(surviving.map { it.javaClass.simpleName }))
             put("externalDefinitionReadFactorKinds", histogram(externalReads.map { it.javaClass.simpleName }))
             put("externalReifiedRows", histogram(rows.map { row ->
