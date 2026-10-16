@@ -58,6 +58,8 @@ class QfLiraSolverHintsTest {
                 numBoolVars = booleans,
                 intBounds = openBounds(0),
                 numRealVars = 1,
+                realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
                 factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
                     intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0)),
             )
