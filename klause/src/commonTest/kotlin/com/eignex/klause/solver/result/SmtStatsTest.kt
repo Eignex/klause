@@ -2,8 +2,33 @@ package com.eignex.klause.solver.result
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class SmtStatsTest {
+    @Test
+    fun `counted stages should retain count one behavior and saturate`() {
+        val sink = SmtStatsSink()
+        sink.observeCompleteSearchBooleans(1, 1)
+
+        sink.observeCompleteSearchStage("BRANCH")
+        sink.observeCompleteSearchStage("BRANCH", 4L)
+        sink.observeCompleteSearchStage("WORK", Long.MAX_VALUE)
+        sink.observeCompleteSearchStage("WORK", 1L)
+
+        assertEquals(mapOf("BRANCH" to 5L, "WORK" to Long.MAX_VALUE), sink.snapshot().completeSearchStages)
+    }
+
+    @Test
+    fun `zero stage counts should leave unobserved progress absent`() {
+        val sink = SmtStatsSink()
+
+        sink.observeCompleteSearchStage("WORK", 0L)
+
+        assertNull(sink.snapshot().completeSearchStages)
+        assertFailsWith<IllegalArgumentException> { sink.observeCompleteSearchStage("WORK", -1L) }
+    }
+
     @Test
     fun `merged traversal progress should retain the model for the smallest unresolved count`() {
         val first = SmtStats(

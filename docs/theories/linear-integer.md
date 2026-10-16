@@ -33,6 +33,18 @@ and ceiling thresholds. Finite variables receive scoped fixings from their finit
 owner, preserving bounds and holes. Shared search owns decision levels, retraction and conflict
 learning; the arithmetic component owns row assertions and numerical checks.
 
+Pure-integer linear checks can reject an active subset through an optional exact
+difference graph after source assertion and the ordinary check charge, before the
+LP request. Only individually implied rows with compact integer constants, at most
+two integer terms and integral normalized weights contribute edges. Disjunction
+alternatives, Boolean terms and unresolved disequality alternatives retain their
+LP obligations. Immutable source bounds contribute unconditional edges; scoped
+bounds do not. Unsafe projected weights are omitted from this implication filter.
+A completed negative cycle names its active source guards for shared conflict
+learning under the production certification policy. Source-bound branches retain
+the LP path. No cycle establishes no source feasibility fact; the filter exposes
+neither a point nor a branching preference.
+
 With null `openHintFlips`, one exact-linear completion owner can reuse a completed
 partial LP point for direct primitive Boolean preferences, including integer-only
 sources. Registration charges the opening token; capture and bounded comparison
@@ -82,6 +94,12 @@ integer branches, reduction caches and LP state. Retraction removes scoped premi
 before evidence can be reused. [TheoryParams](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/pipeline/TheoryParams.kt)
 separates theory checks, open work, decisions and cancellation. Native numerical
 work retains the [LP certification](../lp/certification.md) resource contract.
+Difference-subset preparation and checking charge the same operation token,
+including eligibility, guard masks, graph work and conflict validation. The existing
+10,000-coordinate and 100,000-edge representation limits apply. Interrupted
+preparation publishes no retained prefix. Each query rebuilds active guards after
+retraction; only completed safely normalized potentials can be retained as private
+optimization state. They supply no scoped proof.
 
 Source installation builds derived disequality directions and their premises in
 callback-local maps, then retains one node snapshot. Each numerical assertion keeps

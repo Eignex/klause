@@ -729,6 +729,12 @@ candidates from stopped or unavailable points before rounding.
 Difference graphs, exact linear systems and polynomial completion keep their own
 state while sharing the traversal's source facts and decision lifetime. Integer
 integrality and finite factors cannot be dropped to obtain an arithmetic witness.
+The exact integer linear component can learn a conflict from a completed negative
+cycle in an individually implied difference subset. Its clause negates the active
+source guards and is revalidated against the live trail; an unconditional cycle
+needs no Boolean premise. Missing cycle support, unsafe arithmetic and interruption
+produce no deduction. Omitted rows retain the complete LP/source obligations. See
+[linear integer arithmetic](../theories/linear-integer.md) for eligibility and scope.
 
 Open quadratic integer optimization supplies exact complementary wide predicates
 through a theory brancher. Its optimization node policy prunes against certified
@@ -842,6 +848,15 @@ and registration declines; they establish no source witness. Complete-caller
 `POINT_HINT_*` stages distinguish successful graph/LP capture and consultations that
 find no live point, no preference for the chosen Boolean, or a preferred polarity.
 They exclude private-query captures and do not explain an unavailable point.
+`INTEGER_DIFFERENCE_*` counts performed preparation row/term/bound visits, edge
+attempts and retained/skipped edges, queries, completed cycles and published
+conflicts. Visits can repeat a source row across alternatives or attempts.
+`FORWARDED_CHARGE_UNITS` and `COMPLETED_CHARGE_UNITS` distinguish requested work
+forwarding from calls that returned normally; neither proves meter acceptance.
+`METER_PRESENT_OPERATIONS` and `METER_ABSENT_OPERATIONS` identify whether the
+original token exposed a work meter. These aggregates are emitted through the
+complete-worker observation gate; they are neither distinct source-row counts
+nor CPU time, stop causes or a sum across overlapping stage keys.
 These observations add no scan, numerical query,
 allowance or result authority and do not explain an UNKNOWN verdict by themselves.
 

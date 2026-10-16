@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -17,6 +18,7 @@ import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -36,6 +38,54 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverDifferenceTest {
+    @Test
+    fun `integer subset conflicts should publish their guards and retract for a sibling`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+            ),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertContentEquals(intArrayOf(Lit.make(0, false)), assertNotNull(conflict.explanation).literals)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("INTEGER_DIFFERENCE_PUBLISHED_CONFLICTS"))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertTrue(assignment.intValue(0) >= bigIntOf(1))
+        }
+    }
+
+    @Test
+    fun `integer subset conflicts should retain custom certification policy`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(2), null, null),
+            factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false }))
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = session.push(SearchDecision.Bool(Lit.make(0, true)))
+
+            assertIs<ComponentResult.Consistent>(result)
+            assertIs<SearchResult.Indeterminate>(session.solve(1))
+        }
+    }
+
     @Test
     fun `partial difference checks and complete source witnesses should need no LP owner`() {
         val model = Problem(

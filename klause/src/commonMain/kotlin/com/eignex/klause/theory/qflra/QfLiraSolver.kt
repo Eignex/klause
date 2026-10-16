@@ -208,6 +208,8 @@ class ExactLiraSearchComponent private constructor(
     private val preparedRows = preparedSource.preparedRows
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
+    private var integerDifferencePrepared = false
+    private var integerDifference: IntegerDifferenceConflicts? = null
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
@@ -1083,14 +1085,17 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun differenceConflict(
-        result: RealDifferenceSystem.Result.Infeasible,
+        clause: IntArray?,
         context: SearchContext,
+        stop: Cancellation? = null,
     ): ComponentResult? {
         if (node.sourceBranches.isNotEmpty() ||
             solveContext.certificationPolicy !== ProductionLpCertificationPolicy
         ) return null
-        val clause = result.clause ?: return null
+        if (clause == null) return null
         if (clause.any { literal ->
+                stop?.charge(1L)
+                if (stop?.invoke() == true) return ComponentResult.Indeterminate
                 context.boolValue(Lit.variable(literal))?.let { Lit.evaluate(literal, it) } != false
             }
         ) return null
@@ -1103,6 +1108,33 @@ class ExactLiraSearchComponent private constructor(
         smtStats?.observeConflict(explanation)
         outcome = ComponentCheck.Infeasible(explanation)
         return ComponentResult.Conflict(explanation)
+    }
+
+    private fun integerDifferenceConflict(context: SearchContext): ComponentResult? {
+        if (model.numRealVars != 0 || model.numIntVars == 0 || node.sourceBranches.isNotEmpty() ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy
+        ) return null
+        val stop = IntegerDifferenceAccounting(operationStop) { key, units ->
+            if (completeTraversalObserved) smtStats?.observeCompleteSearchStage(key, units)
+        }
+        try {
+            if (!integerDifferencePrepared) {
+                integerDifference = IntegerDifferenceConflicts.prepare(model, preparedRows.asSequence().map {
+                    IntegerDifferenceConflicts.Row(it.row, it.form, !it.disjunction)
+                }, stop)
+                if (stop()) return ComponentResult.Indeterminate
+                integerDifferencePrepared = true
+            }
+            return when (val result = integerDifference?.check(bools, stop)) {
+                IntegerDifferenceConflicts.Result.Interrupted -> ComponentResult.Indeterminate
+                is IntegerDifferenceConflicts.Result.Conflict -> differenceConflict(result.clause, context, stop)?.also {
+                    if (it is ComponentResult.Conflict) stop.count("PUBLISHED_CONFLICTS")
+                }
+                else -> null
+            }
+        } finally {
+            stop.flush()
+        }
     }
 
     private fun relaxWithin(context: SearchContext): ComponentResult {
@@ -1132,7 +1164,7 @@ class ExactLiraSearchComponent private constructor(
             when (val result = realDifference?.check(bools, operationStop)) {
                 RealDifferenceSystem.Result.Interrupted -> return ComponentResult.Indeterminate
                 is RealDifferenceSystem.Result.Infeasible -> {
-                    differenceConflict(result, context)?.let { return it }
+                    differenceConflict(result.clause, context)?.let { return it }
                 }
                 is RealDifferenceSystem.Result.Feasible -> {
                     if (bools.any { it == UNASSIGNED }) {
@@ -1164,6 +1196,7 @@ class ExactLiraSearchComponent private constructor(
             return ComponentResult.Indeterminate
         }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
+        integerDifferenceConflict(context)?.let { return it }
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
         val result = lp.solve(sparsePointRecovery = true)

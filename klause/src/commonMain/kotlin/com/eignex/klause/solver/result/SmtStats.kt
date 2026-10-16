@@ -91,7 +91,7 @@ data class SmtStats(
     val completeSearchLinearPoints: Long? = null,
     /** Returned LP verdict and stage observations before the caller stop check; excludes private queries. */
     val completeSearchLinearOutcomes: Map<String, Long>? = null,
-    /** Complete-traversal branch and mixed recovery stages; null until observed. */
+    /** Complete-traversal branch, arithmetic and mixed recovery stage counts; null until observed. */
     val completeSearchStages: Map<String, Long>? = null,
 ) {
     /** Combine independent solve slices. */
@@ -214,8 +214,15 @@ internal class SmtStatsSink {
     }
 
     fun observeCompleteSearchStage(key: String) {
+        observeCompleteSearchStage(key, 1L)
+    }
+
+    fun observeCompleteSearchStage(key: String, count: Long) {
+        require(count >= 0L)
+        if (count == 0L) return
         val stages = checkNotNull(completeSearchStages)
-        stages[key] = (stages[key] ?: 0L) + 1L
+        val prior = stages[key] ?: 0L
+        stages[key] = prior + minOf(count, Long.MAX_VALUE - prior)
     }
 
     fun observeCompleteSearchLinearPoint() {
