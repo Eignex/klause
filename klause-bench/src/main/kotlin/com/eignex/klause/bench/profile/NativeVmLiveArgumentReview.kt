@@ -17,7 +17,7 @@ internal object NativeVmLiveArgumentReview {
             it.substringBefore('=') to it.substringAfter('=')
         }
         val review = options["review"]
-        require(review == null || review in setOf("event-loss", "log-identities", "return-sizes"))
+        require(review == null || review in setOf("event-loss", "log-identities", "return-sizes", "task-log"))
         val required = setOf("manifest", "manifest-sha256", "archive") +
             if (review != null) setOf("review") else emptySet()
         require(args.size == required.size && options.keys == required)
@@ -47,11 +47,12 @@ internal object NativeVmLiveArgumentReview {
                 "event-loss" -> "review_native_vm_event_loss.py"
                 "log-identities" -> "review_native_vm_log_identities.py"
                 "return-sizes" -> "review_native_vm_return_sizes.py"
+                "task-log" -> "review_jvm_task_log.py"
                 else -> "review_native_vm_live_arguments.py"
             }
             val tool = File(root, "klause-bench/tools/$name")
             val sources = listOf(name, "native_vm_event_loss.py", "review_native_vm_live_arguments.py") +
-                if (review == "return-sizes") listOf("review_native_vm_log_identities.py") else emptyList()
+                if (review in setOf("return-sizes", "task-log")) listOf("review_native_vm_log_identities.py") else emptyList()
             for (source in sources.distinct()) {
                 File(root, "klause-bench/tools/$source").copyTo(File(out, source))
             }
