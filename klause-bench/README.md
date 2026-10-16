@@ -2294,6 +2294,199 @@ using the complete or heuristic engine alone. These explicit diagnostic controls
 check outcome and deterministic-work parity; they establish no default-route speedup,
 source refutation, independent witness acceptance or optimization claim.
 
+### Saved JVM compilation census
+
+`com.eignex.klause.bench.profile.JvmCompilationCohortReview` accepts `manifest=`,
+`manifest-sha256=` and `archive=` HTTPS inputs. It authenticates the complete
+original archive and every member before decoding any recording. It extracts
+case JFR/XML and bounded original metadata into private temporary storage, hashes
+unselected members incrementally and removes the staging directory on exit.
+Large derived reports are authenticated without extraction or interpretation.
+No captured target JVM, solver or native probe is invoked.
+
+The observer JDK's `jfr print --json` exports Compilation, CompilerInlining,
+CompilerPhase, CompilationFailure, DataLoss, ActiveSetting and JVMInformation
+events. The complete exported JSON bytes are retained in deterministic gzip;
+event indices refer to that export, separately within each original recording.
+Unknown event fields remain in the export. The parser streams UTF-8 and individual
+JSON records, rejects duplicate keys, malformed/truncated envelopes and trailing
+bytes, and never loads a complete export or derived report as a string.
+
+The census retains C1, C2 and unknown tiers, ordinary/OSR, successful/failed and
+replacement root events. Exact textual JFR durations become integer nanoseconds;
+numeric or unknown units remain unavailable. Reported successful `codeSize`
+stays distinct from XML content size, instruction size, file bytes and CPU.
+Missing quantities and empty root sets are unavailable, rather than zero.
+Direct methods and successful inlining references retain complete root costs.
+Each root is counted once within a family; shared family totals are nonadditive.
+Ambiguous compile IDs, incomplete method identities, failed inline attempts and
+unresolved successful references remain explicit. Full XML metadata preserves
+all-tier queues, started/installed roots, failures, replacements and parse errors.
+
+Every archived case directory is retained. The original `cases.json`, individual
+measurement and recording/XML identities must agree for case decoding completion.
+Missing, extra, nested or ambiguous recordings and malformed XML remain negative.
+Observer bench/JDK files are hash-bound before review and checked for changes
+afterwards, separately from the original CLI/runtime/source/worker context.
+Family declarations and observed ordinary-phase roots are reported;
+their correspondence to complete current source phases requires independent
+review. Original source-check outputs and exclusions are preserved without an
+outcome upgrade. Decoding completion supplies no complete lifetime, loss-free,
+source-phase, current-runtime or saving proof. Instrumented JFR durations do not
+replace independent runtime, allocation, quality, RNG/work or cold-run controls.
+
+Saved `class-load.log` files and numbered rotations are authenticated with every
+other archive member. All class-load observations and unparsed lines are retained
+separately, together with each original installed CLI manifest and the available
+harness provenance, requested options and study plan. A file URI can identify a
+recorded jar candidate only by its exact original distribution path and SHA-256;
+matching jar basenames do not establish an association. Shared archive sources,
+generated classes, missing manifests and conflicting observations remain unbound.
+Rotated or multiple logs do not supply a single complete origin stream.
+Class logs declared omitted by the primary source-filter inventory also prevent
+complete origin attribution. An append-only companion can restore those original
+bytes through `class-origins-manifest=`, `class-origins-manifest-sha256=` and
+`class-origins-archive=`. All three are required together. Its catalog must name
+the exact `primaryArchive`; only omitted class-log paths with identical original
+sizes and hashes may be added. Existing members cannot be replaced. Every
+companion member is authenticated, including unselected provenance, before log
+parsing. The primary archive remains immutable, and each restored log retains its
+own archive identity. Multiple process lifetimes or rotations are not combined.
+
+Every compilation root and inline caller/callee keeps a reference to its class
+association table, including missing or malformed method identities. Repeated
+class observations remain distinct. A recorded jar candidate does not establish
+class-loader identity, actual loaded byte digests, complete source phases or
+compiler savings. These observations do not change JFR/XML case completion,
+reported costs, eligibility or source/outcome proof flags.
+
+Bounds are 16 MiB for the manifest, 2 GiB compressed/16 GiB expanded for the
+archive, 8 GiB selected scratch inputs, 128 MiB per recording/XML/class log and 32 MiB per
+original metadata file. Each export allows 8 GiB of JSON, 8 MiB per event,
+four million events and one million retained root/inlining rows. A JFR child has
+300 seconds and 1 MiB of stderr; the enclosing review has 2400 seconds and kills
+owned descendants on timeout. Derived reports allow 512 MiB expanded each;
+the whole compressed output stays below 512 MiB, leaving transfer headroom.
+Partial export, tool failure and resource declines retain explicit negatives and
+recoverable original input identities. Publication still requires source filtering
+and complete byte verification of every retained gzip payload. Each class log
+allows 250,000 complete UTF-8 lines with at most 64 KiB per line; invalid UTF-8
+or a bound decline cannot authorize a parsed prefix.
+The primary and optional companion share the compressed archive, expanded member,
+member-count and selected-scratch bounds; each manifest keeps its 16 MiB limit.
+
+### Saved JVM census cost comparisons
+
+`com.eignex.klause.bench.profile.JvmCompilationCohortCosts` accepts the same three
+manifest/archive arguments as the saved-census reader. Its input is a published
+complete saved-census archive. It authenticates every member before interpreting
+the cohort index, original case metadata and complete per-recording census files.
+It performs no original JVM or solver replay and does not run `jfr print`.
+
+Optional `mapping=<https-url>` and `mapping-sha256=<sha256>` arguments supply a
+separate phase declaration. Both are required together. The bounded JSON object
+uses `schema=1`, `inputCensusArchive` (size and SHA-256), `originalFamiliesIdentity`
+and `originalStudyBuildsIdentity` (uncompressed original sizes and SHA-256 values),
+`sourceHeads` (control and candidate Git heads) and `families`. Original metadata
+gzip identities and both recorded expected/actual heads must match. The family
+universe and every original supporting method selector must be retained. Each
+family declares `methods`, `ordinaryPhase` and `ordinaryPhaseAll`; required phases
+must be declared for their arm. Empty declarations retain their exclusions.
+
+The observer authenticates the complete retained XML metadata and reforms mapped
+families from all saved compilation and inlining rows, including successful
+outside roots. Missing or incomplete XML stays excluded; ambiguous IDs, queued or
+unmeasured roots, OSR, failures and conflicts retain the census rules. The report
+keeps the original comparisons unchanged and adds `phaseMapping` observations,
+pairs and summaries. Mapped rows reference the original family census by case,
+family and authenticated report identity, avoiding another copy of its root lists.
+Plain summaries include `mappedComparisonSummaries` alongside
+the original summaries. The mapping input and its hash remain captured. Recorded
+head equality establishes metadata scope only; it does not prove loaded classes,
+descriptors, synthetic ownership or exhaustive source-phase coverage.
+
+Report format version 2 stores each original or mapped family observation once.
+Every pair arm contains `observationIndex` references into its sibling
+`familyCaseObservations` array, preserving duplicate and unexpected arms. Original
+family censuses retain their producer representation. Mapped XML references use
+`unmeasuredAllTierXmlSnapshotIndicesByCollection` and
+`conflictingXmlSnapshotIndicesByCollection`: each maps `queued`, `tasks` or
+`nmethods` to every corresponding source index in order. Empty maps mean no
+references; repeated indices remain repeated. Expanding each collection/index
+pair recovers the complete reference list. Roots, phases, metrics and exclusions
+are unchanged. These representations avoid duplicate root lists and repeated XML
+collection labels without increasing the output bounds or selecting away records.
+
+`compilation-cost-comparison.json.gz` retains every original family/case row and
+pair, original source-check status, whole recording/tier costs and report recovery
+identities. Pair keys include engine, input index, repetition, mode and recipe.
+`compilation-cost-summary.json` and the child stdout retain every family/engine/
+mode/recipe summary and excluded pair context. Summary maxima are sums of paired
+per-recording maxima, with a retained difference range; they are not cohort maxima.
+`familyObservationSummaries` and `mappedFamilyObservationSummaries` also retain
+the already computed all-tier and C2 scalar quantities for every family/recording,
+including excluded contexts. Their source/phase exclusions and missing quantities
+stay explicit. These descriptive observations do not qualify a comparison or
+establish exhaustive source work or a current source change's benefit.
+`recordingObservationSummaries` retains every recording's all-class and tier
+scalars, original context keys, census identity and `savedJvmContext`. The latter
+authenticates both compressed and expanded identities of the referenced original
+`events-*.json.gz`, then streams that complete saved export without `jfr print`.
+Every JVMInformation event retains its original event index and complete values,
+including unknown fields, commands, arguments, process identity and start time
+when recorded. Missing exports, absent events, repeated or conflicting contexts,
+incomplete original censuses and mismatched event counts remain explicit.
+No context is selected from multiple events and no target process role is inferred.
+Unreferenced saved exports remain named in `unreferencedSavedExportPaths`.
+Context availability does not change original or mapped pair eligibility.
+`methodRecordingObservations` retains every direct root method, inline callee and caller,
+including unknown identities and methods seen only in failed inline attempts.
+Each row references its original recording, direct roots, successful outside
+inlining roots, all inline attempts, unresolved successful references and root
+errors. Inclusive costs deduplicate a shared root within a method, preserving all
+tiers, ordinary/OSR, failed and replacement events; C2 values remain separate.
+Successful-inlining roots are shared and nonadditive across methods.
+Caller references alone do not authorize an inclusive root association; methods
+seen only as callers retain those references with unavailable cost quantities.
+`observedMethodSummaries`, also retained in the plain summary, groups every
+observed exact method identity by arm, engine, mode and recipe across recorded
+input indexes and repetitions. It references every method observation and names
+recordings without that method observation. Those absent contexts are unavailable
+and do not become zero-cost samples. Each metric sums the observed recording
+values only when every such value is available; the method maximum is the largest
+reported root duration across those recordings. This differs from the sum of
+per-recording maxima in the family comparison summaries.
+Recording summaries preserve original source outcome, source-hash status,
+invocation exit, case and cohort completion alongside the original JVM context.
+These descriptive method summaries do not change family eligibility, select a
+process role, establish exhaustive source work or qualify a compiler saving.
+Missing, duplicate or unexpected arms, mismatched problem identities, invalid or
+unknown original source outcomes, incomplete cohorts, missing declared ordinary
+phases, unresolved roots, XML gaps, data-loss events and ambiguous IDs remain
+excluded. Failed roots and missing metrics are retained; absent costs are not zero.
+Available differences and exact ratio operands describe observed all-tier JFR
+quantities. C2 values stay separate, and shared full-root family costs are not
+additive. No family, adverse observation or excluded pair is selected away.
+
+Declared-phase eligibility does not prove exhaustive source phases or a current
+source change's benefit. Original runtime/source outcomes retain their own scope;
+current runtime, allocation, RNG/work, independent and cold controls are separate.
+All full-root, elapsed-time, code-size and saving proof flags remain false.
+Resource bounds are 2 GiB compressed archives, 16 GiB complete member expansion,
+512 MiB selected compressed metadata and saved exports, 512 MiB per expanded census JSON and
+512 MiB complete compressed output. Transport staging is removed after the child
+finishes. Optional mapping inputs are bounded to 16 MiB. The observer retains its
+installed build/JDK identity, exact thirteen-file
+Python closure, original input identities and actual child streams/exit.
+Saved exports keep the census reader's 8 GiB expanded, 8 MiB per event and four
+million event bounds. Each recording allows at most 4096 JVMInformation events
+and 16 MiB of complete context JSON; exceeding a bound declines the complete
+context review and cannot authorize a parsed prefix. Existing 512 MiB report and
+64 MiB summary limits also apply to the retained contexts.
+The complete method observation table allows 250,000 rows across the cohort;
+exceeding the bound declines the review without selecting a method prefix or
+raising the existing report, summary or output limits.
+
 ### Polynomial witness work checkpoints
 
 `com.eignex.klause.bench.profile.PolynomialWitnessProbeProfile` diagnoses the bounded
