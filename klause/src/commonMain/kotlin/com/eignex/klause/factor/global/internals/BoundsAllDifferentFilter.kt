@@ -183,11 +183,8 @@ private fun overfullInterval(lo: LongArray, hi: LongArray, vars: IntArray): IntA
     return null
 }
 
-/**
- * Pure core of [boundsAllDifferentFilter]: given variable lower/upper bounds, fill [newLo]/[newHi]
- * with the bounds-consistent tightened bounds and return `true` if feasible, `false` if a Hall
- * interval is over-full (López-Ortiz et al., IJCAI 2003).
- */
+// Endpoint sentinels and interval capacities must fit signed words in both sweep orientations.
+// Outside that range, keep the bounds unchanged while still rejecting duplicate fixed values.
 internal fun computeBoundsAllDifferent(lo: LongArray, hi: LongArray, newLo: LongArray, newHi: LongArray): Boolean {
     val n = lo.size
     lo.copyInto(newLo)

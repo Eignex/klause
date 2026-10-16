@@ -33,6 +33,23 @@ class AllDifferentInvariantTest {
     }
 
     @Test
+    fun `wide excepted moves should grade repeated nonzero values and ignore repeated zeroes`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 3000000000) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2), exceptSet = longArrayOf(0))))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setInt(0, 3000000000)
+        state.assignment.setInt(1, 3000000000)
+        state.assignment.setInt(2, 0)
+        state.recompute()
+
+        assertEquals(-1L, state.netDelta(IntSet(1, 0)))
+        state.apply(IntSet(1, 0))
+
+        assertEquals(0L, state.cost)
+        assertEquals(1L, state.netDelta(IntSet(1, 3000000000)))
+    }
+
+    @Test
     fun `wide domain repairs should propose unused values without walking the interval`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 1000000000) },
             arrayOf(AllDifferent(intArrayOf(0, 1, 2))))

@@ -56,6 +56,19 @@ class AllDifferentSeparatorTest {
     }
 
     @Test
+    fun `unrepresentable distinct sums should leave the relaxation without Hall cuts`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(Long.MIN_VALUE, Long.MAX_VALUE) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2))))
+        val session = PropagationSession(problem)
+        val relaxation = CpToLpRelaxation(problem, null).build(session)
+
+        val cuts = AllDifferentSeparator().separate(CutContext(
+            problem, relaxation, DoubleArray(relaxation.model.n), session))
+
+        assertTrue(cuts.isEmpty())
+    }
+
+    @Test
     fun `lower bound cut should be the sum of the smallest distinct values`() {
         // The Hall cut is Σ >= 0+1+2 = 3.
         val (p, relaxation, solution) = setup(0, 5, 3)

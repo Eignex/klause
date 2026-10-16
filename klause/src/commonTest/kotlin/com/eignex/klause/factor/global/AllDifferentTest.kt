@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
@@ -12,7 +13,6 @@ import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.ir.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -37,7 +37,7 @@ class AllDifferentTest {
             val sample = assertIs<ExactNeighborhoodResult.Witness>(it.check(
                 ExactNeighborhoodCondition(emptyMap(), distinct, distinct), Cancellation.Never)).sample
 
-            assertEquals(1.0, sample.realValue(0))
+            assertEquals(BigFraction.ONE, sample.exactReals?.single())
         }
     }
 

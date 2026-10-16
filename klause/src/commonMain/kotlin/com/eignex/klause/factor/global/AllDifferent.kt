@@ -149,10 +149,10 @@ class AllDifferent(
         val replacement = ArrayList<Factor>(components.size)
         for (group in components) {
             if (group.size < 2) continue
-            replacement.add(AllDifferent(group.toIntArray()))
+            replacement.add(AllDifferent(group.toIntArray(), boundsConsistent = boundsConsistent))
         }
         return Rewrite(replacement)
     }
 
-    override val variables: VarList = MixedVars(boundInts = vars, boolVars = OptPresence.presenceVarIds(presents))
+    override val variables: VarList = MixedVars(spanInts = vars, boolVars = OptPresence.presenceVarIds(presents))
 }
