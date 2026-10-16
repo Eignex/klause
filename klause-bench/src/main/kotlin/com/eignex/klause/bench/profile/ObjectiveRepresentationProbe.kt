@@ -9,8 +9,8 @@ import com.eignex.klause.compile.CompiledSchema
 import com.eignex.klause.compile.compile
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.json.JsonSchema
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.formats.smtlib.SmtLibProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
@@ -30,13 +30,17 @@ import com.eignex.klause.solver.evidence.sourceResultCapture
 import com.eignex.klause.solver.evidence.verifySourceEvidence
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
+import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryRequest
+import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceExecutionRequest
+import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.minimize
-import com.eignex.klause.solver.pipeline.optimize
 import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.util.BIG_ONE
@@ -202,14 +206,16 @@ internal object ObjectiveRepresentationProbe {
         val bytes = input.readBytes()
         val identity = sha256(bytes)
         File(output, "$identity.smt2").writeBytes(bytes)
-        val captured = SmtLibAdmission.parse(bytes.toString(Charsets.UTF_8), Long.MIN_VALUE, Long.MAX_VALUE)
-        require(captured is SmtLibInput.Quadratic) { "Probe requires an admitted exact source objective: $input" }
-        val source = sourceNames(captured.source)
+        val captured = SmtLib.parse(bytes.toString(Charsets.UTF_8), Long.MIN_VALUE, Long.MAX_VALUE)
+        val capturedObjective = requireNotNull(captured.quadraticObjective) {
+            "Probe requires a captured exact source objective: $input"
+        }
+        val source = sourceNames(captured)
         require(compiled != null || source.ints.isEmpty()) { "Integer sources require an explicit compiled schema" }
-        val original = affineObjective(source, captured.objective)
+        val original = affineObjective(source, capturedObjective)
         val affine = if (compiled == null) original else compiledObjective(compiled, source, original)
-        val quadratic = if (compiled == null) captured.objective else affine.toQuadraticObjectiveSpec()
-        val request = compiled?.request ?: (captured.source as SmtLibInput.Polynomial).problem.pipelineRequest()
+        val quadratic = if (compiled == null) capturedObjective else affine.toQuadraticObjectiveSpec()
+        val attachment = compiled?.let { SourceAttachment(it.model.problem) } ?: captured.source
         val condition = conditions?.getValue(identity)?.jsonObject ?: buildJsonObject { }
         val pins = assumptions(condition, source, compiled)
         for ((index, engine) in engines.withIndex()) {
@@ -224,9 +230,15 @@ internal object ObjectiveRepresentationProbe {
                     ),
                 )
                 val started = System.nanoTime()
-                val execution = if (encoding == "linear") {
-                    OpenTheoryPipeline.optimize(request, affine, params, engine, captured.sense)
-                } else OpenTheoryPipeline.minimize(request, quadratic, params, engine, captured.sense)
+                val setup = if (encoding == "linear") {
+                    SourceSetupRequest(attachment, ExecutionOperation.OPTIMIZE, engine, affine,
+                        captured.sense == ObjectiveSense.MAXIMIZE, cancellation = params.timeout)
+                } else SourceSetupRequest(attachment, engine, quadratic, captured.sense,
+                    cancellation = params.timeout)
+                val invocation = SourceSetup.prepare(setup)
+                val completed = SourceSetup.execute(SourceExecutionRequest(invocation, polynomial = params))
+                val execution = (completed as? SourceExecutionResult.Quadratic)?.result
+                    ?: error("source setup did not install quadratic optimization: $completed")
                 val elapsed = System.nanoTime() - started
                 val scopeRecord = if (capture) captureRecord(
                     requireNotNull(compiled), affine, quadratic, pins, identity, execution.result, encoding,
@@ -294,13 +306,10 @@ internal object ObjectiveRepresentationProbe {
         }
     }
 
-    private fun sourceNames(source: SmtLibInput): SourceNames = when (source) {
-        is SmtLibInput.Polynomial -> SourceNames(source.problem.realVarNames, source.problem.boolVarNames)
-        is SmtLibInput.NonlinearInteger -> SourceNames(
-            source.problem.realVarNames, source.problem.boolVarNames, source.problem.intVarNames,
-        )
-        else -> error("Source is not an admitted polynomial or nonlinear integer input")
-    }
+    private fun sourceNames(source: SmtLibProblem): SourceNames =
+        SourceNames(source.realVarNames.mapKeys { it.key.removeSurrounding("|") },
+            source.boolVarNames.mapKeys { it.key.removeSurrounding("|") },
+            source.intVarNames.mapKeys { it.key.removeSurrounding("|") })
 
     private fun assumptions(condition: JsonObject, source: SourceNames, compiled: CompiledInput?): Assumptions {
         require(condition.keys.all { it in setOf("bools", "ints") }) { "Unsupported source condition" }

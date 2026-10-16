@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.formats.smtlib.realSource
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
@@ -95,11 +95,9 @@ class AffineObjectiveOperationTest {
 
     @Test
     fun `a changed affine objective should open a distinct operation without rebinding an earlier request`() {
-        val source = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val source = SmtLibPolynomial.parse(
                 "(declare-const x Real) (assert (= (* x x) 2)) (check-sat)",
-            ),
-        ).problem
+            ).realSource()
         val objective = LinearObjective(constant = 7, realCoefficients = doubleArrayOf(1.0))
         val request = source.pipelineRequest().affineOperation(objective, ObjectiveSense.MINIMIZE)
         val replacement = objective.copy(constant = 13)

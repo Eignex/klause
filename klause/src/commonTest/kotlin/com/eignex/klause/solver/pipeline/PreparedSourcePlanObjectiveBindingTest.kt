@@ -2,8 +2,8 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealProduct
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.formats.smtlib.realSource
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
@@ -25,7 +25,6 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -80,11 +79,9 @@ class PreparedSourcePlanObjectiveBindingTest {
 
     @Test
     fun `invalid objective coordinates should preserve polynomial satisfaction and allow a rebind`() {
-        val source = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val source = SmtLibPolynomial.parse(
                 "(declare-const x Real) (assert (= (* x x) 2))",
-            ),
-        ).problem
+            ).realSource()
         val plan = source.prepareExecutionPlan()
         val invalid = plan.withObjective(LinearObjective(realCoefficients = doubleArrayOf(1.0, 1.0)))
         val objective = LinearObjective(realCoefficients = doubleArrayOf(0.5), constant = 7)
@@ -152,11 +149,9 @@ class PreparedSourcePlanObjectiveBindingTest {
 
     @Test
     fun `quadratic rebinding should keep exact source units but drop an earlier affine objective`() {
-        val source = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val source = SmtLibPolynomial.parse(
                 "(declare-const x Real) (assert (= (* x x) 2))",
-            ),
-        ).problem
+            ).realSource()
         val affine = source.prepareExecutionPlan().withObjective(
             LinearObjective(realCoefficients = doubleArrayOf(0.5)),
             maximize = true,

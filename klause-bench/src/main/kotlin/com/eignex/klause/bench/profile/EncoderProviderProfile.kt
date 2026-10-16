@@ -7,20 +7,20 @@ import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.formats.smtlib.SmtLib
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.formats.smtlib.SmtLibProblem
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
@@ -31,9 +31,10 @@ import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.execute
-import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
@@ -66,8 +67,8 @@ object EncoderProviderProfile {
         })
         val repeats = options["repeats"]?.toInt() ?: 3
         val warmups = options["warmups"]?.toInt() ?: 1
-        val parser = options["parser"] ?: "admission"
-        require(parser in setOf("admission", "factor"))
+        val parser = options["parser"] ?: "source"
+        require(parser in setOf("source", "admission", "factor"))
         val entry = options["entry"] ?: "pipeline"
         val engine = options["engine"] ?: "cp"
         require(entry in setOf("pipeline", "source", "source-optimize") && engine in setOf("cp", "ls"))
@@ -90,7 +91,8 @@ object EncoderProviderProfile {
             put("javaVersion", System.getProperty("java.version"))
             put("javaOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
             put("processors", Runtime.getRuntime().availableProcessors())
-            put("parser", parser)
+            put("parser", "source")
+            put("requestedParser", parser)
             put("entry", entry)
             put("engine", engine)
             put("nodeLimit", nodeLimit)
@@ -116,13 +118,7 @@ object EncoderProviderProfile {
         val checker = SmtStreamChecker(output)
         for ((index, input) in inputs.withIndex()) {
             val bytes = input.readBytes()
-            val problem = if (parser == "factor") {
-                SmtLib.parse(bytes.decodeToString())
-            } else {
-                val parsed = SmtLibAdmission.parse(bytes.decodeToString())
-                require(parsed is SmtLibInput.Linear) { "input is not a factor-admitted SMT source: $input" }
-                parsed.problem
-            }
+            val problem = SmtLib.parse(bytes.decodeToString())
             require(entry != "source" || problem.objective == null) { "source facade controls require satisfaction" }
             require(entry != "source-optimize" || problem.objective != null) {
                 "source optimization controls require an original objective"
@@ -151,19 +147,17 @@ object EncoderProviderProfile {
                         optimizationPoint(optimization)
                     } else if (entry == "source") {
                         if (engine == "cp") {
-                            BacktrackSolver.source(problem.model).withProjectionProviders(providers)
+                            BacktrackSolver.source(requireNotNull(problem.source.originalSource as? Problem) { "factor source required" }).withProjectionProviders(providers)
                                 .solve(BacktrackParams(cancellation = stop, randomSeed = seed))
                         } else {
-                            LocalSearchSolver.source(problem.model).withProjectionProviders(providers)
+                            LocalSearchSolver.source(requireNotNull(problem.source.originalSource as? Problem) { "factor source required" }).withProjectionProviders(providers)
                                 .solve(LocalSearchParams(cancellation = stop, randomSeed = seed))
                         }
                     } else {
-                    val route = problem.model.pipelineRoute(
-                        providers,
-                        routePureRealToTheory = true,
-                        routeLinearToTheory = true,
-                        boundCancellation = stop,
-                    )
+                    val route = SourceSetup.prepare(SourceSetupRequest(
+                        problem.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+                        providers = providers, cancellation = stop, boundCancellation = stop,
+                    )).route
                     when (route) {
                         is SourceProblemRoute.NativeFormula -> error("factor routing selected a native formula")
 
@@ -188,7 +182,7 @@ object EncoderProviderProfile {
                             FiniteEngine.BACKTRACK,
                         ).result
 
-                        is SourceProblemRoute.Finite -> BacktrackSolver.source(problem.model)
+                        is SourceProblemRoute.Finite -> BacktrackSolver.source(requireNotNull(problem.source.originalSource as? Problem) { "factor source required" })
                             .withProjectionProviders(providers).solve(
                                 BacktrackParams(
                                 cancellation = stop,
@@ -290,11 +284,10 @@ object EncoderProviderProfile {
         nodeLimit: Long?,
     ): OpenTheoryOptimum {
         val spec = requireNotNull(problem.objective)
-        val minimized = LinearObjective(spec.boolWeights, spec.intCoefficients, spec.constant, spec.realCoefficients)
-        val objective = if (problem.sense == ObjectiveSense.MAXIMIZE) minimized.negated() else minimized
+        val objective = LinearObjective(spec.boolWeights, spec.intCoefficients, spec.constant, spec.realCoefficients)
         val budget = nodeLimit?.let(::NodeBudget)
-        val strategy = if (engine == "cp") BacktrackSolver.source(problem.model) else {
-            LocalSearchSolver.source(problem.model)
+        val strategy = if (engine == "cp") BacktrackSolver.source(requireNotNull(problem.source.originalSource as? Problem) { "factor source required" }) else {
+            LocalSearchSolver.source(requireNotNull(problem.source.originalSource as? Problem) { "factor source required" })
         }
         val execution = strategy.withProjectionProviders(providers).optimizeOpen(
             objective,
@@ -351,7 +344,10 @@ object EncoderProviderProfile {
             }
         }
         )
-        val route = problem.model.pipelineRoute(selected, routeLinearToTheory = true, boundCancellation = stop)
+        val route = SourceSetup.prepare(SourceSetupRequest(
+            problem.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+            providers = selected, cancellation = stop, boundCancellation = stop,
+        )).route
         val decline = (route as? SourceProblemRoute.UnsupportedOpen)?.preparedPlan?.decline
         if (installations != 0) {
             check(decline == PreparedPlanDecline.RESOURCE) {
@@ -460,7 +456,6 @@ object EncoderProviderProfile {
                     rational(assignment.realValue(id))
                 }
             }
-            if (source.sense == ObjectiveSense.MAXIMIZE) value = value.negated()
             append("; objective=$value\n")
         }
         append("(model\n")

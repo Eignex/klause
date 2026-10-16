@@ -17,7 +17,11 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.sourceRoute
 import java.io.File
 
@@ -100,16 +104,23 @@ internal object Xcsp3Format : ProblemFormat {
     }
 }
 
-/** SMT-LIB parsing with the benchmark strict-bounds setting. */
+/** SMT-LIB source setup for the finite in-process benchmark adapter. */
 internal object SmtLibFormat : ProblemFormat {
     override val format = Format.SMTLIB
     override val inProcess = true
     override fun ingest(file: File): Ingested {
-        val strict = System.getProperty("klause.bench.smtlib.strictBounds")?.toBooleanStrictOrNull() ?: false
-        val parsed = SmtLib.parse(CorpusFiles.readText(file), strictBounds = strict)
+        val parsed = SmtLib.parse(CorpusFiles.readText(file))
+        require(parsed.quadraticObjective == null) { "finite in-process benchmark requires an affine source objective" }
+        val objective = parsed.objective?.toLinearObjective()
+        val maximize = parsed.sense == ObjectiveSense.MAXIMIZE
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            parsed.source, if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
+            FiniteEngine.BACKTRACK, objective, maximize,
+        ))
         return Ingested(
-            lazy { parsed.model.requireFiniteBenchModel(file) },
-            parsed.objective?.toLinearObjective(),
+            lazy { requireNotNull(invocation.preparedPlan?.model) { "source has no finite benchmark model" }
+                .requireFiniteBenchModel(file) },
+            if (maximize) objective?.negated() else objective,
             parsed.sense == ObjectiveSense.MAXIMIZE,
         )
     }

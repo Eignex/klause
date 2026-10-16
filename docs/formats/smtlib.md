@@ -11,7 +11,7 @@ This page defines admission, lowering and source model rendering.
 ## Declaration policy
 
 `smtLibSemantics` declares exact rational literals, continuous real variables and
-open integer and real declarations. `SmtLib.parse` and `SmtLibAdmission.parse`
+open integer and real declarations. `SmtLib.parse`
 resolve `SemanticOverrides` before reading source commands. Integer and exact
 rational real endpoint replacements constrain every original declaration of that
 sort, including unused declarations. Assertions remain additional constraints;
@@ -238,74 +238,38 @@ not an unlimited completeness guarantee for every integer model.
 
 ## Polynomial source lowering
 
-Integer-aware fallback publishes `ir.NonlinearIntegerProblem` through
-`SmtLibInput.NonlinearInteger`, retaining original Int/Real/Bool identities and an
-exact `to_real` embedding. Its `pipelineRequest()` selects sound incomplete integer
-execution. Native admission validates declaration visibility and canonical names.
-Factor admission resolves source declarations and local bindings before treating
-function names as unsupported factor syntax. A declared `pi` or a linear integer
-helper named `exp`, `log`, `sin` or `cos` retains its source meaning. Actual
-mathematical functions use exact function lowering, including expressions in unused
-`let` bindings.
-Syntactically nonlinear helpers use lexical fallback even when a constant argument
-makes the expanded expression linear; caller-local bindings cannot alter definition
-scope. Nonlinear sessions accept one nonincremental query with at most one objective.
+`SmtLib.parse` returns one `SmtLibProblem` containing the existing
+`SourceAttachment`, declared name maps, original objective and direction. Factor
+sources and exact real, integer-polynomial and function snapshots use that same
+attachment and operation setup. Caller `ProblemSettings` are captured before
+reading and retained by every source representation. Affine objective coefficients
+use original source units; exact quadratic coefficients remain separate from finite
+costs. Function objectives remain embedded in their original source snapshot.
 
-The internal `SmtLibPolynomial.parse` entry point preserves pure Real/Bool polynomial
-satisfaction sources separately from `SmtLib.parse` and its linear factors. It performs
-no theory selection and publishes no SAT/UNSAT result. Public `SmtLibAdmission.parse`
-first attempts the established linear facade. An explicit unsupported-syntax
-decline lowers the same captured command nodes through the polynomial compiler.
-Pure Real/Bool satisfaction sources that reference `define-fun` helpers in assertion
-syntax use lexical polynomial lowering.
-The reference scan visits nested applications and zero-arity symbols iteratively under
-caller cancellation. Unused helper declarations retain lexical body and result-sort
-validation without changing an otherwise supported linear route. Nonlinear helper
-admission also checks objective references. Objectives over `ContinuousProduct` or
-`RealProduct` constraints use exact source capture, including affine objectives
-whose coefficients fit the linear representation. Equivalent affine and degree-two
-syntax retain the same source route, exact rational coefficients and direction.
-Other successful linear inputs retain their existing routes.
-Helper parameter/return sorts and explicit integer operations preserve integer syntax
-even when there is no declared integer variable.
-Streamed admission opens its source factory once and parses each command once.
-The captured command nodes remain within that admission while factor and exact
-formula lowering consume them. A closeable stream is closed once; other streams
-are exhausted. A read interruption prevents tail draining even when the caller's
-cancellation predicate later clears. Source capture and lowering share the
-containing work meter. Cancellation returns `SmtLibInput.Interrupted` without
-publishing partial metadata.
+Text, stream and source-factory overloads use the same exact declaration policy.
+Typed bound replacements constrain original declarations; admission does not add a
+finite integer box. Streamed admission opens its factory once and parses each
+command once. Captured command nodes remain within admission while factor and
+exact formula lowering consume them. A closeable stream is closed once; other
+streams are exhausted. An observed read interruption prevents tail draining even
+if the caller's cancellation predicate clears. Capture and lowering share the
+containing work meter. Interruption throws `CancellationException` before a source
+is published.
 
-Pure-real polynomial admission publishes `ir.PolynomialRealProblem`, an opaque neutral
-snapshot of formula, original declaration identities and auxiliary counts. Its
-`pipelineRequest()` selects the complete polynomial theory. The CLI renders the
-common `OpenTheoryResult`; parsing and frontend code do not invoke the engine.
-Numeric conditional auxiliaries stay private and every original declaration receives
-an exact value, including unused declarations. Point-identified rational coordinates
-use exact SMT numerals/division. Other algebraic coordinates use `(root-obj p k)`
-with an exact integer
-defining polynomial and one-based distinct real-root index. Canonical names are
-quoted in the model. A negative SMT numeral is `(- n)`; a bare `-n` is a symbol.
+Factor-representable real products remain retained factors for library-selected
+polynomial completion. Lexical helpers and objectives can retain exact formula
+snapshots; helper declarations still receive lexical body and result-sort
+validation. Unused declarations stay visible in original output namespaces.
+Native integer snapshots preserve separate declaration-ordered Int/Real/Bool maps,
+with shared numeric formula slots kept private to the prepared source plan.
+Quadratic snapshots retain exact rational coefficients, original Boolean numeric
+selections and objective direction. Unsupported function optimization keeps the
+original expression and an honest execution decline.
 
-This route supports one satisfaction or quadratic optimization result and model publication.
-It declines all-solution enumeration. Local search and ALNS generate finite candidates or exact coordinate neighborhoods and request exact continuous
-completion. They publish exact witnesses and retain heuristic proof guarantees:
-failed completion never establishes global UNSAT. Mixed solving schedules complete
-backtracking, local search and ALNS over the same polynomial constraints. Native
-polynomial allowances belong to the containing invocation across all workers.
-
-`SmtLibInput.Quadratic` binds an exact `QuadraticObjectiveSpec` and its source
-direction to the existing polynomial or nonlinear integer snapshot. The lexical
-evaluator captures the objective in the environment visible at its command.
-Generic degree-two lowering retains literal cross coefficients and separate
-original Bool/Int/Real identities. Numeric selections controlled by original
-Boolean coordinates expand into their exact Boolean polynomial terms; their
-guarded auxiliary definitions remain private to the formula. Hidden nonpolynomial
-coordinates and objectives above degree two decline. Nonlinear objective syntax
-cannot be published as a finite proxy objective. Affine objectives over linear
-constraints retain linear admission when integer coefficients and constants are
-integral and real coefficients are exactly representable in binary64. Other
-affine objective representations use the exact polynomial fallback.
+Shared setup selects the solving mechanisms and publishes the common source result.
+The CLI renders exact rational values, algebraic `(root-obj p k)` values and symbolic
+function values in original coordinates. Numeric conditional auxiliaries remain
+private. A negative SMT numeral is `(- n)`; a bare `-n` is a symbol.
 
 ### Source representation
 
@@ -365,16 +329,12 @@ Polynomial expansion and decision work remain owned by the nonlinear kernel/theo
 
 ### Admission API
 
-`SmtLibAdmission.parse` returns `SmtLibInput.Linear`, `Polynomial`,
-`NonlinearInteger`, `Quadratic` or `Interrupted`. A quadratic input wraps a
-polynomial or nonlinear integer source snapshot with its exact objective and sense.
-The polynomial snapshot owns its source-name maps and returns
-independent metadata views. Its `pipelineRequest()` and `OpenTheoryPipeline.execute`
-extension provide complete polynomial satisfaction through the existing
-`OpenTheoryResult`. `PolynomialTheoryExecution` retains native counters/resource
-cause beside that common result; it does not reinterpret legacy open-work units.
-`PolynomialTheoryParams` captures one invocation's work, allocation and stop controls.
-The source snapshot can be reused for fresh invocations; no traversal state escapes.
+`SmtLib.parse` is the public source entry. Its `SmtLibProblem.source` supplies the
+same attachment to `SourceSetupRequest`; callers bind the retained affine or exact
+quadratic objective and sense before `SourceSetup.prepare` and `SourceSetup.execute`.
+The CLI and preparation/execution probes use this common contract instead of
+frontend source classifications. Source ownership and captured resource defaults
+survive every fresh invocation; traversal state belongs to execution.
 
 A genuine open linear integer beside a bounded mixed product does not by itself
 replace the factor model with a nonlinear source snapshot. Admission reads the

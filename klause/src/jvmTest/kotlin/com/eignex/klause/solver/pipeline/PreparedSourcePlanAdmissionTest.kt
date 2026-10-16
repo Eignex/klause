@@ -4,11 +4,13 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.formats.smtlib.realSource
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.lp.bounding.LpConfig
@@ -21,13 +23,13 @@ import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.times
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class PreparedSourcePlanAdmissionTest(private val engine: FiniteEngine) {
@@ -77,10 +79,8 @@ class PreparedSourcePlanAdmissionTest(private val engine: FiniteEngine) {
 
     @Test
     fun `admitted strategy should solve a polynomial real source`() {
-        val input = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse("(declare-const x Real) (assert (= (* x x) 2))"),
-        )
-        val request = input.problem.pipelineRequest()
+        val input = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))").realSource()
+        val request = input.pipelineRequest()
 
         val execution = OpenTheoryPipeline.execute(
             request,
@@ -106,15 +106,14 @@ class PreparedSourcePlanAdmissionTest(private val engine: FiniteEngine) {
 
     @Test
     fun `admitted strategy should solve a nonlinear integer source`() {
-        val input = assertIs<SmtLibInput.NonlinearInteger>(
-            SmtLibAdmission.parse("(declare-const n Int) (assert (= (* n n) 4))"),
-        )
+        val input = assertIs<NonlinearIntegerProblem>((
+            SmtLib.parse("(declare-const n Int) (assert (= (* n n) 4))")).source.originalSource)
 
-        val execution = OpenTheoryPipeline.execute(input.problem.pipelineRequest(), engine = engine)
+        val execution = OpenTheoryPipeline.execute(input.pipelineRequest(), engine = engine)
 
         val value = parseBigInt(assertIs<OpenTheoryResult.Sat>(execution.result).assignment.intValue(0))
         assertEquals(parseBigInt("4"), value * value)
-        assertAdmitted(input.problem.prepareExecutionPlan(), execution.result.stats)
+        assertAdmitted(input.prepareExecutionPlan(), execution.result.stats)
     }
 
     @Test

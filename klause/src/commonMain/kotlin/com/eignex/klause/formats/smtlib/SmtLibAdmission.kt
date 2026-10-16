@@ -1,146 +1,91 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.NonlinearIntegerProblem
-import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.ProblemSettings
-import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SemanticOverrides
-import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.requiresPolynomialCompletion
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
+import kotlin.coroutines.cancellation.CancellationException
 
-/** The source representation admitted before the pipeline selects an arithmetic theory. */
-sealed interface SmtLibInput {
-    /** Source accepted by the linear lowering. */
-    data class Linear(
-        /** Exact source model and output identities. */
-        val problem: SmtLibProblem,
-    ) : SmtLibInput
-
-    /** Pure real/Boolean polynomial source, retaining exact coefficients and formula structure. */
-    data class Polynomial(
-        /** Engine-neutral source snapshot, including declarations omitted from the formula. */
-        val problem: PolynomialRealProblem,
-    ) : SmtLibInput
-
-    /** Exact polynomial source with original integer and mixed real declaration semantics. */
-    data class NonlinearInteger(
-        /** Neutral source formula and separate original coordinate identities. */
-        val problem: NonlinearIntegerProblem,
-    ) : SmtLibInput
-
-    /** Exact real functions, their domains and original Boolean/integer/real declarations. */
-    data class Transcendental(
-        /** Original exact source, including any unsupported optimization objective. */
-        val problem: TranscendentalProblem,
-    ) : SmtLibInput
-
-    /** A captured quadratic objective on an existing exact source snapshot. */
-    data class Quadratic(
-        /** Polynomial real or nonlinear integer source, retaining original declarations. */
-        val source: SmtLibInput,
-        /** Exact quadratic coefficients and typed original coordinate identities. */
-        val objective: QuadraticObjectiveSpec,
-        /** Original source optimization direction. */
-        val sense: ObjectiveSense,
-    ) : SmtLibInput {
-        init { require(source is Polynomial || source is NonlinearInteger) }
-    }
-
-    /** Admission stopped before a complete source snapshot could be published. */
-    data object Interrupted : SmtLibInput
-}
-
-/** Linear-first source admission with lexical polynomial helpers and an exact polynomial fallback. */
-object SmtLibAdmission {
-    /** Admit [text], retaining linear lowering where its helper semantics preserve the source. */
-    fun parse(
-        text: String,
-        unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
-        unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
-        settings: ProblemSettings = KlauseConfig.current.problemSettings(),
-        cancellation: Cancellation = Cancellation.Never,
-        semanticOverrides: SemanticOverrides = SemanticOverrides(),
-    ): SmtLibInput = parse(
-        { StringCharSource(text) }, unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides,
-    )
-
-    /**
-     * Open and parse one streamed source, retaining its commands through source lowering.
-     * A closeable source is closed once; a non-closeable one is drained to its end instead.
-     * Cancellation stops draining and withholds admission.
-     */
-    fun parse(
-        openSource: () -> CharSource,
-        unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
-        unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
-        settings: ProblemSettings = KlauseConfig.current.problemSettings(),
-        cancellation: Cancellation = Cancellation.Never,
-        semanticOverrides: SemanticOverrides = SemanticOverrides(),
-    ): SmtLibInput {
-        val semantics = resolveSmtLibSemantics(unboundedIntLo, unboundedIntHi, semanticOverrides)
-        if (cancellation()) return SmtLibInput.Interrupted
-        return try {
-            val commands = withSource(openSource, cancellation) { source ->
-                val reader = SExprReader(AdmissionSource(source, cancellation))
-                val commands = ArrayList<SExpr>()
-                while (true) {
-                    cancellation.polynomialSourceCheckpoint(1)
-                    commands.add(reader.readCommandOrNull() ?: break)
-                }
-                commands
+internal fun parseSmtLibSource(
+    openSource: () -> CharSource,
+    unboundedIntLo: Long,
+    unboundedIntHi: Long,
+    settings: ProblemSettings,
+    cancellation: Cancellation,
+    semanticOverrides: SemanticOverrides,
+): SmtLibProblem? {
+    val semantics = resolveSmtLibSemantics(unboundedIntLo, unboundedIntHi, semanticOverrides)
+    if (cancellation()) return null
+    return try {
+        val commands = withSource(openSource, cancellation) { source ->
+            val reader = SExprReader(AdmissionSource(source, cancellation))
+            val commands = ArrayList<SExpr>()
+            while (true) {
+                cancellation.polynomialSourceCheckpoint(1)
+                commands.add(reader.readCommandOrNull() ?: break)
             }
-            val result = try {
-                val linear = parseLinearAdmission(
-                    commands, unboundedIntLo, unboundedIntHi, settings, cancellation, semantics,
-                )
-                SmtLibInput.Linear(linear)
-            } catch (_: UnsupportedSmtException) {
-                if (cancellation()) throw PolynomialSourceInterrupted()
-                val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers = true,
-                    allowFunctions = true, semantics = semantics)
-                for (command in commands) compiler.command(command)
-                val polynomial = compiler.build()
-                if (polynomial.transcendental != null) SmtLibInput.Transcendental(polynomial.transcendental)
-                else {
-                val source = if (polynomial.intVarNames.isNotEmpty()) {
-                    SmtLibInput.NonlinearInteger(NonlinearIntegerProblem(
-                        polynomial.formula, polynomial.realCount, polynomial.boolCount,
-                        polynomial.intVarNames, polynomial.realVarNames, polynomial.boolVarNames, semantics,
-                    ))
-                } else SmtLibInput.Polynomial(
-                    PolynomialRealProblem(
-                        polynomial.formula,
-                        polynomial.realCount,
-                        polynomial.boolCount,
-                        polynomial.sourceRealCount,
-                        polynomial.sourceBoolCount,
-                        polynomial.realVarNames,
-                        polynomial.boolVarNames,
-                        semantics,
-                    ),
-                )
-                polynomial.objective?.let { SmtLibInput.Quadratic(source, it, polynomial.objectiveSense) } ?: source
-                }
-            }
-            if (cancellation()) SmtLibInput.Interrupted else result
-        } catch (_: PolynomialSourceInterrupted) {
-            SmtLibInput.Interrupted
+            commands
         }
+        val spellings = HashMap<String, String>()
+        for (expression in commands) {
+            cancellation.polynomialSourceCheckpoint()
+            val command = expression as? SExpr.SList ?: continue
+            val head = (command.items.firstOrNull() as? SExpr.Atom)?.text
+            if (head == "declare-const" || head == "declare-fun") {
+                val name = (command.items.getOrNull(1) as? SExpr.Atom)?.text ?: continue
+                spellings[polynomialSymbol(name)] = name
+            }
+        }
+        fun sourceNames(names: Map<String, Int>): Map<String, Int> {
+            val original = LinkedHashMap<String, Int>()
+            for ((name, id) in names) {
+                cancellation.polynomialSourceCheckpoint()
+                original[spellings.getValue(name)] = id
+            }
+            return original
+        }
+        val result = try {
+            parseLinearAdmission(commands, unboundedIntLo, unboundedIntHi, settings, cancellation, semantics)
+        } catch (_: UnsupportedSmtException) {
+            if (cancellation()) throw PolynomialSourceInterrupted()
+            val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers = true,
+                allowFunctions = true, semantics = semantics)
+            for (command in commands) compiler.command(command)
+            val captured = compiler.build()
+            val functions = captured.transcendental
+            if (functions != null) {
+                SmtLibProblem(SourceAttachment(functions, settings), null,
+                    sourceNames(functions.intVarNames), sourceNames(functions.boolVarNames),
+                    sourceNames(functions.realVarNames), functions.objectiveSense)
+            } else if (captured.intVarNames.isNotEmpty()) {
+                val source = NonlinearIntegerProblem(
+                    captured.formula, captured.realCount, captured.boolCount,
+                    captured.intVarNames, captured.realVarNames, captured.boolVarNames, semantics,
+                )
+                SmtLibProblem(SourceAttachment(source, settings), null,
+                    sourceNames(source.intVarNames), sourceNames(source.boolVarNames), sourceNames(source.realVarNames),
+                    captured.objectiveSense, captured.objective)
+            } else {
+                val source = captured.realSource(semantics)
+                SmtLibProblem(SourceAttachment(source, settings), null,
+                    emptyMap(), sourceNames(source.boolVarNames), sourceNames(source.realVarNames),
+                    captured.objectiveSense, captured.objective)
+            }
+        }
+        if (cancellation()) null else result
+    } catch (_: PolynomialSourceInterrupted) {
+        null
     }
 }
 
@@ -225,12 +170,11 @@ private fun parseLinearAdmission(
     if (problem.model.factors.any {
             it is ContinuousProduct || it is RealProduct || (it is Power && it.base is Power.Coordinate.Real)
         } &&
-        (builder.intNames.isEmpty() ||
-            ((0 until problem.model.numIntVars).any { id ->
+        ((0 until problem.model.numIntVars).any { id ->
                 problem.model.intBounds.isOpenLower(id) || problem.model.intBounds.isOpenUpper(id)
-            } && problem.model.requiresPolynomialCompletion(FactorProjectionProviders.Default.prepare(problem.model))))
+            } && problem.model.requiresPolynomialCompletion(FactorProjectionProviders.Default.prepare(problem.model)))
     ) {
-        smtUnsupported("pure real nonlinear source requires polynomial lowering")
+        smtUnsupported("open integer products require an exact source formula")
     }
     return problem
 }
@@ -313,7 +257,9 @@ private fun <T> withSource(
     var interrupted = false
     val outcome = try {
         runCatching { read(source) }.also {
-            if (it.exceptionOrNull() is PolynomialSourceInterrupted) interrupted = true
+            if (it.exceptionOrNull() is PolynomialSourceInterrupted ||
+                it.exceptionOrNull() is CancellationException
+            ) interrupted = true
         }
     } finally {
         if (source is AutoCloseable) source.close()

@@ -420,8 +420,9 @@ these diagnostic timings; they are not ordinary CLI throughput measurements.
 `bench.profile.EncoderProviderProfile` runs caller-supplied factor-admitted SMT files
 through normal source routing with default and private equivalent linear encoders.
 Pass `inputs=<comma-separated repository-relative or absolute paths> repeats=N warmups=N seed=N`.
-`parser=admission` requires linear factor admission; `parser=factor` exercises the
-existing library SMT factor facade, including representable bounded mixed products.
+The profile uses `SmtLib.parse` and shared source setup. The `parser=admission`
+and `parser=factor` options are aliases for that same source entry. Mechanism
+probes require an original factor source, including representable bounded mixed products.
 `entry=source engine=cp|ls` instead calls the public source-strategy satisfaction
 facade with the same selected providers, containing token and seed. This mode rejects
 objectives and records its actual native backend beside the requested entry and engine;
@@ -435,6 +436,7 @@ The SMT replay checks points and objectives; global optimum, ray and refutation
 claims require separate original-source checking. Optimization captures retain each
 encoder verdict and a per-source comparison, including UNKNOWN differences caused
 by admission or bounded work; verdict equality supplies no proof verification.
+
 The original source bytes remain the checking authority. Constant nonzero integer
 `div`/`mod` are checked with their original Euclidean SMT semantics; variable and zero
 divisors decline independent checking. Each input also interrupts

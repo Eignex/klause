@@ -6,8 +6,7 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
@@ -441,11 +440,10 @@ class EncoderTest {
 
     @Test
     fun `actual preparation should discard construction cancelled inside a selected installer`() {
-        val source = assertIs<SmtLibInput.Linear>(
-            SmtLibAdmission.parse(
+        val source = (
+            SmtLib.parse(
                 "(declare-const x Real) (assert (= x 1))",
-            ),
-        ).problem.model
+            )).model
         var cancelled = false
         var entered = 0
         val token = Cancellation { cancelled }
@@ -476,12 +474,11 @@ class EncoderTest {
 
     @Test
     fun `selected linear encoders should detect correlated source contradiction`() {
-        val input = assertIs<SmtLibInput.Linear>(
-            SmtLibAdmission.parse(
+        val input = assertIs<Problem>((
+            SmtLib.parse(
                 "(declare-const x Real) (declare-const y Real) " +
                     "(assert (<= x y)) (assert (< y x))",
-            ),
-        )
+            )).source.originalSource)
         var installations = 0
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
@@ -496,7 +493,7 @@ class EncoderTest {
                 }
             },
         )
-        val model = input.problem.model
+        val model = input
         val plan = model.prepareExecutionPlan(providers)
         val request = OpenTheoryRequest(model, componentPlan = assertNotNull(plan.componentPlan), preparedPlan = plan)
             .withPresolve(PresolveConfig.NONE)
@@ -603,12 +600,11 @@ class EncoderTest {
 
     @Test
     fun `guarded provider installation should retract a refuted query before its sibling`() {
-        val input = assertIs<SmtLibInput.Linear>(
-            SmtLibAdmission.parse(
+        val input = assertIs<Problem>((
+            SmtLib.parse(
                 "(declare-const b Bool) (declare-const x Real) " +
                     "(assert (or (not b) (>= x 1))) (assert (= x 0))",
-            ),
-        )
+            )).source.originalSource)
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
                 val selected = BuiltInEncoderProvider.select(factor, target)
@@ -621,7 +617,7 @@ class EncoderTest {
                 }
             },
         )
-        val source = input.problem.model
+        val source = input
         val plan = source.prepareExecutionPlan(providers)
         val queries = OpenExactNeighborhood(source, TheoryParams(), preparedSource = plan)
 
@@ -642,11 +638,10 @@ class EncoderTest {
 
     @Test
     fun `a resource decline should discard an emitted relation before source admission`() {
-        val input = assertIs<SmtLibInput.Linear>(
-            SmtLibAdmission.parse(
+        val input = assertIs<Problem>((
+            SmtLib.parse(
                 "(declare-const x Real) (assert (= x 1))",
-            ),
-        )
+            )).source.originalSource)
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
                 val selected = BuiltInEncoderProvider.select(factor, target)
@@ -661,18 +656,17 @@ class EncoderTest {
             },
         )
 
-        val plan = input.problem.model.prepareExecutionPlan(providers)
+        val plan = input.prepareExecutionPlan(providers)
 
         assertFalse(plan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
     }
 
     @Test
     fun `source optimization should retain an explicit encoder resource decline`() {
-        val input = assertIs<SmtLibInput.Linear>(
-            SmtLibAdmission.parse(
+        val input = (
+            SmtLib.parse(
                 "(declare-const x Real) (assert (= x 1)) (minimize x)",
-            ),
-        ).problem
+            ))
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
                 val selected = BuiltInEncoderProvider.select(factor, target)

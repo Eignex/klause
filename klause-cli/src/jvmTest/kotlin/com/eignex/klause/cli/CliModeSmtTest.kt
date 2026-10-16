@@ -24,7 +24,7 @@ class CliModeSmtTest {
         val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-s", source.absolutePath))) }
 
         assertTrue("sat" in output.lines(), output)
-        assertTrue("(define-fun |x| () Real ((_ klause-real log) 2.0))" in output, output)
+        assertTrue("(define-fun x () Real ((_ klause-real log) 2.0))" in output, output)
         assertTrue("; solvePipeline=transcendental-theory" in output.lines(), output)
         assertTrue("; declaredTheoryRoute=transcendental" in output.lines(), output)
     }

@@ -301,7 +301,9 @@ internal object SourceAgreementProfile {
             val start = lower.toString().let { if (it.startsWith('-')) "(- ${it.drop(1)})" else it }
             val source = "(set-logic QF_LIA)\n(declare-const x Int)\n(assert (>= x $start))\n" +
                 "(assert (= x $bound))\n(check-sat)\n(get-model)\n"
-            val declarations = SmtLib.parse("(declare-const x Int)").model
+            val declarations = requireNotNull(
+                SmtLib.parse("(declare-const x Int)").source.originalSource as? Problem,
+            ) { "declaration fixture requires original factor storage" }
             result += SourceCase(if (negative) "wide-negative" else "wide-positive", source,
                 Problem(0, intBounds = declarations.intBounds, factors = arrayOf(
                     Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.GE, lower),

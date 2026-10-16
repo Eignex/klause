@@ -1,14 +1,17 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.formats.smtlib.realSource
 import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
+import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -18,15 +21,19 @@ import kotlin.test.assertSame
 class NativeExecutionSemanticsTest {
     @Test
     fun `polynomial execution should retain effective real defaults after cancellation`() {
-        val source = assertIs<SmtLibInput.Polynomial>(SmtLibAdmission.parse(
+        val source = SmtLib.parse(
             "(declare-const x Real) (assert (= (* x x) 1))",
             semanticOverrides = SemanticOverrides(undeclaredReals = BoundsOverride(
                 upper = BoundOverride.Value(SemanticRational.ONE),
             )),
-        )).problem
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
 
-        val result = OpenTheoryPipeline.execute(source.pipelineRequest(),
-            PolynomialTheoryParams(cancellation = Cancellation { true }), FiniteEngine.BACKTRACK).result
+        val completed = SourceSetup.execute(SourceExecutionRequest(invocation,
+            polynomial = PolynomialTheoryParams(cancellation = Cancellation { true })))
+        val result = assertIs<SourceExecutionResult.Polynomial>(completed).result.result
 
         assertIs<OpenTheoryResult.Unknown>(result)
         assertSame(source.semantics, result.semantics)
@@ -34,12 +41,12 @@ class NativeExecutionSemanticsTest {
 
     @Test
     fun `nonlinear integer execution should retain effective integer defaults after cancellation`() {
-        val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
+        val source = assertIs<NonlinearIntegerProblem>((SmtLib.parse(
             "(declare-const x Int) (assert (= (* x x) 1))",
             semanticOverrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(
                 upper = BoundOverride.Value(1L),
             )),
-        )).problem
+        )).source.originalSource)
 
         val result = OpenTheoryPipeline.execute(source.pipelineRequest(), NonlinearIntegerTheoryParams(
             polynomial = PolynomialTheoryParams(cancellation = Cancellation { true }),
@@ -51,12 +58,12 @@ class NativeExecutionSemanticsTest {
 
     @Test
     fun `transcendental execution should retain effective real defaults after cancellation`() {
-        val source = assertIs<SmtLibInput.Transcendental>(SmtLibAdmission.parse(
+        val source = assertIs<TranscendentalProblem>((SmtLib.parse(
             "(declare-const x Real) (assert (= (exp 0) 1)) (assert (> x 0))",
             semanticOverrides = SemanticOverrides(undeclaredReals = BoundsOverride(
                 upper = BoundOverride.Value(SemanticRational.ONE),
             )),
-        )).problem
+        )).source.originalSource)
 
         val result = OpenTheoryPipeline.execute(source.pipelineRequest(),
             TranscendentalTheoryParams(cancellation = Cancellation { true }), FiniteEngine.BACKTRACK).result
@@ -81,9 +88,9 @@ class NativeExecutionSemanticsTest {
 
     @Test
     fun `finite polynomial optimization should retain its source policy on objective decline`() {
-        val source = assertIs<SmtLibInput.Polynomial>(SmtLibAdmission.parse(
+        val source = SmtLibPolynomial.parse(
             "(declare-const x Real) (assert (= (* x x) 1))",
-        )).problem
+        ).realSource()
 
         val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(),
             LinearObjective(realCoefficients = doubleArrayOf(1.0)), engine = FiniteEngine.BACKTRACK)

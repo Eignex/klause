@@ -6,14 +6,14 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
@@ -965,11 +965,10 @@ class PreparedSourcePlanTest {
 
     @Test
     fun `nonlinear source declarations should keep interleaved exact numeric coordinates`() {
-        val source = assertIs<SmtLibInput.NonlinearInteger>(
-            SmtLibAdmission.parse(
+        val source = assertIs<NonlinearIntegerProblem>((
+            SmtLib.parse(
                 "(declare-const x Int) (declare-const r Real) (declare-const z Int) (assert (= (* x z) r))",
-            ),
-        ).problem
+            )).source.originalSource)
 
         val plan = source.prepareExecutionPlan()
 

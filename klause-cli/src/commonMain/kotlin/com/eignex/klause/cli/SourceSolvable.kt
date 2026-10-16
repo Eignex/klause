@@ -75,6 +75,8 @@ internal fun attachedSourceSolvable(
     admissionElapsedMs: Long,
     quadraticObjective: QuadraticObjectiveSpec? = null,
     sense: ObjectiveSense = source.embeddedObjectiveSense ?: ObjectiveSense.MINIMIZE,
+    objective: LinearObjective? = null,
+    renderFinite: (Sample) -> String = { error("source requires its exact coordinate renderer") },
 ): Solvable {
     val start = TimeSource.Monotonic.markNow()
     val stop = common.routingPreparationCancellation()
@@ -89,7 +91,7 @@ internal fun attachedSourceSolvable(
         )
     } else {
         val operation = when {
-            source.embeddedObjectiveSense != null -> ExecutionOperation.OPTIMIZE
+            objective != null || source.embeddedObjectiveSense != null -> ExecutionOperation.OPTIMIZE
             common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
             else -> ExecutionOperation.SATISFY
         }
@@ -97,18 +99,21 @@ internal fun attachedSourceSolvable(
             source,
             operation,
             common.resolvedEngine(),
-            maximize = source.embeddedObjectiveSense == ObjectiveSense.MAXIMIZE,
+            objective = objective,
+            maximize = sense == ObjectiveSense.MAXIMIZE,
             cancellation = stop,
             boundCancellation = common.routingCancellation(),
         )
     }
-    val invocation = SourceSetup.prepare(request)
+    var lpStats = LpStats()
+    val invocation = SourceSetup.prepare(request) { lpStats = it }
     val elapsed = start.elapsedNow().inWholeMilliseconds
     common.logRoute(invocation.route, elapsed)
     return preparedSourceSolvable(
         invocation,
-        { error("native source formulas retain their exact original coordinate renderer") },
+        renderFinite,
         render,
+        routingLpStats = lpStats,
         routingElapsedMs = admissionElapsedMs + elapsed,
     )
 }
