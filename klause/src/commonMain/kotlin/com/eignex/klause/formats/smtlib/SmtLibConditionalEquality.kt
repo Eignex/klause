@@ -217,20 +217,63 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         definitionsClosed = true
         tags = SmtLibConditionalTags(definitions) { chargeTagWork(builder) }
         val replaced = HashSet<Factor>()
-        for ((key, equality) in pendingComparisons.entries.toList().asReversed()) {
-            val expanded = expandComparison(key, builder) ?: continue
-            if (expanded == equality.literal) continue
-            val clauses = listOf(
-                Clause(intArrayOf(Lit.negate(equality.literal), expanded)),
-                Clause(intArrayOf(equality.literal, Lit.negate(expanded))),
-            )
-            builder.factors.addAll(clauses)
-            definePredicate(Lit.variable(equality.literal), clauses)
-            replaced.addAll(equality.factors)
+        val deferred = ArrayList<Pair<Key, PendingComparison>>()
+        for ((key, comparison) in pendingComparisons.entries.toList().asReversed()) {
+            val prepared = prepareComparison(key, builder)
+            if (prepared != null) {
+                replaceComparison(comparison, prepared, builder, replaced)
+            } else if (!canPrepareTags(builder)) {
+                if (key.op == "=") expand(key.variable, key.value, builder)?.let {
+                    replaceComparison(comparison, it, builder, replaced)
+                }
+            } else if (chargeTagWork(builder)) {
+                deferred += key to comparison
+            }
+        }
+        for ((key, comparison) in deferred) {
+            val prepared = prepareComparison(key, builder)
+            val expanded = prepared ?: if (work < workLimit && chargeTagWork(builder)) {
+                expandComparison(key, builder)
+            } else null
+            if (expanded != null) replaceComparison(comparison, expanded, builder, replaced)
         }
         builder.factors.removeAll { it in replaced }
         pendingComparisons.clear()
     }
+
+    private fun replaceComparison(
+        comparison: PendingComparison,
+        expanded: Int,
+        builder: Compiler.Builder,
+        replaced: MutableSet<Factor>,
+    ) {
+        if (expanded == comparison.literal) return
+        val clauses = listOf(
+            Clause(intArrayOf(Lit.negate(comparison.literal), expanded)),
+            Clause(intArrayOf(comparison.literal, Lit.negate(expanded))),
+        )
+        builder.factors.addAll(clauses)
+        definePredicate(Lit.variable(comparison.literal), clauses)
+        replaced.addAll(comparison.factors)
+    }
+
+    private fun prepareComparison(key: Key, builder: Compiler.Builder): Int? {
+        comparisons[key]?.let { return it }
+        if (key.op != "=") return null
+        val definition = definitions[key.variable]
+        if (definition != null && definition.image == null && key.variable !in preparedImages &&
+            hasImageDependencies(definition)
+        ) {
+            completeImages(key.variable, builder)
+        }
+        if (definition?.image?.contains(key.value) == false) {
+            return Lit.negate(builder.trueLit()).also { comparisons[key] = it }
+        }
+        return null
+    }
+
+    private fun canPrepareTags(builder: Compiler.Builder): Boolean =
+        work < workLimit && (tags?.hasCodebook == true || workLimit - work > builder.nextInt)
 
     private fun chargeTagWork(builder: Compiler.Builder): Boolean {
         if (builder.sourceCancellation()) throw PolynomialSourceInterrupted()
@@ -239,28 +282,19 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
 
     private fun expandComparison(key: Key, builder: Compiler.Builder): Int? {
         if (key.op == "=") return expand(key.variable, key.value, builder)
-        if (work >= workLimit) return null
-        val definition = definitions[key.variable] ?: return null
-        if (!hasImageDependencies(definition)) return null
-        if (definition.image == null && key.variable !in preparedImages) completeImages(key.variable, builder)
-        return tags?.compare(key.variable, key.op, key.value, builder)?.also { comparisons[key] = it }
+        if (work >= workLimit || !canPrepareTags(builder)) return null
+        val choices = tags ?: return null
+        if (!choices.hasSharedDependencies(key.variable)) return null
+        return choices.compare(key.variable, key.op, key.value, builder)?.also { comparisons[key] = it }
     }
 
     private fun expand(variable: Int, value: Long, builder: Compiler.Builder): Int? {
         val key = Key(variable, value)
-        comparisons[key]?.let { return it }
-        val rootDefinition = definitions[variable]
-        if (rootDefinition != null && rootDefinition.image == null && variable !in preparedImages &&
-            hasImageDependencies(rootDefinition)
-        ) {
-            completeImages(variable, builder)
-        }
-        if (definitions[variable]?.image?.contains(value) == false) {
-            return Lit.negate(builder.trueLit()).also { comparisons[key] = it }
-        }
+        prepareComparison(key, builder)?.let { return it }
         if (variable !in definitions || work >= workLimit) return null
-        if (rootDefinition != null && hasImageDependencies(rootDefinition)) {
-            tags?.compare(variable, "=", value, builder)?.let { literal ->
+        val choices = tags
+        if (choices != null && canPrepareTags(builder) && choices.hasSharedDependencies(variable)) {
+            choices.compare(variable, "=", value, builder)?.let { literal ->
                 comparisons[key] = literal
                 return literal
             }

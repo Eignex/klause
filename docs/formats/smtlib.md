@@ -111,8 +111,12 @@ When a branch compares a simple integer variable with a constant, these meanings
 can exclude conflicting selector tests and omit guard tests implied by that comparison.
 Conflicting branches and excluded defaults are skipped before traversing their definitions.
 Equality keys whose sign reversal exceeds a signed word retain their arithmetic encoding.
-A parse expands comparisons after lowering all assertions and objectives, visiting
-the newest comparisons first. Expansion shares a limit of 65,536 visits; comparisons
+A parse prepares image comparisons after lowering all assertions and objectives,
+visiting the newest comparisons first. Queries requiring shared expression choices
+are deferred until this preparation finishes. Deferred queue work and dependency
+eligibility use the same allowance. If the remaining allowance cannot cover the
+integer namespace scan required for a fresh codebook, equality queries keep their
+ordinary expansion path. Expansion shares a limit of 65,536 visits; comparisons
 that cannot finish retain their exact arithmetic encoding. Numeric branch definitions remain enforced whenever
 a surviving constraint, objective or shared reified predicate needs them. Unused
 fresh definitions are omitted after following these dependencies to a fixpoint.

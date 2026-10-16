@@ -25,6 +25,36 @@ internal class SmtLibConditionalTags(
     private val bits = HashMap<Int, Array<Int?>>()
     private val tests = HashMap<TagTest, Int>()
     private val predicates = HashMap<LeafQuery, Int>()
+    private val shared = HashMap<Int, Boolean>()
+
+    val hasCodebook: Boolean get() = codebook != null
+
+    fun hasSharedDependencies(variable: Int): Boolean {
+        if (!pay()) return false
+        shared[variable]?.let { return it }
+        val definition = definitions.getValue(variable)
+        for (term in definition.arms) {
+            if (!pay()) return false
+            if (term.asSimpleVar()?.let { it in definitions } == true) {
+                shared[variable] = true
+                return true
+            }
+        }
+        if (!pay()) return false
+        if (definition.default.asSimpleVar()?.let { it in definitions } == true) {
+            shared[variable] = true
+            return true
+        }
+        for (guard in definition.guardTests) {
+            if (!pay()) return false
+            if (guard != null && guard.variable in definitions) {
+                shared[variable] = true
+                return true
+            }
+        }
+        shared[variable] = false
+        return false
+    }
 
     fun compare(variable: Int, op: String, value: Long, builder: Compiler.Builder): Int? {
         if (!pay() || !prepareCodebook(builder)) return null

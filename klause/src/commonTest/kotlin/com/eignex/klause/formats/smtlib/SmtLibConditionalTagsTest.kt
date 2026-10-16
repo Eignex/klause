@@ -3,9 +3,12 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
+import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
@@ -17,6 +20,8 @@ import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
 import kotlin.test.Test
@@ -132,6 +137,30 @@ class SmtLibConditionalTagsTest {
     }
 
     @Test
+    fun `shared choice work cannot starve a late image refutation`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE, Long.MAX_VALUE, false,
+            conditionalEqualities = SmtLibConditionalEquality(workLimit = 16),
+        )
+        val reader = SExprReader(StringCharSource("""
+            (declare-const b Bool) (declare-const c Bool) (declare-const d Bool)
+            (declare-const s Int) (declare-const x Int) (assert (<= 0 s 1))
+            (assert (= (ite b (ite (= s 0) 1 2) 3) 99))
+            (assert (> (ite c (ite d x (+ x 1)) (+ x 2)) 0))
+        """.trimIndent()))
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+
+        val result = session.initialize()
+
+        assertIs<ComponentResult.Conflict>(result)
+    }
+
+    @Test
     fun `strict selected leaf comparisons preserve arithmetic beyond signed words`() {
         for (comparison in listOf("(< v -9223372036854775808)", "(> -9223372036854775808 v)")) {
             val parsed = SmtLib.parse("""
@@ -145,6 +174,8 @@ class SmtLibConditionalTagsTest {
             val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
             assertEquals(true, sample.boolValue(parsed.boolVarNames.getValue("b")))
             assertEquals(true, sample.boolValue(parsed.boolVarNames.getValue("c")))
+            val coordinate = parseBigInt(sample.intValue(parsed.intVarNames.getValue("x")))
+            assertTrue(coordinate + bigIntOf(Long.MAX_VALUE) < bigIntOf(Long.MIN_VALUE))
         }
     }
 
@@ -241,6 +272,54 @@ class SmtLibConditionalTagsTest {
 
         assertNull(literal)
         assertEquals(previousFactors, builder.factors.size)
+    }
+
+
+    @Test
+    fun `interrupted tag phases publish no query or unowned private state`() {
+        val phases = listOf("codebook" to 4, "support" to 14, "completed bit" to 49, "formula" to 55)
+        for ((phase, limit) in phases) {
+            val builder = Compiler.Builder(Long.MIN_VALUE, Long.MAX_VALUE, false)
+            val reader = SExprReader(StringCharSource(
+                "(declare-const b Bool) (declare-const x Int) (declare-const y Int)",
+            ))
+            while (true) builder.command(reader.readCommandOrNull() ?: break)
+            val variable = builder.newInt(null, null)
+            val first = LinComb(mapOf(builder.intNames.getValue("x") to 1L), 0)
+            val second = LinComb(mapOf(builder.intNames.getValue("y") to 1L), 0)
+            val guard = Lit.make(builder.boolNames.getValue("b"), positive = true)
+            val start = builder.factors.size
+            val left = builder.reifyLinear(
+                longArrayOf(1, -1), intArrayOf(variable, first.asSimpleVar()!!), LinearOp.EQ, 0,
+            )
+            val right = builder.reifyLinear(
+                longArrayOf(1, -1), intArrayOf(variable, second.asSimpleVar()!!), LinearOp.EQ, 0,
+            )
+            builder.factors += Clause(intArrayOf(Lit.negate(guard), left))
+            builder.factors += Clause(intArrayOf(guard, right))
+            val factors = builder.factors.subList(start, builder.factors.size).toList()
+            builder.conditionalEqualities.define(variable, listOf(guard), listOf(first), second, factors, listOf(null))
+            val definition = SmtLibConditionalEquality.Definition(
+                listOf(guard), listOf(first), second, factors, null, listOf(null),
+            )
+            var visits = 0
+            val tags = SmtLibConditionalTags(mapOf(variable to definition)) { ++visits <= limit }
+
+            val literal = tags.compare(variable, ">", 1, builder)
+            val parsed = builder.build()
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            assertNull(literal, phase)
+            assertEquals(limit + 1, visits, phase)
+            assertEquals(parsed.intVarNames.size, parsed.model.numIntVars, phase)
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            for (column in 0 until parsed.model.numBoolVars) {
+                if (column !in parsed.boolVarNames.values) assertNotNull(session.boolValue(column), phase)
+            }
+        }
     }
 
 }
