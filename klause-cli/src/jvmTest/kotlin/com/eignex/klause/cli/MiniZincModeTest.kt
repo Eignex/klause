@@ -25,6 +25,34 @@ class MiniZincModeTest(private val direction: String) {
     }
 
     @Test
+    fun `finite grid loading should retain original real source and private objective units`() {
+        val source = File.createTempFile("source-grid-flatzinc", ".fzn").apply {
+            writeText("var 0.0..2.0: x; constraint float_le(x,1.0); solve $direction x;")
+        }
+        try {
+            val common = CommonOptions().apply { engine = "cp" }
+
+            val solvable = MiniZincMode.newSession().load(source.absolutePath, common)
+            val shape = solvable.finiteShape
+            val invocation = assertNotNull(shape.sourceInvocation)
+            val projection = assertNotNull(invocation.floatProjection)
+            val original = assertIs<com.eignex.klause.ir.Problem>(invocation.source.originalSource)
+
+            assertEquals(1, original.numRealVars)
+            assertEquals(0, original.numIntVars)
+            assertEquals(0, shape.problem.numRealVars)
+            assertEquals(1, shape.problem.numIntVars)
+            assertSame(shape.problem, projection.privateProblem)
+            assertSame(original, projection.source.originalSource)
+            assertNotNull(projection.objectiveScale)
+            assertNull(solvable.objectiveValue)
+            assertNotNull(solvable.continuousObjectiveValue)
+        } finally {
+            source.delete()
+        }
+    }
+
+    @Test
     fun `finite loading should capture source definitions without materializing heuristic state`() {
         val source = File.createTempFile("source-setup-flatzinc", ".fzn").apply {
             writeText("var -2..2: x; var 0..2: a; var 4..8: score; " +

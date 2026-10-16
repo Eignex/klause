@@ -21,6 +21,7 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.NativeGridOutcome
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
@@ -589,6 +590,7 @@ internal interface OutputProtocol {
     }
     fun onLinearResult(result: LinearOptimizationResult) {}
     fun onLinearSourceResult(result: com.eignex.klause.solver.pipeline.SourceExecutionResult) {}
+    fun onNativeGridOutcome(result: NativeGridOutcome) {}
     fun onComplete(verdict: Verdict)
     fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long)
     fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {}

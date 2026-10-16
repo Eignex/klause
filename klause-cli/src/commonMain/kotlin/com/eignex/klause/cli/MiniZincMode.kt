@@ -6,6 +6,8 @@ import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import com.eignex.klause.formats.flatzinc.flatZincSemantics
 import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.formats.flatzinc.prepareFiniteCompatibility
+import com.eignex.klause.formats.flatzinc.sourceAttachment
 import com.eignex.klause.formats.flatzinc.toSearchHints
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.ir.EffectiveSourceSemantics
@@ -16,10 +18,10 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
+import com.eignex.klause.solver.pipeline.NativeGridOutcome
 import com.eignex.klause.solver.pipeline.PreparedPlanDecline
-import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
-import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
@@ -96,7 +98,8 @@ internal object MiniZincMode : CliMode {
                 )
             }
 
-            val objective = program.linearObjective()
+            val original = program.sourceProgram
+            val objective = original.linearObjective()
             val maximize = program.solve is SolveDirective.Maximize
             val sourceObjective = if (maximize) objective?.negated() else objective
             val operation = when {
@@ -104,9 +107,9 @@ internal object MiniZincMode : CliMode {
                 common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
                 else -> ExecutionOperation.SATISFY
             }
-            val invocation = SourceSetup.prepare(
+            val invocation = program.prepareFiniteCompatibility(
                 SourceSetupRequest(
-                    SourceAttachment(program.problem, program.definitionHints, program.searchHints?.toSearchHints()),
+                    program.sourceAttachment(),
                     operation,
                     common.resolvedEngine(),
                     objective = sourceObjective,
@@ -115,6 +118,21 @@ internal object MiniZincMode : CliMode {
                     boundCancellation = common.routingCancellation(),
                 ),
             )
+            if (invocation.floatProjection != null) {
+                val realObjective = sourceObjective?.takeIf { it.realCoefficients.any { coefficient -> coefficient != 0.0 } }
+                return Solvable(
+                    finite = invocation.finiteShape(),
+                    render = render,
+                    objectiveValue = sourceObjective?.takeIf { realObjective == null }
+                        ?.let { linear -> { sample -> linear.evaluateLong(sample) } },
+                    continuousObjectiveValue = realObjective?.let { linear -> { sample -> linear.evaluateExact(sample).toDouble() } },
+                )
+            }
+            if (floatApproximation) {
+                return preparedSourceSolvable(invocation, render, { assignment ->
+                    applier?.render(original, assignment) ?: writeFlatZincSolution(original, assignment, outputObjective)
+                })
+            }
             return when (val route = invocation.route) {
                 is SourceProblemRoute.NativeFormula ->
                     unsupportedFiniteSource("FlatZinc finite admission selected a native formula")
@@ -153,6 +171,7 @@ internal class MiniZincOutput(
     private val sourceSemantics: EffectiveSourceSemantics? = null,
 ) : OutputProtocol {
     private var context: VerdictContext = VerdictContext()
+    private var checkedGridPoints = false
     private val integerScopeChanged = sourceSemantics?.let {
         it.declared.undeclaredIntegers != it.effective.undeclaredIntegers
     } == true
@@ -226,7 +245,8 @@ internal class MiniZincOutput(
 
     override fun onComplete(verdict: Verdict) {
         if (floatApproximation) {
-            println("% klause-float-claim: grid search; source witness check required; no source proof")
+            val pointScope = if (checkedGridPoints) "original source points checked" else "source witness check required"
+            println("% klause-float-claim: grid search; $pointScope; no global source proof")
         }
         if (integerScopeChanged) {
             println("% klause-source-claim: caller integer bounds; no default-source proof")
@@ -257,6 +277,13 @@ internal class MiniZincOutput(
                 println("% $cause")
             }
         }
+    }
+
+    override fun onNativeGridOutcome(result: NativeGridOutcome) {
+        checkedGridPoints = true
+        val outcome = result.outcome as? FiniteSolveOutcome.Completed ?: return
+        println("% klause-grid-verdict: ${outcome.verdict}; scope=private-grid")
+        println("% klause-grid-solutions: ${outcome.solutions}")
     }
 
     override fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {

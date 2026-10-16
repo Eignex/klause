@@ -152,6 +152,13 @@ including refutations and optima without an original-source transfer. Neither me
 nor one checked source point establishes global completeness. Ordinary
 `SourceSetup.prepare` does not implicitly select a grid for complete/exact consumers.
 
+FlatZinc exposes canonical real data through `FlatZincProgram.sourceProgram` and
+`sourceAttachment()`. Its explicit `prepareFiniteCompatibility(request)` retains the
+caller's original source request while selecting the historical finite view when
+representable. `parseFlatZincExecution` exposes the captured invocation beside its
+native hint data. Historical FlatZinc model/decoder access remains lazy; the callable
+constructor/copy/component descriptors are retained, while Kotlin `isData` changes.
+
 `SourceSetup.execute(SourceExecutionRequest(invocation, ...))` dispatches that captured
 operation. Finite callers supply their existing full `FiniteSolveRequest` factory over
 its selected shape. Arithmetic callers supply `TheoryParams` or `PolynomialTheoryParams`,

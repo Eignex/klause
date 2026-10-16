@@ -4,12 +4,14 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.projection.FloatGridDecline
+import com.eignex.klause.solver.projection.FloatGridDefinition
 import com.eignex.klause.solver.projection.FloatGridObjective
 import com.eignex.klause.solver.projection.FloatGridPreparation
 import com.eignex.klause.solver.projection.FloatGridRequest
 import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.klause.solver.projection.prepareFloatGrid
 import com.eignex.klause.solver.projection.projectObjective
+import com.eignex.klause.util.Cancellation
 
 internal enum class FloatGridConsumerPurpose { FINITE_COMPATIBILITY, HEURISTIC_VIEW }
 
@@ -44,6 +46,23 @@ internal fun SourceSetup.prepareSelectedFloatGrid(
     invocation: PreparedSourceInvocation,
     variables: List<FloatGridVariable>,
     purpose: FloatGridConsumerPurpose,
+): SelectedFloatGridPreparation = selectFloatGrid(invocation, purpose) { consumer, stop ->
+    prepareFloatGrid(FloatGridRequest(invocation.source.problem, variables, consumer), stop)
+}
+
+internal fun SourceSetup.prepareSelectedFloatGrid(
+    invocation: PreparedSourceInvocation,
+    definition: FloatGridDefinition,
+    purpose: FloatGridConsumerPurpose,
+): SelectedFloatGridPreparation = selectFloatGrid(invocation, purpose) { consumer, stop ->
+    require(definition.source === invocation.source.factorProblem) { "grid definition belongs to a foreign source" }
+    definition.bind(consumer, stop)
+}
+
+private fun selectFloatGrid(
+    invocation: PreparedSourceInvocation,
+    purpose: FloatGridConsumerPurpose,
+    prepare: (SelectedFloatGridConsumer, Cancellation) -> FloatGridPreparation,
 ): SelectedFloatGridPreparation {
     invocation.requireUnselectedFloatGrid()
     val stop = invocation.cancellation
@@ -59,9 +78,7 @@ internal fun SourceSetup.prepareSelectedFloatGrid(
         (purpose == FloatGridConsumerPurpose.HEURISTIC_VIEW && !invocation.request.engine.pureLocalSearch)
     ) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.CONSUMER)
     val consumer = SelectedFloatGridConsumer(invocation, purpose)
-    val projection = when (val result = prepareFloatGrid(
-        FloatGridRequest(invocation.source.problem, variables, consumer), stop,
-    )) {
+    val projection = when (val result = prepare(consumer, stop)) {
         is FloatGridPreparation.Prepared -> result
         is FloatGridPreparation.Declined -> return SelectedFloatGridPreparation.Declined(
             if (stop()) SelectedGridDecline.RESOURCE else SelectedGridDecline.PROJECTION,

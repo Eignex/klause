@@ -24,6 +24,27 @@ internal class FloatGridColumn(
     } else null
 }
 
+internal class FloatGridDefinition(
+    val source: Problem,
+    val target: Problem,
+    columns: List<FloatGridColumn>,
+    retainedReals: IntArray,
+    factorOrigins: IntArray,
+) {
+    private val columns = columns.toList()
+    private val retained = retainedReals.copyOf()
+    private val origins = factorOrigins.copyOf()
+
+    fun columns(): List<FloatGridColumn> = columns.toList()
+
+    fun retainedReal(source: Int): Int = retained[source]
+
+    fun bind(owner: Any, cancellation: Cancellation): FloatGridPreparation.Prepared = FloatGridPreparation.Prepared(
+        target, FloatGridMapping(source, target, columns, retained, origins, owner,
+            cancellation.encodingPreparationScope()),
+    )
+}
+
 internal class FloatGridMapping(
     val source: Problem,
     val target: Problem,
@@ -77,6 +98,8 @@ internal class FloatGridMapping(
     fun columns(): List<FloatGridColumn> = capturedColumns.toList()
 
     fun factorOrigins(): IntArray = origins.copyOf()
+
+    fun definition(): FloatGridDefinition = FloatGridDefinition(source, target, capturedColumns, retainedReals, origins)
 
     fun guardedCancellation(cancellation: Cancellation): Cancellation =
         (cancellation or containingCancellation).encodingPreparationScope()
