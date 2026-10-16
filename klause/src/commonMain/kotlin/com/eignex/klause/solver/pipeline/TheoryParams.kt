@@ -48,7 +48,8 @@ data class TheoryParams(
      * A null allowance permits direct primitive point preferences for one linear completion owner
      * with source integer or real coordinates, without a source-clause index
      * or Boolean draw. A Boolean-complete mixed worker can also order the current source
-     * disjunction's rows from an existing exact point or optimal float guess; both alternatives remain searched.
+     * disjunction's rows or a disequality's sides from an existing exact point or optimal float guess;
+     * both alternatives remain searched.
      * Other built-in linear point guidance and compound source-clause preferences use
      * this opt-in. Zero permits bounded construction observations
      * but publishes no component preference; a positive value permits indexed preferences after caller

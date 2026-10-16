@@ -826,7 +826,10 @@ no scan, owner poll, numerical query or work allowance. Stages overlap and their
 counts are not a work total. Disjunction and disequality guide observations distinguish exact
 points from float guesses and record when a preference changes the original order.
 Disequality observations also identify point ties, source/private registration paths
-and registration declines; they establish no source witness.
+and registration declines; they establish no source witness. Complete-caller
+`POINT_HINT_*` stages distinguish successful graph/LP capture and consultations that
+find no live point, no preference for the chosen Boolean, or a preferred polarity.
+They exclude private-query captures and do not explain an unavailable point.
 These observations add no scan, numerical query,
 allowance or result authority and do not explain an UNKNOWN verdict by themselves.
 

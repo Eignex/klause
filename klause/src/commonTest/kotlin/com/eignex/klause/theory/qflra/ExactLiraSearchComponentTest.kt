@@ -139,8 +139,11 @@ class ExactLiraSearchComponentTest {
             ExactLiraSearchComponent(partialModel()).use { component ->
                 component.observeWith(stats)
                 if (complete) component.observeCompleteTraversal()
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+                assertNull(hints.preferredBool(0))
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
                 assertIs<ComponentResult.Consistent>(session.initialize())
+                assertEquals(false, hints.preferredBool(0))
                 assertEquals(if (complete) (0 until 2).count { session.boolValue(it) == null } else null,
                     stats.snapshot().completeSearchMinUnassignedBooleans)
                 assertEquals(if (complete) 0L else null, stats.snapshot().completeSearchLinearChecks)
@@ -158,6 +161,9 @@ class ExactLiraSearchComponentTest {
                 assertEquals(complete, (observed.completeSearchLinearPoints ?: 0L) > 0L)
                 assertEquals(observed.completeSearchLinearChecks, observed.completeSearchLinearOutcomes?.values?.sum())
                 assertEquals(complete, observed.completeSearchStages != null)
+                assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_UNAVAILABLE"))
+                assertEquals(if (complete) 1L else null, observed.completeSearchStages?.get("POINT_HINT_PREFERRED"))
+                assertEquals(complete, (observed.completeSearchStages?.get("POINT_HINT_LP_CAPTURE") ?: 0L) > 0L)
             }
         }
     }
