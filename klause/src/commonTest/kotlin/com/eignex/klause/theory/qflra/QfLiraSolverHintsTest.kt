@@ -63,9 +63,9 @@ class QfLiraSolverHintsTest {
             )
             ExactLiraSearchComponent(model).use { component ->
                 component.observeWith(stats)
-                component.observeCompleteTraversal()
 
                 assertNull(component.partialPointHints(Cancellation.Never))
+                component.observeCompleteTraversal()
 
                 assertEquals(1L, stats.snapshot().completeSearchStages?.get(stage))
                 assertNull(stats.snapshot().completeSearchStages?.get("POINT_HINT_REGISTERED"))

@@ -222,6 +222,7 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintValues: IntArray? = null
     private var pointHintLevel = -1
     private var pointHintStop = Cancellation.Never
+    private var pointHintAdmission: String? = null
     private var dirty = true
     private var sourceInstalled = false
     private var graphFirst = false
@@ -307,6 +308,7 @@ class ExactLiraSearchComponent private constructor(
         completeTraversalObserved = true
         smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
         observeCompleteStage("OPENING")
+        pointHintAdmission?.let(::observeCompleteStage)
     }
 
     internal fun partialPointHints(
@@ -319,7 +321,7 @@ class ExactLiraSearchComponent private constructor(
         if (model.numBoolVars == 0 || model.numBoolVars > MAX_POINT_HINT_ENTRIES ||
             preparedRows.size > MAX_POINT_HINT_ENTRIES
         ) {
-            observeCompleteStage("POINT_HINT_DIMENSION_DECLINED")
+            observePointHintAdmission("POINT_HINT_DIMENSION_DECLINED")
             return null
         }
         if (stop()) return null
@@ -333,7 +335,7 @@ class ExactLiraSearchComponent private constructor(
             if (prepared.row.activator !in bools.indices) return null
             entries += prepared.row.size.toLong() + 1L
             if (entries > MAX_POINT_HINT_ENTRIES) {
-                observeCompleteStage("POINT_HINT_ENTRIES_DECLINED")
+                observePointHintAdmission("POINT_HINT_ENTRIES_DECLINED")
                 return null
             }
             rows += prepared
@@ -343,7 +345,7 @@ class ExactLiraSearchComponent private constructor(
         if (stop() || rows.isEmpty()) return null
         pointHintRows = rows.toList()
         pointHintStop = stop
-        observeCompleteStage("POINT_HINT_REGISTERED")
+        observePointHintAdmission("POINT_HINT_REGISTERED")
         return variables.toIntArray() to SearchCandidateHints { variable ->
             observeCompleteStage("POINT_HINT_CONSULTED")
             if (!partialPointHintAvailable()) {
@@ -1221,6 +1223,11 @@ class ExactLiraSearchComponent private constructor(
 
     private fun observeCompleteStage(stage: String) {
         if (completeTraversalObserved) smtStats?.observeCompleteSearchStage(stage)
+    }
+
+    private fun observePointHintAdmission(stage: String) {
+        pointHintAdmission = stage
+        observeCompleteStage(stage)
     }
 
     private fun branch(context: SearchContext): List<SearchDecision>? {
