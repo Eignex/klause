@@ -468,18 +468,19 @@ internal class WitnessProbe(
         fixed: Map<Int, BigFraction>,
     ): QfNraAssignment? {
         if (exhausted) return null
-        val point = try {
-            PolynomialWitnessDefinitions(arithmetic, MAX_WITNESS_TERMS, MAX_WITNESS_DEGREE, MAX_WITNESS_BITS)
-                .point(atoms, realCount, fixed)
+        return try {
+            val point = PolynomialWitnessDefinitions(
+                arithmetic, MAX_WITNESS_TERMS, MAX_WITNESS_DEGREE, MAX_WITNESS_BITS,
+            ).point(atoms, realCount, fixed) ?: return null
+            val captured = LinkedHashMap<Int, AlgebraicReal>()
+            for ((variable, value) in point) {
+                arithmetic.step()
+                captured[variable] = algebraic.rational(value)
+            }
+            candidate(captured)
         } catch (_: PolynomialResourceLimit) {
             null
-        } ?: return null
-        val captured = LinkedHashMap<Int, AlgebraicReal>()
-        for ((variable, value) in point) {
-            arithmetic.step()
-            captured[variable] = algebraic.rational(value)
         }
-        return candidate(captured)
     }
 
     fun candidate(point: Map<Int, AlgebraicReal>): QfNraAssignment? = candidate(point, null)
