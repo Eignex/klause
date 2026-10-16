@@ -249,10 +249,10 @@ scope. Nonlinear sessions accept one nonincremental query with at most one objec
 The internal `SmtLibPolynomial.parse` entry point preserves pure Real/Bool polynomial
 satisfaction sources separately from `SmtLib.parse` and its linear factors. It performs
 no theory selection and publishes no SAT/UNSAT result. Public `SmtLibAdmission.parse`
-first attempts the established linear facade. Only an explicit unsupported-syntax
-decline reopens the same source through polynomial lowering. Pure Real/Bool
-satisfaction sources that reference `define-fun` helpers in assertion syntax use
-lexical polynomial lowering before legacy expansion can capture caller-local bindings.
+first attempts the established linear facade. An explicit unsupported-syntax
+decline lowers the same captured command nodes through the polynomial compiler.
+Pure Real/Bool satisfaction sources that reference `define-fun` helpers in assertion
+syntax use lexical polynomial lowering.
 The reference scan visits nested applications and zero-arity symbols iteratively under
 caller cancellation. Unused helper declarations retain lexical body and result-sort
 validation without changing an otherwise supported linear route. Nonlinear helper
@@ -263,9 +263,13 @@ syntax retain the same source route, exact rational coefficients and direction.
 Other successful linear inputs retain their existing routes.
 Helper parameter/return sorts and explicit integer operations preserve integer syntax
 even when there is no declared integer variable.
-Reopenable streamed inputs close each owned closeable source, or drain active
-sources without a close contract before retrying. Cancellation stops that drain,
-prevents reopening, and returns `SmtLibInput.Interrupted` without publishing partial metadata.
+Streamed admission opens its source factory once and parses each command once.
+The captured command nodes remain within that admission while factor and exact
+formula lowering consume them. A closeable stream is closed once; other streams
+are exhausted. A read interruption prevents tail draining even when the caller's
+cancellation predicate later clears. Source capture and lowering share the
+containing work meter. Cancellation returns `SmtLibInput.Interrupted` without
+publishing partial metadata.
 
 Pure-real polynomial admission publishes `ir.PolynomialRealProblem`, an opaque neutral
 snapshot of formula, original declaration identities and auxiliary counts. Its
