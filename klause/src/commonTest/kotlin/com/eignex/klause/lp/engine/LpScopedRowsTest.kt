@@ -6,6 +6,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -13,6 +14,70 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpScopedRowsTest {
+    @Test
+    fun `appended rows should preserve touched untouched and new structural columns`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val binary = ExactLpNumber.ofIeee(0.1)
+        val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
+        val logical = ExactLpColumn(ExactLpBounds(), integral = false)
+        val metadata = ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(3)))
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one)), listOf(ExactLpEntry(0, binary))),
+            listOf(binary),
+            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds()), logical),
+            listOf(metadata),
+            ExactLpObjective(listOf(one, binary, third), binary, third, one, Sense.MAXIMIZE),
+        )
+        val column = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)), third, false, 8)
+        val row = LpScopedRow(7, listOf(0 to binary, 2 to third), third, logical, metadata, binary)
+
+        val appended = source.appendScopedRows(
+            listOf(LpStructuralColumn(column, third), LpStructuralColumn(column, one)),
+            listOf(row),
+        )
+
+        assertEquals(listOf(ExactLpEntry(0, one), ExactLpEntry(1, binary)), appended.entries(0))
+        assertEquals(source.entries(1), appended.entries(1))
+        assertEquals(listOf(ExactLpEntry(1, third)), appended.entries(2))
+        assertEquals(emptyList(), appended.entries(3))
+        assertEquals(column, appended.column(2))
+        assertEquals(source.column(2), appended.column(4))
+        assertEquals(metadata, appended.row(1))
+        assertEquals(third, appended.rhs(1))
+        assertEquals(source.objective.withCosts(listOf(one, binary, third, one, third, binary)), appended.objective)
+        assertEquals(0.1.toRawBits(), appended.entries(0).last().number.ieeeBits)
+    }
+
+    @Test
+    fun `appending rows should leave previous model columns unchanged`() {
+        val one = ExactLpNumber.of(1L)
+        val entries = listOf(ExactLpEntry(0, one), ExactLpEntry(1, one))
+        val logical = ExactLpColumn(ExactLpBounds())
+        val source = ExactLpModel(
+            listOf(entries, entries),
+            listOf(one, one),
+            List(4) { logical },
+            List(2) { ExactLpRow() },
+            ExactLpObjective(List(4) { one }),
+        )
+
+        source.appendScopedRows(emptyList(), listOf(LpScopedRow(2, listOf(0 to one), one, logical)))
+
+        for (column in 0..1) assertEquals(entries, source.entries(column))
+    }
+
+    @Test
+    fun `appended duplicate coefficients should retain matrix validation`() {
+        val one = ExactLpNumber.of(1L)
+        val logical = ExactLpColumn(ExactLpBounds())
+        val source = ExactLpModel(
+            listOf(emptyList()), emptyList(), listOf(logical), emptyList(), ExactLpObjective(listOf(one)),
+        )
+        val row = LpScopedRow(0, listOf(0 to one, 0 to one), one, logical)
+
+        assertFailsWith<IllegalArgumentException> { source.appendScopedRows(emptyList(), listOf(row)) }
+    }
     @Test
     fun `layout compaction should remap assertions and keep suspended ancestor coordinates`() {
         val source = LpBuilder().apply {

@@ -146,13 +146,22 @@ internal fun ExactLpModel.appendScopedRows(
     columns: List<LpStructuralColumn>,
     rows: List<LpScopedRow>,
 ): ExactLpModel {
-    val newEntries = Array(n + columns.size) { ArrayList<ExactLpEntry>() }
+    val newEntries = arrayOfNulls<ArrayList<ExactLpEntry>>(n + columns.size)
     for ((index, row) in rows.withIndex()) {
-        for ((column, number) in row.coefficients()) newEntries[column].add(ExactLpEntry(m + index, number))
+        for ((column, number) in row.coefficients()) {
+            val entries = newEntries[column] ?: ArrayList<ExactLpEntry>().also { newEntries[column] = it }
+            entries.add(ExactLpEntry(m + index, number))
+        }
     }
     return ExactLpModel(
         List(newEntries.size) { column ->
-            if (column < n) entries(column) + newEntries[column] else newEntries[column]
+            val added = newEntries[column]
+            if (column < n) {
+                val previous = columnEntries(column)
+                if (added == null) previous else previous + added
+            } else {
+                added.orEmpty()
+            }
         },
         List(m) { rhs(it) } + rows.map { it.rhs },
         List(n) { column(it) } + columns.map { it.column } + List(m) { column(n + it) } + rows.map { it.logical },
