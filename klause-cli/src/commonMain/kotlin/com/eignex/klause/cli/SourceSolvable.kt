@@ -43,7 +43,11 @@ internal fun sourceSolvable(
     var lpStats = LpStats()
     val invocation = SourceSetup.prepare(
         SourceSetupRequest(
-            SourceAttachment(problem, definitionHints, searchHints),
+            if (definedVars.isEmpty() && boolFolds.isEmpty()) {
+                SourceAttachment(problem, definitionHints, searchHints)
+            } else {
+                SourceAttachment(problem, definedVars, boolFolds, definitionHints, searchHints)
+            },
             operation,
             common.resolvedEngine(),
             objective = if (maximize) minimizedObjective?.negated() else minimizedObjective,
@@ -171,6 +175,20 @@ internal fun preparedSourceSolvable(
     val maximize = invocation.maximizeSourceObjective
     return when (SourceSetup.executionKind(invocation)) {
         SourceExecutionKind.FINITE -> {
+            if (definedVars.isNotEmpty() || boolFolds.isNotEmpty()) {
+                val realObjective = objective?.takeIf { it.realCoefficients.any { coefficient -> coefficient != 0.0 } }
+                return Solvable(
+                    finite = invocation.finiteShape(),
+                    render = render,
+                    objectiveValue = objective?.takeIf { realObjective == null }
+                        ?.let { linear -> { sample -> linear.evaluateLong(sample) } },
+                    continuousObjectiveValue = realObjective?.let { linear ->
+                        { sample -> linear.evaluateExact(sample).toDouble() }
+                    },
+                    routingLpStats = routingLpStats,
+                    routingElapsedMs = routingElapsedMs,
+                )
+            }
             val route = invocation.route as SourceProblemRoute.Finite
             linearSolvable(
                 route.problem,
