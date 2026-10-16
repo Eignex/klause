@@ -209,6 +209,7 @@ class ExactLiraSearchComponent private constructor(
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
+    private var sourceBoundPublication: ComponentResult? = null
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
     }
@@ -965,7 +966,34 @@ class ExactLiraSearchComponent private constructor(
         return system.install().also { sourceInstalled = it }
     }
 
+    private fun implySourceBound(prepared: PreparedSourceRow, context: SearchContext): ComponentResult? {
+        val variable = prepared.row.activator
+        if (variable !in bools.indices || context.boolValue(variable) != null || graphFirst || hasPrivateReals ||
+            model.numIntVars != 0 || hasSourceDisjunctions || prepared.disjunction ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
+            node.rowAssertions.isNotEmpty() || node.sourceBranches.isNotEmpty() ||
+            node.disequalityDirections.isNotEmpty() || node.directionPremises.isNotEmpty() ||
+            node.branches.isNotEmpty() || node.reducedBranches.isNotEmpty() ||
+            node.transformedBranches.isNotEmpty() || node.retainedReduction != null
+        ) return null
+        operationStop.charge(prepared.row.size.toLong() + 1L)
+        if (operationStop()) return ComponentResult.Indeterminate
+        if ((0 until prepared.row.size).any { Term.isBool(prepared.row.ref(it)) }) return null
+        val comparison = prepared.form.comparison(true) { false }
+        val implied = system.impliedComparison(comparison, operationStop) ?: return null
+        val decision = SearchDecision.Bool(Lit.make(variable, implied.holds))
+        val explanation = context.explainAtoms(implied.premise, decision) ?: return null
+        if (operationStop()) return ComponentResult.Indeterminate
+        val published = context.imply(decision.literal, explanation)
+        if (published != ComponentResult.Consistent) return published
+        // Shared implication omits delivery to its producer, whose LP scope is already current.
+        val applied = lp.assertWithin(decision, context, operationStop)
+        if (applied == ComponentResult.Consistent) observeCompleteStage("SOURCE_BOUND_IMPLIED")
+        return applied
+    }
+
     private fun assertSource(context: SearchContext): Boolean {
+        sourceBoundPublication = null
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((index, prepared) in preparedRows.withIndex()) {
@@ -975,7 +1003,14 @@ class ExactLiraSearchComponent private constructor(
             val address = prepared.address
             val asserted = node.rowAssertions[address]
             if (prepared.disjunction && asserted == null) continue
-            val truth = node.rowTruth(address, prepared.row, bools) ?: continue
+            val truth = node.rowTruth(address, prepared.row, bools)
+            if (truth == null) {
+                implySourceBound(prepared, context)?.let {
+                    sourceBoundPublication = it
+                    return true
+                }
+                continue
+            }
             val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
             val leaves = prepared.booleans.map { variable ->
                 SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
@@ -1163,6 +1198,7 @@ class ExactLiraSearchComponent private constructor(
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
         }
+        sourceBoundPublication?.let { return it }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()

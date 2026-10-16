@@ -27,6 +27,17 @@ those assertions through their decision scope, checks the residual system and
 contributes exact source coordinates at a complete check. Disequalities require
 an applicable direction and remain part of the source check.
 
+In a pure-real LP scope, an existing exact expression bound can imply an ordinary
+reified inequality. The component reads the current normalized expression column,
+retains its scale, offset and fixed-coordinate premises, and compares exact strict
+endpoints. It creates no missing expression or numerical query. Boolean coefficient
+rows, private completion coordinates and arithmetic alternatives decline this
+optional deduction. Available bound premises become a shared implication clause;
+missing explanations withhold the fact. The producer records the published pin in
+its own current LP scope and defers solving until the shared fixpoint resumes.
+Retraction reads the live bounds again. Floating points provide no implication
+authority; source completion remains required for a witness.
+
 For a source containing integer or real coordinates, the exact-linear component can
 reuse the exact source-coordinate prefix of an existing completed LP witness, or
 the point from its existing feasible difference check,

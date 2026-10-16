@@ -30,6 +30,7 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.util.Cancellation
 
 internal class QfLraSystem(private val model: Problem) {
     fun build(booleanValue: (Int) -> Boolean?): QfLraRelaxation {
@@ -225,6 +226,52 @@ internal class LiveQfLraSystem(
         return true
     }
 
+    fun impliedComparison(comparison: ExactComparison, stop: Cancellation): DerivedComparisonTruth? {
+        if (comparison.op != LinearOp.LE && comparison.op != LinearOp.GE) return null
+        val state = lp.state ?: return null
+        if (state.conflict != null || stop()) return null
+        val key = preparedTerms[comparison.ordered]?.positive ?: return null
+        val term = normalized[key]?.term ?: return null
+        val work = MixedPointArithmetic(stop)
+        val shifted = work.subtractProduct(comparison.bound, BigFraction.ONE, term.offset) ?: return null
+        val threshold = work.quotient(shifted, term.scale) ?: return null
+        val holdsBelow = (comparison.op == LinearOp.LE) == (term.scale > BigFraction.ZERO)
+        if (term.coefficients.isEmpty()) {
+            val relation = BigFraction.ZERO.compareTo(threshold)
+            val holds = if (holdsBelow) {
+                relation < 0 || relation == 0 && !comparison.strict
+            } else relation > 0 || relation == 0 && !comparison.strict
+            return DerivedComparisonTruth(holds, term.premise(SearchAtomPremise.All(emptyList())))
+                .takeUnless { stop() }
+        }
+        val slot = normalized[key] ?: return null
+        if (slot.column >= 0 && slot.column !in 0 until state.model.numVars) return null
+        val column = slot.column.takeIf { it in 0 until state.model.numVars }
+            ?: term.coefficients.keys.singleOrNull() ?: definitions[term.coefficients] ?: return null
+        if (column !in 0 until state.model.numVars) return null
+        val lowerBound = state.activeSide(column, false)?.side
+        val upperBound = state.activeSide(column, true)?.side
+        if (lowerBound != null && upperBound != null) {
+            if (!work.admitted(lowerBound.number.value) || !work.admitted(upperBound.number.value)) return null
+            val relation = lowerBound.number.value.compareTo(upperBound.number.value)
+            if (relation > 0 || relation == 0 && (lowerBound.strict || upperBound.strict)) return null
+        }
+        for (upper in listOf(true, false)) {
+            stop.charge(1L)
+            if (stop()) return null
+            val side = state.activeSide(column, upper)?.side ?: continue
+            if (!work.admitted(side.number.value)) return null
+            val relation = side.number.value.compareTo(threshold)
+            val holds = upper == holdsBelow
+            val strictEnough = if (holds) !comparison.strict || side.strict else comparison.strict || side.strict
+            val stronger = if (upper) relation < 0 else relation > 0
+            if (!stronger && (relation != 0 || !strictEnough)) continue
+            val premise = lp.activeBoundPremise(column, upper) ?: continue
+            return DerivedComparisonTruth(holds, term.premise(premise)).takeUnless { stop() }
+        }
+        return null
+    }
+
     fun disequalitySide(comparison: ExactComparison): DerivedDisequalitySide? {
         val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
         val fixed = rootFixedColumns(key.columns)
@@ -349,6 +396,8 @@ internal class LiveQfLraSystem(
         }
     }
 }
+
+internal data class DerivedComparisonTruth(val holds: Boolean, val premise: SearchAtomPremise)
 
 internal data class DerivedDisequalitySide(val direction: LinearOp, val premise: SearchAtomPremise)
 
