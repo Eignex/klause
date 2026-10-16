@@ -45,9 +45,12 @@ binary rational values. Equal finite real bounds remain source equations and are
 substituted before projection, retaining their exact coordinate in captured models.
 `Problem.pipelineRoute()` consumes the same prepared plan for polynomial, finite
 and linear route construction. Polynomial requests and quadratic execution resolve
-the captured completion data from that plan. Open integer declarations carry explicit
-preparation declines; they are not boxed. Source ownership is selected without the
-objective, then the original objective and direction are bound to the same plan.
+the captured completion data from that plan. A factor scope containing open integer
+declarations can instead select the [nonlinear integer adapter](nonlinear-integer.md)
+when every factor has a complete selected polynomial encoding. Missing relations or
+required conditions produce a preparation decline; open integers are not boxed.
+Source ownership is selected without the objective, then the original objective and
+direction are bound to the same plan.
 Affine continuous costs use the existing exact quadratic executor without discretization.
 
 Backtracking checks interval relaxations and fixed finite branches. Local search

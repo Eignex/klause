@@ -26,7 +26,7 @@ value class EncodingTarget(
         val LINEAR: EncodingTarget = EncodingTarget("linear")
         /** Integer difference relations with combined graph safety admission. */
         val DIFFERENCE: EncodingTarget = EncodingTarget("difference")
-        /** Exact polynomial relations beside a retained finite projection. */
+        /** Exact polynomial relations with source integer and real identities. */
         val POLYNOMIAL: EncodingTarget = EncodingTarget("polynomial")
         internal val entries = listOf(LINEAR, DIFFERENCE, POLYNOMIAL)
     }
@@ -143,7 +143,7 @@ interface TheoryEncoding {
         error("private linear guards unavailable")
     /** Install a neutral polynomial relation, preserving guards and original attribution. */
     fun polynomial(formula: PolynomialRealFormula)
-    /** Map a finite source integer to its private polynomial coordinate. */
+    /** Map a source integer to its exact private polynomial coordinate. */
     fun integer(id: SourceIntId): PolynomialExpression
     /** Map a source real to its polynomial coordinate. */
     fun real(id: SourceRealId): PolynomialExpression

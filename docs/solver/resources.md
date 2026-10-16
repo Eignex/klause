@@ -529,3 +529,10 @@ and deadline to original-unit publication checking before workers begin; supplyi
 those controls through a deferred factory does not leave checking outside its scope.
 Native numerical execution retains its existing theory-work
 currency and cleanup owner, including when an original-unit callback fails.
+
+Factor-to-polynomial preparation shares one latched containing encoding scope across
+preflight, factor installation, declared domain rows and native snapshot capture.
+A transient cancellation discards the private projection. Installation failure and
+missing conditions cannot publish a prefix or restart with a renewed allowance.
+Choosing the smaller finite member or hole traversal avoids scanning a declared
+interval merely to preserve its membership constraints.

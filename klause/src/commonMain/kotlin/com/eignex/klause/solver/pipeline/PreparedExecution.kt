@@ -24,7 +24,10 @@ internal sealed interface PreparedExecution {
     class Polynomial(val completion: SharedPolynomialModel) : Factor {
         override val model: Problem get() = completion.source
     }
-    class NonlinearInteger(val source: NonlinearIntegerProblem) : PreparedExecution
+    class NonlinearInteger(
+        val source: NonlinearIntegerProblem,
+        val projection: FactorPolynomialProjection? = null,
+    ) : PreparedExecution
     class Transcendental(val source: TranscendentalProblem) : PreparedExecution
     class Numerical(val source: LinearSourceProblem, override val model: Problem) : Factor
     class Declined(val model: Problem, val reason: PreparedPlanDecline, val retained: Factor? = null) :
@@ -40,7 +43,8 @@ internal val PreparedExecution.model: Problem? get() = when (this) {
     is PreparedExecution.Polynomial -> completion.source
     is PreparedExecution.Declined -> model
     is PreparedExecution.Numerical -> model
-    is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
+    is PreparedExecution.NonlinearInteger -> projection?.model
+    is PreparedExecution.Transcendental -> null
 }
 
 internal val PreparedExecution.componentPlan: ComponentPlan? get() = finiteLinear?.ownership
@@ -113,7 +117,18 @@ internal class PreparedSourceStructure(
         require(this.integerCoordinates.size == sourceIntCount && this.realCoordinates.size == sourceRealCount)
         execution.model?.let { factorProjections?.requireSource(it) }
         when (execution) {
-            is PreparedExecution.NonlinearInteger -> require(originalSource === execution.source)
+            is PreparedExecution.NonlinearInteger -> {
+                val projection = execution.projection
+                if (projection == null) require(originalSource === execution.source)
+                else {
+                    require(originalSource === projection.original && execution.source === projection.formula)
+                    require(factorProjections === projection.projections)
+                    require(sourceBoolCount == projection.model.numBoolVars &&
+                        sourceIntCount == projection.model.numIntVars && sourceRealCount == projection.model.numRealVars)
+                    require(this.integerCoordinates == execution.source.integerCoordinates &&
+                        this.realCoordinates == execution.source.realCoordinates)
+                }
+            }
             is PreparedExecution.Transcendental -> require(originalSource === execution.source)
             is PreparedExecution.Numerical -> require(originalSource === execution.source)
             else -> Unit
@@ -159,7 +174,7 @@ internal class PreparedOperationBinding(
         ) {
             return false
         }
-        return execution !is PreparedExecution.NonlinearInteger && execution !is PreparedExecution.Transcendental
+        return execution !is PreparedExecution.Transcendental
     }
 }
 

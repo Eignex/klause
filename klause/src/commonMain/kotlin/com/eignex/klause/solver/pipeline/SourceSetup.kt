@@ -117,7 +117,11 @@ object SourceSetup {
         val problem = request.source.problem
         val projections = (problem as? BakedProblem)?.factorProjections
             ?.takeIf { it.providers === request.providers } ?: request.providers.prepare(problem)
-        if (request.quadraticObjective != null) {
+        val exactNormalization = request.maximize && request.objective?.let { objective ->
+            objective.constant == Long.MIN_VALUE || objective.intCoefficientValues.any { it == Long.MIN_VALUE } ||
+                objective.boolWeightValues.any { it == Long.MIN_VALUE }
+        } == true
+        if (request.quadraticObjective != null || exactNormalization) {
             return PreparedSourceInvocation(
                 request,
                 prepareFactorQuadratic(request, projections, polynomialCancellation or stop, stop),
@@ -133,6 +137,9 @@ object SourceSetup {
             polynomialCancellation = polynomialCancellation or stop,
             onLpStats = onLpStats,
         )
-        return PreparedSourceInvocation(request, route, stop)
+        val selected = if (route is SourceProblemRoute.PolynomialTheory &&
+            request.objective?.realCoefficientValues?.any { it != 0.0 } == true
+        ) SourceProblemRoute.NativeFormula(NativeSourceExecution.Polynomial(route.request)) else route
+        return PreparedSourceInvocation(request, selected, stop)
     }
 }

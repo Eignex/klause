@@ -29,12 +29,20 @@ internal fun prepareFactorQuadratic(
         providers = request.providers,
         projections = projections.forEngineView(bounded),
         cancellation = polynomialStop,
-    ).withObjective(
-        requireNotNull(request.quadraticObjective),
-        if (request.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
-    )
+    ).let { prepared ->
+        request.quadraticObjective?.let {
+            prepared.withObjective(it, if (request.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE)
+        } ?: prepared.withObjective(requireNotNull(request.objective), request.maximize)
+    }
     if (stop()) return SourceProblemRoute.NativeFormula(null)
-    if (plan.execution !is PreparedExecution.Polynomial) {
+    val native = when (val execution = plan.execution) {
+        is PreparedExecution.Polynomial -> NativeSourceExecution.Polynomial(plan.polynomialRequest())
+        is PreparedExecution.NonlinearInteger -> NativeSourceExecution.IntegerPolynomial(
+            NonlinearIntegerTheoryRequest(execution.source, plan),
+        )
+        else -> null
+    }
+    if (native == null) {
         return SourceProblemRoute.NativeFormula(
             null,
             if (plan.decline == PreparedPlanDecline.RESOURCE) {
@@ -44,7 +52,7 @@ internal fun prepareFactorQuadratic(
             },
         )
     }
-    return SourceProblemRoute.NativeFormula(NativeSourceExecution.Polynomial(plan.polynomialRequest()))
+    return SourceProblemRoute.NativeFormula(native)
 }
 
 internal fun executeNativeSource(

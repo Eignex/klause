@@ -614,3 +614,9 @@ records that overlap without duplicating factor or coordinate ownership. Complet
 admission can use an enforcing arithmetic peer when finite deduction requires source
 certification. Source finite
 choices are not promoted because another relation needs arithmetic or exact coefficients.
+
+Affine source objectives over selected polynomial real completion use the exact
+quadratic execution surface with their original constant, coefficients and direction.
+Maximization whose signed-word coefficients cannot be negated losslessly selects
+exact normalization or returns a typed preparation decline. Source operation metadata
+is retained independently of that consumer choice.
