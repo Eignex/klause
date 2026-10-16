@@ -1,5 +1,9 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.formats.flatzinc.flatZincSemantics
+import com.eignex.klause.ir.BoundOverride
+import com.eignex.klause.ir.BoundsOverride
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.ConflictAnalysisStats
 import com.eignex.klause.solver.result.LpStats
@@ -18,6 +22,26 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CliModeVerdictTest {
+    @Test
+    fun `caller integer bounds should qualify output and withhold default source terminal claims`() {
+        val semantics = flatZincSemantics.resolve(
+            SemanticOverrides(undeclaredIntegers = BoundsOverride(lower = BoundOverride.Value(-20))),
+        )
+        for (verdict in listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED, Verdict.OPTIMAL)) {
+            val out = capture {
+                MiniZincOutput(sourceSemantics = semantics).apply {
+                    begin(optimize = verdict != Verdict.UNSATISFIABLE, maximize = false)
+                    onComplete(verdict)
+                }
+            }
+
+            assertTrue("unbounded-int-lo=-20 unbounded-int-hi=1000000" in out, out)
+            assertTrue("no default-source proof" in out, out)
+            assertTrue("=====UNSATISFIABLE=====" !in out && "=====UNBOUNDED=====" !in out, out)
+            assertTrue("==========" !in out, out)
+        }
+    }
+
     @Test
     fun `grid completion should not publish source refutation or unboundedness`() {
         for (verdict in listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED)) {

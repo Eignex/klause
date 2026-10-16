@@ -4,12 +4,11 @@ import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_LO
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.FunctionalObjective.Operand
@@ -61,12 +60,13 @@ fun parseFlatZincExecution(
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
     floatScale: Long = DEFAULT_FLOAT_SCALE,
     forLocalSearch: Boolean = false,
-    unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
-    unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+    unboundedIntLo: Long? = null,
+    unboundedIntHi: Long? = null,
     unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
     unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
     settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+    semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ): FlatZincExecutionProgram = parseFlatZincExecution(
     StringCharSource(source),
     floatBuckets,
@@ -78,6 +78,7 @@ fun parseFlatZincExecution(
     unboundedFloatHi,
     exactFloats,
     settings,
+    semanticOverrides,
 )
 
 /** Parse a streamed FlatZinc source and build its finite-execution metadata. */
@@ -86,12 +87,13 @@ fun parseFlatZincExecution(
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
     floatScale: Long = DEFAULT_FLOAT_SCALE,
     forLocalSearch: Boolean = false,
-    unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
-    unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+    unboundedIntLo: Long? = null,
+    unboundedIntHi: Long? = null,
     unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
     unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
     settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+    semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ): FlatZincExecutionProgram {
     var metadata: FlatZincExecutionMetadata? = null
     val program = parseFlatZincWithMetadata(
@@ -105,6 +107,7 @@ fun parseFlatZincExecution(
         unboundedFloatHi,
         exactFloats,
         settings,
+        semanticOverrides,
     ) { compiler, solve ->
         metadata = compiler.buildExecutionMetadata(solve)
     }
