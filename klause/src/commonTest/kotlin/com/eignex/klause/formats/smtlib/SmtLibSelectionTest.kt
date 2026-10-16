@@ -26,7 +26,7 @@ import kotlin.test.assertTrue
 
 class SmtLibSelectionTest {
     @Test
-    fun `affine integer conditionals retain native selection`() {
+    fun `affine integer comparisons omit unused numeric selections`() {
         val parsed = SmtLib.parse("""
             (declare-const b Bool) (declare-const x Int) (declare-const y Int)
             (assert (and (<= 0 x 2) (<= 0 y 2) (> (ite b (+ x 1) y) 1)))
@@ -35,11 +35,29 @@ class SmtLibSelectionTest {
         val sample = assertIs<SolveResult.Sat>(BacktrackSolver(parsed.model.bake())
             .solve(BacktrackParams(randomSeed = 0))).assignment
 
-        assertEquals(1, parsed.model.factors.filterIsInstance<Element>().size)
+        assertEquals(0, parsed.model.factors.filterIsInstance<Element>().size)
         val selected = if (sample.boolValue(parsed.boolVarNames.getValue("b"))) {
             sample.intValue(parsed.intVarNames.getValue("x")) + 1
         } else sample.intValue(parsed.intVarNames.getValue("y"))
         assertTrue(selected > 1)
+    }
+
+    @Test
+    fun `affine integer objectives retain native selection values`() {
+        val parsed = SmtLib.parse("""
+            (declare-const b Bool) (declare-const x Int) (declare-const y Int)
+            (assert (and (<= 0 x 2) (<= 0 y 2)))
+            (minimize (ite b (+ x 1) y))
+        """.trimIndent())
+
+        val sample = assertIs<SolveResult.Sat>(BacktrackSolver(parsed.model.bake())
+            .solve(BacktrackParams(randomSeed = 0))).assignment
+
+        val selection = parsed.model.factors.filterIsInstance<Element>().single()
+        val selected = if (sample.boolValue(parsed.boolVarNames.getValue("b"))) {
+            sample.intValue(parsed.intVarNames.getValue("x")) + 1
+        } else sample.intValue(parsed.intVarNames.getValue("y"))
+        assertEquals(selected, sample.intValue(selection.result))
     }
 
     @Test

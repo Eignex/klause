@@ -19,6 +19,8 @@ import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
 import kotlin.test.Test
@@ -165,7 +167,7 @@ class SmtLibConditionalEqualityTest {
 
         val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
         assertEquals(false, sample.boolValue(parsed.boolVarNames.getValue("b")))
-        assertTrue(sample.intValue(parsed.intVarNames.getValue("x")).toLong() > 1000000)
+        assertTrue(parseBigInt(sample.intValue(parsed.intVarNames.getValue("x"))) > bigIntOf(1000000))
     }
 
     @Test

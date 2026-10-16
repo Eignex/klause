@@ -81,8 +81,8 @@ Constant branch images of at most 1,024 distinct values can reject a comparison
 before visiting its definition tree; unknown or larger images retain exact fallback.
 Complete images also decide equality between disjoint value sets and ordering when
 every pair has the same outcome. This folds narrow bare conditional results and
-constants without branch expansion. Overlapping, open, affine and wide operands
-retain their arithmetic comparison unless another existing rule applies.
+constants without branch expansion. Unresolved image tests use the comparison's
+ordinary lowering, including guarded branch expansion where supported.
 Completed single-variable affine terms preserve these images when checked coefficient
 multiplication and constant addition fit a signed word. Overflow and multi-variable
 terms retain an unknown image. Immutable guard meanings exclude unreachable arms
