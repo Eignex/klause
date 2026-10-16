@@ -73,8 +73,14 @@ private class ExactLinearScore(
     private val coefficients = DoubleArray(row.size) { BigFraction.of(row.constants.exactCoeff(it), scale).toDouble() }
     private val bound = BigFraction.of(row.constants.exactBound, scale).toDouble()
 
-    private fun score(state: LocalSearchState, changedInt: Int = -1, integer: Long = 0L,
-                      changedReal: Int = -1, real: Double = 0.0, flippedBool: Int = -1): Int {
+    private fun score(
+        state: LocalSearchState,
+        changedInt: Int = -1,
+        integer: Long = 0L,
+        changedReal: Int = -1,
+        real: Double = 0.0,
+        flippedBool: Int = -1,
+    ): Int {
         fun intValue(id: Int): Long = if (id == changedInt) integer else state.assignment.intValue(id)
         if (indicator >= 0 && intValue(indicator) != (if (whenOne) 1L else 0L)) return 0
         if (row.variables.reals.isEmpty()) {

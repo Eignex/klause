@@ -158,7 +158,8 @@ class ExactLinearTest {
             ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.EQ, BigFraction.ONE),
         )
         val source = Problem(0, 0, emptyArray(), rows, numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
 
         val result = BacktrackSolver.source(source).solve()
 
