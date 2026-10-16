@@ -54,7 +54,9 @@ engine and limits. Fractions use integer or `numerator/denominator` strings.
 The profile retains input/runtime/build identities, original bytes, every checked
 source point, original objective value and separate native/source conclusions.
 `cases.json` can be replayed by `SourceRecordCheck` against those original bytes.
-The supplied neutral descriptor is a caller construction, not a certified MPS
+Source replay installs the Python venv package on Linux; macOS lab hosts use their
+existing `python3` venv support. Checker dependencies remain isolated in the job's
+captured environment. The supplied neutral descriptor is a caller construction, not a certified MPS
 translation. Point/reference agreement does not verify exported native certificates
 or establish accepted-set completeness. Run through the maintained lab client at
 a pushed revision with `host=auto`; retain the actual host/runtime provenance.
