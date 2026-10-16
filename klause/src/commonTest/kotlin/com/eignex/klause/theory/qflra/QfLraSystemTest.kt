@@ -32,7 +32,6 @@ import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.plus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -669,19 +668,18 @@ class QfLraSystemTest {
     @Test
     fun `oversized target endpoints should decline optional bound arithmetic`() {
         val denominator = parseBigInt("1" + "0".repeat(1300))
-        val nearOne = BigFraction.of(denominator + BIG_ONE, denominator)
+        val endpoint = BigFraction.of(BIG_ONE, denominator)
         for (upper in listOf(false, true)) {
             LpPropagator(object : LpSearchPolicy {}).use { lp ->
                 val system = LiveQfLraSystem(source(), lp)
                 assertTrue(system.install())
                 val session = SearchSession(listOf(lp))
                 session.initialize()
-                val endpoint = if (upper) nearOne + BigFraction.ofLong(4) else nearOne
                 assertTrue(lp.assertBound(0, upper, ExactLpSide(ExactLpNumber.of(endpoint)), axiom))
                 assertTrue(lp.assertBound(1, false, ExactLpSide(ExactLpNumber.of(2)), axiom))
                 val comparison = ExactComparison(
                     mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE),
-                    BigFraction.ofLong(6), LinearOp.LE, strict = false, hasReals = true,
+                    BigFraction.ofLong(2), LinearOp.LE, strict = false, hasReals = true,
                 )
 
                 val bounds = system.comparisonBounds(comparison, axiom, session, Cancellation.Never)
