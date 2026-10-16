@@ -3,8 +3,6 @@ package com.eignex.klause.cli
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
-import com.eignex.klause.ir.BoundOverride
-import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SemanticOverrides
@@ -57,12 +55,9 @@ class MpsModeTest {
             writeText("ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1\n M1 'MARKER' 'INTEND'\nENDATA")
             deleteOnExit()
         }
-        val common = CommonOptions().apply {
-            exact = true
-            semanticOverrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(
-                BoundOverride.Value(2L), BoundOverride.Value(3L),
-            ))
-        }
+        val common = CommonOptions()
+        parseArgs(arrayOf("--exact", "--unbounded-int-lo", "2", "--unbounded-int-hi", "3"),
+            commonFlagSpecs(common)) {}
         val session = MpsMode.newSession()
         val loaded = session.load(input.absolutePath, common)
         val output = session.output(common)
@@ -86,12 +81,9 @@ class MpsModeTest {
                 " M1 'MARKER' 'INTEND'\nRHS\n RHS R 1\nENDATA")
             deleteOnExit()
         }
-        val common = CommonOptions().apply {
-            exact = true
-            semanticOverrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(
-                BoundOverride.Value(2L), BoundOverride.Open,
-            ))
-        }
+        val common = CommonOptions()
+        parseArgs(arrayOf("--exact", "--unbounded-int-lo", "2", "--unbounded-int-hi", "open"),
+            commonFlagSpecs(common)) {}
         val session = MpsMode.newSession()
         val loaded = session.load(input.absolutePath, common)
 
@@ -100,6 +92,34 @@ class MpsModeTest {
         assertIs<SolvablePipeline.Refuted>(loaded.pipeline)
         assertTrue("s UNSATISFIABLE" in text.lines(), text)
         assertTrue("MPS source scope=effective declaration defaults" in text, text)
+    }
+
+    @Test
+    fun `MPS real declaration flags should retain exact rational endpoints`() {
+        val input = File.createTempFile("mps-rational-defaults", ".mps").apply {
+            writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA")
+            deleteOnExit()
+        }
+        val common = CommonOptions()
+        parseArgs(arrayOf("--exact", "--unbounded-real-lo", "1/3", "--unbounded-real-hi", "1/3"),
+            commonFlagSpecs(common)) {}
+        val session = MpsMode.newSession()
+        val loaded = session.load(input.absolutePath, common)
+        val value = BigFraction.ofLong(3).reciprocal()
+        val output = session.output(common)
+
+        val text = capture {
+            val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(1.0 / 3), listOf(value))
+            output.onExactSolution(loaded.render(point), value)
+            output.onComplete(Verdict.SATISFIABLE)
+        }
+
+        assertTrue("o 1/3" in text.lines(), text)
+        assertTrue("s SATISFIABLE" in text.lines(), text)
+        assertTrue("exact effective MPS source witness" in text, text)
+        assertFailsWith<IllegalArgumentException> {
+            loaded.render(Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.0), listOf(BigFraction.ZERO)))
+        }
     }
 
     @Test
