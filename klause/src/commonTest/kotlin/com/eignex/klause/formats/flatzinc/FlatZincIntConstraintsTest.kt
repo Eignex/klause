@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.propagation.Assumptions
@@ -15,6 +16,25 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 
 class FlatZincIntConstraintsTest {
+    @Test
+    fun `wide all different predicates should retain their global relation`() {
+        for (predicate in listOf("all_different_int", "alldifferent_except_0")) {
+            val program = parseFlatZinc(
+                """
+                var 0..3000000000: x;
+                var 0..3000000000: y;
+                var 0..3000000000: z;
+                constraint $predicate([x, y, z]);
+                solve satisfy;
+                """.trimIndent(),
+            )
+
+            val relation = assertIs<AllDifferent>(program.problem.factors.single())
+            assertEquals(3, relation.vars.size)
+            assertEquals(if (predicate == "all_different_int") emptyList() else listOf(0L), relation.exceptSet.toList())
+        }
+    }
+
     @Test
     fun `negative bounds should make nonnegative channel sums false without restricting their inputs`() {
         for (op in listOf("le", "eq")) {

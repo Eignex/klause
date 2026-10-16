@@ -35,6 +35,29 @@ the source relation.
 Generic `Problem` polynomial composition keeps its [finite integer boundary](theories/polynomial-real.md#scope-and-boundaries);
 admitted open/wide SMT powers retain their exact nonlinear source snapshots.
 
+## Distinct integer positions
+
+`AllDifferent` retains integer positions, paired optional-presence literals and
+excepted source values. Its source identity does not contain a value-window width.
+The span-taking compatibility constructor describes that same relation; the window
+hint does not restrict its source values or allocate matching storage.
+
+Finite propagation chooses sparse matching over safely enumerable live domains,
+bounds filtering over wider domains and fixed-value deductions when endpoint or
+interval-capacity arithmetic would overflow. Excepted values may repeat; optional
+positions participate only when present. Complete finite assignments retain exact
+clash checks. Local search uses sparse counts over full signed-word values. Its
+matching seed needs at most one candidate per free position from each domain;
+Hall's condition cannot distinguish a larger row. Repair sampling is bounded on
+wide domains, while swaps operate over occupied source values.
+
+Unconditional Hall and assignment cuts apply only to plain mandatory distinctness.
+Excepted and optional relations retain finite enforcement without those cuts;
+overflowing sum cuts decline. Finite globals compose with arithmetic completion
+through their finite owner and pinned source coordinates, as described by
+[theory composition](theories.md#shared-composition-contract). This path does not
+provide a standalone open-integer distinctness encoder.
+
 ## Distinct-value counts
 
 `NValue` retains its counted integer positions, target, comparison mode, optional

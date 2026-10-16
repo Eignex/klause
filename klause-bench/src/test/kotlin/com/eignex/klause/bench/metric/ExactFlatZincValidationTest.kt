@@ -8,6 +8,17 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ExactFlatZincValidationTest {
+    @ParameterizedTest
+    @CsvSource(value = ["0|0|valid", "3000000000|0|valid", "3000000000|3000000000|invalid"], delimiter = '|')
+    fun `excepted distinctness should omit only zero`(x: String, y: String, status: String) {
+        val source = "var 0..3000000000: x; var 0..3000000000: y; " +
+            "constraint alldifferent_except_0([x,y]); solve satisfy;"
+
+        val checked = ExactFlatZincValidation.inspect(source, "x = $x;\ny = $y;", null)
+
+        assertEquals(status, checked.status, checked.reason)
+    }
+
     @Test
     fun `absolute value checking should preserve holes in an integer value set`() {
         val source = "var {-2,-1,1,2}: n; var float: x; var float: y; " +

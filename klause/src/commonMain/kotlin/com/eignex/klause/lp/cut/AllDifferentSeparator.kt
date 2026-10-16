@@ -23,7 +23,7 @@ internal fun allDifferentGroups(problem: Problem): List<IntArray> {
     val groups = ArrayList<IntArray>()
     for (factor in problem.factors) {
         when (factor) {
-            is AllDifferent -> groups.add(factor.vars)
+            is AllDifferent -> if (factor.presents.isEmpty() && factor.exceptSet.isEmpty()) groups.add(factor.vars)
 
             is SymmetricAllDifferent -> groups.add(factor.xs)
 
@@ -71,7 +71,11 @@ internal class AllDifferentSeparator : CutSeparator {
             }
             if (!ok) continue
 
-            val (minSum, maxSum) = distinctSumBounds(vars, ctx.session)
+            val (minSum, maxSum) = try {
+                distinctSumBounds(vars, ctx.session)
+            } catch (_: ArithmeticException) {
+                continue
+            }
             // The Hall bounds read only the live [min, max] intervals, so the cut is global exactly
             // when those are still the declared intervals (always at the root).
             val global = liveIntervalsAreDeclared(ctx, vars)
@@ -104,7 +108,7 @@ internal class AllDifferentSeparator : CutSeparator {
         val merged = ArrayList<LongArray>() // [lo, hi]
         for ((lo, hi) in ranges) {
             val last = merged.lastOrNull()
-            if (last != null && lo <= last[1] + 1) {
+            if (last != null && (last[1] == Long.MAX_VALUE || lo <= last[1] + 1)) {
                 last[1] = maxOf(last[1], hi)
             } else {
                 merged.add(longArrayOf(lo, hi))
@@ -118,6 +122,7 @@ internal class AllDifferentSeparator : CutSeparator {
             while (v <= r[1] && taken < n) {
                 minSum = addExact(minSum, v)
                 taken++
+                if (v == r[1]) break
                 v++
             }
             if (taken == n) break
@@ -130,6 +135,7 @@ internal class AllDifferentSeparator : CutSeparator {
             while (v >= r[0] && taken < n) {
                 maxSum = addExact(maxSum, v)
                 taken++
+                if (v == r[0]) break
                 v--
             }
             if (taken == n) break

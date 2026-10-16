@@ -1707,11 +1707,11 @@ public final class com/eignex/klause/factor/circuit/Circuit : com/eignex/klause/
 public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/ir/Factor {
 	public fun <init> ([IJI[I[JZ)V
 	public synthetic fun <init> ([IJI[I[JZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> ([I[I[JZ)V
+	public synthetic fun <init> ([I[I[JZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public final fun getBoundsConsistent ()Z
-	public final fun getDomainMin ()J
-	public final fun getDomainSize ()I
 	public final fun getExceptSet ()[J
 	public fun getIntVars ()[I
 	public fun getLinearForm ()Lcom/eignex/klause/ir/LinearForm;

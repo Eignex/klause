@@ -1,16 +1,20 @@
 package com.eignex.klause.factor.global
 
+import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.factor.global.internals.countPresentOccurrences
 import com.eignex.klause.factor.global.internals.proposeRandomRotations
 import com.eignex.klause.factor.global.internals.proposeRandomSwaps
 import com.eignex.klause.factor.global.internals.reginTryAugment
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.randomValue
 import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.WIDE_DOMAIN_DRAWS
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.LongArrayList
@@ -19,8 +23,6 @@ import com.eignex.klause.util.MutableLongIntMap
 
 internal class AllDifferentInvariant(
     private val vars: IntArray,
-    private val domainMin: Long,
-    private val domainSize: Int,
     private val presents: IntArray,
     private val exceptValues: LongHashSet,
     private val occurrencesByVar: IntIntMap,
@@ -28,13 +30,6 @@ internal class AllDifferentInvariant(
 ) : Invariant {
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        for (v in vars) {
-            val d = state.rootDomains[v]
-            require(d.min >= domainMin && d.max < domainMin + domainSize) {
-                "AllDifferent var $v has domain $d outside declared union " +
-                    "[$domainMin..${domainMin + domainSize - 1}]"
-            }
-        }
         val counts = MutableLongIntMap()
         var excess = 0
         for (i in vars.indices) {
@@ -147,37 +142,32 @@ internal class AllDifferentInvariant(
             val v = vars[i]
             if (!state.assumptions.isFrozenInt(v)) continue
             val value = state.assignment.intValue(v)
-            if (value !in exceptValues) used.add(value)
+            if (value !in exceptValues && !used.add(value)) return false
         }
-        var allDistinct = true
         for (i in vars.indices) {
             if (!presentInvFn(state, i)) continue
             val v = vars[i]
             if (state.assumptions.isFrozenInt(v)) continue
             val d = state.rootDomains[v]
-            var chosen = Long.MIN_VALUE
-            d.values.forEach { cand ->
-                if (chosen == Long.MIN_VALUE && (cand in exceptValues || !used.contains(cand))) chosen = cand
+            var chosen: Long? = null
+            var candidate = d.min
+            while (true) {
+                if (candidate in exceptValues || candidate !in used) {
+                    chosen = candidate
+                    break
+                }
+                if (candidate == d.max) break
+                candidate = d.higher(candidate)
             }
-            if (chosen == Long.MIN_VALUE) {
-                allDistinct = false
-            } else {
-                state.assignment.setInt(v, chosen)
-                if (chosen !in exceptValues) used.add(chosen)
-            }
+            val value = chosen ?: return false
+            state.assignment.setInt(v, value)
+            if (value !in exceptValues) used.add(value)
         }
-        return allDistinct
+        return seededDistinct(state)
     }
 
-    /**
-     * Matching-based seed for tight domains where first-fit gives up but a feasible assignment
-     * exists. Present non-frozen vars are matched to distinct non-excepted values via the
-     * all-different augmenting-path matcher [reginTryAugment]; frozen present vars pre-occupy their
-     * value. A var the matching leaves unmatched takes any excepted value in its domain (excepted
-     * values may be shared), and the seed fails only when such a var has no excepted fallback.
-     */
     private fun seedByMatching(state: LocalSearchState): Boolean {
-        val taken = BooleanArray(domainSize)
+        val taken = LongHashSet()
         val freeVars = IntArrayList()
         for (i in vars.indices) {
             if (!presentInvFn(state, i)) continue
@@ -187,48 +177,57 @@ internal class AllDifferentInvariant(
                 continue
             }
             val value = state.assignment.intValue(v)
-            if (value in exceptValues) continue
-            val idx = value - domainMin
-            if (idx in 0L until domainSize.toLong()) {
-                val ii = idx.toInt()
-                if (taken[ii]) return false
-                taken[ii] = true
-            }
+            if (value !in exceptValues && !taken.add(value)) return false
         }
+        val values = LongArrayList()
+        val ids = MutableLongIntMap()
         val m = freeVars.size
         val valuesPerVar = Array(m) { k ->
-            val d = state.rootDomains[freeVars[k]]
             val allowed = IntArrayList()
-            d.values.forEach { cand ->
-                val idx = cand - domainMin
-                if (idx in 0L until domainSize.toLong() && cand !in exceptValues && !taken[idx.toInt()]) {
-                    allowed.add(idx.toInt())
+            val domain = state.rootDomains[freeVars[k]]
+            var candidate = domain.min
+            while (true) {
+                if (candidate !in exceptValues && candidate !in taken) {
+                    var id = ids.getOrDefault(candidate, -1)
+                    if (id < 0) {
+                        id = values.size
+                        values.add(candidate)
+                        ids.put(candidate, id)
+                    }
+                    allowed.add(id)
                 }
+                // A domain retaining m candidates cannot violate Hall for any subset of m free positions.
+                if (allowed.size == m || candidate == domain.max) break
+                candidate = domain.higher(candidate)
             }
-            IntArray(allowed.size) { allowed[it] }
+            allowed.toIntArray()
         }
         val matchVar = IntArray(m) { -1 }
-        val matchVal = IntArray(domainSize) { -1 }
-        val visited = BooleanArray(domainSize)
+        val matchVal = IntArray(values.size) { -1 }
+        val visited = BooleanArray(values.size)
         for (k in 0 until m) {
             visited.fill(false)
             reginTryAugment(k, valuesPerVar, matchVar, matchVal, visited)
         }
         for (k in 0 until m) {
             val v = freeVars[k]
-            val vid = matchVar[k]
-            if (vid >= 0) {
-                state.assignment.setInt(v, vid + domainMin)
-                continue
+            val id = matchVar[k]
+            val value = if (id >= 0) values[id] else {
+                var fallback: Long? = null
+                exceptValues.forEach { if (fallback == null && it in state.rootDomains[v]) fallback = it }
+                fallback ?: return false
             }
-            var chosen = Long.MIN_VALUE
-            state.rootDomains[v].values.forEach { cand ->
-                if (chosen == Long.MIN_VALUE && cand in exceptValues) {
-                    chosen = cand
-                }
-            }
-            if (chosen == Long.MIN_VALUE) return false
-            state.assignment.setInt(v, chosen)
+            state.assignment.setInt(v, value)
+        }
+        return seededDistinct(state)
+    }
+
+    private fun seededDistinct(state: LocalSearchState): Boolean {
+        val used = LongHashSet()
+        for (i in vars.indices) {
+            if (!presentInvFn(state, i)) continue
+            val value = state.assignment.intValue(vars[i])
+            if (value !in exceptValues && !used.add(value)) return false
         }
         return true
     }
@@ -262,7 +261,7 @@ internal class AllDifferentInvariant(
         val targets = LongArray(MAX_REPAIR_TARGETS) { Long.MIN_VALUE }
         var filled = 0
         var seenTargets = 0
-        d.values.forEach { target ->
+        d.forEachRepairValue(state) { target ->
             if (target != value && s.counts.getOrDefault(target, 0) == 0) {
                 seenTargets++
                 if (filled < MAX_REPAIR_TARGETS) {
@@ -278,19 +277,11 @@ internal class AllDifferentInvariant(
             return
         }
         var swapsAdded = 0
-        for (wLong in d.min..d.max) {
+        for (holder in vars.distinct()) {
             if (swapsAdded >= MAX_SWAP_CANDIDATES) break
-            if (wLong == value) continue
-            if (wLong !in d) continue
-            if (s.counts.getOrDefault(wLong, 0) != 1) continue
-            var holder = -1
-            for (v in vars) {
-                if (state.assignment.intValue(v) == wLong) {
-                    holder = v
-                    break
-                }
-            }
-            if (holder == -1 || holder == occupant) continue
+            val wLong = state.assignment.intValue(holder)
+            if (wLong == value || wLong !in d || s.counts.getOrDefault(wLong, 0) != 1) continue
+            if (holder == occupant) continue
             val hd = state.rootDomains[holder]
             if (value !in hd) continue
             sink.addCompound(listOf(Move.IntSet(occupant, wLong), Move.IntSet(holder, value)))
@@ -311,6 +302,16 @@ internal class AllDifferentInvariant(
     override fun proposeExtendedStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         proposeRandomRotations(state, vars, sink, MAX_STRUCTURED_SWAPS, SWAP_ATTEMPT_STRIDE) { s, idx ->
             presentInvFn(s, idx)
+        }
+    }
+
+    private inline fun IntDomain.forEachRepairValue(state: LocalSearchState, action: (Long) -> Unit) {
+        if (spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
+            values.forEach(action)
+        } else {
+            action(min)
+            action(max)
+            repeat(WIDE_DOMAIN_DRAWS) { action(randomValue(state.rng)) }
         }
     }
 

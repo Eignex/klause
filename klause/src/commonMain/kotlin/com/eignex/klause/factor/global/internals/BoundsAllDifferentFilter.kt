@@ -8,6 +8,8 @@ import com.eignex.klause.propagation.lazyReason
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.MutableLongIntMap
 
 /**
  * Bounds-consistency filtering for `all_different ::bounds`: two O(n log n) sweeps over the variable
@@ -31,6 +33,7 @@ internal fun boundsAllDifferentFilter(
 
     val lo = LongArray(n) { state.intDomains[vars[it]].min }
     val hi = LongArray(n) { state.intDomains[vars[it]].max }
+    if (!boundsRangeFits(lo, hi)) return filterFixedDistinctness(state, vars, LongHashSet(), premises)
     val newLo = lo.copyOf()
     val newHi = hi.copyOf()
 
@@ -47,6 +50,44 @@ internal fun boundsAllDifferentFilter(
         }
     }
     return null
+}
+
+internal fun filterFixedDistinctness(
+    state: PropagationState,
+    vars: IntArray,
+    exceptValues: LongHashSet,
+    premises: IntArray,
+): IntArray? {
+    val fixed = MutableLongIntMap()
+    for (variable in vars) {
+        val domain = state.intDomains[variable]
+        if (domain.min != domain.max || domain.min in exceptValues) continue
+        val previous = fixed.getOrDefault(domain.min, -1)
+        if (previous >= 0) return intArrayOf(previous, variable)
+        fixed.put(domain.min, variable)
+    }
+    for (variable in vars) {
+        val domain = state.intDomains[variable]
+        var failure: IntArray? = null
+        fixed.forEach { value, owner ->
+            if (failure == null && owner != variable && value in domain &&
+                !state.excludeIntValue(variable, value, hallReason(state, intArrayOf(owner), premises))
+            ) {
+                failure = intArrayOf(owner, variable)
+            }
+        }
+        if (failure != null) return failure
+    }
+    return null
+}
+
+private fun boundsRangeFits(lo: LongArray, hi: LongArray): Boolean {
+    val lower = lo.minOrNull() ?: return true
+    val upper = hi.maxOrNull() ?: return true
+    // Endpoint sentinels and interval capacities must fit in both sweep orientations.
+    if (lower < Long.MIN_VALUE + 3 || upper > Long.MAX_VALUE - 3) return false
+    if (lower < 0L && upper > Long.MAX_VALUE + lower) return false
+    return upper - lower <= Long.MAX_VALUE - 6
 }
 
 // The reason for [x]'s new bound, recorded for [explainBoundsHall] (via the filtering factor's explain) to build
@@ -152,6 +193,10 @@ internal fun computeBoundsAllDifferent(lo: LongArray, hi: LongArray, newLo: Long
     lo.copyInto(newLo)
     hi.copyInto(newHi)
     if (n < 2) return true
+    if (!boundsRangeFits(lo, hi)) {
+        val fixed = LongHashSet()
+        return lo.indices.none { lo[it] == hi[it] && !fixed.add(lo[it]) }
+    }
 
     if (!raiseMins(lo, hi, newLo)) return false
     val negLo = LongArray(n) { -hi[it] }

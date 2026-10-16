@@ -223,7 +223,7 @@ private fun AllDifferent.allDifferentInvariantProjection(): Invariant {
         LongHashSet(exceptSet.size).also { set -> for (value in exceptSet) set.add(value) }
     }
     return AllDifferentInvariant(
-        vars, domainMin, domainSize, presents, except, occurrences,
+        vars, presents, except, occurrences,
         { state, idx -> OptionalPresence.isPresentInAssignment(presents, idx, state) },
     )
 }
