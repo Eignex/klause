@@ -358,13 +358,24 @@ val checkJvmTaskLog = tasks.register<Exec>("checkJvmTaskLog") {
         "tools/native_vm_event_loss.py")
 }
 
+val checkJvmTaskLogCohort = tasks.register<Exec>("checkJvmTaskLogCohort") {
+    group = "verification"
+    description = "Test complete authenticated cohort log inventories and bounded compressed evidence."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_jvm_task_log_cohort.py")
+    inputs.files("tools/review_jvm_task_log_cohort.py", "tools/test_review_jvm_task_log_cohort.py",
+        "tools/review_jvm_task_log.py", "tools/review_native_vm_log_identities.py",
+        "tools/review_native_vm_live_arguments.py", "tools/native_vm_event_loss.py")
+}
+
 tasks.named("check") {
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,
         checkNativeVmLiveArgumentReview, checkNativeVmEventLoss, checkNativeVmEventLossReview,
         checkNativeVmBoundaryEntries, checkNativeVmBoundaryLifecycle, checkNativeVmBoundaryLifecycleReview,
-        checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkJvmTaskLog, checkNativeVmEntryTransfers,
+        checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkJvmTaskLog, checkJvmTaskLogCohort,
+        checkNativeVmEntryTransfers,
         checkNativeVmDebugImage, checkNativeVmDwarfProvider, checkNativeVmDwarfRecords,
         checkNativeVmDwarfRecordReview, checkNativeVmDwarfContext, checkNativeVmDwarfLayoutReview,
         checkNativeVmEntryAbi, checkNativeVmTaskCalls, checkNativeVmTaskCallFlow,
