@@ -16,6 +16,16 @@ engine receives its existing exact bound assertions; it acquires no search types
 Contradiction stops the batch at its first conflicting prefix, and a decline retains
 the previous state and witness map. Callers retain spent per-bound edit accounting.
 
+Exact-linear preparation retains templates for every source row and every original
+integer/real column. The initial numerical model installs definitions for unconditional
+rows without Boolean terms. Guarded rows, Boolean-dependent rows and source disjunctions
+materialize their definitions when asserted, through the same permanent tautological
+row path used for transient source comparisons. Bounds and their source premises
+retract with the search scope; definitions remain available to sibling scopes.
+Each append retains the existing numerical limits and construction accounting.
+Source acceptance still checks the full selected source rows and original coordinates;
+these numerical definitions supply no separate witness or proof authority.
+
 This page covers engine boundaries, exact authority and consumer integration before
 private basis mechanics. [Certification](certification.md) defines accepted proof
 packages; [dependency integration](dependencies.md) defines kernel interfaces.

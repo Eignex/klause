@@ -145,14 +145,29 @@ internal class LiveQfLraSystem(
         index to FixedSmtColumn(lower.value + column.origin.value, SearchAtomPremise.All(emptyList()))
     }.toMap()
     private val canonicalTerms = HashMap<Map<Int, BigFraction>, Map<Int, BigFraction>>()
-    private val preparedTerms = rowForms.flatten().associate { form ->
-        val comparison = form.comparison(true) { false }
-        comparison.ordered to SmtRowKeys(comparison.terms)
+    private val initialTerms = HashSet<SmtTermKey>()
+    private val preparedTerms = buildMap {
+        for ((factorIndex, forms) in rowForms.withIndex()) {
+            val factor = source.factors[factorIndex]
+            val rows = factor.linearRows
+            for ((rowIndex, form) in forms.withIndex()) {
+                val comparison = form.comparison(true) { false }
+                val keys = SmtRowKeys(comparison.terms)
+                put(comparison.ordered, keys)
+                val row = rows[rowIndex]
+                if (factor.linearForm !is LinearForm.Disjunction && row.activator == LinearRow.ALWAYS &&
+                    (0 until row.size).none { Term.isBool(row.ref(it)) }
+                ) {
+                    initialTerms += keys.positive
+                }
+            }
+        }
     }
     private val normalized = preparedTerms.values.associateTo(HashMap()) { keys ->
         keys.positive to SmtTermSlot(intern(keys.positive.expression(), declaredFixed))
     }
-    private val terms = normalized.values.map { it.term.coefficients }.filter { it.size != 1 }.distinct()
+    private val terms = normalized.filterKeys { it in initialTerms }.values
+        .map { it.term.coefficients }.filter { it.size != 1 }.distinct()
     private val definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
 
     fun install(): Boolean {
