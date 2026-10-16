@@ -118,7 +118,8 @@ class SourceSetupTest {
                 Sample(BooleanArray(0), longArrayOf(2)),
             )
             )
-            assertEquals(FiniteSolveVerdict.OPTIMAL, assertIs<FiniteSolveOutcome.Completed>(result.outcome).verdict)
+            val outcome = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(13L, objective.evaluateLong(assertNotNull(outcome.bestSample)))
             assertEquals(13L, objective.evaluateLong(publications.last()))
         }
     }

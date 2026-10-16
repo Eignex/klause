@@ -31,8 +31,11 @@ Retained hint coordinates follow these actual mapping records. Presolve keeps so
 column slots; a reconstructed column is excluded from direct definition and search
 hints, including aliases and clause-repair outputs. Mapping chains compose those
 exclusions. A custom reconstruction without a direct correspondence withholds optional
-hint projection. Native worker construction still uses the transformed factor model,
-its selected mechanisms and the original source's operation/objective binding.
+hint projection. Finite round hosts retain whether every reconstruction closure is
+fully described by its declarative rebuild steps; only those mappings retain direct
+coordinates outside the rebuilt columns. Native worker construction still uses the
+transformed factor model, its selected mechanisms and the original source's
+operation/objective binding.
 
 Objective adjustments map reduced values into source units as `scale * value + offset`,
 with positive exact rational scale. Composition multiplies scales and transports the

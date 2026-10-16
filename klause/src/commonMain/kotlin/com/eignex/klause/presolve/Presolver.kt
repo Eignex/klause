@@ -203,7 +203,11 @@ object Presolver {
     ): Presolved {
         val passes = problemPasses(problem, config, context, PresolvePass.Capability.FINITE)
         val maxRounds = config.maxRounds
-        if (passes.isEmpty() || maxRounds == 0) return Presolved(problem, { it })
+        if (passes.isEmpty() || maxRounds == 0) {
+            return Presolved(problem, { it }).also {
+                it.mapping = SourceMapping(problem, problem, TransformationGuarantees.IDENTITY)
+            }
+        }
         // A gcd-indivisible equality (`Σ cᵢ·xᵢ = b`, `gcd(cᵢ) ∤ b`) is infeasible independent of the
         // variable bounds, so refuting it here in O(factors) reports the verdict without the session ever
         // seeding its state over the model. Only the infeasible case short-circuits; a feasible
@@ -211,7 +215,9 @@ object Presolver {
         if (PresolvePass.STRENGTHEN_COEFFICIENTS in passes &&
             Presolve.strengthenCoefficients(problem, cancellation).infeasible
         ) {
-            return Presolved(problem, { it }, infeasible = true)
+            return Presolved(problem, { it }, infeasible = true).also {
+                it.mapping = SourceMapping(problem, problem, TransformationGuarantees.IDENTITY)
+            }
         }
         // Hand the round-engine cancellation to the passes so the long-running ones (affine fixpoint,
         // symmetry search) poll it internally — a presolve budget then bounds them, not just the gaps
@@ -235,6 +241,7 @@ object Presolver {
             var current = problem
             val reconstructs = ArrayList<(Sample) -> Sample>()
             val rebuilds = ArrayList<SourceRebuilds>()
+            var liftDescribedByRebuild = true
             var changed = 0L
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
@@ -243,6 +250,7 @@ object Presolver {
                 if (delta.infeasible) return PassOutcome.INFEASIBLE
                 if (delta.isEmpty) return PassOutcome.UNCHANGED
                 delta.reconstruct?.let(reconstructs::add)
+                if (delta.reconstruct != null && delta.rebuild.isEmpty) liftDescribedByRebuild = false
                 if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
                 changed += changedUnitsOf(delta, current.rootIntDomainsInPlace)
                 current = current.withPassDelta(delta, ctx.bakeConfig)
@@ -260,7 +268,9 @@ object Presolver {
         )
         val mapping = SourceMapping(
             problem, host.current, rounds.fired.transformationGuarantees(),
-            SourceRebuilds.compose(host.rebuilds), lift = composeReconstructs(host.reconstructs),
+            SourceRebuilds.compose(host.rebuilds),
+            liftDescribedByRebuild = host.liftDescribedByRebuild,
+            lift = composeReconstructs(host.reconstructs),
         )
         return Presolved(
             host.current,
@@ -306,6 +316,7 @@ object Presolver {
 
             val reconstructs = ArrayList<(Sample) -> Sample>()
             val rebuilds = ArrayList<SourceRebuilds>()
+            var liftDescribedByRebuild = true
             var changed = 0L
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
@@ -317,6 +328,7 @@ object Presolver {
                 if (delta.infeasible) return PassOutcome.INFEASIBLE
                 if (delta.isEmpty) return PassOutcome.UNCHANGED
                 delta.reconstruct?.let(reconstructs::add)
+                if (delta.reconstruct != null && delta.rebuild.isEmpty) liftDescribedByRebuild = false
                 if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
                 changed += changedUnitsOf(delta, input.rootIntDomainsInPlace)
                 session.applyDelta(delta)
@@ -365,12 +377,18 @@ object Presolver {
         val rounds = PresolveRoundEngine.run(passes, maxRounds, cancellation, ctx.presolveBudget, host, abortFraction)
 
         // No pass fired: return the input problem itself, matching the fresh path's identity on a no-op.
-        if (rounds.fired.isEmpty()) return Presolved(problem, { it }, emptyList())
+        if (rounds.fired.isEmpty()) {
+            return Presolved(problem, { it }, emptyList()).also {
+                it.mapping = SourceMapping(problem, problem, TransformationGuarantees.IDENTITY)
+            }
+        }
 
         val transformed = session.materialize()
         val mapping = SourceMapping(
             problem, transformed, rounds.fired.transformationGuarantees(),
-            SourceRebuilds.compose(host.rebuilds), lift = composeReconstructs(host.reconstructs),
+            SourceRebuilds.compose(host.rebuilds),
+            liftDescribedByRebuild = host.liftDescribedByRebuild,
+            lift = composeReconstructs(host.reconstructs),
         )
         return Presolved(
             transformed,

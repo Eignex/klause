@@ -31,10 +31,11 @@ internal class SourceMapping(
     val objectiveAdjustment: ObjectiveAdjustment = ObjectiveAdjustment(),
     chain: List<SourceMapping> = emptyList(),
     val justification: SourceTransformation? = null,
+    liftDescribedByRebuild: Boolean = false,
     lift: ((Sample) -> Sample)? = null,
 ) {
     private val reconstruct: (Sample) -> Sample = lift ?: rebuild.asSampleLift() ?: { it }
-    internal val opaqueReconstruction: Boolean = lift != null
+    internal val opaqueReconstruction: Boolean = lift != null && !liftDescribedByRebuild
     private val capturedChain = chain.toList()
     val stages: List<SourceMapping> get() = capturedChain.ifEmpty { listOf(this) }.toList()
 

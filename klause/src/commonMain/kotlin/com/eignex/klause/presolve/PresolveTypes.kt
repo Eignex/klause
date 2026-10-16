@@ -127,6 +127,7 @@ class PassDelta(
     /** Whether the pass proved infeasibility. */
     val infeasible: Boolean = false,
 ) {
+    // Nonempty steps describe the entire finite reconstruction, including every written column.
     internal var rebuild: SourceRebuilds = SourceRebuilds.NONE
 
     /** Whether the pass left factors, domains and reconstruction unchanged. */
