@@ -110,19 +110,31 @@ class SmtLibAdmissionTest {
     @Test
     fun `cancellation during nonlinear bound closure should withhold source admission`() {
         var work = 0L
+        var capturedWork: Long? = null
         val stop = object : Cancellation {
-            override fun isCancelled(): Boolean = work > 0
+            override fun isCancelled(): Boolean = capturedWork?.let { work > it } == true
             override fun workMeter(): WorkMeter = WorkMeter { work += it }
         }
 
         val input = SmtLibAdmission.parse(
-            "(declare-const n Int) (declare-const m Int) (declare-const x Real) " +
-                "(assert (and (>= m 0) (<= m 1) (= n (+ m 1)))) " +
-                "(assert (= (* (to_real n) x) 4)) (check-sat)",
+            {
+                val source = StringCharSource(
+                    "(declare-const n Int) (declare-const m Int) (declare-const x Real) " +
+                        "(assert (and (>= m 0) (<= m 1) (= n (+ m 1)))) " +
+                        "(assert (= (* (to_real n) x) 4)) (check-sat)",
+                )
+                object : CharSource, AutoCloseable {
+                    override fun next(): String? = source.next()
+                    override fun close() {
+                        capturedWork = work
+                    }
+                }
+            },
             cancellation = stop,
         )
 
         assertEquals(SmtLibInput.Interrupted, input)
+        assertTrue(work > requireNotNull(capturedWork))
     }
 
     @Test
