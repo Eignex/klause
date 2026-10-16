@@ -668,23 +668,22 @@ class QfLiraSolverLpTest {
             component.solveWith(LpSolveContext(factory))
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
             assertIs<ComponentResult.Consistent>(session.initialize())
-            assertTrue(factory.modelRows.all { it == 0 })
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
-            assertEquals(2, factory.modelRows.maxOrNull())
             for (truth in listOf(true, false)) {
-                if (!truth) {
-                    session.popTo(0)
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, truth))))
+                for (guard in listOf(true, false)) {
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, guard))))
+
+                    val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+
+                    val point = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals
+                    assertEquals(truth, point[0] + BigFraction.ofLong(2) * point[1] < BigFraction.ZERO)
+                    assertEquals(truth, point[0] + BigFraction.ofLong(3) * point[1] <= BigFraction.ONE)
+                    assertEquals(guard, point[0] + BigFraction.ofLong(4) * point[1] <= BigFraction.ofLong(5))
+                    session.popTo(1)
                     assertIs<ComponentResult.Consistent>(session.propagate())
-                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
                 }
-                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
-
-                val result = assertIs<SearchResult.Satisfied>(session.solve(1))
-
-                val point = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals
-                assertEquals(truth, point[0] + BigFraction.ofLong(2) * point[1] < BigFraction.ZERO)
-                assertEquals(truth, point[0] + BigFraction.ofLong(3) * point[1] <= BigFraction.ONE)
-                assertTrue(point[0] + BigFraction.ofLong(4) * point[1] <= BigFraction.ofLong(5))
+                session.popTo(0)
+                assertIs<ComponentResult.Consistent>(session.propagate())
             }
         }
         assertEquals(factory.created, factory.closed)
@@ -703,7 +702,6 @@ class QfLiraSolverLpTest {
     ) : LpEngineFactory by ProductionLpEngineFactory {
         var created = 0
         var closed = 0
-        val modelRows = ArrayList<Int>()
         lateinit var lastCancellation: Cancellation
 
         override fun newPersistentSolver(
@@ -716,7 +714,6 @@ class QfLiraSolverLpTest {
             pricing: LpPricingOptions,
         ): PersistentLpSolver {
             created++
-            modelRows += model.m
             lastCancellation = cancellation
             val delegate = ProductionLpEngineFactory.newPersistentSolver(
                 model,

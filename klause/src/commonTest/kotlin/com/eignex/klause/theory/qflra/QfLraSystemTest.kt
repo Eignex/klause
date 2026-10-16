@@ -539,7 +539,7 @@ class QfLraSystemTest {
     fun `a staged root equality should fix a source column before the next normalization`() {
         for (sign in listOf(-1.0, 1.0)) {
             val factors = arrayOf<Factor>(
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
                     doubleArrayOf(sign), LinearOp.EQ, 2.0 * sign),
                 ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
                     doubleArrayOf(1.0, sign), LinearOp.LE, 5.0, strict = true),
