@@ -35,6 +35,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.validation.composedFixpoint
+import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.time.ComparableTimeMark
@@ -258,7 +259,7 @@ class BacktrackSolver internal constructor(
                 sink.timedOut = true
                 SolveResult.Unknown(TerminationReason.BudgetExhausted, sink.snapshot())
             }
-        }
+        }.withSourceSemantics(problem.semantics)
     }
 
     /**
@@ -315,7 +316,7 @@ class BacktrackSolver internal constructor(
 
                 SearchOutcome.BudgetCapped -> SolveResult.Unknown(TerminationReason.BudgetExhausted)
             }
-        }
+        }.withSourceSemantics(problem.semantics)
 
     /**
      * Distinct SAT assignments via single-DFS traversal of the search tree. Complete:
@@ -328,7 +329,7 @@ class BacktrackSolver internal constructor(
      */
     override fun enumerate(params: BacktrackParams): Sequence<Sample> = sequence {
         for (outcome in enumerationOutcomes(params)) {
-            if (outcome is SearchOutcome.Found) yield(outcome.sample)
+            if (outcome is SearchOutcome.Found) yield(outcome.sample.withSourceSemantics(problem.semantics))
         }
     }
 
@@ -353,7 +354,7 @@ class BacktrackSolver internal constructor(
                         else -> ended = true
                     }
                 }
-                accepted
+                accepted?.withSourceSemantics(problem.semantics)
             },
             release = {
                 val cursor = traversal
@@ -461,11 +462,11 @@ class BacktrackSolver internal constructor(
                     when (val event = search.runUntilEvent()) {
                         is StepEvent.Incumbent -> {
                             search.releaseForSequenceYield()
-                            yield(event.result)
+                            yield(event.result.withSourceSemantics(problem.semantics))
                         }
 
                         is StepEvent.Terminal -> {
-                            yield(event.result)
+                            yield(event.result.withSourceSemantics(problem.semantics))
                             break
                         }
 

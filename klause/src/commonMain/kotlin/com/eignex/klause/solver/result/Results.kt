@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.result
 
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceResultEvidence
@@ -52,6 +53,9 @@ enum class TerminationReason {
  *    complete backends return it when they were cut off mid-search.
  */
 sealed interface SampleResult {
+    /** Effective source interpretation, or null for an unbound result. */
+    val semantics: EffectiveSourceSemantics?
+
     /** Underlying assignment if [Found], else `null`. Convenience for callers that
      *  don't care about the termination reason; prefer pattern-matching on the
      *  sealed type when the distinction matters. */
@@ -61,12 +65,16 @@ sealed interface SampleResult {
     data class Found(
         /** The feasible assignment found. */
         val sample: Sample,
+        override val semantics: EffectiveSourceSemantics? = sample.semantics,
     ) : SampleResult {
         override val assignment: Sample get() = sample
     }
 
     /** Proven infeasible. See [com.eignex.klause.solver.SolveResult.Unsat.core] for [core] semantics. */
-    data class Infeasible(val core: UnsatCore? = null) : SampleResult {
+    data class Infeasible(
+        val core: UnsatCore? = null,
+        override val semantics: EffectiveSourceSemantics? = null,
+    ) : SampleResult {
         override val assignment: Sample? = null
     }
 
@@ -74,6 +82,7 @@ sealed interface SampleResult {
     data class Unknown(
         /** Why sampling ended without a definitive answer. */
         val reason: TerminationReason,
+        override val semantics: EffectiveSourceSemantics? = null,
     ) : SampleResult {
         override val assignment: Sample? = null
     }
@@ -95,6 +104,9 @@ sealed interface SampleResult {
  *    exhausted before any feasible reached).
  */
 sealed interface MinimizeResult {
+    /** Effective source interpretation, independent of the verdict's proof authority. */
+    val semantics: EffectiveSourceSemantics?
+
     /** Underlying assignment if Optimal / BestFound, else `null`. */
     val assignment: Sample?
 
@@ -126,6 +138,7 @@ sealed interface MinimizeResult {
         override val objective: Double,
         override val stats: SolveStats = SolveStats.EMPTY,
         override val evidence: SourceResultEvidence? = null,
+        override val semantics: EffectiveSourceSemantics? = sample.semantics,
     ) : WithSample
 
     /** Best solution found before the search stopped. */
@@ -136,6 +149,7 @@ sealed interface MinimizeResult {
         val reason: TerminationReason,
         override val stats: SolveStats = SolveStats.EMPTY,
         override val evidence: SourceResultEvidence? = null,
+        override val semantics: EffectiveSourceSemantics? = sample.semantics,
     ) : WithSample
 
     /**
@@ -152,6 +166,7 @@ sealed interface MinimizeResult {
         val direction: List<BigFraction>,
         override val stats: SolveStats = SolveStats.EMPTY,
         override val evidence: SourceResultEvidence? = null,
+        override val semantics: EffectiveSourceSemantics? = sample.semantics,
     ) : WithSample
 
     /** Proven infeasible. See [com.eignex.klause.solver.SolveResult.Unsat.core] for [core] semantics. */
@@ -160,6 +175,7 @@ sealed interface MinimizeResult {
         val core: UnsatCore? = null,
         override val stats: SolveStats = SolveStats.EMPTY,
         override val evidence: SourceResultEvidence? = null,
+        override val semantics: EffectiveSourceSemantics? = null,
     ) : MinimizeResult {
         override val assignment: Sample? = null
         override val objectiveValue: Double? = null
@@ -171,6 +187,7 @@ sealed interface MinimizeResult {
         val reason: TerminationReason,
         override val stats: SolveStats = SolveStats.EMPTY,
         override val evidence: SourceResultEvidence? = null,
+        override val semantics: EffectiveSourceSemantics? = null,
     ) : MinimizeResult {
         override val assignment: Sample? = null
         override val objectiveValue: Double? = null

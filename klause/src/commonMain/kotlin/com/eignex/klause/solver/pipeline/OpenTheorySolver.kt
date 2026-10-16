@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.PreparedSource
@@ -194,6 +195,9 @@ internal fun SourceRebuilds.lift(
 
 /** The common verdict surface of the complete open-model theory routes. */
 sealed interface OpenTheoryResult {
+    /** Effective source interpretation, or null when the producer has no source binding. */
+    val semantics: EffectiveSourceSemantics?
+
     /** Statistics collected while deciding the model. */
     val stats: SolveStats
 
@@ -202,17 +206,35 @@ sealed interface OpenTheoryResult {
         /** Satisfying assignment. */
         val assignment: OpenTheoryAssignment,
         override val stats: SolveStats,
+        override val semantics: EffectiveSourceSemantics? = null,
     ) : OpenTheoryResult
 
     /** A proof that the source model is infeasible. */
-    data class Unsat(override val stats: SolveStats) : OpenTheoryResult
+    data class Unsat(
+        override val stats: SolveStats,
+        override val semantics: EffectiveSourceSemantics? = null,
+    ) : OpenTheoryResult
 
     /** An explicit budget or cancellation interrupted exact search. */
     data class Unknown(
         /** Reason exact search stopped. */
         val reason: TerminationReason,
         override val stats: SolveStats,
+        override val semantics: EffectiveSourceSemantics? = null,
     ) : OpenTheoryResult
+}
+
+internal fun OpenTheoryResult.withSourceSemantics(semantics: EffectiveSourceSemantics): OpenTheoryResult {
+    val previous = this.semantics
+    require(previous == null || previous.declared == semantics.declared && previous.effective == semantics.effective) {
+        "result belongs to a different source interpretation"
+    }
+    if (previous === semantics) return this
+    return when (this) {
+        is OpenTheoryResult.Sat -> copy(semantics = semantics)
+        is OpenTheoryResult.Unsat -> copy(semantics = semantics)
+        is OpenTheoryResult.Unknown -> copy(semantics = semantics)
+    }
 }
 
 /**

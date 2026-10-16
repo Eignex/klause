@@ -2,6 +2,7 @@ package com.eignex.klause.solver.result
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
@@ -10,6 +11,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.withSourceSemantics
 
 /**
  * Result of [satisfyUnderAssumptions]. Distinguishes a satisfying model, a hypothesis-level
@@ -22,10 +24,14 @@ import com.eignex.klause.solver.SolverParams
  * each [UnsatUnderAssumptions.core].
  */
 sealed interface SatisfyResult {
+    /** Effective source interpretation, with assumption restrictions retained separately. */
+    val semantics: EffectiveSourceSemantics?
+
     /** Satisfiable, carrying a model. */
     data class Sat(
         /** The satisfying assignment. */
         val sample: Sample,
+        override val semantics: EffectiveSourceSemantics? = sample.semantics,
     ) : SatisfyResult
 
     /** Subset of the input assumptions that's jointly infeasible against the problem's
@@ -35,6 +41,7 @@ sealed interface SatisfyResult {
     data class UnsatUnderAssumptions(
         /** The assumption subset that caused infeasibility. */
         val core: Assumptions,
+        override val semantics: EffectiveSourceSemantics? = null,
     ) : SatisfyResult
 
     /** Problem is unsat even with the assumptions dropped — the assumption layer is
@@ -43,12 +50,14 @@ sealed interface SatisfyResult {
     data class GloballyUnsat(
         /** The unsat core, when one is available. */
         val core: UnsatCore? = null,
+        override val semantics: EffectiveSourceSemantics? = null,
     ) : SatisfyResult
 
     /** Indeterminate result (e.g. timeout). */
     data class Unknown(
         /** Why the result is indeterminate. */
         val reason: TerminationReason,
+        override val semantics: EffectiveSourceSemantics? = null,
     ) : SatisfyResult
 }
 
@@ -68,6 +77,7 @@ fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
 ): SatisfyResult {
     if (this is BacktrackSolver && params is BacktrackParams) {
         return satisfyUnderAssumptionsBacktrack(this, assumptions, params, minimizeCore)
+            .withSourceSemantics(problem.semantics)
     }
     val merged = params.withAssumptions(assumptions)
     @Suppress("UNCHECKED_CAST")
@@ -87,7 +97,7 @@ fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
             }
 
         is SolveResult.Unknown -> SatisfyResult.Unknown(r.reason)
-    }
+    }.withSourceSemantics(problem.semantics)
 }
 
 /**

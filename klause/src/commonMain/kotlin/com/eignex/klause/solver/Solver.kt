@@ -12,6 +12,7 @@ import com.eignex.klause.count.SamplingConfig
 import com.eignex.klause.count.accurateSamples
 import com.eignex.klause.count.combineCounts
 import com.eignex.klause.count.countingScope
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.evidence.SourceResultEvidence
@@ -65,6 +66,9 @@ interface SolverParams {
  *    timeout, etc.).
  */
 sealed interface SolveResult {
+    /** Effective source interpretation, or null for a result not bound to a source model. */
+    val semantics: EffectiveSourceSemantics?
+
     /** Snapshot of solver-side counters for this run; [SolveStats.EMPTY] from backends that record none. */
     val stats: SolveStats
 
@@ -77,6 +81,7 @@ sealed interface SolveResult {
         val assignment: Sample,
         override val stats: SolveStats = SolveStats.EMPTY,
         override val evidence: SourceResultEvidence? = null,
+        override val semantics: EffectiveSourceSemantics? = assignment.semantics,
     ) : SolveResult
 
     /**
@@ -98,6 +103,7 @@ sealed interface SolveResult {
          */
         val assumptionCore: Assumptions? = null,
         override val evidence: SourceResultEvidence? = null,
+        override val semantics: EffectiveSourceSemantics? = null,
     ) : SolveResult
 
     /** Indeterminate (e.g. timeout or budget exhaustion). */
@@ -106,6 +112,7 @@ sealed interface SolveResult {
         val reason: TerminationReason,
         override val stats: SolveStats = SolveStats.EMPTY,
         override val evidence: SourceResultEvidence? = null,
+        override val semantics: EffectiveSourceSemantics? = null,
     ) : SolveResult
 }
 
@@ -144,11 +151,12 @@ interface Solver<P : SolverParams> {
      */
     fun sample(params: P): SampleResult {
         val s = openSamples(params).use { it.firstOrNull() }
-        return if (s != null) {
+        val result = if (s != null) {
             SampleResult.Found(s)
         } else {
             SampleResult.Unknown(TerminationReason.BudgetExhausted)
         }
+        return result.withSourceSemantics(problem.semantics)
     }
 
     /** Lazily draw diverse samples. */

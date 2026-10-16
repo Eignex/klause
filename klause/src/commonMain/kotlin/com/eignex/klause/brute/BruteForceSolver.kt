@@ -11,6 +11,7 @@ import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.kpermute.LongPermutation
 import com.eignex.kpermute.longPermutation
 import kotlin.random.Random
@@ -71,7 +72,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
         for (sample in walk(params)) {
             return SolveResult.Sat(sample)
         }
-        return SolveResult.Unsat()
+        return SolveResult.Unsat(semantics = problem.semantics)
     }
 
     /**
@@ -100,7 +101,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
             best != null -> MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted)
             exhausted -> MinimizeResult.Infeasible()
             else -> MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
-        }
+        }.withSourceSemantics(problem.semantics)
     }
 
     /** With replacement: each yield is the first satisfying assignment of a freshly-seeded
@@ -147,7 +148,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
             return sequence {
                 if (!budget.consume()) return@sequence
                 state.recompute()
-                if (state.cost == 0L) yield(state.assignment.snapshot())
+                if (state.cost == 0L) yield(state.assignment.snapshot().withSourceSemantics(problem.semantics))
             }
         }
         // Use a different sub-seed per chunk so two chunks with the same size don't walk
@@ -178,7 +179,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
         if (depth == perms.size) {
             if (!budget.consume()) return@sequence
             state.recompute()
-            if (state.cost == 0L) yield(state.assignment.snapshot())
+            if (state.cost == 0L) yield(state.assignment.snapshot().withSourceSemantics(problem.semantics))
             return@sequence
         }
         for (idx in perms[depth]) {

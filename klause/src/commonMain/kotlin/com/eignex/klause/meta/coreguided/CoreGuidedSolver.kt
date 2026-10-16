@@ -11,6 +11,7 @@ import com.eignex.klause.solver.StatelessSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.withSourceSemantics
 
 internal class CoreGuidedSolver(
     override val problem: BakedProblem,
@@ -34,5 +35,5 @@ internal class CoreGuidedSolver(
             result ?: incumbent?.let {
                 MinimizeResult.BestFound(it.sample, it.objective, TerminationReason.Cancelled, handle.stats)
             } ?: MinimizeResult.Unknown(TerminationReason.Cancelled, handle.stats)
-        }
+        }.withSourceSemantics(problem.semantics)
 }
