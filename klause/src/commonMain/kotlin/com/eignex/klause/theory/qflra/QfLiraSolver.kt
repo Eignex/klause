@@ -1127,8 +1127,10 @@ class ExactLiraSearchComponent private constructor(
             }
             return when (val result = integerDifference?.check(bools, stop)) {
                 IntegerDifferenceConflicts.Result.Interrupted -> ComponentResult.Indeterminate
-                is IntegerDifferenceConflicts.Result.Conflict -> differenceConflict(result.clause, context, stop)?.also {
-                    if (it is ComponentResult.Conflict) stop.count("PUBLISHED_CONFLICTS")
+                is IntegerDifferenceConflicts.Result.Conflict -> {
+                    val conflict = differenceConflict(result.clause, context, stop)
+                    if (conflict is ComponentResult.Conflict) stop.count("PUBLISHED_CONFLICTS")
+                    conflict
                 }
                 else -> null
             }

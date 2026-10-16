@@ -7,7 +7,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.TimeSource
 
@@ -36,7 +35,7 @@ class IntegerDifferenceAccountingTest {
         assertTrue(stop())
         assertEquals(2, polls)
         assertEquals(5L, spent)
-        assertSame(deadline, stop.deadline())
+        assertEquals(deadline, stop.deadline())
         stop.flush()
         assertEquals(5L, observed["INTEGER_DIFFERENCE_FORWARDED_CHARGE_UNITS"])
         assertEquals(5L, observed["INTEGER_DIFFERENCE_COMPLETED_CHARGE_UNITS"])

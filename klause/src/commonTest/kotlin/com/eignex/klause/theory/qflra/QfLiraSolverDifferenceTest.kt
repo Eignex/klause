@@ -71,8 +71,12 @@ class QfLiraSolverDifferenceTest {
     fun `integer subset conflicts should retain custom certification policy`() {
         val model = Problem(
             numBoolVars = 1,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(2), null, null),
-            factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)),
+            intBounds = openBounds(3),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.LE, 0),
+                ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, -1),
+            ),
         )
         ExactLiraSearchComponent(model).use { component ->
             component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false }))
