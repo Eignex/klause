@@ -66,12 +66,12 @@ private fun FlatZincCompiler.integerDefinition(c: FznConstraint, output: Int): D
         }
 
         "int_lin_eq" -> {
-            val coefficients = runCatching { evalIntConstArray(c.args[0]) }.getOrNull()
+            val coefficients = runCatching { evalIntConstArrayLong(c.args[0]) }.getOrNull()
             val inputs = definitionOperands(c.args[1])
             val bound = evalIntConstOrNull(c.args[2])
             if (coefficients == null || inputs == null || bound == null) null
             else DefinitionHint.Linear(
-                output, LongArray(coefficients.size) { coefficients[it].toLong() }, inputs, bound,
+                output, coefficients, inputs, bound,
             )
         }
 
@@ -82,8 +82,8 @@ private fun FlatZincCompiler.integerDefinition(c: FznConstraint, output: Int): D
         "array_int_element", "array_var_int_element" -> {
             val index = definitionIntId(c.args[0])
             if (index == null) null else if (c.name == "array_int_element") {
-                runCatching { evalIntConstArray(c.args[1]) }.getOrNull()?.let {
-                    DefinitionHint.Element(output, index, null, LongArray(it.size) { k -> it[k].toLong() }, 1)
+                runCatching { evalIntConstArrayLong(c.args[1]) }.getOrNull()?.let {
+                    DefinitionHint.Element(output, index, null, it, 1)
                 }
             } else {
                 runCatching { evalIntVarArray(c.args[1]) }.getOrNull()?.let {
@@ -114,8 +114,7 @@ private fun FlatZincCompiler.booleanDefinition(c: FznConstraint, output: Int): D
         val inputs: Array<Operand>
         val bound: Long
         if (c.name.startsWith("int_lin_")) {
-            val values = runCatching { evalIntConstArray(c.args[0]) }.getOrNull() ?: return null
-            coefficients = LongArray(values.size) { values[it].toLong() }
+            coefficients = runCatching { evalIntConstArrayLong(c.args[0]) }.getOrNull() ?: return null
             inputs = definitionOperands(c.args[1]) ?: return null
             bound = evalIntConstOrNull(c.args[2]) ?: return null
         } else {
