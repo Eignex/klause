@@ -305,7 +305,7 @@ internal class AllDifferentInvariant(
         }
     }
 
-    private inline fun IntDomain.forEachRepairValue(state: LocalSearchState, action: (Long) -> Unit) {
+    private fun IntDomain.forEachRepairValue(state: LocalSearchState, action: (Long) -> Unit) {
         if (spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
             values.forEach(action)
         } else {
