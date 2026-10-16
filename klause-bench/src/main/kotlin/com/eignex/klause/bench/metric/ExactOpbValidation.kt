@@ -66,7 +66,7 @@ internal object ExactOpbValidation {
     }.getOrElse {
         SourceValidation("unknown", "exact OPB checking incomplete: ${it.message.orEmpty().take(300)}",
             scope = "opb-integral")
-    }
+    }.copy(scope = "opb-integral")
 
     private fun parse(source: String): Source {
         val header = Regex("(?m)^\\s*\\*\\s*#variable=\\s*([0-9]+)").find(source)
