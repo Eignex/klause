@@ -2,7 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class SmtLibExprTest {
-    private fun parse(text: String): Problem = SmtLib.parse("$text\n(check-sat)").model.bake()
+    private fun parse(text: String): BakedProblem = SmtLib.parse("$text\n(check-sat)").model.bake()
 
     @Test
     fun `an asserted or should post a single clause over its disjuncts`() {
