@@ -351,6 +351,23 @@ install no source bounds, CP domains or search boxes. They share the existing
 coordinate, atom, term, degree, coefficient and native-work limits, and completed
 refutations receive the containing final stop check.
 
+Complete conjunctive equalities can supply private polynomial consequences in that
+same prefix. A common monomial factor is cancelled only when original source signs
+exclude zero. A variable occurring linearly in one monomial of an equality can guide
+exact rewriting of divisible monomials in other rows; no source-variable division
+or sign assumption is introduced. Small rows and low input coordinate degrees guide
+pivot selection. Private reductions retain the original per-coordinate degree bounds,
+coefficient admission and total term ceiling. Dropped rows weaken only this incomplete
+refutation pass and cannot supply a witness.
+Positive term pairs can cover a negative middle monomial when their exponent sum is
+twice its exponent and their common monomial is source-nonnegative. Equal rational
+coefficient portions form a common monomial times a binomial square. Closed sign
+enclosures retain zero; a strict positive remainder remains strict beside nonnegative
+squares. A relation disjoint from the resulting enclosure refutes the conjunction.
+Guarded premises, unknown-zero factors, nondivisible terms, growth declines and
+incomplete pairing provide no additional authority. All visits and exact operations
+share the existing native owner and final stop check; the pass exports no proof artifact.
+
 Before projection, bounded witness probing checks complete exact points and can
 repair one coordinate at a time using roots of an equality specialized at all other
 coordinates. Repaired points can guide later repairs even when the full check fails.
