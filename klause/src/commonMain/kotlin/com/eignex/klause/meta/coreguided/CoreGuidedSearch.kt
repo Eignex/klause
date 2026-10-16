@@ -33,6 +33,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.validation.composedFixpoint
 import com.eignex.klause.solver.withLifetime
+import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
@@ -258,7 +259,8 @@ internal class CoreGuidedSearch(
                         best = sample
                         bestValue = value
                         onIncumbent(
-                            MinimizeResult.BestFound(sample, value.toDouble(), TerminationReason.BudgetExhausted),
+                            MinimizeResult.BestFound(sample, value.toDouble(), TerminationReason.BudgetExhausted)
+                                .withSourceSemantics(base.semantics),
                         )
                     }
                     if (value == lowerBound) return finish(MinimizeResult.Optimal(sample, value.toDouble(), stats))
@@ -447,9 +449,10 @@ internal class CoreGuidedSearch(
     } ?: MinimizeResult.Unknown(reason, stats)
 
     private fun finish(result: MinimizeResult): MinimizeResult {
-        terminal = result
+        val qualified = result.withSourceSemantics(base.semantics)
+        terminal = qualified
         close()
-        return result
+        return qualified
     }
 
     override fun close() {

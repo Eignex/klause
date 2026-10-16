@@ -27,6 +27,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
+import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.cancelledWhen
@@ -218,8 +219,11 @@ internal class Alns(
         }
     }
 
+    override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
+        minimizeRun(objective, params).withSourceSemantics(problem.semantics)
+
     @Suppress("TooGenericExceptionCaught", "ThrowingExceptionFromFinally")
-    override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
+    private fun minimizeRun(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
         check(!activeSearch) { "an ALNS handle is active" }
         _iterationLog.clear()
         val telemetry = AlnsStatsSink()
@@ -428,7 +432,7 @@ internal class Alns(
         }
 
         fun result() = MinimizeResult.BestFound(
-            sample = bestSample,
+            sample = bestSample.withSourceSemantics(problem.semantics),
             objective = bestObj,
             reason = TerminationReason.BudgetExhausted,
             stats = SolveStats(alns = telemetry.snapshot()),
@@ -676,7 +680,7 @@ internal class Alns(
         }
 
         private fun finish(result: MinimizeResult): MinimizeResult {
-            val completed = withStats(result, stats)
+            val completed = withStats(result, stats).withSourceSemantics(problem.semantics)
             verdict = completed
             close()
             return completed

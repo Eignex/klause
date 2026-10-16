@@ -71,6 +71,11 @@ arbitrary-width coordinates through exact neighborhood completion. Windowed fall
 workers project warm starts and discard theory acceptance; their seeds cannot replace
 exact incumbents or justify bounds.
 
+Ordinary finite portfolio verdicts and incumbent callbacks retain the common source
+interpretation when every worker is bound to the same source model. An unbound or
+mixed-source low-level portfolio cannot infer that metadata for a sample-free aggregate.
+Policy metadata does not establish witness or proof authority.
+
 Portfolio evidence names its source model and objective. These are opaque in-memory
 identities: a fresh or transformed model needs its own check, even if structurally
 equivalent. Polynomial worker and neighborhood completion publications retain their actual prepared
