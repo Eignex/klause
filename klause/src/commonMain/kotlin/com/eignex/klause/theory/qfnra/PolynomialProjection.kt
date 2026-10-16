@@ -71,9 +71,10 @@ internal class PolynomialProjection private constructor(
                 require(equation in inputs) { "A required zero must belong to the input family" }
             }
             var equations = requiredZeroes
-            var pending = projectionFamily(polynomials, arithmetic)
+            var pending = canonicalFamily(polynomials, arithmetic)
             var fallback = variableCount - 1
             var sectionCount = 0
+            var ordinaryProjection = false
             for (level in variableCount - 1 downTo 0) {
                 arithmetic.step()
                 if (inconsistentEquations(equations, arithmetic)) {
@@ -91,6 +92,10 @@ internal class PolynomialProjection private constructor(
                 check(variable >= 0 && available[variable])
                 variables[level] = variable
                 available[variable] = false
+                if (section == null && !ordinaryProjection) {
+                    pending = projectionFamily(pending, arithmetic)
+                    ordinaryProjection = true
+                }
                 val top = mutableListOf<Polynomial>()
                 val lower = mutableListOf<Polynomial>()
                 for (polynomial in pending) {
@@ -113,11 +118,9 @@ internal class PolynomialProjection private constructor(
                     }
                     equations = equations.map {
                         arithmetic.step()
-                        rewritten[it] ?: if (variable in it.variables) {
-                            arithmetic.substitute(it, variable, section.replacement)
-                        } else it
+                        rewritten.getValue(it)
                     }
-                    pending = projectionFamily(projected, arithmetic)
+                    pending = canonicalFamily(projected, arithmetic)
                     sectionCount++
                     onSection()
                 } else if (level > 0) {

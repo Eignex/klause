@@ -197,6 +197,22 @@ class PolynomialProjectionTest {
     }
 
     @Test
+    fun `a vanishing product leaves no nonlinear boundary on its required zero section`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= x0 0) (= (* x0 (- (+ (* x1 x1) (* x2 x2)) 1)) 0)))",
+        )
+        val params = QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0))
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, 0, 33, params))
+
+        assertEquals(33, result.assignment.realCount)
+        assertEquals(BigFraction.ZERO, result.assignment.realValue(0).rational)
+        assertEquals(1L, result.stats.equationalSections)
+        assertEquals(0L, result.stats.projectedPolynomials)
+    }
+
+    @Test
     fun `factor boundaries preserve even multiplicity in strict inequalities`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(

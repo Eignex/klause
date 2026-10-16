@@ -624,9 +624,10 @@ invariance of the product, including zero-coordinate fibers. This selection appl
 to input and derived projection boundaries, including objective-image projection.
 The original atoms retain their coefficients, powers and relations for exact source
 checking. Required equations remain whole products; splitting a boundary never makes
-each factor a required zero. A graph substitution rewrites those whole equations even
-when their boundary representatives have been factored. Preparation uses the same
-native owner and kernel limits, with no source-variable division or nonzero premise.
+each factor a required zero. Graph substitutions rewrite whole boundary polynomials
+before factor selection begins. A product that vanishes on a required graph leaves
+no boundary from its remaining factor. Preparation uses the same native owner and
+kernel limits, with no source-variable division or nonzero premise.
 
 Without required equations, variable IDs define ascending lifting order. Complete
 query preparation also collects positive equality atoms reached through conjunctions.
