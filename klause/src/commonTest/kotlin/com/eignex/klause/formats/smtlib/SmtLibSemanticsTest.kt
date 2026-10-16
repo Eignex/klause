@@ -5,7 +5,6 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.FloatSemantics
-import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
@@ -108,19 +107,17 @@ class SmtLibSemanticsTest {
     }
 
     @Test
-    fun `nonlinear integer fallback should enforce caller declaration bounds`() {
+    fun `nonlinear integer helpers should enforce caller declaration bounds`() {
         val overrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(upper = BoundOverride.Value(0L)))
         val input = SmtLib.parse(
             "(declare-const x Int) (define-fun square ((y Int)) Int (* y y)) " +
                 "(assert (= (square x) 1)) (assert (> x 0))",
             semanticOverrides = overrides,
         )
-        val source = assertIs<NonlinearIntegerProblem>((input).source.originalSource)
-
-        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result
+        val result = BacktrackSolver.source(input.model).solve()
 
         assertIs<OpenTheoryResult.Unsat>(result)
-        assertEquals(0L, source.semantics.effective.undeclaredIntegers?.upper)
+        assertEquals(0L, input.semantics.effective.undeclaredIntegers?.upper)
     }
 
     @Test
