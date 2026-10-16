@@ -20,7 +20,10 @@ class SmtLibRealTest {
         val result = BacktrackSolver.source(source.model).solve()
 
         val point = assertIs<OpenTheoryResult.Sat>(result).assignment
-        assertEquals(BigFraction.of(BIG_ONE, parseBigInt(coefficient)), TheoryCompletion.parseRational(point.realValue(0)))
+        assertEquals(
+            BigFraction.of(BIG_ONE, parseBigInt(coefficient)),
+            TheoryCompletion.parseRational(point.realValue(0)),
+        )
         assertEquals(1, source.model.numRealVars)
         assertEquals(1, source.model.factors.filterIsInstance<ExactLinear>().size)
     }
