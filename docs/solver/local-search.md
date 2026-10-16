@@ -136,6 +136,22 @@ declared destroy draw, repair allowance and outer iteration charge remain unchan
 
 ## Source definition materialization
 
+The finite MiniZinc caller supplies its original model and neutral definition/search
+hints to `SourceSetup`. Loading does not build a sweep or functional objective.
+`PortfolioBuilder` requests the native view after composing the actual local-search
+or ALNS configurations and checking their source admission. A complete-only pool,
+including an explicit backtrack-only selection, does not request that view.
+Immutable native descriptors can be shared; each worker constructs its own invariant
+network and objective state. A declined optional definition view retains ordinary
+heuristic execution and every source constraint.
+
+Original-to-routed coordinates come from the retained source plan. Presolve's actual
+mapping then projects definition and search hints, excluding coordinates recovered by
+its reconstruction records. Opaque reconstruction withholds optional hint projection.
+A rewritten factor model selects its own descriptors and execution plan while keeping
+the original source identity and objective binding. Coordinate and metadata visits
+spend the containing construction allowance; cancellation discards the whole view.
+
 `DefinitionalSweep.fromSource` reads neutral `DefinitionHint` relations from an
 unchanged source problem and builds the native dependency graph when requested.
 It keeps integer and Boolean namespaces separate. Sparse output indexes scale with

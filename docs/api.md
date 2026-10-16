@@ -82,6 +82,25 @@ Source execution consumes `PreparedSourcePlan.capabilities` for finite admission
 binds exact optimization objectives on that same preparation. Missing source checks or
 unsupported objective coordinates decline before constructing an executor.
 
+### Source setup
+
+For explicit finite orchestration, attach a canonical `Problem` with
+`SourceAttachment(problem, definitionHints, searchHints)` and call
+`SourceSetup.prepare(SourceSetupRequest(...))`. The request's `objective` uses original
+source direction and units; `maximize` records its sense. `PreparedSourceInvocation`
+retains the actual selected route, source plan and operation admission. Its
+`finiteShape()` supplies the same captured plan to `FiniteSolveRequest` and
+`FinitePipeline.solve`; it does not select a second route. An explicit enumeration
+operation remains enumeration under a cap of one. Existing nonfinite entry points
+retain their own execution surfaces.
+
+These setup types are part of the experimental composition surface. Source arrays
+stay borrowed read-only, metadata containers are captured, and the returned shape
+retains that source lifetime. The caller still supplies the existing typed finite
+execution controls. Setup cancellation remains bound through later preparation and
+selected heuristic construction. Result and proof authority continue to come from
+the installed component contracts and checked results.
+
 ### Objective admission
 
 `Problem.pipelineRequest()` composes shared finite factors with exact continuous

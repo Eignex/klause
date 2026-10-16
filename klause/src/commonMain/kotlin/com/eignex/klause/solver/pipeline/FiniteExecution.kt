@@ -23,12 +23,15 @@ import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.SourceMapping
+import com.eignex.klause.presolve.retainedCoordinates
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -96,6 +99,19 @@ class FiniteSolveRequest(
      */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
 ) {
+    /** Source operation; a solution cap bounds enumeration without changing its identity. */
+    val operation: ExecutionOperation = shape.sourceInvocation?.operation ?: when {
+        shape.optimize -> ExecutionOperation.OPTIMIZE
+        allSolutions || (solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
+        else -> ExecutionOperation.SATISFY
+    }
+
+    init {
+        shape.sourceInvocation?.requireFiniteExecution(shape, engine, operation)
+        require(shape.sourceInvocation == null || shape.optimize || operation != ExecutionOperation.SATISFY ||
+            (!allSolutions && (solutionCap ?: 1L) <= 1L)) { "enumeration needs its captured source operation" }
+    }
+
     /** Captured frontend `key=value` parameters; empty for directly typed options. */
     val engineParams: List<String> get() = executionOptions.originalPairs.toList()
 
@@ -288,6 +304,8 @@ internal class FiniteExecutionRequest(
     val lpSolveContext: LpSolveContext,
     /** Tolerance semantics for continuous leaves; see [BacktrackParams.toleranceCheck]. */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
+    val sourceInvocation: PreparedSourceInvocation? = null,
+    val sourceMapping: SourceMapping? = null,
 )
 
 /** Streaming hooks owned by a rendering frontend. */
@@ -382,6 +400,14 @@ internal fun FinitePipeline.solve(
     require(request.engine == FiniteEngine.FIXED || lpSolveContext == LpSolveContext.Production) {
         "custom LP dependencies require the fixed finite route"
     }
+    val stop = request.shape.sourceInvocation?.let {
+        (request.cancellation or it.cancellation).encodingPreparationScope()
+    } ?: request.cancellation
+    if (request.shape.sourceInvocation != null && stop()) return FiniteSolveResult(
+        FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
+        Duration.ZERO,
+        FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
+    )
     val preparationStart = TimeSource.Monotonic.markNow()
     val preparation = prepare(
         FinitePipelineRequest(
@@ -392,9 +418,11 @@ internal fun FinitePipeline.solve(
             objective = request.shape.linearObjective,
             presolveConfig = request.presolveConfig,
             explicitPresolveConfig = request.explicitPresolveConfig,
-            solutionSetSensitive = request.solutionSetSensitive,
-            cancellation = request.presolveCancellation,
-            solveCancellation = request.cancellation,
+            solutionSetSensitive = request.solutionSetSensitive ||
+                (request.shape.sourceInvocation != null && request.operation == ExecutionOperation.ENUMERATE),
+            cancellation = if (request.shape.sourceInvocation == null) request.presolveCancellation
+                else request.presolveCancellation or stop,
+            solveCancellation = stop,
             presolveBudget = request.presolveBudget,
             zeroObjectivePricing = request.zeroObjectivePricing,
             randomSeed = request.randomSeed,
@@ -415,26 +443,40 @@ internal fun FinitePipeline.solve(
             ).toSolveOutcome().withPresolve(preparation.presolve),
         )
     }
+    val executionPlan = preparation.executionPlan ?: request.shape.preparedPlan
+    val searchHints = if (request.shape.sourceInvocation == null) request.shape.searchHints else {
+        request.shape.searchHints?.let { hints ->
+            preparation.sourceMapping?.retainedCoordinates(stop)?.let { hints.remapped(it, stop) }
+        }
+    }
+    if ((request.shape.sourceInvocation != null && stop()) || executionPlan.decline == PreparedPlanDecline.RESOURCE) {
+        return FiniteSolveResult(
+            preparation,
+            preparationElapsed,
+            FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
+        )
+    }
     val execution = execute(
         FiniteExecutionRequest(
             problem = preparation.executableProblem(),
-            preparedPlan = request.shape.preparedPlan,
+            preparedPlan = executionPlan,
             engine = request.engine,
             optimize = request.shape.optimize,
             objective = preparation.objective,
             localSearchObjective = request.shape.localSearchObjective,
             definitionalSweep = request.shape.definitionalSweep,
-            searchHints = request.shape.searchHints,
+            searchHints = searchHints,
             cores = request.cores,
             executionOptions = request.executionOptions,
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpConfig = request.lpConfig,
             zeroObjectivePricing = request.zeroObjectivePricing,
-            cancellation = request.cancellation,
+            cancellation = stop,
             nodeBudget = request.nodeBudget,
             solveBudgetMillis = request.solveBudgetMillis,
-            allSolutions = request.allSolutions,
+            allSolutions = request.allSolutions ||
+                (request.shape.sourceInvocation != null && request.operation == ExecutionOperation.ENUMERATE),
             solutionCap = request.solutionCap,
             deadlineExceeded = request.deadlineExceeded,
             onEvent = request.onEvent,
@@ -442,6 +484,8 @@ internal fun FinitePipeline.solve(
             onPortfolioFault = request.onPortfolioFault,
             lpSolveContext = lpSolveContext,
             toleranceCheck = request.toleranceCheck?.let { check -> { check(preparation.reconstruct(it)) } },
+            sourceInvocation = request.shape.sourceInvocation,
+            sourceMapping = preparation.sourceMapping,
         ),
         FiniteExecutionCallbacks(
             onSample = { sample -> callbacks.onSample(preparation.reconstruct(sample)) },
@@ -762,6 +806,10 @@ private fun executePortfolio(
         preparedPlan = request.preparedPlan,
         cancellation = request.cancellation,
         numericalCompletion = request.executionOptions.numericalCompletion,
+        sourceHints = request.sourceInvocation?.let { invocation ->
+            { strategies -> invocation.heuristicHints(request.problem, request.objective,
+                request.sourceMapping, request.cancellation, strategies, request.preparedPlan.capabilities) }
+        },
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

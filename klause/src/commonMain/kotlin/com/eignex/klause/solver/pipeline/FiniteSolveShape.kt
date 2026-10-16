@@ -31,6 +31,17 @@ class FiniteSolveShape(
         componentPlan, objective = linearObjective, maximize = maximize,
     ),
 ) {
+    private var invocation: PreparedSourceInvocation? = null
+
+    /** Canonical setup binding when this shape was selected from source metadata. */
+    val sourceInvocation: PreparedSourceInvocation? get() = invocation
+
+    internal fun bindSourceInvocation(value: PreparedSourceInvocation) {
+        require(invocation == null) { "finite shape already belongs to a source invocation" }
+        require(value.preparedPlan === preparedPlan) { "finite shape belongs to a different source plan" }
+        invocation = value
+    }
+
     /** Canonical bounded problem consumed by finite orchestration. */
     val finiteProblem: Problem get() = problem
 }

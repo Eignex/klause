@@ -67,12 +67,13 @@ internal fun FinitePipeline.portfolioExecutor(
     preparedPlan: PreparedSourcePlan,
     cancellation: Cancellation,
     numericalCompletion: Boolean,
+    sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
 ): PortfolioExecutor {
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
     val factories = PortfolioBuilder.factories(problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
-        profile, numericalCompletion).map { factory ->
+        profile, numericalCompletion, sourceHints).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
             SourceWorkerBinding(EngineInvocation(preparedPlan, identity, objective,
                 executionAssumptions = worker.executionAssumptions ?: Assumptions.None),

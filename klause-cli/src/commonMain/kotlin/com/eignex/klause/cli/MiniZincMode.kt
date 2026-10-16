@@ -5,7 +5,7 @@ import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import com.eignex.klause.formats.flatzinc.flatZincSemantics
 import com.eignex.klause.formats.flatzinc.linearObjective
-import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.toSearchHints
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.ir.EffectiveSourceSemantics
@@ -16,10 +16,16 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.PreparedPlanDecline
+import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 
 /**
  * MiniZinc / FlatZinc front-end. The default mode: MiniZinc invokes this binary via the
@@ -59,12 +65,11 @@ internal object MiniZincMode : CliMode {
             // whole source is never held as one String. Parsing only reads; the base bake runs as
             // presolve step 0, bounded by the presolve deadline.
             val overrides = common.sourceOverrides(flatZincSemantics)
-            val executionProgram = parseFlatZincExecution(
+            val program = parseFlatZinc(
                 settings = config.problemSettings(),
                 source = openFileSource(path),
                 semanticOverrides = overrides,
             )
-            val program = executionProgram.program
             val exactFloats = program.semantics.effective.floats == FloatSemantics.Continuous
             sourceSemantics = program.semantics
             floatApproximation = program.floatVarsByName.values.any { !it.lpOnly }
@@ -119,49 +124,39 @@ internal object MiniZincMode : CliMode {
                 }
             }
 
-            return when (val solve = program.solve) {
-                is SolveDirective.Satisfy -> Solvable(
-                    problem = program.problem,
-                    optimize = false,
-                    maximize = false,
-                    lsObjective = null,
-                    linearObjective = null,
-                    objVarId = null,
-                    definitionalSweep = executionProgram.definitionalSweep,
+            val objective = program.linearObjective()
+            val maximize = program.solve is SolveDirective.Maximize
+            val sourceObjective = if (maximize) objective?.negated() else objective
+            val operation = when {
+                objective != null -> ExecutionOperation.OPTIMIZE
+                common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
+                else -> ExecutionOperation.SATISFY
+            }
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SourceAttachment(program.problem, program.definitionHints, program.searchHints?.toSearchHints()),
+                operation,
+                common.resolvedEngine(),
+                objective = sourceObjective,
+                maximize = maximize,
+                cancellation = common.routingPreparationCancellation(),
+                boundCancellation = common.routingCancellation(),
+            ))
+            return when (val route = invocation.route) {
+                is SourceProblemRoute.Finite -> Solvable(
+                    finite = invocation.finiteShape(),
                     render = render,
-                    objectiveValue = null,
-                    searchHints = program.searchHints?.toSearchHints(),
+                    objectiveValue = sourceObjective?.let { linear -> { sample -> linear.evaluateLong(sample) } },
                 )
-
-                is SolveDirective.Minimize, is SolveDirective.Maximize -> {
-                    val (objName, maximize) = when (solve) {
-                        is SolveDirective.Minimize -> solve.objVar to false
-                        is SolveDirective.Maximize -> solve.objVar to true
-                    }
-                    val objVarId = program.intVarsByName[objName]
-                    val linear = requireNotNull(program.linearObjective())
-                    Solvable(
-                        problem = program.problem,
-                        optimize = true,
-                        maximize = maximize,
-                        lsObjective = executionProgram.localSearchObjective,
-                        linearObjective = linear,
-                        objVarId = objVarId,
-                        definitionalSweep = executionProgram.definitionalSweep,
-                        render = render,
-                        // The MiniZinc protocol carries the objective inside the rendered solution, so
-                        // onSolution ignores this value; the sign-corrected objective in original units
-                        // feeds arm attribution and the LS incumbent statistic, which the engine produces
-                        // in its internal minimise frame.
-                        objectiveValue = { s -> linear.evaluateLong(s).let { if (maximize) -it else it } },
-                        continuousObjectiveValue = if (linear.realCoefficients.any { it != 0.0 }) {
-                            { s -> linear.evaluate(s).let { if (maximize) -it else it } }
-                        } else {
-                            null
-                        },
-                        searchHints = program.searchHints?.toSearchHints(),
-                    )
+                SourceProblemRoute.Refuted -> refutedSolvable()
+                is SourceProblemRoute.UnsupportedOpen -> if (
+                    route.preparedPlan.decline == PreparedPlanDecline.RESOURCE
+                ) {
+                    Solvable(null, render, null, pipeline = SolvablePipeline.Interrupted(TerminationReason.Cancelled))
+                } else {
+                    throw UnsupportedFlatZincException("FlatZinc source has no finite execution route", 0, 0)
                 }
+                is SourceProblemRoute.OpenTheory, is SourceProblemRoute.PolynomialTheory ->
+                    throw UnsupportedFlatZincException("FlatZinc source requires an arithmetic execution route", 0, 0)
             }
         }
 
