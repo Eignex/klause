@@ -37,6 +37,11 @@ internal object LinearStopAttributionProfile {
         val sources = Json.decodeFromString<List<LinearStopSource>>(request.decodeToString())
         require(sources.size in 1..8)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        if (System.getenv("KLAUSE_LINEAR_STOP_CHILD") != "1") {
+            LinearStopProcess.launch(args, out)
+            return
+        }
+        require(Runtime.getRuntime().availableProcessors() == 1)
         out.resolve("request.json").writeBytes(request)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("runtime.json").writeText(buildJsonObject {
@@ -88,6 +93,8 @@ private class LinearCliAccess(private val loader: ClassLoader) {
     fun measure(source: LinearStopSource, input: File, observed: Boolean, out: File) {
         val started = System.nanoTime()
         val common = optionsType.getDeclaredConstructor().newInstance()
+        val config = loader.loadClass(prefix + "PlatformKt").getDeclaredMethod("installCliConfig").invoke(null)
+        set(common, "config", requireNotNull(config))
         set(common, "timeLimitMs", 60000L)
         set(common, "deadlineAtMs", System.currentTimeMillis() + 60000L)
         set(common, "randomSeed", source.seed)
@@ -118,7 +125,6 @@ private class LinearCliAccess(private val loader: ClassLoader) {
         val model = request?.model ?: get(pipeline, "Model") as Problem
         val prepared = request?.preparedPlan
         val execution = if (request != null) {
-            val config = get(common, "Config")
             val presolve = config.javaClass.getMethod("presolveConfig").invoke(config)
                 as com.eignex.klause.presolve.PresolveConfig
             OpenTheoryPipeline.execute(request.withPresolve(presolve, cancellation = preparation,
@@ -146,6 +152,8 @@ private class LinearCliAccess(private val loader: ClassLoader) {
             put("pipeline", pipeline.javaClass.simpleName)
             put("declaredRoute", request?.route?.name)
             put("frontendNs", frontendNs)
+            put("presolveSpent", (allowance.second as? PresolveBudget)?.spent())
+            put("presolveAllowance", (allowance.second as? PresolveBudget)?.allowance)
             put("elapsedNs", System.nanoTime() - started)
             put("result", result.javaClass.simpleName)
             put("reason", (result as? OpenTheoryResult.Unknown)?.reason?.name)
