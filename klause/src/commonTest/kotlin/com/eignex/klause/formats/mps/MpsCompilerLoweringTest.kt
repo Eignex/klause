@@ -130,7 +130,8 @@ class MpsCompilerLoweringTest {
 
         val compiled = source.toExactSourceProblem()
 
-        val row = compiled.model.factors.flatMap { it.linearRows }.single { it.size == 2 }
+        val rows = compiled.model.factors.flatMap { it.linearRows }
+        val row = rows.single { it.size == 2 }
         val constants = row.constants as IntegralConstants
         val coefficients = (0 until row.size).map {
             BigFraction.of(constants.exactCoeff(it), BIG_ONE)
@@ -143,6 +144,10 @@ class MpsCompilerLoweringTest {
             checkNotNull(bounds[0].second).fraction - checkNotNull(bounds[0].first).fraction)
         assertEquals("9999999999999999999", bounds[1].second?.fraction.toString())
         assertTrue(compiled.model.intBounds.isOpenUpper(1))
+        val wideUpper = rows.single {
+            it.size == 1 && it.ref(0) == Term.ofIntVar(1) && it.relation == LinearOp.LE
+        }
+        assertEquals("9999999999999999999", (wideUpper.constants as IntegralConstants).exactBound.toString())
     }
 
     @Test
