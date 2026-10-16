@@ -310,7 +310,8 @@ def inspect(selected, manifest, prefix, declaration=None):
                 new_rows = observations(case, metadata[name], mapped, checks, retained, cohort_complete)
                 for row in new_rows:
                     row['mappedFamilyCensus'] = row.pop('familyCensusCopiedVerbatim')
-                    row['originalFamilyCensusCopiedVerbatim'] = report.get('families', {}).get(row['family'])
+                    row['originalFamilyCensusReference'] = {'case': name, 'family': row['family'],
+                        'censusReportIdentity': retained} if row['family'] in report.get('families', {}) else None
                     row['exclusions'].extend(mapping_errors)
                     row['observedDeclaredPhaseAndSourceEligible'] = not row['exclusions']
                 mapped_rows.extend(new_rows)

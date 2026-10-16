@@ -314,7 +314,10 @@ class ReportJvmCompilationCohortTest(unittest.TestCase):
             self.assertEqual(1, result['phaseMapping']['observedComparisonSummaries'][0]['observedDeclaredPhaseAndSourceEligiblePairs'])
             row = result['phaseMapping']['familyCaseObservations'][0]
             self.assertEqual([0, 1], row['mappedFamilyCensus']['inclusiveRootEventIndices'])
-            self.assertEqual([0], row['originalFamilyCensusCopiedVerbatim']['inclusiveRootEventIndices'])
+            original = result['familyCaseObservations'][0]
+            self.assertEqual([0], original['familyCensusCopiedVerbatim']['inclusiveRootEventIndices'])
+            self.assertEqual({'case': original['case'], 'family': original['family'],
+                              'censusReportIdentity': original['censusReportIdentity']}, row['originalFamilyCensusReference'])
             self.assertEqual(10, row['observedMetrics']['reportedElapsedNanos'])
             self.assertFalse(result['phaseMapping']['fullSourcePhaseCoverageProven'])
             self.assertFalse(result['acceptedSavingsCredit'])

@@ -2293,7 +2293,9 @@ families from all saved compilation and inlining rows, including successful
 outside roots. Missing or incomplete XML stays excluded; ambiguous IDs, queued or
 unmeasured roots, OSR, failures and conflicts retain the census rules. The report
 keeps the original comparisons unchanged and adds `phaseMapping` observations,
-pairs and summaries. Plain summaries include `mappedComparisonSummaries` alongside
+pairs and summaries. Mapped rows reference the original family census by case,
+family and authenticated report identity, avoiding another copy of its root lists.
+Plain summaries include `mappedComparisonSummaries` alongside
 the original summaries. The mapping input and its hash remain captured. Recorded
 head equality establishes metadata scope only; it does not prove loaded classes,
 descriptors, synthetic ownership or exhaustive source-phase coverage.
