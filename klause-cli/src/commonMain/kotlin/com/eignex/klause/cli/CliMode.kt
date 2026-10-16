@@ -238,6 +238,10 @@ internal fun defaultEngine(): FiniteEngine = cliProp(CliKnobs.engine)
     ?.let { parseEngine(it) ?: usageError("unknown KLAUSE_ENGINE `$it`; expected ${engineIds()}") }
     ?: FiniteEngine.DEFAULT
 
+internal fun CommonOptions.resolvedEngine(): FiniteEngine = engine
+    ?.let { parseEngine(it) ?: usageError("unknown engine `$it`; expected ${engineIds()}") }
+    ?: if (freeSearch) FiniteEngine.BACKTRACK else defaultEngine()
+
 /** Translate a CLI engine token into the orchestration route it requests. */
 internal fun parseEngine(token: String): FiniteEngine? = when (token.trim().lowercase()) {
     "fixed" -> FiniteEngine.FIXED

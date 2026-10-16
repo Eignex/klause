@@ -120,7 +120,7 @@ class FinitePipelineTest {
         )
         val plan = source.prepareExecutionPlan(providers, preferFinite = true)
 
-        val prepared = FinitePipeline.prepare(
+        val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
                 source,
                 FiniteEngine.BACKTRACK,
@@ -128,10 +128,15 @@ class FinitePipelineTest {
                 explicitPresolveConfig = true,
                 preparedPlan = plan,
             ),
-        ).executableProblem()
+        )
+        val prepared = preparation.executableProblem()
 
         assertEquals(IntDomain(1, 2), prepared.rootIntDomain(0))
         assertEquals(setOf(1L, 2L), BacktrackSolver(prepared).enumerate().map { it.intValue(0) }.toSet())
+        val execution = assertNotNull(preparation.executionPlan)
+        assertSame(source, execution.originalSource)
+        assertSame(prepared, execution.model)
+        assertSame(providers, assertNotNull(execution.factorProjections).providers)
     }
 
     @Test

@@ -12,6 +12,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 @RunWith(Parameterized::class)
@@ -20,6 +22,32 @@ class MiniZincModeTest(private val direction: String) {
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun directions(): List<Array<String>> = listOf("minimize", "maximize").map { arrayOf(it) }
+    }
+
+    @Test
+    fun `finite loading should capture source definitions without materializing heuristic state`() {
+        val source = File.createTempFile("source-setup-flatzinc", ".fzn").apply {
+            writeText("var -2..2: x; var 0..2: a; var 4..8: score; " +
+                "constraint int_abs(x,a) :: defines_var(a); " +
+                "constraint int_lin_eq([2,-1],[a,score],-4) :: defines_var(score); solve $direction score;")
+        }
+        try {
+            for (engine in listOf("cp", "ls")) {
+                val common = CommonOptions().apply { this.engine = engine }
+
+                val solvable = MiniZincMode.newSession().load(source.absolutePath, common)
+                val shape = solvable.finiteShape
+                val invocation = assertNotNull(shape.sourceInvocation)
+
+                assertSame(solvable.problem, invocation.source.originalSource)
+                assertSame(shape.preparedPlan, invocation.preparedPlan)
+                assertEquals(2, invocation.source.definitionHints.size)
+                assertNull(solvable.definitionalSweep)
+                assertNull(solvable.lsObjective)
+            }
+        } finally {
+            source.delete()
+        }
     }
 
     @Test

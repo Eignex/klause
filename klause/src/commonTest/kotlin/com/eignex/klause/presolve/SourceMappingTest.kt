@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
@@ -19,15 +20,62 @@ import com.eignex.klause.util.Bits
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.shl
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SourceMappingTest {
+    @Test
+    fun `source hints should exclude every coordinate reconstructed by a mapping chain`() {
+        val source = Problem(1, 3, Array(3) { IntDomain(0, 9) }, emptyArray())
+        val middle = source.withFactors(emptyArray())
+        val target = middle.withFactors(emptyArray())
+        val first = SourceMapping(source, middle, TransformationGuarantees.IDENTITY,
+            SourceRebuilds(listOf(RebuildStep.CopyLiteral(0, 0),
+                RebuildStep.AffineValue(0, 1, intArrayOf(2), longArrayOf(1), 1))))
+        val second = SourceMapping(middle, target, TransformationGuarantees.IDENTITY,
+            SourceRebuilds(listOf(RebuildStep.QuotientValue(1, 1, intArrayOf(2), longArrayOf(1),
+                1, true, null))))
+
+        val coordinates = assertNotNull(first.then(second).retainedCoordinates())
+
+        assertNull(DefinitionHint.BooleanReference(0).remap(coordinates))
+        assertNull(DefinitionHint.IntegerReference(0).remap(coordinates))
+        assertNull(DefinitionHint.IntegerReference(1).remap(coordinates))
+        assertEquals(2, assertNotNull(DefinitionHint.IntegerReference(2).remap(coordinates)).output)
+    }
+
+    @Test
+    fun `an opaque reconstruction should not confer a direct hint correspondence`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
+        val target = source.withFactors(emptyArray())
+        val mapping = SourceMapping(source, target, TransformationGuarantees.IDENTITY, lift = { it })
+
+        assertNull(mapping.retainedCoordinates())
+    }
+
+    @Test
+    fun `retained coordinate capture should stop on its containing work allowance`() {
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 2) }, emptyArray())
+        val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY)
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 2
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+
+        val coordinates = mapping.retainedCoordinates(stop)
+
+        assertNull(coordinates)
+        assertEquals(2L, charged)
+    }
     @Test
     fun `composition should reconstruct in reverse elimination order`() {
         val source = Problem(0, 3, Array(3) { IntDomain(0, 9) }, emptyArray())

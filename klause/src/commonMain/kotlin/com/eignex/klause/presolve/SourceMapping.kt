@@ -1,10 +1,13 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceTransformation
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 
 internal class ObjectiveAdjustment(
     val scale: BigFraction = BigFraction.ONE,
@@ -28,8 +31,10 @@ internal class SourceMapping(
     val objectiveAdjustment: ObjectiveAdjustment = ObjectiveAdjustment(),
     chain: List<SourceMapping> = emptyList(),
     val justification: SourceTransformation? = null,
-    private val lift: (Sample) -> Sample = rebuild.asSampleLift() ?: { it },
+    lift: ((Sample) -> Sample)? = null,
 ) {
+    private val reconstruct: (Sample) -> Sample = lift ?: rebuild.asSampleLift() ?: { it }
+    internal val opaqueReconstruction: Boolean = lift != null
     private val capturedChain = chain.toList()
     val stages: List<SourceMapping> get() = capturedChain.ifEmpty { listOf(this) }.toList()
 
@@ -40,7 +45,7 @@ internal class SourceMapping(
         require(sample.numBoolVars == target.numBoolVars && sample.numIntVars == target.numIntVars) {
             "reconstruction needs a complete reduced assignment"
         }
-        val lifted = lift(sample)
+        val lifted = reconstruct(sample)
         return if (source === target) lifted else lifted.copy().also { it.witnessCertificate = null }
     }
 
@@ -68,6 +73,48 @@ internal class SourceMapping(
             stages + next.stages,
         ) { sample -> reconstructFrom(target, next.reconstructFrom(next.target, sample)) }
     }
+}
+
+internal fun SourceMapping.retainedCoordinates(cancellation: Cancellation = Cancellation.Never): VarRemap? {
+    if (cancellation()) return null
+    val captured = stages
+    for (stage in captured) {
+        cancellation.charge(1)
+        if (cancellation() || stage.opaqueReconstruction ||
+            stage.target.numBoolVars < stage.source.numBoolVars ||
+            stage.target.numIntVars < stage.source.numIntVars ||
+            stage.target.numRealVars != stage.source.numRealVars
+        ) return null
+    }
+    val bools = IntArray(source.numBoolVars)
+    val ints = IntArray(source.numIntVars)
+    for (id in bools.indices) {
+        cancellation.charge(1)
+        if (cancellation()) return null
+        bools[id] = id
+    }
+    for (id in ints.indices) {
+        cancellation.charge(1)
+        if (cancellation()) return null
+        ints[id] = id
+    }
+    for (stage in captured) {
+        // Presolve preserves column slots; reconstructed columns are not direct execution coordinates.
+        for (step in stage.rebuild.steps) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            when (step) {
+                is RebuildStep.CopyLiteral -> if (step.variable in bools.indices) bools[step.variable] = -1
+                is RebuildStep.SatisfyClauses -> if (step.variable in bools.indices) bools[step.variable] = -1
+                is RebuildStep.RepairClause -> Lit.variable(step.literal).let {
+                    if (it in bools.indices) bools[it] = -1
+                }
+                is RebuildStep.AffineValue -> if (step.variable in ints.indices) ints[step.variable] = -1
+                is RebuildStep.QuotientValue -> if (step.variable in ints.indices) ints[step.variable] = -1
+            }
+        }
+    }
+    return VarRemap(bools, ints)
 }
 
 internal fun List<PresolvePass>.transformationGuarantees(): TransformationGuarantees =

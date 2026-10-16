@@ -14,7 +14,9 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.FunctionalObjective
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,6 +24,23 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class DefinitionalSweepTest {
+    @Test
+    fun `objective materialization should retain its containing work allowance`() {
+        val problem = Problem(0, 5, Array(5) { IntDomain(0, 16) }, labsShapedFactors())
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(2, 3, 4)))
+        val canonical = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 0, 1))
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 8
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+
+        val objective = sweep.functionalObjective(canonical, stop)
+
+        assertNull(objective)
+        assertEquals(8L, charged)
+        assertNotNull(sweep.functionalObjective(canonical))
+    }
 
     @Test
     fun `cancelled literal scope expansion should not affect a later scope`() {

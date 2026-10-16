@@ -50,6 +50,20 @@ model's borrowed read-only lifetime. [FlatZinc](formats/flatzinc.md#source-defin
 retains these records; [native local search](solver/local-search.md#source-definition-materialization)
 materializes its private view only when requested.
 
+`solver.pipeline.SourceAttachment` retains the original `Problem` and captured source
+semantics, copies definition-hint containers and owns independent search-intent
+arrays. Its structural source and hint payloads remain borrowed read-only through
+execution. `SourceSetup.prepare` binds the operation, original objective and direction,
+finite engine choice, providers and containing preparation token. The selected finite
+shape retains that exact source plan; constructing it does not repeat routing.
+Baked sources retain their selected providers unless the request explicitly replaces them.
+
+The source plan keeps the original objective while finite engines receive its
+minimize-oriented projection. Enumeration retains its operation identity even when
+its solution cap is one. Source, operation and engine mismatches reject before finite
+preparation. An observed setup stop remains effective when execution supplies another
+token. Mutable search state belongs to the existing worker or executor lifetime.
+
 ## Distinct integer positions
 
 `AllDifferent` retains integer positions, paired optional-presence literals and

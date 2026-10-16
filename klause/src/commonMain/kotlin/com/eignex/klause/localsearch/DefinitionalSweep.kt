@@ -270,14 +270,32 @@ class DefinitionalSweep internal constructor(
     }
 
     /** Build a gradient view of a finite canonical objective using this consumer's definitions. */
-    fun functionalObjective(objective: LinearObjective): IncrementalObjective? {
-        if (objective.realCoefficientValues.any { it != 0.0 }) return null
-        val integers = objective.intCoefficientValues.indices.filter { objective.intCoefficientValues[it] != 0L }
-        val booleans = objective.boolWeightValues.indices.filter { objective.boolWeightValues[it] != 0L }
+    fun functionalObjective(objective: LinearObjective): IncrementalObjective? =
+        functionalObjective(objective, Cancellation.Never)
+
+    internal fun functionalObjective(objective: LinearObjective, cancellation: Cancellation): IncrementalObjective? {
+        if (cancellation()) return null
+        for (coefficient in objective.realCoefficientValues) {
+            cancellation.charge(1)
+            if (cancellation() || coefficient != 0.0) return null
+        }
+        val integers = ArrayList<Int>()
+        val booleans = ArrayList<Int>()
+        for (id in objective.intCoefficientValues.indices) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            if (objective.intCoefficientValues[id] != 0L) integers += id
+        }
+        for (id in objective.boolWeightValues.indices) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            if (objective.boolWeightValues[id] != 0L) booleans += id
+        }
         return functionalObjective(
             integers.toIntArray(), LongArray(integers.size) { objective.intCoefficientValues[integers[it]] },
             objective.constant, true, booleans.toIntArray(),
             LongArray(booleans.size) { objective.boolWeightValues[booleans[it]] },
+            cancellation,
         )
     }
 
@@ -294,23 +312,57 @@ class DefinitionalSweep internal constructor(
         minimize: Boolean,
         boolTerms: IntArray = EmptyIntArray,
         boolTermCoeffs: LongArray = EmptyLongArray,
+    ): IncrementalObjective? = functionalObjective(
+        terms, termCoeffs, constant, minimize, boolTerms, boolTermCoeffs, Cancellation.Never,
+    )
+
+    private fun functionalObjective(
+        terms: IntArray,
+        termCoeffs: LongArray,
+        constant: Long,
+        minimize: Boolean,
+        boolTerms: IntArray,
+        boolTermCoeffs: LongArray,
+        cancellation: Cancellation,
     ): IncrementalObjective? {
+        if (cancellation()) return null
         val intDefinitions = MutableIntObjectMap<SweepNode>()
         val boolDefinitions = MutableIntObjectMap<SweepNode>()
         for (node in nodes) {
+            cancellation.charge(1)
+            if (cancellation()) return null
             (if (node.outIsBool) boolDefinitions else intDefinitions).put(node.out, node)
         }
-        if (terms.none { intDefinitions.containsKey(it) } && boolTerms.none { boolDefinitions.containsKey(it) }) {
-            return null
+        var defined = false
+        for (term in terms) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            if (intDefinitions.containsKey(term)) defined = true
         }
+        for (term in boolTerms) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            if (boolDefinitions.containsKey(term)) defined = true
+        }
+        if (!defined) return null
         val reachableInts = IntHashSet()
         val reachableBools = IntHashSet()
         val leaves = LinkedHashSet<Int>()
         val boolLeaves = LinkedHashSet<Int>()
         val work = ArrayDeque<Pair<Int, Boolean>>()
-        for (term in terms) work.addLast(term to false)
-        for (term in boolTerms) work.addLast(term to true)
+        for (term in terms) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            work.addLast(term to false)
+        }
+        for (term in boolTerms) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            work.addLast(term to true)
+        }
         while (work.isNotEmpty()) {
+            cancellation.charge(1)
+            if (cancellation()) return null
             val (id, isBool) = work.removeLast()
             val definition = (if (isBool) boolDefinitions else intDefinitions)[id]
             if (definition == null) continue
@@ -319,11 +371,21 @@ class DefinitionalSweep internal constructor(
                 definition !is LiteralIntDefinition && definition !is UnaryPredicateDefinition &&
                 definition !is CapturedBooleanDefinition
             ) return null
-            for (input in definition.intInputs) work.addLast(input to false)
-            for (input in definition.boolInputs) work.addLast(input to true)
+            for (input in definition.intInputs) {
+                cancellation.charge(1)
+                if (cancellation()) return null
+                work.addLast(input to false)
+            }
+            for (input in definition.boolInputs) {
+                cancellation.charge(1)
+                if (cancellation()) return null
+                work.addLast(input to true)
+            }
         }
         val cone = ArrayList<FunctionalObjective.Definition>()
         for (node in nodes) {
+            cancellation.charge(1)
+            if (cancellation()) return null
             if (node.out !in (if (node.outIsBool) reachableBools else reachableInts)) continue
             val compute: ((Int) -> Long, (Int) -> Boolean) -> Long = when (node) {
                 is SweepNode.IntDef -> { intOf, _ -> node.node.compute(intOf) }
@@ -341,15 +403,32 @@ class DefinitionalSweep internal constructor(
                 else -> return null
             }
             cone.add(FunctionalObjective.Definition(node.out, node.outIsBool, compute))
-            for (input in node.intInputs) if (input !in reachableInts) leaves.add(input)
-            for (input in node.boolInputs) if (input !in reachableBools) boolLeaves.add(input)
+            for (input in node.intInputs) {
+                cancellation.charge(1)
+                if (cancellation()) return null
+                if (input !in reachableInts) leaves.add(input)
+            }
+            for (input in node.boolInputs) {
+                cancellation.charge(1)
+                if (cancellation()) return null
+                if (input !in reachableBools) boolLeaves.add(input)
+            }
         }
-        for (term in terms) if (term !in reachableInts) leaves.add(term)
-        for (term in boolTerms) if (term !in reachableBools) boolLeaves.add(term)
-        return FunctionalObjective(
+        for (term in terms) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            if (term !in reachableInts) leaves.add(term)
+        }
+        for (term in boolTerms) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            if (term !in reachableBools) boolLeaves.add(term)
+        }
+        val result = FunctionalObjective(
             terms, termCoeffs, constant, minimize, emptyList(), leaves.toIntArray(),
             boolTerms, boolTermCoeffs, emptyList(), boolLeaves.toIntArray(), cone,
         )
+        return if (cancellation()) null else result
     }
 
     /** One evaluable definition `out = f(inputs)` with its read-set exposed for cone indexing. */

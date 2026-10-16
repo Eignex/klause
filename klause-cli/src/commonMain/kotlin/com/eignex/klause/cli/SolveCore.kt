@@ -66,9 +66,7 @@ internal object SolveCore {
         val publication = ArithmeticPublication(output)
         // Engine resolution: explicit `-e` wins, then `-f` (free) ≡ `-e cp`, else the configured
         // default ([defaultEngine] — the built-in [FiniteEngine.DEFAULT] or a packaged image's env override).
-        val engine = common.engine
-            ?.let { parseEngine(it) ?: usageError("unknown engine `$it`; expected ${engineIds()}") }
-            ?: if (common.freeSearch) FiniteEngine.BACKTRACK else defaultEngine()
+        val engine = common.resolvedEngine()
         // Presolve once, before any worker is built, so every engine and portfolio worker shares
         // the one transformed problem. The pipeline drops solution-set-altering passes (symmetry
         // breaking, value precedence) for a pure-LS engine unless `--presolve` is explicit;

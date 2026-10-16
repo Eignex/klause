@@ -17,6 +17,8 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionStrategy
+import com.eignex.klause.solver.pipeline.PreparedSourceHints
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
@@ -84,14 +86,23 @@ object PortfolioBuilder {
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         profile: ProblemProfile,
         numericalCompletion: Boolean,
+        sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
     ): List<FinitePortfolioFactory> {
         val plan = PortfolioComposition.plan(scenario, ProblemFacts.of(problem, profile, scenario.lpCeiling, objective))
         val residuals = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
         val configs = if (scenario.reportLsPhaseTimes) residuals.map { it.withLsPhaseTimes() } else residuals
+        val strategies = configs.mapNotNull { config -> when (config) {
+            is LocalSearchWorkerConfig -> ExecutionStrategy.LOCAL_SEARCH
+            is AlnsWorkerConfig -> ExecutionStrategy.ALNS
+            is BacktrackWorkerConfig, is CoreGuidedWorkerConfig -> null
+        } }.toSet()
+        val views = if (strategies.isEmpty()) null else sourceHints?.invoke(strategies)
+        val selectedSweep = views?.sweep ?: definitionalSweep
+        val selectedObjective = views?.objective ?: lsObjective
         val count = maxOf(configs.size, scenario.cores)
         val deferCore = scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&
             scenario.btPool == null && configs.any { it is BacktrackWorkerConfig }
-        val pools = poolsFor(scenario, problem, definitionalSweep, objective,
+        val pools = poolsFor(scenario, problem, selectedSweep, objective,
             clausePeers = (0 until count).count { configs[it % configs.size] is BacktrackWorkerConfig } > 1)
         return configs.mapIndexed { armId, config ->
             val family = when (config) {
@@ -110,8 +121,8 @@ object PortfolioBuilder {
                 } else admitted
                 val bounded = budget?.let(completion::withNodeBudget) ?: completion
                 bounded.materialize(
-                    problem, index, armId, seed, scenario.lsLambda, objective, lsObjective,
-                    definitionalSweep, onEvent, pools,
+                    problem, index, armId, seed, scenario.lsLambda, objective, selectedObjective,
+                    selectedSweep, onEvent, pools,
                 ).bindEvidence(ModelIdentity.of(problem, objective)).also {
                     it.improvementOnly = armId >= plan.firstSolutionCount ||
                         (config is CoreGuidedWorkerConfig && deferCore)

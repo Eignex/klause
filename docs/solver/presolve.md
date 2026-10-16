@@ -27,6 +27,13 @@ composed reconstruction to the actual source and reduced model objects. Composit
 requires the preceding target to be the following source. Equal variable counts and
 factor counts do not establish this association.
 
+Retained hint coordinates follow these actual mapping records. Presolve keeps source
+column slots; a reconstructed column is excluded from direct definition and search
+hints, including aliases and clause-repair outputs. Mapping chains compose those
+exclusions. A custom reconstruction without a direct correspondence withholds optional
+hint projection. Native worker construction still uses the transformed factor model,
+its selected mechanisms and the original source's operation/objective binding.
+
 Objective adjustments map reduced values into source units as `scale * value + offset`,
 with positive exact rational scale. Composition multiplies scales and transports the
 later offset through the earlier scale. Current reductions protect objective columns and

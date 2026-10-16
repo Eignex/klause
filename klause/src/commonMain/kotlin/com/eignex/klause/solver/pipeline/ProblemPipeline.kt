@@ -168,6 +168,16 @@ fun Problem.pipelineRoute(
 
 internal fun Problem.pipelineRoute(
     projections: PreparedFactorProjections,
+    objective: LinearObjective?,
+    maximize: Boolean,
+    boundCancellation: Cancellation,
+    preparationCancellation: Cancellation,
+): SourceProblemRoute = pipelineRouteObserved(objective, maximize, false, boundCancellation, null, false,
+    projections.providers, projections, polynomialCancellation = preparationCancellation,
+    preparationCancellation = preparationCancellation)
+
+internal fun Problem.pipelineRoute(
+    projections: PreparedFactorProjections,
     routePureRealToTheory: Boolean,
     boundCancellation: Cancellation,
     polynomialCancellation: Cancellation = boundCancellation,

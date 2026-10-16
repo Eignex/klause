@@ -6,6 +6,7 @@ import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
+import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.FactorProjectionProviders
@@ -84,6 +85,9 @@ class FinitePipelinePreparation(
     /** Time spent baking the source problem before this preparation began. */
     val constructionBakeElapsed: Duration = Duration.ZERO,
 ) {
+    internal var sourceMapping: SourceMapping? = null
+    internal var executionPlan: PreparedSourcePlan? = null
+
     internal fun executableProblem(): BakedProblem = requireNotNull(problem as? BakedProblem) {
         "a nonterminal finite preparation must produce a BakedProblem"
     }
@@ -119,14 +123,28 @@ object FinitePipeline {
         )
         // A source rewrite moves factor ownership with the factors, so the routing plan does not index the
         // model the engine is built from; an untouched model keeps the plan routing already built.
-        val plan = if (prepared.changed) {
-            requireNotNull(prepared.problem.prepareExecutionPlan(
-                request.preparedPlan.factorProjections?.providers ?: FactorProjectionProviders.Default,
-                prepared.objective, preferFinite = true,
-            ).componentPlan)
+        val sourcePlan = if (prepared.changed) {
+            prepared.problem.prepareExecutionPlan(
+                original = requireNotNull(request.preparedPlan.originalSource as? Problem),
+                objective = request.preparedPlan.objective,
+                maximize = request.preparedPlan.maximize,
+                preferFinite = true,
+                providers = request.preparedPlan.factorProjections?.providers ?: FactorProjectionProviders.Default,
+                cancellation = request.solveCancellation,
+            )
         } else {
-            request.componentPlan
+            request.preparedPlan
         }
+        if (sourcePlan.decline == PreparedPlanDecline.RESOURCE) return FinitePipelinePreparation(
+            prepared.problem,
+            prepared.objective ?: request.objective,
+            { prepared.mapping.reconstructFrom(prepared.problem, it) },
+            prepared.stats,
+        ).also {
+            it.sourceMapping = prepared.mapping
+            it.executionPlan = sourcePlan
+        }
+        val plan = requireNotNull(sourcePlan.componentPlan)
         plan.requireFullFiniteProjection(prepared.problem)
         val objective = prepared.objective ?: request.objective
         val outcome = PresolvePipeline.run(
@@ -137,7 +155,7 @@ object FinitePipeline {
             request.cancellation,
             request.zeroObjectivePricing,
             request.randomSeed,
-            request.preparedPlan.factorProjections,
+            plan.factorProjections,
         )
         val finiteModel = if (outcome.stats.infeasible) {
             outcome.problem
@@ -148,12 +166,32 @@ object FinitePipeline {
             if (projections == null) model.bake(request.solveCancellation)
             else model.bake(projections, request.solveCancellation)
         }
+        val sameCoordinatesAndFactors = finiteModel.numBoolVars == request.problem.numBoolVars &&
+            finiteModel.numIntVars == request.problem.numIntVars &&
+            finiteModel.numRealVars == request.problem.numRealVars &&
+            finiteModel.numFactors == request.problem.numFactors &&
+            finiteModel.factors.indices.all { finiteModel.factors[it] === request.problem.factors[it] }
+        val executionPlan = if (outcome.stats.infeasible || sameCoordinatesAndFactors) request.preparedPlan else {
+            val model = requireNotNull(finiteModel as? BakedProblem)
+            model.prepareExecutionPlan(
+                original = requireNotNull(request.preparedPlan.originalSource as? Problem),
+                objective = request.preparedPlan.objective,
+                maximize = request.preparedPlan.maximize,
+                preferFinite = true,
+                providers = model.factorProjections.providers,
+                projections = model.factorProjections,
+                cancellation = request.solveCancellation,
+            )
+        }
         return FinitePipelinePreparation(
             problem = finiteModel,
             objective = outcome.objective ?: objective,
             reconstruct = outcome.reconstruct,
             presolve = outcome.stats.takeIf { outcome.changed || it.infeasible || it.lpStats.hasActivity() },
             constructionBakeElapsed = (request.problem as? BakedProblem)?.bakeElapsed ?: Duration.ZERO,
-        )
+        ).also {
+            it.sourceMapping = outcome.mapping
+            it.executionPlan = executionPlan
+        }
     }
 }

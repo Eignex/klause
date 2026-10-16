@@ -13,6 +13,8 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 internal class SelectedEncoderRequest private constructor(
     val selection: PreparedFactorProjections,
@@ -110,12 +112,14 @@ private fun PreparedFactorProjections.acceptsIntegerCondition(id: SourceIntId, v
 internal fun Cancellation.encodingPreparationScope(): Cancellation =
     if (this is EncodingPreparationCancellation) this else EncodingPreparationCancellation(this)
 
+@OptIn(ExperimentalAtomicApi::class)
 private class EncodingPreparationCancellation(private val parent: Cancellation) : Cancellation {
-    private var stopped = false
+    private val stopped = AtomicBoolean(false)
 
     override fun isCancelled(): Boolean {
-        if (!stopped) stopped = parent()
-        return stopped
+        if (stopped.load()) return true
+        if (parent()) stopped.store(true)
+        return stopped.load()
     }
 
     override fun deadline() = parent.deadline()
