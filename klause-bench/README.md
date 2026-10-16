@@ -2172,7 +2172,9 @@ preparation and containing poll's stack, without extra delegate polls or charges
 These tokens have distinct scopes: a routing/preparation stop can leave the containing
 solve active. A private numerical decline does not establish either stop.
 Results retain the route, final reason, native counters and all captured stacks;
-missing observations remain absent. Observer stack capture adds elapsed overhead.
+missing observations remain absent. Each captured stop records its stack-collection
+nanoseconds separately from run time; delegation and JVM warmup overhead remain outside
+that measurement.
 Optional `bounded=true` runs plain/observed/observed/plain controls with eight
 complete decisions or four heuristic proposals and 10,000 heuristic instructions,
 using the complete or heuristic engine alone. These explicit diagnostic controls

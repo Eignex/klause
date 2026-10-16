@@ -245,7 +245,11 @@ private class LinearCliAccess(private val loader: ClassLoader) {
 }
 
 @Serializable
-internal data class LinearStopObservation(val capturedNs: Long, val stack: List<String>)
+internal data class LinearStopObservation(
+    val capturedNs: Long,
+    val captureElapsedNs: Long,
+    val stack: List<String>,
+)
 
 internal class LinearObservedStop(private val delegate: Cancellation, private val observed: Boolean) : Cancellation {
     var observation: LinearStopObservation? = null
@@ -254,11 +258,9 @@ internal class LinearObservedStop(private val delegate: Cancellation, private va
     override fun isCancelled(): Boolean {
         val cancelled = delegate.isCancelled()
         if (cancelled && observed && observation == null) {
-            observation = LinearStopObservation(
-                System.nanoTime(),
-                Thread.currentThread().stackTrace
-                .take(96).map { it.toString() }
-            )
+            val started = System.nanoTime()
+            val stack = Thread.currentThread().stackTrace.take(96).map { it.toString() }
+            observation = LinearStopObservation(started, System.nanoTime() - started, stack)
         }
         return cancelled
     }
