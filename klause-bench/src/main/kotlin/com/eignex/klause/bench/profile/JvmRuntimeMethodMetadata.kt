@@ -33,9 +33,14 @@ internal object JvmRuntimeMethodMetadata {
             require('=' in it)
             it.substringBefore('=') to it.substringAfter('=')
         }
-        require(args.size == options.size && options.keys == setOf(
-            "manifest", "manifest-sha256", "archive", "archive-sha256",
-        ))
+        require(
+            args.size == options.size && options.keys == setOf(
+            "manifest",
+            "manifest-sha256",
+            "archive",
+            "archive-sha256",
+        )
+        )
         for (name in listOf("manifest-sha256", "archive-sha256")) {
             require(options.getValue(name).matches(Regex("[0-9a-f]{64}")))
         }
@@ -43,7 +48,9 @@ internal object JvmRuntimeMethodMetadata {
             val out = File(requireNotNull(System.getenv("OUT"))).canonicalFile.apply { mkdirs() }
             val execution = runCatching { inspect(options, out) }
             val completion = runCatching {
-                Reports.writeJson(File(out, "completion.json").path, buildJsonObject {
+                Reports.writeJson(
+                    File(out, "completion.json").path,
+                    buildJsonObject {
                     put("completed", execution.isSuccess)
                     put("error", execution.exceptionOrNull()?.let { "${it.javaClass.name}: ${it.message}" })
                     put("runtimeArchiveSha256", options.getValue("archive-sha256"))
@@ -51,7 +58,8 @@ internal object JvmRuntimeMethodMetadata {
                     put("runtimeGeneratedClassesBound", false)
                     put("fullSourcePhaseCoverageProven", false)
                     put("acceptedSavingsCredit", false)
-                })
+                }
+                )
             }
             execution.exceptionOrNull()?.let { original ->
                 completion.exceptionOrNull()?.let(original::addSuppressed)
@@ -69,8 +77,11 @@ internal object JvmRuntimeMethodMetadata {
         val helper = File(root, "klause-bench/tools/jvm_runtime_archive.py")
         helper.copyTo(File(out, helper.name))
         val runtime = File(System.getProperty("java.home"))
-        InstalledBuild.writeManifest(File(out, "observer-build-provenance.json"),
-            File(requireNotNull(System.getenv("KLAUSE_BENCH"))), runtime)
+        InstalledBuild.writeManifest(
+            File(out, "observer-build-provenance.json"),
+            File(requireNotNull(System.getenv("KLAUSE_BENCH"))),
+            runtime,
+        )
         val manifest = File(out, "captured-original-manifest.json")
         download(options.getValue("manifest"), manifest, MAX_MANIFEST_BYTES, options.getValue("manifest-sha256"))
         val original = Reports.json.parseToJsonElement(manifest.readText()).jsonObject
@@ -80,8 +91,15 @@ internal object JvmRuntimeMethodMetadata {
         val archive = File(privateInputs, "runtime.tar.gz")
         download(options.getValue("archive"), archive, MAX_ARCHIVE_BYTES, options.getValue("archive-sha256"))
         val home = File(privateInputs, "runtime")
-        val command = listOf("python3", helper.path, manifest.path, archive.path,
-            options.getValue("archive-sha256"), home.path, File(out, "runtime-preparation.json").path)
+        val command = listOf(
+            "python3",
+            helper.path,
+            manifest.path,
+            archive.path,
+            options.getValue("archive-sha256"),
+            home.path,
+            File(out, "runtime-preparation.json").path,
+        )
         val process = ProcessBuilder(command).directory(root)
             .redirectOutput(File(out, "runtime-preparation.stdout"))
             .redirectError(File(out, "runtime-preparation.stderr")).start()
@@ -110,13 +128,16 @@ internal object JvmRuntimeMethodMetadata {
         var errors = 0
         var reportBytes = 0L
         withJvmRuntimeImage(home.toPath()) { image ->
-            Reports.writeJson(File(out, "image-provider.json").path, buildJsonObject {
+            Reports.writeJson(
+                File(out, "image-provider.json").path,
+                buildJsonObject {
                 put("providerClass", image.provider().javaClass.name)
                 put("providerLoaderClass", image.provider().javaClass.classLoader.javaClass.name)
                 put("observerNativeByteOrder", ByteOrder.nativeOrder().toString())
                 put("separateProviderAndImageReaderLoaderVerified", true)
                 put("scope", "Pinned provider helpers run in the observer; image class inspection parses bytes.")
-            })
+            }
+            )
             val modules = image.getPath("/modules")
             require(Files.isDirectory(modules))
             val declaredModules = File(home, "release").readLines().single { it.startsWith("MODULES=") }
@@ -152,9 +173,12 @@ internal object JvmRuntimeMethodMetadata {
                             put("entry", relative.subpath(1, relative.nameCount).toString())
                             put("entryIndex", classes - 1)
                             put("classSha256", sha256(bytes))
-                            put("metadata", parsed.getOrNull()?.let {
+                            put(
+                                "metadata",
+                                parsed.getOrNull()?.let {
                                 compactJson.encodeToJsonElement(JvmClassMetadata.serializer(), it)
-                            } ?: JsonNull)
+                            } ?: JsonNull
+                            )
                             put("error", parsed.exceptionOrNull()?.let { "${it.javaClass.name}: ${it.message}" })
                         }
                         val line = (compactJson.encodeToString(row) + "\n").encodeToByteArray()
@@ -166,22 +190,27 @@ internal object JvmRuntimeMethodMetadata {
             }
         }
         require(classes > 0)
-        Reports.writeJson(File(out, "inventory.json").path, buildJsonObject {
+        Reports.writeJson(
+            File(out, "inventory.json").path,
+            buildJsonObject {
             put("classes", classes)
             put("resources", resources)
             put("classErrors", errors)
             put("allModuleClassEntriesVisited", true)
             put("allDeclaredClassMetadataComplete", errors == 0)
             put("scope", "All /modules classes, excluding package aliases. Loaded selection and costs unproved.")
-        })
+        }
+        )
         check(errors == 0) { "Runtime class metadata errors remain in the complete inventory" }
     }
 
     private fun download(address: String, output: File, maximum: Long, expected: String) {
         require(address.length <= 4096)
         val uri = URI(address)
-        require(uri.scheme == "https" && uri.host != null && uri.rawUserInfo == null &&
-            uri.rawQuery == null && uri.rawFragment == null)
+        require(
+            uri.scheme == "https" && uri.host != null && uri.rawUserInfo == null &&
+            uri.rawQuery == null && uri.rawFragment == null
+        )
         val connection = uri.toURL().openConnection().apply {
             connectTimeout = 20_000
             readTimeout = 20_000

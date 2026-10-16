@@ -3,6 +3,7 @@ package com.eignex.klause.bench.profile
 import java.nio.file.FileSystem
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.ArrayList
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -12,7 +13,7 @@ import kotlin.test.assertFalse
 class JvmRuntimeImageTest {
     @Test
     fun `class bytes are located under their original module`() {
-        val expected = requireNotNull(java.util.ArrayList::class.java.getResourceAsStream("ArrayList.class"))
+        val expected = requireNotNull(ArrayList::class.java.getResourceAsStream("ArrayList.class"))
             .use { it.readBytes() }
 
         val actual = withJvmRuntimeImage(Path.of(System.getProperty("java.home"))) { image ->
