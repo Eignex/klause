@@ -29,6 +29,14 @@ Missing rational coordinates or a factor without a complete checker remains
 indeterminate. Algebraic, symbolic and arbitrary-width source checks retain their
 existing specialized owners; a finite checker does not reinterpret those values.
 
+The same exact point check validates integer absolute-value and distinctness
+relations before returning from a source with no real coordinates. `AllDifferent`
+compares authoritative arbitrary-width integer values at every present source
+position, preserving repeated roles, presence-literal polarity and exact exempt
+values. Missing integer or presence coordinates reject the proposed point. This
+relation check does not materialize finite domains or supply bounds, integrality
+or whole-source authority for other factors.
+
 `finiteWitnessVerifier` combines the finite point check with exact real checking or
 the caller's explicit source tolerance policy and retains objective/certificate
 admission. Its assumption-aware overload checks exact pins in the private fixpoint
