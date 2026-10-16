@@ -39,10 +39,14 @@ internal class FloatGridDefinition(
 
     fun retainedReal(source: Int): Int = retained[source]
 
-    fun bind(owner: Any, cancellation: Cancellation): FloatGridPreparation.Prepared = FloatGridPreparation.Prepared(
-        target, FloatGridMapping(source, target, columns, retained, origins, owner,
-            cancellation.encodingPreparationScope()),
-    )
+    fun bind(owner: Any, cancellation: Cancellation): FloatGridPreparation {
+        val stop = cancellation.encodingPreparationScope()
+        stop.charge(columns.size.toLong() + retained.size + origins.size)
+        if (stop()) return FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
+        val mapping = FloatGridMapping(source, target, columns, retained, origins, owner, stop)
+        return if (stop()) FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
+        else FloatGridPreparation.Prepared(target, mapping)
+    }
 }
 
 internal class FloatGridMapping(

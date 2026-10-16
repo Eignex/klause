@@ -131,6 +131,8 @@ internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Cancellat
         numRealVars = lower.size, realLower = lower.toDoubleArray(), realUpper = upper.toDoubleArray(),
         settings = source.settings, semantics = source.semantics,
     )
+    stop.charge(columns.size.toLong() + retained.size + origins.size)
+    if (stop()) return FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
     val mapping = FloatGridMapping(source, target, columns, retained, origins.toIntArray(), request.owner, stop)
     return if (stop()) FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
     else FloatGridPreparation.Prepared(target, mapping)

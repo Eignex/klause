@@ -109,7 +109,12 @@ private fun selectFloatGrid(
     val route = SourceProblemRoute.Finite(projection.problem, ownership, plan)
     val checker = invocation.source.problem.bake(consumer.providers, stop)
     if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
-    invocation.bindFloatGrid(SelectedFloatGridBinding(consumer, projection, route, objective, checker), nativeObjective)
+    stop.charge(projection.problem.numIntVars.toLong() - invocation.source.problem.numIntVars +
+        projection.problem.numFactors)
+    if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
+    val binding = SelectedFloatGridBinding(consumer, projection, route, objective, checker)
+    if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
+    invocation.bindFloatGrid(binding, nativeObjective)
     return SelectedFloatGridPreparation.Prepared(invocation)
 }
 
