@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -28,6 +29,28 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class FloatGridPublicationTest {
+    @Test
+    fun `private extrema publications should check the original relation without a finite real propagator`() {
+        val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), false)),
+            numRealVars = 3, realLower = doubleArrayOf(-1.0, 0.0, -1.0),
+            realUpper = doubleArrayOf(1.0, 2.0, 2.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
+        assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(invocation,
+            List(3) { FloatGridVariable(SourceRealId(it)) }, FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+        val binding = assertNotNull(invocation.floatGrid)
+        val points = ArrayList<Sample>()
+        val publication = FloatGridPublication(binding, Cancellation.Never, null, FiniteSolveCallbacks(points::add, {}))
+
+        publication.onSample(Sample(booleanArrayOf(), longArrayOf(0, 0, 1)))
+        publication.onSample(Sample(booleanArrayOf(), longArrayOf(0, 0, 0)))
+
+        assertEquals(1, points.size)
+        assertEquals(BigFraction.ofLong(-1), points.single().exactReals?.get(2))
+        assertSame(source, points.single().coordinateFrame)
+    }
+
     @Test
     fun `retained grid results should not change when later publications update the incumbent`() {
         val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,

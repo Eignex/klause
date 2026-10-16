@@ -32,7 +32,8 @@ internal class FloatGridPublication(
         val mapping = binding.projection.mapping
         mapping.requireOwner(binding.consumer)
         val sample = mapping.reconstruct(binding.projection.problem, native, cancellation) ?: return null
-        val verdict = verifyProjectedSourceWitness(binding.sourceChecker, sample, cancellation, toleranceCheck)
+        val verdict = verifyProjectedSourceWitness(binding.projection.mapping.source, binding.sourceChecker, sample,
+            cancellation, toleranceCheck)
         if (verdict !is Verification.Accepted || cancellation()) return null
         val objective = binding.objective?.let {
             cancellation.charge(it.native.boolWeightValues.size.toLong() + it.native.intCoefficientValues.size)

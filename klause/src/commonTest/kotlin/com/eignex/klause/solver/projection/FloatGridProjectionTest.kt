@@ -34,6 +34,49 @@ import kotlin.test.assertSame
 
 class FloatGridProjectionTest {
     @Test
+    fun `cached geometry should bind a fresh owner without retaining an earlier invocation stop`() {
+        val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+        var stopped = false
+        val original = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
+            listOf(FloatGridVariable(SourceRealId(0)))), Cancellation { stopped }))
+        val definition = original.mapping.definition()
+        stopped = true
+        assertNull(original.mapping.reconstruct(original.problem, Sample(booleanArrayOf(), longArrayOf(1)),
+            Cancellation.Never))
+        val owner = Any()
+
+        val rebound = assertIs<FloatGridPreparation.Prepared>(definition.bind(owner, Cancellation.Never))
+        val point = assertNotNull(rebound.mapping.reconstruct(rebound.problem,
+            Sample(booleanArrayOf(), longArrayOf(1)), Cancellation.Never))
+
+        rebound.mapping.requireOwner(owner)
+        assertSame(original.problem, rebound.problem)
+        assertEquals(BigFraction.ofLong(2).reciprocal(), point.exactReals?.single())
+    }
+
+    @Test
+    fun `binding cached geometry should spend the new containing work allowance`() {
+        val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+        val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
+            listOf(FloatGridVariable(SourceRealId(0)))), Cancellation.Never))
+        var work = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = work >= 1L
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+
+        val rebound = assertIs<FloatGridPreparation.Declined>(prepared.mapping.definition().bind(Any(), stop))
+
+        assertEquals(FloatGridDecline.RESOURCE, rebound.cause)
+        assertEquals(1, source.numRealVars)
+        assertEquals(0, source.numIntVars)
+    }
+
+    @Test
     fun `private linear comparisons should preserve strict and nonstrict grid boundaries`() {
         for ((operation, strict, expected) in listOf(
             Triple(LinearOp.LE, false, setOf(0L, 1L)),

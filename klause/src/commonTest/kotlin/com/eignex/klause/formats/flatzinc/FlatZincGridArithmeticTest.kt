@@ -1,10 +1,12 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.GridAbs
 import com.eignex.klause.factor.arithmetic.GridPower
 import com.eignex.klause.factor.arithmetic.GridProduct
 import com.eignex.klause.factor.arithmetic.Power
+import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.compareTo
@@ -12,7 +14,6 @@ import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -33,11 +34,16 @@ class FlatZincGridArithmeticTest {
     }
 
     @Test
-    fun `overflowing grid ranges should decline with a format diagnostic`() {
+    fun `overflowing private grid ranges should preserve original source bounds`() {
         val source = "var -1.0e308..1.0e308: x; var 0.0..1.0: y; " +
             "constraint float_times(x, x, y); solve satisfy;"
 
-        assertFailsWith<UnsupportedFlatZincException> { parseFlatZinc(source) }
+        val program = parseFlatZinc(source)
+
+        assertEquals(-1e308, program.sourceProgram.problem.realLower[0])
+        assertEquals(1e308, program.sourceProgram.problem.realUpper[0])
+        assertTrue(program.floatVarsByName.values.all { it.lpOnly })
+        assertEquals(1, program.problem.factors.filterIsInstance<ContinuousProduct>().size)
     }
 
     @Test
@@ -70,12 +76,13 @@ class FlatZincGridArithmeticTest {
     }
 
     @Test
-    fun `unrepresentable grid absolute values should retain the frontend decline`() {
-        assertFailsWith<FlatZincParseException> {
-            parseFlatZinc(
-                "var 2.0..3.0: x; var 0.0..0.2: y; constraint float_abs(x,y); solve satisfy;",
-                floatBuckets = 5,
-            )
-        }
+    fun `an empty private absolute value image should retain the original relation`() {
+        val program = parseFlatZinc(
+            "var 2.0..3.0: x; var 0.0..0.2: y; constraint float_abs(x,y); solve satisfy;",
+            floatBuckets = 5,
+        )
+
+        assertFalse(program.problem.factors.filterIsInstance<GridAbs>().single().hasImage)
+        assertEquals(1, program.sourceProgram.problem.factors.filterIsInstance<RealAbs>().size)
     }
 }

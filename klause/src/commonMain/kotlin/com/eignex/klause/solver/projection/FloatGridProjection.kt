@@ -165,7 +165,10 @@ private fun preflightFloatFactor(
     if (projected != roles.reals.size) return false
     return when (factor) {
         is Linear, is ReifiedRealLinear, is RealAbs, is RealArrayMinMax, is RealElement -> true
-        is ContinuousProduct -> factor.finiteChoices == null
+        is ContinuousProduct -> factor.finiteChoices?.let { choices ->
+            choices.size == 1 && source.realLower[choices.operand] == choices.valueAt(0) &&
+                source.realUpper[choices.operand] == choices.valueAt(0)
+        } ?: true
         is Power -> factor.base is Power.Coordinate.Real
         else -> false
     }

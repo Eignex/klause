@@ -2,6 +2,8 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.FactorWeightBook
@@ -252,26 +254,30 @@ class FlatZincCompilerTest {
     }
 
     @Test
-    fun `exact float lowering should decline nonlinear constraints without bucketing`() {
-        val error = assertFailsWith<UnsupportedFlatZincException> {
-            parseFlatZinc(
-                "var -1.0..1.0: x;\nconstraint float_times(x, x, x);\nsolve satisfy;",
-                exactFloats = true,
-            )
-        }
+    fun `exact float intake should retain an unrestricted original product`() {
+        val program = parseFlatZinc(
+            "var -1.0..1.0: x; constraint float_times(x, x, x); solve satisfy;",
+            exactFloats = true,
+        ).sourceProgram
 
-        assertTrue("unsupported by exact float lowering" in error.message.orEmpty())
+        val product = program.problem.factors.filterIsInstance<ContinuousProduct>().single()
+        assertEquals(0, program.problem.numIntVars)
+        assertEquals(1, program.problem.numRealVars)
+        assertNull(product.finiteChoices)
+        assertEquals(product.a, product.b)
+        assertEquals(product.a, product.result)
     }
 
     @Test
-    fun `unrepresentable scaled float arithmetic should be declined with an exact alternative`() {
-        val error = assertFailsWith<UnsupportedFlatZincException> {
-            parseFlatZinc(
-                "var 0.0..1.0: x;\nconstraint float_lin_le([1e20], [x], 1.0);\nsolve satisfy;",
-            )
-        }
+    fun `unrepresentable private scaling should preserve original linear arithmetic`() {
+        val program = parseFlatZinc(
+            "var 0.0..1.0: x; constraint float_lin_le([1e20], [x], 1.0); solve satisfy;",
+        )
 
-        assertTrue("use --exact" in error.message.orEmpty())
+        assertTrue(program.floatVarsByName.getValue("x").lpOnly)
+        assertEquals(0, program.problem.numIntVars)
+        val row = program.sourceProgram.problem.factors.filterIsInstance<Linear>().single()
+        assertEquals(1e20, row.realConstants?.realCoefficients?.at(0))
     }
 
     @Test

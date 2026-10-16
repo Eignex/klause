@@ -194,8 +194,10 @@ values, minimum/maximum, constant-array selection, multiplication/division by
 constants, and products with a finite selected operand. Exact absolute values retain
 `RealAbs` in the source model; the selected consumer installs its complete equality
 alternatives privately. Implied inequalities alone do not enforce this relation.
-Finite-choice products retain `ContinuousProduct` with their declared values and
-source Boolean equality literals, including constant results and operand aliases.
+Finite-choice products whose finite encoding fits the captured alternative limit retain
+`ContinuousProduct` with their declared values and source Boolean equality literals,
+including constant results and operand aliases. Other products retain their unrestricted
+original equality; an encoding limit cannot reject source intake.
 Private selected linear consumers install the complete product alternatives;
 frontends do not expand those products into guarded rows. Literal-only exact
 products retain fixed real operands so binary64 multiplication cannot round away
@@ -207,7 +209,8 @@ and output reconstruction. These maps must survive preparation and source checks
 
 A requested compatibility component requiring approximation, or more than 4096 finite alternatives, uses
 integer buckets at a configurable resolution. Repeated array entries count toward
-the alternative limit. Continuous components without finite choices also use the
+the alternative limit. This limit selects a private representation and does not limit
+original real declarations or selection relations. Continuous components without finite choices also use the
 grid in that compatibility view. Unconstrained floats outside the objective can remain
 continuous. Unrestricted continuous-by-continuous products are outside linear
 arithmetic.

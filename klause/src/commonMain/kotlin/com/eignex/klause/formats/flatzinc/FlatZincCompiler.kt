@@ -9,11 +9,11 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FloatSemantics
-import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.FloatBucketing
@@ -94,6 +94,7 @@ internal class FlatZincCompiler(
 
     internal var lpOnlyFloats: Set<String> = emptySet()
     private var declaredRealCount: Int = 0
+    private val finiteRepresentations by lazy { selectFloatRepresentations(exact = false) }
     internal val realLo = ArrayList<Double>()
     internal val realHi = ArrayList<Double>()
     internal val finiteFloatChoices = HashMap<Int, DoubleArray>()
@@ -120,8 +121,10 @@ internal class FlatZincCompiler(
         integerFloatImages.putAll(collectIntegerFloatImages(onlyRealColumns = true))
         collectAffineFloatImages()
         if (lpOnlyFloats.isNotEmpty()) {
+            val finiteIds = floatVars.filterKeys { finiteRepresentations[it]?.approximate != true }
+                .values.mapTo(HashSet()) { it.varId }
             for (domain in collectFiniteFloatDomains()) {
-                recordFiniteFloatChoices(domain)
+                if (domain.variable.varId in finiteIds) recordFiniteFloatChoices(domain)
             }
             emitFiniteFloatDomains()
         }
@@ -221,7 +224,7 @@ internal class FlatZincCompiler(
             definitionHints = definitionHints,
         ).also { program ->
             program.retainSource(FlatZincSourceState(program.suppliedCopy(), declaredRealCount,
-                selectLegacy = { selectFloatRepresentations() }))
+                selectLegacy = { finiteRepresentations }, projectSearch = { compileSearchAnnotation(it) }))
         }
     }
 

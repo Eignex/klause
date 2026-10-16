@@ -40,8 +40,9 @@ another arithmetic allowance. Interruption withholds acceptance.
 
 `verifyProjectedSourceWitness` combines that exact real check, or the caller's full
 effective source acceptance policy, with original integer declarations and a private
-composed fixpoint from the captured source providers. Explicit enforcing peers cover
-only real relations already checked in the original frame. A private-grid relation
+composed fixpoint over the original Boolean/integer-only factors using their captured
+source descriptors. Every real relation is checked against the full original problem
+before this fixpoint; it is not instantiated as a finite propagator. A private-grid relation
 cannot certify its own original real relation, and a rejected point supplies no
 source refutation. [Private float projections](../model.md#private-float-projections)
 own namespace reconstruction and native-result qualification.

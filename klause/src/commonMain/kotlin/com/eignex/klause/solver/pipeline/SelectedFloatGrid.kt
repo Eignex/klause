@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.projection.FloatGridDecline
 import com.eignex.klause.solver.projection.FloatGridDefinition
 import com.eignex.klause.solver.projection.FloatGridObjective
@@ -107,7 +107,18 @@ private fun selectFloatGrid(
     }
     if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
     val route = SourceProblemRoute.Finite(projection.problem, ownership, plan)
-    val checker = invocation.source.problem.bake(consumer.providers, stop)
+    val source = invocation.source.problem
+    val checkedIntegers = ArrayList<Int>()
+    for (id in source.factors.indices) {
+        stop.charge(1)
+        if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
+        if (source.factors[id].variables.reals.isEmpty()) checkedIntegers += id
+    }
+    val integerView = source.withFactors(checkedIntegers.map { source.factors[it] }.toTypedArray(),
+        source.impliedFactorMask?.let { mask -> BooleanArray(checkedIntegers.size) { mask[checkedIntegers[it]] } })
+    val captured = invocation.preparedPlan?.factorProjections?.takeIf { it.problem === source }
+        ?: consumer.providers.prepare(source)
+    val checker = integerView.bake(captured.projected(integerView, checkedIntegers.toIntArray()), stop)
     if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
     stop.charge(projection.problem.numIntVars.toLong() - invocation.source.problem.numIntVars +
         projection.problem.numFactors)

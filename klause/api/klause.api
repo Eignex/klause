@@ -2412,6 +2412,7 @@ public final class com/eignex/klause/formats/flatzinc/FlatZincExecutionProgram {
 	public final fun getDefinitionalSweep ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
 	public final fun getLocalSearchObjective ()Lcom/eignex/klause/solver/objective/IncrementalObjective;
 	public final fun getProgram ()Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
+	public final fun getSourceInvocation ()Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -2460,6 +2461,7 @@ public final class com/eignex/klause/formats/flatzinc/FlatZincProgram {
 	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public final fun getSetVarsByName ()Ljava/util/Map;
 	public final fun getSolve ()Lcom/eignex/klause/formats/flatzinc/SolveDirective;
+	public final fun getSourceProgram ()Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -2539,6 +2541,11 @@ public final class com/eignex/klause/formats/flatzinc/FlatZincSolutionWriterKt {
 	public static final fun writeFlatZincSolution (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Z)Ljava/lang/String;
 	public static synthetic fun writeFlatZincSolution$default (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;ZILjava/lang/Object;)Ljava/lang/String;
 	public static synthetic fun writeFlatZincSolution$default (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;ZILjava/lang/Object;)Ljava/lang/String;
+}
+
+public final class com/eignex/klause/formats/flatzinc/FlatZincSourceStateKt {
+	public static final fun prepareFiniteCompatibility (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/pipeline/SourceSetupRequest;)Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
+	public static final fun sourceAttachment (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;)Lcom/eignex/klause/solver/pipeline/SourceAttachment;
 }
 
 public abstract interface class com/eignex/klause/formats/flatzinc/OutputItem {
