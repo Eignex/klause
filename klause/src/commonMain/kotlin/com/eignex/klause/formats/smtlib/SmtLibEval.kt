@@ -9,6 +9,7 @@ import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.WideLinComb
 import com.eignex.klause.lowering.constProduct
 import com.eignex.klause.lowering.isConstant
+import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.lowering.scaleByConst
 import com.eignex.klause.lowering.scaleIntComb
 import com.eignex.klause.lowering.sumIntCombs
@@ -67,6 +68,7 @@ internal fun Compiler.Builder.evalTerm(root: SExpr, sort: Sort): Res {
     work.addLast(Frame.Eval(root, sort))
 
     while (work.isNotEmpty()) {
+        sourceCancellation.polynomialSourceCheckpoint(1)
         when (val fr = work.removeLast()) {
             is Frame.PopScope -> popLetScope()
 
@@ -570,8 +572,16 @@ private fun Compiler.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (s
             )
     }
 } else {
+    val binding = lookup(node.text)
+    val variable = intNames[node.text]
     val n = node.text.toLongOrNull()
     when {
+        binding != null -> Res.I(intBinding(node.text, binding))
+
+        variable != null -> narrowRes(LinComb(mapOf(variable to 1), 0))
+
+        node.text in realNames -> smtUnsupported("real variable '${node.text}' used as Int")
+
         n != null -> narrowRes(LinComb(emptyMap(), n))
 
         // An integer literal beyond Long is carried as a wide combination and lowered to a wide factor.
@@ -583,27 +593,13 @@ private fun Compiler.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (s
         node.text.startsWith("#") ->
             smtUnsupported("bitvector literal '${node.text}' (integer context)")
 
-        else -> lookup(node.text)?.let { Res.I(intBinding(node.text, it)) }
-            ?: narrowRes(
-                LinComb(
-                    mapOf(
-                        (
-                            intNames[node.text] ?: smtUnsupported(
-                                "unknown int var '${node.text}'",
-                            )
-                            ) to 1,
-                    ),
-                    0,
-                ),
-            )
+        else -> smtUnsupported("unknown int var '${node.text}'")
     }
 }
 
 /** Fold a real-sorted atom: numeral / decimal literals, real variables, bindings, and (via the
  *  implicit embedding) integer variables reached from a real context through `to_real`. */
 private fun Compiler.Builder.evalRealAtom(node: SExpr.Atom): Res {
-    val lit = parseRealLiteral(node.text)
-    if (lit != null) return Res.R(RealComb(emptyMap(), emptyMap(), lit))
     val binding = lookup(node.text)
     if (binding != null) {
         return when {
@@ -621,6 +617,8 @@ private fun Compiler.Builder.evalRealAtom(node: SExpr.Atom): Res {
     }
     val rv = realNames[node.text]
     if (rv != null) return Res.R(RealComb(emptyMap(), mapOf(rv to BigFraction.ONE), BigFraction.ZERO))
-    val iv = intNames[node.text] ?: smtUnsupported("unknown real var '${node.text}'")
-    return Res.R(LinComb(mapOf(iv to 1), 0).toRealComb())
+    val iv = intNames[node.text]
+    if (iv != null) return Res.R(LinComb(mapOf(iv to 1), 0).toRealComb())
+    val literal = parseRealLiteral(node.text) ?: smtUnsupported("unknown real var '${node.text}'")
+    return Res.R(RealComb(emptyMap(), emptyMap(), literal))
 }

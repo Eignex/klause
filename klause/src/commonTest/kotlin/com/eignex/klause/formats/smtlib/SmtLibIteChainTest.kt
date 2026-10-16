@@ -34,7 +34,7 @@ class SmtLibIteChainTest {
         (declare-const s Int) (declare-const r Int)
         $extraDecls
         (assert (>= s $SEL_LO)) (assert (<= s $SEL_HI))
-        (assert (>= r -10000)) (assert (<= r 10000))
+        (assert (>= r (- 10000))) (assert (<= r 10000))
         (assert (= r $body))
         (check-sat)
         """.trimIndent()

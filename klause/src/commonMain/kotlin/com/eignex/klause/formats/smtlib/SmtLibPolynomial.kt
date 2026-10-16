@@ -164,11 +164,7 @@ internal class SmtLibPolynomialCompiler(
             }
             "set-logic" -> {
                 command.polynomialSize(2)
-                if (command.polynomialAtom(1) !in setOf("QF_NRA", "QF_LRA", "QF_RDL", "ALL") &&
-                    !(allowIntegers && command.polynomialAtom(1) in setOf("QF_NIA", "QF_NIRA", "QF_LIA", "QF_LIRA"))
-                ) {
-                    smtUnsupported("unsupported polynomial logic '${command.polynomialAtom(1)}'")
-                }
+                command.polynomialName(1)
             }
             "set-info", "set-option" -> command.polynomialSize(3)
             "check-sat" -> {
