@@ -154,7 +154,7 @@ class SourceOptionsTest {
             Xcsp3Mode to arrayOf("--unbounded-int-lo", "1"),
             SmtLibMode to arrayOf("--source-relative-tolerance", "0"),
             MiniZincMode to arrayOf("--pin-absent-optional-values", "false"),
-            MpsMode to arrayOf("--unbounded-real-hi", "1"),
+            MpsMode to arrayOf("--pin-absent-optional-values", "false"),
         )
         for ((mode, args) in requests) {
             val common = CommonOptions()
