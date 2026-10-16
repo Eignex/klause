@@ -361,6 +361,8 @@ Common source controls resolve against the selected format's declared semantics 
 A control whose field the format does not declare is a usage error.
 Each endpoint replaces its default independently; an omitted endpoint retains its default. Explicit
 source bounds remain authoritative.
+The mapper preserves a caller's typed base overrides. An exact request replaces applicable
+base float/tolerance values; explicit conflicting CLI grid or positive-tolerance controls are rejected.
 
 | Control | Interpretation |
 |---|---|

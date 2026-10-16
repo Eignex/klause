@@ -15,8 +15,10 @@ import com.eignex.klause.util.times
 import com.eignex.klause.util.unaryMinus
 import kotlin.math.abs
 
+internal enum class SourceFloatMode { CONTINUOUS, GRID }
+
 internal class SourceOptions {
-    var gridRequested = false
+    var floatMode: SourceFloatMode? = null
     var floatBuckets: Int? = null
     var floatScale: Long? = null
     var gridLower: SemanticRational? = null
@@ -25,14 +27,20 @@ internal class SourceOptions {
     var relativeTolerance: SemanticRational? = null
 }
 
-internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticOverrides = try {
+internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticOverrides {
     var resolved = semanticOverrides
     val fields = sourceOptions
-    val gridRequested = fields.gridRequested || fields.floatBuckets != null || fields.floatScale != null ||
+    if (fields.floatMode == SourceFloatMode.CONTINUOUS) {
+        resolved = resolved.copy(floats = FloatSemantics.Continuous)
+    }
+    val gridRequested = fields.floatMode == SourceFloatMode.GRID ||
+        fields.floatBuckets != null || fields.floatScale != null ||
         fields.gridLower != null || fields.gridUpper != null
     if (gridRequested) {
         require(!exact) { "float grid controls conflict with --exact" }
-        val grid = (resolved.floats ?: declared.floats) as? FloatSemantics.Grid
+        val grid = if (fields.floatMode == SourceFloatMode.GRID) {
+            resolved.floats as? FloatSemantics.Grid ?: declared.floats as? FloatSemantics.Grid
+        } else (resolved.floats ?: declared.floats) as? FloatSemantics.Grid
         require(grid != null) { "float grid controls do not apply to ${declared.format}" }
         resolved = resolved.copy(floats = grid.copy(
             buckets = fields.floatBuckets ?: grid.buckets,
@@ -54,10 +62,9 @@ internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticO
         ))
     }
     if (exact) {
-        require(resolved.floats == null || resolved.floats == FloatSemantics.Continuous) {
-            "a float grid conflicts with --exact"
-        }
-        require(resolved.feasibilityTolerance == null || resolved.feasibilityTolerance == SourceTolerance()) {
+        require((fields.absoluteTolerance == null || fields.absoluteTolerance == SemanticRational.ZERO) &&
+            (fields.relativeTolerance == null || fields.relativeTolerance == SemanticRational.ZERO)
+        ) {
             "positive source feasibility tolerance conflicts with --exact"
         }
         resolved = resolved.copy(
@@ -67,10 +74,7 @@ internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticO
         )
     }
     sourceSemantics = declared.resolve(resolved)
-    semanticOverrides = resolved
-    resolved
-} catch (error: IllegalArgumentException) {
-    usageError(error.message.orEmpty())
+    return resolved
 }
 
 internal fun sourceFlagSpecs(options: CommonOptions): List<FlagSpec> = listOf(
@@ -100,10 +104,8 @@ internal fun sourceFlagSpecs(options: CommonOptions): List<FlagSpec> = listOf(
     },
     sourceFlag("--float-semantics", "continuous|grid", "float declaration interpretation") {
         when (it.lowercase()) {
-            "continuous" -> {
-                options.semanticOverrides = options.semanticOverrides.copy(floats = FloatSemantics.Continuous)
-            }
-            "grid" -> options.sourceOptions.gridRequested = true
+            "continuous" -> options.sourceOptions.floatMode = SourceFloatMode.CONTINUOUS
+            "grid" -> options.sourceOptions.floatMode = SourceFloatMode.GRID
             else -> usageError("--float-semantics expects continuous or grid")
         }
     },
