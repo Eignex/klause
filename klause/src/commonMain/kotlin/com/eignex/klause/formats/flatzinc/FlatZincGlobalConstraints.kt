@@ -464,7 +464,6 @@ internal fun FlatZincCompiler.emitAmong(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitAnnotationConstraint(c: FznConstraint) {
-    if (forLocalSearch) return
     expectArity(c, 1)
     val lit = resolveBoolLit(c.args[0])
     factors.add(Clause(intArrayOf(lit)))

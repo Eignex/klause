@@ -19,6 +19,34 @@ class ExactFlatZincValidationTest {
         assertEquals(status, checked.status, checked.reason)
     }
 
+    @ParameterizedTest
+    @CsvSource(value = [
+        "redundant_constraint|true|valid", "redundant_constraint|false|invalid",
+        "fzn_redundant_constraint|true|valid", "fzn_redundant_constraint|false|invalid",
+        "symmetry_breaking_constraint|true|valid", "symmetry_breaking_constraint|false|invalid",
+        "fzn_symmetry_breaking_constraint|true|valid", "fzn_symmetry_breaking_constraint|false|invalid",
+    ], delimiter = '|')
+    fun `annotation wrappers should check their original Boolean requirement`(
+        name: String,
+        value: String,
+        status: String,
+    ) {
+        val source = "var bool: x; constraint $name(x); solve satisfy;"
+
+        assertEquals(status, ExactFlatZincValidation.inspect(source, "x = $value;", null).status)
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = [
+        "redundant_constraint|''", "redundant_constraint|x, x", "redundant_constraint|0",
+        "symmetry_breaking_constraint|''", "symmetry_breaking_constraint|x, x", "symmetry_breaking_constraint|0",
+    ], delimiter = '|')
+    fun `malformed annotation wrappers should leave validation unknown`(name: String, arguments: String) {
+        val source = "var bool: x; constraint $name($arguments); solve satisfy;"
+
+        assertEquals("unknown", ExactFlatZincValidation.inspect(source, "x = true;", null).status)
+    }
+
     @Test
     fun `absolute value checking should preserve holes in an integer value set`() {
         val source = "var {-2,-1,1,2}: n; var float: x; var float: y; " +

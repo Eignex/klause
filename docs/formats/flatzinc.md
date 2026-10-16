@@ -64,6 +64,21 @@ separate declared outputs with exact equalities. A zero divisor is forbidden by 
 relation; a domain containing zero keeps its nonzero alternatives. Output aliases
 and signed-word endpoints retain [exact division semantics](../model.md#integer-division-relations).
 
+## Source annotation constraints
+
+`redundant_constraint` and `symmetry_breaking_constraint`, including their `fzn_`
+spellings, retain their Boolean requirement for every caller. The legacy
+`forLocalSearch` hint does not change the source factor set or skip argument
+validation. Direct wrappers and `klause_redundant` / `klause_symmetry` annotations
+mark the emitted factors in `Problem.impliedFactorMask`; symmetry declarations also
+set `Problem.hasSymmetryBreaking`.
+
+Local search uses this source metadata to seed a lower violation weight through
+`FactorWeightBook`. These factors remain enforced and available to every other
+consumer. Presolve reads the symmetry flag before adding its own symmetry breaks.
+[Local-search weights](../solver/local-search.md) belong to the selected consumer;
+source parsing does not remove constraints for that policy.
+
 ## FlatZinc Boolean channels
 
 FlatZinc retains `bool2int` channels and recognizes them independently of constraint

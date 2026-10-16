@@ -4,6 +4,8 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.localsearch.FactorWeightBook
+import com.eignex.klause.localsearch.IMPLIED_FACTOR_INITIAL_WEIGHT
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.CharSource
@@ -385,13 +387,82 @@ class FlatZincCompilerTest {
     }
 
     @Test
-    fun `redundant_constraint should be dropped for local search`() {
-        val src = """
-            var bool: x;
-            constraint redundant_constraint(x);
-            solve satisfy;
-        """.trimIndent()
-        val program = parseFlatZinc(src, forLocalSearch = true)
-        assertEquals(0, program.problem.factors.size)
+    fun `annotation wrappers should retain source contradictions under either search hint`() {
+        for (name in listOf(
+            "redundant_constraint", "fzn_redundant_constraint",
+            "symmetry_breaking_constraint", "fzn_symmetry_breaking_constraint",
+        )) {
+            for (forLocalSearch in listOf(false, true)) {
+                val program = parseFlatZinc(
+                    "var bool: x = false; constraint $name(x); solve satisfy;",
+                    forLocalSearch = forLocalSearch,
+                )
+
+                val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+
+                assertIs<SolveResult.Unsat>(result)
+            }
+        }
+    }
+
+    @Test
+    fun `annotation wrappers should retain the local search implied weight`() {
+        for (name in listOf(
+            "redundant_constraint", "fzn_redundant_constraint",
+            "symmetry_breaking_constraint", "fzn_symmetry_breaking_constraint",
+        )) {
+            for (forLocalSearch in listOf(false, true)) {
+                val program = parseFlatZinc(
+                    "var bool: x; constraint $name(x); solve satisfy;",
+                    forLocalSearch = forLocalSearch,
+                )
+
+                val weights = FactorWeightBook(program.problem).factorWeights
+
+                assertEquals(listOf(IMPLIED_FACTOR_INITIAL_WEIGHT), weights.toList())
+            }
+        }
+    }
+
+    @Test
+    fun `symmetry wrappers should retain their source symmetry flag`() {
+        for (name in listOf("symmetry_breaking_constraint", "fzn_symmetry_breaking_constraint")) {
+            for (forLocalSearch in listOf(false, true)) {
+                val program = parseFlatZinc(
+                    "var bool: x; constraint $name(x); solve satisfy;",
+                    forLocalSearch = forLocalSearch,
+                )
+
+                assertTrue(program.problem.hasSymmetryBreaking)
+            }
+        }
+    }
+
+    @Test
+    fun `redundant wrappers should leave source symmetry unclaimed`() {
+        for (name in listOf("redundant_constraint", "fzn_redundant_constraint")) {
+            for (forLocalSearch in listOf(false, true)) {
+                val program = parseFlatZinc(
+                    "var bool: x; constraint $name(x); solve satisfy;",
+                    forLocalSearch = forLocalSearch,
+                )
+
+                assertFalse(program.problem.hasSymmetryBreaking)
+            }
+        }
+    }
+
+    @Test
+    fun `annotation wrapper arity should be validated under either search hint`() {
+        for (name in listOf(
+            "redundant_constraint", "fzn_redundant_constraint",
+            "symmetry_breaking_constraint", "fzn_symmetry_breaking_constraint",
+        )) {
+            for (forLocalSearch in listOf(false, true)) {
+                assertFailsWith<FlatZincParseException> {
+                    parseFlatZinc("constraint $name(); solve satisfy;", forLocalSearch = forLocalSearch)
+                }
+            }
+        }
     }
 }

@@ -873,7 +873,10 @@ and strict improvement in the original direction. It uses authoritative coordina
 checks binary integer/float extrema, integer array extrema, and constant or variable
 integer/Boolean/set array selection directly from the original predicates. Integer
 `all_different_int` compares exact integral values, including values beyond binary64 precision.
-`alldifferent_except_0` omits only exact zeroes before comparing distinct values. Set values
+`alldifferent_except_0` omits only exact zeroes before comparing distinct values.
+Redundant and symmetry wrappers, including `fzn_` spellings, require their original
+Boolean argument to hold; malformed arity or non-Boolean arguments leave validation
+unknown. Set values
 use normalized integer intervals for equality and source-universe bounds, without
 enumerating ranges. Index bounds and repeated entries retain their source meaning.
 It checks the preceding `% objective=` cost or finite `_objective` field against the

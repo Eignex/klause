@@ -31,7 +31,7 @@ internal class FlatZincCompiler(
     internal val model: FznModel,
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
     floatScale: Long = DEFAULT_FLOAT_SCALE,
-    /** When true, drop `redundant_constraint` / `symmetry_breaking_constraint` wrappers for local search. */
+    // Compatibility hint; source retention is independent of the requested search.
     internal val forLocalSearch: Boolean = false,
     /** Default domain for unbounded `var int` declarations. */
     unboundedIntLo: Long? = null,
@@ -168,8 +168,10 @@ internal class FlatZincCompiler(
             locateConstraint(c)
             val before = factors.size
             processConstraint(c)
-            val redundant = c.annotations.any { it.name == "klause_redundant" }
-            val symmetry = c.annotations.any { it.name == "klause_symmetry" }
+            val redundant = c.name == "redundant_constraint" || c.name == "fzn_redundant_constraint" ||
+                c.annotations.any { it.name == "klause_redundant" }
+            val symmetry = c.name == "symmetry_breaking_constraint" || c.name == "fzn_symmetry_breaking_constraint" ||
+                c.annotations.any { it.name == "klause_symmetry" }
             if (symmetry) hasSymmetryBreaking = true
             if (redundant || symmetry) for (i in before until factors.size) impliedFactorIds.add(i)
         }
@@ -711,7 +713,8 @@ internal class FlatZincCompiler(
     }
 }
 
-/** Parse and compile FlatZinc from an in-memory [String] — the path for tests and the DSL. */
+/** Parse and compile FlatZinc from an in-memory [String].
+ *  @param forLocalSearch Compatibility hint; source constraints are retained for either value. */
 fun parseFlatZinc(
     source: String,
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
@@ -740,7 +743,8 @@ fun parseFlatZinc(
 
 /** Parse and compile FlatZinc from a streamed [source], pulling one token at a time so the whole file
  *  and its token list are never held. The compiler stays whole-model (its float classification and
- *  `int2float` forward references need every constraint at once); only lexing/parsing are streamed. */
+ *  `int2float` forward references need every constraint at once); only lexing/parsing are streamed.
+ *  @param forLocalSearch Compatibility hint; source constraints are retained for either value. */
 fun parseFlatZinc(
     source: CharSource,
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
