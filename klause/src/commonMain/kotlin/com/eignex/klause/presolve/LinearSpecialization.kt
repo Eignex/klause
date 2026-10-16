@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntegralConstants
+import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
@@ -17,8 +18,6 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.addExact
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
@@ -41,17 +40,9 @@ internal fun Factor.equivalentPseudoBoolean(): PseudoBoolean? {
         LinearOp.EQ -> PbOp.EQ
         LinearOp.NE -> return null
     }
-    if (this is PseudoBoolean) return takeIf { permitsLongPseudoBoolean(constants) }
-    var lower = 0L
-    var upper = 0L
-    try {
-        for (i in 0 until row.size) {
-            val coefficient = row.coeff(i)
-            if (coefficient < 0L) lower = addExact(lower, coefficient) else upper = addExact(upper, coefficient)
-        }
-    } catch (_: CheckedLongOverflowException) {
-        return null
-    }
+    val constants = row.constants as? IntegerConstants ?: return null
+    if (!permitsLongPseudoBoolean(constants)) return null
+    if (this is PseudoBoolean) return this
     return PseudoBoolean(
         LongArray(row.size) { row.coeff(it) },
         IntArray(row.size) { Term.lit(row.ref(it)) },
