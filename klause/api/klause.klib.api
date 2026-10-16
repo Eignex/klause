@@ -7855,20 +7855,23 @@ final class com.eignex.klause.ir/MixedVars : com.eignex.klause.ir/VarList { // c
         final fun <get-spanInts>(): kotlin/IntArray // com.eignex.klause.ir/MixedVars.spanInts.<get-spanInts>|<get-spanInts>(){}[0]
 }
 
-final class com.eignex.klause.ir/NonlinearIntegerProblem { // com.eignex.klause.ir/NonlinearIntegerProblem|null[0]
+final class com.eignex.klause.ir/NonlinearIntegerProblem : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.ir/NonlinearIntegerProblem|null[0]
     final val boolVarNames // com.eignex.klause.ir/NonlinearIntegerProblem.boolVarNames|{}boolVarNames[0]
         final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/NonlinearIntegerProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]
     final val intVarNames // com.eignex.klause.ir/NonlinearIntegerProblem.intVarNames|{}intVarNames[0]
         final fun <get-intVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/NonlinearIntegerProblem.intVarNames.<get-intVarNames>|<get-intVarNames>(){}[0]
     final val realVarNames // com.eignex.klause.ir/NonlinearIntegerProblem.realVarNames|{}realVarNames[0]
-        final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/NonlinearIntegerProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
+        final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/NonlinearIntegerProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]    final val semantics // com.eignex.klause.ir/NonlinearIntegerProblem.semantics|{}semantics[0]
+        final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/NonlinearIntegerProblem.semantics.<get-semantics>|<get-semantics>(){}[0]
 }
 
-final class com.eignex.klause.ir/PolynomialRealProblem { // com.eignex.klause.ir/PolynomialRealProblem|null[0]
+final class com.eignex.klause.ir/PolynomialRealProblem : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.ir/PolynomialRealProblem|null[0]
     final val boolVarNames // com.eignex.klause.ir/PolynomialRealProblem.boolVarNames|{}boolVarNames[0]
         final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/PolynomialRealProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]
     final val realVarNames // com.eignex.klause.ir/PolynomialRealProblem.realVarNames|{}realVarNames[0]
         final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/PolynomialRealProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
+    final val semantics // com.eignex.klause.ir/PolynomialRealProblem.semantics|{}semantics[0]
+        final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/PolynomialRealProblem.semantics.<get-semantics>|<get-semantics>(){}[0]
     final val sourceBoolCount // com.eignex.klause.ir/PolynomialRealProblem.sourceBoolCount|{}sourceBoolCount[0]
         final fun <get-sourceBoolCount>(): kotlin/Int // com.eignex.klause.ir/PolynomialRealProblem.sourceBoolCount.<get-sourceBoolCount>|<get-sourceBoolCount>(){}[0]
     final val sourceRealCount // com.eignex.klause.ir/PolynomialRealProblem.sourceRealCount|{}sourceRealCount[0]
@@ -8167,7 +8170,7 @@ final class com.eignex.klause.ir/TaggedLinearRow : com.eignex.klause.ir/LinearRo
     final fun ref(kotlin/Int): kotlin/Int // com.eignex.klause.ir/TaggedLinearRow.ref|ref(kotlin.Int){}[0]
 }
 
-final class com.eignex.klause.ir/TranscendentalProblem { // com.eignex.klause.ir/TranscendentalProblem|null[0]
+final class com.eignex.klause.ir/TranscendentalProblem : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.ir/TranscendentalProblem|null[0]
     final val boolVarNames // com.eignex.klause.ir/TranscendentalProblem.boolVarNames|{}boolVarNames[0]
         final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]
     final val hasObjective // com.eignex.klause.ir/TranscendentalProblem.hasObjective|{}hasObjective[0]
@@ -8177,7 +8180,8 @@ final class com.eignex.klause.ir/TranscendentalProblem { // com.eignex.klause.ir
     final val objectiveSense // com.eignex.klause.ir/TranscendentalProblem.objectiveSense|{}objectiveSense[0]
         final fun <get-objectiveSense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.ir/TranscendentalProblem.objectiveSense.<get-objectiveSense>|<get-objectiveSense>(){}[0]
     final val realVarNames // com.eignex.klause.ir/TranscendentalProblem.realVarNames|{}realVarNames[0]
-        final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
+        final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]    final val semantics // com.eignex.klause.ir/TranscendentalProblem.semantics|{}semantics[0]
+        final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/TranscendentalProblem.semantics.<get-semantics>|<get-semantics>(){}[0]
 }
 
 final class com.eignex.klause.ir/UndeclaredIntegerBounds { // com.eignex.klause.ir/UndeclaredIntegerBounds|null[0]

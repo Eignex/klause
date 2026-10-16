@@ -9,7 +9,9 @@ class TranscendentalProblem internal constructor(
     internal val objective: TranscendentalExpression? = null,
     /** Original objective direction, when an objective was captured. */
     val objectiveSense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-) {
+    /** Effective source declaration semantics captured before lowering. */
+    override val semantics: EffectiveSourceSemantics = defaultIrSemantics,
+) : SourceSemanticsOwner {
     private val integers = intVarNames.toMap()
     private val reals = realVarNames.toMap()
     private val booleans = boolVarNames.toMap()

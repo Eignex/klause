@@ -11,7 +11,9 @@ class PolynomialRealProblem internal constructor(
     val sourceBoolCount: Int,
     realVarNames: Map<String, Int>,
     boolVarNames: Map<String, Int>,
-) {
+    /** Effective source declaration semantics captured before lowering. */
+    override val semantics: EffectiveSourceSemantics = defaultIrSemantics,
+) : SourceSemanticsOwner {
     private val realNames = realVarNames.toMap()
     private val boolNames = boolVarNames.toMap()
 
