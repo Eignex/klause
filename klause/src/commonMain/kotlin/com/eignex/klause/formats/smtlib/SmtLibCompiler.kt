@@ -77,26 +77,61 @@ internal object Compiler {
              * it can post directly.
              */
             var srcBool: SExpr? = null
+            var sourceScope: BindingSnapshot? = null
         }
 
         // Let scoping as a heap-allocated stack, not recursion. `bindingStacks` maps each name to its
         // shadow stack (innermost binding on top) for O(1) lookup; `scopeNames` records the names bound
         // by each active scope so it can be popped. A deeply nested formula unwinds its `let` chain
         // iteratively into these structures instead of recursing through the call stack.
-        internal class BindingScope {
-            val bindingStacks = HashMap<String, ArrayDeque<Binding>>()
+        internal class ScopedBinding(val depth: Int, val binding: Binding)
+        // Deferred Boolean values exclude their simultaneous peers and later caller-local shadows.
+        internal class BindingSnapshot(val scope: BindingScope, val depth: Int)
+        internal class BindingScope(val parent: BindingSnapshot? = null) {
+            val bindingStacks = HashMap<String, ArrayDeque<ScopedBinding>>()
             val scopeNames = ArrayDeque<List<String>>()
+
+            fun snapshot(): BindingSnapshot = BindingSnapshot(this, scopeNames.size)
+
+            fun lookup(name: String): Binding? {
+                var current: BindingScope? = this
+                var depth = scopeNames.size
+                while (current != null) {
+                    val stack = current.bindingStacks[name]
+                    if (stack != null) {
+                        if (stack.last().depth <= depth) return stack.last().binding
+                        var lower = 0
+                        var upper = stack.lastIndex
+                        while (lower <= upper) {
+                            val middle = lower + (upper - lower) / 2
+                            if (stack[middle].depth <= depth) lower = middle + 1 else upper = middle - 1
+                        }
+                        if (upper >= 0) return stack[upper].binding
+                    }
+                    val inherited = current.parent
+                    current = inherited?.scope
+                    depth = inherited?.depth ?: 0
+                }
+                return null
+            }
         }
         internal var bindingScope = BindingScope()
-        internal fun lookup(name: String): Binding? = bindingScope.bindingStacks[name]?.lastOrNull()
+        internal fun lookup(name: String): Binding? = bindingScope.lookup(name)
 
         /** The literal for a Bool binding, compiling its held term on the first ask. */
         internal fun boolLit(b: Binding): Int {
             b.lit?.let { return it }
             val src = b.srcBool ?: throw UnsupportedSmtException("Bool binding has no value")
-            return compileBool(src).also {
-                b.lit = it
-                b.srcBool = null
+            val caller = bindingScope
+            bindingScope = BindingScope(checkNotNull(b.sourceScope))
+            return try {
+                compileBool(src).also {
+                    b.lit = it
+                    b.srcBool = null
+                    b.sourceScope = null
+                }
+            } finally {
+                bindingScope = caller
             }
         }
 
@@ -104,6 +139,7 @@ internal object Compiler {
          *  as a new scope. */
         internal fun pushLetScope(bindingList: SExpr) {
             val list = bindingList as? SExpr.SList ?: throw UnsupportedSmtException("malformed let bindings")
+            val sourceScope = bindingScope.snapshot()
             pushScopeBindings(
                 list.items.map { pair ->
                     val p = pair as? SExpr.SList ?: throw UnsupportedSmtException("malformed let binding")
@@ -111,7 +147,10 @@ internal object Compiler {
                     val expr = p.argAt(1, "let binding value")
                     val b = Binding(isBool = isBoolExpr(expr), isReal = !isBoolExpr(expr) && isRealExpr(expr))
                     when {
-                        b.isBool -> b.srcBool = expr
+                        b.isBool -> {
+                            b.srcBool = expr
+                            b.sourceScope = sourceScope
+                        }
                         b.isReal -> b.real = realTerm(expr)
                         else -> b.lin = linearTerm(expr)
                     }
@@ -124,11 +163,12 @@ internal object Compiler {
          *  term evaluator, which folds a `let`'s binding values in-stack before building the scope. */
         internal fun pushScopeBindings(bound: List<Pair<String, Binding>>) {
             val names = ArrayList<String>(bound.size)
+            val depth = bindingScope.scopeNames.size + 1
             for ((name, b) in bound) {
                 // A value reachable by name can be referenced any number of times, so an `ite` chain it
                 // holds is finished: nothing can extend it any more, and it must define its variable.
                 (b.lin as? IntComb.Narrow)?.lin?.asSimpleVar()?.let { closeIteChain(it) }
-                bindingScope.bindingStacks.getOrPut(name) { ArrayDeque() }.addLast(b)
+                bindingScope.bindingStacks.getOrPut(name) { ArrayDeque() }.addLast(ScopedBinding(depth, b))
                 names.add(name)
             }
             bindingScope.scopeNames.addLast(names)
