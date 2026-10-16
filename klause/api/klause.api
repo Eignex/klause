@@ -3595,7 +3595,8 @@ public final class com/eignex/klause/ir/NoVars : com/eignex/klause/ir/VarList {
 public final class com/eignex/klause/ir/NonlinearIntegerProblem : com/eignex/klause/ir/SourceSemanticsOwner {
 	public final fun getBoolVarNames ()Ljava/util/Map;
 	public final fun getIntVarNames ()Ljava/util/Map;
-	public final fun getRealVarNames ()Ljava/util/Map;	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun getRealVarNames ()Ljava/util/Map;
+	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 }
 
 public final class com/eignex/klause/ir/NumericAuthority : java/lang/Enum {
@@ -4144,7 +4145,8 @@ public final class com/eignex/klause/ir/TranscendentalProblem : com/eignex/klaus
 	public final fun getHasObjective ()Z
 	public final fun getIntVarNames ()Ljava/util/Map;
 	public final fun getObjectiveSense ()Lcom/eignex/klause/ir/ObjectiveSense;
-	public final fun getRealVarNames ()Ljava/util/Map;	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun getRealVarNames ()Ljava/util/Map;
+	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 }
 
 public final class com/eignex/klause/ir/UndeclaredIntegerBounds {

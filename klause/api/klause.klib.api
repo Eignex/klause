@@ -7861,7 +7861,8 @@ final class com.eignex.klause.ir/NonlinearIntegerProblem : com.eignex.klause.ir/
     final val intVarNames // com.eignex.klause.ir/NonlinearIntegerProblem.intVarNames|{}intVarNames[0]
         final fun <get-intVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/NonlinearIntegerProblem.intVarNames.<get-intVarNames>|<get-intVarNames>(){}[0]
     final val realVarNames // com.eignex.klause.ir/NonlinearIntegerProblem.realVarNames|{}realVarNames[0]
-        final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/NonlinearIntegerProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]    final val semantics // com.eignex.klause.ir/NonlinearIntegerProblem.semantics|{}semantics[0]
+        final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/NonlinearIntegerProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
+    final val semantics // com.eignex.klause.ir/NonlinearIntegerProblem.semantics|{}semantics[0]
         final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/NonlinearIntegerProblem.semantics.<get-semantics>|<get-semantics>(){}[0]
 }
 
@@ -8180,7 +8181,8 @@ final class com.eignex.klause.ir/TranscendentalProblem : com.eignex.klause.ir/So
     final val objectiveSense // com.eignex.klause.ir/TranscendentalProblem.objectiveSense|{}objectiveSense[0]
         final fun <get-objectiveSense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.ir/TranscendentalProblem.objectiveSense.<get-objectiveSense>|<get-objectiveSense>(){}[0]
     final val realVarNames // com.eignex.klause.ir/TranscendentalProblem.realVarNames|{}realVarNames[0]
-        final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]    final val semantics // com.eignex.klause.ir/TranscendentalProblem.semantics|{}semantics[0]
+        final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
+    final val semantics // com.eignex.klause.ir/TranscendentalProblem.semantics|{}semantics[0]
         final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/TranscendentalProblem.semantics.<get-semantics>|<get-semantics>(){}[0]
 }
 
