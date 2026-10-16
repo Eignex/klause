@@ -885,9 +885,11 @@ internal class LocalSearchEngine(
                 } else {
                     objective.evaluate(state.assignment)
                 }
-                if ((if (liveCompletion is Completion.Witness) liveCompletion !== processedCompletion else obj < bestObj) &&
-                    state.intValuesInDomain()
-                ) {
+                val needsPublicationCheck = when (val completed = liveCompletion) {
+                    is Completion.Witness -> completed !== processedCompletion
+                    else -> obj < bestObj
+                }
+                if (needsPublicationCheck && state.intValuesInDomain()) {
                     val decided = liveCompletion ?: decide(
                         state,
                         state.assignment.snapshot(),
