@@ -1,6 +1,5 @@
 package com.eignex.klause.schema
 
-import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.model.BoolExpr
 import com.eignex.klause.model.BoolSpec
 import com.eignex.klause.model.FloatSpec
@@ -39,7 +38,7 @@ open class VariableSchema : Schema<SchemaEntry>() {
 
     protected fun intVar(min: Int, max: Int) = register(IntSpec(min, max)) { IntHandle(it, min, max) }
 
-    protected fun floatVar(min: Double, max: Double, buckets: Int = DEFAULT_FLOAT_BUCKETS) =
+    protected fun floatVar(min: Double, max: Double, buckets: Int? = null) =
         register(FloatSpec(min, max, buckets)) { FloatHandle(it, min, max) }
 
     /**
@@ -72,7 +71,7 @@ open class VariableSchema : Schema<SchemaEntry>() {
      * MiniZinc's "undefined → false" semantics; decode with
      * [com.eignex.klause.compile.CompiledSchema.decode] to read `null` when absent.
      */
-    protected fun optFloatVar(min: Double, max: Double, buckets: Int = DEFAULT_FLOAT_BUCKETS) =
+    protected fun optFloatVar(min: Double, max: Double, buckets: Int? = null) =
         optVar(FloatSpec(min, max, buckets)) { name, present ->
             OptFloatHandle(name = name, present = present, value = FloatHandle(name, min, max))
         }

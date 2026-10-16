@@ -57,7 +57,7 @@ data class IntSpec(
 }
 
 /**
- * Float variable bucketed to [buckets] uniformly-spaced values across `[min, max]`. The
+ * Float variable with an optional explicit grid of [buckets] values across `[min, max]`. The
  * solver represents it as an int domain `[0, buckets-1]`; the compiler stores a decoder so
  * solutions can be read back as Double.
  */
@@ -68,17 +68,17 @@ data class FloatSpec(
     val min: Double,
     /** Inclusive upper bound of the real interval. */
     val max: Double,
-    /** Number of uniformly-spaced values the interval is discretised into (≥ 2). */
-    val buckets: Int,
+    /** Explicit grid size (at least two), or null to use the compiler's effective source policy. */
+    val buckets: Int? = null,
 ) : VarSpec {
     init {
-        require(buckets >= 2) { "FloatSpec needs at least 2 buckets" }
+        require(buckets == null || buckets >= 2) { "FloatSpec needs at least 2 buckets" }
     }
 
     /** Real-value step between adjacent buckets: `(max - min) / (buckets - 1)`. The single
      *  source of truth for the bucket-to-real affine map — decode and the float objectives
      *  all route through it, and downstream consumers should too rather than re-deriving it. */
-    val scale: Double get() = (max - min) / (buckets - 1)
+    val scale: Double get() = (max - min) / (requireNotNull(buckets) { "float grid must be resolved by compilation" } - 1)
 
     /** Decode bucket index [bucket] to its real value: `min + scale * bucket`. */
     fun realValue(bucket: Int): Double = min + scale * bucket

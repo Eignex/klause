@@ -1,5 +1,6 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -7,10 +8,13 @@ import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
+import com.eignex.klause.ir.EffectiveSourceSemantics
+import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.FloatRepresentation
 import com.eignex.klause.lowering.ProblemBuilder
@@ -79,19 +83,24 @@ import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.skema.SchemaDef
 import kotlin.math.roundToInt
 
-internal class Compiler(config: KlauseConfig) {
-    private val pinAbsentOptVars = config.pinAbsentOptVars
+internal class Compiler(config: KlauseConfig, overrides: SemanticOverrides) {
+    private val semantics = schemaSemantics(config, overrides)
     private val settings = config.problemSettings()
 
-    fun compile(def: SchemaDef<SchemaEntry>): CompiledSchema = Lowering(pinAbsentOptVars, settings).run(def)
+    fun compile(def: SchemaDef<SchemaEntry>): CompiledSchema = Lowering(settings, semantics).run(def)
 }
 
 /** Compile this schema definition into a solver-ready [CompiledSchema]. */
-fun SchemaDef<SchemaEntry>.compile(config: KlauseConfig = KlauseConfig.current): CompiledSchema =
-    Compiler(config).compile(this)
+fun SchemaDef<SchemaEntry>.compile(
+    config: KlauseConfig = KlauseConfig.current,
+    semanticOverrides: SemanticOverrides = SemanticOverrides(),
+): CompiledSchema = Compiler(config, semanticOverrides).compile(this)
 
-internal class Lowering(val pinAbsentOptVars: Boolean, settings: ProblemSettings) : CnfLowering {
-    private val problemBuilder = ProblemBuilder(settings)
+internal class Lowering(settings: ProblemSettings, val semantics: EffectiveSourceSemantics) : CnfLowering {
+    private val problemBuilder = ProblemBuilder(settings, semantics)
+    val pinAbsentOptVars = checkNotNull(semantics.effective.pinAbsentOptionalValues)
+    private val grid = semantics.effective.floats as? FloatSemantics.Grid
+    val floatBuckets = grid?.buckets ?: DEFAULT_FLOAT_BUCKETS
 
     override val factors get() = problemBuilder.factors
     val boolVarIdByName get() = problemBuilder.boolVarIdByName
@@ -420,8 +429,10 @@ internal class Lowering(val pinAbsentOptVars: Boolean, settings: ProblemSettings
 
 /** Compile this schema's [VariableSchema.definition] into a solver-ready [CompiledSchema],
  *  using [config] (defaults to the ambient [KlauseConfig.current]). */
-fun VariableSchema.compile(config: KlauseConfig = KlauseConfig.current): CompiledSchema =
-    Compiler(config).compile(this.definition())
+fun VariableSchema.compile(
+    config: KlauseConfig = KlauseConfig.current,
+    semanticOverrides: SemanticOverrides = SemanticOverrides(),
+): CompiledSchema = Compiler(config, semanticOverrides).compile(this.definition())
 
 // Schema-entry driver: turns a SchemaDef into a CompiledSchema by declaring variables,
 // asserting constraints, and packaging the engine state. Kept off the Lowering class so the
@@ -429,6 +440,10 @@ fun VariableSchema.compile(config: KlauseConfig = KlauseConfig.current): Compile
 
 private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     floatRepresentations = schemaFloatRepresentations(def)
+    require(semantics.effective.floats != FloatSemantics.Continuous ||
+        floatRepresentations.values.none { it.approximate }) {
+        "continuous schema float semantics cannot use a grid component"
+    }
     for ((name, entry) in def.entries) {
         when (entry) {
             is BoolSpec -> bindBoolName(name, newBoolVar())
@@ -464,7 +479,8 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
             }
 
             is FloatSpec -> {
-                floatDecoders[name] = entry
+                val buckets = entry.buckets ?: floatBuckets
+                floatDecoders[name] = entry.copy(buckets = buckets)
                 if (!floatRepresentations.getValue(name).approximate) {
                     // LP-only continuous column: a real variable the simplex resolves, no
                     // bucketing. `decode` reads it from `Sample.reals`; float-linear lowers to a real row.
@@ -472,13 +488,13 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
                 } else {
                     // Bucketed inline so `Problem.factors` stays pure int+bool; the parallel floatMeta*
                     // arrays record the bucket params the float-linear lowering reads.
-                    val intId = newIntVar(IntDomain(0L, (entry.buckets - 1).toLong()))
+                    val intId = newIntVar(IntDomain(0L, (buckets - 1).toLong()))
                     bindIntName(name, intId)
                     val fid = floatMetaIntervals.size
                     floatVarIdByName[name] = fid
                     floatMetaIntervals += FloatInterval(entry.min, entry.max)
                     floatMetaIntVarIds.add(intId)
-                    floatMetaBuckets.add(entry.buckets)
+                    floatMetaBuckets.add(buckets)
                 }
             }
 
@@ -527,7 +543,8 @@ private fun Lowering.emitOptVarPins(def: SchemaDef<SchemaEntry>) {
             floatDecoders.containsKey(base) -> {
                 val spec = floatDecoders.getValue(base)
                 val default = 0.0.coerceIn(spec.min, spec.max)
-                val bucket = ((default - spec.min) / spec.scale).roundToInt().coerceIn(0, spec.buckets - 1)
+                val bucket = ((default - spec.min) / spec.scale).roundToInt()
+                    .coerceIn(0, checkNotNull(spec.buckets) - 1)
                 assertExpr(Implies(absent, IntCompare(IntRef(base), IntCmpOp.EQ, IntLit(bucket))))
             }
 
