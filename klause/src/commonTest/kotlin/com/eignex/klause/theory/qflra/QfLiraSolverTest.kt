@@ -13,6 +13,8 @@ import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.UnitConsts
@@ -26,6 +28,7 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModelKey
+import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
@@ -547,6 +550,245 @@ class QfLiraSolverTest {
             assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, false))))
 
             assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+        }
+    }
+
+    @Test
+    fun `compatible real Boolean pins should retain a complete source witness`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 0.0),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, 1.0), LinearOp.EQ, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.LE, 1.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.GE, -1.0),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(0))
+
+            val point = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+            assertContentEquals(booleanArrayOf(true, true), point.bools)
+            assertEquals(listOf(BigFraction.ZERO, BigFraction.ZERO), point.reals)
+        }
+    }
+
+    @Test
+    fun `a strict complement should refute an otherwise compatible real point`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 0.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.LE, 1.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            assertNull(session.model().valueOf<ExactLraAssignment>(component))
+        }
+    }
+
+    @Test
+    fun `real point reuse should discard the retracted sibling coordinates`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-4.0, -4.0),
+            realUpper = doubleArrayOf(4.0, 4.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.GE, 1.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.GE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            val first = assertNotNull(assertIs<SearchResult.Satisfied>(session.solve(0)).model
+                .valueOf<ExactLraAssignment>(component)).reals
+            assertTrue(first[0] * BigFraction.ofLong(2) + first[1] >= BigFraction.ONE)
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            val second = assertNotNull(assertIs<SearchResult.Satisfied>(session.solve(0)).model
+                .valueOf<ExactLraAssignment>(component)).reals
+
+            assertTrue(second[0] * BigFraction.ofLong(2) + second[1] < BigFraction.ONE)
+        }
+    }
+
+    @Test
+    fun `a newly pinned Boolean coefficient should invalidate an incompatible real point`() {
+        for (positive in listOf(false, true)) {
+            val row = object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(2.0, 1.0), LinearOp.LE, 0.0) {
+                override val linearForm = LinearForm.Conjunction(listOf(TaggedLinearRow(
+                    intArrayOf(Term.ofLit(Lit.make(1, positive)), Term.ofRealVar(0), Term.ofRealVar(1)),
+                    RealConstants(RealConsts(doubleArrayOf(1.0)), RealConsts(doubleArrayOf(2.0, 1.0)), 0.0, false),
+                    LinearOp.LE,
+                )))
+            }
+            val source = Problem(
+                numBoolVars = 2,
+                intBounds = openBounds(0),
+                numRealVars = 2,
+                realLower = doubleArrayOf(0.0, 0.0),
+                realUpper = doubleArrayOf(0.0, 0.0),
+                factors = arrayOf(
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                        doubleArrayOf(2.0, 1.0), LinearOp.LE, 1.0),
+                    row,
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+                assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, positive))))
+
+                assertNull(session.model().valueOf<ExactLraAssignment>(component))
+            }
+        }
+    }
+
+    @Test
+    fun `a stopped real point verification should withhold the Boolean leaf`() {
+        var stopped = false
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 0.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.LE, 1.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.LE, 2.0),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), cancellation = Cancellation { stopped })
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            stopped = true
+
+            assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertNull(session.model().valueOf<ExactLraAssignment>(component))
+        }
+    }
+
+    @Test
+    fun `a private real bound should invalidate the earlier Boolean point`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, -2.0),
+            realUpper = doubleArrayOf(2.0, 2.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.LE, 1.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.GE, -1.0),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            val split = assertNotNull(SourceBoundAtom.rationalSplit(session,
+                listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ZERO))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(0))
+
+            val point = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+            assertTrue(point.reals[0] > BigFraction.ZERO)
+        }
+    }
+
+    @Test
+    fun `compatible real points should retain the containing check limit`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 0.0),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, 1.0), LinearOp.EQ, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.LE, 1.0),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), maxChecks = 1)
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertNull(session.model().valueOf<ExactLraAssignment>(component))
+        }
+    }
+
+    @Test
+    fun `a declined optional point check should retain ordinary source completion`() {
+        var optionalStopped = false
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 0.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.LE, 1.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.LE, 2.0),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            assertNotNull(component.partialPointHints(Cancellation { optionalStopped }))
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            optionalStopped = true
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(0))
+
+            assertEquals(listOf(BigFraction.ZERO, BigFraction.ZERO),
+                assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals)
         }
     }
 

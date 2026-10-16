@@ -106,6 +106,16 @@ remain invocation-owned. Retraction restores their premises and invalidates
 incompatible evidence. Open work and numerical limits retain their own currencies;
 a stopped source check withholds the witness or proof.
 
+An owned exact LP point can also remain feasible after a Boolean pin in the same
+pure-real LP scope. Newly resolved comparisons are checked exactly against that
+point after their actual LP assertions and premises are installed. Bounded scalar
+checks use the current operation token; an incompatible or declined comparison
+retains ordinary LP solving. The containing check allowance is still consumed.
+This reuse excludes graph openings, source disjunctions, private arithmetic
+branches and disequality direction state. Retraction and restart discard it.
+Reusing a partial point supplies no source verdict; a complete Boolean leaf still
+passes the original source-coordinate checks.
+
 Sources with no numeric coordinates or no Booleans retain traversal without this
 optional hint work. Integer-only registration is limited to the default-null
 primitive path; explicit allowances retain their existing producer admission.
