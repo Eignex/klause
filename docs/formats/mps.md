@@ -48,6 +48,11 @@ rendered objective values remain in source units when working rows or costs are 
 
 ## Source correspondence
 
+MPS lowering returns an engine-neutral `Problem` with its source columns, numbers
+and effective semantics retained for validation. The model-facing LP layer assembles
+numerical models and certificates from factor views. The format constructs no
+engine matrices, shifted columns, slack columns or engine-specific premise records.
+
 The MPS parser retains decimal source metadata, integer markers, bounds and
 objective sense. The lowered LP may restate continuous coefficients in binary64.
 An unconditional equality defining a free continuous column as an integral affine

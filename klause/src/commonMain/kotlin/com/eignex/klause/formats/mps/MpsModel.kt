@@ -4,7 +4,6 @@ import com.eignex.klause.ir.NumericAuthority
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
-import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.simplex.exact.BigFraction
 
 internal class MpsSourceNumber private constructor(
@@ -16,7 +15,6 @@ internal class MpsSourceNumber private constructor(
     val fraction: BigFraction
         get() = rational ?: requireNotNull(BigFraction.ofDouble(Double.fromBits(checkNotNull(ieeeBits))))
     val double: Double get() = Double.fromBits(projectionBits)
-    val isIeee: Boolean get() = ieeeBits != null
 
     fun plus(other: MpsSourceNumber): MpsSourceNumber = parsed(fraction + other.fraction, double + other.double)
 
@@ -25,15 +23,6 @@ internal class MpsSourceNumber private constructor(
     fun negated(): MpsSourceNumber = parsed(fraction.negated(), -double)
 
     fun absolute(): MpsSourceNumber = if (fraction.signum() < 0) negated() else this
-
-    fun toExactLpNumber(): ExactLpNumber = ieeeBits?.let { ExactLpNumber.ofIeee(Double.fromBits(it)) }
-        ?: ExactLpNumber.of(fraction)
-
-    fun toExactLpNumber(negated: Boolean): ExactLpNumber = if (!negated) {
-        toExactLpNumber()
-    } else {
-        ieeeBits?.let { ExactLpNumber.ofIeee(-Double.fromBits(it)) } ?: ExactLpNumber.of(fraction.negated())
-    }
 
     companion object {
         fun parsed(value: BigFraction, projection: Double = value.toDouble()): MpsSourceNumber =
