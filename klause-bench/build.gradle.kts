@@ -389,13 +389,22 @@ val checkJvmCompilationEvents = tasks.register<Exec>("checkJvmCompilationEvents"
         "tools/native_vm_event_loss.py")
 }
 
+val checkJvmClassOrigins = tasks.register<Exec>("checkJvmClassOrigins") {
+    group = "verification"
+    description = "Test saved class-load observations and recorded installed jar associations."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_read_jvm_class_origins.py")
+    inputs.files("tools/read_jvm_class_origins.py", "tools/test_read_jvm_class_origins.py")
+}
+
 val checkJvmCompilationCohort = tasks.register<Exec>("checkJvmCompilationCohort") {
     group = "verification"
     description = "Test authenticated saved JFR cohorts, complete exports and original case binding."
     workingDir(projectDir)
     commandLine("python3", "tools/test_review_jvm_compilation_cohort.py")
     inputs.files("tools/review_jvm_compilation_cohort.py", "tools/test_review_jvm_compilation_cohort.py",
-        "tools/jvm_compilation_events.py", "tools/review_jvm_task_log_cohort.py", "tools/review_jvm_task_log.py",
+        "tools/jvm_compilation_events.py", "tools/read_jvm_class_origins.py",
+        "tools/review_jvm_task_log_cohort.py", "tools/review_jvm_task_log.py",
         "tools/stream_jvm_task_log.py", "tools/review_native_vm_log_identities.py",
         "tools/review_native_vm_live_arguments.py", "tools/native_vm_event_loss.py")
 }
@@ -419,7 +428,8 @@ tasks.named("check") {
         checkNativeVmLiveArgumentReview, checkNativeVmEventLoss, checkNativeVmEventLossReview,
         checkNativeVmBoundaryEntries, checkNativeVmBoundaryLifecycle, checkNativeVmBoundaryLifecycleReview,
         checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkJvmTaskLog, checkJvmTaskLogCohort,
-        checkJvmTaskLogStreaming, checkJvmCompilationEvents, checkJvmCompilationCohort, checkJvmCompilationCosts, checkNativeVmEntryTransfers,
+        checkJvmTaskLogStreaming, checkJvmCompilationEvents, checkJvmClassOrigins, checkJvmCompilationCohort,
+        checkJvmCompilationCosts, checkNativeVmEntryTransfers,
         checkNativeVmDebugImage, checkNativeVmDwarfProvider, checkNativeVmDwarfRecords,
         checkNativeVmDwarfRecordReview, checkNativeVmDwarfContext, checkNativeVmDwarfLayoutReview,
         checkNativeVmEntryAbi, checkNativeVmTaskCalls, checkNativeVmTaskCallFlow,

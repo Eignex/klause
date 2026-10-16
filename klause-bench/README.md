@@ -2259,8 +2259,33 @@ outcome upgrade. Decoding completion supplies no complete lifetime, loss-free,
 source-phase, current-runtime or saving proof. Instrumented JFR durations do not
 replace independent runtime, allocation, quality, RNG/work or cold-run controls.
 
+Saved `class-load.log` files and numbered rotations are authenticated with every
+other archive member. All class-load observations and unparsed lines are retained
+separately, together with each original installed CLI manifest and the available
+harness provenance, requested options and study plan. A file URI can identify a
+recorded jar candidate only by its exact original distribution path and SHA-256;
+matching jar basenames do not establish an association. Shared archive sources,
+generated classes, missing manifests and conflicting observations remain unbound.
+Rotated or multiple logs do not supply a single complete origin stream.
+Class logs declared omitted by the primary source-filter inventory also prevent
+complete origin attribution. An append-only companion can restore those original
+bytes through `class-origins-manifest=`, `class-origins-manifest-sha256=` and
+`class-origins-archive=`. All three are required together. Its catalog must name
+the exact `primaryArchive`; only omitted class-log paths with identical original
+sizes and hashes may be added. Existing members cannot be replaced. Every
+companion member is authenticated, including unselected provenance, before log
+parsing. The primary archive remains immutable, and each restored log retains its
+own archive identity. Multiple process lifetimes or rotations are not combined.
+
+Every compilation root and inline caller/callee keeps a reference to its class
+association table, including missing or malformed method identities. Repeated
+class observations remain distinct. A recorded jar candidate does not establish
+class-loader identity, actual loaded byte digests, complete source phases or
+compiler savings. These observations do not change JFR/XML case completion,
+reported costs, eligibility or source/outcome proof flags.
+
 Bounds are 16 MiB for the manifest, 2 GiB compressed/16 GiB expanded for the
-archive, 8 GiB selected scratch inputs, 128 MiB per recording/XML and 32 MiB per
+archive, 8 GiB selected scratch inputs, 128 MiB per recording/XML/class log and 32 MiB per
 original metadata file. Each export allows 8 GiB of JSON, 8 MiB per event,
 four million events and one million retained root/inlining rows. A JFR child has
 300 seconds and 1 MiB of stderr; the enclosing review has 2400 seconds and kills
@@ -2268,7 +2293,11 @@ owned descendants on timeout. Derived reports allow 512 MiB expanded each;
 the whole compressed output stays below 512 MiB, leaving transfer headroom.
 Partial export, tool failure and resource declines retain explicit negatives and
 recoverable original input identities. Publication still requires source filtering
-and complete byte verification of every retained gzip payload.
+and complete byte verification of every retained gzip payload. Each class log
+allows 250,000 complete UTF-8 lines with at most 64 KiB per line; invalid UTF-8
+or a bound decline cannot authorize a parsed prefix.
+The primary and optional companion share the compressed archive, expanded member,
+member-count and selected-scratch bounds; each manifest keeps its 16 MiB limit.
 
 ### Saved JVM census cost comparisons
 

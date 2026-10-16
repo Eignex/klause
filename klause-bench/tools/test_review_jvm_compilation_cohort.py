@@ -19,6 +19,11 @@ class ReviewJvmCompilationCohortTest(unittest.TestCase):
             scratch.mkdir()
             contents = {'profile9/cases/a/cli.jfr': b'saved recording',
                         'profile9/cases/a/hotspot.xml': b'<hotspot_log/>',
+                        'profile9/cases/a/class-load.log': b'original log',
+                        'profile9/cases/a/class-load.log.0': b'original rotation',
+                        'profile9/cases/a/class-load.log.1.current': b'current rotation',
+                        'profile9/control-harness-provenance.json': b'{}',
+                        'profile9/study-plan.json': b'[]',
                         'profile9/cases.json': b'[]', 'profile9/study-report.json': b'x' * (200 * 1024)}
             archive = root / 'archive.tar.gz'
             with tarfile.open(archive, 'w:gz') as target:
@@ -120,6 +125,10 @@ class ReviewJvmCompilationCohortTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
             storage = review.cohort.StorageBudget(output)
+            class_origins = review.origins.parse(
+                io.BytesIO(b'[time][info][class,load] p.C source: file:/owned/cli/lib/core.jar\n'),
+                {'version': 1, 'launcher': '/owned/cli/bin/cli',
+                 'provenance': {'distribution': {'lib/core.jar': 'a' * 64}}})
             with patch.object(review.subprocess, 'Popen') as spawn, patch.object(review.threading, 'Timer'):
                 process = spawn.return_value
                 process.stdout = io.BytesIO(raw)
@@ -127,7 +136,7 @@ class ReviewJvmCompilationCohortTest(unittest.TestCase):
                 process.poll.return_value = 0
 
                 result = review.decode_recording(output / 'original.jfr', output, 0, Path('/jdk/bin/jfr'),
-                                                 storage, {}, 'control', {})
+                                                 storage, {}, 'control', {}, class_origins=class_origins)
 
             with gzip.open(output / result['exportFile']['path'], 'rb') as exported:
                 self.assertEqual(raw, exported.read())
@@ -138,6 +147,10 @@ class ReviewJvmCompilationCohortTest(unittest.TestCase):
             self.assertEqual(['print', '--json', '--events'], result['command'][1:4])
             self.assertTrue(all(result[flag] is False for flag in review.cohort.DENIED))
             self.assertNotIn('JAVA_TOOL_OPTIONS', spawn.call_args.kwargs['env'])
+            association = result['recordedInstalledClassOriginAssociations']
+            self.assertEqual([{'eventIndex': 0, 'classIndex': 0}], association['compilationClassReferences'])
+            self.assertEqual('a' * 64, association['classes'][0]['unambiguousRecordedInstalledJar']['sha256'])
+            self.assertFalse(association['runtimeSourceBindingProven'])
 
     def test_nonzero_tool_exit_cannot_promote_a_complete_json_prefix(self):
         raw = b'{"recording":{"events":[]}}'
@@ -210,7 +223,8 @@ class ReviewJvmCompilationCohortTest(unittest.TestCase):
                                             storage, {}, None, {})
 
     def test_case_metadata_missing_recordings_and_xml_errors_remain_explicit(self):
-        for variant in ('complete', 'metadata mismatch', 'missing recording', 'metadata only', 'malformed xml'):
+        for variant in ('complete', 'metadata mismatch', 'missing recording', 'metadata only', 'malformed xml',
+                        'class origins', 'rotated class origins', 'unparsed class origins', 'malformed provenance'):
             with self.subTest(variant=variant), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 output, scratch = root / 'out', root / 'scratch'
@@ -225,6 +239,17 @@ class ReviewJvmCompilationCohortTest(unittest.TestCase):
                             'profile9/cases.json': json.dumps(measurements).encode()}
                 if variant == 'missing recording':
                     del contents['profile9/cases/a/cli.jfr']
+                if variant in ('class origins', 'rotated class origins', 'unparsed class origins', 'malformed provenance'):
+                    contents['profile9/cases/a/class-load.log'] = \
+                        b'[time][info][class,load] p.C source: file:/owned/cli/lib/core.jar\n'
+                    contents['profile9/control-provenance.json'] = json.dumps({
+                        'version': 2 if variant == 'malformed provenance' else 1,
+                        'launcher': '/owned/cli/bin/cli',
+                        'provenance': {'distribution': {'lib/core.jar': 'a' * 64}}}).encode()
+                if variant == 'rotated class origins':
+                    contents['profile9/cases/a/class-load.log.0'] = contents['profile9/cases/a/class-load.log']
+                if variant == 'unparsed class origins':
+                    contents['profile9/cases/a/class-load.log'] += b'unparsed suffix\n'
                 archive = root / 'archive.tar.gz'
                 with tarfile.open(archive, 'w:gz') as target:
                     for name, raw in contents.items():
@@ -245,10 +270,13 @@ class ReviewJvmCompilationCohortTest(unittest.TestCase):
                     review.inspect(path, review.cohort.file_identity(path)['sha256'], archive, output, jfr, scratch, report)
 
                 self.assertTrue(report['completed'])
-                self.assertEqual(variant == 'complete', report['allCaseCensusesComplete'])
+                self.assertEqual(variant in ('complete', 'class origins', 'rotated class origins',
+                                            'unparsed class origins', 'malformed provenance'),
+                                 report['allCaseCensusesComplete'])
                 self.assertEqual(['a'], [row['caseDirectory'] for row in report['cases']])
                 self.assertFalse(report['cases'][0]['originalContextCopiedVerbatim']['sourceHashesMatch'])
                 self.assertFalse(report['cases'][0]['acceptedSavingsCredit'])
+                self.assertEqual(variant == 'class origins', report['cases'][0]['recordedClassOriginsComplete'])
                 if variant == 'metadata mismatch':
                     self.assertFalse(report['cases'][0]['measurementMatchesCasesJson'])
                 if variant == 'malformed xml':
@@ -281,6 +309,86 @@ class ReviewJvmCompilationCohortTest(unittest.TestCase):
                                root / 'jfr', scratch, {})
 
             decode.assert_not_called()
+
+    def test_companion_restores_only_authenticated_original_omitted_class_logs(self):
+        for variant in ('complete', 'no companion', 'wrong primary', 'wrong member', 'overlap', 'extra case',
+                        'corrupt provenance', 'expanded bound', 'selected bound'):
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                output, scratch = root / 'out', root / 'scratch'
+                output.mkdir()
+                scratch.mkdir()
+                original = {'case': 'a', 'arm': 'control', 'sourceHashesMatch': False}
+                log = b'[time][info][class,load] p.C source: file:/owned/cli/lib/core.jar\n'
+                omitted = 'profile9/cases/a/class-load.log.0'
+                contents = {'profile9/cases/a/cli.jfr': b'original recording',
+                            'profile9/cases/a/hotspot.xml': b'<hotspot_log/>',
+                            'profile9/cases/a/class-load.log': log,
+                            'profile9/cases/a/measurement.json': json.dumps(original).encode(),
+                            'profile9/cases.json': json.dumps([original]).encode(),
+                            'profile9/control-provenance.json': json.dumps({'version': 1,
+                                'launcher': '/owned/cli/bin/cli',
+                                'provenance': {'distribution': {'lib/core.jar': 'a' * 64}}}).encode()}
+                additional = {omitted: b'different' if variant == 'wrong member' else log,
+                              'provenance/identity.txt': b'original companion metadata'}
+                if variant == 'overlap':
+                    additional['profile9/cases/a/class-load.log'] = additional.pop(omitted)
+                if variant == 'extra case':
+                    additional['profile9/cases/b/class-load.log.0'] = additional.pop(omitted)
+                archives, manifests = [], []
+                for index, files in enumerate([contents, additional]):
+                    archive = root / f'archive{index}.tar.gz'
+                    with tarfile.open(archive, 'w:gz') as target:
+                        for name, raw in files.items():
+                            info = tarfile.TarInfo(name)
+                            info.size = len(raw)
+                            target.addfile(info, io.BytesIO(raw))
+                    manifests.append({'archive': {'name': archive.name, **review.cohort.file_identity(archive)},
+                                      'files': {name: {'size': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+                                                for name, raw in files.items()}})
+                    archives.append(archive)
+                manifests[0]['catalog'] = {'sourceFilterFileInventory': {'omittedButPrivatelyRetained': [
+                    {'path': 'cases/a/class-load.log.0', 'bytes': len(log), 'sha256': hashlib.sha256(log).hexdigest()}]}}
+                manifests[1]['catalog'] = {'primaryArchive': dict(manifests[0]['archive'])}
+                if variant == 'wrong primary':
+                    manifests[1]['catalog']['primaryArchive']['sha256'] = 'b' * 64
+                if variant == 'corrupt provenance':
+                    manifests[1]['files']['provenance/identity.txt']['sha256'] = 'b' * 64
+                paths = [root / 'manifest0.json', root / 'manifest1.json']
+                for path, manifest in zip(paths, manifests):
+                    path.write_text(json.dumps(manifest))
+                jfr = root / 'jfr'
+                jfr.write_bytes(b'observer tool identity')
+                report = {}
+                field = 'MAX_SELECTED_BYTES' if variant == 'selected bound' else 'MAX_EXPANDED_BYTES'
+                module = review if variant == 'selected bound' else review.cohort
+                maximum = sum(len(raw) for raw in contents.values()) + len(log) - 1 \
+                    if variant in ('selected bound', 'expanded bound') else getattr(module, field)
+                supplement = (paths[1], review.cohort.file_identity(paths[1])['sha256'], archives[1]) \
+                    if variant != 'no companion' else None
+
+                with patch.object(module, field, maximum), patch.object(review, 'decode_recording', return_value={
+                        'completed': True, **{flag: False for flag in review.cohort.DENIED}}) as decode:
+                    if variant in ('complete', 'no companion'):
+                        review.inspect(paths[0], review.cohort.file_identity(paths[0])['sha256'], archives[0],
+                                       output, jfr, scratch, report, supplement)
+                    else:
+                        with self.assertRaises(ValueError):
+                            review.inspect(paths[0], review.cohort.file_identity(paths[0])['sha256'], archives[0],
+                                           output, jfr, scratch, report, supplement)
+                        decode.assert_not_called()
+                        continue
+
+                case = report['cases'][0]
+                self.assertTrue(report['allCaseCensusesComplete'])
+                self.assertFalse(case['recordedClassOriginsComplete'])
+                self.assertFalse(case['acceptedSavingsCredit'])
+                if variant == 'complete':
+                    self.assertTrue(report['classOriginSupplementInventory']['allArchiveMemberBytesVerified'])
+                    self.assertEqual({'primary', 'companion'}, {r['sourceArchive'] for r in case['classOriginInputs']})
+                    self.assertEqual({}, case['omittedClassOriginMembersNotRestored'])
+                else:
+                    self.assertEqual({omitted}, set(case['omittedClassOriginMembersNotRestored']))
 
 
 if __name__ == '__main__':
