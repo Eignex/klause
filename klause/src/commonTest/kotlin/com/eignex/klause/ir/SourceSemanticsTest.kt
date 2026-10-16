@@ -109,7 +109,10 @@ class SourceSemanticsTest {
 
         val resolved = declared.resolve(SemanticOverrides(floats = FloatSemantics.Continuous))
 
-        assertEquals(UndeclaredRealBounds(SemanticRational.ofLong(-10), SemanticRational.ofLong(10)), resolved.effective.undeclaredReals)
+        assertEquals(
+            UndeclaredRealBounds(SemanticRational.ofLong(-10), SemanticRational.ofLong(10)),
+            resolved.effective.undeclaredReals,
+        )
         assertFalse(resolved.isApproximate)
         assertTrue(declared.resolve().isApproximate)
     }
@@ -166,7 +169,9 @@ class SourceSemanticsTest {
         for (format in listOf(SourceFormat.FLATZINC, SourceFormat.SMTLIB, SourceFormat.MPS)) {
             val declared = SourceSemantics(format, undeclaredIntegers = UndeclaredIntegerBounds())
             val resolved = declared.resolve(
-                SemanticOverrides(undeclaredIntegers = BoundsOverride(BoundOverride.Value(-20), BoundOverride.Value(30))),
+                SemanticOverrides(
+                    undeclaredIntegers = BoundsOverride(BoundOverride.Value(-20), BoundOverride.Value(30)),
+                ),
             )
 
             assertEquals(replacement, resolved.effective.undeclaredIntegers)
