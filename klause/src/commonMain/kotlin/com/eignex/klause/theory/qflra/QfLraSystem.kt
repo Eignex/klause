@@ -10,6 +10,7 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.lp.asFraction
+import com.eignex.klause.lp.bounding.LpPremisedBound
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
@@ -19,6 +20,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
@@ -210,6 +212,47 @@ internal class LiveQfLraSystem(
         return true
     }
 
+    fun assertComparisons(comparisons: List<Pair<ExactComparison, SearchAtomPremise>>): SmtAssertionResult {
+        val pending = ArrayList<LpPremisedBound>()
+        fun flush(): SmtAssertionResult {
+            val result = lp.assertBounds(pending)
+            pending.clear()
+            return when (result) {
+                is LpBoundBatchResult.Applied -> SmtAssertionResult.Applied
+                is LpBoundBatchResult.Conflict -> SmtAssertionResult.Conflict
+                is LpBoundBatchResult.Declined -> SmtAssertionResult.Declined
+            }
+        }
+        for ((comparison, premise) in comparisons) {
+            if (comparison.op == LinearOp.NE) return SmtAssertionResult.Declined
+            val keys = preparedTerms[comparison.ordered] ?: SmtRowKeys(comparison.terms)
+            val rows = ArrayList<ExactRationalInequality>(2)
+            comparison.rowsInto(rows)
+            for ((index, row) in rows.withIndex()) {
+                val negated = comparison.op == LinearOp.GE || (comparison.op == LinearOp.EQ && index == 1)
+                val key = if (negated) keys.negative else keys.positive
+                val bound = prepareTerms(key, true, row.rhs, row.strict, premise)
+                    ?: return SmtAssertionResult.Declined
+                if (lp.state?.depth == 0 && bound.column < columns) {
+                    // A structural root side can fix a source column used to normalize the following row.
+                    val flushed = flush()
+                    if (flushed != SmtAssertionResult.Applied) return flushed
+                    if (!lp.assertBound(bound.column, bound.upper, bound.side, bound.premise)) {
+                        return SmtAssertionResult.Declined
+                    }
+                    if (lp.state?.conflict != null) return SmtAssertionResult.Conflict
+                } else {
+                    pending += bound
+                    if (pending.size == 64) {
+                        val flushed = flush()
+                        if (flushed != SmtAssertionResult.Applied) return flushed
+                    }
+                }
+            }
+        }
+        return flush()
+    }
+
     fun disequalitySide(comparison: ExactComparison): DerivedDisequalitySide? {
         val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
         val fixed = rootFixedColumns(key.columns)
@@ -265,6 +308,17 @@ internal class LiveQfLraSystem(
         strict: Boolean,
         premise: SearchAtomPremise,
     ): Boolean {
+        val bound = prepareTerms(key, upper, threshold, strict, premise) ?: return false
+        return lp.assertBound(bound.column, bound.upper, bound.side, bound.premise)
+    }
+
+    private fun prepareTerms(
+        key: SmtTermKey,
+        upper: Boolean,
+        threshold: BigFraction,
+        strict: Boolean,
+        premise: SearchAtomPremise,
+    ): LpPremisedBound? {
         val fixed = rootFixedColumns(key.columns)
         val slot = if (fixed.isEmpty()) {
             key.slot ?: normalized.getOrPut(key) { SmtTermSlot(intern(key.expression(), declaredFixed)) }
@@ -273,9 +327,9 @@ internal class LiveQfLraSystem(
             SmtTermSlot(intern(key.expression(), declaredFixed + fixed))
         }
         val term = slot.term
-        val column = slot.column.takeIf { it >= 0 } ?: (definitionColumn(term.coefficients) ?: return false)
+        val column = slot.column.takeIf { it >= 0 } ?: (definitionColumn(term.coefficients) ?: return null)
         slot.column = column
-        return lp.assertBound(
+        return LpPremisedBound(
             column,
             if (term.scale.signum() < 0) !upper else upper,
             ExactLpSide(ExactLpNumber.of(term.bound(threshold)), strict),
@@ -336,6 +390,12 @@ internal class LiveQfLraSystem(
 }
 
 internal data class DerivedDisequalitySide(val direction: LinearOp, val premise: SearchAtomPremise)
+
+internal enum class SmtAssertionResult {
+    Applied,
+    Conflict,
+    Declined,
+}
 
 // A term as a lookup key: columns ascending, with the hash taken once, since every theory check reasserts the same
 // rows and a map-keyed lookup pays a hash probe per entry to compare.

@@ -968,6 +968,17 @@ class ExactLiraSearchComponent private constructor(
     private fun assertSource(context: SearchContext): Boolean {
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
+        val comparisons = ArrayList<Pair<ExactComparison, SearchAtomPremise>>()
+        val assertionRows = ArrayList<Int>()
+        fun flush(): SmtAssertionResult {
+            val result = system.assertComparisons(comparisons)
+            if (result == SmtAssertionResult.Applied) {
+                for (index in assertionRows) sourceAssertionLevels[index] = context.decisionLevel
+            }
+            comparisons.clear()
+            assertionRows.clear()
+            return result
+        }
         for ((index, prepared) in preparedRows.withIndex()) {
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
@@ -985,9 +996,21 @@ class ExactLiraSearchComponent private constructor(
             if (comparison.op == LinearOp.NE) {
                 disequalities += Triple(address, comparison, premise)
             } else {
-                if (!system.assertComparison(comparison, null, premise)) return false
-                sourceAssertionLevels[index] = context.decisionLevel
+                comparisons += comparison to premise
+                assertionRows += index
+                if (comparisons.size == 64) {
+                    when (flush()) {
+                        SmtAssertionResult.Applied -> Unit
+                        SmtAssertionResult.Conflict -> return true
+                        SmtAssertionResult.Declined -> return false
+                    }
+                }
             }
+        }
+        when (flush()) {
+            SmtAssertionResult.Applied -> Unit
+            SmtAssertionResult.Conflict -> return true
+            SmtAssertionResult.Declined -> return false
         }
         for (atom in node.sourceBranches) {
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)

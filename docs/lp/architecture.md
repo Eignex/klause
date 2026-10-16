@@ -16,6 +16,14 @@ engine receives its existing exact bound assertions; it acquires no search types
 Contradiction stops the batch at its first conflicting prefix, and a decline retains
 the previous state and witness map. Callers retain spent per-bound edit accounting.
 
+Exact-linear source installation groups comparison sides into batches of at most
+64 bounds, retaining the existing per-bound edit debit and independent premises.
+At the root, structural source-column bounds are applied immediately between
+batches so subsequent rows normalize through the same established fixed columns.
+Logical definition bounds do not fix source columns and can share a snapshot.
+A conflict retains only its committed prefix; a declined batch advances no source
+assertion marks. Retraction and full-source acceptance keep their existing scopes.
+
 This page covers engine boundaries, exact authority and consumer integration before
 private basis mechanics. [Certification](certification.md) defines accepted proof
 packages; [dependency integration](dependencies.md) defines kernel interfaces.

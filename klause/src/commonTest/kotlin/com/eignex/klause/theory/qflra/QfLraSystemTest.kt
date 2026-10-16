@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.lp.bounding.LpEffortProfile
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
@@ -406,6 +407,128 @@ class QfLraSystemTest {
             assertEquals(0, assertNotNull(lp.state).model.m)
             assertTrue(assertNotNull(lp.state).model.column(1).integral)
             assertFalse(assertNotNull(lp.state).model.column(0).integral)
+        }
+    }
+
+    @Test
+    fun `a comparison batch should retain the first conflicting prefix and its premises`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            repeat(3) { session.push(SearchDecision.Bool(Lit.make(it, true))) }
+            val terms = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ofLong(2))
+            val comparisons = listOf(
+                ExactComparison(terms, BigFraction.ofLong(3), LinearOp.LE, false, true) to premise(0),
+                ExactComparison(terms, BigFraction.ofLong(4), LinearOp.GE, false, true) to premise(1),
+                ExactComparison(terms, BigFraction.ONE, LinearOp.LE, false, true) to premise(2),
+            )
+
+            assertEquals(SmtAssertionResult.Conflict, system.assertComparisons(comparisons))
+
+            val upper = assertNotNull(lp.state?.activeSide(2, true))
+            assertEquals(BigFraction.ofLong(3), upper.side.number.value)
+            assertEquals(listOf(Lit.make(0, false)),
+                assertNotNull(session.explainAtoms(lp.boundPremise(upper.witness))).literals.toList())
+            val lower = assertNotNull(lp.state?.activeSide(2, false))
+            assertEquals(listOf(Lit.make(1, false)),
+                assertNotNull(session.explainAtoms(lp.boundPremise(lower.witness))).literals.toList())
+        }
+    }
+
+    @Test
+    fun `a comparison batch should preserve strict contradictions`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(lp.atLevel(1))
+            val terms = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ofLong(2))
+            val comparisons = listOf(
+                ExactComparison(terms, BigFraction.ONE, LinearOp.LE, true, true) to axiom,
+                ExactComparison(terms, BigFraction.ONE, LinearOp.GE, false, true) to axiom,
+            )
+
+            assertEquals(SmtAssertionResult.Conflict, system.assertComparisons(comparisons))
+
+            assertTrue(assertNotNull(lp.state?.activeSide(2, true)).side.strict)
+        }
+    }
+
+    @Test
+    fun `root comparison batches should normalize through preceding fixed source columns`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val comparisons = listOf(
+                ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ONE, LinearOp.EQ, false, true) to axiom,
+                ExactComparison(mapOf(0 to BigFraction.ONE, 1 to BigFraction.ofLong(2)),
+                    BigFraction.ofLong(3), LinearOp.LE, false, true) to axiom,
+                ExactComparison(mapOf(1 to BigFraction.ONE), BigFraction.ofLong(2),
+                    LinearOp.GE, false, true) to axiom,
+            )
+
+            assertEquals(SmtAssertionResult.Conflict, system.assertComparisons(comparisons))
+
+            assertEquals(BigFraction.ONE, assertNotNull(lp.state?.activeSide(1, true)).side.number.value)
+            assertEquals(BigFraction.ofLong(2), assertNotNull(lp.state?.activeSide(1, false)).side.number.value)
+        }
+    }
+
+    @Test
+    fun `comparison batches should retain per-bound edit charges`() {
+        val charges = ArrayList<Long>()
+        for (batch in listOf(false, true)) {
+            var charged = 0L
+            LpPropagator(object : LpSearchPolicy {}, onEdit = { charged += it }).use { lp ->
+                val system = LiveQfLraSystem(source(), lp)
+                assertTrue(system.install())
+                assertTrue(lp.atLevel(1))
+                val before = charged
+                val terms = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ofLong(2))
+                val comparisons = listOf(
+                    ExactComparison(terms, BigFraction.ONE, LinearOp.LE, false, true) to axiom,
+                    ExactComparison(terms, BigFraction.ZERO, LinearOp.GE, false, true) to axiom,
+                )
+
+                if (batch) {
+                    assertEquals(SmtAssertionResult.Applied, system.assertComparisons(comparisons))
+                } else {
+                    for ((comparison, premise) in comparisons) {
+                        assertTrue(system.assertComparison(comparison, null, premise))
+                    }
+                }
+
+                charges += charged - before
+            }
+        }
+        assertEquals(listOf(6L, 6L), charges)
+    }
+
+    @Test
+    fun `a comparison batch should discard stronger sibling bounds on retraction`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            val terms = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ofLong(2))
+            assertEquals(SmtAssertionResult.Applied, system.assertComparisons(listOf(
+                ExactComparison(terms, BigFraction.ONE, LinearOp.LE, false, true) to premise(0),
+            )))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+            assertEquals(SmtAssertionResult.Applied, system.assertComparisons(listOf(
+                ExactComparison(terms, BigFraction.ofLong(3), LinearOp.LE, false, true) to premise(1),
+            )))
+
+            val upper = assertNotNull(lp.state?.activeSide(2, true))
+            assertEquals(BigFraction.ofLong(3), upper.side.number.value)
+            assertEquals(listOf(Lit.make(1, false)),
+                assertNotNull(session.explainAtoms(lp.boundPremise(upper.witness))).literals.toList())
         }
     }
 
