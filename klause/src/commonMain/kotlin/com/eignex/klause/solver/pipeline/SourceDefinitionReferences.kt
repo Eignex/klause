@@ -10,6 +10,7 @@ internal class SourceDefinitionReferences(definedVars: IntArray, boolFolds: List
     val folds = boolFolds.map { BoolFoldDefinition(it.out, it.lits.copyOf(), it.isAnd) }
 
     fun remapped(coordinates: VarRemap, cancellation: Cancellation): SourceDefinitionReferences? {
+        if (cancellation()) return null
         val mappedIntegers = ArrayList<Int>()
         for (id in integers) {
             cancellation.charge(1)
