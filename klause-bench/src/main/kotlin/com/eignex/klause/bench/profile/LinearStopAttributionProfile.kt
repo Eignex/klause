@@ -9,17 +9,15 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.lang.management.ManagementFactory
-import java.net.URLClassLoader
-import java.util.Base64
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -27,6 +25,10 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import java.net.URLClassLoader
+import java.util.Base64
 
 internal object LinearStopAttributionProfile {
     @JvmStatic
@@ -44,18 +46,23 @@ internal object LinearStopAttributionProfile {
         require(Runtime.getRuntime().availableProcessors() == 1)
         out.resolve("request.json").writeBytes(request)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        out.resolve("runtime.json").writeText(buildJsonObject {
+        out.resolve("runtime.json").writeText(
+            buildJsonObject {
             put("revision", Reports.readGitSha())
             put("javaVersion", System.getProperty("java.version"))
             put("processors", Runtime.getRuntime().availableProcessors())
-            put("jvmOptions", buildJsonArray {
+            put(
+                "jvmOptions",
+                buildJsonArray {
                 ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-            })
+            }
+            )
             put("entryPoint", "installed-cli-frontend-and-public-pipeline")
             put("cliDriverExecuted", false)
             put("timeoutMs", 60000)
             put("nativeLimitsChanged", false)
-        }.toString() + "\n")
+        }.toString() + "\n"
+        )
         val jars = SolverInvocation.klauseCliBin().canonicalFile.parentFile.parentFile.resolve("lib")
             .listFiles().orEmpty().filter { it.extension == "jar" }.sortedBy { it.name }
         require(jars.isNotEmpty())
@@ -64,17 +71,21 @@ internal object LinearStopAttributionProfile {
         require(sha256(loaded.readBytes()) == sha256(installed.readBytes())) {
             "harness and installed CLI load different solver bytes"
         }
-        out.resolve("loaded-solver.json").writeText(buildJsonObject {
+        out.resolve("loaded-solver.json").writeText(
+            buildJsonObject {
             put("path", loaded.path)
             put("sha256", sha256(loaded.readBytes()))
             put("installedCliSolver", installed.path)
-        }.toString() + "\n")
+        }.toString() + "\n"
+        )
         URLClassLoader(jars.map { it.toURI().toURL() }.toTypedArray(), javaClass.classLoader).use { loader ->
             val access = LinearCliAccess(loader)
             for ((index, source) in sources.withIndex()) {
                 val directory = out.resolve(index.toString()).apply { mkdirs() }
                 val ref = Catalog.uncapped(source.suite).problems.single { it.name == source.problem }
-                val bytes = CorpusFiles.open(CorpusFetcher.resolve(ref.source)).use { it.readNBytes(32 * 1024 * 1024 + 1) }
+                val bytes = CorpusFiles.open(
+                    CorpusFetcher.resolve(ref.source),
+                ).use { it.readNBytes(32 * 1024 * 1024 + 1) }
                 require(bytes.size <= 32 * 1024 * 1024 && sha256(bytes) == source.sha256)
                 val input = directory.resolve("source.smt2").apply { writeBytes(bytes) }
                 val order = if (source.bounded) listOf(false, true, true, false) else listOf(false, true)
@@ -89,7 +100,11 @@ internal object LinearStopAttributionProfile {
 
 @Serializable
 private data class LinearStopSource(
-    val suite: String, val problem: String, val sha256: String, val seed: Long, val bounded: Boolean = false,
+    val suite: String,
+    val problem: String,
+    val sha256: String,
+    val seed: Long,
+    val bounded: Boolean = false,
 )
 
 private class LinearCliAccess(private val loader: ClassLoader) {
@@ -143,34 +158,54 @@ private class LinearCliAccess(private val loader: ClassLoader) {
         val allowance = coreType.declaredMethods.single { it.name.startsWith("presolveAllowance") }
             .apply { isAccessible = true }.invoke(core, common, containing) as Pair<*, *>
         val preparation = LinearObservedStop(allowance.first as Cancellation, observed)
-        val params = TheoryParams(timeout = containing, cancellation = containing, randomSeed = source.seed,
+        val params = TheoryParams(
+            timeout = containing,
+            cancellation = containing,
+            randomSeed = source.seed,
             maxDecisions = if (source.bounded) 8 else Long.MAX_VALUE,
             maxFlips = if (source.bounded) 4 else Long.MAX_VALUE,
-            maxInstructions = if (source.bounded) 10000L else null)
+            maxInstructions = if (source.bounded) 10000L else null,
+        )
         val request = pipeline.javaClass.methods.singleOrNull { it.name == "getRequest" }?.invoke(pipeline)
             as? OpenTheoryRequest
         val model = request?.model ?: get(pipeline, "Model") as Problem
         val prepared = request?.preparedPlan
         val execution = if (request != null) {
             val presolve = config.javaClass.getMethod("presolveConfig").invoke(config)
-                as com.eignex.klause.presolve.PresolveConfig
-            OpenTheoryPipeline.execute(request.withPresolve(presolve, cancellation = preparation,
-                budget = allowance.second as? PresolveBudget), params,
-                if (source.bounded) FiniteEngine.BACKTRACK else FiniteEngine.DEFAULT, 1)
+                as PresolveConfig
+            OpenTheoryPipeline.execute(
+                request.withPresolve(
+                    presolve,
+                    cancellation = preparation,
+                    budget = allowance.second as? PresolveBudget,
+                ),
+                params,
+                if (source.bounded) FiniteEngine.BACKTRACK else FiniteEngine.DEFAULT,
+                1,
+            )
         } else {
             require(pipeline.javaClass.simpleName == "OpenLocalSearch")
-            OpenTheoryPipeline.searchWithoutTheory(model, params, null,
-                if (source.bounded) FiniteEngine.LOCAL_SEARCH else FiniteEngine.DEFAULT, 1)
+            OpenTheoryPipeline.searchWithoutTheory(
+                model,
+                params,
+                null,
+                if (source.bounded) FiniteEngine.LOCAL_SEARCH else FiniteEngine.DEFAULT,
+                1,
+            )
         }
         val result = (execution as OpenTheoryExecution.Satisfy).result
         val stats = result.stats
         val work = stats.openTheory
         out.resolve("stats.txt").writeText(stats.toString() + "\n")
-        val pairs = loader.loadClass(prefix + "CliStatsKt").getDeclaredMethod("openTheoryStatPairs",
-            com.eignex.klause.solver.result.SolveStats::class.java, Long::class.javaPrimitiveType)
+        val pairs = loader.loadClass(prefix + "CliStatsKt").getDeclaredMethod(
+            "openTheoryStatPairs",
+            SolveStats::class.java,
+            Long::class.javaPrimitiveType,
+        )
             .invoke(null, stats, stats.run.wallMs) as List<*>
         out.resolve("stat-pairs.txt").writeText(pairs.joinToString("\n") + "\n")
-        out.resolve("result.json").writeText(buildJsonObject {
+        out.resolve("result.json").writeText(
+            buildJsonObject {
             put("observed", observed)
             put("boundedControl", source.bounded)
             put("engine", if (source.bounded) (if (request != null) "backtrack" else "localsearch") else "mixed")
@@ -198,7 +233,8 @@ private class LinearCliAccess(private val loader: ClassLoader) {
             put("routingStop", Json.encodeToString(routingStop.observation))
             put("preparationStop", Json.encodeToString(preparation.observation))
             put("containingStop", Json.encodeToString(containing.observation))
-        }.toString() + "\n")
+        }.toString() + "\n"
+        )
     }
 
     private fun set(owner: Any, name: String, value: Any) {
@@ -218,8 +254,11 @@ internal class LinearObservedStop(private val delegate: Cancellation, private va
     override fun isCancelled(): Boolean {
         val cancelled = delegate.isCancelled()
         if (cancelled && observed && observation == null) {
-            observation = LinearStopObservation(System.nanoTime(), Thread.currentThread().stackTrace
-                .take(96).map { it.toString() })
+            observation = LinearStopObservation(
+                System.nanoTime(),
+                Thread.currentThread().stackTrace
+                .take(96).map { it.toString() }
+            )
         }
         return cancelled
     }
