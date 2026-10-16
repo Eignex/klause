@@ -1,13 +1,33 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class SmtLibBooleanDefinitionsTest {
+    @Test
+    fun `cancelled empty Boolean definitions should not emit a constant`() {
+        for (conjunction in listOf(false, true)) {
+            val builder = Compiler.Builder(DEFAULT_UNBOUNDED_INT_LO, DEFAULT_UNBOUNDED_INT_HI,
+                strictBounds = false, sourceCancellation = Cancellation { true })
+
+            assertFailsWith<PolynomialSourceInterrupted> {
+                if (conjunction) builder.reifyAnd(emptyList()) else builder.reifyOr(emptyList())
+            }
+
+            assertTrue(builder.factors.isEmpty())
+            assertEquals(0, builder.nextBool)
+        }
+    }
+
     @Test
     fun `one comparison should not allocate a singleton Boolean wrapper`() {
         for (sort in listOf("Int", "Real")) {
