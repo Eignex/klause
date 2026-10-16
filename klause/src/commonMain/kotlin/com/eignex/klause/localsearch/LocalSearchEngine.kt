@@ -768,7 +768,7 @@ internal class LocalSearchEngine(
         var cancelCountdown = 0
         var lastCheckMs = 0L
         var nextMoveCompletion = 0L
-        val completedMoves = if (completion != null && problem.numRealVars > 0 && objective is LinearObjective &&
+        val completedMoves = if (false && completion != null && problem.numRealVars > 0 && objective is LinearObjective &&
             objective.realCoefficientValues.any { it != 0.0 } && problem.numBoolVars + problem.numIntVars > 0 &&
             feasibleMode == FeasibleDescent.SelfOwned
         ) CompletedMoveEvaluation(
