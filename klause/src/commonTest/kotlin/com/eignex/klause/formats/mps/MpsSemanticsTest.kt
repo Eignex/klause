@@ -136,8 +136,10 @@ class MpsSemanticsTest {
             assertTrue(model.sourceExact)
             assertTrue(model.model.factors.flatMap { it.linearRows }.all { row ->
                 val constants = row.constants as IntegralConstants
-                BigFraction.of(constants.exactCoeff(0), BIG_ONE) * value ==
-                    BigFraction.of(constants.exactBound, BIG_ONE)
+                val activity = (0 until row.size).fold(BigFraction.ZERO) { sum, index ->
+                    sum + BigFraction.of(constants.exactCoeff(index), BIG_ONE) * value
+                }
+                activity == BigFraction.of(constants.exactBound, BIG_ONE)
             })
             assertFailsWith<MpsLoweringException> {
                 model.sourceWitness(listOf(checkNotNull(BigFraction.ofDouble(1.0 / 3))))
