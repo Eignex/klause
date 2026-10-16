@@ -137,10 +137,6 @@ class MpsCompiled(
         }
     }
 
-    internal fun withSourceModel(source: MpsModel, mismatch: String?, toleranceMismatch: String?): MpsCompiled =
-        withLinearSource(checkNotNull(source.captureLinearSource(semantics, Cancellation.Never)),
-            mismatch, toleranceMismatch)
-
     internal fun withLinearSource(
         source: LinearSourceProblem,
         mismatch: String?,
@@ -310,14 +306,15 @@ fun MpsModel.toProblem(
     settings: ProblemSettings = KlauseConfig.current.problemSettings(),
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ): MpsCompiled {
-    val effectiveSemantics = semantics.resolve(semanticOverrides)
-    return effectiveDeclarations(effectiveSemantics).lowerProblem(settings, effectiveSemantics)
+    val source = checkNotNull(toLinearSourceProblem(semanticOverrides))
+    return effectiveDeclarations(source.semantics).lowerProblem(settings, source)
 }
 
 private fun MpsModel.lowerProblem(
     settings: ProblemSettings,
-    effectiveSemantics: EffectiveSourceSemantics,
+    source: LinearSourceProblem,
 ): MpsCompiled {
+    val effectiveSemantics = source.semantics
     val exactInput = exactAdapterSnapshot()
     val sourceNumbers = exactInput.sourceNumbers()
     if (sourceNumbers.variableBounds.any { (lower, upper) ->
@@ -326,8 +323,8 @@ private fun MpsModel.lowerProblem(
                     it.fraction <= MPS_INFINITY_EXACT.negated() || it.fraction >= MPS_INFINITY_EXACT)
             }
         }
-    ) return exactInput.lowerExactSource(settings, effectiveSemantics)
-    if (constraints.any { it.indicator != null }) return exactInput.lowerExactSource(settings, effectiveSemantics)
+    ) return source.compileMpsView(settings, allowProjection = false)
+    if (constraints.any { it.indicator != null }) return source.compileMpsView(settings, allowProjection = false)
     val integralDefinitions = integralDefinitions(sourceNumbers)
     val isFloat = BooleanArray(variables.size) { !variables[it].integer && integralDefinitions[it] == null }
     if (integralDefinitions.any { it != null }) {
@@ -443,7 +440,7 @@ private fun MpsModel.lowerProblem(
     if (mismatch != null && (numInt > 0 ||
             checkNotNull(effectiveSemantics.effective.feasibilityTolerance).isExact)
     ) {
-        return exactInput.lowerExactSource(settings, effectiveSemantics)
+        return source.compileMpsView(settings, allowProjection = false)
     }
     return MpsCompiled(
         model,
@@ -452,7 +449,7 @@ private fun MpsModel.lowerProblem(
         columns,
         if (objectiveRow == null) objRowScale.multiplier else 1L,
         variables.count { !it.integer },
-    ).withSourceModel(exactInput, mismatch, exactInput.toleranceMismatch(isFloat, objRowScale, objectiveRow))
+    ).withLinearSource(source, mismatch, exactInput.toleranceMismatch(isFloat, objRowScale, objectiveRow))
 }
 
 internal fun MpsModel.exactAdapterSnapshot(): MpsModel = MpsModel(
