@@ -1,14 +1,13 @@
 package com.eignex.klause.bound
 
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
-import com.eignex.klause.util.constructionIntArray
-import com.eignex.klause.util.constructionLongArray
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -16,6 +15,8 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.addExact
+import com.eignex.klause.util.constructionIntArray
+import com.eignex.klause.util.constructionLongArray
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 import kotlin.math.ceil
@@ -76,7 +77,7 @@ internal class KnapsackLagrangianBound(
         var visits = 0
         val pbs = ArrayList<PseudoBoolean>()
         if (objective != null) for (factor in problem.factors) {
-            if (factor is PseudoBoolean) pbs.add(factor)
+            if (factor is PseudoBoolean && permitsLongPseudoBoolean(factor.constants)) pbs.add(factor)
             if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
         }
         // The subproblem knapsack must be a clean capacity row: all positive literals, positive weights,

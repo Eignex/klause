@@ -4,10 +4,14 @@ import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 
 class PseudoBooleanTest {
 
@@ -34,10 +38,28 @@ class PseudoBooleanTest {
     }
 
     @Test
-    fun `pseudo Boolean sums outside Long range should be rejected`() {
-        assertFailsWith<IllegalArgumentException> {
-            PseudoBoolean(longArrayOf(Long.MAX_VALUE, 1), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 0)
-        }
+    fun `pseudo Boolean sums outside Long range should retain exact source constants`() {
+        val factor = PseudoBoolean(longArrayOf(Long.MAX_VALUE, 1),
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 0)
+
+        assertEquals(bigIntOf(Long.MAX_VALUE), factor.constants.exactCoeff(0))
+        assertEquals(bigIntOf(1), factor.constants.exactCoeff(1))
+    }
+
+    @Test
+    fun `wide remapping should preserve exact weights and their literal roles`() {
+        val wide = parseBigInt("18446744073709551616")
+        val factor = PseudoBoolean(arrayOf(wide, bigIntOf(-2)),
+            intArrayOf(Lit.make(0, true), Lit.make(1, false)), PbOp.GE, wide)
+        val mapping = VarRemap(intArrayOf(1, 1), intArrayOf())
+
+        val mapped = assertIs<PseudoBoolean>(factor.remap(mapping))
+
+        assertEquals(wide, mapped.constants.exactCoeff(0))
+        assertContentEquals(intArrayOf(Lit.make(1, true), Lit.make(1, false)), mapped.literals)
+        assertEquals(mapped.structuralKey().hashCode(), factor.remapStructuralHash(mapping))
+        assertNotEquals(factor.structuralKey(), PseudoBoolean(arrayOf(wide, bigIntOf(-2)),
+            factor.literals, PbOp.GE, bigIntOf(0)).structuralKey())
     }
 
     @Test

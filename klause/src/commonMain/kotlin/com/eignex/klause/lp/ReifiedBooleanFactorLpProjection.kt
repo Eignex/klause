@@ -2,6 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
+import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
@@ -20,6 +21,7 @@ internal fun ReifiedCardinality.emitLpRelaxation(builder: RelaxationBuilder) {
 }
 
 internal fun ReifiedPseudoBoolean.emitLpRelaxation(builder: RelaxationBuilder) {
+    if (!permitsLongPseudoBoolean(constants)) return
     val sum = BoolReifiedSum.fold(builder, literals, weights)
     val a = builder.boolColumn(auxBoolVar)
     val b = subExact(bound, sum.constant)

@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.*
 import com.eignex.klause.factor.bool.*
+import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.circuit.CircuitInvariant
 import com.eignex.klause.factor.circuit.SubcircuitInvariant
@@ -138,7 +139,11 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
             (result as Power.Coordinate.Real).id.index)
     }
 
-    is PseudoBoolean -> PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
+    is PseudoBoolean -> if (permitsLongPseudoBoolean(constants)) {
+        PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
+    } else {
+        ExactPseudoBooleanInvariant(constants, literals, op)
+    }
 
     is RealAbs -> RealAbsInvariant(operand, result)
     is RealArrayMinMax -> RealArrayMinMaxInvariant(this)
@@ -165,7 +170,11 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
         }
     }
 
-    is ReifiedPseudoBoolean -> ReifiedPseudoBooleanInvariant(auxBoolVar, weights, literals, op, bound, boolVars)
+    is ReifiedPseudoBoolean -> if (permitsLongPseudoBoolean(constants)) {
+        ReifiedPseudoBooleanInvariant(auxBoolVar, weights, literals, op, bound, boolVars)
+    } else {
+        ExactPseudoBooleanInvariant(constants, literals, op, auxBoolVar)
+    }
 
     is Regular -> RegularInvariant(seq, numStates, alphabetSize, transitions, q0, accepting)
 

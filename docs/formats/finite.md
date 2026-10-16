@@ -17,6 +17,14 @@ objective orientation and output names.
 
 ## OPB and WBO lowering
 
+Weighted source literals retain `PseudoBoolean`, or `ReifiedPseudoBoolean` for a
+soft relation, at arbitrary integral width. Repetition, complement polarity and
+product indicators retain their source roles. Coefficient width does not allocate
+integer channels or choose a different relation. Native finite propagation and
+local search select their arithmetic after reading the same exact constants;
+[weighted Boolean consumers](../model.md#weighted-boolean-relations) own their
+arithmetic and optional relaxation admission.
+
 OPB/WBO objective normalization combines repeated
 and complementary literals, negation offsets and soft penalties with exact integers.
 Only the final Boolean coefficients and constant must fit signed 64-bit values;

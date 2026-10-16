@@ -128,6 +128,28 @@ Source integer declarations fixed at the trigger expose the enabled row to sound
 bound closure before final ownership. Live invocation pins remain scoped premises
 and retract with their numerical rows.
 
+## Weighted Boolean relations
+
+`PseudoBoolean` and `ReifiedPseudoBoolean` retain exact integral coefficients,
+literal polarity, repetitions, comparison and right-hand side. The reified form
+retains its indicator and both directions of equivalence. Both expose their same
+source relation as a tagged `LinearRow`; exact theory installation consumes it
+without adding source integer coordinates.
+
+Native projections use Long arithmetic only when independent activities, signed
+flip sums and residual magnitudes fit it. Other rows use exact coalesced Boolean
+sums. Complementary literals contribute a constant shift; repeated occurrences
+share one signed move coefficient. Exact propagation reasons contain source Boolean
+pins and the active indicator premise. Exact local search retains body checks and
+move costs without reading a narrow payload. Numeric constants fitting Long alone
+do not imply that their activities or residuals fit.
+
+Presolve lifting, clique/knapsack bounds and LP rows or cuts admit only the arithmetic
+they can represent. A declined optional projection leaves the source relation and
+its finite enforcement intact. The selected exact theory view retains arbitrary-width
+constants and reification. [Finite formats](formats/finite.md#opb-and-wbo-lowering)
+defines OPB/WBO objective normalization separately from relation width.
+
 ## Published assignments and objectives
 
 `Sample`, exact theory assignments and reconstructed witnesses own immutable

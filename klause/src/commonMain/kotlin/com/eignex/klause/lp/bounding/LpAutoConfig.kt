@@ -3,8 +3,8 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.bound.CumulativeEnergeticBound
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
@@ -14,6 +14,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
@@ -24,21 +25,21 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
-import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
-import com.eignex.klause.lp.prepareRootBoxes
-import com.eignex.klause.lp.relaxation.prepareSchedulingViews
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RootBoxes
-import com.eignex.klause.lp.prepareLpHull
 import com.eignex.klause.lp.lpHullFamily
+import com.eignex.klause.lp.prepareLpHull
+import com.eignex.klause.lp.prepareRootBoxes
+import com.eignex.klause.lp.prepareStatesBothBounds
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CumulativeRelaxation
 import com.eignex.klause.lp.relaxation.prepareCandidateArcCount
-import com.eignex.klause.lp.prepareStatesBothBounds
+import com.eignex.klause.lp.relaxation.prepareSchedulingViews
 import com.eignex.klause.lp.relaxation.schedulingViews
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBothBounds
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 
 /**
  * Structural auto-configuration of the LP-relaxation family. Each technique is enabled only when the
@@ -158,6 +159,7 @@ object LpAutoConfig {
                 }
 
                 is ReifiedPseudoBoolean -> {
+                    if (!permitsLongPseudoBoolean(f.constants)) continue
                     lpEmittable = true
                     rows += 2
                 }
@@ -188,6 +190,7 @@ object LpAutoConfig {
                 }
 
                 is PseudoBoolean -> {
+                    if (!permitsLongPseudoBoolean(f.constants)) continue
                     pseudoBoolean = true
                     rows += 1
                 }

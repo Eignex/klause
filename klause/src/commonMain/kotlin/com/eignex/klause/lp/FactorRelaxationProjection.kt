@@ -1,15 +1,17 @@
 package com.eignex.klause.lp
 
-import com.eignex.klause.factor.arithmetic.GridAbs
-import com.eignex.klause.factor.arithmetic.ExactLinear
-import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.GridAbs
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
+import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.table.Element
@@ -43,6 +45,11 @@ internal fun Factor.buildLpRelaxation(builder: RelaxationBuilder, linearProjecti
         emitExactLpRelaxation(builder)
         return
     }
+    if (this is ReifiedPseudoBoolean) {
+        emitLpRelaxation(builder)
+        return
+    }
+    if (this is PseudoBoolean && !permitsLongPseudoBoolean(constants)) return
     if (impliedLinearRows.isNotEmpty()) {
         for (row in impliedLinearRows) row.emitLpRelaxation(builder, linearProjection)
         return
@@ -60,7 +67,6 @@ internal fun Factor.buildLpRelaxation(builder: RelaxationBuilder, linearProjecti
         is RealProduct -> emitLpRelaxation(builder)
         is Regular -> emitLpRelaxation(builder)
         is ReifiedCardinality -> emitLpRelaxation(builder)
-        is ReifiedPseudoBoolean -> emitLpRelaxation(builder)
         is GridAbs -> gridAbsoluteValueTable(this).emitLpRelaxation(builder)
         is Table -> emitLpRelaxation(builder)
         else -> Unit

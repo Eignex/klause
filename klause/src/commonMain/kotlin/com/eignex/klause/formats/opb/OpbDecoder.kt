@@ -1,19 +1,15 @@
 package com.eignex.klause.formats.opb
 
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.BoolFoldDefinition
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearObjectiveSpec
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.ProblemBuilder
-import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.util.BIG_ZERO
@@ -73,61 +69,27 @@ internal object OpbDecoder {
 
                 is OpbStatement.Constraint -> {
                     val relation = lowerRelation(builder, statement.relation)
-                    when {
-                        relation.wide && statement.softCost != null ->
-                            throw OpbLoweringException(
-                                "OPB wide coefficients in a soft constraint are not supported",
-                            )
-
-                        relation.wide -> {
-                            val ints = IntArray(relation.literals.size) { index ->
-                                val literal = relation.literals[index]
-                                val intVar = builder.newBinaryIntVar()
-                                channelBoolTo01(
-                                    builder.factors,
-                                    Lit.variable(literal),
-                                    intVar,
-                                    Lit.isPositive(literal),
-                                )
-                                intVar
-                            }
-                            builder.factors += Linear(
-                                ints,
-                                relation.weights,
-                                toLinearOp(relation.op),
-                                relation.bound,
-                            )
+                    if (statement.softCost == null) {
+                        builder.factors += PseudoBoolean(relation.weights, relation.literals, relation.op, relation.bound)
+                    } else {
+                        val sat = builder.newBool()
+                        builder.factors += ReifiedPseudoBoolean(
+                            sat,
+                            relation.weights,
+                            relation.literals,
+                            relation.op,
+                            relation.bound,
+                        )
+                        hasObjective = true
+                        addObjectiveTerm(
+                            objectiveWeights,
+                            bigIntOf(statement.softCost),
+                            Lit.make(sat, positive = false),
+                        ) {
+                            objectiveConstant += it
                         }
-
-                        statement.softCost == null ->
-                            builder.factors +=
-                                PseudoBoolean(
-                                    relation.longWeights(),
-                                    relation.literals,
-                                    relation.op,
-                                    relation.longBound(),
-                                )
-
-                        else -> {
-                            val sat = builder.newBool()
-                            builder.factors += ReifiedPseudoBoolean(
-                                sat,
-                                relation.longWeights(),
-                                relation.literals,
-                                relation.op,
-                                relation.longBound(),
-                            )
-                            hasObjective = true
-                            addObjectiveTerm(
-                                objectiveWeights,
-                                bigIntOf(statement.softCost),
-                                Lit.make(sat, positive = false),
-                            ) {
-                                objectiveConstant += it
-                            }
-                            softCosts.add(statement.softCost)
-                            softViolations.add(Lit.make(sat, positive = false))
-                        }
+                        softCosts.add(statement.softCost)
+                        softViolations.add(Lit.make(sat, positive = false))
                     }
                 }
             }
@@ -171,11 +133,7 @@ internal object OpbDecoder {
         return Relation(weights.toTypedArray(), literals.toIntArray(), relation.op, relation.bound)
     }
 
-    private class Relation(val weights: Array<BigInt>, val literals: IntArray, val op: PbOp, val bound: BigInt) {
-        val wide: Boolean get() = !bound.fitsLong() || weights.any { !it.fitsLong() }
-        fun longWeights(): LongArray = LongArray(weights.size) { weights[it].toLongExact() }
-        fun longBound(): Long = bound.toLongExact()
-    }
+    private class Relation(val weights: Array<BigInt>, val literals: IntArray, val op: PbOp, val bound: BigInt)
 
     private class Builder(numDeclaredVars: Int, settings: ProblemSettings) : CnfLowering {
         private val problemBuilder = ProblemBuilder(settings)
@@ -199,7 +157,6 @@ internal object OpbDecoder {
 
         override fun newBool(): Int = problemBuilder.newBool()
 
-        fun newBinaryIntVar(): Int = problemBuilder.newInt(IntDomain(0, 1))
 
         fun literalFor(term: OpbTerm): Int {
             if (term.literals.size == 1) return term.literals[0]
@@ -241,11 +198,7 @@ internal object OpbDecoder {
         return value.toLongExact()
     }
 
-    private fun toLinearOp(op: PbOp): LinearOp = when (op) {
-        PbOp.LE -> LinearOp.LE
-        PbOp.GE -> LinearOp.GE
-        PbOp.EQ -> LinearOp.EQ
-    }
+
 }
 
 /** Lower this parsed OPB document to a solver problem. */

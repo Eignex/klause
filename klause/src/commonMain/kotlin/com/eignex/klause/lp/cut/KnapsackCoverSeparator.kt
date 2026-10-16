@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.cut
 
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Relation
@@ -36,7 +37,9 @@ internal class KnapsackCoverSeparator : CutSeparator {
         // for GUB lifting: within a clique at most one item is 1, which strengthens the lift.
         val conflict = conflictGraph(ctx.problem).adjacency
         for (factor in ctx.problem.factors) {
-            if (factor !is PseudoBoolean || factor.op != PbOp.LE) continue
+            if (factor !is PseudoBoolean || !permitsLongPseudoBoolean(factor.constants) ||
+                factor.op != PbOp.LE
+            ) continue
             if (factor.weights.any { it <= 0 } || factor.literals.any { !Lit.isPositive(it) }) continue
             val k = factor.literals.size
             if (k < 2) continue

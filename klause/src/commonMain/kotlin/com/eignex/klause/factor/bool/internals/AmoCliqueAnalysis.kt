@@ -52,6 +52,7 @@ private fun collectCliques(factors: List<Factor>, includeKnapsacks: Boolean): Li
  *  sum past `b` is pairwise exclusive — an at-most-one clique. Only `≤` and `=` bound the activity
  *  from above (a lone `≥` does not); non-positive weights and `b < 0` are skipped. */
 private fun pbKnapsackClique(pb: PseudoBoolean): Set<Int>? {
+    if (!permitsLongPseudoBoolean(pb.constants)) return null
     if (pb.op != PbOp.LE && pb.op != PbOp.EQ) return null
     if (pb.literals.size < 2 || pb.bound < 0) return null
     val order = pb.weights.indices.sortedBy { pb.weights[it] } // ascending weight
