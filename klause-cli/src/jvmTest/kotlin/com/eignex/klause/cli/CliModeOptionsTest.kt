@@ -18,6 +18,27 @@ import kotlin.test.assertTrue
 class CliModeOptionsTest {
 
     @Test
+    fun `unbounded integer flags should retain caller endpoints beyond FlatZinc defaults`() {
+        val source = File.createTempFile("clibounds", ".fzn").apply {
+            writeText("var int: x; solve satisfy;")
+            deleteOnExit()
+        }
+        for ((lower, upper) in listOf(-2_000_000L to 3_000_000L, Long.MIN_VALUE to Long.MAX_VALUE)) {
+            val common = CommonOptions().apply { config = KlauseConfig.DEFAULT }
+            val session = MiniZincMode.newSession()
+            parseArgs(
+                arrayOf("--unbounded-int-lo", lower.toString(), "--unbounded-int-hi", upper.toString()),
+                commonFlagSpecs(common) + session.flags(),
+            ) {}
+
+            val problem = checkNotNull(session.load(source.absolutePath, common).problem)
+
+            assertEquals(lower, problem.intBounds.lower(0))
+            assertEquals(upper, problem.intBounds.upper(0))
+        }
+    }
+
+    @Test
     fun `numeric flags should reject a non-numeric value with a usage error`() {
         val specs = commonFlagSpecs(CommonOptions())
         for (flag in listOf("-t", "-r", "-n")) {
