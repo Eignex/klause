@@ -381,3 +381,10 @@ replace the factor model with a nonlinear source snapshot. Admission reads the
 shared captured encoder support: a complete guarded finite linear cover retains
 the bounded source owner and the open linear fragment. Genuine uncovered nonlinear
 integer composition retains the exact nonlinear snapshot and its original names.
+
+Native polynomial, integer-polynomial, function and quadratic CLI consumers attach
+their admitted source snapshot and captured caller settings to `SourceSetup` before
+execution. They retain exact original coordinate rendering, objective direction and
+native result payloads. The mode does not construct their concrete pipeline requests.
+The admission representation split remains separate from this shared execution binding;
+see [source setup](../api.md#source-setup) and [resource allowances](../solver/resources.md).

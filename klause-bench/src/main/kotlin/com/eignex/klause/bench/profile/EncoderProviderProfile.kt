@@ -116,6 +116,8 @@ object EncoderProviderProfile {
                     val route = problem.model.pipelineRoute(providers, routePureRealToTheory = true,
                         routeLinearToTheory = true, boundCancellation = stop)
                     val result = when (route) {
+                        is SourceProblemRoute.NativeFormula -> error("factor routing selected a native formula")
+
                         is SourceProblemRoute.OpenTheory -> {
                             val execution = OpenTheoryPipeline.execute(route.request,
                                 TheoryParams(cancellation = stop, randomSeed = seed), FiniteEngine.BACKTRACK)

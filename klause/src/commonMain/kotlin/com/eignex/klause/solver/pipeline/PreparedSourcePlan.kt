@@ -5,6 +5,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
@@ -444,12 +445,19 @@ internal fun Problem.preparePolynomialExecutionPlan(
 }
 
 /** Preserve the original polynomial snapshot while preparing its finite and completion projections. */
-fun PolynomialRealProblem.prepareExecutionPlan(): PreparedSourcePlan = Problem(
+fun PolynomialRealProblem.prepareExecutionPlan(): PreparedSourcePlan =
+    prepareExecutionPlan(ProblemSettings(), Cancellation.Never)
+
+internal fun PolynomialRealProblem.prepareExecutionPlan(
+    settings: ProblemSettings,
+    cancellation: Cancellation,
+): PreparedSourcePlan = Problem(
     numBoolVars = totalBoolCount, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray(),
     numRealVars = totalRealCount,
     realLower = DoubleArray(totalRealCount) { Double.NEGATIVE_INFINITY },
     realUpper = DoubleArray(totalRealCount) { Double.POSITIVE_INFINITY },
-).preparePolynomialExecutionPlan(formula, original = this)
+    settings = settings, semantics = semantics,
+).preparePolynomialExecutionPlan(formula, original = this, cancellation = cancellation)
 
 /** Preserve nonlinear integer source syntax and its exact declaration-to-numeric projection. */
 fun NonlinearIntegerProblem.prepareExecutionPlan(): PreparedSourcePlan = PreparedSourcePlan(

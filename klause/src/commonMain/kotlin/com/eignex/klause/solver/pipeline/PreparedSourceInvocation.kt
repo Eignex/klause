@@ -17,6 +17,7 @@ class PreparedSourceInvocation internal constructor(
 
     /** Actual prepared source plan, absent when source deductions refuted the source. */
     val preparedPlan: PreparedSourcePlan? = when (route) {
+        is SourceProblemRoute.NativeFormula -> route.preparedPlan
         is SourceProblemRoute.Finite -> route.preparedPlan
         is SourceProblemRoute.OpenTheory -> route.preparedPlan
         is SourceProblemRoute.PolynomialTheory -> route.preparedPlan

@@ -486,3 +486,14 @@ unconditioned linear relations can be reused across component openings; live ass
 query results and native resources cannot. Conditioned completion supplies only its
 captured pins and current containing token, without renewing any arithmetic allowance.
 Numerical execution and source-enforcement admission keep their separate resource gates.
+
+Native source setup prepays declaration-coordinate capture to its containing token
+before building an immutable plan. Polynomial private views use the attachment's
+captured storage settings. The completed native request retains the same source and
+operation binding; interruption withholds the plan without refunding capture work.
+Execution composes native polynomial, integer or function controls with that same
+containing stop and deadline. Typed integer controls keep their node-budget object;
+function controls retain their work, bit, depth and matrix limits. Default polynomial
+controls retain the existing function-wrapper interpretation. A mismatched native
+control family rejects before worker construction. Neither a fresh execution request
+nor an unused finite factory can renew stopped source preparation.

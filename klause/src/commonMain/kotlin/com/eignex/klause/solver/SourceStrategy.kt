@@ -110,6 +110,8 @@ class SourceStrategy internal constructor(
         val route = invocation.route
         if (scope.stop()) return scope.unknown()
         val result = when (route) {
+            is SourceProblemRoute.NativeFormula -> error("factor satisfaction selected native formula preparation")
+
             is SourceProblemRoute.PolynomialTheory -> {
                 if (!scope.supportsPolynomial(engine)) return scope.unsupported()
                 (

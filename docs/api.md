@@ -95,6 +95,15 @@ SMT-LIB linear admission and source-strategy satisfaction. Finite format adapter
 retain the selected route and their existing definition, Boolean-fold, functional
 objective and search hints. Arithmetic adapters render original exact coordinates;
 XCSP3 objective values beyond binary64's exact integral range retain their original units.
+Native `PolynomialRealProblem`, `NonlinearIntegerProblem` and `TranscendentalProblem`
+snapshots use the same attachment through `SourceAttachment(source, settings)`, with
+explicit immutable `ProblemSettings`. Their actual source identity, exact formula,
+integer/real namespaces and effective semantics remain retained. Pure polynomial
+preparation applies those settings to its private factor view. No finite source model
+is substituted for the native input. `SourceSetupRequest(source, engine,
+quadraticObjective, sense)` captures an exact quadratic objective and its original
+direction. Affine requests retain their existing constructor. An embedded function
+objective must agree with the requested operation and direction and cannot be replaced.
 `PreparedSourceInvocation` retains the actual selected route, source plan and operation admission. Its
 `finiteShape()` supplies the same captured plan to `FiniteSolveRequest` and
 `FinitePipeline.solve`; it does not select a second route. An explicit enumeration
@@ -103,13 +112,16 @@ operation remains enumeration under a cap of one.
 `SourceSetup.execute(SourceExecutionRequest(invocation, ...))` dispatches that captured
 operation. Finite callers supply their existing full `FiniteSolveRequest` factory over
 its selected shape. Arithmetic callers supply `TheoryParams` or `PolynomialTheoryParams`,
-with explicit lane count and optional linear preparation controls. Only the selected
+with explicit lane count and optional linear preparation controls. Additional request
+constructors accept complete `NonlinearIntegerTheoryParams` or
+`TranscendentalTheoryParams`, retaining the existing node ledger and native limits.
+Controls for a different native family reject before execution. Only the selected
 finite factory is called. A foreign shape, engine or operation binding rejects before
 execution; nonfinite enumeration explicitly declines. Source deductions can refute an
 empty enumeration without constructing a worker.
 
-`SourceExecutionResult` retains the complete native finite, linear, polynomial or
-quadratic execution rather than narrowing exact values, bounds, limits, rays, resource
+`SourceExecutionResult` retains the complete native finite, linear, polynomial,
+quadratic or transcendental execution rather than narrowing exact values, bounds, limits, rays, resource
 telemetry or publication receipts. Callback types retain their native source coordinates
 and objective units. Captured interpretation does not upgrade a native claim beyond
 its producing model and proof scope; source-specific transfer qualification still applies.
@@ -117,9 +129,14 @@ its producing model and proof scope; source-specific transfer qualification stil
 unsupported-linear optimization fallback to source-checked heuristic execution on the
 same prepared plan. Exact and original-real FlatZinc use the same arithmetic fallback
 as SMT-LIB linear admission. Those paths, the MiniZinc finite invocation path and
-source-strategy arithmetic satisfaction consume this dispatcher. Legacy source-specific
-entries retain their existing execution surfaces; other input carriers and common
-parameter interpretation have separate adapters.
+source-strategy arithmetic satisfaction consume this dispatcher. Native SMT formula
+and quadratic consumers also submit their attachments through it; their CLI carrier
+owns rendering only. Existing SMT admission still chooses its source representation.
+Required native preparation charges source-coordinate capture to the containing token;
+an interrupted preparation exports no executable plan and returns `Declined`, with
+its original source and stop reason. This supplies no engine refutation or certificate.
+Legacy typed compatibility entries and MPS retain their existing execution surfaces;
+common parameter interpretation has separate adapters.
 
 These setup types are part of the experimental composition surface. Source arrays
 stay borrowed read-only, metadata containers are captured, and the returned shape

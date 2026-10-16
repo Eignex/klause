@@ -39,9 +39,10 @@ import kotlin.time.TimeSource
 class NonlinearIntegerTheoryRequest internal constructor(
     /** Original declarations and exact polynomial source formula. */
     val problem: NonlinearIntegerProblem,
-) {
     /** Shared immutable source ownership and exact declaration-to-numeric mapping. */
-    val preparedPlan: PreparedSourcePlan = problem.prepareExecutionPlan()
+    val preparedPlan: PreparedSourcePlan,
+) {
+    internal constructor(problem: NonlinearIntegerProblem) : this(problem, problem.prepareExecutionPlan())
 }
 
 /** Select sound incomplete integer search with exact continuous completion. */
