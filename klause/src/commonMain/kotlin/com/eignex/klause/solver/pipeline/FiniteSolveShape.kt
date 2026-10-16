@@ -40,7 +40,7 @@ class FiniteSolveShape(
 
     internal fun bindSourceInvocation(value: PreparedSourceInvocation) {
         require(invocation == null) { "finite shape already belongs to a source invocation" }
-        require(value.preparedPlan === preparedPlan) { "finite shape belongs to a different source plan" }
+        require(value.enginePlan === preparedPlan) { "finite shape belongs to a different execution plan" }
         invocation = value
     }
 

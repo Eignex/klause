@@ -23,8 +23,8 @@ internal fun PreparedSourceInvocation.heuristicHints(
     strategies: Set<ExecutionStrategy>,
     capabilities: ExecutionCapabilities,
 ): PreparedSourceHints? {
-    val plan = requireNotNull(preparedPlan)
-    val route = this.route as? SourceProblemRoute.Finite ?: return null
+    val plan = requireNotNull(enginePlan)
+    val route = engineRoute as? SourceProblemRoute.Finite ?: return null
     val projection = requireNotNull(mapping) { "hint projection requires its source mapping" }
     require(projection.source === route.problem) { "hint projection belongs to a different source model" }
     require(
