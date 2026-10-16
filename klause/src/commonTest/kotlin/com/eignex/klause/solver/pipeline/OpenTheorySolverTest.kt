@@ -52,7 +52,7 @@ class OpenTheorySolverTest {
                 "(declare-const x Real) (assert (= x 0.0)) (assert (or a b c))",
         )
         val assignments = listOf(OpenBranching.Automatic, OpenBranching.Activity).map { ordering ->
-            val result = OpenTheoryPipeline.engineFor(OpenTheoryRequest(source.model))
+            val result = OpenTheoryPipeline.engineFor(OpenTheoryRequest(source.model).withPresolve(PresolveConfig.NONE))
                 .solve(TheoryParams(openBranching = ordering))
             val point = assertIs<OpenTheoryResult.Sat>(result).assignment
             listOf("a", "b", "c").map { point.boolValue(source.boolVarNames.getValue(it)) }
@@ -68,7 +68,7 @@ class OpenTheorySolverTest {
                 "(declare-const x Real) (assert (= x 0.0)) (assert (or a b c))",
         )
 
-        val result = OpenTheoryPipeline.engineFor(OpenTheoryRequest(source.model))
+        val result = OpenTheoryPipeline.engineFor(OpenTheoryRequest(source.model).withPresolve(PresolveConfig.NONE))
             .solve(TheoryParams(openBranching = OpenBranching.SourceOrder))
 
         val point = assertIs<OpenTheoryResult.Sat>(result).assignment
