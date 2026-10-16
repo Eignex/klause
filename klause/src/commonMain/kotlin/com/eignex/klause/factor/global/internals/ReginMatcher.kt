@@ -132,45 +132,12 @@ private fun reginFallbackFilter(
     // shrinkage; only the now-unmatched vars need augmenting. The completed matching is still
     // maximum and the pruning is matching-independent, so this changes speed, not results.
     if (cache != null) {
-        for (i in 0 until n) {
-            if (!cache.matchedValue.containsKey(filteredVars[i])) continue
-            val prev = cache.matchedValue.getOrDefault(filteredVars[i], 0L)
-            if (prev !in state.intDomains[filteredVars[i]]) continue // edge broke
-            if (prev in exceptSet) {
-                val base = exceptBase.getOrDefault(prev, -1)
-                if (base < 0) continue
-                for (c in 0 until n) {
-                    if (matchVal[base + c] == -1) {
-                        matchVar[i] = base + c
-                        matchVal[base + c] = i
-                        break
-                    }
-                }
-            } else {
-                val id = valueId.getOrDefault(prev, -1)
-                if (id < 0) continue
-                if (matchVal[id] == -1) {
-                    matchVar[i] = id
-                    matchVal[id] = i
-                }
-            }
-        }
+        reginSeedFallbackMatching(state, filteredVars, exceptSet, cache, n, exceptBase, valueId, matchVar, matchVal)
     }
     // Complete the (warm-started) seed to a maximum matching in one Hopcroft-Karp pass (O(|E|·√n)).
     if (!reginHopcroftKarp(n, valuesPerVar, matchVar, matchVal, IntArray(n), IntArray(n))) {
-        for (i in 0 until n) {
-            if (matchVar[i] != -1) continue
-            for (j in visited.indices) visited[j] = false
-            reginTryAugment(i, valuesPerVar, matchVar, matchVal, visited)
-            // Augment failed: the saturated values plus their occupants and i form a Hall
-            // violator (every one of those vars' domains lies within the visited value set).
-            val hall = IntArrayList()
-            hall.add(filteredVars[i])
-            for (vid in 0 until numValues) {
-                if (visited[vid] && matchVal[vid] >= 0) hall.add(filteredVars[matchVal[vid]])
-            }
-            return hall.toIntArray()
-        }
+        val hall = reginFallbackHallViolation(filteredVars, n, numValues, valuesPerVar, matchVar, matchVal, visited)
+        if (hall != null) return hall
     }
 
     // Oriented graph: matched value→var, unmatched var→value (vars 0..n-1, values after).
@@ -194,6 +161,103 @@ private fun reginFallbackFilter(
     // Reachability from free (unmatched) values over the REVERSE graph.
     val reachedFromFree = BooleanArray(total)
     val queue = IntArray(total)
+    reginReachFromFreeValues(n, numValues, matchVal, radj, reachedFromFree, queue)
+
+    val sccId = reginTarjanScc(adj, total)
+
+    // Prune: a non-matched var→value edge with no support (different SCC and not reachable
+    // from a free value) cannot extend to a feasible matching. Except values are never pruned
+    // (their copies always leave slack). Antecedents cite the sharp Hall set forward-reachable
+    // from the value-node (memoised per value-SCC), hole-aware.
+    val conflict = reginPruneFallbackEdges(
+        state, filteredVars, exceptSet, premises, n, valuesPerVar, matchVar, idToValue,
+        total, adj, sccId, reachedFromFree,
+    )
+    if (conflict != null) return conflict
+    // Persist the matching as the next call's warm-start seed, and record the GAC fixpoint
+    // (var set + per-var domain refs) for the unchanged-domains fast path above.
+    if (cache != null) {
+        cache.matchedValue.clear()
+        for (i in 0 until n) {
+            if (matchVar[i] != -1) cache.matchedValue.put(filteredVars[i], idToValue[matchVar[i]])
+        }
+        cache.recordFixpoint(state, filteredVars)
+    }
+    return null
+}
+
+@Suppress("LongParameterList")
+private fun reginSeedFallbackMatching(
+    state: PropagationState,
+    filteredVars: IntArray,
+    exceptSet: LongHashSet,
+    cache: ReginCache,
+    n: Int,
+    exceptBase: MutableLongIntMap,
+    valueId: MutableLongIntMap,
+    matchVar: IntArray,
+    matchVal: IntArray,
+) {
+    for (i in 0 until n) {
+        if (!cache.matchedValue.containsKey(filteredVars[i])) continue
+        val prev = cache.matchedValue.getOrDefault(filteredVars[i], 0L)
+        if (prev !in state.intDomains[filteredVars[i]]) continue // edge broke
+        if (prev in exceptSet) {
+            val base = exceptBase.getOrDefault(prev, -1)
+            if (base < 0) continue
+            for (c in 0 until n) {
+                if (matchVal[base + c] == -1) {
+                    matchVar[i] = base + c
+                    matchVal[base + c] = i
+                    break
+                }
+            }
+        } else {
+            val id = valueId.getOrDefault(prev, -1)
+            if (id < 0) continue
+            if (matchVal[id] == -1) {
+                matchVar[i] = id
+                matchVal[id] = i
+            }
+        }
+    }
+}
+
+@Suppress("LongParameterList")
+private fun reginFallbackHallViolation(
+    filteredVars: IntArray,
+    n: Int,
+    numValues: Int,
+    valuesPerVar: Array<IntArray>,
+    matchVar: IntArray,
+    matchVal: IntArray,
+    visited: BooleanArray,
+): IntArray? {
+    for (i in 0 until n) {
+        if (matchVar[i] != -1) continue
+        for (j in visited.indices) visited[j] = false
+        reginTryAugment(i, valuesPerVar, matchVar, matchVal, visited)
+        // Augment failed: the saturated values plus their occupants and i form a Hall
+        // violator (every one of those vars' domains lies within the visited value set).
+        val hall = IntArrayList()
+        hall.add(filteredVars[i])
+        for (vid in 0 until numValues) {
+            if (visited[vid] && matchVal[vid] >= 0) hall.add(filteredVars[matchVal[vid]])
+        }
+        return hall.toIntArray()
+    }
+    return null
+}
+
+@Suppress("LongParameterList")
+private fun reginReachFromFreeValues(
+    n: Int,
+    numValues: Int,
+    matchVal: IntArray,
+    radj: Array<IntArrayList>,
+    reachedFromFree: BooleanArray,
+    queue: IntArray,
+) {
     var qHead = 0
     var qTail = 0
     for (vid in 0 until numValues) {
@@ -213,13 +277,23 @@ private fun reginFallbackFilter(
             }
         }
     }
+}
 
-    val sccId = reginTarjanScc(adj, total)
-
-    // Prune: a non-matched var→value edge with no support (different SCC and not reachable
-    // from a free value) cannot extend to a feasible matching. Except values are never pruned
-    // (their copies always leave slack). Antecedents cite the sharp Hall set forward-reachable
-    // from the value-node (memoised per value-SCC), hole-aware.
+@Suppress("LongParameterList")
+private fun reginPruneFallbackEdges(
+    state: PropagationState,
+    filteredVars: IntArray,
+    exceptSet: LongHashSet,
+    premises: IntArray,
+    n: Int,
+    valuesPerVar: Array<IntArray>,
+    matchVar: IntArray,
+    idToValue: LongArrayList,
+    total: Int,
+    adj: Array<IntArrayList>,
+    sccId: IntArray,
+    reachedFromFree: BooleanArray,
+): IntArray? {
     val sccHallVars = MutableIntObjectMap<IntArray>()
     val hallReasons = HashMap<Int, IntArray?>()
     fun hallVarsFor(valNode: Int): IntArray = sccHallVars.getOrPut(sccId[valNode]) {
@@ -262,15 +336,6 @@ private fun reginFallbackFilter(
                 return withI
             }
         }
-    }
-    // Persist the matching as the next call's warm-start seed, and record the GAC fixpoint
-    // (var set + per-var domain refs) for the unchanged-domains fast path above.
-    if (cache != null) {
-        cache.matchedValue.clear()
-        for (i in 0 until n) {
-            if (matchVar[i] != -1) cache.matchedValue.put(filteredVars[i], idToValue[matchVar[i]])
-        }
-        cache.recordFixpoint(state, filteredVars)
     }
     return null
 }
