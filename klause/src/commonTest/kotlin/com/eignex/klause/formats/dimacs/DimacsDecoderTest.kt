@@ -1,5 +1,11 @@
 package com.eignex.klause.formats.dimacs
 
+import com.eignex.klause.ir.BoundOverride
+import com.eignex.klause.ir.BoundsOverride
+import com.eignex.klause.ir.FloatSemantics
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
@@ -12,11 +18,43 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class DimacsDecoderTest {
+    @Test
+    fun `Boolean source lowerings should retain their declared format semantics`() {
+        val models = listOf(
+            SourceFormat.DIMACS to Dimacs.parse("p cnf 1 1\n1 0\n").toProblem(),
+            SourceFormat.WCNF to Dimacs.parseWcnf("3 1 0\n").toProblem().problem,
+        )
+
+        for ((format, source) in models) {
+            assertEquals(format, source.semantics.effective.format)
+            assertEquals(source.semantics.declared, source.semantics.effective)
+        }
+    }
+
+    @Test
+    fun `Boolean source lowerings should reject inapplicable semantic overrides`() {
+        val cnf = Dimacs.parse("p cnf 1 1\n1 0\n")
+        val wcnf = Dimacs.parseWcnf("3 1 0\n")
+        val overrides = listOf(
+            SemanticOverrides(floats = FloatSemantics.Continuous),
+            SemanticOverrides(undeclaredIntegers = BoundsOverride(lower = BoundOverride.Open)),
+            SemanticOverrides(undeclaredReals = BoundsOverride(upper = BoundOverride.Open)),
+            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+            SemanticOverrides(pinAbsentOptionalValues = false),
+        )
+
+        for (policy in overrides) {
+            assertFailsWith<IllegalArgumentException> { cnf.toProblem(semanticOverrides = policy) }
+            assertFailsWith<IllegalArgumentException> { wcnf.toProblem(semanticOverrides = policy) }
+        }
+    }
+
     @Test
     fun `repeated unit penalties should repair through their source literal`() {
         for (literal in listOf(1, -1)) {

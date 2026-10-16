@@ -232,6 +232,10 @@ the declared numeric source values. Integrality stays exact independently.
 feasibility, completeness or proof authority. `hasOverrides` records changes to the
 interpretation, including range replacements. Results referring to an overridden
 source must retain the effective policy rather than claim the original defaults.
+DIMACS, WCNF and XCSP3 lowered sources retain their exact format declaration and
+reject numeric-range, float, tolerance and optional-value overrides, which are
+inapplicable to their supported finite source languages. XCSP3 String and streaming
+entries use the same policy and resource capture as its declaration builder.
 `SourceSemanticsOwner` exposes that immutable capture on source models.
 `Problem` retains it separately from `ProblemSettings`; source rewrites, baking,
 presolve views and private source-bound projections preserve it. `ProblemBuilder`

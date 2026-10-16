@@ -2,9 +2,13 @@ package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.ir.BoundOverride
+import com.eignex.klause.ir.BoundsOverride
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -19,6 +23,51 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class Xcsp3Test {
+    @Test
+    fun `string and streaming sources should retain the same declared semantics`() {
+        val xml = """
+            <instance format="XCSP3" type="CSP"><variables><var id="x">0..2</var></variables></instance>
+        """.trimIndent()
+
+        val sources = listOf(Xcsp3.parse(xml), Xcsp3.parse(StringCharSource(xml)))
+
+        for (source in sources) {
+            assertEquals(xcsp3Semantics, source.semantics.declared)
+            assertEquals(xcsp3Semantics, source.problem.semantics.effective)
+        }
+    }
+
+    @Test
+    fun `XCSP3 should reject an undeclared integer range override`() {
+        val xml = """
+            <instance format="XCSP3" type="CSP"><variables><var id="x">0..2</var></variables></instance>
+        """.trimIndent()
+
+        val error = assertFailsWith<UnsupportedXcsp3Exception> {
+            Xcsp3.parse(xml, semanticOverrides = SemanticOverrides(
+                undeclaredIntegers = BoundsOverride(lower = BoundOverride.Open),
+            ))
+        }
+
+        assertTrue("undeclared integer bounds do not apply" in error.message.orEmpty())
+    }
+
+    @Test
+    fun `XCSP3 declaration builders should capture the same ambient resources as parsing`() {
+        val saved = KlauseConfig.current
+        try {
+            KlauseConfig.current = saved.copy(largeSpanThreshold = 17)
+
+            val built = Compiler.Builder().build()
+            val parsed = Xcsp3.parse("""<instance format="XCSP3" type="CSP"/>""")
+
+            assertEquals(17L, built.problem.settings.largeSpanThreshold)
+            assertEquals(parsed.problem.settings, built.problem.settings)
+        } finally {
+            KlauseConfig.current = saved
+        }
+    }
+
 
     private fun sat(xml: String): IntArray {
         val r = BacktrackSolver(Xcsp3.parse(xml).problem.bake()).solve(BacktrackParams())

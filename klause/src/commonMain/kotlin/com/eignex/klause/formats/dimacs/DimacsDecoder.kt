@@ -5,11 +5,14 @@ package com.eignex.klause.formats.dimacs
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.BoolFoldDefinition
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceSemanticsOwner
 
 /** A WCNF document lowered to hard clauses and a weighted soft-clause objective. */
 data class WcnfProblem(
@@ -21,7 +24,10 @@ data class WcnfProblem(
     val numOriginalBoolVars: Int,
     /** Exact soft-clause violation definitions over original literals. */
     val boolFolds: List<BoolFoldDefinition> = emptyList(),
-) {
+) : SourceSemanticsOwner {
+    /** Effective interpretation captured by the lowered source. */
+    override val semantics: EffectiveSourceSemantics get() = problem.semantics
+
     /** Construct a problem without soft-clause fold metadata. */
     constructor(problem: Problem, objective: LinearObjectiveSpec, numOriginalBoolVars: Int) :
         this(problem, objective, numOriginalBoolVars, emptyList())
@@ -35,7 +41,11 @@ data class WcnfProblem(
 }
 
 /** Lower this parsed CNF document to a solver problem. */
-fun CnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.problemSettings()): Problem {
+fun CnfDocument.toProblem(
+    settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+    semanticOverrides: SemanticOverrides = SemanticOverrides(),
+): Problem {
+    val semantics = dimacsSemantics.resolve(semanticOverrides)
     val totalVars = numBoolVars + if (triviallyUnsat) 1 else 0
     val factors = ArrayList<Factor>(clauses.size + if (triviallyUnsat) 2 else 0)
     factors.addAll(clauses.map(::Clause))
@@ -44,11 +54,15 @@ fun CnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.probl
         factors.add(Clause(intArrayOf(Lit.make(marker, positive = true))))
         factors.add(Clause(intArrayOf(Lit.make(marker, positive = false))))
     }
-    return Problem(totalVars, 0, emptyArray(), factors.toTypedArray(), settings = settings)
+    return Problem(totalVars, 0, emptyArray(), factors.toTypedArray(), settings = settings, semantics = semantics)
 }
 
 /** Lower this parsed WCNF document to hard clauses and a weighted soft-clause objective. */
-fun WcnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.problemSettings()): WcnfProblem {
+fun WcnfDocument.toProblem(
+    settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+    semanticOverrides: SemanticOverrides = SemanticOverrides(),
+): WcnfProblem {
+    val semantics = wcnfSemantics.resolve(semanticOverrides)
     val unitCosts = LongArray(numOriginalBoolVars)
     val direct = BooleanArray(softClauses.size)
     var constant = fixedCost
@@ -93,7 +107,7 @@ fun WcnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.prob
         factors.add(Clause(intArrayOf(Lit.make(marker, positive = false))))
     }
     return WcnfProblem(
-        Problem(totalVars, 0, emptyArray(), factors.toTypedArray(), settings = settings),
+        Problem(totalVars, 0, emptyArray(), factors.toTypedArray(), settings = settings, semantics = semantics),
         LinearObjectiveSpec(boolWeights = weights, constant = constant),
         numOriginalBoolVars,
         boolFolds,
