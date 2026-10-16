@@ -4,10 +4,20 @@ import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.NumericAuthority
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceExecutionKind
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.executionKind
+import com.eignex.klause.solver.validation.LinearSourceCheck
+import com.eignex.klause.solver.validation.checkLinearSourceWitness
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -15,6 +25,8 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -140,6 +152,44 @@ class MpsLinearSourceTest {
 
         assertEquals(source.semantics.numericAuthority, captured.semantics.declared.numericAuthority)
         assertEquals(BigFraction.ofDouble(0.1), assertNotNull(captured.objective).terms.single().coefficient)
+    }
+
+    @Test
+    fun `source tolerance should apply before decimal row normalization`() {
+        val parsed = Mps.parse(
+            "ROWS\n N COST\n G R\nCOLUMNS\n X COST 0.1 R 0.3\nRHS\n RHS COST 0.7 R 1\nENDATA",
+        )
+        val policy = SourceTolerance(absolute = SemanticRational.of(BIG_ONE, bigIntOf(5)))
+        val source = assertNotNull(parsed.toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = policy)))
+
+        val checked = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(3)), Cancellation.Never)
+
+        val witness = assertIs<LinearSourceCheck.Accepted>(checked).witness
+        assertFalse(witness.exact)
+        assertEquals(BigFraction.of(bigIntOf(-2), bigIntOf(5)), witness.objective)
+        val exact = assertNotNull(parsed.toLinearSourceProblem(
+            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+        ))
+        assertIs<LinearSourceCheck.Rejected>(
+            checkLinearSourceWitness(exact, listOf(BigFraction.ofLong(3)), Cancellation.Never),
+        )
+    }
+
+    @Test
+    fun `zero tolerance should retain admitted numerical finite completion`() {
+        val parsed = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n UP B X 1\nENDATA")
+        val policies = listOf(SemanticOverrides(), SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+
+        for (policy in policies) {
+            val source = assertNotNull(parsed.toLinearSourceProblem(policy))
+            for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH)) {
+                val invocation = SourceSetup.prepare(SourceSetupRequest(
+                    SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, engine,
+                ))
+
+                assertEquals(SourceExecutionKind.FINITE, SourceSetup.executionKind(invocation))
+            }
+        }
     }
 
     @Test
