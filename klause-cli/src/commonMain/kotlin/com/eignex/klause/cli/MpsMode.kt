@@ -364,14 +364,13 @@ internal class MpsOutput(
     override fun completionMetadata(verdict: Verdict): String? {
         if (verdict != Verdict.OPTIMAL || best == null || !sourceWitnessAccepted()) return null
         val attainedBound = attainsAcceptedObjectiveBound()
-        if (!sourceExact && !attainedBound) return null
         val status = if (attainedBound) "attained-optimum" else when (exactSourceWitness()) {
             true -> if (proofExact && exactSourceOptimum() == true) "attained-optimum" else "tolerance-optimum"
             false -> "tolerance-optimum"
             null -> return null
         }
         val key = when {
-            claimsCoverTolerance || attainedBound -> "optimizationStatus"
+            (claimsCoverTolerance && sourceExact) || attainedBound -> "optimizationStatus"
             proofExact -> "nominalSourceOptimizationStatus"
             else -> "workingModelOptimizationStatus"
         }

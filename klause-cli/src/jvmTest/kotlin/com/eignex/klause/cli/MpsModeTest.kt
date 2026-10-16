@@ -32,6 +32,27 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `inexact working optima should retain scoped metadata beside accepted source points`() {
+        for (claimsCoverTolerance in listOf(false, true)) {
+            val output = MpsOutput(
+                sourceExact = false,
+                exactSourceWitness = { true },
+                claimsCoverTolerance = claimsCoverTolerance,
+            )
+
+            val text = capture {
+                output.onSolution("v X=1", objective = 1)
+                output.onComplete(Verdict.OPTIMAL)
+            }
+
+            assertTrue("s SATISFIABLE" in text.lines(), text)
+            assertTrue("c workingModelOptimizationStatus=tolerance-optimum" in text.lines(), text)
+            assertTrue("v X=1" in text.lines(), text)
+            assertFalse(text.lines().any { it.startsWith("c optimizationStatus=") }, text)
+        }
+    }
+
+    @Test
     fun `a checked accepted objective bound should retain attained optimum authority`() {
         val output = MpsOutput(
             sourceExact = false,
@@ -112,7 +133,7 @@ class MpsModeTest {
 
         assertTrue("s SATISFIABLE" in text.lines(), text)
         assertTrue("o 1" in text.lines(), text)
-        assertTrue("v X=1" in text.lines(), text)
+        assertEquals(1.0, text.lines().single { it.startsWith("v ") }.substringAfter("X=").toDouble())
         assertTrue("nominalSourceOptimizationStatus=" in text, text)
         assertTrue("tolerance-accepted optimality unproved" in text, text)
     }
