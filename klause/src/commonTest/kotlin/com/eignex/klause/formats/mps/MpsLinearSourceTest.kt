@@ -16,8 +16,6 @@ import com.eignex.klause.solver.pipeline.SourceExecutionKind
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.executionKind
-import com.eignex.klause.solver.validation.LinearSourceCheck
-import com.eignex.klause.solver.validation.checkLinearSourceWitness
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -26,7 +24,6 @@ import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -164,17 +161,14 @@ class MpsLinearSourceTest {
         val policy = SourceTolerance(absolute = SemanticRational.of(BIG_ONE, bigIntOf(5)))
         val source = assertNotNull(parsed.toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = policy)))
 
-        val checked = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(3)), Cancellation.Never)
+        val witness = assertNotNull(source.checkMpsWitness(listOf(BigFraction.ofLong(3))))
 
-        val witness = assertIs<LinearSourceCheck.Accepted>(checked).witness
         assertFalse(witness.exact)
         assertEquals(BigFraction.of(bigIntOf(-2), bigIntOf(5)), witness.objective)
         val exact = assertNotNull(parsed.toLinearSourceProblem(
             SemanticOverrides(feasibilityTolerance = SourceTolerance()),
         ))
-        assertIs<LinearSourceCheck.Rejected>(
-            checkLinearSourceWitness(exact, listOf(BigFraction.ofLong(3)), Cancellation.Never),
-        )
+        assertNull(exact.checkMpsWitness(listOf(BigFraction.ofLong(3))))
     }
 
     @Test

@@ -1,36 +1,32 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.formats.mps.Mps
-import com.eignex.klause.formats.mps.MpsCompiled
-import com.eignex.klause.formats.mps.MpsLoweringException
-import com.eignex.klause.formats.mps.MpsSourceWitness
+import com.eignex.klause.formats.mps.MpsModel
+import com.eignex.klause.formats.mps.checkMpsWitness
 import com.eignex.klause.formats.mps.mpsSemantics
-import com.eignex.klause.formats.mps.toExactSourceProblem
-import com.eignex.klause.formats.mps.toProblem
-import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.objective.toLinearObjective
-import com.eignex.klause.solver.pipeline.NumericalLinearRequest
-import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
-import com.eignex.klause.solver.pipeline.SourceProblemRoute
-import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
+import com.eignex.klause.solver.pipeline.LinearSourceConclusion
+import com.eignex.klause.solver.pipeline.LinearSourceOutcome
+import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.LinearSourceWitness
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.parseBigInt
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.time.TimeSource
 
 /**
- * MPS (Mathematical Programming System) MIP front-end (`.mps`). Parses the instance and lowers it to
- * klause's hybrid model (see [com.eignex.klause.formats.mps.toProblem]: integer columns become CP search
- * variables, float columns become LP-only continuous variables the simplex resolves). An open integer
- * model uses numerical relaxations and source-certified integer branching.
+ * MPS (Mathematical Programming System) front-end (`.mps`). Captures original numerical declarations,
+ * rows and objective once and registers them with the shared source invocation.
  * Emits an `o <cost>` line per improving incumbent, then a final `s SATISFIABLE` / `s OPTIMUM FOUND` /
  * `s UNBOUNDED` / `s UNSATISFIABLE` / `s UNKNOWN` and a `v name=value` line. `-s` statistics are `c`
  * comment lines.
@@ -46,226 +42,91 @@ internal object MpsMode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val semanticOverrides = common.sourceOverrides(mpsSemantics)
-            val source = Mps.parse(openFileSource(path))
-            val settings = common.config.problemSettings()
-            val exact = checkNotNull(common.sourceSemantics).effective.feasibilityTolerance == SourceTolerance()
-            val lowered = try {
-                source.toProblem(settings, semanticOverrides)
-            } catch (_: MpsLoweringException) {
-                source.toExactSourceProblem(settings, semanticOverrides)
-            }
-            val exactSource = source.toExactSourceProblem(settings, semanticOverrides)
-            val sourceAdmission = NumericalLinearRequest(exactSource.model,
-                cancellation = common.routingCancellation()).numericalRowsSupported()
-            var compiled = if (!sourceAdmission || (exact && !lowered.sourceExact)) exactSource else lowered
-            var routingLpStats = LpStats()
-            val routingStart = TimeSource.Monotonic.markNow()
-            var numerical = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective(),
-                compiled.maximize, common.routingCancellation())
-            var route = numerical.finiteRoute { routingLpStats = it }
-            if ((route == null || route == SourceProblemRoute.Refuted) && !compiled.sourceExact) {
-                compiled = exactSource
-                numerical = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective(),
-                    compiled.maximize, common.routingCancellation())
-                route = numerical.finiteRoute { routingLpStats = it }
-            }
-            val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
-            if (route != null) common.logRoute(route, routingElapsedMs)
-            else common.frontendRouting = CliRoutingStats("numerical-mip", routingElapsedMs)
-            if (exact) requireExactMpsSource(compiled)
-            val qualificationStop = common.routingPreparationCancellation()
-            val claimsCoverTolerance = compiled.exactClaimsCoverTolerance(qualificationStop)
-            val acceptedObjectiveBound = if (claimsCoverTolerance) null else
-                compiled.toleranceObjectiveBound(qualificationStop)
-            val state = MpsOutputState(compiled.objectiveScale, compiled.toleranceDifference,
-                compiled.sourceExact, compiled.sourceDifference,
-                compiled.semantics.declared.undeclaredIntegers != compiled.semantics.effective.undeclaredIntegers ||
-                    compiled.semantics.declared.undeclaredReals != compiled.semantics.effective.undeclaredReals,
-                claimsCoverTolerance, acceptedObjectiveBound)
+            val start = TimeSource.Monotonic.markNow()
+            outputState = MpsOutputState()
+            val overrides = common.sourceOverrides(mpsSemantics)
+            val parsed = Mps.parse(openFileSource(path))
+            val stop = common.routingPreparationCancellation()
+            val source = parsed.toLinearSourceProblem(overrides, stop) ?: return interruptedSolvable(
+                if (stop()) TerminationReason.Timeout else TerminationReason.Cancelled,
+                start.elapsedNow().inWholeMilliseconds,
+            )
+            val state = MpsOutputState(
+                source.semantics.declared.undeclaredIntegers != source.semantics.effective.undeclaredIntegers ||
+                    source.semantics.declared.undeclaredReals != source.semantics.effective.undeclaredReals,
+            )
             outputState = state
-            cliLogger(common.verbose).v {
-                "parsed ${fileName(path)}: int=${compiled.model.numIntVars} " +
-                    "factors=${compiled.model.factors.size} float-cols=${compiled.floatColumns} " +
-                    "objScale=${compiled.objectiveScale}"
-            }
-            val render: (Sample) -> String = { sample ->
-                if (sample.exactReals == null && compiled.model.numRealVars > 0) {
-                    // A float leaf under tolerance semantics: its values are the doubles themselves.
-                    val witness = compiled.sourceWitness(compiled.columns.map { column ->
-                        if (column.real) checkNotNull(BigFraction.ofDouble(sample.reals[column.id]))
-                        else BigFraction.ofLong(sample.ints[column.id])
-                    })
-                    state.latestSourceObjective = witness.objective
-                    state.exactSourceWitness = witness.exact
-                    state.exactSourceOptimum = false
-                    renderMpsFloat(compiled, sample)
-                } else {
-                    val witness = compiled.sourceWitness(sample.ints, sample.exactReals)
-                    state.latestSourceObjective = witness.objective
-                    state.exactSourceWitness = witness.exact
-                    state.exactSourceOptimum = compiled.sourceExact && witness.exact
-                    renderMpsWitness(compiled, witness)
-                }
-            }
-            val renderOpen: (OpenTheoryAssignment) -> String = { assignment ->
-                val witness = try {
-                    compiled.sourceWitness(compiled.columns.map { column ->
-                        val value = if (column.real) {
-                            assignment.realValue(column.id)
-                        } else {
-                            assignment.intValue(column.id)
-                        }
-                        parseOpenMpsNumber(value)
-                    })
-                } catch (_: IllegalArgumentException) {
-                    null
-                }
-                state.sourceWitnessAccepted = witness != null
-                state.latestSourceObjective = witness?.objective
-                state.exactSourceWitness = witness?.exact
-                state.exactSourceOptimum = witness?.exact == true && compiled.sourceExact
-                renderMpsOpenModel(compiled, assignment)
-            }
-            val objective = compiled.objective?.toLinearObjective()
-            val finite = route as? SourceProblemRoute.Finite
-            return if (route == SourceProblemRoute.Refuted) {
-                refutedSolvable(routingLpStats, routingElapsedMs)
-            } else if (finite != null) {
-                mpsLinearSolvable(compiled, common.exact, linearSolvable(
-                    finite.problem,
-                    if (compiled.maximize) objective?.negated() else objective,
-                    compiled.maximize,
-                    render,
-                    routingLpStats = routingLpStats,
-                    routingElapsedMs = routingElapsedMs,
-                    preparedRoute = finite,
-                )).withNumericalCompletion()
-            } else {
-                Solvable(finite = null, render = render, objectiveValue = null,
-                    pipeline = SolvablePipeline.NumericalLinear(
-                        NumericalLinearRequest(compiled.model, objective, compiled.maximize), renderOpen),
-                    routingLpStats = routingLpStats, routingElapsedMs = routingElapsedMs)
-            }
+            val reconstruct = parsed.fitsMpsReconstructionBudget(stop)
+            return linearSourceSolvable(SourceAttachment(source, common.config.problemSettings()), common, { witness ->
+                state.exactSourceWitness = witness.exact
+                renderMpsSourceWitness(witness, reconstruct, stop)
+            }, start.elapsedNow().inWholeMilliseconds)
         }
 
         override fun output(common: CommonOptions): OutputProtocol {
             val state = outputState
             return MpsOutput(
-                state.objectiveScale,
-                state.toleranceDifference == null && !state.witnessOnly,
-                state.toleranceDifference ?: state.sourceDifference,
-                { state.latestSourceObjective },
-                state.sourceExact && !state.witnessOnly,
-                { state.sourceWitnessAccepted },
-                { state.exactSourceWitness },
-                { _ ->
-                    if (state.sourceWitnessAccepted) state.latestSourceObjective?.let(SourceValue::Rational) else null
-                },
-                exactSourceOptimum = { state.exactSourceOptimum },
+                exactSourceWitness = { state.exactSourceWitness },
                 effectiveDeclarations = state.effectiveDeclarations,
-                claimsCoverTolerance = state.claimsCoverTolerance,
-                acceptedObjectiveBound = state.acceptedObjectiveBound,
             )
         }
     }
 }
 
-private class MpsOutputState(
-    val objectiveScale: Long = 1L,
-    val toleranceDifference: String? = null,
-    val sourceExact: Boolean = true,
-    val sourceDifference: String? = null,
-    val effectiveDeclarations: Boolean = false,
-    val claimsCoverTolerance: Boolean = true,
-    val acceptedObjectiveBound: BigFraction? = null,
-) {
-    var latestSourceObjective: BigFraction? = null
-    var sourceWitnessAccepted = true
-    var witnessOnly = false
+private class MpsOutputState(val effectiveDeclarations: Boolean = false) {
     var exactSourceWitness: Boolean? = null
-    var exactSourceOptimum: Boolean? = null
 }
 
-private fun parseOpenMpsNumber(value: String): BigFraction {
-    val parts = value.split('/')
-    return BigFraction.of(parseBigInt(parts[0]), if (parts.size == 1) BIG_ONE else parseBigInt(parts[1]))
-}
-
-// The effective source policy checks every floating leaf before publication.
-private fun mpsLinearSolvable(compiled: MpsCompiled, exact: Boolean, solvable: Solvable): Solvable = if (exact) {
-    solvable
-} else {
-    solvable.withToleranceCheck { sample ->
-        val reals = sample.exactReals
-        if (reals == null) {
-            compiled.withinTolerance(sample.ints, sample.reals)
-        } else {
-            try {
-                compiled.sourceWitness(sample.ints, reals)
-                true
-            } catch (_: IllegalArgumentException) {
-                false
-            }
-        }
+private fun MpsModel.fitsMpsReconstructionBudget(stop: Cancellation): Boolean {
+    if (variables.size > 4096) return false
+    var remaining = 32768L - variables.size - objective.indices.size
+    if (remaining < 0L) return false
+    for (row in constraints) {
+        stop.charge(1L)
+        if (stop()) return false
+        remaining -= row.indices.size.toLong() + 1L
+        if (remaining < 0L) return false
     }
+    return true
 }
 
-private fun requireExactMpsSource(compiled: MpsCompiled) {
-    if (!compiled.sourceExact) {
-        throw MpsLoweringException("exact MPS lowering differs from the source at ${compiled.sourceDifference}")
-    }
-}
-
-internal fun renderMpsFloat(compiled: MpsCompiled, sample: Sample): String {
-    checkedIntegralMpsFloat(compiled, sample)?.let { return renderMpsWitness(compiled, it) }
+internal fun renderMpsSourceWitness(
+    witness: LinearSourceWitness,
+    reconstruct: Boolean,
+    cancellation: Cancellation = Cancellation.Never,
+): String {
+    val variables = witness.source.variables
+    val original = witness.values
+    val values = if (reconstruct && original.size <= 4096) {
+        checkedIntegralMpsSource(witness, original, cancellation)?.values ?: original
+    } else original
     return buildString {
         append("v")
-        for (column in compiled.columns) {
-            val value = if (column.real) {
-                sample.approximateRealValue(column.id).toString()
-            } else {
-                sample.intValue(column.id).toString()
-            }
-            append(" ${column.name}=$value")
+        for (index in variables.indices) append(" ${variables[index].name}=${exactMpsNumber(values[index])}")
+    }
+}
+
+private fun checkedIntegralMpsSource(
+    witness: LinearSourceWitness,
+    original: List<BigFraction>,
+    stop: Cancellation,
+): LinearSourceWitness? {
+    if (stop()) return null
+    val variables = witness.source.variables
+    var changed = false
+    val candidate = original.mapIndexed { index, value ->
+        stop.charge(1L)
+        if (stop()) return null
+        when {
+            variables[index].integer || value.isZero -> value
+            abs(value.toDouble()) <= 1e-12 -> BigFraction.ZERO.also { changed = true }
+            value.den == BIG_ONE && value.num.fitsLong() -> value
+            else -> return null
         }
     }
-}
-
-private fun checkedIntegralMpsFloat(compiled: MpsCompiled, sample: Sample): MpsSourceWitness? {
-    if (!compiled.sourceExact || compiled.columns.size > 4096 || sample.reals.size > 4096 ||
-        sample.reals.none { it != 0.0 && abs(it) <= 1e-12 }
-    ) return null
-    val values = sample.reals.map { value ->
-        if (!value.isFinite()) return null
-        if (abs(value) <= 1e-12) BigFraction.ZERO else {
-            val exact = BigFraction.ofDouble(value) ?: return null
-            if (exact.den != BIG_ONE || !exact.num.fitsLong()) return null
-            exact
-        }
-    }
-    val witness = compiled.sourceWitnessOrNull(sample.ints, values, maxEntries = 32768) ?: return null
-    return witness.takeIf { it.exact && it.objective == compiled.sourceObjective(sample.ints, sample.reals) }
-}
-
-/** Render an MPS solution line: `v name=value` per column, each value from the exact source witness. */
-internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String =
-    renderMpsWitness(compiled, compiled.sourceWitness(s.ints, s.exactReals))
-
-private fun renderMpsWitness(compiled: MpsCompiled, witness: MpsSourceWitness): String = buildString {
-    append("v")
-    for (index in compiled.columns.indices) {
-        append(" ${compiled.columns[index].name}=${exactMpsNumber(witness.values[index])}")
-    }
-}
-
-/** Render an open-theory witness without depending on the concrete theory that produced it. */
-internal fun renderMpsOpenModel(compiled: MpsCompiled, assignment: OpenTheoryAssignment): String = buildString {
-    append("v")
-    for (col in compiled.columns) {
-        val value = if (col.real) assignment.realValue(col.id) else assignment.intValue(col.id)
-        append(" ${col.name}=$value")
-    }
+    if (!changed) return null
+    val checked = witness.source.checkMpsWitness(candidate, stop) ?: return null
+    return checked.takeIf { it.exact && it.objective == witness.objective }
 }
 
 /** MPS output protocol (PB-competition-style `s`/`o`/`v`). */
@@ -285,6 +146,18 @@ internal class MpsOutput(
     private val acceptedObjectiveBound: BigFraction? = null,
 ) : BufferedBestOutput() {
     private var bestObjective: Long? = null
+    private var linearSource: LinearSourceOutcome? = null
+    private var nativeOptimumExact = false
+
+    override fun onLinearSourceResult(result: SourceExecutionResult) {
+        val qualified = result.linearSource ?: return
+        linearSource = qualified
+        nativeOptimumExact = if (result is SourceExecutionResult.Finite) {
+            (result.result.outcome as? FiniteSolveOutcome.Completed)?.bestSample?.let {
+                it.numRealVars == 0 || it.exactReals != null
+            } == true
+        } else qualified.nativeConclusion == LinearSourceConclusion.OPTIMAL
+    }
 
     override fun acceptsSourceWitness(): Boolean = sourceWitnessAccepted()
 
@@ -321,7 +194,15 @@ internal class MpsOutput(
         is SourceValue.Extension -> arithmeticObjectiveText(objective)
     }
 
-    override fun statusLine(verdict: Verdict): String = when (verdict) {
+    override fun statusLine(verdict: Verdict): String = if (linearSource != null) {
+        when (verdict) {
+            Verdict.OPTIMAL -> if (best == null) "s UNKNOWN" else "s OPTIMUM FOUND"
+            Verdict.SATISFIABLE, Verdict.BEST_FOUND -> if (best == null) "s UNKNOWN" else "s SATISFIABLE"
+            Verdict.UNBOUNDED -> if (best == null) "s UNKNOWN" else "s UNBOUNDED"
+            Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
+            Verdict.UNKNOWN -> "s UNKNOWN"
+        }
+    } else when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
             if (best == null) {
                 "s UNKNOWN"
@@ -348,20 +229,37 @@ internal class MpsOutput(
 
     override fun lpStatisticPairs(stats: SolveStats): List<Pair<String, String>> {
         val pairs = super.lpStatisticPairs(stats)
-        val key = when {
+        val qualified = linearSource
+        val key = if (qualified != null) when {
+            !qualified.nativeClaimsUnrestricted -> "restrictedModelLpRootBound"
+            qualified.nominalSourceExact && qualified.claimsCoverTolerance -> "lpRootBound"
+            qualified.nominalSourceExact -> "nominalSourceLpRootBound"
+            else -> "workingModelLpRootBound"
+        } else when {
             claimsCoverTolerance -> "lpRootBound"
             proofExact -> "nominalSourceLpRootBound"
             else -> "workingModelLpRootBound"
         }
         val scoped = pairs.map { (name, value) -> (if (name == "lpRootBound") key else name) to value }
         return if (pairs.any { it.first == "lpRootBound" }) {
-            scoped + ("${key}Scale" to "$objectiveScale")
+            scoped + ("${key}Scale" to (qualified?.objectiveScale?.toString() ?: "$objectiveScale"))
         } else pairs
     }
 
     override fun keepStat(key: String): Boolean = true
 
     override fun completionMetadata(verdict: Verdict): String? {
+        linearSource?.let { source ->
+            if (best == null) return null
+            if (verdict == Verdict.OPTIMAL && source.conclusion == LinearSourceConclusion.OPTIMAL) {
+                return "optimizationStatus=attained-optimum"
+            }
+            if (source.nativeConclusion != LinearSourceConclusion.OPTIMAL) return null
+            val status = if (source.nominalSourceExact && source.incumbent?.exact == true && nativeOptimumExact) {
+                "attained-optimum"
+            } else "tolerance-optimum"
+            return "${source.nativeScope()}OptimizationStatus=$status"
+        }
         if (verdict != Verdict.OPTIMAL || best == null || !sourceWitnessAccepted()) return null
         val attainedBound = attainsAcceptedObjectiveBound()
         val status = if (attainedBound) "attained-optimum" else when (exactSourceWitness()) {
@@ -379,6 +277,7 @@ internal class MpsOutput(
 
     override fun verdictReason(verdict: Verdict): String? {
         val cause = super.verdictReason(verdict)
+        linearSource?.let { return linearSourceReason(it, cause) }
         val sourceQualification = sourceDifference?.let { "lowered model differs from MPS source at $it" }
         val witnessQualification = when (exactSourceWitness()) {
             true -> "exact $sourceScope MPS source witness"
@@ -402,11 +301,42 @@ internal class MpsOutput(
             .joinToString("; ").ifEmpty { null }
     }
 
+    private fun linearSourceReason(source: LinearSourceOutcome, cause: String?): String? {
+        val declaration = if (effectiveDeclarations) "MPS source scope=effective declaration defaults" else null
+        val witness = source.incumbent?.let {
+            if (it.exact) "exact $sourceScope MPS source witness" else "MPS source tolerance witness"
+        }
+        val scope = when {
+            !source.nativeClaimsUnrestricted -> "restricted-model"
+            source.nominalSourceExact -> "nominal"
+            else -> "working-model"
+        }
+        val qualification = when {
+            source.nativeConclusion == LinearSourceConclusion.UNSATISFIABLE &&
+                source.conclusion != LinearSourceConclusion.UNSATISFIABLE ->
+                "$scope refutation; tolerance-accepted feasibility unproved"
+            source.nativeConclusion == LinearSourceConclusion.OPTIMAL &&
+                source.conclusion != LinearSourceConclusion.OPTIMAL ->
+                "$scope optimization result; tolerance-accepted optimality unproved"
+            source.nativeConclusion == LinearSourceConclusion.UNBOUNDED &&
+                source.conclusion != LinearSourceConclusion.UNBOUNDED ->
+                "$scope unboundedness; source recession proof unproved"
+            else -> null
+        }
+        return listOfNotNull(declaration, qualification, witness, cause).joinToString("; ").ifEmpty { null }
+    }
+
     private val sourceScope: String get() = if (effectiveDeclarations) "effective" else "original"
 
     private fun attainsAcceptedObjectiveBound(): Boolean = acceptedObjectiveBound?.let { bound ->
         sourceWitnessAccepted() && sourceObjective() == bound
     } == true
+}
+
+private fun LinearSourceOutcome.nativeScope(): String = when {
+    !nativeClaimsUnrestricted -> "restrictedModel"
+    nominalSourceExact -> "nominalSource"
+    else -> "workingModel"
 }
 
 /** Print terminating rationals within 64 decimal places as decimals, and others as fractions. */
