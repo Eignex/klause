@@ -17,6 +17,7 @@ import com.eignex.klause.ir.WideConsts
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.div
@@ -32,6 +33,8 @@ class ExactLinear private constructor(
     private val coefficients: Array<BigInt>,
     private val rhs: BigInt,
     override val relation: LinearOp,
+    override val strict: Boolean,
+    override val activator: Int,
 ) : Factor, LinearRow {
     override val size: Int get() = references.size
     override fun ref(k: Int): Int = references[k]
@@ -41,6 +44,7 @@ class ExactLinear private constructor(
     override val linearForm: LinearForm = LinearForm.Conjunction(listOf(this))
     override val variables: MixedVars = MixedVars(
         boundInts = references.filter(Term::isInt).map(Term::intVar).toIntArray(),
+        boolVars = if (activator == LinearRow.ALWAYS) intArrayOf() else intArrayOf(activator),
         reals = references.filter(Term::isReal).map(Term::realVar).toIntArray(),
     )
 
@@ -50,7 +54,8 @@ class ExactLinear private constructor(
             if (Term.isInt(reference)) Term.ofIntVar(mapping.int(Term.intVar(reference)))
             else Term.ofRealVar(mapping.real(Term.realVar(reference)))
         },
-        coefficients.map { BigFraction.of(it, BIG_ONE) }, relation, BigFraction.of(rhs, BIG_ONE),
+        coefficients.map { BigFraction.of(it, BIG_ONE) }, relation, BigFraction.of(rhs, BIG_ONE), strict,
+        if (activator == LinearRow.ALWAYS) activator else mapping.bool(activator),
     )
 
     override fun structuralKey(): StructuralKey = key()
@@ -71,6 +76,8 @@ class ExactLinear private constructor(
             .entries.sortedWith(compareBy({ it.key.first }, { it.key.second }))
         return StructuralKey.of(FactorKind.EXACT_LINEAR) {
             enum(relation)
+            bool(strict)
+            int(if (activator == LinearRow.ALWAYS) activator else mapping?.bool(activator) ?: activator)
             ints(rhs.toString().map { it.code }.toIntArray())
             int(kept.size)
             for ((coordinate, coefficient) in kept) {
@@ -84,7 +91,17 @@ class ExactLinear private constructor(
     /** Exact source construction; positive denominator clearing preserves the comparison direction. */
     companion object {
         /** Coalesce repeated tagged coordinates before capturing the exact relation. */
-        fun of(refs: IntArray, coefficients: List<BigFraction>, relation: LinearOp, rhs: BigFraction): ExactLinear {
+        fun of(
+            refs: IntArray,
+            coefficients: List<BigFraction>,
+            relation: LinearOp,
+            rhs: BigFraction,
+            strict: Boolean = false,
+            activator: Int = LinearRow.ALWAYS,
+        ): ExactLinear {
+            require(!strict || relation == LinearOp.LE || relation == LinearOp.GE) { "strict row must be an inequality" }
+            require(activator >= LinearRow.ALWAYS) { "invalid row activator" }
+
             require(refs.size == coefficients.size)
             require(refs.all { it >= 0 && (Term.isInt(it) || Term.isReal(it)) })
             val terms = LinkedHashMap<Int, BigFraction>()
@@ -94,8 +111,10 @@ class ExactLinear private constructor(
             val kept = terms.filterValues { !it.isZero }
             val denominator = kept.values.fold(rhs.den) { scale, value -> scale / scale.gcd(value.den) * value.den }
             val multiplier = BigFraction.of(if (relation == LinearOp.GE) -denominator else denominator, BIG_ONE)
+            val integerStrict = strict && kept.keys.none(Term::isReal)
+            val bound = (rhs * multiplier).num - if (integerStrict) BIG_ONE else BIG_ZERO
             return ExactLinear(kept.keys.toIntArray(), kept.values.map { (it * multiplier).num }.toTypedArray(),
-                (rhs * multiplier).num, if (relation == LinearOp.GE) LinearOp.LE else relation)
+                bound, if (relation == LinearOp.GE) LinearOp.LE else relation, strict && !integerStrict, activator)
         }
     }
 }
