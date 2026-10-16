@@ -813,7 +813,8 @@ class QfLiraSolverTest {
                 val session = SearchSession(listOf(component))
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 for (variable in order) {
-                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, variable != 1))))
+                    val decision = SearchDecision.Bool(Lit.make(variable, variable != 1))
+                    assertIs<ComponentResult.Consistent>(session.push(decision))
                 }
 
                 val result = assertIs<SearchResult.Satisfied>(session.solve(0))
