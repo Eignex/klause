@@ -1,11 +1,13 @@
 package com.eignex.klause.formats.xcsp3
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearObjectiveSpec
@@ -97,7 +99,10 @@ internal fun splitCondition(text: String): Pair<String, String> {
 
 /** Compiler for the supported XCSP3 integer subset. */
 internal object Compiler {
-    internal class Builder(private val settings: ProblemSettings = ProblemSettings()) : CnfLowering {
+    internal class Builder(
+        private val settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+        private val semantics: EffectiveSourceSemantics = xcsp3Semantics.resolve(),
+    ) : CnfLowering {
         internal val varIds = LinkedHashMap<String, Int>() // resolved name (incl. array cells) -> int var id
         internal val arrayDims = HashMap<String, IntArray>() // array id -> declared dimension sizes
         internal val domains = ArrayList<IntDomain>()
@@ -1234,6 +1239,7 @@ internal object Compiler {
         fun build(): Xcsp3Problem = Xcsp3Problem(
             Problem(
                 settings = settings,
+                semantics = semantics,
                 numBoolVars = nextBool,
                 numIntVars = domains.size,
                 intDomains = domains.toTypedArray(),
