@@ -16,6 +16,21 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class CliModeOptionsTest {
+    @Test
+    fun `unsupported caller bound precision should return a clean cli usage diagnostic`() {
+        val input = File.createTempFile("callerprecision", ".fzn").apply {
+            writeText("var float: x; solve satisfy;")
+            deleteOnExit()
+        }
+        var code = -1
+
+        val error = captureErr {
+            code = runCli(arrayOf("--unbounded-real-lo", "1/3", input.absolutePath))
+        }
+
+        assertEquals(2, code, error)
+        assertTrue("undeclared real bound cannot be represented exactly in binary64" in error, error)
+    }
 
     @Test
     fun `unbounded integer flags should retain caller endpoints beyond FlatZinc defaults`() {
