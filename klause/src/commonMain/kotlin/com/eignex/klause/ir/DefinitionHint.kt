@@ -70,88 +70,121 @@ sealed interface DefinitionHint {
     /** An integer source variable or literal. */
     sealed interface Operand {
         /** Original integer coordinate. */
-        class Variable(/** Integer variable ID. */ val id: Int) : Operand
+        class Variable(
+            /** Integer variable ID. */
+            val id: Int,
+        ) : Operand
 
         /** Exact signed-word integer literal. */
-        class Constant(/** Source value. */ val value: Long) : Operand
+        class Constant(
+            /** Source value. */
+            val value: Long,
+        ) : Operand
     }
 
     /** Absolute-value relation oriented toward its result. */
     class Abs(
         override val output: Int,
-        /** Source operand. */ val input: Operand,
+        /** Source operand. */
+        val input: Operand,
     ) : Integer
 
     /** Minimum or maximum relation oriented toward its result. */
     class Extreme(
         override val output: Int,
-        /** Ordered source operands, including repeated roles. */ val inputs: Array<Operand>,
-        /** Whether the result is the maximum. */ val maximum: kotlin.Boolean,
+        /** Ordered source operands, including repeated roles. */
+        val inputs: Array<Operand>,
+        /** Whether the result is the maximum. */
+        val maximum: kotlin.Boolean,
     ) : Integer
 
     /** Multiplication relation oriented toward its result. */
     class Product(
         override val output: Int,
-        /** Left source operand. */ val left: Operand,
-        /** Right source operand. */ val right: Operand,
+        /** Left source operand. */
+        val left: Operand,
+        /** Right source operand. */
+        val right: Operand,
     ) : Integer
 
     /** Fixed nonnegative integer power oriented toward its result. */
     class Power(
         override val output: Int,
-        /** Source base. */ val base: Operand,
-        /** Source exponent. */ val exponent: Int,
+        /** Source base. */
+        val base: Operand,
+        /** Source exponent. */
+        val exponent: Int,
     ) : Integer
 
     /** Addition relation oriented toward its result. */
     class Plus(
         override val output: Int,
-        /** Left source operand. */ val left: Operand,
-        /** Right source operand. */ val right: Operand,
+        /** Left source operand. */
+        val left: Operand,
+        /** Right source operand. */
+        val right: Operand,
     ) : Integer
 
     /** Source equality `sum(coefficients * inputs) = bound`, including the output's original roles. */
     class Linear(
         override val output: Int,
-        /** Exact source coefficients. */ val coefficients: LongArray,
-        /** Ordered source operands. */ val inputs: Array<Operand>,
-        /** Exact source right-hand side. */ val bound: Long,
+        /** Exact source coefficients. */
+        val coefficients: LongArray,
+        /** Ordered source operands. */
+        val inputs: Array<Operand>,
+        /** Exact source right-hand side. */
+        val bound: Long,
     ) : Integer
 
     /** Integer value of a Boolean source literal. */
     class BooleanValue(
         override val output: Int,
-        /** [Lit]-encoded source literal, with its polarity retained. */ val literal: Int,
+        /** [Lit]-encoded source literal, with its polarity retained. */
+        val literal: Int,
     ) : Integer
 
     /** Source array selection oriented toward an integer result. */
     class Element(
         override val output: Int,
-        /** Original integer index coordinate. */ val index: Int,
-        /** Ordered integer coordinates, or null for a constant array. */ val variables: IntArray?,
-        /** Ordered source literals, or null for a variable array. */ val values: LongArray?,
-        /** Source index of the first array position. */ val offset: Int,
+        /** Original integer index coordinate. */
+        val index: Int,
+        /** Ordered integer coordinates, or null for a constant array. */
+        val variables: IntArray?,
+        /** Ordered source literals, or null for a variable array. */
+        val values: LongArray?,
+        /** Source index of the first array position. */
+        val offset: Int,
     ) : Integer
 
     /** Exact integer comparison oriented toward its Boolean indicator. */
     class Comparison(
         override val output: Int,
-        /** Exact source coefficients. */ val coefficients: LongArray,
-        /** Ordered integer operands. */ val inputs: Array<Operand>,
-        /** Exact source right-hand side. */ val bound: Long,
-        /** Source comparison, with strictness retained separately. */ val relation: LinearOp,
-        /** Whether LE or GE denotes its strict counterpart. */ val strict: kotlin.Boolean = false,
+        /** Exact source coefficients. */
+        val coefficients: LongArray,
+        /** Ordered integer operands. */
+        val inputs: Array<Operand>,
+        /** Exact source right-hand side. */
+        val bound: Long,
+        /** Source comparison, with strictness retained separately. */
+        val relation: LinearOp,
+        /** Whether LE or GE denotes its strict counterpart. */
+        val strict: kotlin.Boolean = false,
     ) : Boolean
 
     /** Constant-set membership oriented toward its Boolean indicator. */
     class Membership(
         override val output: Int,
-        /** Original integer member coordinate. */ val input: Int,
-        /** Exact source set values. */ val values: LongArray,
+        /** Original integer member coordinate. */
+        val input: Int,
+        /** Exact source set values. */
+        val values: LongArray,
     ) : Boolean
 
     /** Boolean fold whose source literals retain polarity and multiplicity. */
-    class Fold(/** Source definition. */ val definition: BoolFoldDefinition) : Boolean {
+    class Fold(
+        /** Source definition. */
+        val definition: BoolFoldDefinition,
+    ) : Boolean {
         override val output: Int get() = definition.out
     }
 }

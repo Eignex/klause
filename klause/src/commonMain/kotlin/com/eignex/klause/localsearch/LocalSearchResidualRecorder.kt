@@ -10,6 +10,7 @@ import com.eignex.klause.factor.scheduling.internals.CumulativeLsState
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.solver.objective.CapturedIntegerDefinition
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.result.LocalSearchResidual
 import com.eignex.klause.solver.result.LocalSearchResidualFactor
@@ -143,6 +144,7 @@ internal class LocalSearchResidualRecorder {
             is FunctionalObjective.Power -> "IntDef.Power"
             is FunctionalObjective.Plus -> "IntDef.Plus"
             is FunctionalObjective.Lin -> "IntDef.Lin"
+            is CapturedIntegerDefinition -> "IntDef.CapturedIntegerDefinition"
         }
         is DefinitionalSweep.SweepNode.CmpReif -> "CmpReif"
         is DefinitionalSweep.SweepNode.SetInReif -> "SetInReif"
