@@ -15,6 +15,7 @@ import com.eignex.klause.lowering.LinearEncodingInterrupted
 import com.eignex.klause.lowering.LinearFormulaLowering
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.solver.SelectedEncoderRequest
 import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
@@ -41,17 +42,36 @@ internal fun PreparedFactorProjections.linearTheoryModel(
     completeFiniteConditions: Boolean = false,
 ): Problem? {
     require(target != EncodingTarget.POLYNOMIAL)
-    val integerPins = fixedIntegers.toMap()
-    val booleanPins = fixedBooleans.toMap()
-    val factors = ArrayList<Factor>(indices.size)
+    val request = requestEncoders(target, indices, fixedIntegers, fixedBooleans, cancellation,
+        completeFiniteConditions, onDecline) ?: return null
+    return linearTheoryModel(request, onDecline)
+}
+
+internal fun PreparedFactorProjections.linearTheoryModel(
+    request: SelectedEncoderRequest,
+    onDecline: (EncoderDecline) -> Unit = {},
+): Problem? {
+    require(request.selection === this) { "encoder request belongs to a different canonical source" }
+    require(request.target != EncodingTarget.POLYNOMIAL)
+    val stop = request.cancellation
+    if (stop()) {
+        onDecline(EncoderDecline.RESOURCE)
+        return null
+    }
+    val factors = ArrayList<Factor>(request.indices.size)
     val origins = ArrayList<Int>()
     val allocator = EncodingRealAllocator(problem.numRealVars)
-    for (index in indices) {
-        val relations = installLinearFactor(index, target, integerPins, booleanPins, cancellation, allocator,
-            onDecline, completeFiniteConditions)
-            ?: return null
+    for (position in request.indices.indices) {
+        val index = request.indices[position]
+        val relations = installSelectedLinearFactor(index, request.target, request.encoders[position],
+            request.fixedIntegers, request.fixedBooleans, stop, allocator,
+            onDecline, request.completeFiniteConditions) ?: return null
         factors += relations
         repeat(relations.size) { origins += index }
+    }
+    if (stop()) {
+        onDecline(EncoderDecline.RESOURCE)
+        return null
     }
     return EncodedTheoryModel(problem, factors.toTypedArray(),
         problem.impliedFactorMask?.let { mask -> BooleanArray(factors.size) { local ->
@@ -65,11 +85,32 @@ internal fun PreparedFactorProjections.installLinearFactor(
     integerPins: Map<SourceIntId, BigInt> = emptyMap(),
     booleanPins: Map<SourceBoolId, Boolean> = emptyMap(),
     cancellation: Cancellation = Cancellation.Never,
-    allocator: EncodingRealAllocator = EncodingRealAllocator(problem.numRealVars),
+    allocator: EncodingRealAllocator? = null,
     onDecline: (EncoderDecline) -> Unit = {},
     completeFiniteConditions: Boolean = false,
 ): List<EncodedTheoryFactor>? {
-    val selected = encoder(index, target)
+    val request = requestEncoders(target, listOf(index), integerPins, booleanPins, cancellation,
+        completeFiniteConditions, onDecline) ?: return null
+    return installSelectedLinearFactor(index, target, request.encoders.single(), request.fixedIntegers,
+        request.fixedBooleans, request.cancellation, allocator ?: EncodingRealAllocator(problem.numRealVars),
+        onDecline, completeFiniteConditions)
+}
+
+private fun PreparedFactorProjections.installSelectedLinearFactor(
+    index: Int,
+    target: EncodingTarget,
+    selected: Encoder,
+    integerPins: Map<SourceIntId, BigInt>,
+    booleanPins: Map<SourceBoolId, Boolean>,
+    cancellation: Cancellation,
+    allocator: EncodingRealAllocator,
+    onDecline: (EncoderDecline) -> Unit,
+    completeFiniteConditions: Boolean,
+): List<EncodedTheoryFactor>? {
+    if (cancellation()) {
+        onDecline(EncoderDecline.RESOURCE)
+        return null
+    }
     if (completeFiniteConditions && target == EncodingTarget.LINEAR &&
         selected.support == EncoderSupport.CONDITIONED &&
         selected.requiredIntegers.any { it !in integerPins }
@@ -93,7 +134,7 @@ internal fun PreparedFactorProjections.installLinearFactor(
     val encoding = LinearTheoryEncoding(target, sourceIndex, integerPins, booleanPins, cancellation,
         booleans, integers, reals, allocator)
     val forms = try {
-        val decline = encoder(index, target).install(source, encoding)
+        val decline = selected.install(source, encoding)
         if (decline != null) {
             onDecline(decline)
             return null

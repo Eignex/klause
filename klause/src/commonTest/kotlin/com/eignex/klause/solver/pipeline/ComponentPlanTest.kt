@@ -18,11 +18,22 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.EncodedTheoryFactor
+import com.eignex.klause.theory.Encoder
+import com.eignex.klause.theory.EncoderProvider
+import com.eignex.klause.theory.EncoderSupport
+import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.qflra.exactTheoryOwnable
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -103,6 +114,67 @@ class ComponentPlanTest {
         assertEquals(FactorOwner.CP, model.componentPlan(preferFinite = true).factorOwner(0))
         assertEquals(FactorOwner.CP, model.componentPlan().factorOwner(0))
         assertEquals(true, model.componentPlan().factorEncoded(0))
+    }
+
+    @Test
+    fun `an ineligible whole source should install its eligible connected fragment without a prefix`() {
+        for (reverse in listOf(false, true)) {
+            val row = Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.EQ, 1)
+            val global = AllDifferent(intArrayOf(0, 1), 0, 2)
+            val factors = if (reverse) arrayOf<Factor>(global, row) else arrayOf<Factor>(row, global)
+            val source = Problem(0, 3, Array(3) { IntDomain(0, 1) }, factors,
+                openIntHi = booleanArrayOf(false, false, true))
+            val installations = mutableMapOf<EncodingTarget, Int>()
+            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (!selected.enforcesSource) selected else Encoder(selected.support) { view, encoding ->
+                    installations[target] = (installations[target] ?: 0) + 1
+                    selected.install(view, encoding)
+                }
+            })
+
+            val plan = source.componentPlan(providers.prepare(source))
+            val result = plan.search(source, plan.cpSourceDomains(source)).use {
+                assertIs<ComponentResult.Consistent>(it.session.initialize())
+                it.session.solve(source.numBoolVars)
+            }
+
+            val rowIndex = if (reverse) 1 else 0
+            val globalIndex = if (reverse) 0 else 1
+            assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
+            assertEquals(FactorOwner.CP, plan.factorOwner(globalIndex))
+            assertFalse(plan.factorEncoded(globalIndex))
+            assertTrue(plan.factorEncoded(rowIndex))
+            assertEquals(1, installations[EncodingTarget.LINEAR])
+            assertEquals(1, installations[EncodingTarget.DIFFERENCE])
+            val relation = assertIs<EncodedTheoryFactor>(
+                assertNotNull(plan.encodedTheoryFragment(source)).factors.single(),
+            )
+            assertEquals(rowIndex, relation.attribution.sourceFactorIndex)
+            assertIs<SearchResult.Satisfied>(result)
+        }
+    }
+
+    @Test
+    fun `a selected complete real candidate should not install an unused difference candidate`() {
+        val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0)
+        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(row), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val installations = mutableMapOf<EncodingTarget, Int>()
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            if (target == EncodingTarget.POLYNOMIAL) BuiltInEncoderProvider.select(factor, target)
+            else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                installations[target] = (installations[target] ?: 0) + 1
+                encoding.linear(assertNotNull(view.linearForm))
+                null
+            }
+        })
+
+        val plan = source.componentPlan(providers.prepare(source))
+
+        assertEquals(ProblemPipeline.EXACT_LRA, plan.theoryPipeline)
+        assertEquals(1, installations[EncodingTarget.LINEAR])
+        assertEquals(0, installations[EncodingTarget.DIFFERENCE] ?: 0)
     }
 
     private fun tighteningFactors(): List<Factor> = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3))

@@ -532,7 +532,16 @@ for the identical model; a rewritten or remapped model selects against its own f
 Encoder selection names the consumer language separately from numerical execution.
 Direct and equivalent encoders enforce the whole factor; conditioned encoders require
 captured source pins. Relaxation-only and unsupported descriptors confer no source
-ownership. Finite/linear planning reads those selected relations for fragment admission and
+ownership. Selected factor indices, target, canonical source capture and condition
+maps are admitted before a receiving model or its private coordinate allocator is
+created. Admission reads the captured descriptors rather than selecting providers
+again. Integer pins respect original bounds and declared holes, including open sides;
+finite fallback boxes confer no additional condition. A request owns copies of its
+indices and pins and retains its containing cancellation. Descriptor acceptance is
+eligibility only: actual installation and complete-fragment checks still establish
+which consumer can enforce the source.
+
+Finite/linear planning reads those selected relations for fragment admission and
 shared component installation. Variable ownership is separate: finite declarations
 and their choices remain in finite state, while open integers and reals remain
 arithmetic-owned. `factorOwner` names the primary enforcing path; `factorEncoded`
