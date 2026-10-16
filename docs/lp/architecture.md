@@ -23,9 +23,15 @@ materialize their definitions when asserted, through the same permanent tautolog
 row path used for transient source comparisons. Bounds and their source premises
 retract with the search scope; definitions remain available to sibling scopes.
 Active ordinary comparisons stage at most 64 layouts in source order and append
-new multi-column definitions together. Zero- and single-column layouts end a group:
+new multi-column definitions together. Optional staging also caps its metadata
+entry work, forwarding charges and cancellation through the containing token while
+normalizing, copying mappings and building definition rows. Reaching this staging
+cap falls back to sequential source assertions without renewing their allowance.
+Zero- and single-column layouts end a group:
 their bounds apply before subsequent normalization can substitute a root-fixed column.
-Source bounds still apply individually, with their original premises and edit debits.
+Source bounds still apply individually with their original premises. Each edit
+charges the current model's column count, including later staged definitions;
+batching can increase that per-side charge.
 Definition mappings publish only after an atomic append; a declined append permits
 sequential fallback only while the captured state and cancellation remain valid.
 Each append retains the existing numerical limits and charges its actual construction

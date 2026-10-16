@@ -28,6 +28,7 @@ import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -514,6 +515,27 @@ class QfLraSystemTest {
     }
 
     @Test
+    fun `each staged bound should charge the full current column count`() {
+        val factors = Array<Factor>(2) { index ->
+            ReifiedRealLinear(index, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(1.0, index + 2.0), LinearOp.LE, 3.0)
+        }
+        val comparisons = factors.map { it.linearRows.single().exactForm(2).comparison(true) { false } }
+        val debits = ArrayList<Long>()
+        LpPropagator(object : LpSearchPolicy {}, onEdit = { debits += it }).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(factors), lp)
+            assertTrue(system.install())
+            assertEquals(2, system.prepareComparisons(comparisons, 0, Cancellation.Never))
+
+            for ((index, comparison) in comparisons.withIndex()) {
+                assertTrue(system.assertComparison(comparison, null, premise(index)))
+            }
+
+            assertEquals(listOf(4L, 4L), debits)
+        }
+    }
+
+    @Test
     fun `a staged root equality should fix a source column before the next normalization`() {
         for (sign in listOf(-1.0, 1.0)) {
             val factors = arrayOf<Factor>(
@@ -629,7 +651,7 @@ class QfLraSystemTest {
 
     @Test
     fun `cancelled definition preparation should leave the captured layout reusable`() {
-        for (cancelAt in listOf(2, 5)) {
+        for (cancelAt in listOf(2, 7, 17)) {
             val factors = arrayOf<Factor>(
                 ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
                     doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0),
@@ -654,6 +676,31 @@ class QfLraSystemTest {
                 assertTrue(system.assertComparison(comparisons[1], null, premise(1)))
                 assertEquals(2, assertNotNull(lp.state).model.m)
             }
+        }
+    }
+
+    @Test
+    fun `definition staging should forward work exhaustion before publishing a layout`() {
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0)
+        val comparison = factor.linearRows.single().exactForm(2).comparison(true) { false }
+        var armed = false
+        var charged = 0L
+        val meter = WorkMeter { if (armed) charged += it }
+        val stop = object : Cancellation {
+            override fun isCancelled() = charged >= 8L
+            override fun workMeter() = meter
+        }
+        LpPropagator(object : LpSearchPolicy {}, cancellation = stop).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(arrayOf(factor)), lp)
+            assertTrue(system.install())
+            val before = lp.state
+            armed = true
+
+            assertNull(system.prepareComparisons(listOf(comparison), 0, stop))
+
+            assertTrue(charged >= 8L)
+            assertTrue(before === lp.state)
         }
     }
 

@@ -228,12 +228,14 @@ internal class LiveQfLraSystem(
 
     fun prepareComparisons(comparisons: List<ExactComparison>, first: Int, stop: Cancellation): Int? {
         val state = lp.state ?: return null
+        val staging = SmtDefinitionStaging(stop)
         val pending = LinkedHashMap<Map<Int, BigFraction>, Int>()
         var end = first
         while (end < comparisons.size && end - first < 64) {
-            if (stop()) return null
             val comparison = comparisons[end]
+            if (!staging.reserve(comparison.terms.size + 1L)) break
             val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
+            if (!staging.reserve(3L * key.columns.size + 1L)) break
             val term = termSlot(key).term
             // A source-column bound can change the root substitutions used by the following row.
             if (term.coefficients.size <= 1) {
@@ -248,16 +250,29 @@ internal class LiveQfLraSystem(
             }
             end++
         }
+        if (staging.stopped) return null
         if (end == first) return (first + 1).takeUnless { stop() || lp.state !== state }
         if (pending.isEmpty()) return end.takeUnless { stop() || lp.state !== state }
-        val definitionsAfter = definitions.toMutableMap().also { it.putAll(pending) }
-        val rows = pending.keys.mapIndexed { index, coefficients ->
-            LpScopedRow(
-                state.rows.lastId + index + 1L,
-                coefficients.map { it.key to ExactLpNumber.of(it.value.negated()) },
-                ExactLpNumber.of(0L),
-                ExactLpColumn(ExactLpBounds(), integral = false),
-            )
+        val definitionsAfter = HashMap<Map<Int, BigFraction>, Int>()
+        for ((coefficients, column) in definitions) {
+            if (!staging.reserve(coefficients.size + 1L)) {
+                return end.takeUnless { staging.stopped || stop() || lp.state !== state }
+            }
+            definitionsAfter[coefficients] = column
+        }
+        val rows = ArrayList<LpScopedRow>(pending.size)
+        for ((coefficients, column) in pending) {
+            if (!staging.reserve(coefficients.size + 1L)) {
+                return end.takeUnless { staging.stopped || stop() || lp.state !== state }
+            }
+            val entries = ArrayList<Pair<Int, ExactLpNumber>>(coefficients.size)
+            for ((sourceColumn, coefficient) in coefficients) {
+                if (!staging.reserve(1L)) return end.takeUnless { staging.stopped || stop() || lp.state !== state }
+                entries += sourceColumn to ExactLpNumber.of(coefficient.negated())
+            }
+            rows += LpScopedRow(state.rows.lastId + rows.size + 1L, entries,
+                ExactLpNumber.of(0L), ExactLpColumn(ExactLpBounds(), integral = false))
+            definitionsAfter[coefficients] = column
         }
         if (stop() || lp.state !== state) return null
         if (lp.append(rows, scoped = false)) {
@@ -394,6 +409,20 @@ internal class LiveQfLraSystem(
                 ),
             )
         }
+    }
+}
+
+private class SmtDefinitionStaging(private val stop: Cancellation) {
+    private var remaining = 65_536L
+    var stopped = false
+        private set
+
+    fun reserve(units: Long): Boolean {
+        if (stopped || units > remaining) return false
+        remaining -= units
+        stop.charge(units)
+        stopped = stop()
+        return !stopped
     }
 }
 

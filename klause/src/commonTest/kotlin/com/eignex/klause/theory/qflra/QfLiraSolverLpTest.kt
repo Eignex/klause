@@ -646,6 +646,50 @@ class QfLiraSolverLpTest {
         }
     }
 
+    @Test
+    fun `active guarded definition groups should retain source witnesses across sibling rollback`() {
+        val source = Problem(
+            2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 2.0), LinearOp.LE, 0.0, strict = true),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 3.0), LinearOp.LE, 1.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 4.0), LinearOp.LE, 5.0),
+            ),
+        )
+        val factory = TrackingLpFactory()
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertTrue(factory.modelRows.all { it == 0 })
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertEquals(2, factory.modelRows.maxOrNull())
+            for (truth in listOf(true, false)) {
+                if (!truth) {
+                    session.popTo(0)
+                    assertIs<ComponentResult.Consistent>(session.propagate())
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+                }
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+                val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+
+                val point = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals
+                assertEquals(truth, point[0] + BigFraction.ofLong(2) * point[1] < BigFraction.ZERO)
+                assertEquals(truth, point[0] + BigFraction.ofLong(3) * point[1] <= BigFraction.ONE)
+                assertTrue(point[0] + BigFraction.ofLong(4) * point[1] <= BigFraction.ofLong(5))
+            }
+        }
+        assertEquals(factory.created, factory.closed)
+    }
+
     private fun halfIntegerSource() = Problem(
         0,
         intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
@@ -659,6 +703,7 @@ class QfLiraSolverLpTest {
     ) : LpEngineFactory by ProductionLpEngineFactory {
         var created = 0
         var closed = 0
+        val modelRows = ArrayList<Int>()
         lateinit var lastCancellation: Cancellation
 
         override fun newPersistentSolver(
@@ -671,6 +716,7 @@ class QfLiraSolverLpTest {
             pricing: LpPricingOptions,
         ): PersistentLpSolver {
             created++
+            modelRows += model.m
             lastCancellation = cancellation
             val delegate = ProductionLpEngineFactory.newPersistentSolver(
                 model,
