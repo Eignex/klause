@@ -32,9 +32,9 @@ import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ComponentPlanTest {
@@ -126,7 +126,8 @@ class ComponentPlanTest {
                 openIntHi = booleanArrayOf(false, false, true))
             val installations = mutableMapOf<EncodingTarget, Int>()
             val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
-                val selected = BuiltInEncoderProvider.select(factor, target)
+                val selected = if (factor === global) Encoder(EncoderSupport.UNSUPPORTED)
+                    else BuiltInEncoderProvider.select(factor, target)
                 if (!selected.enforcesSource) selected else Encoder(selected.support) { view, encoding ->
                     installations[target] = (installations[target] ?: 0) + 1
                     selected.install(view, encoding)
@@ -192,7 +193,7 @@ class ComponentPlanTest {
     }
 
     @Test
-    fun `variable partition should exclude enumerated columns from theory`() {
+    fun `arithmetic eligible globals should retain enumerated coordinate ownership`() {
         val spec = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(9, 9, 9), null, null),
@@ -204,9 +205,11 @@ class ComponentPlanTest {
 
         val partition = spec.variablePartition()
 
-        assertFalse(partition.isTheoryEligible(0))
-        assertFalse(partition.isTheoryEligible(1))
+        assertTrue(partition.isTheoryEligible(0))
+        assertTrue(partition.isTheoryEligible(1))
         assertTrue(partition.isTheoryEligible(2))
+        val plan = spec.componentPlan()
+        for (variable in 0..2) assertEquals(IntVariableOwner.CP, plan.intOwner(variable))
     }
 
     @Test

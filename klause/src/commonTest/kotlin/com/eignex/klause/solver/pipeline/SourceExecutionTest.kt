@@ -20,12 +20,17 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.Encoder
+import com.eignex.klause.theory.EncoderProvider
+import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -358,6 +363,10 @@ class SourceExecutionTest {
                 SourceAttachment(source),
                 ExecutionOperation.SATISFY,
                 FiniteEngine.LOCAL_SEARCH,
+                providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+                    if (factor is AllDifferent) Encoder(EncoderSupport.UNSUPPORTED)
+                    else BuiltInEncoderProvider.select(factor, target)
+                }),
             ),
         )
         assertEquals(SourceExecutionKind.HEURISTIC, SourceSetup.executionKind(invocation))

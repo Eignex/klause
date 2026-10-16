@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
@@ -244,15 +245,15 @@ class PlannedSearchTest {
         mapOf(HYBRID_X to IntDomain(0, 7), HYBRID_Z to IntDomain(0, 7))
 
     private fun differenceHybridFixture(fixZAtSeven: Boolean = false): Problem {
-        val openLower = Bits(3).also { it.set(HYBRID_Y) }
-        val openUpper = Bits(3).also { it.set(HYBRID_Y) }
+        val openLower = Bits(4).also { it.set(HYBRID_Y) }
+        val openUpper = Bits(4).also { it.set(HYBRID_Y) }
         val factors = ArrayList<Factor>().apply {
             add(Clause(intArrayOf(Lit.make(0, true))))
             add(Linear(intArrayOf(1), intArrayOf(HYBRID_X), LinearOp.GE, 0))
             add(Linear(intArrayOf(1), intArrayOf(HYBRID_X), LinearOp.LE, 7))
             add(Linear(intArrayOf(1), intArrayOf(HYBRID_Z), LinearOp.GE, 0))
             add(Linear(intArrayOf(1), intArrayOf(HYBRID_Z), LinearOp.LE, 7))
-            add(AllDifferent(intArrayOf(HYBRID_X, HYBRID_Z), domainMin = 0, domainSize = 8))
+            add(NValue(3, intArrayOf(HYBRID_X, HYBRID_Z)))
             add(Linear(intArrayOf(1), intArrayOf(HYBRID_Y), LinearOp.EQ, 0))
             add(Linear(intArrayOf(1, -1), intArrayOf(HYBRID_X, HYBRID_Y), LinearOp.EQ, 7))
             if (fixZAtSeven) add(Linear(intArrayOf(1), intArrayOf(HYBRID_Z), LinearOp.EQ, 7))
@@ -260,8 +261,8 @@ class PlannedSearchTest {
         return Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(
-                longArrayOf(0, 0, 0),
-                longArrayOf(7, 7, 0),
+                longArrayOf(0, 0, 0, 2),
+                longArrayOf(7, 7, 0, 2),
                 openLower,
                 openUpper,
             ),
