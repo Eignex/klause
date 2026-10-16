@@ -90,7 +90,7 @@ class MpsCompiled(
     private var sourceMismatch: String? = null
     private var toleranceMismatch: String? = null
 
-    /** Whether the lowered rows, bounds, and objective have the original source values. */
+    /** Whether lowered rows, bounds and objective retain the source under its effective declaration policy. */
     val sourceExact: Boolean get() = sourceModel != null && sourceMismatch == null
 
     /** The first source value the lowered model does not retain, if any. */
@@ -357,8 +357,19 @@ fun MpsModel.toProblem(
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ): MpsCompiled {
     val effectiveSemantics = semantics.resolve(semanticOverrides)
+    return effectiveDeclarations(effectiveSemantics).lowerProblem(settings, effectiveSemantics)
+}
+
+private fun MpsModel.lowerProblem(settings: ProblemSettings, effectiveSemantics: EffectiveSourceSemantics): MpsCompiled {
     val exactInput = exactAdapterSnapshot()
     val sourceNumbers = exactInput.sourceNumbers()
+    if (sourceNumbers.variableBounds.any { (lower, upper) ->
+            listOfNotNull(lower, upper).any {
+                it.literalBound && (it.fraction != BigFraction.ofDouble(it.double) ||
+                    it.fraction <= MPS_INFINITY_EXACT.negated() || it.fraction >= MPS_INFINITY_EXACT)
+            }
+        }
+    ) return exactInput.lowerExactSource(settings, effectiveSemantics)
     if (constraints.any { it.indicator != null }) return exactInput.lowerExactSource(settings, effectiveSemantics)
     val integralDefinitions = integralDefinitions(sourceNumbers)
     val isFloat = BooleanArray(variables.size) { !variables[it].integer && integralDefinitions[it] == null }
@@ -633,7 +644,7 @@ private val MPS_INFINITY_EXACT = BigFraction.of(
 )
 
 internal fun MpsSourceNumber?.finiteMps(): MpsSourceNumber? = this?.takeIf {
-    it.fraction > MPS_INFINITY_EXACT.negated() && it.fraction < MPS_INFINITY_EXACT
+    it.literalBound || (it.fraction > MPS_INFINITY_EXACT.negated() && it.fraction < MPS_INFINITY_EXACT)
 }
 
 private fun MpsSourceNumber.shiftedBy(origin: ExactLpNumber): ExactLpNumber =
