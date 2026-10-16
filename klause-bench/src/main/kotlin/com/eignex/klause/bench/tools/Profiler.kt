@@ -4,6 +4,7 @@ import jdk.jfr.Recording
 import jdk.jfr.consumer.RecordedEvent
 import jdk.jfr.consumer.RecordingFile
 import java.io.File
+import java.io.PrintStream
 import java.time.Duration
 import java.util.Locale
 
@@ -31,13 +32,26 @@ internal data class ProfileConfig(
  */
 internal object Profiler {
     private const val CLI_CALLER_DEPTH = 3
+    private const val MODEL_CALLER_DEPTH = 4
+    private val mechanismPackages = listOf(
+        "com.eignex.klause.util.",
+        "com.eignex.klause.bench.",
+        "com.eignex.klause.lp.engine.",
+        "com.eignex.klause.lp.lattice.",
+        "com.eignex.klause.simplex.",
+        "com.eignex.klause.arithmetic.",
+    )
 
-    fun summarizeCli(file: File) {
+    fun summarizeCli(file: File) = summarizeCli(file, System.out)
+
+    fun summarizeCli(file: File, output: PrintStream) {
         val cpu = HashMap<String, Long>()
         val phases = HashMap<String, Long>()
         val allocation = HashMap<String, Long>()
         val cpuCallers = HashMap<String, Long>()
         val allocationCallers = HashMap<String, Long>()
+        val cpuModelCallers = HashMap<String, Long>()
+        val allocationModelCallers = HashMap<String, Long>()
         RecordingFile(file.toPath()).use { recording ->
             while (recording.hasMoreEvents()) {
                 val event = recording.readEvent()
@@ -46,20 +60,26 @@ internal object Profiler {
                         topMethod(event)?.let { cpu.merge(it, 1L, Long::plus) }
                         phases.merge(cliPhase(event), 1L, Long::plus)
                         cpuCallers.merge(cliOperationCallers(event), 1L, Long::plus)
+                        cpuModelCallers.merge(cliModelCallers(event), 1L, Long::plus)
                     }
                     "jdk.ObjectAllocationSample" -> {
                         val weight = event.getLong("weight")
                         allocation.merge(cliPhase(event), weight, Long::plus)
                         allocationCallers.merge(cliOperationCallers(event), weight, Long::plus)
+                        allocationModelCallers.merge(cliModelCallers(event), weight, Long::plus)
                     }
                 }
             }
         }
-        printTable("whole CLI: CPU samples by phase (stack attribution)", phases, 40)
-        printTable("whole CLI: CPU self-samples", cpu, 60)
-        printTable("whole CLI: CPU samples by captured callers", cpuCallers, 60)
-        printTable("whole CLI: sampled allocation weight by phase (estimated bytes)", allocation, 40)
-        printTable("whole CLI: sampled allocation weight by captured callers (estimated bytes)", allocationCallers, 60)
+        printTable("whole CLI: CPU samples by phase (stack attribution)", phases, 40, output)
+        printTable("whole CLI: CPU self-samples", cpu, 60, output)
+        printTable("whole CLI: CPU samples by captured callers", cpuCallers, 60, output)
+        printTable("whole CLI: sampled allocation weight by phase (estimated bytes)", allocation, 40, output)
+        printTable("whole CLI: sampled allocation weight by captured callers (estimated bytes)",
+            allocationCallers, 60, output)
+        printTable("whole CLI: CPU samples by captured model-facing callers", cpuModelCallers, 60, output)
+        printTable("whole CLI: sampled allocation weight by captured model-facing callers (estimated bytes)",
+            allocationModelCallers, 60, output)
     }
 
     private fun cliOperationCallers(event: RecordedEvent): String =
@@ -73,6 +93,17 @@ internal object Profiler {
         .take(CLI_CALLER_DEPTH)
         .joinToString(" <- ")
         .ifEmpty { "no captured Klause operation" }
+
+    private fun cliModelCallers(event: RecordedEvent): String =
+        cliModelCallers(event.stackTrace?.frames.orEmpty().map { "${it.method.type.name}.${it.method.name}" })
+
+    internal fun cliModelCallers(stack: List<String>): String = stack.asSequence()
+        .filter { frame ->
+            frame.startsWith("com.eignex.klause.") && mechanismPackages.none { prefix -> frame.startsWith(prefix) }
+        }
+        .take(MODEL_CALLER_DEPTH)
+        .joinToString(" <- ")
+        .ifEmpty { "no captured model-facing caller" }
 
     private fun cliPhase(event: RecordedEvent): String =
         cliPhase(event.stackTrace?.frames.orEmpty().map { "${it.method.type.name}.${it.method.name}" })
@@ -204,16 +235,16 @@ internal object Profiler {
         return "${frame.method.type.name}.${frame.method.name}"
     }
 
-    private fun printTable(title: String, counts: Map<String, Long>, topN: Int) {
+    private fun printTable(title: String, counts: Map<String, Long>, topN: Int, output: PrintStream = System.out) {
         val total = counts.values.sum()
-        println("=== $title ===")
+        output.println("=== $title ===")
         if (total == 0L) {
-            println("  (no samples)")
+            output.println("  (no samples)")
             return
         }
         counts.entries.sortedByDescending { it.value }.take(topN).forEach { (method, n) ->
             val pct = n.toDouble() * 100.0 / total
-            println("  ${"%5.1f%%".format(Locale.ROOT, pct)}  ${"%9d".format(Locale.ROOT, n)}  $method")
+            output.println("  ${"%5.1f%%".format(Locale.ROOT, pct)}  ${"%9d".format(Locale.ROOT, n)}  $method")
         }
     }
 }

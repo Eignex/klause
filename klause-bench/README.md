@@ -1536,6 +1536,25 @@ and ALNS bootstrap/repair. Resumed initial scoring remains seeding; retained
 projection building remains preparation. Allocation weights estimate bytes;
 CPU sample shares are not wall-time attribution.
 
+Separate model-facing caller tables retain the first four captured Klause frames
+after excluding `util`, `bench`, `lp.engine`, `lp.lattice`, `simplex` and `arithmetic` packages.
+The existing operation-caller tables retain their first three frames. These are
+bounded views of recorded stacks; absent ancestors remain unknown. Filtering does
+not establish a unique owner or cause, and counts overlap the phase and self tables.
+Both CPU counts and estimated allocation weights are summarized after CLI timing;
+recorder settings and solver execution are unchanged.
+
+`com.eignex.klause.bench.profile.CliRecordingSummary` replays retained recordings
+on the remote lab host. Pass one positive `sourceJob=<id>` and one to eight
+`recording=<case>:<measurementUUID>:<rawSHA256>` arguments. It derives sibling jobs
+from the lab's `JOB_DIR`, reads only the selected fixed recording/metadata paths,
+rejects symlink escapes and files over 16 MiB, and verifies recording identity
+before and after parsing. Original measurement and available solve-record hashes
+remain separate from the parser build/runtime in its output. Use a maintained
+`lab profile` job with `host=lab`; it runs no CLI or solver and makes no timing or
+verdict claim. Missing or trimmed source files fail explicitly. No inline recording
+transport, public upload or local JFR parsing is needed.
+
 ```sh
 ./gradlew :klause-bench:bench --args="solve suite=mzn-bench name=mario engine=cp profile=cpu timeout=30000"
 ./gradlew :klause-bench:intDomainMicrobench
