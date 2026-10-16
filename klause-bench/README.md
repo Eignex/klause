@@ -2190,7 +2190,10 @@ full compiler roots, exact elapsed time or code size.
 
 Resource bounds are 100,000 original members, 4,096 archived case directories,
 8,192 logs, 16 GiB expanded member bytes, 128 MiB retained and interpreted raw
-bytes per log, and 2 GiB stored compressed case evidence. Streaming XML is bounded
+bytes per log, and 512 MiB stored compressed case evidence. The compressed budget
+leaves room for archive framing and harness files under the lab's 1 GiB case
+transfer limit. Oversized or missing transfer files remain explicit failures;
+they cannot establish complete archived-data validation. Streaming XML is bounded
 to 16 million elements, one million retained metadata rows and depth 1,024.
 UTF-8 decoding and the complete uncompressed size/SHA-256 are checked across all
 chunks; declarations and entities are rejected. Derived reports stream directly
