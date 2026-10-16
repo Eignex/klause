@@ -1829,7 +1829,8 @@ original capture's authenticated source and worker provenance.
 The pinned observer emits compiler diagnostics on stdout before attachment.
 The reviewer recognizes external-compiler and redundant `uint64` cast warnings
 only when locations, source contexts and any column underlines match the original
-script. External-compiler warnings retain their hints. The stdout readiness marker
+script, including the empty terminal source line after a trailing newline.
+External-compiler warnings retain their hints. The stdout readiness marker
 bounds compiler output; stderr independently retains its `Attached` status.
 The original observer command must match the source-bound invocation; no total
 order across the two output streams is inferred. Diagnostic prefixes are bounded
