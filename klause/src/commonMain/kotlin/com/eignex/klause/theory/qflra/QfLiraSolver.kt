@@ -338,13 +338,22 @@ class ExactLiraSearchComponent private constructor(
         pointHintRows = rows.toList()
         pointHintStop = stop
         return variables.toIntArray() to SearchCandidateHints { variable ->
-            if (!partialPointHintAvailable()) null
-            else if (defaultOpening && graphFirst && !defaultGraphSelections) {
+            observeCompleteStage("POINT_HINT_CONSULTED")
+            if (!partialPointHintAvailable()) {
+                observeCompleteStage("POINT_HINT_UNAVAILABLE")
+                null
+            } else if (defaultOpening && graphFirst && !defaultGraphSelections) {
                 smtStats?.observeDefaultGraphHintRelease()
                 releasePartialPointHints()
                 null
-            } else pointHintValues?.getOrNull(variable)?.let { value ->
-                when (value) { TRUE -> true; FALSE -> false; else -> null }
+            } else {
+                val preference = when (pointHintValues?.getOrNull(variable)) {
+                    TRUE -> true
+                    FALSE -> false
+                    else -> null
+                }
+                observeCompleteStage(if (preference == null) "POINT_HINT_NO_PREFERENCE" else "POINT_HINT_PREFERRED")
+                preference
             }
         }
     }
@@ -398,6 +407,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintLevel = context.decisionLevel
         pointHintValues = values
         smtStats?.observePointHintCapture(graph)
+        observeCompleteStage(if (graph) "POINT_HINT_GRAPH_CAPTURE" else "POINT_HINT_LP_CAPTURE")
     }
 
     private fun hintTruth(comparison: ExactComparison, point: List<BigFraction>): Boolean? =
