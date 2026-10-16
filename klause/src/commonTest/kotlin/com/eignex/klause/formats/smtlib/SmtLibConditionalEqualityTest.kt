@@ -28,6 +28,99 @@ import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `affine equality children expand across multiple pending generations`() {
+        val depth = 16
+        val source = buildString {
+            for (index in 0..depth) append("(declare-const b$index Bool)\n")
+            append("(assert (let ((v0 (ite b0 0 1000))) ")
+            for (index in 1..depth) {
+                append("(let ((v$index (ite b$index (+ v${index - 1} 1) 1000))) ")
+            }
+            append("(= v$depth $depth)")
+            repeat(depth + 2) { append(')') }
+        }
+        val parsed = SmtLib.parse(source)
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+
+        val result = session.initialize()
+
+        assertEquals(0, parsed.model.numIntVars)
+        assertTrue(parsed.model.factors.all { it is Clause })
+        assertIs<ComponentResult.Consistent>(result)
+        for (index in 0..depth) assertEquals(true, session.boolValue(parsed.boolVarNames.getValue("b$index")))
+    }
+
+    @Test
+    fun `signed affine equalities select the matching conditional branch`() {
+        for ((comparison, expected) in listOf(
+            "(= (+ (* 2 (ite b 2 8)) 1) 5)" to true,
+            "(= 17 (+ (* 2 (ite b 2 8)) 1))" to false,
+            "(= (- (* 2 (ite b 2 8)) 1) 3)" to true,
+            "(= 15 (- (* 2 (ite b 2 8)) 1))" to false,
+            "(= (+ (* (- 2) (ite b 2 8)) 1) (- 3))" to true,
+            "(= (- 15) (+ (* (- 2) (ite b 2 8)) 1))" to false,
+        )) {
+            val parsed = SmtLib.parse("(declare-const b Bool) (assert $comparison)")
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            val result = session.initialize()
+
+            assertEquals(0, parsed.model.numIntVars, comparison)
+            assertTrue(parsed.model.factors.all { it is Clause }, comparison)
+            assertIs<ComponentResult.Consistent>(result, comparison)
+            assertEquals(expected, session.boolValue(parsed.boolVarNames.getValue("b")), comparison)
+        }
+    }
+
+    @Test
+    fun `nonintegral conditional affine targets refute without arithmetic`() {
+        for (comparison in listOf(
+            "(= (+ (* 2 (ite b 2 8)) 1) 6)",
+            "(= 6 (+ (* 2 (ite b 2 8)) 1))",
+            "(= (+ (* (- 2) (ite b 2 8)) 1) (- 4))",
+        )) {
+            val parsed = SmtLib.parse("(declare-const b Bool) (assert $comparison)")
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            val result = session.initialize()
+
+            assertEquals(0, parsed.model.numIntVars, comparison)
+            assertTrue(parsed.model.factors.all { it is Clause }, comparison)
+            assertIs<ComponentResult.Conflict>(result, comparison)
+        }
+    }
+
+    @Test
+    fun `overflowing affine equality inversion retains arithmetic support`() {
+        val minimum = "(- (- 9223372036854775807) 1)"
+        for (comparison in listOf(
+            "(= (- (* 2 (ite b 9223372036854775807 0)) 9223372036854775807) 9223372036854775807)",
+            "(= (- (ite b $minimum 0)) $minimum)",
+        )) {
+            val parsed = SmtLib.parse("(declare-const b Bool) (assert b) (assert $comparison)")
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            val result = session.initialize()
+
+            assertTrue(parsed.model.numIntVars > 0, comparison)
+            assertTrue(parsed.model.factors.any { it !is Clause }, comparison)
+            assertIs<ComponentResult.Consistent>(result, comparison)
+        }
+    }
+
+    @Test
     fun `affine conditional images reject unreachable values without equality expansion`() {
         for (term in listOf(
             "(ite c (+ (ite b 2 8) 1) 17)",

@@ -98,7 +98,11 @@ can exclude conflicting selector tests and omit guard tests implied by that comp
 Conflicting branches and excluded defaults are skipped before traversing their definitions.
 Equality keys whose sign reversal exceeds a signed word retain their arithmetic encoding.
 A parse expands comparisons after lowering all assertions and objectives, visiting
-the newest comparisons first. Expansion shares a limit of 65,536 visits; comparisons
+the newest comparisons first. Equality of a one-variable affine conditional term
+and a constant is reduced to an integer value test when checked subtraction and
+exact division fit a signed word. A nonintegral target is false; overflow retains
+the arithmetic comparison. Normalized child comparisons join the same iterative
+queue. Expansion shares a limit of 65,536 visits; comparisons
 that cannot finish retain their exact arithmetic encoding. Numeric branch definitions remain enforced whenever
 a surviving constraint, objective or shared reified predicate needs them. Unused
 fresh definitions are omitted after following these dependencies to a fixpoint.

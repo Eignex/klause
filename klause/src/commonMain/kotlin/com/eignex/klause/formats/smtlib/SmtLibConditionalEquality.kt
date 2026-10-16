@@ -56,6 +56,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     private val booleanDefinitions = HashMap<Int, List<Factor>>()
     private val equalities = HashMap<Key, Int>()
     private val pendingEqualities = LinkedHashMap<Key, PendingEquality>()
+    private val pendingOrder = ArrayDeque<Key>()
     private var work = 0
 
     fun define(
@@ -228,13 +229,16 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         if (variable !in definitions) return null
         return pendingEqualities.getOrPut(key) {
             val literal = builder.reifyLinear(longArrayOf(1), intArrayOf(variable), LinearOp.EQ, value)
+            pendingOrder.addLast(key)
             PendingEquality(literal, builder.factors.last())
         }.literal
     }
 
     fun expandPending(builder: Compiler.Builder) {
         val replaced = HashSet<Factor>()
-        for ((key, equality) in pendingEqualities.entries.toList().asReversed()) {
+        while (pendingOrder.isNotEmpty()) {
+            val key = pendingOrder.removeLast()
+            val equality = pendingEqualities.getValue(key)
             val expanded = expand(key.variable, key.value, builder) ?: continue
             if (expanded == equality.literal) continue
             val clauses = listOf(

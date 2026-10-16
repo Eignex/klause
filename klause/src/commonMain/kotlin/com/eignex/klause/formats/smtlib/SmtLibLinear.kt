@@ -14,6 +14,7 @@ import com.eignex.klause.lowering.intCombDiff
 import com.eignex.klause.lowering.linCombDiff
 import com.eignex.klause.lowering.reifyDifferenceLinear
 import com.eignex.klause.lowering.reifyLinear
+import com.eignex.klause.lowering.subExact
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.lowering.wideConstHolds
 
@@ -140,11 +141,23 @@ private fun Compiler.Builder.constantConditionalComparison(op: String, a: IntCom
 
 private fun Compiler.Builder.conditionalEquality(a: IntComb, b: IntComb): Int? {
     if (a !is IntComb.Narrow || b !is IntComb.Narrow) return null
-    val variable = if (b.lin.coeffs.isEmpty()) a.lin.asSimpleVar() else {
-        if (a.lin.coeffs.isEmpty()) b.lin.asSimpleVar() else null
-    } ?: return null
+    val term = if (b.lin.coeffs.isEmpty()) a.lin else {
+        if (a.lin.coeffs.isEmpty()) b.lin else return null
+    }
+    val source = term.coeffs.entries.singleOrNull() ?: return null
+    if (source.value == 0L) return null
+    val variable = source.key
     closeIteChain(variable)
-    val value = if (b.lin.coeffs.isEmpty()) b.lin.constant else a.lin.constant
+    if (!conditionalEqualities.isDefined(variable) && (source.value != 1L || term.constant != 0L)) return null
+    val constant = if (b.lin.coeffs.isEmpty()) b.lin.constant else a.lin.constant
+    val difference = try {
+        subExact(constant, term.constant)
+    } catch (_: ArithmeticException) {
+        return null
+    }
+    if (difference == Long.MIN_VALUE && source.value == -1L) return null
+    if (difference % source.value != 0L) return Lit.negate(trueLit())
+    val value = difference / source.value
     return conditionalEqualities.reify(variable, value, this)?.also { literal ->
         if (intDomains[variable] is PresolveDomain.Finite) {
             iteChains.noteAtom(literal, variable, value, allowsElement = !conditionalEqualities.isDefined(variable))
