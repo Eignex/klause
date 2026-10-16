@@ -97,13 +97,18 @@ internal class QfNraQuery(
             }
             val normalized = PolynomialFormula.normalize(conditioned, arithmetic, fixed)
             yield(null)
+            var refuted = false
             val witness = work.probe {
-                WitnessProbe(normalized, boolCount, arithmetic, algebraic, work)
+                refuted = realCount <= MAX_WITNESS_REALS && refutePolynomialSigns(
+                    normalized, arithmetic, MAX_WITNESS_ATOMS, MAX_WITNESS_TERMS,
+                )
+                if (refuted) null else WitnessProbe(normalized, boolCount, arithmetic, algebraic, work)
                     .probeWitness(realCount, fixed, work::coupled)
             }
-            if (witness != null) {
+            if (refuted || witness != null) {
                 arithmetic.step()
-                yield(QfNraResult.Satisfiable(witness, work.snapshot()))
+                yield(if (refuted) QfNraResult.Unsatisfiable(work.snapshot())
+                    else QfNraResult.Satisfiable(checkNotNull(witness), work.snapshot()))
                 return@sequence
             }
             yield(null)
