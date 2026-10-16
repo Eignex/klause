@@ -11596,6 +11596,7 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveRequest {
 	public final fun getOnEvent ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnPortfolioEvent ()Lkotlin/jvm/functions/Function2;
 	public final fun getOnPortfolioFault ()Lkotlin/jvm/functions/Function1;
+	public final fun getOperation ()Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
 	public final fun getPrepareOnly ()Z
 	public final fun getPresolveBudget ()Lcom/eignex/klause/presolve/PresolveBudget;
 	public final fun getPresolveCancellation ()Lcom/eignex/klause/util/Cancellation;
@@ -11630,6 +11631,7 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveShape {
 	public final fun getPreparedPlan ()Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getSearchHints ()Lcom/eignex/klause/ir/SearchHints;
+	public final fun getSourceInvocation ()Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
 }
 
 public final class com/eignex/klause/solver/pipeline/FiniteSolveVerdict : java/lang/Enum {
@@ -12268,6 +12270,15 @@ public final class com/eignex/klause/solver/pipeline/PreparedPlanDecline : java/
 	public static fun values ()[Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 }
 
+public final class com/eignex/klause/solver/pipeline/PreparedSourceInvocation {
+	public final fun finiteShape ()Lcom/eignex/klause/solver/pipeline/FiniteSolveShape;
+	public final fun getAdmission ()Lcom/eignex/klause/solver/pipeline/StrategyAdmission;
+	public final fun getOperation ()Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
+	public final fun getPreparedPlan ()Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
+	public final fun getRoute ()Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
+	public final fun getSource ()Lcom/eignex/klause/solver/pipeline/SourceAttachment;
+}
+
 public final class com/eignex/klause/solver/pipeline/PreparedSourcePlan {
 	public final fun belongsTo (Ljava/lang/Object;)Z
 	public final fun booleanCoordinate (I)I
@@ -12394,6 +12405,15 @@ public final class com/eignex/klause/solver/pipeline/QuadraticOptimizationExecut
 	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
 }
 
+public final class com/eignex/klause/solver/pipeline/SourceAttachment : com/eignex/klause/ir/SourceSemanticsOwner {
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Ljava/util/List;Lcom/eignex/klause/ir/SearchHints;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Ljava/util/List;Lcom/eignex/klause/ir/SearchHints;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getDefinitionHints ()Ljava/util/List;
+	public final fun getOriginalSource ()Lcom/eignex/klause/ir/SourceSemanticsOwner;
+	public final fun getSearchHints ()Lcom/eignex/klause/ir/SearchHints;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+}
+
 public final class com/eignex/klause/solver/pipeline/SourceIncumbentPublication {
 	public fun <init> (JLcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;)V
 	public final fun component1 ()J
@@ -12478,6 +12498,24 @@ public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$Unsuppor
 	public final fun getUnplaceable ()Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceSetup {
+	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/SourceSetup;
+	public final fun prepare (Lcom/eignex/klause/solver/pipeline/SourceSetupRequest;)Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceSetupRequest {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/SourceAttachment;Lcom/eignex/klause/solver/pipeline/ExecutionOperation;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;ZLcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/SourceAttachment;Lcom/eignex/klause/solver/pipeline/ExecutionOperation;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;ZLcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBoundCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
+	public final fun getMaximize ()Z
+	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun getOperation ()Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
+	public final fun getProviders ()Lcom/eignex/klause/solver/FactorProjectionProviders;
+	public final fun getSource ()Lcom/eignex/klause/solver/pipeline/SourceAttachment;
 }
 
 public final class com/eignex/klause/solver/pipeline/StrategyAdmission {
