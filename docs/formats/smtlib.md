@@ -54,6 +54,13 @@ simultaneous bindings were introduced. Direct assertions and reified reads use
 that captured view, so later shadows do not change a shared Boolean value.
 Scope restoration remains iterative, including long chains of asserted aliases.
 
+Linear lowering shares a comparison literal within one source parse only when its
+folded exact coefficients, tagged integer/real coordinates, constant, relation and
+strictness agree. Shared literals retain full equivalence in either polarity.
+The parse-local table retains at most 65,536 coordinate/key entries; other
+comparisons still lower independently. Lookup work charges the source token and
+retains its cancellation. The table carries no solver state or cross-source names.
+
 Exp is the real exponential, log is the natural logarithm on strictly positive
 arguments, and sine/cosine use radians. Every arithmetic atom must have defined
 terms. Negation and ordinary Boolean connectives cannot make an invalid log term

@@ -7,12 +7,14 @@ import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.LinComb
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.lowering.WideLinComb
 import com.eignex.klause.lowering.isConstant
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_TEN
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.signum
@@ -189,9 +191,47 @@ private fun Compiler.Builder.reifyRealAtom(d: RealComb, linOp: LinearOp, strict:
         }
         return if (holds) trueLit() else Lit.negate(trueLit())
     }
-    val w = newBool()
-    factors.add(exactRealRow(d, linOp, strict, w))
-    return Lit.make(w, true)
+    return realPredicates.literal(d, linOp, strict) {
+        val w = newBool()
+        factors.add(exactRealRow(d, linOp, strict, w))
+        Lit.make(w, true)
+    }
+}
+
+internal class SmtRealPredicates(private val cancellation: Cancellation, private val maxEntries: Int = 65_536) {
+    private data class Predicate(
+        val integers: Map<Int, BigFraction>,
+        val reals: Map<Int, BigFraction>,
+        val constant: BigFraction,
+        val relation: LinearOp,
+        val strict: Boolean,
+    )
+
+    private val literals = HashMap<Predicate, Int>()
+    private var retainedEntries = 0
+
+    init {
+        require(maxEntries >= 0)
+    }
+
+    fun literal(term: RealComb, relation: LinearOp, strict: Boolean, create: () -> Int): Int {
+        val entries = term.intCoeffs.size.toLong() + term.realCoeffs.size + 1L
+        cancellation.charge(entries)
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        if (entries > maxEntries) return create()
+        val key = Predicate(
+            term.intCoeffs.filterValues { !it.isZero },
+            term.realCoeffs.filterValues { !it.isZero },
+            term.constant, relation, strict,
+        )
+        literals[key]?.let { return it }
+        val literal = create()
+        if (entries <= maxEntries - retainedEntries) {
+            literals[key] = literal
+            retainedEntries += entries.toInt()
+        }
+        return literal
+    }
 }
 
 internal fun Compiler.Builder.realIte(cond: Int, a: RealComb, b: RealComb): RealComb = realSelection(cond, a, b)
