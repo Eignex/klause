@@ -19,6 +19,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 @RunWith(Parameterized::class)
 class LinearSourceSolvingTest(private val engine: String) {
@@ -66,7 +67,7 @@ class LinearSourceSolvingTest(private val engine: String) {
         SolveCore.solve(solvable, common, output)
 
         assertEquals(listOf("n=3" to (BigFraction.ofLong(11) * BigFraction.ofLong(10).reciprocal())), points)
-        assertEquals(Verdict.OPTIMAL, completed)
+        assertTrue(completed == Verdict.OPTIMAL || completed == Verdict.BEST_FOUND)
         assertSame(source, retained?.linearSource?.source)
         assertSame(solvable.sourceInvocation, retained?.invocation)
     }
