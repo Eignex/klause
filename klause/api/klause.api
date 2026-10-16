@@ -995,20 +995,23 @@ public final class com/eignex/klause/count/ApproxCountConfig {
 }
 
 public final class com/eignex/klause/count/Count {
-	public fun <init> (JJJZD)V
+	public fun <init> (JJJZDLcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (JJJZDLcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()J
 	public final fun component2 ()J
 	public final fun component3 ()J
 	public final fun component4 ()Z
 	public final fun component5 ()D
-	public final fun copy (JJJZD)Lcom/eignex/klause/count/Count;
-	public static synthetic fun copy$default (Lcom/eignex/klause/count/Count;JJJZDILjava/lang/Object;)Lcom/eignex/klause/count/Count;
+	public final fun component6 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (JJJZDLcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/count/Count;
+	public static synthetic fun copy$default (Lcom/eignex/klause/count/Count;JJJZDLcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/count/Count;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getConfidence ()D
 	public final fun getEstimate ()J
 	public final fun getExact ()Z
 	public final fun getLower ()J
 	public final fun getRatio ()D
+	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public final fun getUpper ()J
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;

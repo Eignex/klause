@@ -5972,7 +5972,7 @@ final class com.eignex.klause.count/ApproxCountConfig { // com.eignex.klause.cou
 }
 
 final class com.eignex.klause.count/Count { // com.eignex.klause.count/Count|null[0]
-    constructor <init>(kotlin/Long, kotlin/Long, kotlin/Long, kotlin/Boolean, kotlin/Double) // com.eignex.klause.count/Count.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Boolean;kotlin.Double){}[0]
+    constructor <init>(kotlin/Long, kotlin/Long, kotlin/Long, kotlin/Boolean, kotlin/Double, com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.count/Count.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Boolean;kotlin.Double;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
     final val confidence // com.eignex.klause.count/Count.confidence|{}confidence[0]
         final fun <get-confidence>(): kotlin/Double // com.eignex.klause.count/Count.confidence.<get-confidence>|<get-confidence>(){}[0]
@@ -5984,6 +5984,8 @@ final class com.eignex.klause.count/Count { // com.eignex.klause.count/Count|nul
         final fun <get-lower>(): kotlin/Long // com.eignex.klause.count/Count.lower.<get-lower>|<get-lower>(){}[0]
     final val ratio // com.eignex.klause.count/Count.ratio|{}ratio[0]
         final fun <get-ratio>(): kotlin/Double // com.eignex.klause.count/Count.ratio.<get-ratio>|<get-ratio>(){}[0]
+    final val semantics // com.eignex.klause.count/Count.semantics|{}semantics[0]
+        final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.count/Count.semantics.<get-semantics>|<get-semantics>(){}[0]
     final val upper // com.eignex.klause.count/Count.upper|{}upper[0]
         final fun <get-upper>(): kotlin/Long // com.eignex.klause.count/Count.upper.<get-upper>|<get-upper>(){}[0]
 
@@ -5992,7 +5994,8 @@ final class com.eignex.klause.count/Count { // com.eignex.klause.count/Count|nul
     final fun component3(): kotlin/Long // com.eignex.klause.count/Count.component3|component3(){}[0]
     final fun component4(): kotlin/Boolean // com.eignex.klause.count/Count.component4|component4(){}[0]
     final fun component5(): kotlin/Double // com.eignex.klause.count/Count.component5|component5(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Double = ...): com.eignex.klause.count/Count // com.eignex.klause.count/Count.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Boolean;kotlin.Double){}[0]
+    final fun component6(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.count/Count.component6|component6(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Double = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.count/Count // com.eignex.klause.count/Count.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Boolean;kotlin.Double;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.count/Count.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.count/Count.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.count/Count.toString|toString(){}[0]
