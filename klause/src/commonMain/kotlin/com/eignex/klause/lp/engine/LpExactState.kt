@@ -55,7 +55,7 @@ internal data class LpBoundConflict(val column: Int, val lower: LpBoundAssertion
 
 internal class LpProjectedScalarChanges(val bounds: IntArray, val costs: IntArray)
 
-internal class LpExactState internal constructor(
+internal class LpExactState private constructor(
     val baseModel: ExactLpModel,
     assertions: List<LpBoundAssertion> = emptyList(),
     scopes: List<Int> = emptyList(),
@@ -72,7 +72,25 @@ internal class LpExactState internal constructor(
      * column and rechecks every assertion, which on a large model costs more than the node it is for.
      */
     previous: LpExactState? = null,
+    appendedFrom: LpExactState?,
 ) {
+    internal constructor(
+        baseModel: ExactLpModel,
+        assertions: List<LpBoundAssertion> = emptyList(),
+        scopes: List<Int> = emptyList(),
+        matrixRevision: Long = 0L,
+        boundRevision: Long = 0L,
+        objectiveRevision: Long = 0L,
+        popRevision: Long = 0L,
+        changedColumns: List<Int> = emptyList(),
+        rows: LpScopedRows = LpScopedRows.initial(baseModel.m),
+        rowRevision: Long = 0L,
+        previous: LpExactState? = null,
+    ) : this(
+        baseModel, assertions, scopes, matrixRevision, boundRevision, objectiveRevision, popRevision,
+        changedColumns, rows, rowRevision, previous, null,
+    )
+
     private val activeAssertions = assertions.toList()
     private val scopeMarks = scopes.toList()
     private val changed = changedColumns.toList()
@@ -109,7 +127,17 @@ internal class LpExactState internal constructor(
         require(scopeMarks.zipWithNext().all { (a, b) -> a <= b })
         require(changed.all { it in 0 until baseModel.numVars } && changed.distinct().size == changed.size)
         val source = previous?.takeIf { it.baseModel.sharesRegion(baseModel) && it.rows === rows }
-        if (source == null) {
+        if (appendedFrom != null) {
+            trailStorageUnits = appendedFrom.trailStorageUnits
+            lower = appendedFrom.lower.copyOf(baseModel.numVars)
+            upper = appendedFrom.upper.copyOf(baseModel.numVars)
+            for (j in appendedFrom.model.numVars until baseModel.numVars) seedDeclared(j)
+            model = fullModel(appendedFrom.model)
+            inconsistent = appendedFrom.inconsistent.copyOf(model.numVars)
+            for (j in appendedFrom.model.numVars until model.numVars) {
+                inconsistent[j] = !model.column(j).bounds.consistent
+            }
+        } else if (source == null) {
             trailStorageUnits = activeAssertions.sumOf { it.storageUnits() } + scopeMarks.size
             validateRows()
             validateAssertions(0)
@@ -231,8 +259,10 @@ internal class LpExactState internal constructor(
         }
     }
 
-    private fun fullModel(): ExactLpModel {
-        val columns = List(baseModel.numVars) { column(it) }
+    private fun fullModel(prefix: ExactLpModel? = null): ExactLpModel {
+        val columns = List(baseModel.numVars) { j ->
+            if (prefix != null && j < prefix.numVars) prefix.column(j) else column(j)
+        }
         return if (rows.activeCount == rows.size) {
             baseModel.copy(columns = columns)
         } else {
@@ -244,6 +274,44 @@ internal class LpExactState internal constructor(
                 },
             )
         }
+    }
+
+    internal fun appendRows(
+        rows: List<LpScopedRow>,
+        scoped: Boolean,
+        token: Cancellation,
+        permanentRows: Set<Long>,
+    ): LpExactState? {
+        if (token()) return null
+        val additions = rows.toList()
+        val permanent = permanentRows.toSet()
+        if (additions.isEmpty()) return takeIf { permanent.isEmpty() }
+        val newM = model.m.toLong() + additions.size
+        if (model.n + newM >= Int.MAX_VALUE ||
+            listOf(matrixRevision, boundRevision, objectiveRevision, rowRevision).any { it == Long.MAX_VALUE } ||
+            additions.any { it.id <= this.rows.lastId || !it.validFor(model.n) } ||
+            additions.zipWithNext().any { (left, right) -> left.id >= right.id } ||
+            !additions.map { it.id }.containsAll(permanent) ||
+            additions.any { it.id in permanent && (!it.metadata.global || it.metadata.premises != null) }
+        ) return null
+        val nnz = (0 until model.n).sumOf { model.entries(it).size.toLong() } +
+            additions.sumOf { it.coefficients().size.toLong() }
+        if (nnz + newM > Int.MAX_VALUE || token()) return null
+        // This producer preserves all old coordinate indices, row identities and bound assertions.
+        return LpExactState(
+            baseModel.appendScopedRows(emptyList(), additions),
+            activeAssertions,
+            scopeMarks,
+            matrixRevision + 1L,
+            boundRevision + 1L,
+            objectiveRevision + 1L,
+            popRevision,
+            emptyList(),
+            this.rows.append(additions.map { it.id }, if (scoped) depth else null, permanent),
+            rowRevision + 1L,
+            previous = null,
+            appendedFrom = this,
+        )
     }
 
     private fun boundsProject(j: Int): Boolean {

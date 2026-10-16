@@ -18,6 +18,96 @@ import kotlin.test.assertTrue
 
 class LpBoundTrailTest {
     @Test
+    fun `row appends should retain suspended and retired logical semantics across pops`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)), integral = true)
+        for (suspended in listOf(false, true)) {
+            val trail = LpBoundTrail(source)
+            assertTrue(trail.append(LpScopedRow(0L, listOf(0 to one), one, logical,
+                ExactLpRow(strict = true)), scoped = false))
+            assertTrue(trail.push())
+            assertTrue(if (suspended) trail.suspend(setOf(0L)) else trail.deactivate(0L))
+            val before = trail.state
+
+            assertTrue(trail.append(emptyList(), listOf(LpScopedRow(1L, listOf(0 to one), zero, logical)),
+                scoped = true, permanentRows = setOf(1L)))
+
+            val state = trail.state
+            val fresh = LpExactState(state.baseModel, state.assertions, state.scopes, rows = state.rows)
+            assertTrue(state.model.sameAuthority(fresh.model))
+            assertEquals(fresh.rows.entries(), state.rows.entries())
+            assertNull(state.activeSide(1, false))
+            assertFalse(state.model.row(0).strict)
+            assertFalse(state.model.column(1).integral)
+            assertNull(state.rows.row(1).depth)
+            assertFalse(before.rows.row(0).active)
+            assertEquals(1, before.model.m)
+            assertTrue(trail.pop(0))
+            assertEquals(suspended, trail.state.rows.row(0).active)
+            assertEquals(suspended, trail.state.model.row(0).strict)
+            assertEquals(suspended, trail.state.model.column(1).integral)
+            assertEquals(suspended, trail.state.activeSide(1, false) != null)
+            assertTrue(trail.state.rows.row(1).active)
+        }
+    }
+
+    @Test
+    fun `row append validation should use one captured addition and permanent set`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        assertTrue(trail.push())
+        val before = trail.state
+        val one = ExactLpNumber.of(1L)
+        val additions = mutableListOf(LpScopedRow(5L, listOf(0 to one), one, ExactLpColumn(ExactLpBounds())))
+        val permanent = mutableSetOf(5L)
+        var polls = 0
+        val token = Cancellation {
+            if (++polls == 2) {
+                additions.clear()
+                additions += LpScopedRow(9L, listOf(99 to one), one, ExactLpColumn(ExactLpBounds()))
+                permanent.clear()
+            }
+            false
+        }
+
+        assertTrue(trail.append(emptyList(), additions, scoped = true, token = token, permanentRows = permanent))
+
+        assertEquals(listOf(5L), trail.state.rows.entries().map { it.id })
+        assertNull(trail.state.rows.row(0).depth)
+        assertEquals(listOf(ExactLpEntry(0, one)), trail.state.model.entries(0))
+        assertEquals(0, before.model.m)
+        assertTrue(trail.pop(0))
+        assertTrue(trail.state.rows.row(0).active)
+    }
+
+    @Test
+    fun `cancelled and unprojectable row appends should preserve the exact prefix for retry`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val one = ExactLpNumber.of(1L)
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
+        for (cancelled in listOf(false, true)) {
+            val trail = LpBoundTrail(source)
+            assertTrue(trail.assertBound(0, true, ExactLpSide(one), 1L))
+            val before = trail.state
+            var polls = 0
+            val token = Cancellation { cancelled && ++polls >= 3 }
+            val row = LpScopedRow(0L, listOf(0 to if (cancelled) one else huge), one,
+                ExactLpColumn(ExactLpBounds()))
+
+            assertFalse(trail.append(row, scoped = false, token = token))
+
+            assertSame(before, trail.state)
+            assertEquals(1L, trail.state.activeSide(0, true)?.witness)
+            assertTrue(trail.append(LpScopedRow(0L, listOf(0 to one), one,
+                ExactLpColumn(ExactLpBounds())), scoped = false))
+            assertEquals(1, trail.state.model.m)
+            assertEquals(0, before.model.m)
+        }
+    }
+
+    @Test
     fun `weaker active witnesses should survive arbitrary backjumps`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(

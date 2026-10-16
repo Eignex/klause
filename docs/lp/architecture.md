@@ -23,6 +23,12 @@ materialize their definitions when asserted, through the same permanent tautolog
 row path used for transient source comparisons. Bounds and their source premises
 retract with the search scope; definitions remain available to sibling scopes.
 Each append retains the existing numerical limits and construction accounting.
+For a row-only append, the bound trail constructs the successor from the actual
+predecessor and one captured set of additions. Its exact state extends the validated
+bound prefix and seeds the new logical coordinates; old witnesses, scopes and
+inactive row semantics remain unchanged. General state construction retains full
+validation. Matrix projection and numerical replacement remain fresh and eager,
+with their existing per-prefix admission, cancellation and failure behavior.
 Source acceptance still checks the full selected source rows and original coordinates;
 these numerical definitions supply no separate witness or proof authority.
 
