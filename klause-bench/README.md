@@ -2374,6 +2374,12 @@ the loaded adapter has no observer or did not enter its numerical path.
 the CLI's initial lowering choice. The default `lowering=exact-source` preserves
 the supplied-point diagnostic's explicit exact source rows. Neither mode runs CLI
 routing or presolve; use ordinary CLI comparisons for integrated recovery claims.
+`residualObjective=feasibility` asks the same numerical completion to find a point
+without minimizing the residual objective; the search still measures the original
+objective. The default is `source`. Optional `lambda=<nonnegative number>` selects
+linear cost shaping and class weight normalization for the diagnostic; absence keeps
+its standalone feasibility-first shaping. These controls are recorded independently
+and do not change source witness checks or confer residual optimality.
 `cases.json` uses the maintained offline source-verifier record format; `sources/`
 contains its hash-named original bytes. Independently check it with
 `verify_source_results.py --source-root <sources> --witness-only` on the analysis host.

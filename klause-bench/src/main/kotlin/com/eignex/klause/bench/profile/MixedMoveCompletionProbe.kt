@@ -11,6 +11,7 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.localsearch.CandidateCompletion
+import com.eignex.klause.localsearch.CostShaping
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.bake
@@ -46,7 +47,7 @@ internal object MixedMoveCompletionProbe {
         }
         require(options.keys.all {
             it in setOf("input", "text64", "suite", "problem", "sourceSHA256", "initial64", "exact",
-                "instructions", "seed", "repeats", "timeout", "lowering")
+                "instructions", "seed", "repeats", "timeout", "lowering", "residualObjective", "lambda")
         })
         require(listOf(options["input"], options["text64"], options["suite"]).count { it != null } == 1)
         require((options["suite"] == null) == (options["problem"] == null))
@@ -123,6 +124,9 @@ internal object MixedMoveCompletionProbe {
         val objective = objectiveSpec.toLinearObjective().let {
             if (compiled.maximize) it.negated() else it
         }
+        val residualObjective = options["residualObjective"] ?: "source"
+        require(residualObjective in setOf("source", "feasibility"))
+        val lambda = options["lambda"]?.toDouble()?.also { require(it.isFinite() && it >= 0.0) }
         val cases = mutableListOf<JsonObject>()
         val runs = mutableListOf<JsonObject>()
         out.resolve("settings.json").writeText(buildJsonObject {
@@ -138,6 +142,8 @@ internal object MixedMoveCompletionProbe {
             put("exact", exact)
             put("lowering", lowering)
             put("sourceExact", compiled.sourceExact)
+            put("residualObjective", residualObjective)
+            put("lambda", lambda)
             put("instructions", instructions)
             put("seed", seed)
             put("repeats", repeats)
@@ -159,12 +165,12 @@ internal object MixedMoveCompletionProbe {
                 compiled.withinTolerance(sample.ints, sample.reals)
             }
             val completion = if (tolerant == null) {
-                constructor.newInstance(compiled.model, objective)
+                constructor.newInstance(compiled.model, objective.takeIf { residualObjective == "source" })
             } else {
                 val context = tolerant.parameterTypes.last()
                 val companion = context.getField("Companion").get(null)
                 val production = companion.javaClass.getMethod("getProduction").invoke(companion)
-                constructor.newInstance(compiled.model, objective, callback, production)
+                constructor.newInstance(compiled.model, objective.takeIf { residualObjective == "source" }, callback, production)
             }
             val attempts = mutableListOf<JsonObject>()
             var lpVerdict: String? = null
@@ -218,6 +224,8 @@ internal object MixedMoveCompletionProbe {
             val begun = System.nanoTime()
             val results = solver.improvements(objective, LocalSearchParams(
                 maxInstructions = instructions, randomSeed = seed, initialAssignment = initial,
+                costShaping = lambda?.let { CostShaping.Linear(it) } ?: CostShaping.FeasibilityFirst,
+                normalizeWeightsByClass = lambda != null,
                 cancellation = Cancellation.after(timeout.milliseconds),
             )).toList()
             for ((publication, result) in results.withIndex()) {
