@@ -1283,7 +1283,10 @@ class ExactLiraSearchComponent private constructor(
                 val rows = agreementSourceRows(context)
                 if (rows != null) {
                     candidate = completeMixedPoint(model.numRealVars, model.numIntVars, retained, rows, lpStop,
-                        onStage = ::observeCompleteStage)
+                        onStage = ::observeCompleteStage,
+                        realCompletion = { columns, residual, token ->
+                            reduction.completeReals(columns, residual, token, ::observeCompleteStage)
+                        })
                 } else {
                     observeCompleteStage("RECOVERY_ROWS_UNAVAILABLE")
                 }
@@ -1693,6 +1696,13 @@ private class ExactLiraReductionCache(
         closeSourceLpOwners(owners)
     }
     private val results = HashMap<ExactLiraReductionKey, ExactLiraReduction>()
+
+    fun completeReals(
+        columns: Int,
+        rows: List<ExactRationalInequality>,
+        stop: Cancellation,
+        onStage: (String) -> Unit,
+    ): List<BigFraction>? = completeMixedRealComponents(columns, rows, budget, stop, onStage)
 
     fun reduce(
         bools: IntArray,

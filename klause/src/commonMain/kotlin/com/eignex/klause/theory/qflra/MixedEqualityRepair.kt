@@ -112,7 +112,10 @@ internal class MixedEqualityRepair(
         return point.takeUnless { stop() }?.also { onStage?.invoke("RECOVERY_EQUALITY_RECONSTRUCTED") }
     }
 
-    fun differencePoint(rows: List<ExactRationalInequality>): List<BigFraction>? {
+    fun completePoint(
+        rows: List<ExactRationalInequality>,
+        realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> List<BigFraction>?)?,
+    ): List<BigFraction>? {
         val residual = ArrayList<ExactRationalInequality>()
         var entries = 0L
         for (row in rows) {
@@ -141,10 +144,6 @@ internal class MixedEqualityRepair(
                 }
                 continue
             }
-            if (coefficients.size > 2) {
-                onStage?.invoke("RECOVERY_EQUALITY_RESIDUAL_UNSUPPORTED")
-                return null
-            }
             entries += coefficients.size + 1L
             if (entries > MAX_REPAIR_ENTRIES) {
                 onStage?.invoke("RECOVERY_EQUALITY_LIMIT")
@@ -156,15 +155,18 @@ internal class MixedEqualityRepair(
             residual += ExactRationalInequality(ordered.toIntArray(), ordered.map(coefficients::getValue), bound,
                 row.strict)
         }
-        val graph = RealDifferenceSystem.prepareRows(pivots.size, residual, stop) ?: run {
-            onStage?.invoke("RECOVERY_EQUALITY_GRAPH_UNAVAILABLE")
-            return null
-        }
-        onStage?.invoke("RECOVERY_EQUALITY_GRAPH_ATTEMPT")
-        val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
+        val graph = RealDifferenceSystem.prepareRows(pivots.size, residual, stop)
         if (stop()) return null
-        val free = (result as? RealDifferenceSystem.Result.Feasible)?.point ?: return null
-        onStage?.invoke("RECOVERY_EQUALITY_GRAPH_FEASIBLE")
+        val free = if (graph == null) {
+            onStage?.invoke("RECOVERY_EQUALITY_GRAPH_UNAVAILABLE")
+            realCompletion?.invoke(pivots.size, residual, stop) ?: return null
+        } else {
+            onStage?.invoke("RECOVERY_EQUALITY_GRAPH_ATTEMPT")
+            val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
+            if (stop()) return null
+            (result as? RealDifferenceSystem.Result.Feasible)?.point ?: return null
+        }
+        onStage?.invoke("RECOVERY_EQUALITY_FREE_POINT")
         return point(free)
     }
 }

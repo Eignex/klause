@@ -16,6 +16,7 @@ internal fun completeMixedPoint(
     rows: List<ExactRationalInequality>,
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
+    realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> List<BigFraction>?)? = null,
 ): List<BigFraction>? {
     onStage?.invoke("RECOVERY_ATTEMPT")
     fun declined(stage: String): List<BigFraction>? {
@@ -101,13 +102,13 @@ internal fun completeMixedPoint(
         val repaired = realGuess?.let { repair?.point(it) }
         if (stop()) return declined("RECOVERY_STOPPED")
         for (difference in listOf(false, true)) {
-            val reals = if (difference) repair?.differencePoint(residual) else repaired
+            val reals = if (difference) repair?.completePoint(residual, realCompletion) else repaired
             if (stop()) return declined("RECOVERY_STOPPED")
             if (reals == null) continue
             val point = reals + integers
             stop.charge(rowWork)
             if (!stop() && point.satisfiesSourceRows(rows, stop) && !stop()) {
-                onStage?.invoke(if (difference) "RECOVERY_EQUALITY_GRAPH_POINT" else "RECOVERY_EQUALITY_POINT")
+                onStage?.invoke(if (difference) "RECOVERY_EQUALITY_RESIDUAL_POINT" else "RECOVERY_EQUALITY_POINT")
                 return point
             }
             onStage?.invoke("RECOVERY_EQUALITY_REJECTED")
