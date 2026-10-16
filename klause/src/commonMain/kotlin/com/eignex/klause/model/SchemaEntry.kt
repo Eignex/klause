@@ -57,9 +57,9 @@ data class IntSpec(
 }
 
 /**
- * Float variable with an optional explicit grid of [buckets] values across `[min, max]`. The
- * solver represents it as an int domain `[0, buckets-1]`; the compiler stores a decoder so
- * solutions can be read back as Double.
+ * Float declaration with an optional explicit grid of [buckets] values across `[min, max]`.
+ * Components requiring a grid use an integer index and a retained decoder. Other supported
+ * components retain continuous real coordinates.
  */
 @Serializable
 @SerialName("float")
@@ -75,10 +75,12 @@ data class FloatSpec(
         require(buckets == null || buckets >= 2) { "FloatSpec needs at least 2 buckets" }
     }
 
-    /** Real-value step between adjacent buckets: `(max - min) / (buckets - 1)`. The single
-     *  source of truth for the bucket-to-real affine map — decode and the float objectives
-     *  all route through it, and downstream consumers should too rather than re-deriving it. */
-    val scale: Double get() = (max - min) / (requireNotNull(buckets) { "float grid must be resolved by compilation" } - 1)
+    /** Real-value step `(max - min) / (buckets - 1)` for a grid resolved by compilation. */
+    val scale: Double
+        get() {
+            val count = requireNotNull(buckets) { "float grid must be resolved by compilation" }
+            return (max - min) / (count - 1)
+        }
 
     /** Decode bucket index [bucket] to its real value: `min + scale * bucket`. */
     fun realValue(bucket: Int): Double = min + scale * bucket
