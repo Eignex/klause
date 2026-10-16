@@ -167,12 +167,18 @@ internal class PolynomialWitnessSupports(
                 arithmetic.step()
                 if (id == variable) degree = exponent
                 else {
-                    val factor = power(point.getValue(id), exponent) ?: return false
+                    val coordinate = point.getValue(id)
+                    if (coordinate.isZero) {
+                        coefficient = BigFraction.ZERO
+                        break
+                    }
+                    val factor = power(coordinate, exponent) ?: return false
                     arithmetic.step()
                     coefficient *= factor
                     if (!admitted(coefficient)) return false
                 }
             }
+            if (coefficient.isZero) continue
             arithmetic.step()
             val sum = (coefficients[degree] ?: BigFraction.ZERO) + coefficient
             if (!admitted(sum)) return false
@@ -188,11 +194,17 @@ internal class PolynomialWitnessSupports(
             var product = term.coefficient
             for ((variable, exponent) in term.powers) {
                 arithmetic.step()
-                val factor = power(point.getValue(variable), exponent) ?: return null
+                val coordinate = point.getValue(variable)
+                if (coordinate.isZero) {
+                    product = BigFraction.ZERO
+                    break
+                }
+                val factor = power(coordinate, exponent) ?: return null
                 arithmetic.step()
                 product *= factor
                 if (!admitted(product)) return null
             }
+            if (product.isZero) continue
             arithmetic.step()
             sum += product
             if (!admitted(sum)) return null
