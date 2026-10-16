@@ -455,7 +455,8 @@ class MpsModeTest {
             assertTrue((if (flags.isNotEmpty()) "s OPTIMUM FOUND" else "s SATISFIABLE") in text.lines(), text)
             if (flags.isEmpty()) assertTrue("nominalSourceOptimizationStatus=" in text, text)
             assertTrue("o 0" in text.lines(), text)
-            assertTrue("solvePipeline=numerical-mip" in text, text)
+            assertTrue("c frontendRoutingOutcome=native-formula" in text.lines(), text)
+            assertTrue("c reportedBackend=numerical-mip" in text.lines(), text)
             assertFalse("declaredTheoryRoute=" in text, text)
         }
     }
@@ -470,12 +471,18 @@ class MpsModeTest {
             deleteOnExit()
         }
         for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
+            val loaded = MpsMode.newSession().load(
+                source.absolutePath,
+                CommonOptions().apply { exact = flags.isNotEmpty() },
+            )
             val text = capture {
                 assertEquals(0, runCli(arrayOf("-s", "-p", "1", *flags, source.absolutePath)))
             }
 
+            val invocation = assertIs<SolvablePipeline.LinearSource>(loaded.pipeline).invocation
+            assertEquals(SourceExecutionKind.NUMERICAL, SourceSetup.executionKind(invocation))
             assertTrue("s UNKNOWN" in text.lines(), text)
-            assertTrue("solvePipeline=numerical-mip" in text, text)
+            assertTrue("c solvePipeline=linear-source" in text.lines(), text)
             assertFalse("declaredTheoryRoute=" in text, text)
             assertFalse(text.lines().any { it.startsWith("v ") }, text)
         }
@@ -574,7 +581,7 @@ class MpsModeTest {
             assertTrue("s OPTIMUM FOUND" in text.lines(), text)
             assertTrue("o 0" in text.lines(), text)
             assertTrue("v I=0 X=0" in text.lines(), text)
-            assertTrue("solvePipeline=numerical-mip" in text, text)
+            assertTrue("c frontendRoutingOutcome=native-formula" in text.lines(), text)
             assertTrue("reportedBackend=numerical-mip" in text, text)
             assertFalse("declaredTheoryRoute=" in text, text)
         }
