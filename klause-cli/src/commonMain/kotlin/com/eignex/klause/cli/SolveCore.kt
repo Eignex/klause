@@ -20,6 +20,9 @@ import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
+import com.eignex.klause.solver.pipeline.FiniteSolveShape
+import com.eignex.klause.solver.pipeline.SourceExecutionKind
+import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.NODE_LIMIT_KEY
 import com.eignex.klause.solver.pipeline.OpenBranching
@@ -94,6 +97,36 @@ internal object SolveCore {
         // `-p N` gives the open portfolio a lane per core, as it does the finite one.
         val openCores = common.parallel ?: 1
         when (val pipeline = rawSolvable.pipeline) {
+            is SolvablePipeline.LinearSource -> {
+                val kind = SourceSetup.executionKind(pipeline.invocation)
+                val controls = when (kind) {
+                    SourceExecutionKind.FINITE -> {
+                        dropOpenOnlyParams(common)
+                        val budget = (common.nodeBudget ?: takeNodeBudget(common)).also { common.nodeBudget = it }
+                        val cancel = budget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
+                        SourceExecutionRequest(pipeline.invocation, finiteRequest = { shape ->
+                            finiteRequest(shape, common, engine, openCores, config, solutionSetSensitive,
+                                presolveCancel, presolveBudget, cancel, deadline, budget)
+                        })
+                    }
+                    SourceExecutionKind.POLYNOMIAL -> SourceExecutionRequest(
+                        pipeline.invocation, polynomial = polynomialParams(common, deadlineCancel), cores = openCores,
+                    )
+                    else -> {
+                        val params = theoryParams(common, deadlineCancel)
+                        if (common.engineParams.isNotEmpty()) {
+                            usageError("unsupported linear source parameter `${common.engineParams.first()}`")
+                        }
+                        SourceExecutionRequest(
+                            pipeline.invocation, theory = params, cores = openCores,
+                            presolveConfig = config, presolveCancellation = presolveCancel, presolveBudget = presolveBudget,
+                        )
+                    }
+                }
+                solveLinearSource(rawSolvable, pipeline, controls, common, output, publication)
+                return
+            }
+
             is SolvablePipeline.NativeSource -> {
                 solveNativeSource(rawSolvable, pipeline, common, output, publication, deadlineCancel, openCores)
                 return
@@ -457,29 +490,10 @@ internal object SolveCore {
             }
 
             is SolvablePipeline.OpenTheory -> {
-                val nodeLimit = takeOpenNodeLimit(common)
                 if (solutionSetSensitive) {
                     usageError("all-solution enumeration is unavailable for open theory models")
                 }
-                val theoryParams = TheoryParams(
-                    maxLeaves = Long.MAX_VALUE,
-                    openWorkLimit = nodeLimit ?: Long.MAX_VALUE,
-                    maxDecisions = takeOpenLongParam(common, "max-decisions", nonNegative = true) ?: Long.MAX_VALUE,
-                    sharedRestart = takeOpenLongParam(common, "shared-restart", nonNegative = false),
-                    maxLearnedClauses = takeOpenIntParam(common, "max-learned", nonNegative = true),
-                    lbdGlue = takeOpenIntParam(common, "lbd-glue", nonNegative = true) ?: 2,
-                    openHintFlips = takeOpenLongParam(common, "open-hint-flips", nonNegative = true),
-                    openBranching = takeOpenBranching(common) ?: TheoryParams().openBranching,
-                    openHintMinSplits = takeOpenLongParam(common, "open-hint-min-splits", nonNegative = false)
-                        ?: TheoryParams().openHintMinSplits,
-                    cancellation = deadlineCancel,
-                    timeout = deadlineCancel,
-                    randomSeed = takeOpenLongParam(common, "seed", nonNegative = true, signed = true)
-                        ?: common.randomSeed ?: 0,
-                    maxFlips = takeOpenLongParam(common, "max-flips", nonNegative = true) ?: Long.MAX_VALUE,
-                    maxInstructions = takeOpenLongParam(common, "max-instructions", nonNegative = true),
-                    alnsIterations = takeOpenIntParam(common, "alns-iterations", nonNegative = true) ?: 50,
-                )
+                val theoryParams = theoryParams(common, deadlineCancel)
                 val request = pipeline.request.withPresolve(
                     config,
                     cancellation = presolveCancel,
@@ -647,6 +661,26 @@ internal object SolveCore {
     // finite ones, where they mean nothing, so they are dropped there rather than failing the run as unknown keys.
     private val openOnlyParams = setOf("shared-restart", "open-branching", "open-hint-flips", "open-hint-min-splits")
 
+    private fun theoryParams(common: CommonOptions, cancel: Cancellation): TheoryParams = TheoryParams(
+        maxLeaves = Long.MAX_VALUE,
+        openWorkLimit = takeOpenNodeLimit(common) ?: Long.MAX_VALUE,
+        maxDecisions = takeOpenLongParam(common, "max-decisions", nonNegative = true) ?: Long.MAX_VALUE,
+        sharedRestart = takeOpenLongParam(common, "shared-restart", nonNegative = false),
+        maxLearnedClauses = takeOpenIntParam(common, "max-learned", nonNegative = true),
+        lbdGlue = takeOpenIntParam(common, "lbd-glue", nonNegative = true) ?: 2,
+        openHintFlips = takeOpenLongParam(common, "open-hint-flips", nonNegative = true),
+        openBranching = takeOpenBranching(common) ?: TheoryParams().openBranching,
+        openHintMinSplits = takeOpenLongParam(common, "open-hint-min-splits", nonNegative = false)
+            ?: TheoryParams().openHintMinSplits,
+        cancellation = cancel,
+        timeout = cancel,
+        randomSeed = takeOpenLongParam(common, "seed", nonNegative = true, signed = true)
+            ?: common.randomSeed ?: 0,
+        maxFlips = takeOpenLongParam(common, "max-flips", nonNegative = true) ?: Long.MAX_VALUE,
+        maxInstructions = takeOpenLongParam(common, "max-instructions", nonNegative = true),
+        alnsIterations = takeOpenIntParam(common, "alns-iterations", nonNegative = true) ?: 50,
+    )
+
     private fun dropOpenOnlyParams(common: CommonOptions) {
         common.engineParams.removeAll { it.substringBefore('=') in openOnlyParams }
     }
@@ -761,50 +795,11 @@ internal object SolveCore {
         deadline: Long?,
         nodeBudget: NodeBudget?,
     ) {
-        // This route is propagation only, for every input, whether or not the model carries a search
-        // annotation. It serves the CSP/COP fixed-search track, where a model states its own search and
-        // a relaxation bound is not among the permitted deductions. An explicit `--lp` asking for
-        // anything but `off` is refused rather than quietly dropped. A relaxation on one deterministic
-        // solver is `-e cp --param bt-arm=<label>`, a pool of one with the portfolio's LP surface.
-        if (common.lp != null) {
-            val asked = runCatching { LpConfig.parse(common.lp!!) }
-                .getOrElse { e -> usageError("--lp: ${e.message}") }
-            if (asked.emphasis != LpEmphasis.OFF) {
-                usageError("--lp: `-e fixed` solves by propagation alone; only `off` applies here")
-            }
-        }
-        val lpConfig = LpConfig.OFF
         executeFinite(
-            FiniteSolveRequest(
-                shape = solvable.finiteShape,
-                engine = FiniteEngine.FIXED,
-                presolveConfig = presolveConfig,
-                explicitPresolveConfig = common.presolve != null,
-                solutionSetSensitive = solutionSetSensitive,
-                presolveBudget = presolveBudget,
-                cores = 1,
-                executionOptions = ExecutionOptions.parse(common.engineParams).let {
-                    if (solvable.numericalCompletion) it.withNumericalCompletion() else it
-                },
-                randomSeed = common.randomSeed,
-                defaultArms = 1,
-                lpConfig = lpConfig,
-                zeroObjectivePricing = common.lpPricing,
-                cancellation = cancel,
-                presolveCancellation = presolveCancellation,
-                nodeBudget = nodeBudget,
-                solveBudgetMillis = common.timeLimitMs,
-                allSolutions = common.allSolutions,
-                solutionCap = common.solutionCap,
-                deadlineExceeded = { deadline != null && nowMillis() > deadline },
-                onEvent = verboseListener(common.verbose),
-                onPortfolioEvent = null,
-                prepareOnly = EngineParams(common.engineParams).bool("dry-run-presolve") == true,
-                toleranceCheck = solvable.toleranceCheck,
-            ),
-            solvable,
-            common,
-            output,
+            finiteRequest(solvable.finiteShape, common, FiniteEngine.FIXED, 1, presolveConfig,
+                solutionSetSensitive, presolveCancellation, presolveBudget, cancel, deadline, nodeBudget,
+                solvable.numericalCompletion, solvable.toleranceCheck),
+            solvable, common, output,
         )
     }
 
@@ -996,53 +991,68 @@ internal object SolveCore {
         cancel: Cancellation,
         nodeBudget: NodeBudget?,
     ) {
-        val configuredArms = cliProp(CliKnobs.portfolioArms)?.toIntOrNull()
-        val defaultArms = configuredArms ?: autoArms(cores)
+        executeFinite(
+            finiteRequest(solvable.finiteShape, common, engine, cores, presolveConfig,
+                solutionSetSensitive, presolveCancellation, presolveBudget, cancel, null, nodeBudget,
+                solvable.numericalCompletion, solvable.toleranceCheck),
+            solvable, common, output,
+        )
+    }
+
+    private fun finiteRequest(
+        shape: FiniteSolveShape,
+        common: CommonOptions,
+        engine: FiniteEngine,
+        cores: Int,
+        presolveConfig: PresolveConfig,
+        solutionSetSensitive: Boolean,
+        presolveCancellation: Cancellation,
+        presolveBudget: PresolveBudget?,
+        cancel: Cancellation,
+        deadline: Long?,
+        nodeBudget: NodeBudget?,
+        numericalCompletion: Boolean = false,
+        toleranceCheck: ((Sample) -> Boolean)? = null,
+    ): FiniteSolveRequest {
+        val fixed = engine == FiniteEngine.FIXED
+        if (fixed) rejectParallel(engine, cores, FiniteEngine.BACKTRACK)
+        val askedLp = (common.lp ?: if (fixed) null else defaultLp())?.let {
+            runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
+        }
+        if (fixed && askedLp != null && askedLp.emphasis != LpEmphasis.OFF) {
+            usageError("--lp: `-e fixed` solves by propagation alone; only `off` applies here")
+        }
+        val configuredArms = if (fixed) null else cliProp(CliKnobs.portfolioArms)?.toIntOrNull()
         val engineParams = if (configuredArms != null &&
             common.engineParams.none { it.substringBefore('=') in listOf("arms", "ls", "bt") }
-        ) {
-            common.engineParams + "arms=$configuredArms"
-        } else {
-            common.engineParams
-        }
-        // `--lp CEILING` caps the portfolio's LP emphasis; the flag wins, then the `klause.lp`
-        // env default, else AGGRESSIVE (uncapped — the pool spreads the LP intensity itself); `off`
-        // disables LP across the pool.
-        val lpCeiling = (common.lp ?: defaultLp())?.let {
-            runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
-        } ?: LpConfig.AGGRESSIVE
-        executeFinite(
-            FiniteSolveRequest(
-                shape = solvable.finiteShape,
-                engine = engine,
-                presolveConfig = presolveConfig,
-                explicitPresolveConfig = common.presolve != null,
-                solutionSetSensitive = solutionSetSensitive,
-                presolveBudget = presolveBudget,
-                cores = cores,
-                executionOptions = ExecutionOptions.parse(engineParams).let {
-                    if (solvable.numericalCompletion) it.withNumericalCompletion() else it
-                },
-                randomSeed = common.randomSeed,
-                defaultArms = defaultArms,
-                lpConfig = lpCeiling,
-                zeroObjectivePricing = common.lpPricing,
-                cancellation = cancel,
-                presolveCancellation = presolveCancellation,
-                nodeBudget = nodeBudget,
-                solveBudgetMillis = null,
-                allSolutions = common.allSolutions,
-                solutionCap = common.solutionCap,
-                deadlineExceeded = { false },
-                onEvent = null,
-                onPortfolioEvent = portfolioVerboseListener(common.verbose),
-                onPortfolioFault = ::warnPortfolioFault,
-                prepareOnly = EngineParams(common.engineParams).bool("dry-run-presolve") == true,
-                toleranceCheck = solvable.toleranceCheck,
-            ),
-            solvable,
-            common,
-            output,
+        ) common.engineParams + "arms=$configuredArms" else common.engineParams
+        return FiniteSolveRequest(
+            shape = shape,
+            engine = engine,
+            presolveConfig = presolveConfig,
+            explicitPresolveConfig = common.presolve != null,
+            solutionSetSensitive = solutionSetSensitive,
+            presolveBudget = presolveBudget,
+            cores = cores,
+            executionOptions = ExecutionOptions.parse(engineParams).let {
+                if (numericalCompletion) it.withNumericalCompletion() else it
+            },
+            randomSeed = common.randomSeed,
+            defaultArms = if (fixed) 1 else configuredArms ?: autoArms(cores),
+            lpConfig = if (fixed) LpConfig.OFF else askedLp ?: LpConfig.AGGRESSIVE,
+            zeroObjectivePricing = common.lpPricing,
+            cancellation = cancel,
+            presolveCancellation = presolveCancellation,
+            nodeBudget = nodeBudget,
+            solveBudgetMillis = if (fixed) common.timeLimitMs else null,
+            allSolutions = common.allSolutions,
+            solutionCap = common.solutionCap,
+            deadlineExceeded = { fixed && deadline != null && nowMillis() > deadline },
+            onEvent = if (fixed) verboseListener(common.verbose) else null,
+            onPortfolioEvent = if (fixed) null else portfolioVerboseListener(common.verbose),
+            onPortfolioFault = if (fixed) null else ::warnPortfolioFault,
+            prepareOnly = EngineParams(common.engineParams).bool("dry-run-presolve") == true,
+            toleranceCheck = toleranceCheck,
         )
     }
 
