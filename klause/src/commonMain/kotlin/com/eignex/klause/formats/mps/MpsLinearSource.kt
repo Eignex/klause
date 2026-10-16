@@ -9,6 +9,11 @@ import com.eignex.klause.ir.LinearSourceTerm
 import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.validation.LinearSourceCheck
+import com.eignex.klause.solver.validation.LinearSourceWitness
+import com.eignex.klause.solver.validation.checkLinearSourceWitness
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -21,6 +26,18 @@ fun MpsModel.toLinearSourceProblem(
 ): LinearSourceProblem? {
     if (cancellation()) return null
     return captureLinearSource(semantics.resolve(semanticOverrides), cancellation)
+}
+
+/**
+ * Check declaration-order coordinates against a captured MPS source and its resolved tolerance.
+ * Returns null for a rejected point or an interrupted check.
+ */
+fun LinearSourceProblem.checkMpsWitness(
+    values: List<BigFraction>,
+    cancellation: Cancellation = Cancellation.Never,
+): LinearSourceWitness? {
+    require(semantics.declared.format == SourceFormat.MPS) { "MPS witness checking requires an MPS source" }
+    return (checkLinearSourceWitness(this, values, cancellation) as? LinearSourceCheck.Accepted)?.witness
 }
 
 internal fun MpsModel.captureLinearSource(

@@ -40,7 +40,11 @@ The compatibility `toExactSourceProblem` entry defaults to zero;
 its explicit overrides and internal exact-row fallback retain their resolved policy.
 Source representation and the permitted feasibility slack are separate properties.
 
-The CLI loader captures shared typed caller overrides before lowering. `--exact`
+The CLI loader captures shared typed caller overrides in one [linear source snapshot](#source-correspondence).
+It registers one source attachment with the common CLI invocation, which owns preparation,
+engine controls, source validation and result qualification. The format renderer receives
+checked original declaration-order coordinates and their original rational objective;
+it does not compile a second source model or retry routing. `--exact`
 replaces the feasibility tolerance with zero while preserving other fields for
 applicability checking. Finite leaf checks and numerical source publication use
 that captured policy throughout the loaded source's lifetime. Absolute slack and
@@ -56,6 +60,8 @@ containers retain their numbers when the parsed model's coefficient arrays chang
 `MpsCompiled` retains that same neutral representation for its witness helpers and
 delegates original-unit point checks and tolerance qualification to the shared
 validator and evidence mechanisms used by source setup.
+`LinearSourceProblem.checkMpsWitness` exposes that same point checker for a captured
+MPS source, returning no witness when the candidate is rejected or checking stops.
 Compatibility compilation captures this source before constructing a working view;
 an exact-row fallback reuses that snapshot and its effective policy.
 
@@ -139,13 +145,14 @@ gap test uses lowered objective units and accounts for reduced-cost movement, ro
 residuals and objective rounding. The rendered objective uses source decimal
 coefficients at the returned point.
 
-For a source-exact model with at most 4096 coordinates, float rendering can try
+For a checked MPS point with at most 4096 source coordinates, rendering can try
 replacing residuals within `1e-12` of zero by zero when the remaining real values
 are integral and fit `Long`. Optional verification admits at most 32768 column,
 row and coefficient entries. The candidate must pass every original decimal row,
 bound and integrality check, and its source objective must equal the unchanged
 float point's source objective. A failed check retains the original float witness.
-This output-only reconstruction changes no search assignment, cutoff or
+The replacement uses the captured original source independently of the working
+view's numeric correspondence. This output-only reconstruction changes no search assignment, cutoff or
 optimization-status authority.
 
 `TOLERANCE_OPTIMUM` differs from `ATTAINED_OPTIMUM`. A tolerance-accepted float
@@ -182,8 +189,8 @@ status; an exact nominal feasible base and ray remain valid in the accepted
 superset. Optimum output identifies `optimizationStatus=attained-optimum` or
 `optimizationStatus=tolerance-optimum` only for its covered accepted set.
 
-`--exact` requires exact source certificates. A hybrid lowering that differs from
-the source is replaced by the exact source adapter for numerical execution.
+`--exact` requires exact source certificates. Shared setup derives an exact working
+view from the retained source under that zero-tolerance policy.
 Output comments identify exact source feasibility or tolerance acceptance
 independently of optimization authority. A float point retains tolerance optimum
 qualification even when its feasibility is exact; attainment requires a certified
