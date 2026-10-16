@@ -570,6 +570,14 @@ internal fun Problem.preparePolynomialExecutionPlan(
     projections.requireSource(this)
     val openInteger = (0 until numIntVars).any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) }
     var encodingDecline: EncoderDecline? = null
+    if (openInteger && sourceFormula == null && original is Problem) {
+        val projection = integerPolynomialProjection(original, projections, cancellation) { encodingDecline = it }
+        if (projection != null) {
+            val plan = projection.prepareExecutionPlan()
+            if (!cancellation()) return objective?.let { plan.withObjective(it, maximize) } ?: plan
+            encodingDecline = EncoderDecline.RESOURCE
+        }
+    }
     val polynomial = if (openInteger) {
         null
     } else {
@@ -692,23 +700,7 @@ fun NonlinearIntegerProblem.prepareExecutionPlan(): PreparedSourcePlan = Prepare
             integerCoordinates,
             (0 until numericCount).filter { it !in integerCoordinates },
             (0 until boolCount).toList(),
-            ComponentExecutionContract(
-                ComponentStrategySupport(
-                    ProcedureCompleteness.WITNESS_SEARCH,
-                    setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION),
-                ),
-                ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH, witnessAuthority),
-                optimization = ComponentStrategySupport(
-                    ProcedureCompleteness.EXHAUSTIVE,
-                    setOf(
-                        ExecutionClaimAuthority.WITNESS,
-                        ExecutionClaimAuthority.REFUTATION,
-                        ExecutionClaimAuthority.OBJECTIVE_BOUND,
-                        ExecutionClaimAuthority.OPTIMALITY,
-                        ExecutionClaimAuthority.UNBOUNDEDNESS,
-                    ),
-                ),
-            ),
+            nonlinearIntegerExecutionContract(),
         ),
     ),
     boolCount,
@@ -731,3 +723,21 @@ internal fun PreparedSourcePlan.linearWorkingPlan(): PreparedSourcePlan {
         factorProjections = factorProjections,
     )
 }
+
+internal fun nonlinearIntegerExecutionContract(): ComponentExecutionContract = ComponentExecutionContract(
+    ComponentStrategySupport(
+        ProcedureCompleteness.WITNESS_SEARCH,
+        setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION),
+    ),
+    ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH, witnessAuthority),
+    optimization = ComponentStrategySupport(
+        ProcedureCompleteness.EXHAUSTIVE,
+        setOf(
+            ExecutionClaimAuthority.WITNESS,
+            ExecutionClaimAuthority.REFUTATION,
+            ExecutionClaimAuthority.OBJECTIVE_BOUND,
+            ExecutionClaimAuthority.OPTIMALITY,
+            ExecutionClaimAuthority.UNBOUNDEDNESS,
+        ),
+    ),
+)

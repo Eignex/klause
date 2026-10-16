@@ -799,3 +799,16 @@ restrictions, and produces worker factories. Every worker constructs its own mut
 selectors and strategy state; options never contain those instances. Node allowances,
 cancellation and lane counts remain invocation arguments, shared or partitioned by
 the existing [resource](solver/resources.md) and [portfolio](solver/portfolio.md) owners.
+
+### Factor-backed open polynomial plans
+
+A selected nonlinear integer execution can retain a factor model as its original
+source and an internal complete polynomial projection as its execution formula.
+The binding validates factor identity, captured providers, declaration counts and
+exact coordinate maps. Every source factor must have a complete selected encoder;
+finite peers cannot silently supply omitted relations in this execution. Integer
+endpoints and finite membership exclusions remain source constraints. Private
+continuous auxiliaries are omitted from declaration output. The native integer
+service checks the complete encoded formula and integrality before publication;
+its incomplete candidate search supplies no finite-box exhaustion proof.
+See [nonlinear integer composition](theories/nonlinear-integer.md#solving-and-composition).

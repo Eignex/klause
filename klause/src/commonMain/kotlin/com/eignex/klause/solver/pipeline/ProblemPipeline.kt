@@ -305,10 +305,12 @@ private fun Problem.pipelineRouteObserved(
 
         is PreparedExecution.FiniteLinear -> execution
 
-        is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental,
-        is PreparedExecution.Numerical,
-        ->
-            error("factor source requires factor execution")
+        is PreparedExecution.NonlinearInteger -> return SourceProblemRoute.NativeFormula(
+            NativeSourceExecution.IntegerPolynomial(NonlinearIntegerTheoryRequest(execution.source, arithmetic)),
+        )
+
+        is PreparedExecution.Transcendental, is PreparedExecution.Numerical ->
+            error("factor source requires polynomial execution")
     }
     val arithmeticRoute = arithmeticExecution.ownership.theoryPipeline
     val preferExact = routeLinearToTheory &&

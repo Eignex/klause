@@ -10,6 +10,12 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.Encoder
+import com.eignex.klause.theory.EncoderProvider
+import com.eignex.klause.theory.EncoderSupport
+import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Bits
@@ -70,7 +76,11 @@ class ExecutionCapabilitiesTest {
                 "(declare-const x Real) (assert (= (* x x) 2))",
             ).realSource().pipelineRequest()
 
-        val unsupported = source.prepareExecutionPlan().capabilities.admission(FiniteEngine.BACKTRACK)
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            if (target == EncodingTarget.POLYNOMIAL) Encoder(EncoderSupport.UNSUPPORTED)
+            else BuiltInEncoderProvider.select(factor, target)
+        })
+        val unsupported = source.prepareExecutionPlan(providers).capabilities.admission(FiniteEngine.BACKTRACK)
         val exhausted = OpenTheoryPipeline.execute(
             supported,
             PolynomialTheoryParams(maximumWork = 0),

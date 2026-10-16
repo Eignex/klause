@@ -224,11 +224,17 @@ sealed class SourceExecutionResult protected constructor(
 /** Inspect the selected execution family without allocating a worker or changing the source plan. */
 fun SourceSetup.executionKind(invocation: PreparedSourceInvocation): SourceExecutionKind =
     when (val route = invocation.engineRoute) {
-        is SourceProblemRoute.NativeFormula -> when (invocation.source.formula) {
-            is AttachedSourceFormula.Linear -> SourceExecutionKind.NUMERICAL
-            is AttachedSourceFormula.IntegerPolynomial -> SourceExecutionKind.NONLINEAR_INTEGER
-            is AttachedSourceFormula.Functions -> SourceExecutionKind.FUNCTIONS
-            is AttachedSourceFormula.Polynomial, null -> SourceExecutionKind.POLYNOMIAL
+        is SourceProblemRoute.NativeFormula -> when (route.execution) {
+            is NativeSourceExecution.Numerical -> SourceExecutionKind.NUMERICAL
+            is NativeSourceExecution.IntegerPolynomial -> SourceExecutionKind.NONLINEAR_INTEGER
+            is NativeSourceExecution.Functions -> SourceExecutionKind.FUNCTIONS
+            is NativeSourceExecution.Polynomial -> SourceExecutionKind.POLYNOMIAL
+            null -> when (invocation.source.formula) {
+                is AttachedSourceFormula.Linear -> SourceExecutionKind.NUMERICAL
+                is AttachedSourceFormula.IntegerPolynomial -> SourceExecutionKind.NONLINEAR_INTEGER
+                is AttachedSourceFormula.Functions -> SourceExecutionKind.FUNCTIONS
+                is AttachedSourceFormula.Polynomial, null -> SourceExecutionKind.POLYNOMIAL
+            }
         }
 
         is SourceProblemRoute.Finite -> SourceExecutionKind.FINITE

@@ -12,6 +12,19 @@ plan; arithmetic-owned coordinates do not become finite projection columns. Boun
 representable factors compose through the shared polynomial model rather than a
 separate constraint API.
 
+Library setup can also project a retained factor model into this execution when it
+contains open integer declarations and every original factor has a complete selected
+polynomial encoding. The plan retains the original model, captured provider selection,
+factor attribution and separate declaration namespaces. All integer coordinates precede
+original real coordinates in the private numeric layout; defining auxiliaries follow.
+The projection emits declared integer endpoints and finite membership holes exactly,
+and retains real endpoints as their exact binary rational values. It does not create
+finite CP domains for open integers. Whole-scope encoder preflight checks support and
+required source pins before installation; only a completed projection is published.
+Source-fixed integer conditions are retained in each attribution, while unproved Boolean
+pins cannot authorize a conditioned encoding. Every strategy consumes the same projection
+and existing exact formula witness check. Unsupported scopes decline without proof.
+
 ## Solving and composition
 
 Search checks the whole real relaxation first. A completed real refutation also

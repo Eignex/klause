@@ -75,7 +75,11 @@ class PreparedSourcePlanTest {
             realUpper = doubleArrayOf(2.0, 2.0),
         )
 
-        val plan = source.prepareExecutionPlan()
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            if (factor is AllDifferent && target == EncodingTarget.POLYNOMIAL) Encoder(EncoderSupport.UNSUPPORTED)
+            else BuiltInEncoderProvider.select(factor, target)
+        })
+        val plan = source.prepareExecutionPlan(providers)
 
         val ownership = assertNotNull(plan.componentPlan)
         val finite = ownership.cpProjection(source, ownership.cpSourceDomains(source)).problem
