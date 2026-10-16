@@ -345,6 +345,12 @@ following bare conditional references and leaving affine expressions opaque. It 
 65,536 diagnostic visits and at most 1,024 leaves per definition; incomplete observations
 remain explicit. These limits and counters belong only to the diagnostic, and do not
 change the compiler's work counter or install an encoding.
+The ownership report also counts exact repeated retained clause-gate meanings after
+normalizing only their private output Boolean, and exact repeated integer predicate
+rows after excluding only their output Boolean. It preserves input identities,
+polarity, coefficients and bounds, without algebraic equivalence checks. Gate origin
+uses the explicit predicate owners captured before expansion; this origin set does
+not cover every primitive row allocation. These observations install no interning.
 Its additional compilation is before the opening deadline and supplies no timing,
 CLI-equivalence, refusal-cause or source-verdict claim.
 

@@ -24,6 +24,7 @@ internal object SmtLibDefinitionOwnershipInspection {
         val booleanOwners: Map<Int, Owner>,
         val definitions: Map<Int, Any>,
         val lateImages: Map<Int, Int>,
+        val predicateSharing: JsonObject,
     )
 
     fun compile(builder: Any, state: Any, canonical: SmtLibProblem, out: File): SmtLibProblem {
@@ -36,13 +37,14 @@ internal object SmtLibDefinitionOwnershipInspection {
         for (assertion in assertions) extension("SmtLibExprKt", "assert", builder, assertion)
         extension("SmtLibIteChainKt", "lowerOpenIteChains", builder)
         extension("SmtLibIteChainKt", "lowerOpenIteChains", builder)
+        val beforeExpansion = (field(state, "booleanDefinitions") as Map<Int, List<Factor>>).keys.toSet()
         method(state, "expandPending", builder)
         val factors = field(builder, "factors") as MutableList<Factor>
         val intNames = field(builder, "intNames") as Map<String, Int>
         val boolNames = field(builder, "boolNames") as Map<String, Int>
         val originalSources = intNames.values.toSet()
         val originalFactors = factors.toList()
-        val snapshot = snapshot(state, factors, intNames.values, boolNames.values)
+        val snapshot = snapshot(state, factors, intNames.values, boolNames.values, beforeExpansion)
         val removed = requireNotNull(method(state, "retainNeededDefinitions", factors, intNames.values, boolNames.values, null))
         val removedInts = field(removed, "ints") as Set<Int>
         val removedBools = field(removed, "bools") as Set<Int>
@@ -67,7 +69,13 @@ internal object SmtLibDefinitionOwnershipInspection {
         return parsed
     }
 
-    private fun snapshot(state: Any, factors: List<Factor>, ints: Collection<Int>, bools: Collection<Int>): Snapshot {
+    private fun snapshot(
+        state: Any,
+        factors: List<Factor>,
+        ints: Collection<Int>,
+        bools: Collection<Int>,
+        beforeExpansion: Set<Int>,
+    ): Snapshot {
         val definitions = field(state, "definitions") as Map<Int, Any>
         require(definitions.isNotEmpty()) { "ownership inspection requires conditional definitions" }
         val predicates = field(state, "booleanDefinitions") as Map<Int, List<Factor>>
@@ -119,7 +127,14 @@ internal object SmtLibDefinitionOwnershipInspection {
         bools.forEach { need(booleanOwners[it]) }
         for (factor in factors) if (factor !in owners) read(factor)
         while (pending.isNotEmpty()) parts.getValue(pending.removeFirst()).forEach(::read)
-        return Snapshot(owners, retained, integerOwners, booleanOwners, definitions, lateImages)
+        val beforeSharing = field(state, "work")
+        val surviving = factors.filter { factor -> owners[factor]?.let { it !in retained } != true }
+        val sharing = SmtLibPredicateSharingInspection.inspect(
+            predicates, retained.filter { !it.integer }.mapTo(HashSet()) { it.variable },
+            bools.toSet(), beforeExpansion, surviving,
+        )
+        require(field(state, "work") == beforeSharing)
+        return Snapshot(owners, retained, integerOwners, booleanOwners, definitions, lateImages, sharing)
     }
 
     private fun report(
@@ -172,6 +187,8 @@ internal object SmtLibDefinitionOwnershipInspection {
                 }
                 "${row.op}/arity${row.vars.size}/known${images.count { it != null }}/unknown${images.count { it == null }}"
             }))
+            put("predicateSharing", snapshot.predicateSharing)
+            put("predicateSharingSolverCounterChanged", false)
             put("conditionalLeaves", SmtLibConditionalLeafInspection(snapshot.definitions, sources)
                 .inspect(retainedDefinitions, directlyRead, rows))
             put("externalRowExamples", buildJsonArray {
