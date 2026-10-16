@@ -966,11 +966,7 @@ class ExactLiraSearchComponent private constructor(
         return system.install().also { sourceInstalled = it }
     }
 
-    private fun refuteSourceInterval(
-        comparison: ExactComparison,
-        premise: SearchAtomPremise,
-        context: SearchContext,
-    ): SearchExplanation? {
+    private fun refuteSourceIntervals(context: SearchContext): SearchExplanation? {
         if (graphFirst || hasPrivateReals || model.numIntVars != 0 || model.numRealVars == 0 ||
             hasSourceDisjunctions || solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
             node.rowAssertions.isNotEmpty() || node.sourceBranches.isNotEmpty() ||
@@ -978,9 +974,29 @@ class ExactLiraSearchComponent private constructor(
             node.branches.isNotEmpty() || node.reducedBranches.isNotEmpty() ||
             node.transformedBranches.isNotEmpty() || node.retainedReduction != null
         ) return null
-        val endpoints = system.comparisonRefutation(comparison, operationStop) ?: return null
-        if (operationStop()) return null
-        return context.explainAtoms(SearchAtomPremise.All(listOf(premise, endpoints)))
+        for (prepared in preparedRows) {
+            operationStop.charge(1L)
+            if (operationStop()) return null
+            val row = prepared.row
+            if (row.size > 1024) continue
+            operationStop.charge(prepared.booleans.size.toLong())
+            if (operationStop()) return null
+            if (prepared.booleans.any { bools[it] == UNASSIGNED }) continue
+            operationStop.charge(row.size.toLong())
+            if (operationStop()) return null
+            if ((0 until row.size).none { Term.isReal(row.ref(it)) }) continue
+            val truth = node.rowTruth(prepared.address, row, bools) ?: continue
+            val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
+            val endpoints = system.comparisonRefutation(comparison, operationStop) ?: continue
+            val leaves = prepared.booleans.map { variable ->
+                SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
+            }
+            val premise = SearchAtomPremise.All(listOf(SearchAtomPremise.All(leaves), endpoints))
+            val explanation = context.explainAtoms(premise)
+            if (operationStop()) return null
+            if (explanation != null) return explanation
+        }
+        return null
     }
 
     private fun assertSource(context: SearchContext): Boolean {
@@ -1001,10 +1017,6 @@ class ExactLiraSearchComponent private constructor(
             }.toMutableList<SearchAtomPremise>()
             if (asserted != null) leaves += SearchAtomPremise.Asserted(SearchDecision.Theory(asserted))
             val premise = SearchAtomPremise.All(leaves)
-            refuteSourceInterval(comparison, premise, context)?.let {
-                sourceIntervalConflict = it
-                return true
-            }
             if (comparison.op == LinearOp.NE) {
                 disequalities += Triple(address, comparison, premise)
             } else {
@@ -1022,6 +1034,7 @@ class ExactLiraSearchComponent private constructor(
             is LpBoundBatchResult.Applied -> Unit
         }
         if (!assertDisequalities(disequalities)) return false
+        sourceIntervalConflict = refuteSourceIntervals(context)
         nodesByLevel.put(context.decisionLevel, node)
         return true
     }

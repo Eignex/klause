@@ -479,12 +479,12 @@ class QfLiraSolverConflictTest {
             intBounds = openBounds(0),
             numRealVars = 2,
             realLower = doubleArrayOf(-2.0, 0.0),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, 0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, 1.0),
             factors = arrayOf(
                 ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
                     doubleArrayOf(1.0), LinearOp.LE, 0.0),
                 ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
-                    doubleArrayOf(2.0, 3.0), LinearOp.GE, 3.0),
+                    doubleArrayOf(2.0, 3.0), LinearOp.GE, 4.0),
             ),
         )
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
@@ -556,6 +556,66 @@ class QfLiraSolverConflictTest {
 
             assertContentEquals(intArrayOf(Lit.make(0, false)), assertNotNull(conflict.explanation).literals)
             assertEquals(1L, stats.snapshot().completeSearchStages?.get("SOURCE_INTERVAL_CONFLICT"))
+        }
+    }
+
+    @Test
+    fun `a narrowed endpoint should recheck an installed source row before another LP check`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, 3.0), LinearOp.LE, 1.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), maxChecks = 1)
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertContentEquals(intArrayOf(Lit.make(0, false)), assertNotNull(conflict.explanation).literals)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("SOURCE_INTERVAL_CONFLICT"))
+            assertEquals(0L, stats.snapshot().completeSearchLinearChecks)
+        }
+    }
+
+    @Test
+    fun `equality endpoint feasibility should ignore inequality-only strict metadata`() {
+        for (strict in listOf(false, true)) {
+            val factor = object : Factor by Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(2.0, 3.0), LinearOp.EQ, 0.0) {
+                override val linearForm = LinearForm.Conjunction(listOf(TaggedLinearRow(
+                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(2.0, 3.0)), 0.0, strict),
+                    LinearOp.EQ,
+                )))
+            }
+            val source = Problem(
+                numBoolVars = 0,
+                intBounds = openBounds(0),
+                numRealVars = 2,
+                realLower = doubleArrayOf(0.0, 0.0),
+                realUpper = doubleArrayOf(1.0, 1.0),
+                factors = arrayOf(factor),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                val result = assertIs<SearchResult.Satisfied>(session.solve(0))
+
+                assertEquals(listOf(BigFraction.ZERO, BigFraction.ZERO),
+                    assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals)
+            }
         }
     }
 

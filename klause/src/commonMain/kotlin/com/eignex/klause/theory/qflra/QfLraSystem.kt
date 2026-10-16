@@ -234,7 +234,7 @@ internal class LiveQfLraSystem(
         if (!work.admitted(comparison.bound)) return null
         fun refuteSide(upper: Boolean): SearchAtomPremise? {
             var slack = comparison.bound
-            var strict = comparison.strict
+            var strict = comparison.strict && comparison.op != LinearOp.EQ
             val premises = ArrayList<SearchAtomPremise>()
             for ((column, coefficient) in comparison.terms) {
                 stop.charge(1L)

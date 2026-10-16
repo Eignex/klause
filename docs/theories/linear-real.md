@@ -28,7 +28,9 @@ contributes exact source coordinates at a complete check. Disequalities require
 an applicable direction and remain part of the source check.
 
 A resolved pure-real comparison can also conflict through exact interval activity
-before numerical completion. Each nonzero coefficient selects the current primitive
+before numerical completion. After installing current assertions, the component
+rechecks eligible resolved rows against current endpoints. Each nonzero coefficient
+selects the current primitive
 source column's lower or upper bound according to its sign. Exact slack and open
 endpoints prove a contradiction only when the entire interval excludes the row;
 equalities check both sides. The conflict clause retains every row and selected
