@@ -319,8 +319,8 @@ internal object Compiler {
             if (hasOpenProductOperand()) closeProductBounds()
             for (a in asserts) assert(a)
             lowerOpenIteChains()
-            val compiledObjective = objectiveSpec?.let { (t, neg) ->
-                if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
+            val compiledObjective = objectiveSpec?.let { (t, _) ->
+                if (isRealExpr(t)) realObjective(t, false) else linearObjective(t, false)
             }
             lowerOpenIteChains() // an objective term can open chains of its own
             conditionalEqualities.expandPending(this)

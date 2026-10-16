@@ -7,11 +7,14 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.arithmetic.ExactLinear
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import java.io.File
@@ -51,10 +54,13 @@ internal object LinearSourceShape {
         out.resolve("source.smt2").writeBytes(bytes)
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         val started = System.nanoTime()
-        val admitted = SmtLibAdmission.parse(bytes.decodeToString(), cancellation = Cancellation.after(10.seconds))
-        val parsed = requireNotNull((admitted as? SmtLibInput.Linear)?.problem) { "Linear admission did not complete" }
+        val admitted = SmtLib.parse(bytes.decodeToString(), cancellation = Cancellation.after(10.seconds))
+        val parsed = admitted
         val parsingNs = System.nanoTime() - started
-        val model = parsed.model
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            parsed.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val model = requireNotNull(invocation.preparedPlan?.model) { "source has no factor inspection view" }
         val exactRows = model.factors.filterIsInstance<ExactLinear>()
         val activatedRows = exactRows.filter { it.activator != LinearRow.ALWAYS }
         val predicates = HashSet<StructuralKey>()

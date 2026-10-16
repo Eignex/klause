@@ -4,9 +4,8 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.formats.smtlib.realSource
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -191,12 +190,10 @@ class PolynomialStrategyAdaptersTest {
 
     @Test
     fun `pure real heuristic arms should repair coordinates before publishing algebraic witnesses`() {
-        val input = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val input = SmtLibPolynomial.parse(
                 "(declare-const x Real) (assert (= (* x x) 2))",
-            ),
-        )
-        val request = input.problem.pipelineRequest()
+            ).realSource()
+        val request = input.pipelineRequest()
         val params = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(
                 localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 12),
@@ -216,12 +213,10 @@ class PolynomialStrategyAdaptersTest {
 
     @Test
     fun `pure real heuristic arms should respect cancellation and exhausted node allowances`() {
-        val input = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val input = SmtLibPolynomial.parse(
                 "(declare-const x Real) (assert (= (* x x) 2))",
-            ),
-        )
-        val request = input.problem.pipelineRequest()
+            ).realSource()
+        val request = input.pipelineRequest()
         val controls = listOf(
             LocalSearchParams(cancellation = Cancellation { true }),
             LocalSearchParams(nodeBudget = NodeBudget(0)),

@@ -3,16 +3,17 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionStrategy
+import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.PreparedSourcePlan
-import com.eignex.klause.solver.pipeline.pipelineRoute
-import com.eignex.klause.solver.pipeline.prepareExecutionPlan
+import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
@@ -42,17 +43,20 @@ internal object PreparedPlanProfile {
         val polynomial = Problem(0, 1, arrayOf(IntDomain(0, 8)), arrayOf(ContinuousProduct(0, 0, 1)),
             numRealVars = 2, realLower = doubleArrayOf(-2.0, 0.0), realUpper = doubleArrayOf(2.0, 4.0))
         val openText = "(declare-const x Real) (assert (> x 0)) (assert (< x 3))"
-        val open = (SmtLibAdmission.parse(openText) as SmtLibInput.Linear).problem.model
+        val open = SmtLib.parse(openText).source
         val nonlinearText = "(declare-const x Int) (assert (= (* x x) 4))"
-        val nonlinear = (SmtLibAdmission.parse(nonlinearText) as SmtLibInput.NonlinearInteger).problem
+        val nonlinear = SmtLib.parse(nonlinearText).source
         val nativeText = "(declare-const x Real) (assert (= (* x x) 2))"
-        val native = (SmtLibAdmission.parse(nativeText) as SmtLibInput.Polynomial).problem
+        val native = SmtLib.parse(nativeText).source
+        fun prepare(source: SourceAttachment): PreparedSourcePlan = requireNotNull(SourceSetup.prepare(
+            SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK),
+        ).preparedPlan)
         val preparations: Map<String, () -> PreparedSourcePlan> = linkedMapOf(
-            "finite" to { finite.prepareExecutionPlan(preferFinite = true) },
-            "open" to { open.prepareExecutionPlan() },
-            "polynomial" to { polynomial.prepareExecutionPlan() },
-            "native-polynomial" to { native.prepareExecutionPlan() },
-            "nonlinear-integer" to { nonlinear.prepareExecutionPlan() },
+            "finite" to { prepare(SourceAttachment(finite)) },
+            "open" to { prepare(open) },
+            "polynomial" to { prepare(SourceAttachment(polynomial)) },
+            "source-polynomial" to { prepare(native) },
+            "nonlinear-integer" to { prepare(nonlinear) },
         )
         output.resolve("provenance.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha())
@@ -68,7 +72,7 @@ internal object PreparedPlanProfile {
                 put("finite", "Problem(bool=0,int=[0..8],factors=[])")
                 put("polynomial", "Problem(bool=0,int=[0..8],real=[-2..2,0..4],ContinuousProduct(0,0,1))")
                 put("open", openText)
-                put("native-polynomial", nativeText)
+                put("source-polynomial", nativeText)
                 put("nonlinear-integer", nonlinearText)
             })
             put("classpath", buildJsonArray {
@@ -120,7 +124,9 @@ internal object PreparedPlanProfile {
             }
             if (round >= 0) println("completed preparation round $round")
         }
-        println("default finite route: ${finite.pipelineRoute()::class.simpleName}")
-        println("exact open route: ${open.pipelineRoute(routePureRealToTheory = true)::class.simpleName}")
+        println("default finite route: ${SourceSetup.prepare(SourceSetupRequest(SourceAttachment(finite),
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK)).route::class.simpleName}")
+        println("exact open route: ${SourceSetup.prepare(SourceSetupRequest(open,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK)).route::class.simpleName}")
     }
 }

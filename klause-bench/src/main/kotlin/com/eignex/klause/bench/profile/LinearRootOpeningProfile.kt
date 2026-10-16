@@ -5,12 +5,15 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
-import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PlannedSearch
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.search.SearchNodePolicy
@@ -55,10 +58,8 @@ internal object LinearRootOpeningProfile {
         out.resolve("source.smt2").writeBytes(bytes)
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         val parsingStarted = System.nanoTime()
-        val admitted = SmtLibAdmission.parse(bytes.decodeToString())
-        val compiled = requireNotNull((admitted as? SmtLibInput.Linear)?.problem) {
-            "source admission did not select linear lowering"
-        }
+        val admitted = SmtLib.parse(bytes.decodeToString())
+        val compiled = admitted
         val parsingNs = System.nanoTime() - parsingStarted
         require(compiled.objective == null) { "only satisfaction openings are supported" }
         val deadlineStarted = System.nanoTime()
@@ -68,7 +69,13 @@ internal object LinearRootOpeningProfile {
         val factory = OpenTheoryPipeline.javaClass.declaredMethods.single {
             it.name.startsWith("engineFor") && it.parameterCount == 1
         }
-        val engine = requireNotNull(factory.invoke(OpenTheoryPipeline, OpenTheoryRequest(compiled.model)))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            compiled.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK, cancellation = stop,
+        ))
+        val model = requireNotNull(invocation.preparedPlan?.model) { "source has no factor inspection view" }
+        val request = (invocation.route as? SourceProblemRoute.OpenTheory)?.request
+            ?: error("source setup did not select a linear opening")
+        val engine = requireNotNull(factory.invoke(OpenTheoryPipeline, request))
         val stateType = Class.forName("com.eignex.klause.solver.pipeline.OpenTheorySolveState")
         val state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
         val begin = engine.javaClass.declaredMethods.single { it.name.startsWith("begin") && it.parameterCount == 3 }
@@ -117,10 +124,10 @@ internal object LinearRootOpeningProfile {
                 put("decisionLevel", session?.decisionLevel)
                 put("finiteFixpointCancelled", planned?.cp?.session?.fixpointCancelled)
                 put("theoryComponent", planned?.theory?.javaClass?.simpleName)
-                put("compiledBooleans", compiled.model.numBoolVars)
-                put("compiledIntegers", compiled.model.numIntVars)
-                put("compiledReals", compiled.model.numRealVars)
-                put("compiledFactors", compiled.model.factors.size)
+                put("compiledBooleans", model.numBoolVars)
+                put("compiledIntegers", model.numIntVars)
+                put("compiledReals", model.numRealVars)
+                put("compiledFactors", model.factors.size)
                 put("sourceBooleanNames", compiled.boolVarNames.size)
                 put("sourceIntegerNames", compiled.intVarNames.size)
                 put("sourceRealNames", compiled.realVarNames.size)

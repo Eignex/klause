@@ -2,8 +2,8 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.formats.smtlib.realSource
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -61,9 +61,7 @@ class PolynomialTheoryRequestTest {
 
     @Test
     fun `mixed polynomial portfolio should find a witness after complete search is capped`() {
-        val input = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse("(declare-const b Bool) (declare-const x Real) (assert b) (assert (= (* x x) 2))"),
-        )
+        val input = SmtLibPolynomial.parse("(declare-const b Bool) (declare-const x Real) (assert b) (assert (= (* x x) 2))").realSource()
         val params = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(
                 backtrack = BacktrackParams(maxInstructions = 0),
@@ -71,7 +69,7 @@ class PolynomialTheoryRequestTest {
             ),
         )
 
-        val execution = OpenTheoryPipeline.execute(input.problem.pipelineRequest(), params, FiniteEngine.MIXED)
+        val execution = OpenTheoryPipeline.execute(input.pipelineRequest(), params, FiniteEngine.MIXED)
 
         val witness = assertIs<OpenTheoryResult.Sat>(execution.result)
         assertNotNull(witness.assignment.algebraicRealValue(0))
@@ -80,13 +78,11 @@ class PolynomialTheoryRequestTest {
 
     @Test
     fun `native exhaustion should stop every polynomial strategy before entry`() {
-        val input = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse("(declare-const x Real) (assert (= (* x x) 2))"),
-        )
+        val input = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))").realSource()
 
         for (engine in FiniteEngine.entries) {
             val execution = OpenTheoryPipeline.execute(
-                input.problem.pipelineRequest(),
+                input.pipelineRequest(),
                 PolynomialTheoryParams(maximumWork = 0),
                 engine,
             )
@@ -98,8 +94,7 @@ class PolynomialTheoryRequestTest {
 
     @Test
     fun `source assumptions should publish original coordinates without numeric ite auxiliaries`() {
-        val input = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val input = SmtLibPolynomial.parse(
                 """
                 (declare-const b Bool)
                 (declare-const x Real)
@@ -108,10 +103,9 @@ class PolynomialTheoryRequestTest {
                 (assert (= (ite b x (- x)) 1))
                 (check-sat-assuming (b))
                 """.trimIndent(),
-            ),
-        )
+            ).realSource()
 
-        val execution = OpenTheoryPipeline.execute(input.problem.pipelineRequest())
+        val execution = OpenTheoryPipeline.execute(input.pipelineRequest())
 
         val result = assertIs<OpenTheoryResult.Sat>(execution.result)
         val witness = assertIs<OpenTheoryAssignment.ExactNra>(result.assignment)
@@ -130,14 +124,12 @@ class PolynomialTheoryRequestTest {
             "(define-fun f ((y Real)) Real (* x y))" to "(= (f 2) 14)",
             "(define-fun f () Real x)" to "(= f 7)",
         )) {
-            val input = assertIs<SmtLibInput.Polynomial>(
-                SmtLibAdmission.parse(
+            val input = SmtLibPolynomial.parse(
                     "(declare-const x Real) $definition (assert (= x 1)) " +
                         "(assert (let ((x 7)) $call)) (check-sat)",
-                ),
-            )
+                ).realSource()
 
-            val execution = OpenTheoryPipeline.execute(input.problem.pipelineRequest())
+            val execution = OpenTheoryPipeline.execute(input.pipelineRequest())
 
             assertIs<OpenTheoryResult.Unsat>(execution.result)
         }
@@ -145,14 +137,12 @@ class PolynomialTheoryRequestTest {
 
     @Test
     fun `helper arguments should read caller bindings before entering definition scope`() {
-        val input = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val input = SmtLibPolynomial.parse(
                 "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) (assert (= x 1)) " +
                     "(assert (let ((x 7)) (= (f x) 7))) (check-sat)",
-            ),
-        )
+            ).realSource()
 
-        val execution = OpenTheoryPipeline.execute(input.problem.pipelineRequest())
+        val execution = OpenTheoryPipeline.execute(input.pipelineRequest())
 
         val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
         val arithmetic = AlgebraicArithmetic()
@@ -162,25 +152,21 @@ class PolynomialTheoryRequestTest {
 
     @Test
     fun `complete route should refute a strict irrational boundary`() {
-        val input = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val input = SmtLibPolynomial.parse(
                 "(declare-const x Real) (assert (= (* x x) 2)) (assert (> x 0)) (assert (< (* x x) 2))",
-            ),
-        )
+            ).realSource()
 
-        val execution = OpenTheoryPipeline.execute(input.problem.pipelineRequest())
+        val execution = OpenTheoryPipeline.execute(input.pipelineRequest())
 
         assertIs<OpenTheoryResult.Unsat>(execution.result)
     }
 
     @Test
     fun `expired wall token should stay distinct from external cancellation`() {
-        val input = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse("(declare-const x Real) (assert (= (* x x) 2))"),
-        )
+        val input = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))").realSource()
 
         val execution = OpenTheoryPipeline.execute(
-            input.problem.pipelineRequest(),
+            input.pipelineRequest(),
             PolynomialTheoryParams(timeout = Cancellation { true }),
         )
 
@@ -190,12 +176,10 @@ class PolynomialTheoryRequestTest {
 
     @Test
     fun `external cancellation should preserve the cancelled reason`() {
-        val input = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse("(declare-const x Real) (assert (= (* x x) 2))"),
-        )
+        val input = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))").realSource()
 
         val execution = OpenTheoryPipeline.execute(
-            input.problem.pipelineRequest(),
+            input.pipelineRequest(),
             PolynomialTheoryParams(cancellation = Cancellation { true }),
         )
 
@@ -204,12 +188,10 @@ class PolynomialTheoryRequestTest {
 
     @Test
     fun `representation resource decline should keep its native cause`() {
-        val input = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse("(declare-const x Real) (assert (= (* x x) 2))"),
-        )
+        val input = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))").realSource()
 
         val execution = OpenTheoryPipeline.execute(
-            input.problem.pipelineRequest(),
+            input.pipelineRequest(),
             PolynomialTheoryParams(maximumDenseCoefficients = 1),
         )
 

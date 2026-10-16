@@ -3,8 +3,8 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.formats.smtlib.realSource
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -43,11 +43,9 @@ class ExecutionCapabilitiesTest {
 
     @Test
     fun `native source completion should not invent a counting surface`() {
-        val source = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val source = SmtLibPolynomial.parse(
                 "(declare-const x Real) (assert (= (* x x) 2))",
-            ),
-        ).problem
+            ).realSource()
         val plan = source.prepareExecutionPlan()
 
         val admission = plan.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.EXACT_COUNT)
@@ -68,11 +66,9 @@ class ExecutionCapabilitiesTest {
             realLower = doubleArrayOf(1.0),
             realUpper = doubleArrayOf(1.0),
         )
-        val supported = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val supported = SmtLibPolynomial.parse(
                 "(declare-const x Real) (assert (= (* x x) 2))",
-            ),
-        ).problem.pipelineRequest()
+            ).realSource().pipelineRequest()
 
         val unsupported = source.prepareExecutionPlan().capabilities.admission(FiniteEngine.BACKTRACK)
         val exhausted = OpenTheoryPipeline.execute(
@@ -136,11 +132,9 @@ class ExecutionCapabilitiesTest {
 
     @Test
     fun `polynomial invocation pins should not change prepared source admission or later witnesses`() {
-        val source = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val source = SmtLibPolynomial.parse(
                 "(declare-const x Real) (declare-const b Bool) (assert (= (* x x) 2)) (assert b)",
-            ),
-        ).problem
+            ).realSource()
         val request = source.pipelineRequest()
         val scoped = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(

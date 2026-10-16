@@ -5,9 +5,11 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.FloatSemantics
+import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -95,27 +97,25 @@ class SmtLibSemanticsTest {
         val overrides = SemanticOverrides(undeclaredReals = BoundsOverride(
             upper = BoundOverride.Value(SemanticRational.ZERO),
         ))
-        val input = SmtLibAdmission.parse(
+        val input = SmtLib.parse(
             "(declare-const x Real) (assert (= (* x x) 1)) (assert (> x 0))",
             semanticOverrides = overrides,
         )
-        val source = assertIs<SmtLibInput.Polynomial>(input).problem
-
-        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result
+        val result = BacktrackSolver.source(input.model).solve()
 
         assertIs<OpenTheoryResult.Unsat>(result)
-        assertEquals(SemanticRational.ZERO, source.semantics.effective.undeclaredReals?.upper)
+        assertEquals(SemanticRational.ZERO, input.semantics.effective.undeclaredReals?.upper)
     }
 
     @Test
     fun `nonlinear integer fallback should enforce caller declaration bounds`() {
         val overrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(upper = BoundOverride.Value(0L)))
-        val input = SmtLibAdmission.parse(
+        val input = SmtLib.parse(
             "(declare-const x Int) (define-fun square ((y Int)) Int (* y y)) " +
                 "(assert (= (square x) 1)) (assert (> x 0))",
             semanticOverrides = overrides,
         )
-        val source = assertIs<SmtLibInput.NonlinearInteger>(input).problem
+        val source = assertIs<NonlinearIntegerProblem>((input).source.originalSource)
 
         val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result
 
@@ -127,11 +127,11 @@ class SmtLibSemanticsTest {
     fun `function fallback should enforce exact rational bounds on original declarations`() {
         val third = SemanticRational.of(bigIntOf(1), bigIntOf(3))
         val overrides = SemanticOverrides(undeclaredReals = BoundsOverride(upper = BoundOverride.Value(third)))
-        val input = SmtLibAdmission.parse(
+        val input = SmtLib.parse(
             "(declare-const x Real) (assert (= (exp 0) 1)) (assert (> x (/ 1 3)))",
             semanticOverrides = overrides,
         )
-        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+        val source = assertIs<TranscendentalProblem>((input).source.originalSource)
 
         val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result
 
@@ -151,7 +151,7 @@ class SmtLibSemanticsTest {
             assertFailsWith<IllegalArgumentException> { SmtLib.parse("", semanticOverrides = replacement) }
             var opened = false
             assertFailsWith<IllegalArgumentException> {
-                SmtLibAdmission.parse({ opened = true; StringCharSource("") }, semanticOverrides = replacement)
+                SmtLib.parse({ opened = true; StringCharSource("") }, semanticOverrides = replacement)
             }
             assertFalse(opened)
         }

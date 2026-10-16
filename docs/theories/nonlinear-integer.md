@@ -5,7 +5,7 @@ snapshot with separate original integer, real and Boolean identities. Integer
 coordinates embed into the polynomial coordinate space exactly. The snapshot
 retains the source expression DAG; products and fixed powers are not expanded by
 the input format. Source integer arithmetic remains arbitrary precision.
-Typed SMT fallback exposes this snapshot through `SmtLibInput.NonlinearInteger`.
+SMT admission retains this snapshot through `SmtLibProblem.source` and the shared source attachment.
 Its `pipelineRequest()` retains the shared prepared source plan and uses the common
 exact verdict and witness surface. Original declaration mappings remain in that
 plan; arithmetic-owned coordinates do not become finite projection columns. Bounded

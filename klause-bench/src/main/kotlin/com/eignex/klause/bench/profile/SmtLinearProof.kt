@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.optimization.LinearApproach
 import com.eignex.klause.lp.optimization.LinearPinnedObjective
 import com.eignex.klause.lp.optimization.LinearPinnedRefutation
@@ -17,12 +18,15 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
-import com.eignex.klause.solver.pipeline.OpenTheoryRequest
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.optimizeLinear
 import com.eignex.klause.util.BIG_ONE
@@ -86,8 +90,7 @@ object SmtLinearProof {
             out.resolve("$index.smt2").writeBytes(bytes)
             val compiled = SmtLib.parse(bytes.decodeToString())
             val maximize = compiled.sense == ObjectiveSense.MAXIMIZE
-            val minimized = requireNotNull(compiled.objective).toLinearObjective()
-            val objective = if (maximize) minimized.negated() else minimized
+            val objective = requireNotNull(compiled.objective).toLinearObjective()
             val sense = if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
             val coordinates = buildMap {
                 compiled.boolVarNames.forEach { (name, id) ->
@@ -103,9 +106,17 @@ object SmtLinearProof {
             val condition = conditionBytes?.let { readCondition(it, coordinates) } ?: SourceCondition()
             val scope = SourceScope(SourceRevision(sha(bytes), "klause-ir-exact-v1"),
                 condition = condition, objective = SourceObjective("cost", sense))
-            val capture = requireNotNull(compiled.model.sourceProofContext(scope, objective))
-            val request = OpenTheoryRequest(compiled.model, objective, maximize = maximize)
-                .let { if (conditionBytes == null) it else it.withLinearAuthority(capture) }
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                compiled.source, ExecutionOperation.OPTIMIZE, engine, objective, maximize,
+                cancellation = params.timeout,
+            ))
+            val original = requireNotNull(invocation.preparedPlan?.originalSource as? Problem) {
+                "linear proof capture requires original factor premises"
+            }
+            val capture = requireNotNull(original.sourceProofContext(scope, objective))
+            val selected = (invocation.route as? SourceProblemRoute.OpenTheory)?.request
+                ?: error("source setup did not select a linear proof producer")
+            val request = if (conditionBytes == null) selected else selected.withLinearAuthority(capture)
             val execution = if (direct) null else {
                 OpenTheoryPipeline.execute(request, params, engine, cores) as OpenTheoryExecution.Optimize
             }

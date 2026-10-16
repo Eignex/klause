@@ -6,6 +6,7 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SmtLibProblem
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.search.CardinalitySearchComponent
@@ -15,8 +16,8 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBranchSelection
-import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchModelKey
@@ -47,16 +48,19 @@ internal object SearchSelectionProfile {
         val source = Base64.getDecoder().decode(requireNotNull(options["source64"]))
         val parsed = SmtLib.parse(source.toString(Charsets.UTF_8))
         require(parsed.objective == null) { "selection profile accepts satisfaction sources" }
-        val plan = parsed.model.componentPlan()
+        val model = requireNotNull(parsed.source.originalSource as? Problem) {
+            "selection profile requires original factor storage"
+        }
+        val plan = model.componentPlan()
         require(!plan.hasCpComponent && plan.theoryPipeline in setOf(
             ProblemPipeline.EXACT_LRA, ProblemPipeline.EXACT_LIRA, ProblemPipeline.DIFFERENCE_THEORY,
         )) { "selection profile requires a complete linear source plan without CP-owned factors" }
-        val clauses = parsed.model.factors.filterIsInstance<Clause>()
-        val cardinalities = parsed.model.factors.filterIsInstance<Cardinality>()
+        val clauses = model.factors.filterIsInstance<Clause>()
+        val cardinalities = model.factors.filterIsInstance<Cardinality>()
         val finite = parsed.intVarNames.getValue(requireNotNull(options["finite"]))
-        require(parsed.model.intBounds.hasLower(finite) && parsed.model.intBounds.hasUpper(finite))
-        val sourceLower = parsed.model.intBounds.lower(finite)
-        val sourceUpper = parsed.model.intBounds.upper(finite)
+        require(model.intBounds.hasLower(finite) && model.intBounds.hasUpper(finite))
+        val sourceLower = model.intBounds.lower(finite)
+        val sourceUpper = model.intBounds.upper(finite)
         require(sourceLower >= -1_000_000 && sourceUpper <= 1_000_000 && sourceUpper - sourceLower in 1..1024) {
             "finite proposal needs a small bounded source domain"
         }
@@ -98,7 +102,7 @@ internal object SearchSelectionProfile {
                 val choices = ArrayList<String>()
                 val stop = Cancellation.after(10.seconds)
                 val started = System.nanoTime()
-                val component = ExactLiraSearchComponent(parsed.model) { value, model -> model.contribute(key, value) }
+                val component = ExactLiraSearchComponent(model) { value, model -> model.contribute(key, value) }
                 component.use { arithmetic ->
                     val proposal = object : SearchBranchProposal {
                         override val branchKind = SearchBranchKind.Finite
@@ -118,9 +122,9 @@ internal object SearchSelectionProfile {
                         add(arithmetic)
                     }
                     val session = SearchComponentSet(components, proposals = listOf(proposal))
-                        .session(cancellation = stop, atoms = SearchAtomRegistry(parsed.model.numBoolVars))
+                        .session(cancellation = stop, atoms = SearchAtomRegistry(model.numBoolVars))
                     val initialized = session.initialize()
-                    val run = session.openRun(parsed.model.numBoolVars, branchSelection = selection,
+                    val run = session.openRun(model.numBoolVars, branchSelection = selection,
                         observer = object : SearchRunObserver {
                             override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
                                 choices += decision.toString()
