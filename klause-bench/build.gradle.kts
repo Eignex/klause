@@ -378,6 +378,28 @@ val checkJvmTaskLogStreaming = tasks.register<Exec>("checkJvmTaskLogStreaming") 
         "tools/review_native_vm_live_arguments.py", "tools/native_vm_event_loss.py")
 }
 
+val checkJvmCompilationEvents = tasks.register<Exec>("checkJvmCompilationEvents") {
+    group = "verification"
+    description = "Test streamed all-tier JFR compilation roots, exact units and unavailable quantities."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_jvm_compilation_events.py")
+    inputs.files("tools/jvm_compilation_events.py", "tools/test_jvm_compilation_events.py",
+        "tools/review_jvm_task_log_cohort.py", "tools/review_jvm_task_log.py", "tools/stream_jvm_task_log.py",
+        "tools/review_native_vm_log_identities.py", "tools/review_native_vm_live_arguments.py",
+        "tools/native_vm_event_loss.py")
+}
+
+val checkJvmCompilationCohort = tasks.register<Exec>("checkJvmCompilationCohort") {
+    group = "verification"
+    description = "Test authenticated saved JFR cohorts, complete exports and original case binding."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_jvm_compilation_cohort.py")
+    inputs.files("tools/review_jvm_compilation_cohort.py", "tools/test_review_jvm_compilation_cohort.py",
+        "tools/jvm_compilation_events.py", "tools/review_jvm_task_log_cohort.py", "tools/review_jvm_task_log.py",
+        "tools/stream_jvm_task_log.py", "tools/review_native_vm_log_identities.py",
+        "tools/review_native_vm_live_arguments.py", "tools/native_vm_event_loss.py")
+}
+
 tasks.named("check") {
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
@@ -385,7 +407,7 @@ tasks.named("check") {
         checkNativeVmLiveArgumentReview, checkNativeVmEventLoss, checkNativeVmEventLossReview,
         checkNativeVmBoundaryEntries, checkNativeVmBoundaryLifecycle, checkNativeVmBoundaryLifecycleReview,
         checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkJvmTaskLog, checkJvmTaskLogCohort,
-        checkJvmTaskLogStreaming, checkNativeVmEntryTransfers,
+        checkJvmTaskLogStreaming, checkJvmCompilationEvents, checkJvmCompilationCohort, checkNativeVmEntryTransfers,
         checkNativeVmDebugImage, checkNativeVmDwarfProvider, checkNativeVmDwarfRecords,
         checkNativeVmDwarfRecordReview, checkNativeVmDwarfContext, checkNativeVmDwarfLayoutReview,
         checkNativeVmEntryAbi, checkNativeVmTaskCalls, checkNativeVmTaskCallFlow,

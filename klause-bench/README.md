@@ -2218,6 +2218,58 @@ unfinished, OSR, replaced and source-excluded work, source outcomes and independ
 runtime/allocation/RNG/work controls require separate evidence. Nominal printed
 stamp differences remain distinct from compiler elapsed-time and code-size proof.
 
+### Saved JVM compilation census
+
+`com.eignex.klause.bench.profile.JvmCompilationCohortReview` accepts `manifest=`,
+`manifest-sha256=` and `archive=` HTTPS inputs. It authenticates the complete
+original archive and every member before decoding any recording. It extracts
+case JFR/XML and bounded original metadata into private temporary storage, hashes
+unselected members incrementally and removes the staging directory on exit.
+Large derived reports are authenticated without extraction or interpretation.
+No captured target JVM, solver or native probe is invoked.
+
+The observer JDK's `jfr print --json` exports Compilation, CompilerInlining,
+CompilerPhase, CompilationFailure, DataLoss, ActiveSetting and JVMInformation
+events. The complete exported JSON bytes are retained in deterministic gzip;
+event indices refer to that export, separately within each original recording.
+Unknown event fields remain in the export. The parser streams UTF-8 and individual
+JSON records, rejects duplicate keys, malformed/truncated envelopes and trailing
+bytes, and never loads a complete export or derived report as a string.
+
+The census retains C1, C2 and unknown tiers, ordinary/OSR, successful/failed and
+replacement root events. Exact textual JFR durations become integer nanoseconds;
+numeric or unknown units remain unavailable. Reported successful `codeSize`
+stays distinct from XML content size, instruction size, file bytes and CPU.
+Missing quantities and empty root sets are unavailable, rather than zero.
+Direct methods and successful inlining references retain complete root costs.
+Each root is counted once within a family; shared family totals are nonadditive.
+Ambiguous compile IDs, incomplete method identities, failed inline attempts and
+unresolved successful references remain explicit. Full XML metadata preserves
+all-tier queues, started/installed roots, failures, replacements and parse errors.
+
+Every archived case directory is retained. The original `cases.json`, individual
+measurement and recording/XML identities must agree for case decoding completion.
+Missing, extra, nested or ambiguous recordings and malformed XML remain negative.
+Observer bench/JDK files are hash-bound before review and checked for changes
+afterwards, separately from the original CLI/runtime/source/worker context.
+Family declarations and observed ordinary-phase roots are reported;
+their correspondence to complete current source phases requires independent
+review. Original source-check outputs and exclusions are preserved without an
+outcome upgrade. Decoding completion supplies no complete lifetime, loss-free,
+source-phase, current-runtime or saving proof. Instrumented JFR durations do not
+replace independent runtime, allocation, quality, RNG/work or cold-run controls.
+
+Bounds are 16 MiB for the manifest, 2 GiB compressed/16 GiB expanded for the
+archive, 8 GiB selected scratch inputs, 128 MiB per recording/XML and 32 MiB per
+original metadata file. Each export allows 8 GiB of JSON, 8 MiB per event,
+four million events and one million retained root/inlining rows. A JFR child has
+300 seconds and 1 MiB of stderr; the enclosing review has 2400 seconds and kills
+owned descendants on timeout. Derived reports allow 512 MiB expanded each;
+the whole compressed output stays below 512 MiB, leaving transfer headroom.
+Partial export, tool failure and resource declines retain explicit negatives and
+recoverable original input identities. Publication still requires source filtering
+and complete byte verification of every retained gzip payload.
+
 ### Polynomial witness work checkpoints
 
 `com.eignex.klause.bench.profile.PolynomialWitnessProbeProfile` diagnoses the bounded
