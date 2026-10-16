@@ -2155,6 +2155,30 @@ code-size/root coverage, clocks or compiler savings, and never changes original
 argument-binding or capture-wide acceptance flags. The review performs no new
 field reads, observer attachment or captured JVM replay.
 
+### Linear containing-stop attribution
+
+`bench.profile.LinearStopAttributionProfile` accepts one `request64=<base64 JSON>`
+argument containing up to eight `{suite, problem, sha256, seed, bounded?}` entries.
+Run the committed profile on AWS with one processor. It preserves original source
+bytes, installed distribution/runtime/harness provenance and actual JVM options.
+The installed CLI frontend supplies its source admission, routing token and selected
+request; the public pipeline executes that request with the CLI's retained deadline,
+shared preparation allowance and default mixed engine. The CLI solve driver and
+output protocol are not executed, so compare ordinary CLI streams separately.
+
+Each default entry runs plain then observed under separate unchanged 60-second
+containing deadlines. Observation retains the first existing true routing,
+preparation and containing poll's stack, without extra delegate polls or charges.
+These tokens have distinct scopes: a routing/preparation stop can leave the containing
+solve active. A private numerical decline does not establish either stop.
+Results retain the route, final reason, native counters and all captured stacks;
+missing observations remain absent. Observer stack capture adds elapsed overhead.
+Optional `bounded=true` runs plain/observed/observed/plain controls with eight
+complete decisions or four heuristic proposals and 10,000 heuristic instructions,
+using the complete or heuristic engine alone. These explicit diagnostic controls
+check outcome and deterministic-work parity; they establish no default-route speedup,
+source refutation, independent witness acceptance or optimization claim.
+
 ### Polynomial witness work checkpoints
 
 `com.eignex.klause.bench.profile.PolynomialWitnessProbeProfile` diagnoses the bounded
