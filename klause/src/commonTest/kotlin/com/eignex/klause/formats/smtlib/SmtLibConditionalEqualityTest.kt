@@ -1,8 +1,13 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -12,17 +17,138 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
+    @Test
+    fun `late child images reject multiple values within one shared allowance`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE, Long.MAX_VALUE, false,
+            conditionalEqualities = SmtLibConditionalEquality(workLimit = 6),
+        )
+        val reader = SExprReader(StringCharSource("""
+            (declare-const b Bool) (declare-const s Int) (assert (<= 0 s 1))
+            (declare-const r10 Bool) (declare-const r11 Bool) (declare-const r12 Bool)
+            (assert (let ((v (ite b (ite (= s 0) 1 2) 3)))
+                (and (= r10 (= v 10)) (= r11 (= v 11)) (= r12 (= v 12)))))
+        """.trimIndent()))
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+
+        val result = session.initialize()
+
+        assertEquals(parsed.intVarNames.size, parsed.model.numIntVars)
+        assertTrue(parsed.model.factors.none { it is Element })
+        assertIs<ComponentResult.Consistent>(result)
+        for (value in 10..12) assertEquals(false, session.boolValue(parsed.boolVarNames.getValue("r$value")))
+    }
+
+    @Test
+    fun `an incomplete late image retains exact numeric comparisons`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE, Long.MAX_VALUE, false,
+            conditionalEqualities = SmtLibConditionalEquality(workLimit = 3),
+        )
+        val reader = SExprReader(StringCharSource("""
+            (declare-const b Bool) (declare-const s Int) (assert (<= 0 s 1))
+            (declare-const r10 Bool) (declare-const r11 Bool) (declare-const r12 Bool)
+            (assert (let ((v (ite b (ite (= s 0) 1 2) 3)))
+                (and (= r10 (= v 10)) (= r11 (= v 11)) (= r12 (= v 12)))))
+        """.trimIndent()))
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        assertTrue(parsed.model.factors.any { it is Element })
+        val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+        for (value in 10..12) assertEquals(false, sample.boolValue(parsed.boolVarNames.getValue("r$value")))
+    }
+
+    @Test
+    fun `completed guard images exclude an open default without bounding its source`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE, Long.MAX_VALUE, false,
+            conditionalEqualities = SmtLibConditionalEquality(workLimit = 128),
+        )
+        val reader = SExprReader(StringCharSource("""
+            (declare-const b Bool) (declare-const s Int) (declare-const x Int)
+            (assert (<= 0 s 1)) (assert (> x 1000000))
+            (assert (let ((v (ite b (ite (= s 0) 1 2) 3)))
+                (= (ite (= v 1) 4 (ite (= v 2) 5 (ite (= v 3) 6 x))) 99)))
+        """.trimIndent()))
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+
+        val result = session.initialize()
+
+        assertEquals(parsed.intVarNames.size, parsed.model.numIntVars)
+        assertFalse(parsed.model.intBounds.hasUpper(parsed.intVarNames.getValue("x")))
+        assertIs<ComponentResult.Conflict>(result)
+    }
+
+    @Test
+    fun `an independent numeric consumer retains a late conditional value`() {
+        val parsed = SmtLib.parse("""
+            (declare-const b Bool) (declare-const s Int) (declare-const x Int) (declare-const r Bool)
+            (assert (<= 0 s 1)) (assert (= x 3))
+            (assert (let ((v (ite b (ite (= s 0) 1 2) 3))) (and (= r (= v 10)) (= x v))))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        assertTrue(parsed.model.factors.any { it is Element })
+        val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+        assertEquals(false, sample.boolValue(parsed.boolVarNames.getValue("b")))
+        assertEquals("3", sample.intValue(parsed.intVarNames.getValue("x")))
+    }
+
+    @Test
+    fun `cancellation during late image completion aborts parsing`() {
+        val images = SmtLibConditionalEquality()
+        var observedBuilder: Compiler.Builder? = null
+        var sourceIntegers = Int.MAX_VALUE
+        var completionPolls = 0
+        val stop = Cancellation {
+            val current = observedBuilder
+            current != null && current.nextInt > sourceIntegers &&
+                (sourceIntegers until current.nextInt).all(images::isDefined) && ++completionPolls == 2
+        }
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = images, sourceCancellation = stop,
+        )
+        observedBuilder = builder
+        val reader = SExprReader(StringCharSource("""
+            (declare-const b Bool) (declare-const s Int) (assert (<= 0 s 1))
+            (assert (= (ite b (ite (= s 0) 1 2) 3) 10))
+        """.trimIndent()))
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        sourceIntegers = builder.intNames.size
+
+        assertFailsWith<PolynomialSourceInterrupted> { builder.build() }
+    }
+
     @Test
     fun `repeated conditional guards exclude unreachable values without equality expansion`() {
         val terms = listOf(
