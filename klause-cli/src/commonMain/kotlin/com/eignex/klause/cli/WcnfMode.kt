@@ -23,7 +23,9 @@ internal object WcnfMode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(wcnfSemantics)
-            val parsed = Dimacs.parseWcnf(openFileSource(path)).toProblem(common.config.problemSettings(), semanticOverrides = overrides)
+            val parsed = Dimacs.parseWcnf(openFileSource(path)).toProblem(
+                common.config.problemSettings(), semanticOverrides = overrides,
+            )
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: vars=${parsed.numOriginalBoolVars} " +
                     "auxiliaries=${parsed.problem.numBoolVars - parsed.numOriginalBoolVars} factors=${parsed.problem.numFactors}"

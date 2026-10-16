@@ -100,7 +100,9 @@ internal fun sourceFlagSpecs(options: CommonOptions): List<FlagSpec> = listOf(
     },
     sourceFlag("--float-semantics", "continuous|grid", "float declaration interpretation") {
         when (it.lowercase()) {
-            "continuous" -> options.semanticOverrides = options.semanticOverrides.copy(floats = FloatSemantics.Continuous)
+            "continuous" -> {
+                options.semanticOverrides = options.semanticOverrides.copy(floats = FloatSemantics.Continuous)
+            }
             "grid" -> options.sourceOptions.gridRequested = true
             else -> usageError("--float-semantics expects continuous or grid")
         }

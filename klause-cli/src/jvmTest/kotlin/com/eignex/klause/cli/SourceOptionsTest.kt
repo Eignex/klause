@@ -39,7 +39,9 @@ class SourceOptionsTest {
 
     @Test
     fun `invalid source numbers should produce usage errors`() {
-        for (text in listOf("NaN", "Infinity", "1/0", "word", "1e10001", "1e-10001", "1e999999999999999999999")) {
+        for (text in listOf(
+            "NaN", "Infinity", "1/0", "word", "1e10001", "1e-10001", "1e999999999999999999999",
+        )) {
             assertFailsWith<CliUsageException>(text) { semanticNumber(text) }
         }
     }
@@ -48,8 +50,10 @@ class SourceOptionsTest {
     fun `integer source controls should distinguish finite extrema from open endpoints across formats`() {
         for (declared in listOf(flatZincSemantics, smtLibSemantics)) {
             val common = CommonOptions()
-            parseArgs(arrayOf("--unbounded-int-lo", Long.MIN_VALUE.toString(), "--unbounded-int-hi", "open"),
-                commonFlagSpecs(common)) {}
+            parseArgs(
+                arrayOf("--unbounded-int-lo", Long.MIN_VALUE.toString(), "--unbounded-int-hi", "open"),
+                commonFlagSpecs(common),
+            ) {}
 
             common.sourceOverrides(declared)
 
@@ -62,8 +66,11 @@ class SourceOptionsTest {
     @Test
     fun `grid controls should replace requested fields and preserve declared defaults`() {
         val common = CommonOptions()
-        parseArgs(arrayOf("--float-semantics", "grid", "--float-buckets", "17", "--float-scale", "3000000000",
-            "--float-grid-lo", "-2.5"), commonFlagSpecs(common)) {}
+        parseArgs(
+            arrayOf("--float-semantics", "grid", "--float-buckets", "17", "--float-scale", "3000000000",
+                "--float-grid-lo", "-2.5"),
+            commonFlagSpecs(common),
+        ) {}
 
         common.sourceOverrides(flatZincSemantics)
 
@@ -97,7 +104,9 @@ class SourceOptionsTest {
 
     @Test
     fun `one tolerance replacement should preserve the other effective component`() {
-        for ((flag, absolute) in listOf("--source-absolute-tolerance" to true, "--source-relative-tolerance" to false)) {
+        for ((flag, absolute) in listOf(
+            "--source-absolute-tolerance" to true, "--source-relative-tolerance" to false,
+        )) {
             val common = CommonOptions()
             parseArgs(arrayOf(flag, "0"), commonFlagSpecs(common)) {}
 
@@ -164,7 +173,9 @@ class SourceOptionsTest {
                 deleteOnExit()
             }
             val common = CommonOptions()
-            parseArgs(arrayOf("--unbounded-int-lo", "2", "--unbounded-int-hi", "3"), commonFlagSpecs(common)) {}
+            parseArgs(
+                arrayOf("--unbounded-int-lo", "2", "--unbounded-int-hi", "3"), commonFlagSpecs(common),
+            ) {}
 
             val model = assertNotNull(mode.newSession().load(input.absolutePath, common).problem)
 

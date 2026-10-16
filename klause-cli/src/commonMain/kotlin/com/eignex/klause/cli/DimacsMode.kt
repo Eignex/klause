@@ -23,7 +23,9 @@ internal object DimacsMode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(dimacsSemantics)
-            val problem = Dimacs.parse(openFileSource(path)).toProblem(common.config.problemSettings(), semanticOverrides = overrides)
+            val problem = Dimacs.parse(openFileSource(path)).toProblem(
+                common.config.problemSettings(), semanticOverrides = overrides,
+            )
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${problem.numBoolVars} factors=${problem.numFactors}"
             }
