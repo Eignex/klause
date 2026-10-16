@@ -622,9 +622,9 @@ class SmtLibAdmissionTest {
             "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n))) (check-sat)",
         )
 
-        val source = assertIs<NonlinearIntegerProblem>((input).source.originalSource)
-        assertEquals(mapOf("n" to 0), source.intVarNames)
-        assertEquals(mapOf("x" to 0), source.realVarNames)
+        assertIs<Problem>(input.source.originalSource)
+        assertEquals(mapOf("n" to 0), input.intVarNames)
+        assertEquals(mapOf("x" to 0), input.realVarNames)
     }
 
     @Test
@@ -840,7 +840,7 @@ class SmtLibAdmissionTest {
 
             val captured = (SmtLib.parse(text))
 
-            assertIs<NonlinearIntegerProblem>((captured.source).originalSource)
+            assertIs<Problem>(captured.source.originalSource)
             assertEquals(sense, captured.sense)
             assertEquals(
                 QuadraticCoefficient.of(bigIntOf(7), bigIntOf(3)),

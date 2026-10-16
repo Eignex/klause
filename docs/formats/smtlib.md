@@ -260,8 +260,12 @@ containing work meter. Interruption throws `CancellationException` before a sour
 is published.
 
 Factor-representable real products remain retained factors for library-selected
-polynomial completion. Lexical helpers and objectives can retain exact formula
-snapshots. Every helper declaration receives lexical body, argument and result-sort
+polynomial completion. Objective capture evaluates the original expression in its
+lexical definition scope and maps exact coefficients into original declaration
+coordinates. Representable affine coefficients retain the affine metadata; quadratic
+and non-binary rational coefficients retain the exact objective metadata. Capturing
+the objective does not add product auxiliaries to the factor source. Function
+objectives retain their complete source expression and domains. Every helper declaration receives lexical body, argument and result-sort
 validation, including unused definitions and integer helpers. Unused declarations stay visible in original output namespaces.
 Native integer snapshots preserve separate declaration-ordered Int/Real/Bool maps,
 with shared numeric formula slots kept private to the prepared source plan.
@@ -362,11 +366,11 @@ and captured resource defaults survive every fresh invocation; traversal state b
 execution retains the invocation's selected shape and minimized consumer objective,
 while rendering costs in original source units.
 
-A genuine open linear integer beside a bounded mixed product does not by itself
-replace the factor model with a nonlinear source snapshot. Admission reads the
-shared captured encoder support: a complete guarded finite linear cover retains
-the bounded source owner and the open linear fragment. Genuine uncovered nonlinear
-integer composition retains the exact nonlinear snapshot and its original names.
+Open integer declarations beside retained polynomial factors remain in the factor
+source. Shared library setup selects a complete whole-factor polynomial projection
+or returns its typed decline; SMT admission does not inspect solver completion
+requirements to classify that source. A source expression outside the factor
+representation retains its exact expression snapshot and original names.
 
 Native polynomial, integer-polynomial, function and quadratic CLI consumers attach
 their admitted source snapshot and captured caller settings to `SourceSetup` before

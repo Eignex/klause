@@ -1,8 +1,5 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.factor.arithmetic.Power
-import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ProblemSettings
@@ -112,58 +109,24 @@ private fun parseLinearAdmission(
     val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds = false, settings = settings,
         sourceCancellation = cancellation, semantics = semantics)
     val scope = SmtLibScope(cancellation)
-    var nonlinearSyntax = false
-    var quadraticObjective = false
     for (command in commands) {
         builder.command(command.factorSourceSymbols(cancellation))
         if (!scope.command(command)) smtUnsupported("source symbol or expression sort is invalid in its lexical scope")
-        nonlinearSyntax = nonlinearSyntax || hasNonlinearSyntax(command, cancellation)
-        val head = ((command as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text
-        if (head == "minimize" || head == "maximize") {
-            quadraticObjective = quadraticObjective || hasNonlinearSyntax(command, cancellation)
-        }
     }
-    if (quadraticObjective) smtUnsupported("quadratic objectives require exact source capture")
-    if (builder.objectiveSpec != null && nonlinearSyntax && builder.macros.isNotEmpty() &&
-        referencesHelper(builder.objectiveSpec!!.first, builder.macros.keys, cancellation)
-    ) smtUnsupported("nonlinear helper objectives require exact original objective capture")
-    val problem = builder.build()
-    if (builder.objectiveSpec != null && problem.model.factors.any {
-            it is ContinuousProduct || it is RealProduct || (it is Power && it.base is Power.Coordinate.Real)
-        }
-    ) smtUnsupported("polynomial objectives require exact source capture")
-    return problem
-}
-
-private fun referencesHelper(expression: SExpr, helpers: Set<String>, cancellation: Cancellation): Boolean {
-    val pending = ArrayDeque<SExpr>()
-    pending.addLast(expression)
-    while (pending.isNotEmpty()) {
-        if (cancellation()) throw PolynomialSourceInterrupted()
-        when (val node = pending.removeLast()) {
-            is SExpr.Atom -> if (node.text in helpers) return true
-            is SExpr.SList -> pending.addAll(node.items)
-        }
+    if (builder.objectiveSpec == null) return builder.build()
+    var captureFailure: UnsupportedSmtException? = null
+    val objective = try {
+        captureSmtSourceObjective(commands, cancellation, semantics)
+    } catch (unsupported: UnsupportedSmtException) {
+        captureFailure = unsupported
+        null
     }
-    return false
-}
-
-private fun hasNonlinearSyntax(expression: SExpr, cancellation: Cancellation): Boolean {
-    val work = ArrayDeque<SExpr>()
-    work.addLast(expression)
-    while (work.isNotEmpty()) {
-        if (cancellation()) throw PolynomialSourceInterrupted()
-        val node = work.removeLast() as? SExpr.SList ?: continue
-        val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
-        if (head == "^") return true
-        if (head == "*" && node.items.drop(1).count { argument ->
-                val text = (argument as? SExpr.Atom)?.text
-                text == null || text.isEmpty() || text.any { it !in '0'..'9' && it != '.' }
-            } > 1
-        ) return true
-        work.addAll(node.items)
+    if (objective == null) {
+        val source = builder.build()
+        if (!source.hasDeclaredAffineObjective()) throw requireNotNull(captureFailure)
+        return source
     }
-    return false
+    return objective.bindObjective(builder.buildSource(), cancellation)
 }
 
 private fun <T> withSource(
