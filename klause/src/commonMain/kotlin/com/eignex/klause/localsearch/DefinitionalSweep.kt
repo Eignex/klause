@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.BoolFoldDefinition
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -16,6 +17,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -30,7 +32,7 @@ import com.eignex.klause.util.toSortedIntArray
  * Topologically ordered functional definitions consumed by [LocalSearchSolver]. The engine-side,
  * format-agnostic DAG covers the whole model: integer definitions through [SweepNode.IntDef],
  * Boolean reifications and channels, set membership, conjunction/disjunction, and variable-index
- * element access. Frontends supply definition hints or source-annotation nodes.
+ * element access. Frontends supply neutral source definition hints and Boolean-fold roles.
  *
  * Sweeping evaluates defined variables from free variables so local search need only repair the
  * remaining constraints. [network] maintains those definitions incrementally after each move.
@@ -79,6 +81,15 @@ class DefinitionalSweep internal constructor(
 
     /** Factory for sweeps inferred from the factor IR. */
     companion object {
+        /** Materialize source definition hints in this consumer's node and dependency representation.
+         * Constraints remain enforced; competing outputs, cyclic cones and outputs admitting the
+         * minimum-word no-write sentinel stay searched. Cancellation discards the whole view. */
+        fun fromSource(
+            problem: Problem,
+            hints: List<DefinitionHint>,
+            cancellation: Cancellation = Cancellation.Never,
+        ): DefinitionalSweep? = sourceDefinitionSweep(problem, hints, cancellation)
+
         /** Infer definitions using the source domains to recognize hinted binary literal channels.
          * Unique unit unary predicates used only by those channels are maintained with them.
          * Hinted native [com.eignex.klause.factor.table.Element] results follow their indexes and selected cells,
@@ -258,6 +269,18 @@ class DefinitionalSweep internal constructor(
         }
     }
 
+    /** Build a gradient view of a finite canonical objective using this consumer's definitions. */
+    fun functionalObjective(objective: LinearObjective): IncrementalObjective? {
+        if (objective.realCoefficientValues.any { it != 0.0 }) return null
+        val integers = objective.intCoefficientValues.indices.filter { objective.intCoefficientValues[it] != 0L }
+        val booleans = objective.boolWeightValues.indices.filter { objective.boolWeightValues[it] != 0L }
+        return functionalObjective(
+            integers.toIntArray(), LongArray(integers.size) { objective.intCoefficientValues[integers[it]] },
+            objective.constant, true, booleans.toIntArray(),
+            LongArray(booleans.size) { objective.boolWeightValues[booleans[it]] },
+        )
+    }
+
     /**
      * Build a [FunctionalObjective] `Σ termCoeffs·terms + Σ boolTermCoeffs·[boolTerm holds] + constant`
      * in the direction given by [minimize] over this sweep's int and bool cones, so local search descends the
@@ -293,7 +316,8 @@ class DefinitionalSweep internal constructor(
             if (definition == null) continue
             if (!(if (isBool) reachableBools else reachableInts).add(id)) continue
             if (definition !is SweepNode.IntDef && definition !is SweepNode.BoolFold &&
-                definition !is LiteralIntDefinition && definition !is UnaryPredicateDefinition
+                definition !is LiteralIntDefinition && definition !is UnaryPredicateDefinition &&
+                definition !is CapturedBooleanDefinition
             ) return null
             for (input in definition.intInputs) work.addLast(input to false)
             for (input in definition.boolInputs) work.addLast(input to true)
@@ -313,6 +337,7 @@ class DefinitionalSweep internal constructor(
                     if (boolOf(Lit.variable(node.literal)) == Lit.isPositive(node.literal)) 1L else 0L
                 }
                 is UnaryPredicateDefinition -> { intOf, _ -> if (node.holds(intOf(node.input))) 1L else 0L }
+                is CapturedBooleanDefinition -> { intOf, _ -> if (node.holds(intOf)) 1L else 0L }
                 else -> return null
             }
             cone.add(FunctionalObjective.Definition(node.out, node.outIsBool, compute))

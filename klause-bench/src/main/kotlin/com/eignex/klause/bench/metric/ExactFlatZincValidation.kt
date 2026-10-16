@@ -167,6 +167,16 @@ internal object ExactFlatZincValidation {
                 require(args.size == 1) { "annotation wrapper arity" }
                 return boolean(args.single())
             }
+            if (name == "bool2int") {
+                require(args.size == 2) { "Boolean channel arity" }
+                return numeric(args[1]).compareTo(number(if (boolean(args[0])) "1" else "0")) == 0
+            }
+            if (name == "array_bool_and" || name == "array_bool_or") {
+                require(args.size == 2) { "Boolean fold arity" }
+                val inputs = array(args[0]).map(::boolean)
+                val folded = if (name == "array_bool_and") inputs.all { it } else inputs.any { it }
+                return folded == boolean(args[1])
+            }
             if (name == "bool_clause") {
                 require(args.size == 2)
                 return array(args[0]).any { boolean(it) } || array(args[1]).any { !boolean(it) }
@@ -217,6 +227,13 @@ internal object ExactFlatZincValidation {
                 "predicate arity"
             }
             val relation = when (base) {
+                "set_in" -> {
+                    val value = numeric(args[0])
+                    require(value.integral) { "noninteger membership argument" }
+                    val set = args[1] as? Value.SetValue ?: error("non-set membership argument")
+                    set.intervals.any { (lo, hi) -> number(lo.toString()) <= value && value <= number(hi.toString()) }
+                }
+
                 "int2float" -> equal(args[0], args[1])
 
                 "float_eq", "int_eq", "bool_eq", "set_eq" -> equal(args[0], args[1])
