@@ -7,6 +7,21 @@ import kotlin.test.assertFailsWith
 
 class PolynomialRealFormulaTest {
     @Test
+    fun `distinct formula should capture operands and preserve repeated roles when remapped`() {
+        val operands = mutableListOf<PolynomialExpression>(
+            PolynomialExpression.Variable(SourceRealId(0)), PolynomialExpression.Variable(SourceRealId(1)),
+        )
+        val source = PolynomialDistinct(operands)
+        operands.clear()
+
+        val image = source.remap(VarRemap(intArrayOf(), intArrayOf(), intArrayOf(2, 2)))
+
+        assertEquals(PolynomialDistinct(List(2) { PolynomialExpression.Variable(SourceRealId(2)) }), image)
+        assertEquals(2, source.operands.size)
+        assertFailsWith<IllegalArgumentException> { image.requireVariableCounts(0, 2) }
+    }
+
+    @Test
     fun `separately built deep equal formulas should compare without call stack recursion`() {
         var first: PolynomialRealFormula = PolynomialRealFormula.BooleanVariable(SourceBoolId(0))
         var second: PolynomialRealFormula = PolynomialRealFormula.BooleanVariable(SourceBoolId(0))

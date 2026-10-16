@@ -18,7 +18,9 @@ Every arithmetic atom must have defined terms. Invalid log arguments remain
 invalid under negation, conjunction and disjunction. Boolean formula truth cannot
 turn an undefined arithmetic term into a witness. Numeric and Boolean conditionals evaluate
 the selected branch. Unsupported domain certification retains unknown separately
-from unknown atom truth. No delta or tolerance mode alters these semantics.
+from unknown atom truth. Distinctness retains every original operand and requires
+its domain even when another Boolean alternative is true. Selected relaxation and
+source checking expand comparisons under their containing native work allowance. No delta or tolerance mode alters these semantics.
 
 ## Solving and composition
 

@@ -4,9 +4,9 @@ import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.PolynomialDistinct
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
-import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
@@ -79,15 +79,8 @@ internal fun distinctPolynomialFormula(
         }
         values += PolynomialExpression.Sum(terms)
     }
-    val comparisons = ArrayList<PolynomialRealFormula>()
-    for (first in values.indices) {
-        for (second in first + 1 until values.size) {
-            cancellation.charge(1)
-            if (cancellation()) return null
-            comparisons += PolynomialRealFormula.Atom(values[first], PolynomialRelation.NE, values[second])
-        }
-    }
-    val formula = PolynomialRealFormula.And(comparisons)
+    if (cancellation()) return null
+    val formula = PolynomialDistinct(values)
     return if (factor.activator == LinearRow.ALWAYS) formula else PolynomialRealLowering.equivalent(
         PolynomialRealFormula.BooleanVariable(SourceBoolId(factor.activator)), formula,
     )

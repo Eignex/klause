@@ -11,6 +11,7 @@ import com.eignex.klause.arithmetic.quadratic.QuadraticControl
 import com.eignex.klause.arithmetic.quadratic.QuadraticModel
 import com.eignex.klause.arithmetic.quadratic.QuadraticRow
 import com.eignex.klause.arithmetic.quadratic.QuadraticRowRelation
+import com.eignex.klause.ir.PolynomialDistinct
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
@@ -136,7 +137,7 @@ private fun affineRows(
                 val variable = node.operand as? PolynomialRealFormula.BooleanVariable ?: return null
                 if (bools[variable.id.index] != false) return null
             }
-            is PolynomialRealFormula.Or, is PolynomialSelection -> return null
+            is PolynomialRealFormula.Or, is PolynomialSelection, is PolynomialDistinct -> return null
             is PolynomialRealFormula.Atom -> {
                 val relation = when (node.relation) {
                     PolynomialRelation.EQ -> QuadraticRowRelation.EQ

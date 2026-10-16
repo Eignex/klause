@@ -21,6 +21,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TheoryCompletion
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
+import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraResult
@@ -95,7 +96,7 @@ class DistinctEncodersTest {
             if (factor === distinct && target == EncodingTarget.POLYNOMIAL) DistinctEncoders.polynomial
             else BuiltInEncoderProvider.select(factor, target)
         })
-        val shared = assertNotNull(source.prepareExecutionPlan(providers).polynomialModel)
+        val shared = assertNotNull(source.preparePolynomialExecutionPlan(providers = providers).polynomialModel)
 
         val result = shared.service.invocation().use { it.check(PolynomialCondition()) }
 
