@@ -32,16 +32,18 @@ class PolynomialMagnitudeRefutationTest {
 
     @Test
     fun `non-strict source boundaries retain a feasible equality`() {
-        val source = SmtLibPolynomial.parse(
-            "(declare-const x Real) (assert (<= (* x x) 1)) (assert (>= x 1))",
-        )
-        val arithmetic = PolynomialArithmetic()
-        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        for (boundary in listOf("(>= x 1)", "(<= x (- 1))")) {
+            val source = SmtLibPolynomial.parse(
+                "(declare-const x Real) (assert (<= (* x x) 1)) (assert $boundary)",
+            )
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
 
-        val refuted = refutePolynomialMagnitudes(formula, arithmetic, 128, 2048, 8, 4096)
+            val refuted = refutePolynomialMagnitudes(formula, arithmetic, 128, 2048, 8, 4096)
 
-        assertFalse(refuted)
-        assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, 0, 1))
+            assertFalse(refuted, boundary)
+            assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, 0, 1))
+        }
     }
 
     @Test
