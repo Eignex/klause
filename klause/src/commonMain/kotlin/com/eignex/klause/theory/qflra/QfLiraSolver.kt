@@ -291,6 +291,9 @@ class ExactLiraSearchComponent private constructor(
         smtStats = stats
     }
 
+    internal val defaultMixedPointOwner: Boolean
+        get() = completeTraversalObserved && mixedPointCompletion && defaultDisjunctionHints
+
     internal fun useMixedPointCompletion() {
         check(context == null)
         mixedPointCompletion = true

@@ -125,6 +125,10 @@ Missing leaves, incomplete or ambiguous definitions, cycles and cancellation sup
 no derived gate preference. The adapter performs no second Boolean or arithmetic search.
 A default opening with source integer or real coordinates and exactly one linear
 completion owner can reuse its completed point for direct primitive preferences.
+Automatic variable ordering selects conflict activity only for a complete mixed
+worker with that default owner. Explicit source-order and activity settings retain
+their policy. Pure sources, private queries, explicit hint allowances and custom
+registered providers retain source order under automatic selection.
 Source integers may be fractional in that point; complete integrality checks and
 exhaustive integer branching retain their authority. Registration precedes component
 initialization; evaluation uses a point from an existing numerical check. It

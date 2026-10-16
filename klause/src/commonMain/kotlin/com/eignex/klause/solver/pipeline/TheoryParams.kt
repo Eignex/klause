@@ -13,6 +13,9 @@ enum class OpenBranching(
 
     /** Conflict-activity order over the shared session. */
     Activity("activity"),
+
+    /** Activity for a complete mixed default point owner; source order for other openings. */
+    Automatic("auto"),
     ;
 
     /** Resolution from the identifier the engine param carries. */
@@ -64,10 +67,12 @@ data class TheoryParams(
     /**
      * Boolean branching for each feasibility traversal.
      *
-     * Only the Boolean skeleton is branched here, so this is the whole variable-order lever the open
-     * route has; the theory decides the arithmetic residual at a leaf either way.
+     * Automatic selects activity for a complete mixed worker with one default point owner.
+     * Other openings retain source order, including private queries and explicit hint allowances.
+     * Explicit source-order and activity selections retain their selected policy.
+     * The theory decides the arithmetic residual at a leaf.
      */
-    val openBranching: OpenBranching = OpenBranching.SourceOrder,
+    val openBranching: OpenBranching = OpenBranching.Automatic,
     /**
      * Splits that must consult the hint before its allowance is spent drawing one.
      *
