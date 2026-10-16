@@ -238,6 +238,30 @@ internal object ObjectiveRepresentationProbe {
                     cancellation = params.timeout)
                 val invocation = SourceSetup.prepare(setup)
                 val completed = SourceSetup.execute(SourceExecutionRequest(invocation, polynomial = params))
+                if (completed is SourceExecutionResult.Declined || completed is SourceExecutionResult.Refuted) {
+                    val record = buildJsonObject {
+                        put("sourceSha256", identity)
+                        put("engine", engine.name)
+                        put("encoding", encoding)
+                        put("entry", if (compiled == null) "polynomial-source" else "compiled-schema")
+                        put("condition", condition)
+                        put("elapsedNanos", System.nanoTime() - started)
+                        put("nativeWork", 0)
+                        put("javaCores", Runtime.getRuntime().availableProcessors())
+                        put("result", buildJsonObject {
+                            put("kind", if (completed is SourceExecutionResult.Refuted) "SourceRefuted" else "Unknown")
+                            put("reason", (completed as? SourceExecutionResult.Declined)?.reason?.toString())
+                            put("phase", "source-preparation")
+                            put("nativeOptimizationStarted", false)
+                        })
+                        if (capture) put("sourceCapture", buildJsonObject {
+                            put("captured", false)
+                            put("reason", "native optimization did not start")
+                        })
+                    }
+                    File(output, "$identity.${engine.name}.$encoding.json").writeText(record.toString() + "\n")
+                    continue
+                }
                 val execution = (completed as? SourceExecutionResult.Quadratic)?.result
                     ?: error("source setup did not install quadratic optimization: $completed")
                 val elapsed = System.nanoTime() - started

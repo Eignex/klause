@@ -436,7 +436,9 @@ The SMT replay checks points and objectives; global optimum, ray and refutation
 claims require separate original-source checking. Optimization captures retain each
 encoder verdict and a per-source comparison, including UNKNOWN differences caused
 by admission or bounded work; verdict equality supplies no proof verification.
-
+Source preparation declines remain explicit diagnostic UNKNOWN records with no
+native execution work or optimization certificate. Source preparation refutations
+are labelled separately from a native optimization result.
 The original source bytes remain the checking authority. Constant nonzero integer
 `div`/`mod` are checked with their original Euclidean SMT semantics; variable and zero
 divisors decline independent checking. Each input also interrupts

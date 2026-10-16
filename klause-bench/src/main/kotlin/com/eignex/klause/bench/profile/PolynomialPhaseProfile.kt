@@ -25,6 +25,7 @@ import com.eignex.klause.util.WorkMeter
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -85,7 +86,12 @@ internal object PolynomialPhaseProfile {
 
     internal fun pipeline(text: String, timeoutMs: Long = 60_000L): PipelinePhaseTrace {
         val observation = DeadlineObservation(timeoutMs)
-        val source = SmtLib.parse(text, cancellation = observation)
+        val source = try {
+            SmtLib.parse(text, cancellation = observation)
+        } catch (_: CancellationException) {
+            return PipelinePhaseTrace("Unknown", "Timeout", "source-admission", null,
+                "not started", "not started", observation.charges, 0, observation.stack)
+        }
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             source.source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = observation,
         ))
@@ -97,6 +103,14 @@ internal object PolynomialPhaseProfile {
                 localSearch = LocalSearchParams(randomSeed = 3),
             ),
         ), cores = 1))
+        if (completed is SourceExecutionResult.Declined || completed is SourceExecutionResult.Refuted) {
+            return PipelinePhaseTrace(
+                if (completed is SourceExecutionResult.Refuted) "SourceRefuted" else "Unknown",
+                (completed as? SourceExecutionResult.Declined)?.reason?.toString(),
+                "source-preparation", null, "not started", "not started",
+                preparedCharges, observation.charges - preparedCharges, observation.stack,
+            )
+        }
         val execution = (completed as? SourceExecutionResult.Polynomial)?.result
             ?: error("source setup did not install polynomial satisfaction")
         return PipelinePhaseTrace(execution.result.javaClass.simpleName,

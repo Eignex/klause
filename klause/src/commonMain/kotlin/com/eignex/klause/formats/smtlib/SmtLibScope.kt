@@ -52,7 +52,10 @@ internal class SmtLibScope(private val cancellation: Cancellation) {
             cancellation.polynomialSourceCheckpoint()
             val (node, scope) = work.removeLast()
             when (node) {
-                is SExpr.Atom -> if (!known(node.text, scope)) return false
+                is SExpr.Atom -> if (!known(node.text, scope)) {
+                    if (node.text.startsWith("#")) smtUnsupported("bitvector literal '${node.text}'")
+                    return false
+                }
                 is SExpr.SList -> {
                     val head = node.polynomialHead()
                     if (head == "let") {

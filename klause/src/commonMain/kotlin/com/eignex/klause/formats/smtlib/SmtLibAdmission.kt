@@ -119,12 +119,11 @@ private fun parseLinearAdmission(
     var exited = false
     var invalidNonlinearSession = false
     var nonlinearSyntax = false
-    var invalidScope = false
     var signedSymbols = false
     var quadraticObjective = false
     for (command in commands) {
         builder.command(command)
-        if (!scope.command(command)) invalidScope = true
+        if (!scope.command(command)) smtUnsupported("source symbol is outside its lexical scope")
         nonlinearSyntax = nonlinearSyntax || hasNonlinearSyntax(command, cancellation)
         signedSymbols = signedSymbols || hasSignedNumberSymbol(command, cancellation)
         val head = ((command as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text
@@ -156,7 +155,6 @@ private fun parseLinearAdmission(
         for (declaration in declarations) validation.command(declaration)
     }
     val problem = builder.build()
-    if (invalidScope) smtUnsupported("source symbol is outside its lexical scope")
     if (builder.objectiveSpec != null && problem.model.factors.any {
             it is ContinuousProduct || it is RealProduct || (it is Power && it.base is Power.Coordinate.Real)
         }
