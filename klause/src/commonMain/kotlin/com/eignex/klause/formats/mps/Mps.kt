@@ -400,7 +400,7 @@ object Mps {
             objectiveRow?.coeffs?.values?.toList() ?: emptyList(),
             objectiveRow?.rhs?.negated() ?: MpsSourceNumber.parsed(BigFraction.ZERO),
         )
-        return MpsModel(name, sense, objective, variables, constraints).withSourceNumbers(source)
+        return MpsModel(name, sense, objective, variables, constraints, mpsSemantics).withSourceNumbers(source)
     }
 
     /** Resolve a row's `[lower, upper]` from its type, rhs and optional range (`null` = open side). */

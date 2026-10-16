@@ -3,6 +3,7 @@ package com.eignex.klause.formats.mps
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearObjectiveSpec
@@ -10,6 +11,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
@@ -23,7 +26,15 @@ import com.eignex.klause.util.unaryMinus
  * Real declarations remain open; their decimal bounds are rows rather than binary64 endpoints.
  * An auxiliary equality preserves fractional objective coefficients, constant and original units.
  */
-fun MpsModel.toExactSourceProblem(settings: ProblemSettings = KlauseConfig.current.problemSettings()): MpsCompiled {
+fun MpsModel.toExactSourceProblem(
+    settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+    semanticOverrides: SemanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+): MpsCompiled = lowerExactSource(settings, semantics.resolve(semanticOverrides))
+
+internal fun MpsModel.lowerExactSource(
+    settings: ProblemSettings,
+    effectiveSemantics: EffectiveSourceSemantics,
+): MpsCompiled {
     val source = exactAdapterSnapshot()
     val numbers = source.sourceNumbers()
     var intCount = 0
@@ -107,6 +118,7 @@ fun MpsModel.toExactSourceProblem(settings: ProblemSettings = KlauseConfig.curre
     }
     val model = Problem(
         settings = settings,
+        semantics = effectiveSemantics,
         numBoolVars = 0,
         intBounds = IntBounds.fromModelBounds(lower, upper, openLower, openUpper),
         factors = factors.toTypedArray(),
