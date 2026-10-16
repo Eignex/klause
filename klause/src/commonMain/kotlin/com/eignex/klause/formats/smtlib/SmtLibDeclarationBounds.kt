@@ -14,7 +14,9 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 
 internal fun Compiler.Builder.retainDeclarationBounds() {
-    visitSmtDeclarationBounds(semantics, intNames.values, realNames.values, sourceCancellation) { id, real, lower, value ->
+    visitSmtDeclarationBounds(
+        semantics, intNames.values, realNames.values, sourceCancellation,
+    ) { id, real, lower, value ->
         factors.add(ExactLinear.of(
             intArrayOf(if (real) Term.ofRealVar(id) else Term.ofIntVar(id)),
             listOf(BigFraction.ONE), if (lower) LinearOp.GE else LinearOp.LE,
