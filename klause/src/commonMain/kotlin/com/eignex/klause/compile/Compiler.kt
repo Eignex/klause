@@ -1,6 +1,7 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
+import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -101,6 +102,7 @@ internal class Lowering(settings: ProblemSettings, val semantics: EffectiveSourc
     val pinAbsentOptVars = checkNotNull(semantics.effective.pinAbsentOptionalValues)
     private val grid = semantics.effective.floats as? FloatSemantics.Grid
     val floatBuckets = grid?.buckets ?: DEFAULT_FLOAT_BUCKETS
+    val floatLinearScale = (grid?.linearScale ?: DEFAULT_FLOAT_SCALE).toDouble()
 
     override val factors get() = problemBuilder.factors
     val boolVarIdByName get() = problemBuilder.boolVarIdByName

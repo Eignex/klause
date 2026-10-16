@@ -211,7 +211,7 @@ internal fun Lowering.expandTable(t: TableConstraint): BoolExpr {
  * Scaling math (per float var `v` with interval `[lo, hi]` and `N` buckets, step
  * `step = (hi - lo) / (N - 1)`): substitute `v = lo + b · step` and rearrange to
  * `Σ (c_v · step_v) · b_v ⟨op⟩ bound − Σ c_v · lo_v`, then multiply by `SCALE` and
- * round to integer coefficients. Discretisation error is ~1/SCALE per term.
+ * quantize to integer coefficients. Discretisation error is ~1/SCALE per term.
  */
 internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
     val n = c.varNames.size
@@ -247,10 +247,9 @@ internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
         factors += Linear(EmptyIntArray, EmptyDoubleArray, realVars, c.coeffs.copyOf(), realOp, c.bound)
         return
     }
-    // Bucketed-int rewrite, at the same scale as the grid arithmetic (`GRID_SCALE`) so the two agree.
-    val scale = 1_000_000.0
+    val scale = floatLinearScale
     var scaledBound = c.bound
-    val scaledCoeffs = IntArray(n)
+    val scaledCoeffs = LongArray(n)
     val intVarIds = IntArray(n)
     for (i in 0 until n) {
         val name = c.varNames[i]
@@ -258,7 +257,7 @@ internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
         val interval = floatMetaIntervals[fid]
         val buckets = floatMetaBuckets[fid]
         val step = if (buckets > 1) (interval.hi - interval.lo) / (buckets - 1) else 0.0
-        scaledCoeffs[i] = (c.coeffs[i] * step * scale).toLong().toInt()
+        scaledCoeffs[i] = floatLinearLong(c.coeffs[i] * step * scale)
         intVarIds[i] = floatMetaIntVarIds[fid]
         scaledBound -= c.coeffs[i] * interval.lo
     }
@@ -267,13 +266,30 @@ internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
     // truncate-then-±1) is correct when B is non-integral and for either sign. Non-strict ops
     // keep the truncated bound.
     val scaledReal = scaledBound * scale
-    val scaledBoundLong = when (c.op) {
-        IntCmpOp.LT -> ceil(scaledReal).toLong() - 1
-        IntCmpOp.GT -> floor(scaledReal).toLong() + 1
-        else -> scaledReal.toLong()
+    val integralBound = floatLinearLong(when (c.op) {
+        IntCmpOp.LT -> ceil(scaledReal)
+        IntCmpOp.GT -> floor(scaledReal)
+        else -> scaledReal
+    })
+    val loweredBound = when (c.op) {
+        IntCmpOp.LT -> {
+            require(integralBound > Long.MIN_VALUE) { "Schema float-linear strict bound exceeds Long" }
+            integralBound - 1
+        }
+        IntCmpOp.GT -> {
+            require(integralBound < Long.MAX_VALUE) { "Schema float-linear strict bound exceeds Long" }
+            integralBound + 1
+        }
+        else -> integralBound
     }
-    val scaledBoundInt = scaledBoundLong.toInt()
-    factors += Linear(scaledCoeffs, intVarIds, realOp, scaledBoundInt)
+    factors += Linear(scaledCoeffs, intVarIds, realOp, loweredBound)
+}
+
+private fun floatLinearLong(value: Double): Long {
+    require(value.isFinite() && value >= Long.MIN_VALUE.toDouble() && value < -Long.MIN_VALUE.toDouble()) {
+        "Schema float-linear value exceeds Long"
+    }
+    return value.toLong()
 }
 
 internal fun Lowering.assertAllDifferent(terms: List<IntExpr>) {
