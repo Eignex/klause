@@ -13,6 +13,7 @@ internal class PolynomialWitnessSupports(
     private val maximumTerms: Int,
     private val maximumDegree: Int,
     private val maximumBits: Int,
+    private val maximumRefinements: Int,
 ) {
     private data class Term(val coefficient: BigFraction, val powers: List<Pair<Int, Int>>)
     private data class Row(val atom: PolynomialAtom, val terms: List<Term>, val variables: List<Int>)
@@ -85,7 +86,14 @@ internal class PolynomialWitnessSupports(
                 if (axis.isZero || axis.degree <= 0) continue
                 for (root in algebraic.roots(axis)) {
                     arithmetic.step()
-                    val value = root.rational ?: continue
+                    var refined = root
+                    var passes = 0
+                    while (refined.rational == null && passes < maximumRefinements) {
+                        arithmetic.step()
+                        refined = algebraic.refine(refined)
+                        passes++
+                    }
+                    val value = refined.rational ?: continue
                     if (!admitted(value)) return null
                     if (!takeProposal()) return null
                     point[variable] = value
