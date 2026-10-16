@@ -341,4 +341,22 @@ class PolynomialWitnessSupportsTest {
             }
         }
     }
+
+    @Test
+    fun `containing work exhaustion withholds a completed source witness`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const a Real) (declare-const b Real)
+            (assert (and (= (* a a) 4) (= (* b b) 9) (< (* a b) 0)))
+            """.trimIndent(),
+        )
+        val completed = assertIs<QfNraResult.Satisfiable>(solveQfNra(
+            source.formula, source.boolCount, source.realCount,
+        ))
+
+        val stopped = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1))
+
+        assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(stopped).reason)
+    }
 }
