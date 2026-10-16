@@ -5,14 +5,13 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FlatZincIntegerFloatImagesTest {
     @Test
-    fun `rounded derived bounds should use the grid and decline exact mode`() {
+    fun `rounded derived bounds should preserve exact source intake and a private grid view`() {
         val source = """
             var {50, 100, 200}: n;
             var 50.0..200.0: raw;
@@ -25,9 +24,10 @@ class FlatZincIntegerFloatImagesTest {
         val program = parseFlatZinc(source, floatBuckets = 2)
 
         assertFalse(program.floatVarsByName.getValue("scaled").lpOnly)
-        val error = assertFailsWith<UnsupportedFlatZincException> { parseFlatZinc(source, exactFloats = true) }
-        assertTrue(error.message.orEmpty().contains("require rounded arithmetic"))
-        assertTrue(error.message.orEmpty().contains("binary64 rational literals"))
+        val exact = parseFlatZinc(source, exactFloats = true).sourceProgram
+        assertTrue(exact.floatVarsByName.values.all { it.lpOnly })
+        assertTrue(exact.problem.realLower.contentEquals(doubleArrayOf(50.0, 0.5)))
+        assertTrue(exact.problem.realUpper.contentEquals(doubleArrayOf(200.0, 2.0)))
         assertTrue(program.floatRepresentations.getValue("scaled").approximate)
         val reason = program.floatRepresentations.getValue("scaled").approximation.orEmpty()
         assertTrue(reason.contains("rounded arithmetic"))

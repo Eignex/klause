@@ -2,6 +2,8 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.DomainStorageSettings
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.intdomain.AbstractIntDomain
@@ -12,6 +14,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FlatZincFloatPolicyTest {
@@ -142,9 +145,13 @@ class FlatZincFloatPolicyTest {
             solve satisfy;
         """.trimIndent()
 
-        assertFailsWith<UnsupportedFlatZincException> {
-            parseFlatZinc(source, exactFloats = true, unboundedFloatLo = 0.5, unboundedFloatHi = 0.5)
-        }
+        val program = parseFlatZinc(source, exactFloats = true,
+            unboundedFloatLo = 0.5, unboundedFloatHi = 0.5).sourceProgram
+
+        assertEquals(0, program.problem.numIntVars)
+        assertTrue(program.problem.realLower.all { it == Double.NEGATIVE_INFINITY })
+        assertTrue(program.problem.realUpper.all { it == Double.POSITIVE_INFINITY })
+        assertNull(program.problem.factors.filterIsInstance<ContinuousProduct>().single().finiteChoices)
     }
 
     @Test
@@ -159,7 +166,9 @@ class FlatZincFloatPolicyTest {
                 solve satisfy;
             """.trimIndent()
 
-            assertFailsWith<UnsupportedFlatZincException> { parseFlatZinc(source, exactFloats = true) }
+            val exact = parseFlatZinc(source, exactFloats = true).sourceProgram
+            assertTrue(exact.floatVarsByName.values.all { it.lpOnly })
+            assertNull(exact.problem.factors.filterIsInstance<ContinuousProduct>().single().finiteChoices)
         }
     }
 
@@ -191,7 +200,9 @@ class FlatZincFloatPolicyTest {
             val program = parseFlatZinc(source, floatBuckets = 2)
 
             assertFalse(program.floatVarsByName.getValue("x").lpOnly)
-            assertFailsWith<UnsupportedFlatZincException> { parseFlatZinc(source, exactFloats = true) }
+            val exact = parseFlatZinc(source, exactFloats = true).sourceProgram
+            assertTrue(exact.floatVarsByName.values.all { it.lpOnly })
+            assertNull(exact.problem.factors.filterIsInstance<ContinuousProduct>().single().finiteChoices)
         }
     }
 
@@ -219,9 +230,9 @@ class FlatZincFloatPolicyTest {
             assertEquals(limit == 5, program.floatVarsByName.getValue("x").lpOnly)
         }
         val model = FlatZincParser(FlatZincLexer(source)).parse()
-        assertFailsWith<UnsupportedFlatZincException> {
-            FlatZincCompiler(model, exactFloats = true, floatChoiceLimit = 4).compile()
-        }
+        val exact = FlatZincCompiler(model, exactFloats = true, floatChoiceLimit = 4).compile().sourceProgram
+        assertEquals(3, exact.problem.numRealVars)
+        assertNull(exact.problem.factors.filterIsInstance<ContinuousProduct>().single().finiteChoices)
     }
 
     @Test
@@ -312,7 +323,7 @@ class FlatZincFloatPolicyTest {
     }
 
     @Test
-    fun `exact mode should decline an oversized finite encoding`() {
+    fun `exact mode should retain source selection beyond the private encoding limit`() {
         for (result in listOf("x", "0.125")) {
             val model = FlatZincParser(
                 FlatZincLexer(
@@ -325,12 +336,10 @@ class FlatZincFloatPolicyTest {
                 ),
             ).parse()
 
-            val error = assertFailsWith<UnsupportedFlatZincException> {
-                FlatZincCompiler(model, exactFloats = true, floatChoiceLimit = 2).compile()
-            }
+            val program = FlatZincCompiler(model, exactFloats = true, floatChoiceLimit = 2).compile().sourceProgram
 
-            assertTrue(error.message.orEmpty().contains("2 alternative limit"))
-            assertTrue(error.message.orEmpty().contains("(at 3:1)"))
+            assertTrue(program.floatVarsByName.values.all { it.lpOnly })
+            assertEquals(3, program.problem.factors.filterIsInstance<RealElement>().single().size)
         }
     }
 

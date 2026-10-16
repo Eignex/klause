@@ -1,13 +1,20 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -19,6 +26,22 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FlatZincSourceStateTest {
+    @Test
+    fun `finite declarations should not acquire an unrepresentable unrelated grid window`() {
+        val lower = BIG_ONE shl 2048
+        val policy = FloatSemantics.Grid(3, 1000, UndeclaredRealBounds(SemanticRational.of(lower),
+            SemanticRational.of(lower + BIG_ONE)))
+
+        val program = parseFlatZinc("var 100.0..102.0: x; constraint float_le(x,101.0); solve satisfy;",
+            semanticOverrides = SemanticOverrides(floats = policy))
+
+        assertEquals(100.0, program.sourceProgram.problem.realLower[0])
+        assertEquals(102.0, program.sourceProgram.problem.realUpper[0])
+        assertEquals(100.0, program.floatVarsByName.getValue("x").lo)
+        assertEquals(102.0, program.floatVarsByName.getValue("x").hi)
+        assertEquals(0, program.problem.numRealVars)
+    }
+
     @Test
     fun `source capture should retain original real products without materializing private buckets`() {
         val program = parseFlatZinc("""

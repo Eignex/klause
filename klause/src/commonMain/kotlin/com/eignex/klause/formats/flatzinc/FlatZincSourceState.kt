@@ -16,8 +16,8 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.prepareSelectedFloatGrid
 import com.eignex.klause.solver.projection.FloatGridDefinition
 import com.eignex.klause.solver.projection.FloatGridVariable
-import com.eignex.klause.util.IntDisjointSet
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntDisjointSet
 
 internal class FlatZincGridGeometry(
     val definition: FloatGridDefinition?,
@@ -30,11 +30,17 @@ internal class FlatZincSourceState(
     private val selectLegacy: () -> Map<String, FloatRepresentation>,
     sharedGeometry: Lazy<FlatZincGridGeometry>? = null,
     private val fixedLegacy: FlatZincProgram? = null,
+    private val projectSearch: (FlatZincProgram) -> FlatZincSearchHints? = { it.searchHints },
 ) {
     private val geometryOwner = sharedGeometry ?: lazy { prepareGeometry() }
     val geometry: FlatZincGridGeometry get() = geometryOwner.value
     internal val materialized: Boolean get() = geometryOwner.isInitialized()
-    val legacy: FlatZincProgram by lazy { fixedLegacy ?: projectedProgram(original, geometry) }
+    val legacy: FlatZincProgram by lazy {
+        fixedLegacy ?: withSearch(projectedProgram(original, geometry))
+    }
+
+    private fun withSearch(program: FlatZincProgram): FlatZincProgram =
+        program.copy(searchHints = projectSearch(program))
 
     fun attachment(): SourceAttachment = SourceAttachment(original.problem, original.definitionHints,
         original.searchHints?.toSearchHints(), (0 until original.problem.numRealVars).map {
@@ -108,9 +114,9 @@ internal class FlatZincSourceState(
     fun executionProgram(invocation: PreparedSourceInvocation): FlatZincProgram {
         val binding = invocation.floatGrid ?: return original
         val view = FlatZincGridGeometry(binding.projection.mapping.definition(), original.floatRepresentations)
-        val program = projectedProgram(original, view)
+        val program = withSearch(projectedProgram(original, view))
         return program.suppliedCopy().retainSource(FlatZincSourceState(original, declaredReals, selectLegacy,
-            lazyOf(view), program))
+            lazyOf(view), program, projectSearch))
     }
 
     fun copyFor(copied: FlatZincProgram): FlatZincSourceState? {
@@ -130,7 +136,11 @@ internal class FlatZincSourceState(
                 floats, arrays, copied.outputItems, copied.searchHints, copied.enumLabelsByVar, copied.setVarsByName,
                 copied.floatRepresentations, copied.semantics, copied.definitionHints)
         }
-        return FlatZincSourceState(sourceCopy, declaredReals, selectLegacy, geometryOwner, copied.suppliedCopy())
+        val search = if (copied.searchHints === legacy.searchHints) projectSearch else { program: FlatZincProgram ->
+            program.searchHints
+        }
+        return FlatZincSourceState(sourceCopy, declaredReals, selectLegacy, geometryOwner, copied.suppliedCopy(),
+            search)
     }
 }
 

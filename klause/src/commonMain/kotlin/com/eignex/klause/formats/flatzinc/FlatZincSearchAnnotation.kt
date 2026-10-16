@@ -3,9 +3,9 @@ package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.util.IntArrayList
 
 /** Build [FlatZincSearchHints] from the search annotations on the `solve` item. */
-internal fun FlatZincCompiler.compileSearchAnnotation(): FlatZincSearchHints? {
+internal fun FlatZincCompiler.compileSearchAnnotation(context: FlatZincProgram? = null): FlatZincSearchHints? {
     val blocks = model.solve.annotations.filter(::isSearchAnnotation).flatMap(::searchBlocksOf)
-    val tiers = blocks.mapNotNull(::compileSearchBlock)
+    val tiers = blocks.mapNotNull { compileSearchBlock(it, context) }
     if (tiers.isEmpty()) return null
 
     val firstBlockVarName = blocks.firstNotNullOfOrNull { (it.args.getOrNull(1) as? FznExpr.Ident)?.name }
@@ -40,11 +40,11 @@ internal fun FlatZincCompiler.searchBlocksOf(a: FznAnnotation): List<FznAnnotati
     else -> emptyList()
 }
 
-private fun FlatZincCompiler.compileSearchBlock(a: FznAnnotation): FlatZincSearchTier? {
+private fun FlatZincCompiler.compileSearchBlock(a: FznAnnotation, context: FlatZincProgram?): FlatZincSearchTier? {
     if (a.args.size < 3) return null
     val bools = IntArrayList()
     val ints = IntArrayList()
-    collectSearchVars(a.args[0], bools, ints)
+    collectSearchVars(a.args[0], bools, ints, context)
     if (bools.isEmpty() && ints.isEmpty()) return null
     val varName = (a.args[1] as? FznExpr.Ident)?.name
     val valName = (a.args[2] as? FznExpr.Ident)?.name
@@ -57,27 +57,37 @@ private fun FlatZincCompiler.compileSearchBlock(a: FznAnnotation): FlatZincSearc
 }
 
 // Resolve a search variable expression to bool/int ids in the listed order.
-private fun FlatZincCompiler.collectSearchVars(e: FznExpr, bools: IntArrayList, ints: IntArrayList) {
+private fun FlatZincCompiler.collectSearchVars(
+    e: FznExpr,
+    bools: IntArrayList,
+    ints: IntArrayList,
+    context: FlatZincProgram?,
+) {
+    val boolNames = context?.boolVarsByName ?: boolVars
+    val intNames = context?.intVarsByName ?: intVars
+    val floatNames = context?.floatVarsByName ?: floatVars
+    val setNames = context?.setVarsByName ?: setVarsByName
+    val arrayNames = context?.arraysByName ?: arrays
     when (e) {
         is FznExpr.Ident -> {
             val name = e.name
-            boolVars[name]?.let {
+            boolNames[name]?.let {
                 bools.add(it)
                 return
             }
-            intVars[name]?.let {
+            intNames[name]?.let {
                 ints.add(it)
                 return
             }
-            floatVars[name]?.let {
+            floatNames[name]?.let {
                 if (!it.lpOnly) ints.add(it.varId)
                 return
             }
-            setVarsByName[name]?.let { layout ->
+            setNames[name]?.let { layout ->
                 for (b in layout.indicatorBoolIds) bools.add(b)
                 return
             }
-            when (val arr = arrays[name]) {
+            when (val arr = arrayNames[name]) {
                 is FlatZincArray.Vars -> {
                     when (arr.elementKind) {
                         FlatZincArray.Vars.ElementKind.Bool -> for (v in arr.varIds) bools.add(v)
@@ -92,10 +102,10 @@ private fun FlatZincCompiler.collectSearchVars(e: FznExpr, bools: IntArrayList, 
             }
         }
 
-        is FznExpr.ArrayLit -> for (el in e.elements) collectSearchVars(el, bools, ints)
+        is FznExpr.ArrayLit -> for (el in e.elements) collectSearchVars(el, bools, ints, context)
 
         is FznExpr.ArrayAccess -> {
-            val arr = arrays[e.name] as? FlatZincArray.Vars ?: return
+            val arr = arrayNames[e.name] as? FlatZincArray.Vars ?: return
             val idx = e.index - 1
             if (idx !in arr.varIds.indices) return
             when (arr.elementKind) {

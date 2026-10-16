@@ -25,7 +25,7 @@ class FlatZincProgram(
     /** Ordered output items or null when no output clause exists. */
     val outputItems: List<OutputItem>?,
     /** Search hints inferred from search annotations. */
-    val searchHints: FlatZincSearchHints?,
+    searchHints: FlatZincSearchHints?,
     /** Enum labels preserved by the FlatZinc frontend. */
     val enumLabelsByVar: Map<String, List<String>> = emptyMap(),
     /** Set variable layouts by name. */
@@ -43,6 +43,7 @@ class FlatZincProgram(
     private val suppliedFloats = floatVarsByName
     private val suppliedArrays = arraysByName
     private val suppliedRepresentations = floatRepresentations
+    private val suppliedSearchHints = searchHints
     internal var retainedSource: FlatZincSourceState? = null
         private set
 
@@ -62,6 +63,12 @@ class FlatZincProgram(
     val floatRepresentations: Map<String, FloatRepresentation>
         get() = retainedSource?.legacy?.floatRepresentations ?: suppliedRepresentations
 
+    /** Search groups in the historical finite compatibility coordinates. */
+    val searchHints: FlatZincSearchHints? get() {
+        retainedSource?.let { return it.legacy.searchHints }
+        return suppliedSearchHints
+    }
+
     /** Original real declarations and metadata, without forcing a private compatibility view. */
     val sourceProgram: FlatZincProgram get() = retainedSource?.original ?: this
 
@@ -73,7 +80,7 @@ class FlatZincProgram(
 
     internal fun suppliedCopy(): FlatZincProgram = FlatZincProgram(
         suppliedProblem, solve, boolVarsByName, suppliedInts, suppliedFloats, suppliedArrays, outputItems,
-        searchHints, enumLabelsByVar, setVarsByName, suppliedRepresentations, semantics, definitionHints,
+        suppliedSearchHints, enumLabelsByVar, setVarsByName, suppliedRepresentations, semantics, definitionHints,
     )
 
     /** Copy the public program fields, preserving source correspondence only for the actual model. */

@@ -21,7 +21,9 @@ internal fun FlatZincCompiler.emitFloatSelection(c: FznConstraint) {
     if (x.lpOnly) {
         factors.add(RealElement(idx, x.varId, arr))
         val domain = intDomains[idx]
-        if (domain.min == domain.max && domain.min in 1L..arr.size.toLong()) {
+        if (x.varId in finiteFloatChoices && domain.min == domain.max &&
+            domain.min in 1L..arr.size.toLong()
+        ) {
             factors.add(Clause(intArrayOf(exactFloatValueLiteral(x.varId, arr[(domain.min - 1).toInt()]))))
         }
         return

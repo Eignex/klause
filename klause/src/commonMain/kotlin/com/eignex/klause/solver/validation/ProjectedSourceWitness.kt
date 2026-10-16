@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.validation
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -8,7 +9,8 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.Cancellation
 
 internal fun verifyProjectedSourceWitness(
-    source: BakedProblem,
+    source: Problem,
+    integerChecker: BakedProblem,
     sample: Sample,
     cancellation: Cancellation,
     toleranceCheck: ((Sample) -> Boolean)?,
@@ -26,12 +28,6 @@ internal fun verifyProjectedSourceWitness(
         ) return Verification.Rejected("assignment violates an original integer declaration")
     }
     checkProjectedRealBounds(source, sample, cancellation)?.let { return it }
-    val checkedRealFactors = HashSet<Int>()
-    for (id in source.factors.indices) {
-        cancellation.charge(1)
-        if (cancellation()) return Verification.Indeterminate("source factor check cancelled")
-        if (source.factors[id].variables.reals.isNotEmpty()) checkedRealFactors += id
-    }
     if (toleranceCheck == null) {
         when (val checked = verifyRealCoordinates(source, sample, cancellation)) {
             is Verification.Accepted -> Unit
@@ -42,12 +38,12 @@ internal fun verifyProjectedSourceWitness(
         return Verification.Rejected("original source acceptance policy refutes the assignment")
     }
     if (cancellation()) return Verification.Indeterminate("source verification cancelled")
-    return composedFixpoint(source, Candidate(sample, Unit), cancellation,
-        enforcingPeers = checkedRealFactors, onWork = { cancellation.charge(it) })
+    return composedFixpoint(integerChecker, Candidate(sample, Unit), cancellation,
+        onWork = { cancellation.charge(it) })
 }
 
 private fun checkProjectedRealBounds(
-    source: BakedProblem,
+    source: Problem,
     sample: Sample,
     cancellation: Cancellation,
 ): Verification<Nothing, Nothing>? {
