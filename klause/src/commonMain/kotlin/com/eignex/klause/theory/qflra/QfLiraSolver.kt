@@ -973,6 +973,7 @@ class ExactLiraSearchComponent private constructor(
             node.branches.isNotEmpty() || node.reducedBranches.isNotEmpty() ||
             node.transformedBranches.isNotEmpty() || node.retainedReduction != null
         ) return true
+        if (lp.state?.conflict != null) return true
         for (prepared in preparedRows) {
             operationStop.charge(1L)
             if (operationStop()) return false
