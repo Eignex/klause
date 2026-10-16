@@ -25,10 +25,11 @@ internal fun BakedProblem.countingScope(assumptions: Assumptions): BakedProblem 
 }
 
 internal fun BakedProblem.scopedApproximateCount(config: ApproxCountConfig): Count =
-    if (rootDeductions is PropagationResult.Unsat) zeroCount else ApproxMC.run(this, config)
+    if (rootDeductions is PropagationResult.Unsat) zeroCount.copy(semantics = semantics) else ApproxMC.run(this, config)
 
 internal fun BakedProblem.scopedExactCount(config: ExactCountConfig): Sequence<Count> =
-    if (rootDeductions is PropagationResult.Unsat) sequenceOf(zeroCount) else AnytimeCounter.run(this, config)
+    if (rootDeductions is PropagationResult.Unsat) sequenceOf(zeroCount.copy(semantics = semantics))
+    else AnytimeCounter.run(this, config)
 
 internal fun BakedProblem.accurateSamples(
     config: SamplingConfig,
@@ -41,6 +42,11 @@ private val zeroCount = Count(0L, 0L, 0L, exact = true, confidence = 1.0)
 internal fun combineCounts(proven: Count, approximate: () -> Count): Count {
     if (proven.exact) return proven
     val approx = approximate()
+    val semantics = proven.semantics?.takeIf { captured ->
+        approx.semantics?.let {
+            captured.declared == it.declared && captured.effective == it.effective
+        } == true
+    }
     val lower = maxOf(proven.lower, approx.lower)
     val upper = maxOf(lower, minOf(proven.upper, approx.upper))
     return Count(
@@ -49,5 +55,6 @@ internal fun combineCounts(proven: Count, approximate: () -> Count): Count {
         upper = upper,
         exact = approx.exact,
         confidence = approx.confidence,
+        semantics = semantics,
     )
 }

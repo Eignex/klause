@@ -74,7 +74,8 @@ internal object AnytimeCounter {
             val exact = openMass.isZero() && undecidedMass.isZero()
             val upper = clampToLong(upperMass)
             val estimate = if (exact) lower else lower + (upper - lower) / 2
-            return Count(estimate = estimate, lower = lower, upper = upper, exact = exact, confidence = 1.0)
+            return Count(estimate = estimate, lower = lower, upper = upper, exact = exact, confidence = 1.0,
+                semantics = problem.semantics)
         }
 
         // Root feasibility (and the trivial empty-projection case).
