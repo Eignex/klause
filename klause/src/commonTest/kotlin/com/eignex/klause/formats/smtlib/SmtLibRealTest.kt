@@ -10,9 +10,106 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class SmtLibRealTest {
+    @Test
+    fun `scaled and complemented real comparisons should share an original defining row`() {
+        val source = SmtLib.parse(
+            """
+                (declare-const x Real)
+                (declare-const y Real)
+                (declare-const a Bool)
+                (declare-const b Bool)
+                (declare-const c Bool)
+                (assert (= a (<= (+ (* 2.0 x) (* 4.0 y)) 6.0)))
+                (assert (= b (>= (+ (* (- 3.0) x) (* (- 6.0) y)) (- 9.0))))
+                (assert (= c (> (+ x (* 2.0 y)) 3.0)))
+            """.trimIndent(),
+        )
+
+        val predicates = source.model.factors.filterIsInstance<ExactLinear>()
+            .filter { it.activator != LinearRow.ALWAYS }
+
+        assertEquals(1, predicates.size)
+    }
+
+    @Test
+    fun `scaled strict complements should preserve equality boundary truth`() {
+        for ((closed, complement, truth) in listOf(Triple("<=", ">", true), Triple("<", ">=", false))) {
+            val source = SmtLib.parse(
+                """
+                    (declare-const x Real)
+                    (declare-const a Bool)
+                    (declare-const b Bool)
+                    (assert (= x 0.0))
+                    (assert (= a ($closed (* 2.0 x) 0.0)))
+                    (assert (= b ($complement (* 3.0 x) 0.0)))
+                    (assert (= a $truth))
+                    (assert (= b ${!truth}))
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver.source(source.model).solve()
+
+            assertIs<OpenTheoryResult.Sat>(result)
+        }
+    }
+
+    @Test
+    fun `a negative canonical first definition should retain its exact complement`() {
+        val source = SmtLib.parse(
+            """
+                (declare-const x Real)
+                (declare-const a Bool)
+                (declare-const b Bool)
+                (assert (= a (> (* 2.0 x) 6.0)))
+                (assert (= b (<= (* 3.0 x) 9.0)))
+                (assert a)
+                (assert b)
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver.source(source.model).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `complement folding should not skip an unsupported source operand`() {
+        assertFailsWith<UnsupportedSmtException> {
+            SmtLib.parse(
+                """
+                    (declare-const x Real)
+                    (assert (or (<= x 0.0) (> x 0.0) (= (div 1 0) 0)))
+                """.trimIndent(),
+            )
+        }
+    }
+
+    @Test
+    fun `a complemented predicate should retain a used conditional numeric definition`() {
+        val source = SmtLib.parse(
+            """
+                (declare-const x Real)
+                (declare-const guard Bool)
+                (declare-const a Bool)
+                (declare-const b Bool)
+                (assert (let ((value (ite guard 1 2)))
+                    (and (= a (> x (to_real value))) (= b (<= x (to_real value))))))
+                (assert guard)
+                (assert (= x 1.0))
+                (assert (not a))
+                (assert b)
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver.source(source.model).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
     @Test
     fun `identical folded real comparisons should share one predicate literal`() {
         val source = SmtLib.parse(

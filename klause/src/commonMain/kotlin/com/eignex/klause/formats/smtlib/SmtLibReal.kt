@@ -214,23 +214,109 @@ internal class SmtRealPredicates(private val cancellation: Cancellation, private
         require(maxEntries >= 0)
     }
 
+    private class Normalized(val predicate: Predicate, val complemented: Boolean)
+
     fun literal(term: RealComb, relation: LinearOp, strict: Boolean, create: () -> Int): Int {
         val entries = term.intCoeffs.size.toLong() + term.realCoeffs.size + 1L
-        cancellation.charge(entries)
-        if (cancellation()) throw PolynomialSourceInterrupted()
-        if (entries > maxEntries) return create()
-        val key = Predicate(
+        work(entries)
+        if (entries > maxEntries) {
+            val literal = create()
+            work(1L)
+            return literal
+        }
+        val normalized = normalized(term, relation, strict)
+        val key = normalized?.predicate ?: Predicate(
             term.intCoeffs.filterValues { !it.isZero },
             term.realCoeffs.filterValues { !it.isZero },
             term.constant, relation, strict,
         )
-        literals[key]?.let { return it }
+        val complemented = normalized?.complemented == true
+        val existing = literals[key]
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        if (existing != null) return if (complemented) Lit.negate(existing) else existing
         val literal = create()
+        work(1L)
         if (entries <= maxEntries - retainedEntries) {
-            literals[key] = literal
+            literals[key] = if (complemented) Lit.negate(literal) else literal
             retainedEntries += entries.toInt()
         }
+        if (cancellation()) throw PolynomialSourceInterrupted()
         return literal
+    }
+
+    private fun normalized(term: RealComb, relation: LinearOp, strict: Boolean): Normalized? {
+        if (relation != LinearOp.LE && relation != LinearOp.GE) return null
+        val divisor = leading(term.intCoeffs) ?: leading(term.realCoeffs) ?: return null
+        if (!admitted(divisor)) return null
+        for (coefficient in term.intCoeffs.values) if (!admitsRatio(coefficient, divisor)) return null
+        for (coefficient in term.realCoeffs.values) if (!admitsRatio(coefficient, divisor)) return null
+        if (!admitsRatio(term.constant, divisor)) return null
+        work(2L * words(divisor) + 1L)
+        val reciprocal = divisor.reciprocal()
+        val integers = scaled(term.intCoeffs, reciprocal)
+        val reals = scaled(term.realCoeffs, reciprocal)
+        val constant = scaled(term.constant, reciprocal)
+        val complemented = (relation == LinearOp.GE) != (divisor.signum() < 0)
+        work(integers.size.toLong() + reals.size + 2L)
+        return Normalized(Predicate(integers, reals, constant, LinearOp.LE,
+            if (complemented) !strict else strict), complemented)
+    }
+
+    private fun leading(coefficients: Map<Int, BigFraction>): BigFraction? {
+        var variable: Int? = null
+        var leading: BigFraction? = null
+        for ((index, coefficient) in coefficients) {
+            work(1L)
+            if (!coefficient.isZero && (variable == null || index < variable)) {
+                variable = index
+                leading = coefficient
+            }
+        }
+        return leading
+    }
+
+    private fun admitted(value: BigFraction): Boolean {
+        work(1L)
+        return value.num.magnitudeBitLength() <= 4096 && value.den.magnitudeBitLength() <= 4096
+    }
+
+    private fun admitsRatio(value: BigFraction, divisor: BigFraction): Boolean {
+        if (!admitted(value)) return false
+        if (value.isZero || divisor == BigFraction.ONE || divisor == BigFraction.MINUS_ONE) return true
+        return productBits(value.num.magnitudeBitLength(), divisor.den.magnitudeBitLength()) <= 4096 &&
+            productBits(value.den.magnitudeBitLength(), divisor.num.magnitudeBitLength()) <= 4096
+    }
+
+    private fun productBits(first: Int, second: Int): Int = when {
+        first == 0 || second == 0 -> 0
+        first == 1 -> second
+        second == 1 -> first
+        else -> first + second
+    }
+
+    private fun words(value: BigFraction): Long =
+        (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 127L) / 64L
+
+    private fun scaled(coefficients: Map<Int, BigFraction>, reciprocal: BigFraction): Map<Int, BigFraction> {
+        work(coefficients.size.toLong() + 1L)
+        val result = LinkedHashMap<Int, BigFraction>()
+        for ((variable, coefficient) in coefficients) {
+            if (!coefficient.isZero) result[variable] = scaled(coefficient, reciprocal)
+        }
+        return result
+    }
+
+    private fun scaled(value: BigFraction, reciprocal: BigFraction): BigFraction {
+        val size = words(value) + words(reciprocal)
+        work(size * size + 2L * size + 1L)
+        val result = value * reciprocal
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        return result
+    }
+
+    private fun work(units: Long) {
+        cancellation.charge(units)
+        if (cancellation()) throw PolynomialSourceInterrupted()
     }
 }
 

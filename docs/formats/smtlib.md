@@ -54,12 +54,23 @@ simultaneous bindings were introduced. Direct assertions and reified reads use
 that captured view, so later shadows do not change a shared Boolean value.
 Scope restoration remains iterative, including long chains of asserted aliases.
 
-Linear lowering shares a comparison literal within one source parse only when its
-folded exact coefficients, tagged integer/real coordinates, constant, relation and
-strictness agree. Shared literals retain full equivalence in either polarity.
-The parse-local table retains at most 65,536 coordinate/key entries; other
-comparisons still lower independently. Lookup work charges the source token and
-retains its cancellation. The table carries no solver state or cross-source names.
+Linear lowering shares exact comparison literals within one source parse. Optional
+key normalization divides the folded affine form by its first nonzero coefficient
+in resolved coordinate order, with integer and real namespaces kept separate.
+Positive scalar equivalents share a literal; reversing an inequality preserves
+strictness, and an exact strict/closed complement shares its negation. A cache key
+can therefore denote the complement of the original defining literal. The original
+row keeps its own positive coordinate and full equivalence; reuse emits no inverse
+redefinition. Open and closed comparisons at the same orientation remain distinct.
+All operands and their required domains are lowered before key reuse.
+
+The same parse-local table retains at most 65,536 coordinate/key entries. Optional
+normalization admits 4,096-bit rational operands and preflights numerator and
+denominator products before allocating normalized maps or performing division.
+A private representation decline retains the original exact-key lookup and
+independent lowering. Source cancellation withholds source publication; scans, copies,
+bounded arithmetic and lookup work charge the same containing source token.
+The table carries no solver state, additional allowance or cross-source names.
 
 Boolean lowering folds the library constant and exact literal identities in
 AND, OR and IFF after their children have been lowered. Empty, singleton,
