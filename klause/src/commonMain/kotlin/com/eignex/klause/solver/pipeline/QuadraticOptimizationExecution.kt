@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
@@ -19,6 +20,8 @@ data class QuadraticOptimizationExecution(
     val nativeWork: Long,
     /** Mandatory arithmetic representation decline, when one stopped execution. */
     val resource: PolynomialTheoryResource? = null,
+    /** Source interpretation captured for this invocation, absent on an unbound execution. */
+    val semantics: EffectiveSourceSemantics? = null,
 ) {
     private var retainedPublication: QuadraticIncumbentPublication? = null
     /**
@@ -90,5 +93,5 @@ fun OpenTheoryPipeline.minimize(
                 native.declinedResource
             } else native.resource,
         ).also { it.retainPublication(publication.latest) }
-    }
+    }.withSourceSemantics(request.preparedPlan.sourceSemantics)
 }

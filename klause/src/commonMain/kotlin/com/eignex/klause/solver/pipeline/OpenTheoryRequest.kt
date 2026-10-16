@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
@@ -116,16 +117,22 @@ class OpenTheoryRequest internal constructor(
 
 /** The common execution result for a complete open-model request. */
 sealed interface OpenTheoryExecution {
+    /** Source interpretation captured for this invocation, absent on an unbound execution. */
+    val semantics: EffectiveSourceSemantics?
+
     /** Satisfiability result for a request without an objective. */
     data class Satisfy(
         /** The satisfiability verdict. */
         val result: OpenTheoryResult,
-    ) : OpenTheoryExecution
+    ) : OpenTheoryExecution {
+        override val semantics: EffectiveSourceSemantics? get() = result.semantics
+    }
 
     /** Optimization result for a request with an objective. */
     data class Optimize(
         /** The optimization verdict. */
         val result: OpenTheoryOptimum,
+        override val semantics: EffectiveSourceSemantics? = null,
     ) : OpenTheoryExecution {
         private var retainedPublication: SourceIncumbentPublication? = null
 
@@ -200,7 +207,7 @@ object OpenTheoryPipeline {
         params: TheoryParams,
         cores: Int,
         onAccepted: ((SourceIncumbentPublication) -> Unit)?,
-    ): OpenTheoryExecution = observed(onAccepted) { publication ->
+    ): OpenTheoryExecution = observed(request.preparedPlan.sourceSemantics, onAccepted) { publication ->
         portfolioExecution(request, params, cores, sourceObjective(request, params), publication)
     }
 
@@ -230,7 +237,7 @@ object OpenTheoryPipeline {
         objective: LinearObjective? = null,
         cores: Int = 1,
         searchesContinuousOnly: Boolean = false,
-    ): OpenTheoryExecution = observed(null) { publication ->
+    ): OpenTheoryExecution = observed(model.semantics, null) { publication ->
         heuristicExecution(model, params, objective, cores, searchesContinuousOnly,
             objective?.let { OpenSourceObjective(it) }, publication)
     }
@@ -291,7 +298,7 @@ object OpenTheoryPipeline {
         engine: FiniteEngine,
         cores: Int,
         onAccepted: ((SourceIncumbentPublication) -> Unit)?,
-    ): OpenTheoryExecution = observed(onAccepted) { publication ->
+    ): OpenTheoryExecution = observed(request.preparedPlan.sourceSemantics, onAccepted) { publication ->
         executeObserved(request, params, engine, cores, sourceObjective(request, params), publication)
     }
 
@@ -358,7 +365,7 @@ object OpenTheoryPipeline {
         cores: Int,
         maximize: Boolean,
         onAccepted: ((SourceIncumbentPublication) -> Unit)?,
-    ): OpenTheoryExecution = observed(onAccepted) { publication ->
+    ): OpenTheoryExecution = observed(model.semantics, onAccepted) { publication ->
         val values = objective?.let { OpenSourceObjective(it, if (maximize) it.negated() else it, maximize) }
         heuristicObserved(model, params, objective, engine, cores, values, publication)
     }
@@ -369,7 +376,7 @@ object OpenTheoryPipeline {
         objective: LinearObjective?,
         engine: FiniteEngine,
         maximize: Boolean = false,
-    ): OpenTheoryExecution = observed(null) { publication ->
+    ): OpenTheoryExecution = observed(preparedSource.sourceSemantics, null) { publication ->
         val model = requireNotNull(preparedSource.model)
         val values = objective?.let { OpenSourceObjective(it, if (maximize) it.negated() else it, maximize) }
         heuristicObserved(model, params, objective, engine, 1, values, publication, preparedSource)
@@ -416,7 +423,7 @@ object OpenTheoryPipeline {
         request: OpenTheoryRequest,
         params: TheoryParams,
         onAccepted: ((SourceIncumbentPublication) -> Unit)?,
-    ): OpenTheoryExecution = observed(onAccepted) { publication ->
+    ): OpenTheoryExecution = observed(request.preparedPlan.sourceSemantics, onAccepted) { publication ->
         executeDirect(request, params, sourceObjective(request, params), publication)
     }
 
@@ -460,13 +467,14 @@ object OpenTheoryPipeline {
             params.cancellation or params.timeout) }
 
     private fun observed(
+        semantics: EffectiveSourceSemantics?,
         callback: ((SourceIncumbentPublication) -> Unit)?,
         action: (SourcePublicationObserver) -> OpenTheoryExecution,
     ): OpenTheoryExecution {
         val publication = SourcePublicationObserver(callback)
         return publication.execute { action(publication) }.also { execution ->
             if (execution is OpenTheoryExecution.Optimize) execution.retainPublication(publication.latest)
-        }
+        }.withSourceSemantics(semantics)
     }
 
     /**

@@ -154,6 +154,13 @@ class SourceStrategy internal constructor(
         objective: LinearObjective,
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
         sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+    ): QuadraticOptimizationExecution = optimizeSource(objective, polynomial, sense)
+        .withSourceSemantics(source.semantics)
+
+    private fun optimizeSource(
+        objective: LinearObjective,
+        polynomial: PolynomialTheoryParams,
+        sense: ObjectiveSense,
     ): QuadraticOptimizationExecution {
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
@@ -195,6 +202,13 @@ class SourceStrategy internal constructor(
         objective: QuadraticObjectiveSpec,
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
         sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+    ): QuadraticOptimizationExecution = optimizeSource(objective, polynomial, sense)
+        .withSourceSemantics(source.semantics)
+
+    private fun optimizeSource(
+        objective: QuadraticObjectiveSpec,
+        polynomial: PolynomialTheoryParams,
+        sense: ObjectiveSense,
     ): QuadraticOptimizationExecution {
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
@@ -219,6 +233,14 @@ class SourceStrategy internal constructor(
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
         theory: TheoryParams = TheoryParams(),
         sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+    ): OpenTheoryExecution = optimizeOpenSource(objective, polynomial, theory, sense)
+        .withSourceSemantics(source.semantics)
+
+    private fun optimizeOpenSource(
+        objective: LinearObjective,
+        polynomial: PolynomialTheoryParams,
+        theory: TheoryParams,
+        sense: ObjectiveSense,
     ): OpenTheoryExecution {
         val scope = scope(polynomial, theory)
         fun incomplete(reason: TerminationReason): OpenTheoryExecution = OpenTheoryExecution.Optimize(
