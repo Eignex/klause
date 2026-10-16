@@ -145,7 +145,8 @@ class MpsCompilerLoweringTest {
         assertEquals("9999999999999999999", bounds[1].second?.fraction.toString())
         assertTrue(compiled.model.intBounds.isOpenUpper(1))
         val wideUpper = rows.single {
-            it.size == 1 && it.ref(0) == Term.ofIntVar(1) && it.relation == LinearOp.LE
+            it.size == 1 && it.ref(0) == Term.ofIntVar(1) && it.relation == LinearOp.LE &&
+                (it.constants as IntegralConstants).exactCoeff(0) == BIG_ONE
         }
         assertEquals("9999999999999999999", (wideUpper.constants as IntegralConstants).exactBound.toString())
     }
