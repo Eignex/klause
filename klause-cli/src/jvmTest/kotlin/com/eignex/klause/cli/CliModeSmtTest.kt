@@ -263,7 +263,8 @@ class CliModeSmtTest {
         assertTrue("; declaredTheoryRoute=exact_nra" in output, output)
         assertTrue("; reportedBackend=backtrack" in output, output)
         assertTrue("; frontendLoadMs=" in output, output)
-        assertFalse("frontendRoutingMs=" in output, output)
+        assertTrue("; frontendRoutingMs=" in output, output)
+        assertTrue("; frontendRoutingOutcome=native-formula" in output, output)
         assertTrue("nativeCpPropagationMs=" in output, output)
         assertFalse("define-fun" in output, output)
     }
