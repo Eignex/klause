@@ -153,6 +153,8 @@ private fun Compiler.Builder.selectionDigits(constant: BigInt, columns: List<Int
 }
 
 private fun Compiler.Builder.selectionIndex(conditions: List<Int>): Int {
+    val guard = conditions.singleOrNull()
+    guard?.let { selectionIndexesByGuard[it] }?.let { return it }
     val index = newInt(0, conditions.size.toLong())
     val start = factors.size
     for ((position, condition) in conditions.withIndex()) {
@@ -162,6 +164,7 @@ private fun Compiler.Builder.selectionIndex(conditions: List<Int>): Int {
     }
     conditionalEqualities.define(index, conditions, List(conditions.size) { LinComb(emptyMap(), it.toLong() + 1) },
         LinComb(emptyMap(), 0), factors.subList(start, factors.size), conditions.map(iteChains::guardEquality))
+    if (guard != null) selectionIndexesByGuard[guard] = index
     return index
 }
 

@@ -121,7 +121,11 @@ or materialized branch columns. Wide terms with no finite magnitude use the same
 guarded arithmetic relation and retain their exact source coefficients.
 
 Choice indexes reify the original signed guard directly, retaining its identity
-for arithmetic branch preferences. Guards are inputs to each conditional definition;
+for arithmetic branch preferences. Binary selections with the same compiled signed
+guard share one index within a parse; opposite guard polarities retain separate
+indexes. Each index owns its channel independently of the consuming selections,
+so removing an unused selection preserves the index needed by other consumers.
+Guards are inputs to each conditional definition;
 their source or predicate definitions remain independently owned when unused
 choice state is removed or the same guard controls several selections.
 

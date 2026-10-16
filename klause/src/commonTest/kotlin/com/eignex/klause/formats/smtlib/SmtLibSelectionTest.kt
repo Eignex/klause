@@ -3,6 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.propagation.bake
@@ -70,6 +71,96 @@ class SmtLibSelectionTest {
 
         assertEquals(2, parsed.model.factors.filterIsInstance<Element>().size)
         assertIs<SolveResult.Unsat>(result)
+    }
+
+    @Test
+    fun `selections sharing a signed guard retain both branch values`() {
+        for (positive in listOf(false, true)) {
+            for (branch in listOf(false, true)) {
+                val parsed = SmtLib.parse("""
+                    (declare-const b Bool) (declare-const x Int) (declare-const y Int)
+                    (declare-const z Int) (declare-const w Int)
+                    (assert (and (<= (- 4) x 4) (<= (- 4) y 4) (<= (- 4) z 4) (<= (- 4) w 4)))
+                    (assert (let ((g ${if (positive) "b" else "(not b)"})) (and
+                        (= x y) (= z w)
+                        (= (+ x y) (ite g (+ x 1) (- y 1)))
+                        (= (+ z w) (ite g (+ z 2) (- w 2))))))
+                    (assert ${if (branch) "b" else "(not b)"})
+                """.trimIndent())
+
+                val result = BacktrackSolver.source(parsed.model)
+                    .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+                val selections = parsed.model.factors.filterIsInstance<Element>()
+                assertEquals(2, selections.size)
+                assertEquals(1, selections.map { it.idx }.distinct().size)
+                val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+                assertEquals(branch, sample.boolValue(parsed.boolVarNames.getValue("b")))
+                assertEquals(if (branch == positive) "1" else "-1", sample.intValue(parsed.intVarNames.getValue("x")))
+                assertEquals(sample.intValue(parsed.intVarNames.getValue("x")),
+                    sample.intValue(parsed.intVarNames.getValue("y")))
+                assertEquals(if (branch == positive) "2" else "-2", sample.intValue(parsed.intVarNames.getValue("z")))
+                assertEquals(sample.intValue(parsed.intVarNames.getValue("z")),
+                    sample.intValue(parsed.intVarNames.getValue("w")))
+            }
+        }
+    }
+
+    @Test
+    fun `removing an earlier or later choice preserves its shared live index`() {
+        for (unusedFirst in listOf(false, true)) {
+            for (branch in listOf(false, true)) {
+                val unused = "(= (ite g 7 8) ${if (branch) 7 else 8})"
+                val source = """
+                    (declare-const b Bool) (declare-const c Bool)
+                    (declare-const x Int) (declare-const y Int)
+                    (assert (and (<= (- 4) x 4) (<= (- 4) y 4)))
+                    (assert (let ((g (and b c))) (and
+                        ${if (unusedFirst) unused else ""}
+                        (= x y) (= (+ x y) (ite g (+ x 1) (- y 1)))
+                        ${if (branch) "g" else "(not g)"}
+                        ${if (unusedFirst) "" else unused})))
+                """.trimIndent()
+                val parsed = SmtLib.parse(source)
+                val live = SmtLib.parse(source.replace(unused, ""))
+
+                val result = BacktrackSolver.source(parsed.model)
+                    .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+                assertEquals(live.model.numIntVars, parsed.model.numIntVars)
+                assertEquals(1, parsed.model.factors.filterIsInstance<Element>().size)
+                val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+                assertEquals(branch, sample.boolValue(parsed.boolVarNames.getValue("b")) &&
+                    sample.boolValue(parsed.boolVarNames.getValue("c")))
+                assertEquals(if (branch) "1" else "-1", sample.intValue(parsed.intVarNames.getValue("x")))
+                assertEquals(sample.intValue(parsed.intVarNames.getValue("x")),
+                    sample.intValue(parsed.intVarNames.getValue("y")))
+            }
+        }
+    }
+
+    @Test
+    fun `integer and real selections share their signed guard index`() {
+        for (branch in listOf(false, true)) {
+            val parsed = SmtLib.parse("""
+                (declare-const b Bool) (declare-const x Int) (declare-const y Int) (declare-const r Real)
+                (assert (and (<= (- 4) x 4) (<= (- 4) y 4) (= x y)))
+                (assert (= (+ x y) (ite (not b) (+ x 1) (- y 1))))
+                (assert (= r (ite (not b) (/ 1 3) (/ 2 3))))
+                (assert ${if (branch) "b" else "(not b)"})
+            """.trimIndent())
+
+            val result = BacktrackSolver.source(parsed.model)
+                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+            assertEquals(parsed.model.factors.filterIsInstance<Element>().single().idx,
+                parsed.model.factors.filterIsInstance<RealElement>().single().idx)
+            val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+            assertEquals(if (branch) "-1" else "1", sample.intValue(parsed.intVarNames.getValue("x")))
+            assertEquals(sample.intValue(parsed.intVarNames.getValue("x")),
+                sample.intValue(parsed.intVarNames.getValue("y")))
+            assertEquals(if (branch) "2/3" else "1/3", sample.realValue(parsed.realVarNames.getValue("r")))
+        }
     }
 
     @Test
