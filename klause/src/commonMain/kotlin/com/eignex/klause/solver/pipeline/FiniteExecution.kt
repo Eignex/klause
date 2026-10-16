@@ -239,6 +239,16 @@ class FiniteSolveResult(
     ) : this(preparation, preparationElapsed, outcome, nativeSourceResult) {
         retainedSourceMinimum = nativeSourceMinimum
     }
+
+    private var grid: NativeGridOutcome? = null
+
+    /** Native private-grid claims, retained independently of [outcome]'s original-source qualification. */
+    val nativeGridOutcome: NativeGridOutcome? get() = grid
+
+    internal fun bindNativeGridOutcome(value: NativeGridOutcome) {
+        require(grid == null) { "finite result already retains its native grid outcome" }
+        grid = value
+    }
 }
 
 /** Streaming hooks exposed by the finite solve facade. */
@@ -467,11 +477,17 @@ internal fun FinitePipeline.solve(
     require(request.engine == FiniteEngine.FIXED || lpSolveContext == LpSolveContext.Production) {
         "custom LP dependencies require the fixed finite route"
     }
+    request.shape.sourceInvocation?.freezeExecution()
     val stop = request.shape.sourceInvocation?.let {
         (request.cancellation or it.cancellation).encodingPreparationScope()
     } ?: request.cancellation
+    val gridPublication = request.shape.sourceInvocation?.floatGrid?.let {
+        FloatGridPublication(it, stop, request.toleranceCheck, callbacks)
+    }
+    fun result(preparation: FinitePipelinePreparation, elapsed: Duration, outcome: FiniteSolveOutcome): FiniteSolveResult =
+        gridPublication?.result(preparation, elapsed, outcome) ?: FiniteSolveResult(preparation, elapsed, outcome)
     if (request.shape.sourceInvocation != null && stop()) {
-        return FiniteSolveResult(
+        return result(
             FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
             Duration.ZERO,
             FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
@@ -501,9 +517,9 @@ internal fun FinitePipeline.solve(
         ),
     )
     val preparationElapsed = preparationStart.elapsedNow()
-    if (request.prepareOnly) return FiniteSolveResult(preparation, preparationElapsed, FiniteSolveOutcome.PreparedOnly)
+    if (request.prepareOnly) return result(preparation, preparationElapsed, FiniteSolveOutcome.PreparedOnly)
     if (preparation.presolve?.infeasible == true) {
-        return FiniteSolveResult(
+        return result(
             preparation,
             preparationElapsed,
             FiniteExecutionResult.Completed(
@@ -524,7 +540,7 @@ internal fun FinitePipeline.solve(
         }
     }
     if ((request.shape.sourceInvocation != null && stop()) || executionPlan.decline == PreparedPlanDecline.RESOURCE) {
-        return FiniteSolveResult(
+        return result(
             preparation,
             preparationElapsed,
             FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
@@ -578,17 +594,25 @@ internal fun FinitePipeline.solve(
             onPortfolioEvent = request.onPortfolioEvent,
             onPortfolioFault = request.onPortfolioFault,
             lpSolveContext = lpSolveContext,
-            toleranceCheck = sourceCheck?.let { check ->
-                FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum())
-            },
+            toleranceCheck = if (gridPublication == null) {
+                sourceCheck?.let { check ->
+                    FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum())
+                }
+            } else null,
             sourceInvocation = request.shape.sourceInvocation,
             sourceMapping = preparation.sourceMapping,
             sourceControls = request.sourceControls,
         ),
         FiniteExecutionCallbacks(
-            onSample = { sample -> callbacks.onSample(preparation.reconstruct(sample)) },
+            onSample = { sample ->
+                val lifted = preparation.reconstruct(sample)
+                if (gridPublication == null) callbacks.onSample(lifted) else gridPublication.onSample(lifted)
+            },
             onImprovement = { improvement ->
-                callbacks.onImprovement(
+                if (gridPublication != null) {
+                    gridPublication.onImprovement(preparation.reconstruct(improvement.sample),
+                        improvement.workerLabel, improvement.elapsedMs)
+                } else callbacks.onImprovement(
                     FiniteSolveImprovement(
                         preparation.reconstruct(improvement.sample),
                         improvement.workerLabel,
@@ -599,7 +623,7 @@ internal fun FinitePipeline.solve(
             },
         ),
     )
-    return FiniteSolveResult(
+    return result(
         preparation,
         preparationElapsed,
         execution.reconstructed(preparation.reconstruct, request.shape.finiteProblem, request.shape.linearObjective)

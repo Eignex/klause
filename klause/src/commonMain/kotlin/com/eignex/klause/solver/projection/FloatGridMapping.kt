@@ -74,11 +74,18 @@ internal class FloatGridMapping(
 
     fun retainedReal(sourceId: SourceRealId): Int = retainedReals[sourceId.index]
 
+    fun columns(): List<FloatGridColumn> = capturedColumns.toList()
+
+    fun factorOrigins(): IntArray = origins.copyOf()
+
     fun guardedCancellation(cancellation: Cancellation): Cancellation =
         (cancellation or containingCancellation).encodingPreparationScope()
 
     fun reconstruct(problem: Problem, sample: Sample, cancellation: Cancellation): Sample? {
         requireTarget(problem)
+        require(sample.coordinateFrame == null || sample.coordinateFrame === target) {
+            "float reconstruction belongs to a different coordinate frame"
+        }
         require(sample.numBoolVars == target.numBoolVars && sample.numIntVars == target.numIntVars &&
             sample.numRealVars == target.numRealVars) { "float reconstruction needs a complete private assignment" }
         val stop = guardedCancellation(cancellation)
@@ -131,6 +138,7 @@ internal class FloatGridMapping(
         if (stop()) return null
         val result = Sample(bools, ints, approximate, exact, sample.exactInts?.take(source.numIntVars), algebraic, symbolic)
             .withSourceSemantics(source.semantics)
+            .withCoordinateFrame(source)
         return if (stop()) null else result
     }
 }

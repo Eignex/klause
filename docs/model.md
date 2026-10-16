@@ -101,6 +101,34 @@ original rows, declaration kinds and tolerance qualification remain authoritativ
 The typed working coordinate records the storage namespace independently of the
 original declaration namespace.
 
+## Private float projections
+
+An explicitly selected finite compatibility or heuristic consumer may request a
+private integer grid under the captured `FloatSemantics.Grid` permission. Ordinary
+source setup does not materialize that view. Original real declarations, bounds,
+relations and objective remain on the attachment. An absent endpoint may use the
+private search window; an explicit endpoint wins. Derived auxiliary windows describe
+private search geometry and supply no original-source bounds.
+
+The same invocation retains its canonical plan and a separate engine plan over the
+private model. Private factor descriptors come from the captured provider bundle;
+original factor indices do not select descriptors for converted factors. Cross-kind
+maps retain real-to-private-integer coordinates, exact rational origins and steps,
+retained real coordinates and private factor origins. Binding closes before a finite
+shape escapes or execution starts. Unsupported factors, open original integer sides,
+unrepresentable geometry/objectives and resource stops decline only this view.
+
+Publication reconstructs engine/presolve coordinates into the private grid frame,
+then original real coordinates, and checks the original model and effective acceptance
+policy. The lift clears private proof receipts. Original objective values retain their
+constant, exact positive affine conversion and maximization direction. Grid exhaustion
+and optimization prove only private-grid claims: `FiniteSolveResult.nativeGridOutcome`
+retains that native result and immutable `SourceFloatProjection`, while the ordinary
+outcome publishes checked source points without transferring unproved global claims.
+Per-solve publication state and retained result metadata do not share mutable worker
+state or renew the containing allowance. See [source checking](solver/validation.md)
+and [reconstruction](solver/presolve.md#guarantees-and-source-mappings).
+
 ## Distinct integer positions
 
 `AllDifferent` retains integer positions, paired optional-presence literals and

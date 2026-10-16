@@ -68,6 +68,14 @@ remapping retains that combined row and the original source-check obligation.
 
 ## Rebuild ownership
 
+For a selected private float grid, finite presolve reconstructs into its actual
+private grid model first. The invocation's explicit cross-kind grid map then lifts
+to original real coordinates before source checking. The canonical source plan and
+private engine plan retain separate factor/coordinate namespaces. A matching number
+of coordinates does not establish correspondence, and a foreign source, target or
+selected consumer cannot reuse the map. Original real bounds and global proof scope
+remain with the source; see [private float projections](../model.md#private-float-projections).
+
 [PresolveShared.rebuildProblem](../../klause/src/commonMain/kotlin/com/eignex/klause/presolve/PresolveShared.kt)
 carries the originating cancellation token into a fresh `BakedProblem`.
 [RootBaker.reseed](../../klause/src/commonMain/kotlin/com/eignex/klause/presolve/RootBaker.kt)

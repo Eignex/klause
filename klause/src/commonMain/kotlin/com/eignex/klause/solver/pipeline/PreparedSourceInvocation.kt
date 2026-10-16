@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 
 /** Source, operation and selected plan retained through one invocation's construction and execution. */
 class PreparedSourceInvocation internal constructor(
@@ -37,7 +37,11 @@ class PreparedSourceInvocation internal constructor(
 
     internal val enginePlan: PreparedSourcePlan? get() = floatGrid?.route?.preparedPlan ?: preparedPlan
 
+    /** Captured private grid geometry, when an explicit finite consumer selected it. */
+    val floatProjection: SourceFloatProjection? get() = floatGrid?.metadata
+
     private var finiteBorrowed = false
+    private var executionFrozen = false
 
     private var finite = (route as? SourceProblemRoute.Finite)?.let { selected ->
         require(selected.preparedPlan.belongsTo(source.originalSource)) { "setup selected an unrelated source" }
@@ -92,7 +96,13 @@ class PreparedSourceInvocation internal constructor(
     }
 
     internal fun requireUnselectedFloatGrid() {
-        require(!finiteBorrowed && floatGrid == null) { "source invocation already exposed an execution view" }
+        require(!finiteBorrowed && !executionFrozen && floatGrid == null) {
+            "source invocation already exposed an execution view"
+        }
+    }
+
+    internal fun freezeExecution() {
+        executionFrozen = true
     }
 
     internal fun requireFiniteExecution(shape: FiniteSolveShape, engine: FiniteEngine, operation: ExecutionOperation) {
