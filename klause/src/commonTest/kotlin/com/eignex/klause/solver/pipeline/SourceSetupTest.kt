@@ -285,7 +285,7 @@ class SourceSetupTest {
         val program = parseFlatZinc(
             "var -3..3: x; var 0..3: a; var -2..4: t; " +
                 "constraint int_abs(x,a) :: defines_var(a); " +
-                "constraint int_plus(x,1,t) :: defines_var(t); solve minimize a;",
+                "constraint int_lin_eq([1,-1],[x,t],-1) :: defines_var(t); solve minimize a;",
         )
         val x = program.intVarsByName.getValue("x")
         val t = program.intVarsByName.getValue("t")

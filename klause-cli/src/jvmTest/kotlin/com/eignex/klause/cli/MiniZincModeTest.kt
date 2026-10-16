@@ -39,7 +39,7 @@ class MiniZincModeTest(private val direction: String) {
                 val shape = solvable.finiteShape
                 val invocation = assertNotNull(shape.sourceInvocation)
 
-                assertSame(solvable.problem, invocation.source.originalSource)
+                assertTrue(solvable.problem === invocation.source.originalSource)
                 assertSame(shape.preparedPlan, invocation.preparedPlan)
                 assertEquals(2, invocation.source.definitionHints.size)
                 assertNull(solvable.definitionalSweep)
