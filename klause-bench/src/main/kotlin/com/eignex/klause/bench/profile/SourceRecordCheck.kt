@@ -132,8 +132,10 @@ object SourceRecordCheck {
                 .redirectOutput(ProcessBuilder.Redirect.appendTo(file)).start()
             check(process.waitFor() == 0) { "${command.first()} failed; see ${file.path}" }
         }
-        execute(log, listOf("sudo", "apt-get", "update", "-qq"))
-        execute(log, listOf("sudo", "apt-get", "install", "-yq", "python3-venv"))
+        if (System.getProperty("os.name").startsWith("Linux", ignoreCase = true)) {
+            execute(log, listOf("sudo", "apt-get", "update", "-qq"))
+            execute(log, listOf("sudo", "apt-get", "install", "-yq", "python3-venv"))
+        }
         val environment = out.resolve("checker-environment")
         execute(log, listOf("python3", "-m", "venv", environment.absolutePath))
         val python = environment.resolve("bin/python").absolutePath
