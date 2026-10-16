@@ -37,7 +37,7 @@ object SourceRecordCheck {
             bundleOptions == setOf("bundle", "sha256") || bundleOptions == setOf("input64", "sha256"),
         ) {
             "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest> " +
-                "and checker=source|boolean|minizinc"
+                "and checker=source|candidate|boolean|minizinc"
         }
         require(options["captureSources"] in listOf(null, "true", "false")) { "captureSources must be true or false" }
         require(options["witnessOnly"] in listOf(null, "true", "false")) { "witnessOnly must be true or false" }
@@ -47,9 +47,10 @@ object SourceRecordCheck {
         require(options["catalog"] == null || options["catalog"] == "true")
         val checker = when (options["checker"] ?: "source") {
             "source" -> "verify_source_results.py"
+            "candidate" -> "verify_candidate_source_results.py"
             "boolean" -> "verify_boolean_source_results.py"
             "minizinc" -> null
-            else -> error("checker must be source, boolean or minizinc")
+            else -> error("checker must be source, candidate, boolean or minizinc")
         }
         require(!rootBounds || checker == "verify_source_results.py") { "rootBounds requires the source checker" }
         require(!witnessOnly || checker == "verify_source_results.py") { "witnessOnly requires the source checker" }
@@ -142,7 +143,9 @@ object SourceRecordCheck {
             tools.resolve("requirements-source-checks.txt").absolutePath))
         execute(out.resolve("checker-dependencies.txt"), listOf(python, "-m", "pip", "freeze"))
         out.resolve("checker-tool-hashes.json").writeText(buildJsonObject {
-            for (name in listOf(checker, "requirements-source-checks.txt")) {
+            val names = listOf(checker, "requirements-source-checks.txt") +
+                if (checker == "verify_candidate_source_results.py") listOf("verify_source_results.py") else emptyList()
+            for (name in names) {
                 put(name, sha(tools.resolve(name).readBytes()))
             }
         }.toString() + "\n")

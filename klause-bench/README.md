@@ -1285,6 +1285,16 @@ the encoded input is capped at 96 KiB and the compressed `sha256` remains requir
 Each `sources` value is base64 original bytes or an object with `gzip64` holding
 base64 gzip bytes. Decompression preserves the original source hash and caps the
 combined uncompressed sources at 64 MiB.
+`checker=candidate` separately checks unpublished cached exact LP points against
+integer-only original SMT sources. Its records carry `diagnosticCandidateOnly`,
+the unchanged schema2 probe/root text and producer hashes, without solver verdict
+fields. It requires actual current-state/layout provenance and a complete empty
+source reconstruction before projecting declared integer IDs. Every original
+declaration must be covered by an exact integral coordinate, and every original
+assertion is checked with all inputs pinned. Fractional, missing or unqualified
+values are ineligible. Acceptance validates only that assignment; rejection refutes
+only the pinned point. Neither produces ordinary solver verdict or recovery credit.
+The candidate script and its imported maintained source checker are both hashed.
 `rootBounds=true` additionally checks each recorded `lpRootBound` against the
 unchanged original MPS constraints and objective, in minimized source units.
 MPS statistics retain the positive integer `lpRootBoundScale` used by lowering.
