@@ -209,8 +209,13 @@ repair, graph construction and full-row validation. Equation repair admits at mo
 65,536 input entries, pivot cells and projected entries and 4,096-bit scalars; pairing,
 sparse elimination and substitution charge the same token before bounded arithmetic.
 Retained pivots can reduce inequalities to a difference graph over free real coordinates;
-this reuses the same decomposition and token, without a second elimination or LP call. Its difference potential query charges copied cells and conservative
-edge-sweep and predecessor-walk batches to that same token. These nonrefundable
+this reuses the same decomposition and token without a second elimination. A general
+residual is partitioned under that token. Difference components use the graph checker;
+other components share the existing reduction owner's `SourceLpBudget`, including its
+256-operation cap, 128 combined rows/variables, 512 entries and aggregate input-bit
+admission. Opening or closing a residual component renews no allowance. Its graph
+potential query charges copied cells and conservative edge-sweep and predecessor-walk
+batches to that same token. These nonrefundable
 batches add no allowance. An observed stop withholds the recovered point, and a
 failed guessed integer assignment supplies no source refutation.
 
