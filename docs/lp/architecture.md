@@ -169,6 +169,12 @@ admission; each transient component closes within that invocation. Only exact pr
 coordinates are consumed. Source reconstruction and every original row still gate
 publication, and a failed guessed assignment supplies no source conflict or bound.
 
+Numerical local-search completion may supply a worker-retained immutable source
+encoding to the model-facing leaf adapter. Only unconditioned built-in linear rows
+are reused across finite candidates; conditioned and custom encodings remain
+candidate-specific. Pinned relaxation assembly, numerical state and witness checks
+belong to each attempt. [Local search](../solver/local-search.md) owns that lifecycle.
+
 Finite satisfaction and optimization searches share root hull pruning and global
 cut harvesting. Satisfaction uses a zero objective and admits variable shaving;
 objective shaving and incumbent-relative fixings remain optimization work. Root

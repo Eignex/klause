@@ -1,25 +1,36 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.Encoder
+import com.eignex.klause.theory.EncoderDecline
+import com.eignex.klause.theory.EncoderProvider
+import com.eignex.klause.theory.EncoderSupport
+import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -60,6 +71,65 @@ class LeafRealCompletionTest {
 
         val refuted = assertIs<Completion.Refuted>(completion)
         assertEquals(setOf(0, 1), refuted.factors.toSet())
+    }
+
+    @Test
+    fun `repeated completion should validate each candidate's finite pins`() {
+        val completion = LeafRealCompletion(problem, objective = null)
+
+        val first = completion.complete(candidate(2, 0.4), Cancellation.Never)
+        val rejected = completion.complete(candidate(0, 0.4), Cancellation.Never)
+        val repeated = completion.complete(candidate(2, 0.4), Cancellation.Never)
+
+        assertEquals(BigFraction.ofDouble(0.5), assertIs<Completion.Witness>(first).sample.exactReals?.single())
+        assertIs<Completion.Refuted>(rejected)
+        assertEquals(BigFraction.ofDouble(0.5), assertIs<Completion.Witness>(repeated).sample.exactReals?.single())
+    }
+
+    @Test
+    fun `a cancelled preparation should leave a later completion available`() {
+        val completion = LeafRealCompletion(problem, objective = null)
+
+        val stopped = completion.complete(candidate(2, 0.4), Cancellation { true })
+        val resumed = completion.complete(candidate(2, 0.4), Cancellation.Never)
+
+        assertIs<Completion.Undecided>(stopped)
+        assertEquals(BigFraction.ofDouble(0.5), assertIs<Completion.Witness>(resumed).sample.exactReals?.single())
+    }
+
+    @Test
+    fun `conditioned completion should install the current integer operand`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0)), numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val completion = LeafRealCompletion(source, objective = null)
+
+        for (pin in listOf(0L, 1L, 0L)) {
+            val sample = Sample(booleanArrayOf(), longArrayOf(pin), doubleArrayOf(1.0, 0.5))
+            val result = completion.complete(sample, Cancellation.Never)
+
+            assertEquals(BigFraction.ofLong(pin), assertIs<Completion.Witness>(result).sample.exactReals?.get(1))
+        }
+    }
+
+    @Test
+    fun `custom linear encoders should retain candidate-specific declines`() {
+        val projections = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            val selected = BuiltInEncoderProvider.select(factor, target)
+            if (target != EncodingTarget.LINEAR) selected else {
+                Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0))) { view, encoding ->
+                    if (encoding.fixedInteger(SourceIntId(0)) == bigIntOf(0)) EncoderDecline.UNSUPPORTED
+                    else selected.install(view, encoding)
+                }
+            }
+        }).prepare(problem)
+        val encoding = LinearCompletionEncoding(projections)
+
+        val accepted = encoding.modelFor(candidate(2, 0.5), Cancellation.Never)
+        val declined = encoding.modelFor(candidate(0, 0.5), Cancellation.Never)
+
+        assertNotNull(accepted)
+        assertNull(declined)
     }
 
     @Test

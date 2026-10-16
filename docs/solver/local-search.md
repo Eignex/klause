@@ -715,6 +715,13 @@ and sparse row repair under the existing numerical limits. Every recovered point
 passes exact LP and original-source checks; feasibility does not require residual
 objective attainment. Its arithmetic work joins floating LP work in the existing
 instruction conversion, including unsuccessful attempts.
+Each numerical completion worker retains a completed source-check encoding for
+built-in `Linear` and `ExactLinear` real-dependent factors. Installation uses empty
+finite conditions, so candidate changes do not invalidate that immutable model.
+Every attempt still assembles and solves its pinned residual and checks its completed
+coordinates. Conditioned relations and custom encoder providers install against each
+candidate's finite values. Interrupted preparation publishes no retained model, and
+a source rewrite creates a fresh completion worker.
 An optional private completion observer receives the residual verdict and existing LP
 statistics. It supplies no admission authority and performs no additional numerical query.
 

@@ -447,6 +447,11 @@ their separate reasons.
 Numerical mixed completion includes bounded exact point-recovery arithmetic in its
 LP-to-instruction conversion. The observed recovery phase retains its spent work on
 failure or cancellation and creates no additional query or allowance.
+Worker-retained unconditioned source encodings contain immutable completed rows,
+without samples, solve state or cancellation tokens. Construction uses the current
+attempt's cancellation; reuse polls that attempt's token and retains the ordinary
+completion instruction debit. It neither repeats skipped construction charges nor
+refunds spent work. Failed or interrupted installation remains retryable.
 
 [Transcendental execution](../theories/transcendental.md#state-and-resources) retains
 private source services in shared invocation slots. Slot native reservations and the
