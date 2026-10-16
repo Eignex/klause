@@ -228,9 +228,10 @@ internal class MiniZincOutput(
         }
         if (realScopeChanged) {
             val bounds = checkNotNull(sourceSemantics?.effective?.undeclaredReals)
+            val lower = bounds.lower?.let { BigFraction.of(it.numerator, it.denominator).toString() } ?: "open"
+            val upper = bounds.upper?.let { BigFraction.of(it.numerator, it.denominator).toString() } ?: "open"
             println(
-                "% klause-source-semantics: unbounded-real-lo=${bounds.lower ?: "open"} " +
-                    "unbounded-real-hi=${bounds.upper ?: "open"}",
+                "% klause-source-semantics: unbounded-real-lo=$lower unbounded-real-hi=$upper",
             )
         }
     }

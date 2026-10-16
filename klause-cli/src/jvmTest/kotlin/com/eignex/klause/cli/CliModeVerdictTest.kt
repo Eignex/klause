@@ -52,21 +52,26 @@ class CliModeVerdictTest {
 
     @Test
     fun `caller real bounds should qualify output and withhold default source terminal claims`() {
-        val semantics = flatZincSemantics.resolve(SemanticOverrides(
-            undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(-20))),
-        ))
-        for (verdict in listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED, Verdict.OPTIMAL)) {
-            val out = capture {
-                MiniZincOutput(sourceSemantics = semantics).apply {
-                    begin(optimize = verdict != Verdict.UNSATISFIABLE, maximize = false)
-                    onComplete(verdict)
+        for ((lower, text) in listOf(
+            SemanticRational.ofLong(-20) to "-20",
+            SemanticRational.of(bigIntOf(-1), bigIntOf(2)) to "-1/2",
+        )) {
+            val semantics = flatZincSemantics.resolve(SemanticOverrides(
+                undeclaredReals = BoundsOverride(lower = BoundOverride.Value(lower)),
+            ))
+            for (verdict in listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED, Verdict.OPTIMAL)) {
+                val out = capture {
+                    MiniZincOutput(sourceSemantics = semantics).apply {
+                        begin(optimize = verdict != Verdict.UNSATISFIABLE, maximize = false)
+                        onComplete(verdict)
+                    }
                 }
-            }
 
-            assertTrue("unbounded-real-lo=-20 unbounded-real-hi=open" in out, out)
-            assertTrue("no default-source proof" in out, out)
-            assertTrue("=====UNSATISFIABLE=====" !in out && "=====UNBOUNDED=====" !in out, out)
-            assertTrue("==========" !in out, out)
+                assertTrue("unbounded-real-lo=$text unbounded-real-hi=open" in out, out)
+                assertTrue("no default-source proof" in out, out)
+                assertTrue("=====UNSATISFIABLE=====" !in out && "=====UNBOUNDED=====" !in out, out)
+                assertTrue("==========" !in out, out)
+            }
         }
     }
 
