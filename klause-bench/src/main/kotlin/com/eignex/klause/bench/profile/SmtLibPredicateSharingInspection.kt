@@ -47,6 +47,7 @@ internal object SmtLibPredicateSharingInspection {
             arithmetic.getOrPut(signature) { HashSet() }.add(row.auxBoolVar)
         }
         return buildJsonObject {
+            put("schemaVersion", 2)
             put("scope", "retained private output identities; exact structural meanings, no algebraic equivalence")
             put("clauseGates", summarize(gates, beforeExpansion))
             put("retainedBooleanOwnersOutsideClauseGateScope", skipped)
@@ -62,10 +63,11 @@ internal object SmtLibPredicateSharingInspection {
     private fun summarize(groups: Map<String, Set<Int>>, beforeExpansion: Set<Int>): JsonObject {
         val repeated = groups.values.filter { it.size > 1 }
         return buildJsonObject {
-            put("privateOutputs", groups.values.sumOf { it.size })
+            put("outputSignatureMemberships", groups.values.sumOf { it.size })
+            put("distinctPrivateOutputs", groups.values.flatten().toSet().size)
             put("distinctMeanings", groups.size)
             put("repeatedMeaningGroups", repeated.size)
-            put("redundantOutputs", repeated.sumOf { it.size - 1 })
+            put("groupMembershipExcess", repeated.sumOf { it.size - 1 })
             put("outputsInRepeatedGroupsBeforeExpansion", repeated.sumOf { group ->
                 group.count { it in beforeExpansion }
             })

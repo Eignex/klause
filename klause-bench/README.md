@@ -350,7 +350,9 @@ normalizing only their private output Boolean, and exact repeated integer predic
 rows after excluding only their output Boolean. It preserves input identities,
 polarity, coefficients and bounds, without algebraic equivalence checks. Gate origin
 uses the explicit predicate owners captured before expansion; this origin set does
-not cover every primitive row allocation. These observations install no interning.
+not cover every primitive row allocation. Per-signature membership excess can count
+one arithmetic output several times; the distinct-output union is reported separately.
+These counts do not estimate removable columns or install interning.
 Its additional compilation is before the opening deadline and supplies no timing,
 CLI-equivalence, refusal-cause or source-verdict claim.
 
