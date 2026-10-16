@@ -12,8 +12,10 @@ import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -151,6 +153,19 @@ class FlatZincSemanticsTest {
             assertEquals(1_000_000L, program.problem.intBounds.upper(0))
             assertEquals(programs.first().semantics.effective, program.semantics.effective)
         }
+    }
+
+    @Test
+    fun `typed grid windows should retain representable subnormal endpoints`() {
+        val endpoint = SemanticRational.of(BIG_ONE, BIG_ONE shl 1074)
+        val bounds = UndeclaredRealBounds(endpoint, endpoint)
+        val overrides = SemanticOverrides(floats = FloatSemantics.Grid(8, 1_000_000, bounds))
+
+        val program = parseFlatZinc("var float: x; solve minimize x;", semanticOverrides = overrides)
+
+        val variable = program.floatVarsByName.getValue("x")
+        assertEquals(Double.MIN_VALUE, variable.lo)
+        assertEquals(Double.MIN_VALUE, variable.hi)
     }
 
     @Test
