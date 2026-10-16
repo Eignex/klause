@@ -2769,6 +2769,8 @@ public final class com/eignex/klause/formats/mps/MpsIndicator {
 }
 
 public final class com/eignex/klause/formats/mps/MpsLinearSourceKt {
+	public static final fun checkMpsWitness (Lcom/eignex/klause/ir/LinearSourceProblem;Ljava/util/List;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/validation/LinearSourceWitness;
+	public static synthetic fun checkMpsWitness$default (Lcom/eignex/klause/ir/LinearSourceProblem;Ljava/util/List;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/validation/LinearSourceWitness;
 	public static final fun toLinearSourceProblem (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/ir/LinearSourceProblem;
 	public static synthetic fun toLinearSourceProblem$default (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/ir/LinearSourceProblem;
 }
