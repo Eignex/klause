@@ -8,6 +8,21 @@ binary64. Exact and tolerance-based publication have distinct guarantees.
 owns numerical evidence. This page defines source correspondence, tolerances and
 the claims each route may publish.
 
+## Declared policy
+
+`MpsModel.semantics` captures source defaults before lowering. Parsed models declare
+`DECIMAL_LITERALS`; programmatic models interpret supplied doubles as exact binary64
+literals. `toProblem(settings, semanticOverrides)` resolves caller policy before
+constructing a model. `MpsCompiled.semantics` and its `Problem` retain the same effective
+contract. Float grids, default undeclared ranges and optional-value policies are
+inapplicable to MPS and reject overrides.
+
+MPS defaults to `SourceTolerance(absolute=1/10000000, relative=1/10000000)`.
+Each component can be replaced independently, including zero. Zero tolerance uses
+exact source rows. The compatibility `toExactSourceProblem` entry defaults to zero;
+its explicit overrides and internal exact-row fallback retain their resolved policy.
+Source representation and the permitted feasibility slack are separate properties.
+
 ## Source correspondence
 
 The MPS parser retains decimal source metadata, integer markers, bounds and
@@ -49,8 +64,8 @@ so retraction removes their authority.
 Integral integer objectives retain their source coefficients directly. Other
 objectives use an auxiliary equality retaining original decimal coefficients and
 constant in source units. The returned column mapping omits this auxiliary and
-its source witness check requires exact feasibility, independently of the hybrid
-lowering's tolerance correspondence. Both loading entry points use the same factor
+its source witness check uses the captured effective feasibility tolerance.
+The compatibility entry defaults to zero tolerance. Both loading entry points use the same factor
 execution views. Integer-only rows
 have exact finite filtering and scores; continuous rows have heuristic scores and
 source-certified completion. Wide coefficients, RHS values and objective definitions
@@ -68,17 +83,17 @@ sources as well as bounded mixed sources.
 
 ## Tolerance publication
 
-Finite default MPS solves can accept a complete continuous candidate by source tolerance.
-Root primal proposals can retain their LP float coordinates when the composed
-source check accepts the full point; rejected proposals retain real-completion
-fallback. These proposals carry the same tolerance witness guarantee. Rows use
+MPS witness checks use original source decimals with exact rational arithmetic,
+including finite binary64 candidate coordinates. Rows permit
+`max(absolute, relative * max(abs(bound), sum(abs(a(i) * x(i)))))`;
+column bounds permit `max(absolute, relative * abs(bound))`. Integrality remains
+exact. The float and rational witness APIs apply the same effective policy,
+including zero and overflow/cancellation of floating term activities. Cooperative
+cancellation withholds the point; a partial check establishes no witness.
+`MpsSourceWitness.exact` records whether the accepted point satisfies every row and
+bound without slack, independently of `sourceExact` and the configured tolerance.
 
-```text
-1e-7 * max(1, abs(bound), sum(abs(a(i) * x(i))))
-```
-
-and column bounds use `1e-7 * max(1, abs(bound))`. Nonfinite row activity or
-magnitude is checked again exactly against this scaled tolerance. The separate LP
+The separate LP
 gap test uses lowered objective units and accounts for reduced-cost movement, row
 residuals and objective rounding. The rendered objective uses source decimal
 coefficients at the returned point.
@@ -99,8 +114,9 @@ point is not an exact witness. Optimum publication requires no
 the source is replaced by the exact source adapter for numerical execution.
 Exact adapter witnesses require original decimal feasibility. Working-model
 witnesses on the default finite LP lane retain the separate tolerance guarantee.
-Output comments identify an exact original-source witness or a source-tolerance
-witness independently of the optimization status.
+Output comments identify actual exact original-source feasibility or tolerance
+acceptance independently of the optimization status. An exact point alone does not
+upgrade an inexact working-model optimum to an attained source optimum.
 Optimal output includes `optimizationStatus=attained-optimum` or
 `optimizationStatus=tolerance-optimum` for that accepted witness guarantee.
 

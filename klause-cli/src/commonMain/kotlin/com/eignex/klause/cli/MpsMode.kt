@@ -6,6 +6,8 @@ import com.eignex.klause.formats.mps.MpsLoweringException
 import com.eignex.klause.formats.mps.MpsSourceWitness
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
@@ -46,12 +48,17 @@ internal object MpsMode : CliMode {
         override fun load(path: String, common: CommonOptions): Solvable {
             val source = Mps.parse(openFileSource(path))
             val settings = common.config.problemSettings()
-            val lowered = try {
-                source.toProblem(settings)
-            } catch (_: MpsLoweringException) {
-                source.toExactSourceProblem(settings)
+            val semanticOverrides = if (common.exact) {
+                SemanticOverrides(feasibilityTolerance = SourceTolerance())
+            } else {
+                SemanticOverrides()
             }
-            val exactSource = source.toExactSourceProblem(settings)
+            val lowered = try {
+                source.toProblem(settings, semanticOverrides)
+            } catch (_: MpsLoweringException) {
+                source.toExactSourceProblem(settings, semanticOverrides)
+            }
+            val exactSource = source.toExactSourceProblem(settings, semanticOverrides)
             val sourceAdmission = NumericalLinearRequest(exactSource.model,
                 cancellation = common.routingCancellation()).numericalRowsSupported()
             var compiled = if (!sourceAdmission || (common.exact && !lowered.sourceExact)) exactSource else lowered
@@ -81,13 +88,17 @@ internal object MpsMode : CliMode {
             val render: (Sample) -> String = { sample ->
                 if (sample.exactReals == null && compiled.model.numRealVars > 0) {
                     // A float leaf under tolerance semantics: its values are the doubles themselves.
-                    state.latestSourceObjective = compiled.sourceObjective(sample.ints, sample.reals)
-                    state.exactSourceWitness = false
+                    val witness = compiled.sourceWitness(compiled.columns.map { column ->
+                        if (column.real) checkNotNull(BigFraction.ofDouble(sample.reals[column.id]))
+                        else BigFraction.ofLong(sample.ints[column.id])
+                    })
+                    state.latestSourceObjective = witness.objective
+                    state.exactSourceWitness = witness.exact
                     renderMpsFloat(compiled, sample)
                 } else {
                     val witness = compiled.sourceWitness(sample.ints, sample.exactReals)
                     state.latestSourceObjective = witness.objective
-                    state.exactSourceWitness = compiled.sourceExact
+                    state.exactSourceWitness = witness.exact
                     renderMpsWitness(compiled, witness)
                 }
             }
@@ -106,7 +117,7 @@ internal object MpsMode : CliMode {
                 }
                 state.sourceWitnessAccepted = witness != null
                 state.latestSourceObjective = witness?.objective
-                if (witness != null) state.exactSourceWitness = compiled.sourceExact
+                if (witness != null) state.exactSourceWitness = witness.exact
                 renderMpsOpenModel(compiled, assignment)
             }
             val objective = compiled.objective?.toLinearObjective()
@@ -166,7 +177,7 @@ private fun parseOpenMpsNumber(value: String): BigFraction {
     return BigFraction.of(parseBigInt(parts[0]), if (parts.size == 1) BIG_ONE else parseBigInt(parts[1]))
 }
 
-// MPS results use tolerance semantics: a float leaf stands when the source rows hold within MPS_TOLERANCE.
+// The effective source policy checks every floating leaf before publication.
 private fun mpsLinearSolvable(compiled: MpsCompiled, exact: Boolean, solvable: Solvable): Solvable = if (exact) {
     solvable
 } else {
@@ -314,7 +325,7 @@ internal class MpsOutput(
     override fun completionMetadata(verdict: Verdict): String? {
         if (verdict != Verdict.OPTIMAL || best == null || !sourceExact || !sourceWitnessAccepted()) return null
         val status = when (exactSourceWitness()) {
-            true -> "attained-optimum"
+            true -> if (proofExact) "attained-optimum" else "tolerance-optimum"
             false -> "tolerance-optimum"
             null -> return null
         }

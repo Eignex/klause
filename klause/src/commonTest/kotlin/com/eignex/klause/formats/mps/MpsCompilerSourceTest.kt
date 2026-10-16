@@ -1,6 +1,8 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.parseBigInt
@@ -249,7 +251,7 @@ class MpsCompilerSourceTest {
             MpsObjective("", IntArray(0), DoubleArray(0), 0.0),
             listOf(MpsVar("X", integer = true, lower = -1e19, upper = 0.0)),
             emptyList(),
-        ).toProblem()
+        ).toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
 
         assertTrue(compiled.sourceExact)
         assertNull(compiled.sourceDifference)
@@ -266,7 +268,7 @@ class MpsCompilerSourceTest {
             MpsObjective("", IntArray(0), DoubleArray(0), 0.0),
             listOf(MpsVar("X", integer = true, lower = 0.0, upper = 1e19)),
             emptyList(),
-        ).toProblem()
+        ).toProblem(semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
 
         assertTrue(compiled.sourceExact)
         assertNull(compiled.sourceDifference)

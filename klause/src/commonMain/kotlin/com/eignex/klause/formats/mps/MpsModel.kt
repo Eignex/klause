@@ -1,6 +1,8 @@
 package com.eignex.klause.formats.mps
 
+import com.eignex.klause.ir.NumericAuthority
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.simplex.exact.BigFraction
 
@@ -260,6 +262,8 @@ class MpsModel(
     val variables: List<MpsVar>,
     /** Linear rows. */
     val constraints: List<MpsConstraint>,
+    /** Declared source policy, resolved with caller overrides before lowering. */
+    val semantics: SourceSemantics = mpsSemantics.copy(numericAuthority = NumericAuthority.BINARY64_LITERALS),
 ) {
     private var parsedSourceNumbers: MpsSourceNumbers? = null
 
@@ -285,9 +289,10 @@ class MpsModel(
         objective: MpsObjective = this.objective,
         variables: List<MpsVar> = this.variables,
         constraints: List<MpsConstraint> = this.constraints,
+        semantics: SourceSemantics = this.semantics,
     ): MpsModel {
         val source = sourceNumbers().reconciled(objective, variables, constraints)
-        return MpsModel(name, sense, objective, variables, constraints).withSourceNumbers(source)
+        return MpsModel(name, sense, objective, variables, constraints, semantics).withSourceNumbers(source)
     }
 
     operator fun component1(): String = name
@@ -298,14 +303,15 @@ class MpsModel(
 
     override fun equals(other: Any?): Boolean = other is MpsModel &&
         name == other.name && sense == other.sense && objective == other.objective &&
-        variables == other.variables && constraints == other.constraints
+        variables == other.variables && constraints == other.constraints && semantics == other.semantics
 
     override fun hashCode(): Int {
         var result = name.hashCode()
         result = 31 * result + sense.hashCode()
         result = 31 * result + objective.hashCode()
         result = 31 * result + variables.hashCode()
-        return 31 * result + constraints.hashCode()
+        result = 31 * result + constraints.hashCode()
+        return 31 * result + semantics.hashCode()
     }
 
     override fun toString(): String =
