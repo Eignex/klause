@@ -721,7 +721,6 @@ internal class LocalSearchEngine(
         val maxFlips = moveCap(params)
         var cancelled = false
         var liveCompletion: Completion? = null
-        var processedCompletion: Completion.Witness? = null
         var pendingCompletedMove = false
 
         // Cross-engine solution flow: publish each improvement into the shared exchange, and before a
@@ -885,11 +884,9 @@ internal class LocalSearchEngine(
                 } else {
                     objective.evaluate(state.assignment)
                 }
-                val needsPublicationCheck = when (val completed = liveCompletion) {
-                    is Completion.Witness -> completed !== processedCompletion
-                    else -> obj < bestObj
-                }
-                if (needsPublicationCheck && state.intValuesInDomain()) {
+                if ((liveCompletion is Completion.Witness || obj < bestObj) &&
+                    state.intValuesInDomain()
+                ) {
                     val decided = liveCompletion ?: decide(
                         state,
                         state.assignment.snapshot(),
@@ -920,7 +917,6 @@ internal class LocalSearchEngine(
                         solution.symbolicReals == null && solution.algebraicReals == null &&
                         previous.symbolicReals == null && previous.algebraicReals == null
                     ) objective.evaluateExact(solution) < objective.evaluateExact(previous) else solved < bestObj
-                    processedCompletion = decided
                     if (improves) {
                         bestObj = solved
                         bestSample = solution
