@@ -169,6 +169,28 @@ class ProblemPipelineTest {
     }
 
     @Test
+    fun `optional stop should retain fully proved bounds for finite admission`() {
+        val open = Bits(1).also { it.set(0) }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, open),
+            factors = arrayOf(Linear(longArrayOf(2), intArrayOf(0), LinearOp.LE, 10)),
+        )
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val optional = budget.orSpent(Cancellation.Never)
+
+        val route = assertIs<SourceProblemRoute.Finite>(model.pipelineRoute(
+            boundCancellation = optional,
+            preparationCancellation = Cancellation.Never,
+            onLpStats = { budget.charge(budget.remaining()) },
+        ))
+
+        assertTrue(optional())
+        assertEquals(IntDomain(0, 5), route.problem.finiteIntDomains().single())
+        assertSame(model, route.preparedPlan.originalSource)
+    }
+
+    @Test
     fun `optional stop should retain proved partial bounds for complete admission`() {
         val open = Bits(3).also { it.set(1); it.set(2) }
         val model = Problem(
