@@ -11684,16 +11684,20 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryEngine {
 }
 
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryExecution {
+	public abstract fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryExecution$Optimize : com/eignex/klause/solver/pipeline/OpenTheoryExecution {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution$Optimize;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution$Optimize;Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution$Optimize;
+	public final fun component2 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution$Optimize;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution$Optimize;Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution$Optimize;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAcceptedIncumbent ()Lcom/eignex/klause/solver/pipeline/SourceIncumbentPublication;
 	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -11705,6 +11709,7 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryExecution$Satisfy
 	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution$Satisfy;Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution$Satisfy;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -12192,15 +12197,16 @@ public final class com/eignex/klause/solver/pipeline/QuadraticIntegerOptimizatio
 }
 
 public final class com/eignex/klause/solver/pipeline/QuadraticOptimizationExecution {
-	public fun <init> (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;
 	public final fun component2 ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;
 	public final fun component3 ()J
 	public final fun component4 ()J
 	public final fun component5 ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;
-	public final fun copy (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public final fun component6 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun copy (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAcceptedIncumbent ()Lcom/eignex/klause/solver/pipeline/QuadraticIncumbentPublication;
 	public final fun getNativeWork ()J
@@ -12208,6 +12214,7 @@ public final class com/eignex/klause/solver/pipeline/QuadraticOptimizationExecut
 	public final fun getPolynomialStats ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;
 	public final fun getResource ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;
 	public final fun getResult ()Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;
+	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
