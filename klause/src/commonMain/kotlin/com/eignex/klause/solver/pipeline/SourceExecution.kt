@@ -261,7 +261,7 @@ private fun executeCapturedSource(
     callbacks: SourceExecutionCallbacks,
 ): SourceExecutionResult {
     val invocation = request.invocation
-    val kind = executionKind(invocation)
+    val kind = SourceSetup.executionKind(invocation)
     if (invocation.operation !in setOf(
             ExecutionOperation.SATISFY,
             ExecutionOperation.OPTIMIZE,

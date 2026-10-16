@@ -169,7 +169,9 @@ internal fun legacyPreparedExecution(
         originalSource as NonlinearIntegerProblem,
     )
     PreparedExecutionKind.TRANSCENDENTAL -> PreparedExecution.Transcendental(originalSource as TranscendentalProblem)
-    PreparedExecutionKind.NUMERICAL -> PreparedExecution.Numerical(originalSource as LinearSourceProblem, requireNotNull(model))
+    PreparedExecutionKind.NUMERICAL -> PreparedExecution.Numerical(
+        originalSource as LinearSourceProblem, requireNotNull(model),
+    )
     PreparedExecutionKind.DECLINED -> if (decline == PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE &&
         polynomialModel != null
     ) PreparedExecution.Polynomial(polynomialModel) else PreparedExecution.Declined(

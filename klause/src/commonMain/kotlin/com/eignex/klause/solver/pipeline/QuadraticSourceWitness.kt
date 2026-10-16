@@ -6,6 +6,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
+import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
@@ -28,7 +29,7 @@ internal fun checkQuadraticSourceWitness(
 ): SourceEvidenceCheck = try {
     val arithmetic = PolynomialArithmetic(cancellation, limits)
     arithmetic.step()
-    val linear = plan.originalSource is com.eignex.klause.ir.LinearSourceProblem
+    val linear = plan.originalSource is LinearSourceProblem
     val model = plan.sourceModel.takeIf { linear }
     if (point.numBoolVars != (model?.numBoolVars ?: plan.sourceBoolCount) ||
         point.numIntVars != (model?.numIntVars ?: plan.sourceIntCount) ||
@@ -51,7 +52,7 @@ internal fun checkQuadraticSourceWitness(
                     point.bools, values, cancellation, arithmetic, limits)
             }
         }
-        is com.eignex.klause.ir.LinearSourceProblem -> checkQuadraticIrWitness(plan, point, cancellation, arithmetic, limits)
+        is LinearSourceProblem -> checkQuadraticIrWitness(plan, point, cancellation, arithmetic, limits)
         is Problem -> checkQuadraticIrWitness(plan, point, cancellation, arithmetic, limits)
         else -> SourceEvidenceCheck.Unavailable("quadratic source has no installed witness checker")
     }

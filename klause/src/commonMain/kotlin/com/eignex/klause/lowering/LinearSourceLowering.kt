@@ -50,7 +50,9 @@ internal fun lowerLinearSource(
     for (index in columns.indices) {
         stop.charge(1L)
         if (stop()) return null
-        columns[index] = if (source.variableValues[index].integer) Term.ofIntVar(integers++) else Term.ofRealVar(reals++)
+        columns[index] = if (source.variableValues[index].integer) {
+            Term.ofIntVar(integers++)
+        } else Term.ofRealVar(reals++)
     }
     val sourceReals = reals
     val lower = LongArray(integers)
@@ -108,7 +110,7 @@ internal fun lowerLinearSource(
             val comparison = row(original.termValues, relation, bound)
             val guard = original.indicator
             factors += if (guard == null) comparison as Factor else {
-                LinearIndicator(Term.intVar(columns[guard.column]), guard.whenOne, comparison)
+                LinearIndicator(Term.intVar(columns[guard.column]), guard.whenOne, comparison as ExactLinear)
             }
         }
         if (original.lower != null && original.lower == original.upper) add(original.lower, LinearOp.EQ) else {
@@ -171,7 +173,8 @@ internal fun lowerLinearSource(
         realLower = DoubleArray(reals) { if (it < realLower.size) realLower[it] else Double.NEGATIVE_INFINITY },
         realUpper = DoubleArray(reals) { if (it < realUpper.size) realUpper[it] else Double.POSITIVE_INFINITY },
     )
-    return LinearSourceView(source, model, objective, columns, integers, sourceReals, exact, objectiveScale).takeUnless { stop() }
+    return LinearSourceView(source, model, objective, columns, integers, sourceReals, exact, objectiveScale)
+        .takeUnless { stop() }
 }
 
 private fun BigFraction.fitsObjectiveLong(): Boolean =
@@ -188,5 +191,7 @@ private fun LinearSourceProblem.canProjectToDouble(stop: Cancellation): Boolean 
     return variableValues.all { supported(it.lower) && supported(it.upper) } &&
         rowValues.all { row -> supported(row.lower) && supported(row.upper) &&
             row.termValues.all { supported(it.coefficient) } } &&
-        (objective?.let { supported(it.constant) && it.termValues.all { term -> supported(term.coefficient) } } != false)
+        (objective?.let { objective ->
+            supported(objective.constant) && objective.termValues.all { supported(it.coefficient) }
+        } != false)
 }

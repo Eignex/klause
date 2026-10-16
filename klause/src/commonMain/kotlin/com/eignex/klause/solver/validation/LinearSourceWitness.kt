@@ -39,8 +39,11 @@ internal fun checkLinearSourceWitness(
     val absolute = BigFraction.of(tolerance.absolute.numerator, tolerance.absolute.denominator)
     val relative = BigFraction.of(tolerance.relative.numerator, tolerance.relative.denominator)
     var exact = true
-    fun slack(bound: BigFraction, magnitude: BigFraction): BigFraction =
-        maxOf(absolute, relative * maxOf(bound.magnitude(), magnitude))
+    fun slack(bound: BigFraction, magnitude: BigFraction): BigFraction {
+        val boundMagnitude = bound.magnitude()
+        val scaled = relative * if (boundMagnitude > magnitude) boundMagnitude else magnitude
+        return if (absolute > scaled) absolute else scaled
+    }
     fun satisfies(value: BigFraction, lower: BigFraction?, upper: BigFraction?, magnitude: BigFraction): Boolean {
         if ((lower != null && value < lower) || (upper != null && value > upper)) exact = false
         return (lower == null || value >= lower - slack(lower, magnitude)) &&

@@ -45,6 +45,7 @@ internal fun prepareLinearSource(
         )
     } else {
         view.model.pipelineRoute(
+            projections = request.providers.prepare(view.model),
             objective = objective,
             maximize = maximize,
             boundCancellation = request.boundCancellation or stop,

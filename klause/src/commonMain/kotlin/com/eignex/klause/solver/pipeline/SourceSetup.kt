@@ -108,7 +108,9 @@ object SourceSetup {
     ): PreparedSourceInvocation {
         val stop = request.cancellation.encodingPreparationScope()
         request.source.formula?.let { formula ->
-            if (formula is AttachedSourceFormula.Linear) return prepareLinearSource(request, formula.problem, stop, onLpStats)
+            if (formula is AttachedSourceFormula.Linear) {
+                return prepareLinearSource(request, formula.problem, stop, onLpStats)
+            }
             val route = prepareNativeSource(request, formula, stop)
             return PreparedSourceInvocation(request, route, stop)
         }

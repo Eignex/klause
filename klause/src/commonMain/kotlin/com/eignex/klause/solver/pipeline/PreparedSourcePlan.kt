@@ -222,7 +222,8 @@ class PreparedSourcePlan private constructor(
     /** Original rational linear objective, independent of a private working objective column. */
     val sourceLinearObjective: LinearSourceObjective? get() = (originalSource as? LinearSourceProblem)?.objective
 
-    internal val workingLinearObjective: LinearObjective? get() = operation.workingLinearObjective ?: operation.objective
+    internal val workingLinearObjective: LinearObjective?
+        get() = operation.workingLinearObjective ?: operation.objective
 
     /** Direction of [objective]. */
     val maximize: Boolean get() = operation.maximize

@@ -47,6 +47,18 @@ forwarded to the bench JVM. Keep the CLI distribution and runtime fixed during a
 | `corpus status`, `corpus gc`, `corpus compress [path]` | Inspect, evict or compress fetched collections |
 | `mine [by=config\|suite\|family\|format\|category\|kind] <cases.json> ...` | Report portfolio holder share, set cover, work and rewards; retain quarantined cases |
 
+`com.eignex.klause.bench.profile.LinearSourceCapture` records direct-library
+`LinearSourceProblem` invocations. Supply one base64 JSON array with original MPS
+bytes and SHA-256, declaration-order rational variables/rows/objective, tolerance,
+engine and limits. Fractions use integer or `numerator/denominator` strings.
+The profile retains input/runtime/build identities, original bytes, every checked
+source point, original objective value and separate native/source conclusions.
+`cases.json` can be replayed by `SourceRecordCheck` against those original bytes.
+The supplied neutral descriptor is a caller construction, not a certified MPS
+translation. Point/reference agreement does not verify exported native certificates
+or establish accepted-set completeness. Run through the maintained lab client at
+a pushed revision with `host=auto`; retain the actual host/runtime provenance.
+
 ## Selection and named sets
 
 `sets/<name>.txt` fixes membership as one `<suite>/<problem>` identity per line,
