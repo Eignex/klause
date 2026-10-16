@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
@@ -148,6 +149,32 @@ class SourceRecessionTest {
                 LinearOp.LE, BigFraction.ZERO, strict = strict, activator = 0)
             Case("false boundary strict $strict", listOf(row), listOf(0L, 0L), listOf(1L, 0L), aux = false) to strict
         }
+
+        for ((case, expected) in cases) assertEquals(expected, proves(case), case.name)
+    }
+    @Test
+    fun `distinct rays should preserve every affine separation`() {
+        val distinct = Distinct((0..1).map {
+            Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
+        })
+        val cases = listOf(
+            Case("separating values", listOf(distinct), listOf(1L, 0L), listOf(1L, 0L)) to true,
+            Case("crossing values", listOf(distinct), listOf(0L, 1L), listOf(1L, 0L)) to false,
+            Case("invalid initial collision", listOf(distinct), listOf(0L, 0L), listOf(1L, 1L)) to false,
+        )
+
+        for ((case, expected) in cases) assertEquals(expected, proves(case), case.name)
+    }
+
+    @Test
+    fun `false distinct rays should retain a permanent affine collision`() {
+        val distinct = Distinct((0..1).map {
+            Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
+        }, activator = 0)
+        val cases = listOf(
+            Case("persistent collision", listOf(distinct), listOf(0L, 0L), listOf(1L, 1L), aux = false) to true,
+            Case("isolated collision", listOf(distinct), listOf(0L, 0L), listOf(1L, 0L), aux = false) to false,
+        )
 
         for ((case, expected) in cases) assertEquals(expected, proves(case), case.name)
     }
