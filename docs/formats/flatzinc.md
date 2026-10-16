@@ -12,7 +12,8 @@ representation and output reconstruction.
 ## Declared semantics and caller ranges
 
 `flatZincSemantics` declares binary64 literal authority, default grid policy and
-`[-1000000, 1000000]` for integer declarations without a range. Parsing resolves
+`[-1000000, 1000000]` for integer declarations without a range, and open real
+endpoints for unranged float declarations. Parsing resolves
 `SemanticOverrides` before declaration planning and retains both defaults and
 effective policy in `FlatZincProgram.semantics`. String, streamed and execution
 entries use the same resolver. Legacy positional arguments feed that resolver;
@@ -25,18 +26,27 @@ authoritative, including restrictions introduced by a ranged alias. Open sides
 remain marked in `Problem.intBounds`; the finite placeholder endpoints carry no
 source-bound authority. Raw compilation retains the model without choosing a route.
 
+Real endpoint replacements apply to unranged scalar and array declarations.
+Continuous columns retain their effective finite or open sides, including bounds
+outside the grid window. Explicit source ranges and their aliases remain
+authoritative. A finite default range defines the grid for a bucketed declaration;
+a missing side uses the approximation window. A disjoint window declines that grid
+representation without refuting the source. Rational endpoints must be exactly
+representable under binary64 authority; unsupported endpoints are not rounded.
+
 Float grid windows remain separate from continuous source bounds. Typed grid
 settings pass through the same declaration planner and its private placeholder
 namespace. A singleton grid window cannot certify a finite source choice. Per-float
 representation metadata identifies the actual approximated components separately
 from the format's default grid policy.
 
-The CLI prints effective integer endpoints when they differ from the defaults.
-Such a run withholds default-source refutation, unboundedness and optimum markers;
+The output protocol prints effective integer or real endpoints when they differ
+from the defaults.
+Such a run withholds default-source refutation, unboundedness, optimum markers
+and unattained-bound metadata;
 its effective-scope result is separate from proof of the unchanged default source.
-Other frontend migrations, global semantic configuration removal and the shared
-library result-qualification surface remain unfinished. An explicit source-real
-range override is not yet exposed by this FlatZinc resolver.
+CLI flag mapping to typed real defaults, other frontend migrations, global semantic
+configuration removal and remaining open result qualification remain unfinished.
 
 ## Integer extrema and selection
 

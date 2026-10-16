@@ -55,6 +55,10 @@ internal class FlatZincCompiler(
         exactFloats = exactFloats,
     ).resolve(semanticOverrides)
     private val integerSemantics = checkNotNull(sourceSemantics.effective.undeclaredIntegers)
+    private val realSemantics = checkNotNull(sourceSemantics.effective.undeclaredReals)
+    private val sourceRealLower = realSemantics.lower?.sourceRealBound() ?: Double.NEGATIVE_INFINITY
+    private val sourceRealUpper = realSemantics.upper?.sourceRealBound() ?: Double.POSITIVE_INFINITY
+    private val hasDefaultRealBounds = realSemantics.lower != null || realSemantics.upper != null
     private val gridSemantics = sourceSemantics.gridDefaults()
     internal val floatBuckets = gridSemantics.buckets
     internal val floatScale = gridSemantics.linearScale
@@ -532,10 +536,16 @@ internal class FlatZincCompiler(
         else -> failHere("set `$ownerName`: universe must be an int range or int set, got ${elem::class.simpleName}")
     }
 
-    internal fun allocOpenFloat(name: String): Int = if (name in lpOnlyFloats || (forFloatPlanning && exactFloats)) {
-        allocFloat(name, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)
-    } else {
-        allocFloat(name, unboundedFloatLo, unboundedFloatHi).also {
+    internal fun allocOpenFloat(name: String): Int {
+        if (name in lpOnlyFloats || (forFloatPlanning && (exactFloats || hasDefaultRealBounds))) {
+            return allocFloat(name, sourceRealLower, sourceRealUpper)
+        }
+        val lower = if (realSemantics.lower == null) unboundedFloatLo else sourceRealLower
+        val upper = if (realSemantics.upper == null) unboundedFloatHi else sourceRealUpper
+        if (lower > upper) {
+            unsupportedHere("float variable `$name`: approximation window excludes its effective source bounds")
+        }
+        return allocFloat(name, lower, upper).also {
             if (forFloatPlanning) floatSearchWindowIds.add(it)
         }
     }

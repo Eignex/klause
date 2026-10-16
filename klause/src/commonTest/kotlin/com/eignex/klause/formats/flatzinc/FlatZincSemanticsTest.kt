@@ -203,4 +203,108 @@ class FlatZincSemanticsTest {
         }
         assertTrue(program.semantics.isApproximate)
     }
+
+    @Test
+    fun `unranged continuous scalar and array declarations should retain caller real bounds`() {
+        val bounds = BoundsOverride(
+            BoundOverride.Value(SemanticRational.ofLong(-2_000_000)),
+            BoundOverride.Value(SemanticRational.ofLong(3_000_000)),
+        )
+        for (declaration in listOf("var float: x;", "array[1..2] of var float: x;")) {
+            val program = parseFlatZinc("$declaration solve satisfy;", semanticOverrides = SemanticOverrides(
+                floats = FloatSemantics.Continuous, undeclaredReals = bounds,
+            ))
+
+            for (id in 0 until program.problem.numRealVars) {
+                assertEquals(-2_000_000.0, program.problem.realLower[id])
+                assertEquals(3_000_000.0, program.problem.realUpper[id])
+            }
+            assertTrue(program.problem.numRealVars > 0)
+            assertEquals(UndeclaredRealBounds(), program.semantics.declared.undeclaredReals)
+            assertTrue(program.semantics.hasOverrides)
+        }
+    }
+
+    @Test
+    fun `an omitted continuous real endpoint should remain open`() {
+        val program = parseFlatZinc("var float: x; solve satisfy;", semanticOverrides = SemanticOverrides(
+            floats = FloatSemantics.Continuous,
+            undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
+        ))
+
+        assertEquals(2_000_000.0, program.problem.realLower[0])
+        assertEquals(Double.POSITIVE_INFINITY, program.problem.realUpper[0])
+    }
+
+    @Test
+    fun `continuous real defaults outside the grid window should survive float planning`() {
+        val program = parseFlatZinc("var float: x; solve satisfy;", semanticOverrides = SemanticOverrides(
+            undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
+        ))
+
+        assertTrue(program.floatVarsByName.getValue("x").lpOnly)
+        assertEquals(2_000_000.0, program.problem.realLower[0])
+        assertEquals(Double.POSITIVE_INFINITY, program.problem.realUpper[0])
+    }
+
+    @Test
+    fun `finite caller real defaults should define the unranged objective grid`() {
+        val program = parseFlatZinc("var float: x; solve minimize x;", semanticOverrides = SemanticOverrides(
+            floats = FloatSemantics.Grid(4, 1_000_000),
+            undeclaredReals = BoundsOverride(
+                BoundOverride.Value(SemanticRational.ofLong(2_000_000)),
+                BoundOverride.Value(SemanticRational.ofLong(3_000_000)),
+            ),
+        ))
+
+        val variable = program.floatVarsByName.getValue("x")
+        assertFalse(variable.lpOnly)
+        assertEquals(2_000_000.0, variable.lo)
+        assertEquals(3_000_000.0, variable.hi)
+        assertEquals(4, variable.buckets)
+    }
+
+    @Test
+    fun `source real ranges and their aliases should retain their own bounds`() {
+        val program = parseFlatZinc(
+            "var -2.0..5.0: x; var float: y = x; solve satisfy;",
+            semanticOverrides = SemanticOverrides(
+                floats = FloatSemantics.Continuous,
+                undeclaredReals = BoundsOverride(
+                    BoundOverride.Value(SemanticRational.ofLong(-20)),
+                    BoundOverride.Value(SemanticRational.ofLong(30)),
+                ),
+            ),
+        )
+
+        assertEquals(1, program.problem.numRealVars)
+        assertEquals(-2.0, program.problem.realLower[0])
+        assertEquals(5.0, program.problem.realUpper[0])
+    }
+
+    @Test
+    fun `an unranged real bound should decline rather than round a non-binary rational`() {
+        val bound = SemanticRational.of(bigIntOf(1), bigIntOf(10))
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            parseFlatZinc("var float: x; solve satisfy;", semanticOverrides = SemanticOverrides(
+                floats = FloatSemantics.Continuous,
+                undeclaredReals = BoundsOverride(lower = BoundOverride.Value(bound)),
+            ))
+        }
+
+        assertTrue("undeclared real bound cannot be represented exactly" in error.message.orEmpty())
+    }
+
+    @Test
+    fun `a grid window disjoint from an open real default should decline without a refutation`() {
+        val error = assertFailsWith<UnsupportedFlatZincException> {
+            parseFlatZinc("var float: x; solve minimize x;", semanticOverrides = SemanticOverrides(
+                floats = FloatSemantics.Grid(4, 1_000_000),
+                undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
+            ))
+        }
+
+        assertTrue("approximation window excludes its effective source bounds" in error.message.orEmpty())
+    }
 }

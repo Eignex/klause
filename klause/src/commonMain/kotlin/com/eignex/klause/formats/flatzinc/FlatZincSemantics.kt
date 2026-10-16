@@ -26,6 +26,7 @@ val flatZincSemantics: SourceSemantics = SourceSemantics(
     numericAuthority = NumericAuthority.BINARY64_LITERALS,
     floats = FloatSemantics.Grid(DEFAULT_FLOAT_BUCKETS, DEFAULT_FLOAT_SCALE),
     undeclaredIntegers = UndeclaredIntegerBounds(-MINIZINC_UNBOUNDED_DEFAULT, MINIZINC_UNBOUNDED_DEFAULT),
+    undeclaredReals = UndeclaredRealBounds(),
 )
 
 internal class FlatZincSemantics(
@@ -59,17 +60,21 @@ private fun semanticFloat(value: Double): SemanticRational {
     return SemanticRational.of(rational.num, rational.den)
 }
 
-internal fun SemanticRational.gridFloat(): Double {
+internal fun SemanticRational.gridFloat(): Double = binary64("float grid window")
+
+internal fun SemanticRational.sourceRealBound(): Double = binary64("undeclared real bound")
+
+private fun SemanticRational.binary64(role: String): Double {
     val exact = BigFraction.of(numerator, denominator)
     val exponent = denominator.magnitudeBitLength() - 1
     require(exponent in 0..1074 && denominator == BIG_ONE shl exponent) {
-        "float grid window cannot be represented exactly in binary64"
+        "$role cannot be represented exactly in binary64"
     }
     val scale = if (exponent <= 1022) Double.fromBits((1023L - exponent) shl 52)
         else Double.fromBits(1L shl (1074 - exponent))
     val value = numerator.toDouble() * scale
     require(value.isFinite() && BigFraction.ofDouble(value) == exact) {
-        "float grid window cannot be represented exactly in binary64"
+        "$role cannot be represented exactly in binary64"
     }
     return value
 }
