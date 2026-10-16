@@ -604,6 +604,7 @@ final enum class com.eignex.klause.solver.pipeline/IntVariableOwner : kotlin/Enu
 
 final enum class com.eignex.klause.solver.pipeline/OpenBranching : kotlin/Enum<com.eignex.klause.solver.pipeline/OpenBranching> { // com.eignex.klause.solver.pipeline/OpenBranching|null[0]
     enum entry Activity // com.eignex.klause.solver.pipeline/OpenBranching.Activity|null[0]
+    enum entry Automatic // com.eignex.klause.solver.pipeline/OpenBranching.Automatic|null[0]
     enum entry SourceOrder // com.eignex.klause.solver.pipeline/OpenBranching.SourceOrder|null[0]
 
     final val entries // com.eignex.klause.solver.pipeline/OpenBranching.entries|#static{}entries[0]

@@ -419,9 +419,15 @@ class OpenTheoryEngine internal constructor(
             // Drawn here rather than beside the plan, so a root that propagation already refuted never pays
             // for a proposal no traversal would have read.
             val hints = state.candidateHints(plan, model, cancellation)
-            val branching = when (params.openBranching) {
-                OpenBranching.SourceOrder -> BooleanBranching.SourceOrder(model.numBoolVars)
+            val selectedBranching = when (params.openBranching) {
+                OpenBranching.Automatic -> if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
+                    (planned.theory as? ExactLiraSearchComponent)?.defaultMixedPointOwner == true
+                ) OpenBranching.Activity else OpenBranching.SourceOrder
+                else -> params.openBranching
+            }
+            val branching = when (selectedBranching) {
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
+                OpenBranching.SourceOrder, OpenBranching.Automatic -> BooleanBranching.SourceOrder(model.numBoolVars)
             }
             val run = planned.session.openRun(
                 model.numBoolVars,

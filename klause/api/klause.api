@@ -11275,6 +11275,7 @@ public final class com/eignex/klause/solver/pipeline/NumericalLinearRequest {
 
 public final class com/eignex/klause/solver/pipeline/OpenBranching : java/lang/Enum {
 	public static final field Activity Lcom/eignex/klause/solver/pipeline/OpenBranching;
+	public static final field Automatic Lcom/eignex/klause/solver/pipeline/OpenBranching;
 	public static final field Companion Lcom/eignex/klause/solver/pipeline/OpenBranching$Companion;
 	public static final field SourceOrder Lcom/eignex/klause/solver/pipeline/OpenBranching;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;

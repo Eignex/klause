@@ -303,8 +303,11 @@ for more flips than the limit holds and the draw takes the whole remainder, leav
 none. The allowance is not spent until `--param open-hint-min-splits=N` splits have asked for a
 hint (default 128), so a model the theory dominates — which reaches almost no split — never pays
 for one.
-`--param open-branching=activity|source-order` chooses which Boolean the traversal splits:
-`source-order` (the default) walks the variables in model order, `activity` follows conflict activity
+`--param open-branching=auto|activity|source-order` chooses which Boolean the traversal splits.
+The default `auto` selects conflict activity for a complete mixed worker with one
+default linear point owner; other openings, including private queries and explicit
+hint allowances, retain source order. `source-order` walks the variables in model
+order; `activity` follows conflict activity
 over the shared session. This setting controls Boolean variable order; theory
 components can also request exact integer-bound or other arithmetic decisions.
 Activity order is opt-in.
