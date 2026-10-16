@@ -97,7 +97,8 @@ class NumericalLinearRequest(
                 stop() -> TerminationReason.Cancelled
                 else -> TerminationReason.Unsupported
             }
-            return LinearOptimizationResult(scope, null, null, null, null, reason, SolveStats.EMPTY, model.semantics)
+            return LinearOptimizationResult(scope, null, null, null, null, reason, SolveStats.EMPTY,
+                model.semantics)
         }
         return LinearAuthorityInvocation(context, params.copy(cancellation = stop)).use { invocation ->
             val result = requireNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1, onIncumbent))

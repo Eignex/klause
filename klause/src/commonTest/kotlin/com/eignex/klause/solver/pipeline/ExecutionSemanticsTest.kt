@@ -6,11 +6,11 @@ import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.QuadraticCoefficient
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticObjectiveTerm
 import com.eignex.klause.ir.QuadraticVariable
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.SourceSemantics
@@ -26,8 +26,8 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.sourceProofContext
-import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
