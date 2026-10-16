@@ -2,11 +2,17 @@ package com.eignex.klause.bench.profile
 
 import java.lang.reflect.Field
 
-internal class LinearQueryInputProbe(
-    component: Any,
-    private val samples: LinearQueryInputSamples<Any>,
-) {
-    enum class Skip { UNINITIALIZED, NO_OWNER, NO_SOLVER, UNSUPPORTED_SOLVER, NO_INPUT, STALE, UNCACHED, INVALID_STORAGE }
+internal class LinearQueryInputProbe(component: Any, samples: LinearQueryInputSamples<Any>) {
+    enum class Skip {
+        UNINITIALIZED,
+        NO_OWNER,
+        NO_SOLVER,
+        UNSUPPORTED_SOLVER,
+        NO_INPUT,
+        STALE,
+        UNCACHED,
+        INVALID_STORAGE,
+    }
 
     private val loader = component.javaClass.classLoader
     private val delegate = field("theory.qflra.ExactLiraSearchComponent", "lpDelegate").get(component) as Lazy<*>
@@ -66,7 +72,11 @@ internal class LinearQueryInputGate(
         if (input !== current) return skip(1)
         if (matchingReads < Long.MAX_VALUE) matchingReads++
         val units = readCachedWeight(input)
-        if (units == null) skip(2) else if (units < 0L) skip(3)
+        if (units == null) {
+            skip(2)
+        } else if (units < 0L) {
+            skip(3)
+        }
         samples.observe(input, units)
     }
 

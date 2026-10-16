@@ -16,18 +16,18 @@ import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.result.SmtStats
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.io.PrintStream
-import java.lang.management.ManagementFactory
-import java.lang.reflect.Method
-import java.util.concurrent.TimeUnit
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.io.PrintStream
+import java.lang.management.ManagementFactory
+import java.lang.reflect.Method
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.milliseconds
 
 internal object LinearQueryEligibilityProfile {
     @JvmStatic
@@ -70,7 +70,9 @@ internal object LinearQueryEligibilityProfile {
                 val current = probe
                 if (current == null) {
                     if (unboundPolls < Long.MAX_VALUE) unboundPolls++
-                } else current.observe()
+                } else {
+                    current.observe()
+                }
             }
         }
         var timedNs: Long
@@ -90,8 +92,10 @@ internal object LinearQueryEligibilityProfile {
                 val params = TheoryParams(timeout = stop, randomSeed = 1L)
                 val stateType = Class.forName("com.eignex.klause.solver.pipeline.OpenTheorySolveState")
                 state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
-                val opening = requireNotNull(method(engine, "begin", 3)
-                    .invoke(engine, params, state, SearchNodePolicy.ExpandAll))
+                val opening = requireNotNull(
+                    method(engine, "begin", 3)
+                        .invoke(engine, params, state, SearchNodePolicy.ExpandAll),
+                )
                 run = member(opening, "getRun")
                 var result = member(opening, "getResult")
                 if (run != null) {
@@ -109,7 +113,9 @@ internal object LinearQueryEligibilityProfile {
                         } catch (_: ReflectiveOperationException) {
                             probeStatus = "unsupported-input-fields"
                         }
-                    } else probeStatus = "no-exact-lira-component"
+                    } else {
+                        probeStatus = "no-exact-lira-component"
+                    }
                     val advance = method(run, "advance", 0)
                     while (result == null && !original()) result = advance.invoke(run)
                 }
@@ -132,7 +138,13 @@ internal object LinearQueryEligibilityProfile {
                 val geometry = LinearQueryEligibility.inspect(input, analysis::step)
                 val result = buildJsonObject {
                     put("geometry", Reports.json.parseToJsonElement(Reports.json.encodeToString(geometry)))
-                    for (name in listOf("matrixRevision", "boundRevision", "objectiveRevision", "rowRevision", "popRevision")) {
+                    for (name in listOf(
+                        "matrixRevision",
+                        "boundRevision",
+                        "objectiveRevision",
+                        "rowRevision",
+                        "popRevision",
+                    )) {
                         put(name, field(sample.state, name) as Long)
                     }
                     put("depth", (field(sample.state, "scopeMarks") as List<*>).size)
@@ -157,7 +169,7 @@ internal object LinearQueryEligibilityProfile {
             put("head", Reports.readGitSha())
             put("sourceSha256", options.getValue("sha256"))
             put("sourceBytes", bytes.size)
-            sourceCounts?.let { put("parsedSourceCounts", it) }
+            put("parsedSourceCounts", sourceCounts)
             put("suite", options.getValue("suite"))
             put("problem", options.getValue("problem"))
             put("entry", "public-open-theory-run; compilation-included")
@@ -201,22 +213,30 @@ internal object LinearQueryEligibilityProfile {
 
     private fun verifyLoadedSolver(out: File) {
         val loaded = File(OpenTheoryPipeline.javaClass.protectionDomain.codeSource.location.toURI())
-        val installed = SolverInvocation.klauseCliBin().canonicalFile.parentFile.parentFile.resolve("lib/${loaded.name}")
+        val installed = SolverInvocation.klauseCliBin().canonicalFile.parentFile.parentFile.resolve(
+            "lib/${loaded.name}",
+        )
         require(installed.isFile && sha256(loaded.readBytes()) == sha256(installed.readBytes()))
-        writeBounded(out.resolve("loaded-solver.json"), buildJsonObject {
+        val identity = buildJsonObject {
             put("path", loaded.path)
             put("sha256", sha256(loaded.readBytes()))
             put("installedCliPath", installed.path)
             put("runtime", JsonArray(ManagementFactory.getRuntimeMXBean().inputArguments.map { JsonPrimitive(it) }))
             put("javaVersion", System.getProperty("java.version"))
             put("processors", Runtime.getRuntime().availableProcessors())
-        }.toString())
+        }
+        writeBounded(out.resolve("loaded-solver.json"), identity.toString())
     }
 
     private fun launch(args: Array<String>, out: File) {
-        val command = arrayListOf(File(System.getProperty("java.home"), "bin/java").path,
-            "-Xmx3g", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1",
-            "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector")
+        val command = arrayListOf(
+            File(System.getProperty("java.home"), "bin/java").path,
+            "-Xmx3g",
+            "-XX:+UseSerialGC",
+            "-XX:ActiveProcessorCount=1",
+            "--enable-native-access=ALL-UNNAMED",
+            "--add-modules=jdk.incubator.vector",
+        )
         for (name in listOf("klause.workspace.root", "klause.bench.corpusCache")) {
             System.getProperty(name)?.let { command += "-D$name=$it" }
         }
@@ -236,7 +256,10 @@ internal object LinearQueryEligibilityProfile {
             timeout = !process.waitFor(120L, TimeUnit.SECONDS)
         } finally {
             val forced = process.isAlive
-            if (forced) { process.destroyForcibly(); process.waitFor() }
+            if (forced) {
+                process.destroyForcibly()
+                process.waitFor()
+            }
             val transport = buildJsonObject {
                 put("timeout", timeout)
                 put("forced", forced)
@@ -245,8 +268,15 @@ internal object LinearQueryEligibilityProfile {
             require(transport.toByteArray().size <= 4096)
             out.resolve("transport.json").writeText(transport)
         }
-        val names = listOf("launcher.json", "transport.json", "measured.stdout", "measured.stderr", "build-provenance.json",
-            "loaded-solver.json", "eligibility.json")
+        val names = listOf(
+            "launcher.json",
+            "transport.json",
+            "measured.stdout",
+            "measured.stderr",
+            "build-provenance.json",
+            "loaded-solver.json",
+            "eligibility.json",
+        )
         require(names.sumOf { out.resolve(it).length() } <= MAX_OUTPUT_BYTES)
         check(!timeout && process.exitValue() == 0) { "eligibility observation JVM failed" }
     }

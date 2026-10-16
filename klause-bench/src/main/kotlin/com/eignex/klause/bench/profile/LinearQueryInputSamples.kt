@@ -78,7 +78,9 @@ internal class LinearQueryInputSamples<T : Any> {
     fun snapshot(): Snapshot<T> {
         val samples = checkpoints.toMutableList()
         val latest = last
-        val lastIndex = if (latest == null) -1 else if (lastIsCheckpoint) {
+        val lastIndex = if (latest == null) {
+            -1
+        } else if (lastIsCheckpoint) {
             checkpointIndex(latest.state)
         } else {
             samples.add(latest)

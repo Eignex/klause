@@ -56,7 +56,9 @@ internal class LinearQueryMetadata(private val budget: QueryAnalysisBudget) {
             if (integer !in 0 until source.numIntVars || source.numRealVars + integer !in protected.indices) {
                 consistent = false
                 protected.fill(true)
-            } else protected[source.numRealVars + integer] = true
+            } else {
+                protected[source.numRealVars + integer] = true
+            }
         }
         val definitions = definitions(component)
         val byRow = arrayOfNulls<Map<*, *>>(metadata.size)
@@ -112,7 +114,8 @@ internal class LinearQueryMetadata(private val budget: QueryAnalysisBudget) {
                 free(active) && free(original) && !asserted[column],
                 number(requireNotNull(costs[column])).isZero,
                 number(required(active, "origin")).isZero,
-                protected[column], sides(active),
+                protected[column],
+                sides(active),
             )
         }
         val rows = metadata.indices.map { row ->
@@ -129,7 +132,9 @@ internal class LinearQueryMetadata(private val budget: QueryAnalysisBudget) {
                 if (!free(original)) add(QueryRowBlocker.DECLARED_BOUND)
                 if (!free(active)) add(QueryRowBlocker.ACTIVE_BOUND)
                 if (asserted[matrix.size + row]) add(QueryRowBlocker.ASSERTION)
-                if (required(active, "integral") as Boolean || required(original, "integral") as Boolean) add(QueryRowBlocker.INTEGER_LOGICAL)
+                val integral = required(active, "integral") as Boolean ||
+                    required(original, "integral") as Boolean
+                if (integral) add(QueryRowBlocker.INTEGER_LOGICAL)
                 if (!number(requireNotNull(costs[matrix.size + row])).isZero) add(QueryRowBlocker.NONZERO_COST)
                 if (!number(required(active, "origin")).isZero) add(QueryRowBlocker.NONZERO_ORIGIN)
                 if (!(required(info, "global") as Boolean)) add(QueryRowBlocker.CONDITIONAL)
@@ -138,7 +143,9 @@ internal class LinearQueryMetadata(private val budget: QueryAnalysisBudget) {
                 if (!number(requireNotNull(rhs[row])).isZero) add(QueryRowBlocker.NONZERO_RHS)
                 if (!(required(identity, "active") as Boolean) || get(identity, "depth") != null ||
                     get(identity, "suspendedAt") != null
-                ) add(QueryRowBlocker.SCOPED_OR_INACTIVE)
+                ) {
+                    add(QueryRowBlocker.SCOPED_OR_INACTIVE)
+                }
             }
             QueryDefinitionRow(known, blockers, rowColumns[row].toIntArray(), sides(active), premiseUnits(info))
         }

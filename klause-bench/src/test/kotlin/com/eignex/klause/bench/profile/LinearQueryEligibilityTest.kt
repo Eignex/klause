@@ -118,7 +118,9 @@ class LinearQueryEligibilityTest {
     @Test
     fun `oversized original input bits should fail the unchanged scalar guard`() {
         for (bits in listOf(4096, 4097)) {
-            val result = LinearQueryEligibility.inspect(QueryEligibilityInput(emptyList(), emptyList(), true, bits, true))
+            val result = LinearQueryEligibility.inspect(
+                QueryEligibilityInput(emptyList(), emptyList(), true, bits, true),
+            )
 
             assertEquals(bits <= 4096, result.staticGuards.getValue("inputBits4096"))
         }

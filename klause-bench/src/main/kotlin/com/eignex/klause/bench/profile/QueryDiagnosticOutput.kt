@@ -3,15 +3,17 @@ package com.eignex.klause.bench.profile
 import java.io.File
 import java.io.IOException
 import java.io.OutputStream
-import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 internal class QueryDiagnosticOutput(private val maximum: Long) {
     private val written = AtomicLong()
     private val overflow = AtomicBoolean()
     val exceeded: Boolean get() = overflow.get()
 
-    init { require(maximum >= 0L) }
+    init {
+        require(maximum >= 0L)
+    }
 
     fun write(file: File, text: String) {
         val bytes = text.toByteArray()

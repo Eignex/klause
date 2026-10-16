@@ -11,8 +11,17 @@ internal data class QuerySourceColumn(
 )
 
 internal enum class QueryRowBlocker {
-    DECLARED_BOUND, ACTIVE_BOUND, ASSERTION, INTEGER_LOGICAL, NONZERO_COST, NONZERO_ORIGIN,
-    CONDITIONAL, STRICT, PREMISES, NONZERO_RHS, SCOPED_OR_INACTIVE,
+    DECLARED_BOUND,
+    ACTIVE_BOUND,
+    ASSERTION,
+    INTEGER_LOGICAL,
+    NONZERO_COST,
+    NONZERO_ORIGIN,
+    CONDITIONAL,
+    STRICT,
+    PREMISES,
+    NONZERO_RHS,
+    SCOPED_OR_INACTIVE,
 }
 
 internal data class QueryDefinitionRow(
@@ -55,8 +64,10 @@ internal data class QueryEligibilityResult(
     val maximumInputBits: Int,
     val staticGuards: Map<String, Boolean>,
     val unprovedRequirements: List<String> = listOf(
-        "numerical working-model construction and basis", "remaining original-owner allowance",
-        "subsequent exact arithmetic growth and pivots", "full original-prefix and source witness acceptance",
+        "numerical working-model construction and basis",
+        "remaining original-owner allowance",
+        "subsequent exact arithmetic growth and pivots",
+        "full original-prefix and source witness acceptance",
     ),
 )
 
@@ -121,15 +132,36 @@ internal object LinearQueryEligibility {
             "reconstructionCaptureAllocation16777216" to (captureKnown && captureAllocation <= 16L * 1024L * 1024L),
         )
         scan(input.rows.size.toLong() * (QueryRowBlocker.entries.size + 1L) + input.columns.size)
-        val blockers = QueryRowBlocker.entries.associate { reason -> reason.name to
-            input.rows.count { reason in it.blockers } }
+        val blockers = QueryRowBlocker.entries.associate { reason ->
+            reason.name to input.rows.count { reason in it.blockers }
+        }
+        val status = if (guards.values.all { it }) {
+            "static-input-lead-only"
+        } else {
+            "no-positive-static-eligibility-evidence"
+        }
         return QueryEligibilityResult(
-            if (guards.values.all { it }) "static-input-lead-only" else "no-positive-static-eligibility-evidence",
-            input.mappingConsistent, input.columns.size, input.rows.size, input.rows.count { it.knownIdentity }, blockers,
-            input.rows.size - rows, rows, structural, input.columns.size - structural,
-            input.columns.count { it.protectedFinite }, entries, reconstructionEntries, cells, storage,
-            admissionWork, admissionAllocation, captureWork.takeIf { captureKnown },
-            captureAllocation.takeIf { captureKnown }, input.maximumInputBits, guards,
+            status = status,
+            mappingConsistent = input.mappingConsistent,
+            originalStructural = input.columns.size,
+            originalRows = input.rows.size,
+            knownRows = input.rows.count { it.knownIdentity },
+            retainedRowBlockers = blockers,
+            removedRows = input.rows.size - rows,
+            retainedRows = rows,
+            retainedStructural = structural,
+            restoredZeroColumns = input.columns.size - structural,
+            protectedFiniteColumns = input.columns.count { it.protectedFinite },
+            retainedStructuralEntries = entries,
+            reconstructionEntries = reconstructionEntries,
+            continuationCells = cells,
+            layoutStorageUnits = storage,
+            admissionWorkUpperBound = admissionWork,
+            admissionAllocationUpperBound = admissionAllocation,
+            reconstructionCaptureWorkUpperBound = captureWork.takeIf { captureKnown },
+            reconstructionCaptureAllocationUpperBound = captureAllocation.takeIf { captureKnown },
+            maximumInputBits = input.maximumInputBits,
+            staticGuards = guards,
         )
     }
 }

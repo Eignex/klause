@@ -1,6 +1,5 @@
 package com.eignex.klause.bench.profile
 
-import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import kotlin.test.Test
@@ -10,8 +9,7 @@ import kotlin.test.assertFalse
 class LinearQueryInputProbeTest {
     @Test
     fun `probing an unopened component should not initialize its numerical owner`() {
-        val source = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-            factors = arrayOf())
+        val source = Problem(0, 0, intDomains = emptyArray(), factors = emptyArray())
         val samples = LinearQueryInputSamples<Any>()
         ExactLiraSearchComponent(source).use { component ->
             val delegate = component.javaClass.getDeclaredField("lpDelegate").apply { isAccessible = true }
