@@ -228,8 +228,6 @@ class CliModeOpenTheoryTest {
         assertTrue("sat" in out.lines(), out)
     }
 
-    // 2x + y <= 3 over open columns, so every engine with an open route finds a witness.
-
     @Test
     fun `constant SMT sources should execute with ALNS`() {
         for ((source, expected) in listOf(
@@ -297,7 +295,7 @@ class CliModeOpenTheoryTest {
             deleteOnExit()
         }
 
-        val out = capture { assertEquals(0, runCli(arrayOf("-p", "1", "-r", "570", "-t", "5000", smt.absolutePath))) }
+        val out = capture { assertEquals(0, runCli(arrayOf(smt.absolutePath))) }
 
         assertEquals("sat", out.lines().firstOrNull(), out)
         assertTrue("(define-fun y () Int 2)" in out, out)
