@@ -965,6 +965,45 @@ class ExactLiraSearchComponent private constructor(
         return system.install().also { sourceInstalled = it }
     }
 
+    private fun propagateSourceBounds(context: SearchContext): Boolean {
+        if (graphFirst || hasPrivateReals || model.numIntVars != 0 || model.numRealVars == 0 ||
+            hasSourceDisjunctions || solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
+            node.rowAssertions.isNotEmpty() || node.sourceBranches.isNotEmpty() ||
+            node.disequalityDirections.isNotEmpty() || node.directionPremises.isNotEmpty() ||
+            node.branches.isNotEmpty() || node.reducedBranches.isNotEmpty() ||
+            node.transformedBranches.isNotEmpty() || node.retainedReduction != null
+        ) return true
+        for (prepared in preparedRows) {
+            operationStop.charge(1L)
+            if (operationStop()) return false
+            val row = prepared.row
+            if (row.size > 1024) continue
+            operationStop.charge(prepared.booleans.size.toLong() + row.size)
+            if (operationStop()) return false
+            if (prepared.booleans.any { bools[it] == UNASSIGNED }) continue
+            if ((0 until row.size).none { Term.isReal(row.ref(it)) }) continue
+            val truth = node.rowTruth(prepared.address, row, bools) ?: continue
+            val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
+            val premise = SearchAtomPremise.All(prepared.booleans.map { variable ->
+                SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
+            })
+            val bounds = system.comparisonBounds(comparison, premise, context, operationStop)
+            if (operationStop()) return false
+            if (bounds.isEmpty()) continue
+            when (val result = lp.assertBounds(bounds)) {
+                is LpBoundBatchResult.Declined -> return false
+                is LpBoundBatchResult.Conflict -> {
+                    observeCompleteStage("SOURCE_BOUND_CONFLICT")
+                    return true
+                }
+                is LpBoundBatchResult.Applied -> {
+                    if (result.count > 0) observeCompleteStage("SOURCE_BOUND_BATCH")
+                }
+            }
+        }
+        return !operationStop()
+    }
+
     private fun assertSource(context: SearchContext): Boolean {
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
@@ -999,6 +1038,7 @@ class ExactLiraSearchComponent private constructor(
             is LpBoundBatchResult.Applied -> Unit
         }
         if (!assertDisequalities(disequalities)) return false
+        if (!propagateSourceBounds(context)) return false
         nodesByLevel.put(context.decisionLevel, node)
         return true
     }

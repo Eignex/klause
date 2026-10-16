@@ -10,6 +10,7 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.lp.asFraction
+import com.eignex.klause.lp.bounding.LpPremisedBound
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
@@ -20,6 +21,7 @@ import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpScopedRow
+import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.exactComparison
@@ -27,6 +29,7 @@ import com.eignex.klause.lp.exactForm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.search.SearchAtomPremise
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SourceBoundAtom
@@ -225,6 +228,87 @@ internal class LiveQfLraSystem(
         return true
     }
 
+    fun comparisonBounds(
+        comparison: ExactComparison,
+        premise: SearchAtomPremise,
+        context: SearchContext,
+        stop: Cancellation,
+    ): List<LpPremisedBound> {
+        if (comparison.terms.isEmpty() || comparison.terms.size > 1024 || comparison.op == LinearOp.NE) {
+            return emptyList()
+        }
+        val state = lp.state ?: return emptyList()
+        stop.charge(comparison.terms.size.toLong() + 1L)
+        if (state.conflict != null || stop()) return emptyList()
+        val work = MixedPointArithmetic(stop)
+        if (!work.admitted(comparison.bound)) return emptyList()
+        val terms = comparison.terms.entries.toList()
+        val result = ArrayList<LpPremisedBound>()
+        fun deriveSide(upper: Boolean) {
+            var slack = comparison.bound
+            var missing = -1
+            var strictEndpoints = 0
+            val sides = arrayOfNulls<ExactLpSide>(terms.size)
+            val reasons = arrayOfNulls<SearchAtomPremise>(terms.size)
+            for ((index, term) in terms.withIndex()) {
+                stop.charge(1L)
+                val (column, coefficient) = term
+                if (stop() || column !in 0 until columns || column >= state.model.numVars) return
+                if (coefficient.isZero) continue
+                val endpointUpper = (coefficient < BigFraction.ZERO) == upper
+                val side = state.activeSide(column, endpointUpper)?.side
+                val reason = lp.activeBoundPremise(column, endpointUpper)
+                if (side == null || reason == null) {
+                    if (missing >= 0) return
+                    missing = index
+                    continue
+                }
+                slack = work.subtractProduct(slack, coefficient, side.number.value) ?: return
+                sides[index] = side
+                reasons[index] = reason
+                if (side.strict) strictEndpoints++
+            }
+            for ((index, term) in terms.withIndex()) {
+                stop.charge(1L)
+                if (stop()) return
+                val (column, coefficient) = term
+                if (coefficient.isZero || (missing >= 0 && index != missing)) continue
+                val side = sides[index]
+                val residue = if (side == null) slack else {
+                    work.subtractProduct(slack, coefficient.negated(), side.number.value) ?: continue
+                }
+                val threshold = work.quotient(residue, coefficient) ?: continue
+                val strict = (comparison.strict && comparison.op != LinearOp.EQ) ||
+                    strictEndpoints > (if (side?.strict == true) 1 else 0)
+                val boundUpper = (coefficient > BigFraction.ZERO) == upper
+                val derived = ExactLpSide(ExactLpNumber.of(threshold), strict)
+                val previous = state.activeSide(column, boundUpper)?.side
+                if (previous != null && !derived.strongerThan(previous, boundUpper)) continue
+                stop.charge(reasons.size.toLong() + 1L)
+                if (stop()) return
+                val support = ArrayList<SearchAtomPremise>(reasons.size)
+                support += premise
+                for (other in reasons.indices) {
+                    if (other != index) reasons[other]?.let(support::add)
+                }
+                val reason = SearchAtomPremise.All(support)
+                if (context.sourcePremisesAvailable(reason, stop)) {
+                    result += LpPremisedBound(column, boundUpper, derived, reason)
+                }
+            }
+        }
+        when (comparison.op) {
+            LinearOp.LE -> deriveSide(upper = true)
+            LinearOp.GE -> deriveSide(upper = false)
+            LinearOp.EQ -> {
+                deriveSide(upper = true)
+                deriveSide(upper = false)
+            }
+            LinearOp.NE -> Unit
+        }
+        return if (stop()) emptyList() else result
+    }
+
     fun disequalitySide(comparison: ExactComparison): DerivedDisequalitySide? {
         val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
         val fixed = rootFixedColumns(key.columns)
@@ -351,6 +435,32 @@ internal class LiveQfLraSystem(
 }
 
 internal data class DerivedDisequalitySide(val direction: LinearOp, val premise: SearchAtomPremise)
+
+private fun SearchContext.sourcePremisesAvailable(premise: SearchAtomPremise, stop: Cancellation): Boolean {
+    val pending = ArrayDeque<SearchAtomPremise>()
+    val expanded = HashSet<SearchAtomPremise.All>()
+    val literals = HashSet<Int>()
+    pending.add(premise)
+    var remaining = 4096
+    while (pending.isNotEmpty()) {
+        stop.charge(1L)
+        if (stop() || remaining-- <= 0) return false
+        when (val current = pending.removeLast()) {
+            is SearchAtomPremise.Asserted -> {
+                val literal = atomLiteral(current.decision) ?: return false
+                if (boolValue(literal ushr 1) != (literal and 1 == 0)) return false
+                literals.add(literal)
+            }
+            is SearchAtomPremise.All -> {
+                if (!expanded.add(current)) continue
+                if (current.premises.size > remaining - pending.size) return false
+                pending.addAll(current.premises)
+            }
+            SearchAtomPremise.Unavailable -> return false
+        }
+    }
+    return literals.size <= 4096 && !stop()
+}
 
 // A term as a lookup key: columns ascending, with the hash taken once, since every theory check reasserts the same
 // rows and a map-keyed lookup pays a hash probe per entry to compare.

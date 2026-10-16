@@ -27,6 +27,20 @@ those assertions through their decision scope, checks the residual system and
 contributes exact source coordinates at a complete check. Disequalities require
 an applicable direction and remain part of the source check.
 
+In an original pure-real LP frame, a charged source-order pass can tighten primitive
+coordinate bounds from resolved rows before numerical completion. Each deduction
+divides exact residual slack by the target coefficient, using sign-correct active
+endpoints for every other nonzero term. It retains the row's Boolean antecedents
+and those other endpoint premises; the target's own endpoint is excluded from its
+support and openness. Equality checks both directions and ignores inequality-only
+strict metadata. Missing support, multiple unbounded terms, private coordinates or
+arithmetic alternatives decline this pass. Every proposal requires active, nameable
+antecedents within 4,096 premise visits, at most 1,024 numeric terms and the existing
+4,096-bit arithmetic limit. Improving bounds use the existing scoped LP batch API
+and edit accounting. Retraction removes their assertions and reasons together.
+This is one pass per source assertion operation, with the same token and ordinary
+numerical fallback; it supplies no completed source witness.
+
 For a source containing integer or real coordinates, the exact-linear component can
 reuse the exact source-coordinate prefix of an existing completed LP witness, or
 the point from its existing feasible difference check,

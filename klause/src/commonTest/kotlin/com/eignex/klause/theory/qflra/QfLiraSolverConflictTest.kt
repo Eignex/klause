@@ -39,6 +39,35 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverConflictTest {
     @Test
+    fun `a propagated source endpoint conflict should retain the activating Boolean`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(5.0, 0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, 1.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, -2.0), LinearOp.LE, 2.0),
+            ),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(0)))
+
+            assertContentEquals(intArrayOf(1), assertNotNull(conflict.explanation).literals)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("SOURCE_BOUND_CONFLICT"))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+        }
+    }
+
+    @Test
     fun `a false source clause should conflict despite feasible real bounds`() {
         val model = Problem(
             numBoolVars = 1,

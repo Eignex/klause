@@ -8,6 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.lp.bounding.LpEffortProfile
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
@@ -27,6 +28,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -474,6 +476,189 @@ class QfLraSystemTest {
                 assertEquals(0, assertNotNull(lp.state).model.m)
                 assertTrue(lp.atLevel(0))
             }
+        }
+    }
+
+    @Test
+    fun `derived bounds should preserve coefficient signs and omit the target endpoint premise`() {
+        for (operator in listOf(LinearOp.LE, LinearOp.GE)) {
+            for (coefficient in listOf(2L, -2L)) {
+                LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                    val system = LiveQfLraSystem(source(), lp)
+                    assertTrue(system.install())
+                    val session = SearchSession(listOf(lp))
+                    session.initialize()
+                    for (variable in 0..2) session.publish(SearchDecision.Bool(Lit.make(variable, true)))
+                    val upper = operator == LinearOp.LE
+                    assertTrue(lp.assertBound(1, !upper, ExactLpSide(ExactLpNumber.of(2)), premise(1)))
+                    val targetUpper = (coefficient > 0L) == upper
+                    val oldValue = if (targetUpper) -10L else 10L
+                    assertTrue(lp.assertBound(0, !targetUpper, ExactLpSide(ExactLpNumber.of(oldValue)), premise(2)))
+                    val comparison = ExactComparison(
+                        mapOf(0 to BigFraction.ofLong(coefficient), 1 to BigFraction.ONE),
+                        BigFraction.ofLong(6), operator, strict = false, hasReals = true,
+                    )
+
+                    val bound = system.comparisonBounds(comparison, premise(0), session, Cancellation.Never)
+                        .single { it.column == 0 }
+
+                    assertEquals(targetUpper, bound.upper)
+                    assertEquals(BigFraction.ofLong(if (coefficient > 0L) 2 else -2), bound.side.number.value)
+                    assertEquals(setOf(1, 3), assertNotNull(session.explainAtoms(bound.premise)).literals.toSet())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `derived openness should use the row and other endpoints only`() {
+        for (operator in listOf(LinearOp.LE, LinearOp.GE, LinearOp.EQ)) {
+            for (rowStrict in listOf(false, true)) {
+                for (otherStrict in listOf(false, true)) {
+                    LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                        val system = LiveQfLraSystem(source(), lp)
+                        assertTrue(system.install())
+                        val session = SearchSession(listOf(lp))
+                        session.initialize()
+                        val upper = operator != LinearOp.GE
+                        val target = ExactLpSide(ExactLpNumber.of(if (upper) -10 else 10), strict = true)
+                        val other = ExactLpSide(ExactLpNumber.of(2), strict = otherStrict)
+                        assertTrue(lp.assertBound(0, !upper, target, axiom))
+                        assertTrue(lp.assertBound(1, !upper, other, axiom))
+                        val comparison = ExactComparison(
+                            mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE),
+                            BigFraction.ofLong(6), operator, rowStrict, hasReals = true,
+                        )
+
+                        val bound = system.comparisonBounds(comparison, axiom, session, Cancellation.Never)
+                            .single { it.column == 0 }
+
+                        assertEquals(BigFraction.ofLong(4), bound.side.number.value)
+                        assertEquals(otherStrict || (rowStrict && operator != LinearOp.EQ), bound.side.strict)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `two missing endpoints should withhold a bound until one becomes available`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            val comparison = ExactComparison(
+                mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE),
+                BigFraction.ofLong(6), LinearOp.LE, strict = false, hasReals = true,
+            )
+            assertTrue(system.comparisonBounds(comparison, axiom, session, Cancellation.Never).isEmpty())
+            assertTrue(lp.assertBound(1, false, ExactLpSide(ExactLpNumber.of(2)), axiom))
+
+            val bound = system.comparisonBounds(comparison, axiom, session, Cancellation.Never).single()
+
+            assertEquals(0, bound.column)
+            assertTrue(bound.upper)
+            assertEquals(BigFraction.ofLong(4), bound.side.number.value)
+        }
+    }
+
+    @Test
+    fun `zero coefficients should require no endpoint and contribute no strictness`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            assertTrue(lp.assertBound(1, false, ExactLpSide(ExactLpNumber.of(2), strict = true)))
+            val comparison = ExactComparison(
+                mapOf(0 to BigFraction.ONE, 1 to BigFraction.ZERO),
+                BigFraction.ofLong(6), LinearOp.LE, strict = false, hasReals = true,
+            )
+
+            val bound = system.comparisonBounds(comparison, axiom, session, Cancellation.Never).single()
+
+            assertEquals(0, bound.column)
+            assertEquals(BigFraction.ofLong(6), bound.side.number.value)
+            assertFalse(bound.side.strict)
+        }
+    }
+
+    @Test
+    fun `unavailable or inactive source support should withhold derived bounds`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            assertTrue(lp.assertBound(1, false, ExactLpSide(ExactLpNumber.of(2)), premise(1)))
+            val comparison = ExactComparison(
+                mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE),
+                BigFraction.ofLong(6), LinearOp.LE, strict = false, hasReals = true,
+            )
+            assertTrue(system.comparisonBounds(comparison, axiom, session, Cancellation.Never).isEmpty())
+            session.publish(SearchDecision.Bool(Lit.make(1, true)))
+            assertTrue(system.comparisonBounds(comparison, premise(0), session, Cancellation.Never).isEmpty())
+
+            val bounds = system.comparisonBounds(comparison, SearchAtomPremise.Unavailable, session, Cancellation.Never)
+
+            assertTrue(bounds.isEmpty())
+        }
+    }
+
+    @Test
+    fun `interruption during source support validation should publish no proposed prefix`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            session.publish(SearchDecision.Bool(0))
+            assertTrue(lp.assertBound(1, false, ExactLpSide(ExactLpNumber.of(2)), axiom))
+            val comparison = ExactComparison(
+                mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE),
+                BigFraction.ofLong(6), LinearOp.LE, strict = false, hasReals = true,
+            )
+            var stopped = false
+            val context = object : SearchContext by session {
+                override fun atomLiteral(decision: SearchDecision): Int? {
+                    stopped = true
+                    return session.atomLiteral(decision)
+                }
+            }
+
+            val bounds = system.comparisonBounds(comparison, premise(0), context, Cancellation { stopped })
+
+            assertTrue(stopped)
+            assertTrue(bounds.isEmpty())
+            assertNull(lp.state?.activeSide(0, true))
+            assertEquals(1, system.comparisonBounds(comparison, premise(0), session, Cancellation.Never).size)
+        }
+    }
+
+    @Test
+    fun `derived endpoint support should retract before a sibling row uses it`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            session.push(SearchDecision.Bool(0))
+            assertTrue(lp.atLevel(1))
+            assertTrue(lp.assertBound(1, false, ExactLpSide(ExactLpNumber.of(2)), premise(0)))
+            val comparison = ExactComparison(
+                mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE),
+                BigFraction.ofLong(6), LinearOp.LE, strict = false, hasReals = true,
+            )
+            val bounds = system.comparisonBounds(comparison, axiom, session, Cancellation.Never)
+            lp.assertBounds(bounds)
+            assertEquals(BigFraction.ofLong(4), assertNotNull(lp.state?.activeSide(0, true)).side.number.value)
+
+            session.popTo(0)
+
+            assertNull(lp.state?.activeSide(0, true))
+            assertNull(lp.state?.activeSide(1, false))
+            assertTrue(system.comparisonBounds(comparison, axiom, session, Cancellation.Never).isEmpty())
         }
     }
 
