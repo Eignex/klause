@@ -3,7 +3,11 @@ package com.eignex.klause.cli
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
@@ -11,12 +15,15 @@ import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
 import com.eignex.kumulant.stat.summary.SumResult
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -24,6 +31,121 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MpsModeTest {
+    @Test
+    fun `MPS loading should apply shared absolute relative and zero tolerance overrides`() {
+        val source = File.createTempFile("mps-shared-tolerance", ".mps").apply {
+            writeText("ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 100\nENDATA\n")
+            deleteOnExit()
+        }
+        val policies = listOf(
+            SourceTolerance(absolute = SemanticRational.ONE) to true,
+            SourceTolerance(relative = SemanticRational.of(BIG_ONE, bigIntOf(100))) to true,
+            SourceTolerance() to false,
+        )
+
+        for ((policy, accepted) in policies) {
+            val common = CommonOptions().apply { semanticOverrides = SemanticOverrides(feasibilityTolerance = policy) }
+            val loaded = MpsMode.newSession().load(source.absolutePath, common)
+            val original = assertIs<Problem>(loaded.finiteShape.preparedPlan.originalSource)
+            val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(99.5))
+
+            assertEquals(policy, original.semantics.effective.feasibilityTolerance)
+            assertEquals(accepted, assertNotNull(loaded.toleranceCheck)(point))
+        }
+    }
+
+    @Test
+    fun `MPS exact loading should replace the shared tolerance without mutating caller overrides`() {
+        val source = File.createTempFile("mps-shared-exact", ".mps").apply {
+            writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA\n")
+            deleteOnExit()
+        }
+        val policy = SourceTolerance(absolute = SemanticRational.ONE)
+        val common = CommonOptions().apply {
+            exact = true
+            semanticOverrides = SemanticOverrides(feasibilityTolerance = policy)
+        }
+
+        val loaded = MpsMode.newSession().load(source.absolutePath, common)
+        val original = assertIs<Problem>(loaded.finiteShape.preparedPlan.originalSource)
+
+        assertEquals(SourceTolerance(), original.semantics.effective.feasibilityTolerance)
+        assertEquals(policy, common.semanticOverrides.feasibilityTolerance)
+        assertNull(loaded.toleranceCheck)
+    }
+
+    @Test
+    fun `MPS exact loading should reject inapplicable shared overrides`() {
+        val source = File.createTempFile("mps-shared-inapplicable", ".mps").apply {
+            writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA\n")
+            deleteOnExit()
+        }
+        val common = CommonOptions().apply {
+            exact = true
+            semanticOverrides = SemanticOverrides(floats = FloatSemantics.Continuous)
+        }
+
+        assertFailsWith<IllegalArgumentException> { MpsMode.newSession().load(source.absolutePath, common) }
+    }
+
+    @Test
+    fun `loaded MPS tolerance checks should retain the captured caller policy`() {
+        val source = File.createTempFile("mps-shared-capture", ".mps").apply {
+            writeText("ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 1\nENDATA\n")
+            deleteOnExit()
+        }
+        val common = CommonOptions().apply {
+            semanticOverrides = SemanticOverrides(
+                feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ONE),
+            )
+        }
+        val loaded = MpsMode.newSession().load(source.absolutePath, common)
+        common.semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+
+        val accepted = assertNotNull(loaded.toleranceCheck)(Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5)))
+
+        assertTrue(accepted)
+    }
+
+    @Test
+    fun `numerical MPS publication should apply the captured shared tolerance`() {
+        val source = File.createTempFile("mps-shared-open-tolerance", ".mps").apply {
+            writeText(
+                "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -1\n" +
+                    " M1 'MARKER' 'INTEND'\n X COST 1 R 1\nBOUNDS\n LI B I 3\nENDATA\n",
+            )
+            deleteOnExit()
+        }
+        val policies = listOf(SourceTolerance(absolute = SemanticRational.ONE) to true, SourceTolerance() to false)
+        val value = BigFraction.ofLong(5L) * BigFraction.ofLong(2L).reciprocal()
+        for ((policy, accepted) in policies) {
+            val common = CommonOptions().apply { semanticOverrides = SemanticOverrides(feasibilityTolerance = policy) }
+            val session = MpsMode.newSession()
+            val loaded = session.load(source.absolutePath, common)
+            val pipeline = assertIs<SolvablePipeline.NumericalLinear>(loaded.pipeline)
+            val assignment = OpenTheoryAssignment.Sampled(
+                Sample(BooleanArray(0), longArrayOf(3L), doubleArrayOf(2.5), listOf(value)),
+            )
+            val rendered = pipeline.render(assignment)
+            val output = session.output(common)
+
+            val text = capture {
+                ArithmeticPublication(output).publish(rendered, SourceValue.Rational(value))
+                output.onComplete(Verdict.BEST_FOUND)
+            }
+
+            assertEquals(accepted, "s SATISFIABLE" in text.lines(), text)
+            assertEquals(accepted, text.lines().any { it.startsWith("v ") }, text)
+            if (accepted) {
+                assertTrue("o 2.5" in text.lines(), text)
+                assertTrue("MPS source tolerance witness" in text, text)
+            } else {
+                assertTrue("s UNKNOWN" in text.lines(), text)
+            }
+            assertFalse("s OPTIMUM FOUND" in text.lines(), text)
+        }
+    }
+
     @Test
     fun `finite MPS execution should retain original open declarations after bound closure`() {
         val source = File.createTempFile("mps-original-declarations", ".mps").apply {
