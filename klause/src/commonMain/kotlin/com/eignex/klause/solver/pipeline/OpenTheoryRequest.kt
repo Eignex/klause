@@ -376,10 +376,28 @@ object OpenTheoryPipeline {
         objective: LinearObjective?,
         engine: FiniteEngine,
         maximize: Boolean = false,
-    ): OpenTheoryExecution = observed(preparedSource.sourceSemantics, null) { publication ->
-        val model = requireNotNull(preparedSource.model)
-        val values = objective?.let { OpenSourceObjective(it, if (maximize) it.negated() else it, maximize) }
-        heuristicObserved(model, params, objective, engine, 1, values, publication, preparedSource)
+    ): OpenTheoryExecution = searchWithoutTheory(preparedSource, params, objective, engine, maximize, 1, null)
+
+    internal fun searchWithoutTheory(
+        preparedSource: PreparedSourcePlan,
+        params: TheoryParams,
+        objective: LinearObjective?,
+        engine: FiniteEngine,
+        maximize: Boolean,
+        cores: Int,
+        onAccepted: ((SourceIncumbentPublication) -> Unit)?,
+    ): OpenTheoryExecution = observed(preparedSource.sourceSemantics, onAccepted) { publication ->
+        val stop = params.cancellation or params.timeout
+        if (stop() || preparedSource.decline == PreparedPlanDecline.RESOURCE) {
+            incompleteOpenExecution(
+                objective,
+                if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
+            )
+        } else {
+            val model = requireNotNull(preparedSource.model)
+            val values = objective?.let { OpenSourceObjective(it, if (maximize) it.negated() else it, maximize) }
+            heuristicObserved(model, params, objective, engine, cores, values, publication, preparedSource)
+        }
     }
 
     private fun heuristicObserved(

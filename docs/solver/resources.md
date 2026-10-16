@@ -50,7 +50,11 @@ bootstrap slices retain the containing lifetime scope and rearm their invocation
 Source setup charges integral-objective interval inspection, sound bound closure and
 linear preparation to the containing invocation. A polynomial preparation cap applies only after the selected
 completion requires polynomial installation. A finite completion proved available
-by closure does not consume an unused polynomial phase allowance.
+by closure does not consume an unused polynomial phase allowance. Shared source execution
+calls only the selected finite request factory and retains the typed native controls for
+arithmetic execution. Their cooperative stop composes with the captured source token;
+the original deadline also bounds native timeout reporting. Heuristic fallback reuses
+the captured source plan and ledger without another routing allowance.
 
 ## Units and boundaries
 

@@ -84,7 +84,7 @@ unsupported objective coordinates decline before constructing an executor.
 
 ### Source setup
 
-For explicit finite orchestration, attach a canonical `Problem` with
+For source orchestration, attach a canonical `Problem` with
 `SourceAttachment(problem, definitionHints, searchHints)` and call
 `SourceSetup.prepare(SourceSetupRequest(...))`. The request's `objective` uses original
 source direction and units; `maximize` records its sense. Setup prefers exact arithmetic
@@ -95,8 +95,27 @@ the SMT finite adapter retains the selected plan and its existing definition hin
 `PreparedSourceInvocation` retains the actual selected route, source plan and operation admission. Its
 `finiteShape()` supplies the same captured plan to `FiniteSolveRequest` and
 `FinitePipeline.solve`; it does not select a second route. An explicit enumeration
-operation remains enumeration under a cap of one. Existing nonfinite entry points
-retain their own execution surfaces.
+operation remains enumeration under a cap of one.
+
+`SourceSetup.execute(SourceExecutionRequest(invocation, ...))` dispatches that captured
+operation. Finite callers supply their existing full `FiniteSolveRequest` factory over
+its selected shape. Arithmetic callers supply `TheoryParams` or `PolynomialTheoryParams`,
+with explicit lane count and optional linear preparation controls. Only the selected
+finite factory is called. A foreign shape, engine or operation binding rejects before
+execution; nonfinite enumeration explicitly declines. Source deductions can refute an
+empty enumeration without constructing a worker.
+
+`SourceExecutionResult` retains the complete native finite, linear, polynomial or
+quadratic execution rather than narrowing exact values, bounds, limits, rays, resource
+telemetry or publication receipts. Callback types retain their native source coordinates
+and objective units. Captured interpretation does not upgrade a native claim beyond
+its producing model and proof scope; source-specific transfer qualification still applies.
+`executionKind` inspects the installed family; library policy owns
+unsupported-linear optimization fallback to source-checked heuristic execution on the
+same prepared plan. The MiniZinc finite invocation path, SMT linear admission and
+source-strategy arithmetic satisfaction consume this dispatcher. Legacy source-specific
+entries retain their existing execution surfaces; other input carriers and common
+parameter interpretation have separate adapters.
 
 These setup types are part of the experimental composition surface. Source arrays
 stay borrowed read-only, metadata containers are captured, and the returned shape
@@ -105,8 +124,10 @@ execution controls. Setup cancellation remains bound through later preparation a
 selected heuristic construction. The LP-observing `prepare(request, onLpStats)` overload
 uses the same setup; cancellation observed by its callback prevents a runnable plan.
 Source-strategy satisfaction retains its separate polynomial installation cap within
-the containing allowance. Native optimization entries retain their existing execution
-surfaces and route controls. Result and proof authority continue to come from
+the containing allowance. Execution composes its typed cooperative token with that
+captured stop and retains the containing deadline as a timeout. Fresh controls cannot
+resume a stopped source invocation. Native optimization compatibility entries retain
+their existing execution surfaces and route controls. Result and proof authority continue to come from
 the installed component contracts and checked results.
 
 ### Objective admission

@@ -4,18 +4,14 @@ import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
-import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.SourceAttachment
-import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.algebraicRealValue
@@ -145,56 +141,13 @@ internal object SmtLibMode : CliMode {
             val route = invocation.route
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
             common.logRoute(route, routingElapsedMs)
-            return when (route) {
-                is SourceProblemRoute.PolynomialTheory -> polynomialSolvable(
-                    route, { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) }, routingElapsedMs,
-                )
-                is SourceProblemRoute.Finite -> linearSolvable(
-                    route.problem,
-                    minimizedObjective,
-                    maximize,
-                    render,
-                    routingLpStats = routingLpStats,
-                    routingElapsedMs = routingElapsedMs,
-                    preparedRoute = route,
-                )
-
-                // An objective the descent can minimize goes to it; any other leaves the theory to local search.
-                is SourceProblemRoute.OpenTheory ->
-                    if (route.request.objective == null || OpenTheoryPipeline.canMinimize(route.request)) {
-                        openTheorySolvable(
-                            route.request,
-                            { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
-                            routingLpStats,
-                            routingElapsedMs,
-                        )
-                    } else {
-                        openLocalSearchSmt(
-                            route.request.model,
-                            objective,
-                            parsed.sense,
-                            ints,
-                            bools,
-                            reals,
-                            routingLpStats,
-                            routingElapsedMs,
-                        )
-                    }
-
-                is SourceProblemRoute.UnsupportedOpen ->
-                    openLocalSearchSmt(
-                        route.problem,
-                        objective,
-                        parsed.sense,
-                        ints,
-                        bools,
-                        reals,
-                        routingLpStats,
-                        routingElapsedMs,
-                    )
-
-                SourceProblemRoute.Refuted -> refutedSolvable(routingLpStats, routingElapsedMs)
-            }
+            return preparedSourceSolvable(
+                invocation,
+                render,
+                { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
+                routingLpStats,
+                routingElapsedMs,
+            )
         }
 
         override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput { latestSourceObjective }
@@ -228,29 +181,6 @@ private fun quadraticSmtSolvable(input: SmtLibInput.Quadratic, admissionElapsedM
         )
         renderOpenTheoryModel(ints, bools, reals, assignment)
     }, admissionElapsedMs)
-}
-
-// An open model searched by local search alone, minimizing [objective] when there is one.
-@Suppress("LongParameterList")
-private fun openLocalSearchSmt(
-    model: Problem,
-    objective: LinearObjective?,
-    sense: ObjectiveSense,
-    ints: Map<String, Int>,
-    bools: Map<String, Int>,
-    reals: Map<String, Int>,
-    routingLpStats: LpStats,
-    routingElapsedMs: Long,
-): Solvable {
-    val maximize = sense == ObjectiveSense.MAXIMIZE
-    return openLocalSearchSolvable(
-        model,
-        { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
-        routingLpStats,
-        routingElapsedMs,
-        objective = if (maximize) objective?.negated() else objective,
-        maximize = maximize,
-    )
 }
 
 /** Render an SMT-LIB `(get-model)`-style model: one `(define-fun name () Sort value)` per

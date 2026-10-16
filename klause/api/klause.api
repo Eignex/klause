@@ -12418,6 +12418,72 @@ public final class com/eignex/klause/solver/pipeline/SourceAttachment : com/eign
 	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 }
 
+public final class com/eignex/klause/solver/pipeline/SourceExecutionCallbacks {
+	public fun <init> ()V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteSolveCallbacks;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteSolveCallbacks;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getFinite ()Lcom/eignex/klause/solver/pipeline/FiniteSolveCallbacks;
+	public final fun getOnLinearIncumbent ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnQuadraticIncumbent ()Lkotlin/jvm/functions/Function1;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceExecutionKind : java/lang/Enum {
+	public static final field FINITE Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
+	public static final field HEURISTIC Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
+	public static final field LINEAR Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
+	public static final field POLYNOMIAL Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
+	public static final field REFUTED Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceExecutionKt {
+	public static final fun execute (Lcom/eignex/klause/solver/pipeline/SourceSetup;Lcom/eignex/klause/solver/pipeline/SourceExecutionRequest;Lcom/eignex/klause/solver/pipeline/SourceExecutionCallbacks;)Lcom/eignex/klause/solver/pipeline/SourceExecutionResult;
+	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/SourceSetup;Lcom/eignex/klause/solver/pipeline/SourceExecutionRequest;Lcom/eignex/klause/solver/pipeline/SourceExecutionCallbacks;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceExecutionResult;
+	public static final fun executionKind (Lcom/eignex/klause/solver/pipeline/SourceSetup;Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;)Lcom/eignex/klause/solver/pipeline/SourceExecutionKind;
+	public static final fun getMaximizeSourceObjective (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;)Z
+	public static final fun getSourceObjective (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;)Lcom/eignex/klause/solver/objective/LinearObjective;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceExecutionRequest {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;ILcom/eignex/klause/presolve/PresolveConfig;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;ILcom/eignex/klause/presolve/PresolveConfig;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCores ()I
+	public final fun getFiniteRequest ()Lkotlin/jvm/functions/Function1;
+	public final fun getInvocation ()Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
+	public final fun getPolynomial ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;
+	public final fun getPresolveBudget ()Lcom/eignex/klause/presolve/PresolveBudget;
+	public final fun getPresolveCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public final fun getPresolveConfig ()Lcom/eignex/klause/presolve/PresolveConfig;
+	public final fun getTheory ()Lcom/eignex/klause/solver/pipeline/TheoryParams;
+}
+
+public abstract class com/eignex/klause/solver/pipeline/SourceExecutionResult : com/eignex/klause/ir/SourceSemanticsOwner {
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getInvocation ()Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Finite : com/eignex/klause/solver/pipeline/SourceExecutionResult {
+	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/FiniteSolveResult;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Linear : com/eignex/klause/solver/pipeline/SourceExecutionResult {
+	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Polynomial : com/eignex/klause/solver/pipeline/SourceExecutionResult {
+	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Quadratic : com/eignex/klause/solver/pipeline/SourceExecutionResult {
+	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Refuted : com/eignex/klause/solver/pipeline/SourceExecutionResult {
+}
+
 public final class com/eignex/klause/solver/pipeline/SourceIncumbentPublication {
 	public fun <init> (JLcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;)V
 	public final fun component1 ()J
