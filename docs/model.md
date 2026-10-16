@@ -195,8 +195,11 @@ an explicit range remain source data.
 `FloatSemantics.Grid` retains its approximation window separately from undeclared
 source-real bounds. Replacing a grid with continuous semantics removes that window,
 while retaining an explicitly supplied source range. Numeric literal authority
-stays fixed when tolerance or float interpretation changes. A zero feasibility
-tolerance requires exact checking of the declared numeric source values.
+stays fixed when tolerance or float interpretation changes. `SourceTolerance`
+declares slack as `max(absolute, relative * scale)`. A row's scale is the maximum
+of its finite bound magnitude and the sum of absolute term activities; a variable
+bound uses its finite bound magnitude. Zero components require exact checking of
+the declared numeric source values. Integrality stays exact independently.
 
 `EffectiveSourceSemantics` retains both defaults and effective policy. Its
 `isApproximate` flag identifies a grid or positive tolerance; it supplies no

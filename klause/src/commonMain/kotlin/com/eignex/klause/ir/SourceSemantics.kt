@@ -61,6 +61,26 @@ sealed interface FloatSemantics {
 }
 
 /**
+ * Source feasibility slack `max(absolute, relative * scale)`. For a row, scale is the maximum
+ * of the finite bound magnitude and the sum of absolute term activities; for a variable bound
+ * it is the finite bound magnitude. Integrality is checked exactly, independently of this slack.
+ */
+data class SourceTolerance(
+    /** Minimum permitted absolute slack in source units. */
+    val absolute: Double = 0.0,
+    /** Permitted slack relative to the checked source scale. */
+    val relative: Double = 0.0,
+) {
+    init {
+        require(absolute.isFinite() && absolute >= 0.0) { "absolute tolerance must be finite and nonnegative" }
+        require(relative.isFinite() && relative >= 0.0) { "relative tolerance must be finite and nonnegative" }
+    }
+
+    /** Whether no source feasibility slack is permitted. */
+    val isExact: Boolean get() = absolute == 0.0 && relative == 0.0
+}
+
+/**
  * Declared source defaults. Optional policies are absent when that semantic has no meaning
  * for the source. Bounds apply only to declarations without their own range.
  * This value contains no engine, theory, route or resource policy.
@@ -76,17 +96,11 @@ data class SourceSemantics(
     val undeclaredIntegers: UndeclaredIntegerBounds? = null,
     /** Default undeclared real range, or null when real declarations require a range. */
     val undeclaredReals: UndeclaredRealBounds? = null,
-    /** Absolute source feasibility tolerance; zero requires exact checking, null makes this inapplicable. */
-    val feasibilityTolerance: Double? = null,
+    /** Source feasibility slack; zero components require exact checking, null makes this inapplicable. */
+    val feasibilityTolerance: SourceTolerance? = null,
     /** Canonicalization of absent optional values, or null when the source has no optional values. */
     val pinAbsentOptionalValues: Boolean? = null,
 ) {
-    init {
-        require(feasibilityTolerance == null || feasibilityTolerance.isFinite() && feasibilityTolerance >= 0.0) {
-            "feasibility tolerance must be finite and nonnegative"
-        }
-    }
-
     /** Resolve caller semantics before lowering, rejecting every inapplicable override. */
     fun resolve(overrides: SemanticOverrides = SemanticOverrides()): EffectiveSourceSemantics {
         require(overrides.floats == null || floats != null) { "float interpretation does not apply to $format" }
@@ -123,8 +137,8 @@ data class SemanticOverrides(
     val undeclaredIntegers: UndeclaredIntegerBounds? = null,
     /** Replacement default real range, including explicit open endpoints. */
     val undeclaredReals: UndeclaredRealBounds? = null,
-    /** Replacement absolute source feasibility tolerance. */
-    val feasibilityTolerance: Double? = null,
+    /** Replacement absolute and relative source feasibility slack. */
+    val feasibilityTolerance: SourceTolerance? = null,
     /** Replacement absent-value canonicalization. */
     val pinAbsentOptionalValues: Boolean? = null,
 )
@@ -144,7 +158,7 @@ class EffectiveSourceSemantics internal constructor(
      * witness validity, completeness, refutation authority or an independently checked proof.
      */
     val isApproximate: Boolean
-        get() = effective.floats is FloatSemantics.Grid || (effective.feasibilityTolerance ?: 0.0) > 0.0
+        get() = effective.floats is FloatSemantics.Grid || effective.feasibilityTolerance?.isExact == false
 }
 
 /** Source payload paired with the effective semantics under which it was lowered. */
