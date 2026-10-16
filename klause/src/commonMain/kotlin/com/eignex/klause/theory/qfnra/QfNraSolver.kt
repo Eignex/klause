@@ -374,18 +374,18 @@ internal class WitnessProbe(
                     arithmetic.step()
                     sourceTermCounts[index]
                 }
-                if (guideIndices.indices.all { index ->
+                val guidePayloads = if (guideIndices.indices.all { index ->
                         arithmetic.step()
                         formula.atoms[guideIndices[index]].polynomial === conjunctive[index].polynomial &&
                             sourcePayloads[guideIndices[index]].size == guideTermCounts[index]
                     }
                 ) {
                     repeat(3 * guideIndices.size + 1) { arithmetic.step() }
+                    guideIndices.map { index -> arithmetic.step(); sourcePayloads[index] }
+                } else null
+                if (guidePayloads != null) {
                     admittedTerms = Triple(
-                        conjunctive.toList(), guideIndices.toList(), guideIndices.map { index ->
-                            arithmetic.step()
-                            sourcePayloads[index]
-                        },
+                        conjunctive.toList(), guideIndices.toList(), guidePayloads,
                     )
                 }
                 try {
@@ -395,6 +395,9 @@ internal class WitnessProbe(
                     }?.let { return it }
                 } finally {
                     admittedTerms = null
+                }
+                if (guidePayloads != null && axes.size > 1) {
+                    supportWitness(conjunctive, guidePayloads, realCount, fixed)?.let { return it }
                 }
             } else if (nonlinear) {
                 coupledPhase {
@@ -496,6 +499,28 @@ internal class WitnessProbe(
             captured[variable] = algebraic.rational(value)
         }
         return captured
+    }
+
+    private fun supportWitness(
+        atoms: List<PolynomialAtom>,
+        payloads: List<List<PolynomialTerm>>,
+        realCount: Int,
+        fixed: Map<Int, BigFraction>,
+    ): QfNraAssignment? {
+        if (exhausted || queries == MAX_WITNESS_AXES) return null
+        return try {
+            val point = PolynomialWitnessSupports(arithmetic, MAX_WITNESS_TERMS, MAX_WITNESS_DEGREE, MAX_WITNESS_BITS)
+                .point(atoms, payloads, realCount, fixed, takeAxis = {
+                    arithmetic.step()
+                    if (queries == MAX_WITNESS_AXES) false else { queries++; true }
+                }, takeProposal = {
+                    arithmetic.step()
+                    if (proposals >= MAX_WITNESS_PROPOSALS - 1) false else { proposals++; true }
+                }) ?: return null
+            candidate(captureRational(point))
+        } catch (_: PolynomialResourceLimit) {
+            null
+        }
     }
 
     private fun definitionBoundaries(

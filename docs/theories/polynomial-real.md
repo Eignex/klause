@@ -425,8 +425,9 @@ payloads. Completed conjunction indices map them to the same normalized atom and
 exact polynomial identity, with the admitted payload counts. Only the admission
 producer creates this state; constructor and direct coupled calls accept no payload
 lists. Source retention, bounded mapping copies and identity consultations charge
-the same probe owner. The mapping is consumed by one coupled entry and cleared on
-exit or interruption; another query's conditions and fixings prepare fresh payloads.
+the same probe owner. The coupled mapping is consumed by one entry and cleared on
+exit or interruption. Probe-private immutable payloads can remain for support joins
+in that same call; another query's conditions and fixings prepare fresh payloads.
 Co-occurrence and guide preparation reuse those terms while retaining their traversal
 and arithmetic charges. Specialized line polynomials retain fresh extraction.
 
@@ -483,6 +484,23 @@ check. The full Boolean formula still decides acceptance; final assignment captu
 and rejected-point guidance reconstruct coordinates from the same owned line point.
 Interrupted checking or capture publishes no witness and refunds no work. Ordinary
 CAD point evaluation and the existing query, proposal and phase limits remain intact.
+
+After coupled proposals, a complete numeric conjunction can join sparse rational
+proposals from equalities with disjoint unfixed coordinate supports. Each support
+starts with its existing zero seed and isolates original-coordinate roots while
+retaining earlier choices. A source row is checked when its last changing support
+has been chosen; coordinates outside the supports retain their proposed zero or
+fixed seed. Cached source payloads retain coefficient, degree and total-term
+admission. Specialization checks exact rational coefficients before isolation and
+uses the existing kernel representation limits. A greedy join can decline even
+when a dense or differently joined solution exists. Overlap, nonrational roots,
+guarded conjunction admission and exhausted counters supply no source refutation.
+Only the existing complete original-formula sample check accepts a finished point.
+Each partial attempt consumes the same proposal ledger, reserving one slot for
+that final check; each axis consumes the same root ledger. Support preparation,
+partial checks and capture debit only the remaining original global probe prefix.
+The coupled half-prefix is not moved or renewed. An unfinished join leaves ordinary
+coordinate repair and complete CAD available with the retained charges.
 
 Equalities under negation or disjunction are proposal guides, never asserted facts.
 Scalar equality repair ranks a rejected proposal using the completed source-atom
