@@ -2370,6 +2370,10 @@ Each attempt also records its finite-coordinate hash, residual LP verdict, colle
 LP statistics and elapsed time; the first sixteen retain their complete finite point.
 These private proposals carry no witness credit. Absence of LP observations means
 the loaded adapter has no observer or did not enter its numerical path.
+`lowering=cli` retains an exactly representable hybrid source in exact mode, matching
+the CLI's initial lowering choice. The default `lowering=exact-source` preserves
+the supplied-point diagnostic's explicit exact source rows. Neither mode runs CLI
+routing or presolve; use ordinary CLI comparisons for integrated recovery claims.
 `cases.json` uses the maintained offline source-verifier record format; `sources/`
 contains its hash-named original bytes. Independently check it with
 `verify_source_results.py --source-root <sources> --witness-only` on the analysis host.

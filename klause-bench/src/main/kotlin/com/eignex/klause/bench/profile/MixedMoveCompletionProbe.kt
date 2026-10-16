@@ -46,7 +46,7 @@ internal object MixedMoveCompletionProbe {
         }
         require(options.keys.all {
             it in setOf("input", "text64", "suite", "problem", "sourceSHA256", "initial64", "exact",
-                "instructions", "seed", "repeats", "timeout")
+                "instructions", "seed", "repeats", "timeout", "lowering")
         })
         require(listOf(options["input"], options["text64"], options["suite"]).count { it != null } == 1)
         require((options["suite"] == null) == (options["problem"] == null))
@@ -78,7 +78,11 @@ internal object MixedMoveCompletionProbe {
         require(instructions > 0L && repeats in 1..100 && timeout > 0L)
         val parsed = Mps.parse(bytes.decodeToString())
         val hybrid = parsed.toProblem()
-        val compiled = if (exact || (!hybrid.sourceExact && hybrid.model.numIntVars > 0)) {
+        val lowering = options["lowering"] ?: "exact-source"
+        require(lowering in setOf("cli", "exact-source"))
+        val compiled = if ((exact && (lowering == "exact-source" || !hybrid.sourceExact)) ||
+            (!hybrid.sourceExact && hybrid.model.numIntVars > 0)
+        ) {
             parsed.toExactSourceProblem()
         } else hybrid
         val original = parsed.toExactSourceProblem()
@@ -132,6 +136,8 @@ internal object MixedMoveCompletionProbe {
                 else -> "source tolerance"
             })
             put("exact", exact)
+            put("lowering", lowering)
+            put("sourceExact", compiled.sourceExact)
             put("instructions", instructions)
             put("seed", seed)
             put("repeats", repeats)
