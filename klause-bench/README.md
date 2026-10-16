@@ -318,6 +318,8 @@ factor kinds and exact-row predicate counts. Predicate identity removes only the
 activator before using `ExactLinear` structural keys; it does not reason about
 signs, implications or source satisfiability. Parsing has a separate ten-second
 deadline. This diagnostic opens no solver and supplies no route or verdict claim.
+For up to eight sources, `batch64=<base64 JSON array of argument arrays>` retains
+each inspection in a numbered directory.
 
 With `inspect=disjunction-names`, the tool additionally replays predicate registration
 from the cached preparation fragment in a fresh registry, using only the original

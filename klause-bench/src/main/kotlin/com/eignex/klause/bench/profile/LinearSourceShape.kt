@@ -16,7 +16,9 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.lang.management.ManagementFactory
+import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -25,6 +27,17 @@ import kotlinx.serialization.json.put
 internal object LinearSourceShape {
     @JvmStatic
     fun main(args: Array<String>) {
+        val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        if (args.size == 1 && args[0].startsWith("batch64=")) {
+            val bytes = Base64.getDecoder().decode(args[0].substringAfter('='))
+            require(bytes.size <= 32 * 1024)
+            val requests = Json.decodeFromString<List<List<String>>>(bytes.decodeToString())
+            require(requests.size in 1..8)
+            requests.forEachIndexed { index, request -> inspect(request.toTypedArray(), out.resolve("$index")) }
+        } else inspect(args, out)
+    }
+
+    private fun inspect(args: Array<String>, out: File) {
         require(args.size == 3) { "Use suite=ID problem=NAME sha256=HEX" }
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256"))
@@ -34,7 +47,7 @@ internal object LinearSourceShape {
             .single { it.name == options.getValue("problem") }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(source.source)).use { it.readNBytes(4 * 1024 * 1024 + 1) }
         require(bytes.size <= 4 * 1024 * 1024 && sha256(bytes) == expected)
-        val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        out.mkdirs()
         out.resolve("source.smt2").writeBytes(bytes)
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         val started = System.nanoTime()
