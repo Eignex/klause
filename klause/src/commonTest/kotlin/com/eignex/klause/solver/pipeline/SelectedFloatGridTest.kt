@@ -9,10 +9,13 @@ import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.projection.FloatGridDecline
 import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderProvider
+import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,6 +27,93 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SelectedFloatGridTest {
+    @Test
+    fun `automatic grid selection should preserve an admitted original complete arm for the actual operation`() {
+        for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.MIXED)) {
+            for (operation in listOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE)) {
+                val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.25)), numRealVars = 1,
+                    realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+                    semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(2, 1000)).resolve())
+                val objective = if (operation == ExecutionOperation.OPTIMIZE) {
+                    LinearObjective(realCoefficients = doubleArrayOf(1.0))
+                } else null
+                val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source), operation,
+                    engine, objective, maximize = objective != null))
+                val canonical = invocation.preparedPlan
+                assertTrue(ExecutionStrategy.COMPLETE in assertNotNull(invocation.admission).arms)
+
+                val result = assertIs<SelectedFloatGridPreparation.Declined>(SourceSetup.prepareSelectedFloatGrid(
+                    invocation, listOf(FloatGridVariable(SourceRealId(0))),
+                    FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY))
+
+                assertEquals(SelectedGridDecline.CONSUMER, result.cause)
+                assertNull(invocation.floatProjection)
+                assertSame(canonical, invocation.enginePlan)
+                assertSame(invocation.route, invocation.engineRoute)
+            }
+        }
+    }
+
+    @Test
+    fun `a declined original complete arm should preserve an available automatic private view`() {
+        for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.MIXED, FiniteEngine.LOCAL_SEARCH)) {
+            val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+                intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.5)), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+                semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+                if (factor.variables.reals.isNotEmpty()) Encoder(EncoderSupport.UNSUPPORTED)
+                else BuiltInEncoderProvider.select(factor, target)
+            })
+            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+                ExecutionOperation.SATISFY, engine, providers = providers))
+            assertTrue(ExecutionStrategy.COMPLETE !in assertNotNull(invocation.admission).arms)
+
+            assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(
+                invocation, listOf(FloatGridVariable(SourceRealId(0))),
+                FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY))
+
+            assertNotNull(invocation.floatProjection)
+            assertSame(source, invocation.source.originalSource)
+        }
+    }
+
+    @Test
+    fun `explicit private compatibility should remain available beside an original complete mixed arm`() {
+        for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.MIXED)) {
+            val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+                semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+                ExecutionOperation.SATISFY, engine))
+            assertTrue(ExecutionStrategy.COMPLETE in assertNotNull(invocation.admission).arms)
+
+            assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(
+                invocation, listOf(FloatGridVariable(SourceRealId(0))),
+                FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+
+            assertNotNull(invocation.floatProjection)
+        }
+    }
+
+    @Test
+    fun `automatic private selection should preserve an original source refutation`() {
+        val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+        val request = SourceSetupRequest(SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.MIXED)
+        val invocation = PreparedSourceInvocation(request, SourceProblemRoute.Refuted, Cancellation.Never)
+
+        val result = assertIs<SelectedFloatGridPreparation.Declined>(SourceSetup.prepareSelectedFloatGrid(
+            invocation, listOf(FloatGridVariable(SourceRealId(0))),
+            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY))
+
+        assertEquals(SelectedGridDecline.SOURCE_REFUTED, result.cause)
+        assertSame(SourceProblemRoute.Refuted, invocation.engineRoute)
+        assertNull(invocation.floatProjection)
+    }
+
     @Test
     fun `an explicit private view should preserve the canonical plan and recapture its own descriptors`() {
         val relation = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.5)
@@ -123,11 +213,13 @@ class SelectedFloatGridTest {
         stopped = true
 
         val result = assertIs<SelectedFloatGridPreparation.Declined>(SourceSetup.prepareSelectedFloatGrid(
-            invocation, listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.HEURISTIC_VIEW,
+            invocation, listOf(FloatGridVariable(SourceRealId(0))),
+            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
         ))
         stopped = false
         val repeated = assertIs<SelectedFloatGridPreparation.Declined>(SourceSetup.prepareSelectedFloatGrid(
-            invocation, listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.HEURISTIC_VIEW,
+            invocation, listOf(FloatGridVariable(SourceRealId(0))),
+            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
         ))
 
         assertEquals(SelectedGridDecline.RESOURCE, result.cause)

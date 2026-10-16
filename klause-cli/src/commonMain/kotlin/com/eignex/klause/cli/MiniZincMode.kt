@@ -6,7 +6,7 @@ import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import com.eignex.klause.formats.flatzinc.flatZincSemantics
 import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
-import com.eignex.klause.formats.flatzinc.prepareFiniteCompatibility
+import com.eignex.klause.formats.flatzinc.prepareSourceExecution
 import com.eignex.klause.formats.flatzinc.sourceAttachment
 import com.eignex.klause.formats.flatzinc.toSearchHints
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
@@ -107,7 +107,7 @@ internal object MiniZincMode : CliMode {
                 common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
                 else -> ExecutionOperation.SATISFY
             }
-            val invocation = program.prepareFiniteCompatibility(
+            val invocation = program.prepareSourceExecution(
                 SourceSetupRequest(
                     program.sourceAttachment(),
                     operation,
@@ -133,7 +133,11 @@ internal object MiniZincMode : CliMode {
                 )
             }
             if (floatApproximation) {
-                return preparedSourceSolvable(invocation, render, { assignment ->
+                floatApproximation = false
+                val renderOriginal: (Sample) -> String = { sample ->
+                    applier?.render(original, sample) ?: writeFlatZincSolution(original, sample, outputObjective)
+                }
+                return preparedSourceSolvable(invocation, renderOriginal, { assignment ->
                     applier?.render(original, assignment)
                         ?: writeFlatZincSolution(original, assignment, outputObjective)
                 })

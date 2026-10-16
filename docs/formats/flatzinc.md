@@ -148,6 +148,14 @@ The historical `problem`, name/array decoders and component metadata request a l
 finite compatibility view. `prepareFiniteCompatibility` binds that view to the same
 source invocation with the caller's actual operation, providers and containing stop.
 `parseFlatZincExecution` uses this binding and exposes its `sourceInvocation`.
+`prepareSourceExecution` selects automatic execution from the same original invocation.
+An actually admitted original complete arm takes precedence over a private grid; mixed
+requests retain that original arm through the common dispatcher. Otherwise the permitted
+compatibility view may run, with the original route retained on decline. Admission uses
+the captured operation, objective and participating arms. Explicit
+`prepareFiniteCompatibility` requests may still select private-grid CP or mixed execution.
+Original execution uses original renderers and proof qualification; availability of a
+legacy grid does not downgrade an original-source proof.
 Cached geometry retains only immutable source/model definitions; another operation
 binds its own consumer, checks and stop. Structured view declines preserve the
 canonical original route. Source-frame samples use the original decoder; unbound

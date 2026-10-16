@@ -27,6 +27,22 @@ import kotlin.test.assertTrue
 
 class FlatZincSourceStateTest {
     @Test
+    fun `a copied private search group should retain only original integer hints on source attachment`() {
+        val program = parseFlatZinc("""
+            var 1..2: i;
+            var 0.0..1.0: grid;
+            constraint float_le(grid, 0.5);
+            solve :: int_search([i, grid], input_order, indomain_max, complete) satisfy;
+        """.trimIndent(), floatBuckets = 3)
+
+        val copied = program.copy()
+
+        assertEquals(listOf(0, 1), assertNotNull(copied.searchHints).tiers.single().intVars.toList())
+        assertEquals(listOf(0), assertNotNull(copied.sourceAttachment().searchHints).tiers.single().intVars.toList())
+        assertSame(program.sourceProgram.problem, copied.sourceProgram.problem)
+    }
+
+    @Test
     fun `finite declarations should not acquire an unrepresentable unrelated grid window`() {
         val lower = BIG_ONE shl 2048
         val policy = FloatSemantics.Grid(3, 1000, UndeclaredRealBounds(SemanticRational.of(lower),

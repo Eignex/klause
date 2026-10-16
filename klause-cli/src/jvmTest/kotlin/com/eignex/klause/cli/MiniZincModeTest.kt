@@ -1,9 +1,18 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.ExecutionStrategy
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -15,6 +24,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class MiniZincModeTest(private val direction: String) {
@@ -25,12 +36,67 @@ class MiniZincModeTest(private val direction: String) {
     }
 
     @Test
+    fun `automatic complete and mixed loading should solve and render an off grid original optimum`() {
+        val source = File.createTempFile("original-off-grid", ".fzn").apply {
+            writeText("var 0.0..1.0: x :: output_var; constraint float_eq(x,0.25); solve $direction x;")
+        }
+        val previous = System.out
+        try {
+            for (engine in listOf("cp", "mixed")) {
+                val common = CommonOptions().apply {
+                    this.engine = engine
+                    parallel = 1
+                    sourceOptions.floatBuckets = 2
+                }
+                val session = MiniZincMode.newSession()
+                val solvable = session.load(source.absolutePath, common)
+                val invocation = assertNotNull(solvable.sourceInvocation)
+                assertTrue(ExecutionStrategy.COMPLETE in assertNotNull(invocation.admission).arms)
+                assertNull(invocation.floatProjection)
+                val bytes = ByteArrayOutputStream()
+                val stream = PrintStream(bytes)
+                try {
+                    System.setOut(stream)
+                    SolveCore.solve(solvable, common, session.output(common))
+                } finally {
+                    System.setOut(previous)
+                    stream.close()
+                }
+                val output = bytes.toString(Charsets.UTF_8.name())
+                assertTrue("x = 0.25;" in output, output)
+                assertTrue("==========" in output.lines(), output)
+                assertFalse("private-grid" in output, output)
+            }
+        } finally {
+            System.setOut(previous)
+            source.delete()
+        }
+    }
+
+    @Test
+    fun `prepared finite dispatch should retain its source invocation objective units and routing costs`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(3), constant = 7)
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK, objective, maximize = direction == "maximize"))
+        val stats = LpStats()
+
+        val solvable = preparedSourceSolvable(invocation, { "" }, { "" }, stats, 17)
+
+        assertSame(invocation, solvable.sourceInvocation)
+        assertSame(invocation.finiteShape(), solvable.finiteShape)
+        assertEquals(10L, assertNotNull(solvable.objectiveValue)(Sample(booleanArrayOf(), longArrayOf(1))))
+        assertSame(stats, solvable.routingLpStats)
+        assertEquals(17L, solvable.routingElapsedMs)
+    }
+
+    @Test
     fun `finite grid loading should retain original real source and private objective units`() {
         val source = File.createTempFile("source-grid-flatzinc", ".fzn").apply {
             writeText("var 0.0..2.0: x; constraint float_le(x,1.0); solve $direction x;")
         }
         try {
-            val common = CommonOptions().apply { engine = "cp" }
+            val common = CommonOptions().apply { engine = "ls" }
 
             val solvable = MiniZincMode.newSession().load(source.absolutePath, common)
             val shape = solvable.finiteShape

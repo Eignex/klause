@@ -155,7 +155,8 @@ nor one checked source point establishes global completeness. Ordinary
 FlatZinc exposes canonical real data through `FlatZincProgram.sourceProgram` and
 `sourceAttachment()`. Its explicit `prepareFiniteCompatibility(request)` retains the
 caller's original source request while selecting the historical finite view when
-representable. `parseFlatZincExecution` exposes the captured invocation beside its
+representable. Automatic `prepareSourceExecution(request)` preserves an admitted original
+complete arm; only its absence permits a private view. `parseFlatZincExecution` exposes the captured invocation beside its
 native hint data. Historical FlatZinc model/decoder access remains lazy; the callable
 constructor/copy/component descriptors are retained, while Kotlin `isData` changes.
 

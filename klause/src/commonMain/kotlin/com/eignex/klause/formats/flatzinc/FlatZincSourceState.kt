@@ -95,19 +95,18 @@ internal class FlatZincSourceState(
         return if (cancellation()) null else representations to variables
     }
 
-    fun prepare(invocation: PreparedSourceInvocation) {
+    fun prepare(invocation: PreparedSourceInvocation, purpose: FloatGridConsumerPurpose) {
         val stop = invocation.cancellation
         if (stop() || original.problem.numRealVars == 0 ||
             original.semantics.effective.floats !is FloatSemantics.Grid
         ) return
         if (geometryOwner.isInitialized()) {
             geometry.definition?.let {
-                SourceSetup.prepareSelectedFloatGrid(invocation, it, FloatGridConsumerPurpose.FINITE_COMPATIBILITY)
+                SourceSetup.prepareSelectedFloatGrid(invocation, it, purpose)
             }
         } else {
             val (_, variables) = selection(stop) ?: return
-            if (variables.isNotEmpty()) SourceSetup.prepareSelectedFloatGrid(invocation, variables,
-                FloatGridConsumerPurpose.FINITE_COMPATIBILITY)
+            if (variables.isNotEmpty()) SourceSetup.prepareSelectedFloatGrid(invocation, variables, purpose)
         }
     }
 
@@ -122,6 +121,15 @@ internal class FlatZincSourceState(
     fun copyFor(copied: FlatZincProgram): FlatZincSourceState? {
         if (copied.problem !== legacy.problem || copied.semantics !== original.semantics) return null
         val definition = geometry.definition
+        val sourceSearch = if (copied.searchHints === legacy.searchHints) original.searchHints else {
+            copied.searchHints?.let { hints ->
+                val tiers = hints.tiers.mapNotNull { tier ->
+                    val integers = tier.intVars.filter { it in 0 until original.problem.numIntVars }.toIntArray()
+                    if (integers.isEmpty() && tier.boolVars.isEmpty()) null else tier.copy(intVars = integers)
+                }
+                hints.copy(tiers = tiers).takeIf { tiers.isNotEmpty() }
+            }
+        }
         val sourceCopy = if (definition == null) copied.suppliedCopy() else {
             val floats = LinkedHashMap<String, FloatBucketing>()
             for ((name, value) in copied.floatVarsByName) {
@@ -133,7 +141,7 @@ internal class FlatZincSourceState(
             }
             FlatZincProgram(original.problem, copied.solve, copied.boolVarsByName,
                 copied.intVarsByName.filter { (name, id) -> name !in floats && id < original.problem.numIntVars },
-                floats, arrays, copied.outputItems, copied.searchHints, copied.enumLabelsByVar, copied.setVarsByName,
+                floats, arrays, copied.outputItems, sourceSearch, copied.enumLabelsByVar, copied.setVarsByName,
                 copied.floatRepresentations, copied.semantics, copied.definitionHints)
         }
         val search = if (copied.searchHints === legacy.searchHints) projectSearch else { program: FlatZincProgram ->
@@ -190,10 +198,20 @@ fun FlatZincProgram.sourceAttachment(): SourceAttachment = retainedSource?.attac
     ?: SourceAttachment(problem, definitionHints, searchHints?.toSearchHints())
 
 /** Bind the documented finite compatibility view while retaining the original source and native fallback. */
-fun FlatZincProgram.prepareFiniteCompatibility(request: SourceSetupRequest): PreparedSourceInvocation {
+fun FlatZincProgram.prepareFiniteCompatibility(request: SourceSetupRequest): PreparedSourceInvocation =
+    prepareInvocation(request, FloatGridConsumerPurpose.FINITE_COMPATIBILITY)
+
+/** Prepare original execution, retaining admitted complete arms before selecting an optional private grid. */
+fun FlatZincProgram.prepareSourceExecution(request: SourceSetupRequest): PreparedSourceInvocation =
+    prepareInvocation(request, FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY)
+
+private fun FlatZincProgram.prepareInvocation(
+    request: SourceSetupRequest,
+    purpose: FloatGridConsumerPurpose,
+): PreparedSourceInvocation {
     require(request.source.originalSource === sourceProgram.problem) { "FlatZinc request belongs to another source" }
     val invocation = SourceSetup.prepare(request)
-    retainedSource?.prepare(invocation)
+    retainedSource?.prepare(invocation, purpose)
     return invocation
 }
 
