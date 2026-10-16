@@ -400,6 +400,17 @@ val checkJvmCompilationCohort = tasks.register<Exec>("checkJvmCompilationCohort"
         "tools/review_native_vm_live_arguments.py", "tools/native_vm_event_loss.py")
 }
 
+val checkJvmCompilationCosts = tasks.register<Exec>("checkJvmCompilationCosts") {
+    group = "verification"
+    description = "Test source-qualified observed JFR cost pairs and complete census archive binding."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_report_jvm_compilation_cohort.py")
+    inputs.files("tools/report_jvm_compilation_cohort.py", "tools/test_report_jvm_compilation_cohort.py",
+        "tools/jvm_compilation_events.py", "tools/review_jvm_task_log_cohort.py", "tools/review_jvm_task_log.py",
+        "tools/stream_jvm_task_log.py", "tools/review_native_vm_log_identities.py",
+        "tools/review_native_vm_live_arguments.py", "tools/native_vm_event_loss.py")
+}
+
 tasks.named("check") {
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
@@ -407,7 +418,7 @@ tasks.named("check") {
         checkNativeVmLiveArgumentReview, checkNativeVmEventLoss, checkNativeVmEventLossReview,
         checkNativeVmBoundaryEntries, checkNativeVmBoundaryLifecycle, checkNativeVmBoundaryLifecycleReview,
         checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkJvmTaskLog, checkJvmTaskLogCohort,
-        checkJvmTaskLogStreaming, checkJvmCompilationEvents, checkJvmCompilationCohort, checkNativeVmEntryTransfers,
+        checkJvmTaskLogStreaming, checkJvmCompilationEvents, checkJvmCompilationCohort, checkJvmCompilationCosts, checkNativeVmEntryTransfers,
         checkNativeVmDebugImage, checkNativeVmDwarfProvider, checkNativeVmDwarfRecords,
         checkNativeVmDwarfRecordReview, checkNativeVmDwarfContext, checkNativeVmDwarfLayoutReview,
         checkNativeVmEntryAbi, checkNativeVmTaskCalls, checkNativeVmTaskCallFlow,

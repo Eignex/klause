@@ -2270,6 +2270,35 @@ Partial export, tool failure and resource declines retain explicit negatives and
 recoverable original input identities. Publication still requires source filtering
 and complete byte verification of every retained gzip payload.
 
+### Saved JVM census cost comparisons
+
+`com.eignex.klause.bench.profile.JvmCompilationCohortCosts` accepts the same three
+manifest/archive arguments as the saved-census reader. Its input is a published
+complete saved-census archive. It authenticates every member before interpreting
+the cohort index, original case metadata and complete per-recording census files.
+It performs no original JVM or solver replay and does not run `jfr print`.
+
+`compilation-cost-comparison.json.gz` retains every original family/case row and
+pair, original source-check status, whole recording/tier costs and report recovery
+identities. Pair keys include engine, input index, repetition, mode and recipe.
+Missing, duplicate or unexpected arms, mismatched problem identities, invalid or
+unknown original source outcomes, incomplete cohorts, missing declared ordinary
+phases, unresolved roots, XML gaps, data-loss events and ambiguous IDs remain
+excluded. Failed roots and missing metrics are retained; absent costs are not zero.
+Available differences and exact ratio operands describe observed all-tier JFR
+quantities. C2 values stay separate, and shared full-root family costs are not
+additive. No family, adverse observation or excluded pair is selected away.
+
+Declared-phase eligibility does not prove exhaustive source phases or a current
+source change's benefit. Original runtime/source outcomes retain their own scope;
+current runtime, allocation, RNG/work, independent and cold controls are separate.
+All full-root, elapsed-time, code-size and saving proof flags remain false.
+Resource bounds are 2 GiB compressed archives, 16 GiB complete member expansion,
+512 MiB selected compressed metadata, 512 MiB per expanded census JSON and
+512 MiB complete compressed output. Transport staging is removed after the child
+finishes. The observer retains its installed build/JDK identity, exact nine-file
+Python closure, original input identities and actual child streams/exit.
+
 ### Polynomial witness work checkpoints
 
 `com.eignex.klause.bench.profile.PolynomialWitnessProbeProfile` diagnoses the bounded
