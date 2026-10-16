@@ -2,7 +2,7 @@
 
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
@@ -20,10 +20,12 @@ import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
+import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.kumulant.bandit.UnivariateBandit
@@ -171,7 +173,25 @@ class Portfolio(
      * A backtrack arm's [ResumableSolve] is resumed each time it is scheduled; an arm whose handle reaches a verdict
      * that settles nothing, or fails, is retired. Local-search satisfaction walks resume across counted segments.
      */
-    override fun solve(cancellation: Cancellation): SolveResult {
+    override fun solve(cancellation: Cancellation): SolveResult = qualify(solveRun(cancellation))
+
+    private fun sourceSemantics(): EffectiveSourceSemantics? {
+        val model = workers.firstOrNull()?.evidenceModel ?: return null
+        return model.semantics.takeIf {
+            workers.all { worker -> worker.evidenceModel?.sameModel(model) == true }
+        }
+    }
+
+    private fun qualify(result: SolveResult): SolveResult =
+        sourceSemantics()?.let { result.withSourceSemantics(it) } ?: result
+
+    private fun qualify(result: MinimizeResult): MinimizeResult =
+        sourceSemantics()?.let { result.withSourceSemantics(it) } ?: result
+
+    private fun qualify(result: MinimizeResult.WithSample): MinimizeResult.WithSample =
+        sourceSemantics()?.let { result.withSourceSemantics(it) } ?: result
+
+    private fun solveRun(cancellation: Cancellation): SolveResult {
         val run = Schedule(cancellation, arrayOfNulls<ResumableSolve>(workers.size))
         val verdicts = ArrayList<SolveResult>()
         var decided: SolveResult? = null
@@ -302,14 +322,21 @@ class Portfolio(
         else minimize(cancellation, onImprovement, PortfolioIncumbents.exact(exact))
     }
 
-    // A callback failure stays the primary failure.
-    @Suppress("TooGenericExceptionCaught")
     internal fun <V> minimize(
         cancellation: Cancellation,
         onImprovement: ((AttributedImprovement) -> Unit)?,
         incumbents: PortfolioIncumbents<V>,
         terminalCheck: PortfolioTerminalCheck? = null,
         onAccepted: ((AcceptedPortfolioIncumbent<V>) -> Unit)? = null,
+    ): MinimizeResult = qualify(minimizeRun(cancellation, onImprovement, incumbents, terminalCheck, onAccepted))
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun <V> minimizeRun(
+        cancellation: Cancellation,
+        onImprovement: ((AttributedImprovement) -> Unit)?,
+        incumbents: PortfolioIncumbents<V>,
+        terminalCheck: PortfolioTerminalCheck?,
+        onAccepted: ((AcceptedPortfolioIncumbent<V>) -> Unit)?,
     ): MinimizeResult {
         val run = Schedule(cancellation, arrayOfNulls<ResumableSearch>(workers.size))
         val incumbent = incumbents.exchange
@@ -329,7 +356,7 @@ class Portfolio(
         // check, the callback and the install are one step: concurrent lanes report improvements in the order they
         // installed and never report one a peer already beat.
         fun install(claim: Claim, candidate: Candidate<MinimizeResult.WithSample, V>) {
-            val r = candidate.assignment
+            val r = qualify(candidate.assignment)
             val before = incumbent.current()
             if (!incumbents.isImproving(candidate.objective)) return
             val worker = workers[claim.arm]

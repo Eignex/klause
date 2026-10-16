@@ -4,9 +4,12 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
+import com.eignex.klause.count.SampleQuality
+import com.eignex.klause.count.SamplingConfig
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SemanticOverrides
@@ -15,7 +18,12 @@ import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.meta.alns.Alns
+import com.eignex.klause.meta.coreguided.CoreGuidedSolver
+import com.eignex.klause.portfolio.Portfolio
+import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.result.MinimizeResult
@@ -27,6 +35,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class ResultSemanticsTest {
     @Test
@@ -165,5 +174,93 @@ class ResultSemanticsTest {
             assertSame(semantics, incumbent.sample.semantics)
             assertEquals(8.0, incumbent.objective)
         }
+    }
+
+    @Test
+    fun `a session cursor should retain policy after closing its operation`() {
+        val semantics = SourceSemantics(SourceFormat.DIMACS).resolve()
+        val model = Problem(1, 0, emptyArray(), emptyArray(), semantics = semantics).bake()
+        val session = BacktrackSolver(model).session()
+
+        val point = session.use { owner ->
+            owner.openEnumerate(BacktrackParams(randomSeed = 0)).use { it.first() }
+        }
+
+        assertSame(semantics, point.semantics)
+    }
+
+    @Test
+    fun `a retained optimization terminal should keep policy and object identity`() {
+        val semantics = SourceSemantics(SourceFormat.WCNF).resolve()
+        val model = Problem(1, 0, emptyArray(), emptyArray(), semantics = semantics).bake()
+        val callbacks = mutableListOf<MinimizeResult.WithSample>()
+        val search = BacktrackSolver(model).resumable(LinearObjective(longArrayOf(1)), BacktrackParams(randomSeed = 0))
+
+        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L, callbacks::add) }
+        val repeated = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("completed search") }
+
+        assertSame(semantics, assertIs<MinimizeResult.Optimal>(result).semantics)
+        assertSame(result, repeated)
+        assertTrue(callbacks.isNotEmpty())
+        for (incumbent in callbacks) assertSame(semantics, incumbent.sample.semantics)
+    }
+
+    @Test
+    fun `core guided optimization should qualify reconstructed incumbents`() {
+        val semantics = SourceSemantics(SourceFormat.WCNF).resolve()
+        val model = Problem(1, 0, emptyArray(), emptyArray(), semantics = semantics).bake()
+        val callbacks = mutableListOf<MinimizeResult.WithSample>()
+        val search = CoreGuidedSolver(model).resumable(LinearObjective(longArrayOf(1)), BacktrackParams())
+
+        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L, callbacks::add) }
+
+        assertSame(semantics, assertIs<MinimizeResult.Optimal>(result).semantics)
+        assertTrue(callbacks.isNotEmpty())
+        for (incumbent in callbacks) assertSame(semantics, incumbent.sample.semantics)
+    }
+
+    @Test
+    fun `alns cancellation should retain policy without an incumbent`() {
+        val semantics = SourceSemantics(SourceFormat.WCNF).resolve()
+        val model = Problem(1, 0, emptyArray(), emptyArray(), semantics = semantics).bake()
+        val solver = Alns(LocalSearchSolver(model), maxIterations = 0)
+
+        val result = solver.minimize(LinearObjective(longArrayOf(1)), LocalSearchParams(cancellation = Cancellation { true }))
+
+        assertSame(semantics, assertIs<MinimizeResult.Unknown>(result).semantics)
+    }
+
+    @Test
+    fun `a bound portfolio should qualify an aggregated cancellation`() {
+        val semantics = SourceSemantics(SourceFormat.DIMACS).resolve()
+        val source = Problem(1, 0, emptyArray(), emptyArray(), semantics = semantics)
+        val worker = PortfolioWorker.ofSolve("source", 0) { _, _ -> error("cancelled worker") }
+            .bindEvidence(ModelIdentity.of(source))
+
+        val result = Portfolio.thompson(listOf(worker)).use { it.solve(Cancellation { true }) }
+
+        assertSame(semantics, assertIs<SolveResult.Unknown>(result).semantics)
+    }
+
+    @Test
+    fun `a portfolio without source identity should leave an aggregate unbound`() {
+        val worker = PortfolioWorker.ofSolve("unbound", 0) { _, _ -> error("cancelled worker") }
+
+        val result = Portfolio.thompson(listOf(worker)).use { it.solve(Cancellation { true }) }
+
+        assertNull(assertIs<SolveResult.Unknown>(result).semantics)
+    }
+
+    @Test
+    fun `accurate sampling should retain policy through integer channel decoding`() {
+        val semantics = SourceSemantics(SourceFormat.XCSP3).resolve()
+        val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), semantics = semantics).bake()
+        val solver = BacktrackSolver(model)
+
+        val point = solver.samples(SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0), BacktrackParams()).first()
+
+        assertSame(semantics, point.semantics)
+        assertEquals(0, point.numBoolVars)
+        assertEquals(1, point.numIntVars)
     }
 }

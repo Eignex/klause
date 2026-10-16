@@ -482,7 +482,7 @@ internal class ResumableMinimize(
         done?.let { return it }
         check(!closed) { "search is closed" }
         globalToken = baseCancellation.lifetimeCancellation() or global
-        publishClausePrimalCandidate()?.let(onIncumbent)
+        publishClausePrimalCandidate()?.let { onIncumbent(it.withSourceSemantics(problem.semantics)) }
         if (!rootIsExhausted && !slice.begin(sliceMillis, sliceNodes)) return null
         // A counted budget only means something if the search polls on a counted cadence: the run stops
         // where it polls, and the default cadence is tuned by elapsed time, so the pause would land on a
@@ -649,7 +649,9 @@ internal class ResumableMinimize(
             }
             if (firstRun) {
                 firstRun = false
-                firstRunWork()?.let { return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics)) }
+                firstRunWork()?.let {
+                    return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
+                }
             }
             unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
             if (treeBudgetExhausted) return terminal(terminalBudget())

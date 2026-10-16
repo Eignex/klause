@@ -8,6 +8,7 @@ import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -41,7 +42,9 @@ internal class CellContext private constructor(
 
     /** Decode an enumerated [model] back to an assignment over the original problem's variables. */
     fun decode(model: Sample): Sample {
-        if (model.numBoolVars == baseNumBoolVars && model.numIntVars == baseNumIntVars) return model
+        if (model.numBoolVars == baseNumBoolVars && model.numIntVars == baseNumIntVars) {
+            return model.withSourceSemantics(problem.semantics)
+        }
         // The channel appends its vars after the originals, so the originals are the leading slice.
         return Sample.fromOwned(
             bools = BooleanArray(baseNumBoolVars) { model.boolValue(it) },
@@ -49,7 +52,7 @@ internal class CellContext private constructor(
             reals = model.reals,
             exactReals = model.exactReals,
             exactInts = model.exactInts?.take(baseNumIntVars),
-        )
+        ).withSourceSemantics(problem.semantics)
     }
 
     /** Count distinct projections, preserving whether the cell was completely checked. */

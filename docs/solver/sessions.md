@@ -6,7 +6,11 @@ scopes and prevents overlapping operations from mutating active state.
 
 The caller opens a session, establishes assumptions, starts an operation, consumes
 or resumes it, and closes its owner before changing scope. Published results remain
-readable independently of the live operation. This page defines capture, exclusion
+readable independently of the live operation. Finite solve, sample and optimization
+results retain the model's captured source interpretation, including cancellation
+and refutation without an assignment. Stream points and resumable incumbents retain
+the same policy after their owner closes; this metadata adds no proof authority.
+This page defines capture, exclusion
 and cleanup; backend state follows [search](search.md) and [local search](local-search.md).
 
 Session ownership wrappers preserve the underlying handle's cumulative scheduling
