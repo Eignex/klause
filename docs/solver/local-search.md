@@ -152,7 +152,11 @@ or ALNS configurations and checking their source admission. A complete-only pool
 including an explicit backtrack-only selection, does not request that view.
 Immutable native descriptors can be shared; each worker constructs its own invariant
 network and objective state. A declined optional definition view retains ordinary
-heuristic execution and every source constraint.
+heuristic execution and every source constraint. With empty source definition metadata,
+the selected consumer retains native unhinted absolute-value, product, integer-power,
+quotient and remainder maintenance from its actual working factors. Their dependency
+ordering and optional objective gradient spend the same containing allowance; loading
+and complete-only pools do not instantiate this view.
 
 Original-to-routed coordinates come from the retained source plan. Presolve's actual
 mapping then projects definition and search hints, excluding coordinates recovered by

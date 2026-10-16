@@ -5,6 +5,7 @@ import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.unhintedDefinitionSweep
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.retainedCoordinates
 import com.eignex.klause.propagation.BakedProblem
@@ -43,9 +44,13 @@ internal fun PreparedSourceInvocation.heuristicHints(
         return null
     }
     val definitions = source.definitionHints
-    if (definitions.isEmpty() && source.definitionReferences == null) return null
     val stop = (cancellation or this.cancellation).encodingPreparationScope()
     if (stop()) return null
+    if (definitions.isEmpty() && source.definitionReferences == null) {
+        val sweep = unhintedDefinitionSweep(problem, stop) ?: return null
+        val functional = objective?.let { sweep.functionalObjective(it, stop) }
+        return if (stop()) null else PreparedSourceHints(sweep, functional)
+    }
     val projected = projection.retainedCoordinates(stop) ?: return null
     val coordinates = plan.sourceCoordinates(stop)?.followedBy(projected, stop) ?: return null
     val hints = ArrayList<DefinitionHint>()

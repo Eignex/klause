@@ -125,7 +125,7 @@ class CliModeVerdictTest {
             val out = capture { MiniZincOutput(floatApproximation = true).onComplete(verdict) }
 
             assertTrue("=====UNKNOWN=====" in out, out)
-            assertTrue("no source proof" in out, out)
+            assertTrue("no global source proof" in out, out)
             assertTrue("=====UNSATISFIABLE=====" !in out && "=====UNBOUNDED=====" !in out, out)
         }
     }
