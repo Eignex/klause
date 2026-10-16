@@ -113,6 +113,12 @@ establish exactness merely because the interval collapses to one value.
 
 ## Theory invocation scopes
 
+Finite source-strategy satisfaction uses the same captured source execution entry.
+Each call supplies its own complete typed single-consumer controls to the selected
+finite factory. The native result and reconstructed source outcome are retained in
+that call's completed envelope; another call cannot replace its interruption reason
+or coordinates. Native solving and publication use the containing captured stop.
+
 Theory services can retain immutable source snapshots while each solve owns a fresh
 invocation. Published exact scalars outlive that invocation; its mutable traversal,
 query results and work ledger remain private. Conditioned queries capture their pins
