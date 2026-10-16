@@ -2369,6 +2369,24 @@ source refutation, independent witness acceptance or optimization claim.
 
 ### Saved JVM compilation census
 
+`bench.profile.JvmRuntimeMethodMetadata` accepts `manifest=`, `manifest-sha256=`,
+`archive=` and `archive-sha256=`. These identify an original CLI provenance manifest
+and its original JDK archive. Every archive file, including file-link aliases,
+must reproduce the complete retained runtime digest map before the image reader
+is staged. Only `lib/modules`, `lib/jrt-fs.jar` and `release` are staged; their
+identities are checked before and after inspection. The observer loads the pinned
+JRT provider as a separate helper, without changing its own runtime home or running
+an original JDK executable. It visits all class files under `/modules`, including
+module descriptors and generated image classes; `/packages` aliases are excluded.
+Original method descriptors, attributes and line tables use the same class-file
+reader as the jar inventory. Parse failures remain explicit and fail completion.
+The archive, staged image and partial output remain private in the capture archive.
+Limits are 256 MiB compressed input, 1 GiB expanded runtime data, 20,000 archive
+members, 200,000 image resources, 100,000 classes, 16 MiB per class and 512 MiB
+of compact metadata. This is declared image metadata, not loaded/private/generated
+runtime selection, intrinsic lowering, physical compiler lifetimes or cost proof.
+Use a lab worker; no solver, checker or recording exporter runs.
+
 `bench.profile.JvmInstalledMethodMetadata` accepts `head=`, `manifest=` and
 `manifest-sha256=`. The HTTPS manifest is an original installed CLI provenance
 manifest. Two detached builds of the pinned source must reproduce its complete

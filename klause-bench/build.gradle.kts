@@ -443,8 +443,16 @@ val checkJvmMethodCosts = tasks.register<Exec>("checkJvmMethodCosts") {
         "tools/review_native_vm_live_arguments.py", "tools/native_vm_event_loss.py")
 }
 
+val checkJvmRuntimeArchive = tasks.register<Exec>("checkJvmRuntimeArchive") {
+    group = "verification"
+    description = "Test complete original runtime archive identity and offline image staging."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_jvm_runtime_archive.py")
+    inputs.files("tools/jvm_runtime_archive.py", "tools/test_jvm_runtime_archive.py")
+}
+
 tasks.named("check") {
-    dependsOn(checkJvmRecordingContext, checkJvmMethodCosts)
+    dependsOn(checkJvmRecordingContext, checkJvmMethodCosts, checkJvmRuntimeArchive)
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,
