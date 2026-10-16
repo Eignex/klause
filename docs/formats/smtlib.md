@@ -79,6 +79,12 @@ placeholder, which is removed only after its branch expansion completes.
 Comparisons finish open decision lists before expanding their branch tests.
 Constant branch images of at most 1,024 distinct values can reject a comparison
 before visiting its definition tree; unknown or larger images retain exact fallback.
+After assertion and objective chains close, nested comparisons can complete missing
+images through their closed branch and guard dependencies. This iterative completion
+publishes only complete nonempty sets and preserves existing known images. Its node,
+dependency and completion visits share the ordinary expansion allowance. Direct
+one-level comparisons retain their existing path. Open, cyclic or capped metadata
+keeps the arithmetic fallback; completing an image never changes numeric bounds.
 Immutable guard meanings exclude unreachable arms from those images. A default
 omits selector values covered by its guards, and a fully covered selector image
 excludes the default even when that default is open arithmetic.

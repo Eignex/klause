@@ -8,6 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 
@@ -19,7 +20,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         val arms: List<LinComb>,
         val default: LinComb,
         val factors: List<Factor>,
-        val image: Set<Long>?,
+        var image: Set<Long>?,
         val guardTests: List<GuardEquality?>,
     ) {
         var noArm: Int? = null
@@ -49,11 +50,17 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         class Known(val literal: Int) : Frame
         class Join(val variable: Int, val definition: Definition) : Frame
     }
+    private sealed interface ImageFrame {
+        class Eval(val variable: Int) : ImageFrame
+        class Complete(val variable: Int, val definition: Definition) : ImageFrame
+    }
 
     private val definitions = HashMap<Int, Definition>()
     private val booleanDefinitions = HashMap<Int, List<Factor>>()
     private val equalities = HashMap<Key, Int>()
     private val pendingEqualities = LinkedHashMap<Key, PendingEquality>()
+    private val preparedImages = HashSet<Int>()
+    private var definitionsClosed = false
     private var work = 0
 
     fun define(
@@ -64,6 +71,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         factors: List<Factor>,
         guardTests: List<GuardEquality?>,
     ) {
+        check(!definitionsClosed)
         definitions[variable] = Definition(
             guards.toList(), arms.toList(), default, factors.toList(),
             constantImage(arms, default, guardTests), guardTests.toList(),
@@ -203,6 +211,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     }
 
     fun expandPending(builder: Compiler.Builder) {
+        definitionsClosed = true
         val replaced = HashSet<Factor>()
         for ((key, equality) in pendingEqualities.entries.toList().asReversed()) {
             val expanded = expand(key.variable, key.value, builder) ?: continue
@@ -222,6 +231,12 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     private fun expand(variable: Int, value: Long, builder: Compiler.Builder): Int? {
         val key = Key(variable, value)
         equalities[key]?.let { return it }
+        val rootDefinition = definitions[variable]
+        if (rootDefinition != null && rootDefinition.image == null && variable !in preparedImages &&
+            hasImageDependencies(rootDefinition)
+        ) {
+            completeImages(variable, builder)
+        }
         if (definitions[variable]?.image?.contains(value) == false) {
             return Lit.negate(builder.trueLit()).also { equalities[key] = it }
         }
@@ -290,6 +305,65 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
             }
         }
         return literals.single()
+    }
+
+    private fun hasImageDependencies(definition: Definition): Boolean =
+        definition.arms.any { it.asSimpleVar()?.let { source -> source in definitions } == true } ||
+            definition.default.asSimpleVar()?.let { it in definitions } == true ||
+            definition.guardTests.any { it != null && it.variable in definitions }
+
+    private fun completeImages(variable: Int, builder: Compiler.Builder) {
+        check(definitionsClosed)
+        if (work >= workLimit) return
+        val pending = ArrayDeque<ImageFrame>()
+        val active = HashSet<Int>()
+        val cyclic = HashSet<Int>()
+        pending.addLast(ImageFrame.Eval(variable))
+        while (pending.isNotEmpty()) {
+            if (builder.sourceCancellation()) throw PolynomialSourceInterrupted()
+            if (++work > workLimit) return
+            when (val frame = pending.removeLast()) {
+                is ImageFrame.Eval -> {
+                    val definition = definitions.getValue(frame.variable)
+                    when {
+                        frame.variable in active -> cyclic.addAll(active)
+                        definition.image != null || !preparedImages.add(frame.variable) -> Unit
+                        else -> {
+                            active.add(frame.variable)
+                            pending.addLast(ImageFrame.Complete(frame.variable, definition))
+                            for (arm in definition.arms.asReversed()) {
+                                if (!scheduleImageDependency(arm.asSimpleVar(), builder, pending)) return
+                            }
+                            if (!scheduleImageDependency(definition.default.asSimpleVar(), builder, pending)) return
+                            for (guard in definition.guardTests.asReversed()) {
+                                if (!scheduleImageDependency(guard?.variable, builder, pending)) return
+                            }
+                        }
+                    }
+                }
+                is ImageFrame.Complete -> {
+                    active.remove(frame.variable)
+                    if (frame.variable !in cyclic && frame.definition.image == null) {
+                        val definition = frame.definition
+                        val image = constantImage(definition.arms, definition.default, definition.guardTests)
+                        if (!image.isNullOrEmpty()) definition.image = image
+                    }
+                }
+            }
+        }
+    }
+
+    private fun scheduleImageDependency(
+        variable: Int?,
+        builder: Compiler.Builder,
+        pending: ArrayDeque<ImageFrame>,
+    ): Boolean {
+        if (builder.sourceCancellation()) throw PolynomialSourceInterrupted()
+        if (++work > workLimit) return false
+        if (variable != null && variable in definitions && definitions.getValue(variable).image == null) {
+            pending.addLast(ImageFrame.Eval(variable))
+        }
+        return true
     }
 
     private fun scheduleBranches(
