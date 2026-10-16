@@ -61,6 +61,13 @@ The parse-local table retains at most 65,536 coordinate/key entries; other
 comparisons still lower independently. Lookup work charges the source token and
 retains its cancellation. The table carries no solver state or cross-source names.
 
+Boolean lowering folds the library constant and exact literal identities in
+AND, OR and IFF after their children have been lowered. Empty, singleton,
+duplicate and complementary operands retain their full logical meaning without
+extra gate names. Child domain constraints remain in the source. Returning an
+existing literal without emitting factors preserves its existing predicate
+metadata; a newly emitted constant unit describes its positive Boolean coordinate.
+
 Exp is the real exponential, log is the natural logarithm on strictly positive
 arguments, and sine/cosine use radians. Every arithmetic atom must have defined
 terms. Negation and ordinary Boolean connectives cannot make an invalid log term
