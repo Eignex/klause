@@ -103,6 +103,13 @@ SMT-LIB linear admission and source-strategy satisfaction. Finite format adapter
 retain the selected route and their existing definition, Boolean-fold, functional
 objective and search hints. Arithmetic adapters render original exact coordinates;
 XCSP3 objective values beyond binary64's exact integral range retain their original units.
+Callers with factor-backed integer orientations and Boolean-fold roles can use
+`SourceAttachment(problem, definedVars, boolFolds, definitionHints, searchHints)`.
+The attachment owns those compatibility containers. The selected finite heuristic
+consumer projects and infers them under the captured invocation; complete-only
+execution does not construct a sweep or gradient. The original three-argument
+constructor retains its neutral-hint behavior. See [source definition materialization](solver/local-search.md#source-definition-materialization)
+for move and objective-gradient policies.
 Native `PolynomialRealProblem`, `NonlinearIntegerProblem` and `TranscendentalProblem`
 snapshots use the same attachment through `SourceAttachment(source, settings)`, with
 explicit immutable `ProblemSettings`. Their actual source identity, exact formula,

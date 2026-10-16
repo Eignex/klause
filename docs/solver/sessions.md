@@ -29,6 +29,13 @@ unchanged. Solve, sample, enumerate and minimize require parameters that enforce
 assumptions; unsupported parameters reject non-empty pins or deductions explicitly. The
 default methods of custom sessions reject scoped operations they cannot implement.
 
+Finite source compatibility callers capture integer-definition orientations and
+Boolean-fold roles in the same attachment as the source. Their optional native
+views are requested only after actual heuristic admission and presolve, using the
+same containing cancellation and work meter. An interrupted construction publishes
+no partial view and cannot renew that allowance for search. Reusing an attachment
+in a fresh invocation retains its owned metadata and creates a fresh execution scope.
+
 ## Streams and exclusive ownership
 
 `openSamples`, `openEnumerate`, `openExactCount` and `openImprovements` return

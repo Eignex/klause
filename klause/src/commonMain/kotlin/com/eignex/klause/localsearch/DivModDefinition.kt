@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.Assignment
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
@@ -31,11 +32,23 @@ internal class DivModDefinition(private val relation: DivMod, override val out: 
     }
 }
 
-internal fun divModDefinitions(problem: Problem): List<SweepNode> = problem.factors.flatMap { factor ->
-    val relation = factor as? DivMod ?: return@flatMap emptyList()
-    listOf(relation.quotient, relation.remainder).mapNotNull { output ->
-        if (relation.quotient == relation.remainder || output == relation.dividend || output == relation.divisor ||
-            !problem.intBounds.hasLower(output) || problem.intBounds.lower(output) == Long.MIN_VALUE) null
-        else DivModDefinition(relation, output)
+internal fun divModDefinitions(
+    problem: Problem,
+    cancellation: Cancellation = Cancellation.Never,
+): List<SweepNode> {
+    val definitions = ArrayList<SweepNode>()
+    for (factor in problem.factors) {
+        cancellation.charge(1)
+        if (cancellation()) return emptyList()
+        val relation = factor as? DivMod ?: continue
+        for (output in listOf(relation.quotient, relation.remainder)) {
+            cancellation.charge(1)
+            if (cancellation()) return emptyList()
+            if (relation.quotient == relation.remainder || output == relation.dividend || output == relation.divisor ||
+                !problem.intBounds.hasLower(output) || problem.intBounds.lower(output) == Long.MIN_VALUE
+            ) continue
+            definitions += DivModDefinition(relation, output)
+        }
     }
+    return if (cancellation()) emptyList() else definitions
 }
