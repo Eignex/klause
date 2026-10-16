@@ -141,7 +141,8 @@ def compiler_diagnostics(text, stderr, script, launch):
               'compilerWarningSafetyProven': False, 'crossStreamOrderProven': False,
               'scope': 'Pinned pre-execution compiler diagnostic rendering only; no warning safety, '
                        'probe coverage, calling convention, task lifetime or compiler-cost proof.'}
-    lines, error_lines, source = text.splitlines(), stderr.splitlines(), script.splitlines()
+    lines, error_lines = text.splitlines(), stderr.splitlines()
+    source = script.split('\n') if script else []
     if max(len(lines), len(error_lines)) > MAX_RECORDS * 5 or len(source) > MAX_DIAGNOSTIC_LINES:
         raise ValueError('Compiler diagnostic line inventory exceeds bounds')
     try:

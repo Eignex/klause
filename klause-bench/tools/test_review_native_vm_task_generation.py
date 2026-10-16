@@ -119,6 +119,14 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
         boundary = [review.capture.observer.ATTACHED]
         variants = {
             'complete': warning + boundary,
+            'terminal newline': [warning[0].replace(':1-2:', ':1-3:'), *source, '', *warning[3:], *boundary],
+            'multiple terminal newlines': [warning[0].replace(':1-2:', ':1-4:'), *source, '', '',
+                                          *warning[3:], *boundary],
+            'missing terminal context': [warning[0].replace(':1-2:', ':1-3:'), *warning[1:], *boundary],
+            'nonempty terminal context': [warning[0].replace(':1-2:', ':1-3:'), *source, 'foreign',
+                                         *warning[3:], *boundary],
+            'past terminal line': [warning[0].replace(':1-2:', ':1-4:'), *source, '', '',
+                                   *warning[3:], *boundary],
             'without warnings': boundary,
             'foreign source': [warning[0].replace('/original/', '/foreign/'), *warning[1:], *boundary],
             'invalid span': [warning[0].replace(':1-2:', ':0-2:'), *warning[1:], *boundary],
@@ -159,14 +167,21 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
                           'readiness in stderr': 'Attached 2 probes\n' + review.capture.observer.ATTACHED + '\n'
                           }.get(name, 'Attached 2 probes\n')
 
-                result = review.compiler_diagnostics(text, stderr, script, launch)
+                source_script = script
+                if name in ('terminal newline', 'missing terminal context', 'nonempty terminal context',
+                            'past terminal line'):
+                    source_script += '\n'
+                if name == 'multiple terminal newlines':
+                    source_script += '\n\n'
 
-                accepted = name in ('complete', 'without warnings')
+                result = review.compiler_diagnostics(text, stderr, source_script, launch)
+
+                accepted = name in ('complete', 'without warnings', 'terminal newline', 'multiple terminal newlines')
                 self.assertEqual(accepted, result['renderingProven'])
                 self.assertFalse(result['compilerWarningSafetyProven'])
                 self.assertFalse(result['crossStreamOrderProven'])
-                if name == 'complete':
-                    self.assertEqual(warning, result['warnings'][0]['rawLines'])
+                if name in ('complete', 'terminal newline', 'multiple terminal newlines'):
+                    self.assertEqual(lines[:-1], result['warnings'][0]['rawLines'])
                 if not accepted:
                     self.assertEqual(0, result['prefixLines'])
                     self.assertTrue(result['errors'])
@@ -478,8 +493,9 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
                 ready = b'__BPFTRACE_NOTIFY_PROBES_ATTACHED\n'
                 data['live/observer/observer.stdout'] = ready + data['live/observer/observer.stdout']
                 data['live/observer/observer.stderr'] = b'Attached 2 probes\n' + data['live/observer/observer.stderr']
-                warning = (f'/original/observer.bt:1-{len(script.decode().splitlines())}: WARNING: found external warnings\n'.encode()
-                           + script + b'HINT: include/header.h:1: warning: declaration does not declare anything\n'
+                source_lines = script.decode().split('\n')
+                warning = (f'/original/observer.bt:1-{len(source_lines)}: WARNING: found external warnings\n'.encode()
+                           + script + b'\nHINT: include/header.h:1: warning: declaration does not declare anything\n'
                            b'1 warning generated.\n')
                 external_warning = warning
                 if mode == 'compiler-casts':
