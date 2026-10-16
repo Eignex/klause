@@ -9,9 +9,14 @@ internal fun repairMixedEqualities(
     guess: List<BigFraction>,
     rows: List<ExactRationalInequality>,
     stop: Cancellation,
+    onStage: ((String) -> Unit)? = null,
 ): List<BigFraction>? {
     val columns = guess.size
-    if (columns.toLong() * columns > MAX_REPAIR_ENTRIES || stop()) return null
+    if (columns.toLong() * columns > MAX_REPAIR_ENTRIES) {
+        onStage?.invoke("RECOVERY_EQUALITY_LIMIT")
+        return null
+    }
+    if (stop()) return null
     val work = MixedRepairWork(stop)
     if (!guess.all(work::admitted)) return null
     val directions = HashMap<MixedEqualityKey, Int>()
@@ -20,7 +25,11 @@ internal fun repairMixedEqualities(
     for (row in rows) {
         stop.charge(4L * row.columns.size + 3L)
         entries += row.columns.size + 1L
-        if (entries > MAX_REPAIR_ENTRIES || stop()) return null
+        if (entries > MAX_REPAIR_ENTRIES) {
+            onStage?.invoke("RECOVERY_EQUALITY_LIMIT")
+            return null
+        }
+        if (stop()) return null
         if (row.columns.any { it !in 0 until columns }) return null
         if (!row.coefficients.all(work::admitted) || !work.admitted(row.rhs)) return null
         if (row.strict) continue
@@ -35,7 +44,11 @@ internal fun repairMixedEqualities(
         directions[key] = next
         if (next == 3 && previous != 3) equalities += key
     }
-    if (equalities.isEmpty()) return null
+    if (equalities.isEmpty()) {
+        onStage?.invoke("RECOVERY_EQUALITY_NO_PAIRS")
+        return null
+    }
+    onStage?.invoke("RECOVERY_EQUALITY_PAIRED")
     stop.charge(3L * columns)
     if (stop()) return null
     val pivots = arrayOfNulls<MixedRepairEquation>(columns)
@@ -52,6 +65,7 @@ internal fun repairMixedEqualities(
             val previous = pivots[pivot]
             if (previous == null) {
                 pivots[pivot] = MixedRepairEquation(coefficients, bound)
+                onStage?.invoke("RECOVERY_EQUALITY_PIVOT")
                 break
             }
             val scale = work.quotient(coefficients.getValue(pivot), previous.coefficients.getValue(pivot))
@@ -78,7 +92,7 @@ internal fun repairMixedEqualities(
         }
         point[pivot] = work.quotient(value, equation.coefficients.getValue(pivot)) ?: return null
     }
-    return point.takeUnless { stop() }
+    return point.takeUnless { stop() }?.also { onStage?.invoke("RECOVERY_EQUALITY_RECONSTRUCTED") }
 }
 
 private data class MixedEqualityKey(val terms: List<Pair<Int, BigFraction>>, val bound: BigFraction)
