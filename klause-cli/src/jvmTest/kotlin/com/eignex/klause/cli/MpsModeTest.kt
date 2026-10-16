@@ -781,6 +781,17 @@ class MpsModeTest {
     }
 
     @Test
+    fun `retained integer objectives should undo arbitrary positive multipliers`() {
+        for ((scale, expected) in listOf(2L to "0.5", 3L to "1/3", 5L to "0.2", 100L to "0.01")) {
+            val output = MpsOutput(objectiveScale = scale)
+
+            val text = capture { output.onSolution("v I=1", objective = 1L) }
+
+            assertTrue("o $expected" in text.lines(), text)
+        }
+    }
+
+    @Test
     fun `MPS root statistics should retain their source objective scale`() {
         for (scale in listOf(1L, 3L, 100L)) {
             val output = MpsOutput(objectiveScale = scale)

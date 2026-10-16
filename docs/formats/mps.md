@@ -98,9 +98,11 @@ selected LINEAR and POLYNOMIAL encoders install the equivalent guarded relation
 privately. Finite integer checks and numerical row emission read that same source
 implication. Numerical rows enabled by a finite pin retain both equality premises,
 so retraction removes their authority.
-Integral integer objectives retain their source coefficients directly. Other
-objectives use an auxiliary equality retaining original decimal coefficients and
-constant in source units. The returned column mapping omits this auxiliary and
+The compatibility exact entry delegates canonical-source compilation to the shared
+linear lowering. Integer-only objectives use an exact positive multiplier when
+their working coefficients fit signed words; other objectives use an auxiliary
+equality retaining original coefficients and constant. The multiplier need not be
+a power of ten. Rendered objectives undo it exactly. The returned column mapping omits this auxiliary and
 its source witness check uses the captured effective feasibility tolerance.
 The compatibility entry defaults to zero tolerance. Both loading entry points use the same factor
 execution views. Integer-only rows
