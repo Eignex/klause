@@ -56,10 +56,8 @@ object SourceSetup {
     fun prepare(request: SourceSetupRequest, onLpStats: (LpStats) -> Unit): PreparedSourceInvocation =
         prepareObserved(request, onLpStats)
 
-    internal fun prepare(
-        request: SourceSetupRequest,
-        polynomialCancellation: Cancellation,
-    ): PreparedSourceInvocation = prepareObserved(request, null, polynomialCancellation)
+    internal fun prepare(request: SourceSetupRequest, polynomialCancellation: Cancellation): PreparedSourceInvocation =
+        prepareObserved(request, null, polynomialCancellation)
 
     private fun prepareObserved(
         request: SourceSetupRequest,

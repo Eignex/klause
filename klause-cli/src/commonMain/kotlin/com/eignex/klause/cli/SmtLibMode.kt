@@ -132,8 +132,11 @@ internal object SmtLibMode : CliMode {
             }
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                    SourceAttachment(parsed.model), operation, common.resolvedEngine(),
-                    objective = objective, maximize = maximize,
+                    SourceAttachment(parsed.model),
+                    operation,
+                    common.resolvedEngine(),
+                    objective = objective,
+                    maximize = maximize,
                     boundCancellation = common.routingCancellation(),
                     cancellation = common.routingPreparationCancellation(),
                 ),

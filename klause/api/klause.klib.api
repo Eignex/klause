@@ -17347,6 +17347,7 @@ final object com.eignex.klause.solver.pipeline/OpenTheoryPipeline { // com.eigne
 
 final object com.eignex.klause.solver.pipeline/SourceSetup { // com.eignex.klause.solver.pipeline/SourceSetup|null[0]
     final fun prepare(com.eignex.klause.solver.pipeline/SourceSetupRequest): com.eignex.klause.solver.pipeline/PreparedSourceInvocation // com.eignex.klause.solver.pipeline/SourceSetup.prepare|prepare(com.eignex.klause.solver.pipeline.SourceSetupRequest){}[0]
+    final fun prepare(com.eignex.klause.solver.pipeline/SourceSetupRequest, kotlin/Function1<com.eignex.klause.solver.result/LpStats, kotlin/Unit>): com.eignex.klause.solver.pipeline/PreparedSourceInvocation // com.eignex.klause.solver.pipeline/SourceSetup.prepare|prepare(com.eignex.klause.solver.pipeline.SourceSetupRequest;kotlin.Function1<com.eignex.klause.solver.result.LpStats,kotlin.Unit>){}[0]
 }
 
 final object com.eignex.klause.theory/BuiltInEncoderProvider : com.eignex.klause.theory/EncoderProvider { // com.eignex.klause.theory/BuiltInEncoderProvider|null[0]
