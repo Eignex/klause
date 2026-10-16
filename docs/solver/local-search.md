@@ -713,6 +713,11 @@ witness. That witness retains floating coordinates without exact-real authority;
 it carries no optimum proof. Without the callback, including explicit exact MPS
 invocations, unavailable exact certification leaves completion undecided. Both
 policies retain numerical execution and the containing cancellation/work ledger.
+Exact numerical completion requests bounded independent-denominator point recovery
+and sparse row repair under the existing numerical limits. Every recovered point
+passes exact LP and original-source checks; feasibility does not require residual
+objective attainment. Its arithmetic work joins floating LP work in the existing
+instruction conversion, including unsuccessful attempts.
 An optional private completion observer receives the residual verdict and existing LP
 statistics. It supplies no admission authority and performs no additional numerical query.
 

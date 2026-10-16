@@ -33,7 +33,9 @@ internal class LeafRealCompletion(
     private val problem: Problem,
     private val objective: LinearObjective?,
     private val toleranceCheck: ((Sample) -> Boolean)?,
-    private val context: LpSolveContext = LpSolveContext.Production,
+    private val context: LpSolveContext = if (toleranceCheck == null) {
+        LpSolveContext.Production.copy(sparsePointRecovery = true)
+    } else LpSolveContext.Production,
 ) : CandidateCompletion {
     constructor(problem: Problem, objective: LinearObjective?) : this(problem, objective, null)
 
@@ -72,8 +74,10 @@ internal class LeafRealCompletion(
         }
         val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink,
             context = context, toleranceCheck = check, encoders = encoders)
-        val work = movesFor(sink.snapshot().standaloneWorkOps.sum)
-        observeLp?.invoke(real.verdict, sink.snapshot())
+        val stats = sink.snapshot()
+        val pointWork = stats.phases["EXACT_POINT_RECOVERY_STANDALONE"]?.work?.toDouble() ?: 0.0
+        val work = movesFor(stats.standaloneWorkOps.sum + pointWork)
+        observeLp?.invoke(real.verdict, stats)
         if (cancellation()) return Completion.Undecided(work)
         return when (real.verdict) {
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED ->

@@ -661,6 +661,10 @@ private fun certifyLpResultWithin(
                 cancellation,
                 observer,
             )
+            observer?.observePhase(LpPhaseMetrics(
+                LpSolvePhase.EXACT_POINT_RECOVERY, recovered.decline?.name ?: "WITNESS",
+                recovered.elapsed.inWholeNanoseconds, work = recovered.work, steps = recovered.repairs,
+            ))
             pointRecovery = recovered
             recovered.witness
         }
