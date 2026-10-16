@@ -371,10 +371,17 @@ source verdict, and cannot establish a default-route recovery.
 retains the hash-matched original, build identity, declaration/lowered dimensions,
 factor kinds and exact-row predicate counts. Predicate identity removes only the
 activator before using `ExactLinear` structural keys; it does not reason about
-signs, implications or source satisfiability. Raw coordinate/activated-row entry
-counts describe the parsed source, independently of runtime fragment admission.
-Parsing has a separate ten-second
-deadline. This diagnostic opens no solver and supplies no route or verdict claim.
+signs, implications or source satisfiability. A separate optional analysis of activated
+inequalities with real coordinates normalizes exact coefficient ratios in resolved
+tagged-coordinate order. It counts oriented predicates, exact complement classes
+and classes observed in both literal polarities; open and closed boundaries remain
+distinct. These compiled-row classes establish neither compiler allocation savings
+nor provider admission. Raw coordinate/activated-row entry counts describe the
+parsed source, independently of runtime fragment admission.
+Parsing and normalization share one ten-second token. Normalization admits at most
+65,536 cumulative row/term entries and 4,096-bit integer operands; interrupted,
+oversized or input-limited analysis marks its counts as a prefix. This diagnostic
+opens no solver and supplies no route or verdict claim.
 For up to eight sources, `batch64=<base64 JSON array of argument arrays>` retains
 each inspection in a numbered directory.
 
