@@ -11,6 +11,7 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class NValueInvariantTest {
@@ -57,6 +58,15 @@ class NValueInvariantTest {
                 assertEquals(expected - before, delta, "$mode $move")
             }
         }
+    }
+
+    @Test
+    fun `excepted seeds should recheck a target that is also a counted position`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(2, 2)),
+            arrayOf(NValue(0, intArrayOf(0, 1), exceptSet = longArrayOf(0))))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+
+        assertFalse(state.factors[0].seedFeasible(state, 0))
     }
 
     @Test

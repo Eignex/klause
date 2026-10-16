@@ -996,7 +996,9 @@ internal fun Compiler.Builder.knapsack(e: XmlElement) {
 internal fun Compiler.Builder.nValues(e: XmlElement) {
     val vars = listVars(e)
     val condText = requireNotNull(e.child("condition")).textContent.trim()
-    val except = parseInts(e.child("except")?.textContent)?.toSet().orEmpty()
+    val except = e.child("except")?.let {
+        (parseInts(it.textContent) ?: throw UnsupportedXcsp3Exception("nValues: non-constant <except>")).toSet()
+    }.orEmpty()
     val cnt = distinctCountVar(vars, except)
     postCondition(intArrayOf(1), intArrayOf(cnt), condText)
 }
