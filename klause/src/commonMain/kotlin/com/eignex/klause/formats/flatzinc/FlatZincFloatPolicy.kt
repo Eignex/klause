@@ -17,17 +17,7 @@ internal fun FlatZincCompiler.selectFloatRepresentations(): Map<String, FloatRep
     val hasFloatColumns = model.varDecls.any { it.isVar && it.type.hasFloats() }
     val hasExactSelection = exactFloats && model.constraints.any { it.name == "array_float_element" }
     if (!hasFloatColumns && !hasExactSelection) return emptyMap()
-    // Resolve aliases before assigning real and integer ids, whose namespaces overlap.
-    val declarations = FlatZincCompiler(
-        model,
-        floatBuckets,
-        floatScale,
-        forLocalSearch,
-        unboundedIntLo,
-        unboundedIntHi,
-        floatChoiceLimit = floatChoiceLimit,
-    )
-    declarations.processDeclarations()
+    val declarations = floatPlanningDeclarations()
     return FloatChoicePlanner(declarations, exactFloats, floatChoiceLimit).select()
 }
 
@@ -48,7 +38,9 @@ private class FloatChoicePlanner(
     private val references = model.constraints.mapIndexed { index, c ->
         (c.args.flatMap(::variables) + listOfNotNull(domains[index]?.variable?.varId)).distinct()
     }
-    private val singletons = declarations.floatVars.values.filter { it.lo == it.hi }
+    private val singletons = declarations.floatVars.values.filter {
+        it.lo == it.hi && it.varId !in declarations.floatSearchWindowIds
+    }
         .associate { it.varId to doubleArrayOf(it.lo) }
     private val choices = HashMap(singletons)
     private val integerImages = declarations.collectIntegerFloatImages(onlyRealColumns = false)

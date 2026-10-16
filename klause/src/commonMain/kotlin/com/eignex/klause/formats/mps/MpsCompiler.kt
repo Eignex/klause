@@ -405,12 +405,12 @@ const val MPS_TOLERANCE: Double = 1e-7
 
 private val MPS_TOLERANCE_EXACT = BigFraction.of(BIG_ONE, bigIntOf(10_000_000L))
 
-/** Bounds at or beyond this magnitude are the MPS "infinity" convention (`1e30`), not a literal bound. */
+/** Bounds at or beyond this magnitude are the MPS "infinity" convention (`1e20`), not a literal bound. */
 private const val MPS_INFINITY = 1e20
 
 /**
  * Lower an [MpsModel] to a klause [Problem] for the hybrid MIP/CP engine:
- *  - **integer columns** become model integer variables; a side left unbounded (or at the `1e30`
+ *  - **integer columns** become model integer variables; a side left unbounded (or at the `1e20`
  *    marker) stays open for pipeline selection.
  *  - **float columns** become LP-only continuous variables — present in the LP relaxation, absent from CP
  *    search; the simplex resolves them at nodes and leaves. Their real bounds carry through directly, so
@@ -1163,7 +1163,7 @@ private inline fun <T> emitRow(lower: Double?, upper: Double?, bound: (Double) -
 private fun emptyRowHolds(lower: Double?, upper: Double?): Boolean =
     (lower == null || lower <= 0.0) && (upper == null || upper >= 0.0)
 
-/** A row bound, with the `1e30` marker read as the open side it stands for. */
+/** A row bound, with the `1e20` marker read as the open side it stands for. */
 private fun rowBound(value: Double?): Double? =
     if (value == null || value >= MPS_INFINITY || value <= -MPS_INFINITY) null else value
 

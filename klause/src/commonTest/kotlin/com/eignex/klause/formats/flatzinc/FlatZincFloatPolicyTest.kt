@@ -2,6 +2,9 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.ir.DomainStorageSettings
+import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.intdomain.AbstractIntDomain
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
@@ -12,6 +15,138 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FlatZincFloatPolicyTest {
+    @Test
+    fun `planning should retain caller scalar and array float search bounds`() {
+        val source = """
+            var int: n;
+            var float: x;
+            array[1..2] of var float: values;
+            solve satisfy;
+        """.trimIndent()
+        val ranges = listOf(-3.0 to 7.0, -3000000.0 to 4000000.0, 0.5 to 0.5)
+        for ((lo, hi) in ranges) {
+            val model = FlatZincParser(FlatZincLexer(source)).parse()
+            val compiler = FlatZincCompiler(
+                model,
+                unboundedIntLo = -11L,
+                unboundedIntHi = 19L,
+                unboundedFloatLo = lo,
+                unboundedFloatHi = hi,
+            )
+
+            val declarations = compiler.floatPlanningDeclarations()
+
+            assertEquals(3, declarations.floatVars.size)
+            for (variable in declarations.floatVars.values) {
+                assertEquals(lo, variable.lo)
+                assertEquals(hi, variable.hi)
+            }
+            val integer = declarations.intDomains[declarations.intVars.getValue("n")]
+            assertEquals(-11L, integer.min)
+            assertEquals(19L, integer.max)
+        }
+    }
+
+    @Test
+    fun `exact planning should preserve open floats without overlapping integer ids`() {
+        val model = FlatZincParser(
+            FlatZincLexer(
+                """
+                var 1..2: i;
+                var float: x;
+                var 1..2: j;
+                array[1..2] of var float: values;
+                var float: alias = x;
+                solve satisfy;
+                """.trimIndent(),
+            ),
+        ).parse()
+        val compiler = FlatZincCompiler(
+            model,
+            exactFloats = true,
+            unboundedFloatLo = Double.NEGATIVE_INFINITY,
+            unboundedFloatHi = Double.POSITIVE_INFINITY,
+        )
+
+        val declarations = compiler.floatPlanningDeclarations()
+
+        val floats = declarations.floatVars.values.distinctBy { it.varId }
+        assertEquals(3, floats.size)
+        assertEquals(5, declarations.intDomains.size)
+        assertEquals(0, declarations.realLo.size)
+        val integerIds = listOf("i", "j").map { declarations.intVars.getValue(it) }
+        for (variable in floats) {
+            assertFalse(variable.varId in integerIds)
+            assertEquals(Double.NEGATIVE_INFINITY, variable.lo)
+            assertEquals(Double.POSITIVE_INFINITY, variable.hi)
+        }
+        assertEquals(declarations.floatVars.getValue("x"), declarations.floatVars.getValue("alias"))
+    }
+
+    @Test
+    fun `planning domains should inherit caller storage policy`() {
+        val source = """
+            var {1, 3, 5}: n;
+            var float: x;
+            solve satisfy;
+        """.trimIndent()
+        for (threshold in listOf(0, 1024)) {
+            val settings = ProblemSettings(
+                storage = DomainStorageSettings(bitsetThreshold = threshold),
+                largeSpanThreshold = 123L,
+                lpMaxTableauCells = 456L,
+                lpCeilingTableauCells = 789L,
+            )
+            val model = FlatZincParser(FlatZincLexer(source)).parse()
+            val compiler = FlatZincCompiler(model, settings = settings)
+
+            val declarations = compiler.floatPlanningDeclarations()
+            val program = compiler.compile()
+
+            for (domain in declarations.intDomains) {
+                assertEquals(settings.storage, assertIs<AbstractIntDomain>(domain).storage)
+            }
+            assertEquals(settings, program.problem.settings)
+        }
+    }
+
+    @Test
+    fun `singleton search windows should not certify nonlinear float components`() {
+        val source = """
+            var float: x;
+            var float: y;
+            var float: z;
+            constraint float_times(x, y, z);
+            solve satisfy;
+        """.trimIndent()
+        for (value in listOf(-0.5, 0.0, 0.5)) {
+            val program = parseFlatZinc(source, unboundedFloatLo = value, unboundedFloatHi = value)
+
+            for (name in listOf("x", "y", "z")) {
+                val variable = program.floatVarsByName.getValue(name)
+                assertFalse(variable.lpOnly)
+                assertEquals(value, variable.lo)
+                assertEquals(value, variable.hi)
+                assertTrue(program.floatRepresentations.getValue(name).approximate)
+            }
+        }
+    }
+
+    @Test
+    fun `exact mode should not use fallback windows as finite source choices`() {
+        val source = """
+            var float: x;
+            var float: y;
+            var float: z;
+            constraint float_times(x, y, z);
+            solve satisfy;
+        """.trimIndent()
+
+        assertFailsWith<UnsupportedFlatZincException> {
+            parseFlatZinc(source, exactFloats = true, unboundedFloatLo = 0.5, unboundedFloatHi = 0.5)
+        }
+    }
+
     @Test
     fun `integer images should not enumerate oversized or rounded domains`() {
         for (domain in listOf("0..1000000000000", "{9007199254740993}")) {

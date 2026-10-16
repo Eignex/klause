@@ -81,8 +81,16 @@ one-based source index and repeated entries. Grid entries use the result's exist
 bucket conversion and representability checks. Lowering visits array positions
 inside the index domain, including domains wider than a signed integer.
 
+Representation planning resolves aliases in a private declaration pass with one
+shared integer placeholder namespace for integer and float columns. It captures the
+caller's bounds, exact-float mode and `ProblemSettings`, including integer domain
+storage. Exact-mode open floats stay open in this pass. Grid search bounds on
+unranged floats are search windows, including singleton windows; they do not supply
+source-fixed choices or exactness evidence. Explicit source ranges remain separate
+from these fallback windows.
+
 FlatZinc first preserves finite float choices from constant-array selection and
-singleton domains. Supported connected operations retain exact relations with
+source singleton domains. Supported connected operations retain exact relations with
 Boolean structure or native real selection. This includes comparisons, strict/reified comparisons, absolute
 values, minimum/maximum, constant-array selection, multiplication/division by
 constants, and products with a finite selected operand. Exact absolute values retain
