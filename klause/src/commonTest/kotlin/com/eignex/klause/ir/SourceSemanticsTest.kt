@@ -40,10 +40,10 @@ class SourceSemanticsTest {
         val declared = SourceSemantics(
             format = SourceFormat.MPS,
             numericAuthority = NumericAuthority.DECIMAL_LITERALS,
-            feasibilityTolerance = 1e-6,
+            feasibilityTolerance = SourceTolerance(1e-7, 1e-7),
         )
 
-        val resolved = declared.resolve(SemanticOverrides(feasibilityTolerance = 0.0))
+        val resolved = declared.resolve(SemanticOverrides(feasibilityTolerance = SourceTolerance()))
 
         assertEquals(NumericAuthority.DECIMAL_LITERALS, resolved.effective.numericAuthority)
         assertFalse(resolved.isApproximate)
@@ -82,7 +82,7 @@ class SourceSemanticsTest {
             SemanticOverrides(floats = FloatSemantics.Continuous),
             SemanticOverrides(undeclaredIntegers = UndeclaredIntegerBounds()),
             SemanticOverrides(undeclaredReals = UndeclaredRealBounds()),
-            SemanticOverrides(feasibilityTolerance = 0.0),
+            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
             SemanticOverrides(pinAbsentOptionalValues = false),
         )
 
@@ -92,13 +92,19 @@ class SourceSemanticsTest {
     }
 
     @Test
-    fun `invalid replacement tolerances should be rejected during resolution`() {
-        val declared = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = 1e-6)
-
+    fun `tolerance components should reject negative or nonfinite slack`() {
         for (tolerance in listOf(-1.0, Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)) {
-            assertFailsWith<IllegalArgumentException> {
-                declared.resolve(SemanticOverrides(feasibilityTolerance = tolerance))
-            }
+            assertFailsWith<IllegalArgumentException> { SourceTolerance(absolute = tolerance) }
+            assertFailsWith<IllegalArgumentException> { SourceTolerance(relative = tolerance) }
+        }
+    }
+
+    @Test
+    fun `either tolerance component should qualify the source as approximate`() {
+        for (tolerance in listOf(SourceTolerance(absolute = 1e-7), SourceTolerance(relative = 1e-7))) {
+            val declared = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance)
+
+            assertTrue(declared.resolve().isApproximate)
         }
     }
 
