@@ -3774,13 +3774,15 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryExecution { // com.
 }
 
 sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum|null[0]
+    abstract val semantics // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.semantics|{}semantics[0]
+        abstract fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.semantics.<get-semantics>|<get-semantics>(){}[0]
     abstract val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.stats|{}stats[0]
         abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.stats.<get-stats>|<get-stats>(){}[0]
     open val linearResult // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.linearResult|{}linearResult[0]
         open fun <get-linearResult>(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.linearResult.<get-linearResult>|<get-linearResult>(){}[0]
 
     final class Bounded : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment?, com.eignex.klause.simplex.exact/BigFraction?, com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.eignex.klause.simplex.exact.BigFraction?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment?, com.eignex.klause.simplex.exact/BigFraction?, com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.eignex.klause.simplex.exact.BigFraction?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val incumbent // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.incumbent|{}incumbent[0]
             final fun <get-incumbent>(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.incumbent.<get-incumbent>|<get-incumbent>(){}[0]
@@ -3788,6 +3790,8 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
             final fun <get-linearResult>(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.linearResult.<get-linearResult>|<get-linearResult>(){}[0]
         final val reason // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.reason|{}reason[0]
             final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.reason.<get-reason>|<get-reason>(){}[0]
+        final val semantics // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.stats.<get-stats>|<get-stats>(){}[0]
         final val value // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.value|{}value[0]
@@ -3798,35 +3802,41 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
         final fun component3(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component4|component4(){}[0]
         final fun component5(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component5|component5(){}[0]
-        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment? = ..., com.eignex.klause.simplex.exact/BigFraction? = ..., com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.eignex.klause.simplex.exact.BigFraction?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?){}[0]
+        final fun component6(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component6|component6(){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment? = ..., com.eignex.klause.simplex.exact/BigFraction? = ..., com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.eignex.klause.simplex.exact.BigFraction?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.toString|toString(){}[0]
     }
 
     final class Infeasible : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible|null[0]
-        constructor <init>(com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.<init>|<init>(com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?){}[0]
+        constructor <init>(com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.<init>|<init>(com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val linearResult // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.linearResult|{}linearResult[0]
             final fun <get-linearResult>(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.linearResult.<get-linearResult>|<get-linearResult>(){}[0]
+        final val semantics // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.stats.<get-stats>|<get-stats>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.component1|component1(){}[0]
         final fun component2(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.component2|component2(){}[0]
-        final fun copy(com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.copy|copy(com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?){}[0]
+        final fun component3(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.copy|copy(com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.toString|toString(){}[0]
     }
 
     final class Optimal : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.klause.simplex.exact/BigFraction, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.klause.simplex.exact/BigFraction, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val assignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.assignment.<get-assignment>|<get-assignment>(){}[0]
         final val linearResult // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.linearResult|{}linearResult[0]
             final fun <get-linearResult>(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.linearResult.<get-linearResult>|<get-linearResult>(){}[0]
+        final val semantics // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.stats.<get-stats>|<get-stats>(){}[0]
         final val value // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.value|{}value[0]
@@ -3836,17 +3846,20 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
         final fun component2(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component4|component4(){}[0]
-        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?){}[0]
+        final fun component5(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component5|component5(){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.toString|toString(){}[0]
     }
 
     final class Unbounded : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.klause.simplex.exact/BigFraction, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.klause.simplex.exact/BigFraction, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val linearResult // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.linearResult|{}linearResult[0]
             final fun <get-linearResult>(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.linearResult.<get-linearResult>|<get-linearResult>(){}[0]
+        final val semantics // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.semantics.<get-semantics>|<get-semantics>(){}[0]
         final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.stats.<get-stats>|<get-stats>(){}[0]
         final val value // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.value|{}value[0]
@@ -3858,7 +3871,8 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
         final fun component2(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component4|component4(){}[0]
-        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?){}[0]
+        final fun component5(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component5|component5(){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.toString|toString(){}[0]
@@ -13031,7 +13045,7 @@ final class com.eignex.klause.solver.evidence/SourcePremise { // com.eignex.klau
 }
 
 final class com.eignex.klause.solver.evidence/SourceProofContext { // com.eignex.klause.solver.evidence/SourceProofContext|null[0]
-    constructor <init>(com.eignex.klause.solver.evidence/SourceScope, kotlin.collections/Set<com.eignex.klause.solver.evidence/SourceCoordinate>, kotlin.collections/Map<kotlin/String, com.eignex.klause.solver.evidence/SourcePremise>, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction>? = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.evidence/SourceSemanticsChecker? = ...) // com.eignex.klause.solver.evidence/SourceProofContext.<init>|<init>(com.eignex.klause.solver.evidence.SourceScope;kotlin.collections.Set<com.eignex.klause.solver.evidence.SourceCoordinate>;kotlin.collections.Map<kotlin.String,com.eignex.klause.solver.evidence.SourcePremise>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>?;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.evidence.SourceSemanticsChecker?){}[0]
+    constructor <init>(com.eignex.klause.solver.evidence/SourceScope, kotlin.collections/Set<com.eignex.klause.solver.evidence/SourceCoordinate>, kotlin.collections/Map<kotlin/String, com.eignex.klause.solver.evidence/SourcePremise>, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction>? = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.evidence/SourceSemanticsChecker? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.evidence/SourceProofContext.<init>|<init>(com.eignex.klause.solver.evidence.SourceScope;kotlin.collections.Set<com.eignex.klause.solver.evidence.SourceCoordinate>;kotlin.collections.Map<kotlin.String,com.eignex.klause.solver.evidence.SourcePremise>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>?;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.evidence.SourceSemanticsChecker?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
     final val coordinates // com.eignex.klause.solver.evidence/SourceProofContext.coordinates|{}coordinates[0]
         final fun <get-coordinates>(): kotlin.collections/Set<com.eignex.klause.solver.evidence/SourceCoordinate> // com.eignex.klause.solver.evidence/SourceProofContext.coordinates.<get-coordinates>|<get-coordinates>(){}[0]
@@ -13043,6 +13057,8 @@ final class com.eignex.klause.solver.evidence/SourceProofContext { // com.eignex
         final fun <get-premises>(): kotlin.collections/Map<kotlin/String, com.eignex.klause.solver.evidence/SourcePremise> // com.eignex.klause.solver.evidence/SourceProofContext.premises.<get-premises>|<get-premises>(){}[0]
     final val scope // com.eignex.klause.solver.evidence/SourceProofContext.scope|{}scope[0]
         final fun <get-scope>(): com.eignex.klause.solver.evidence/SourceScope // com.eignex.klause.solver.evidence/SourceProofContext.scope.<get-scope>|<get-scope>(){}[0]
+    final val semantics // com.eignex.klause.solver.evidence/SourceProofContext.semantics|{}semantics[0]
+        final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.evidence/SourceProofContext.semantics.<get-semantics>|<get-semantics>(){}[0]
 }
 
 final class com.eignex.klause.solver.evidence/SourceResultCapture { // com.eignex.klause.solver.evidence/SourceResultCapture|null[0]
@@ -14238,6 +14254,8 @@ final class com.eignex.klause.solver.result/LinearOptimizationResult { // com.ei
         final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/LinearOptimizationResult.reason.<get-reason>|<get-reason>(){}[0]
     final val scope // com.eignex.klause.solver.result/LinearOptimizationResult.scope|{}scope[0]
         final fun <get-scope>(): com.eignex.klause.solver.evidence/SourceScope // com.eignex.klause.solver.result/LinearOptimizationResult.scope.<get-scope>|<get-scope>(){}[0]
+    final val semantics // com.eignex.klause.solver.result/LinearOptimizationResult.semantics|{}semantics[0]
+        final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/LinearOptimizationResult.semantics.<get-semantics>|<get-semantics>(){}[0]
     final val stats // com.eignex.klause.solver.result/LinearOptimizationResult.stats|{}stats[0]
         final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/LinearOptimizationResult.stats.<get-stats>|<get-stats>(){}[0]
     final val terminal // com.eignex.klause.solver.result/LinearOptimizationResult.terminal|{}terminal[0]
