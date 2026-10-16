@@ -59,7 +59,9 @@ internal object SmtLibDefinitionOwnershipInspection {
         )
         require(parsed.intVarNames == canonical.intVarNames && parsed.boolVarNames == canonical.boolVarNames)
         SmtLibCompilationInspection.requireSameModel(parsed.model, canonical.model)
+        val observedWork = field(state, "work")
         val report = report(snapshot, originalFactors, originalSources, removedInts, removedBools)
+        require(field(state, "work") == observedWork)
         out.resolve("compiler-ownership.json").writeText(report.toString() + "\n")
         return parsed
     }
@@ -166,6 +168,8 @@ internal object SmtLibDefinitionOwnershipInspection {
                 }
                 "${row.op}/arity${row.vars.size}/known${images.count { it != null }}/unknown${images.count { it == null }}"
             }))
+            put("conditionalLeaves", SmtLibConditionalLeafInspection(snapshot.definitions, sources)
+                .inspect(retainedDefinitions, directlyRead, rows))
             put("externalRowExamples", buildJsonArray {
                 for (row in rows.take(32)) add(buildJsonObject {
                     put("operator", row.op.name)

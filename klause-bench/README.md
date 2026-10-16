@@ -337,6 +337,11 @@ real columns and open product operands; it changes no solver code or allowance.
 For each unknown definition image it also calls the existing image calculation once
 against completed child metadata, without storing its result or changing the expansion
 counter. This observes late image availability rather than performing an image fixpoint.
+An independent read-only graph walk records constant and arithmetic leaf identities,
+following bare conditional references and leaving affine expressions opaque. It has
+65,536 diagnostic visits and at most 1,024 leaves per definition; incomplete observations
+remain explicit. These limits and counters belong only to the diagnostic, and do not
+change the compiler's work counter or install an encoding.
 Its additional compilation is before the opening deadline and supplies no timing,
 CLI-equivalence, refusal-cause or source-verdict claim.
 
