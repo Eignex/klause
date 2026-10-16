@@ -52,8 +52,6 @@ internal object SmtLibMode : CliMode {
             val stop = Cancellation { common.deadlineAtMs?.let { nowMillis() >= it } == true }
             val admitted = SmtLibAdmission.parse(
                 { openFileSource(path) },
-                config.unboundedIntLo,
-                config.unboundedIntHi,
                 settings = config.problemSettings(),
                 cancellation = stop,
             )

@@ -375,16 +375,20 @@ that snapshot; later changes to the ambient library default cannot change the ru
 
 Process-wide defaults a packaged image can ship without touching the command line. Each is read as
 a JVM system property (the dotted name) or an environment variable (the same name uppercased with
-`.` → `_`, e.g. `KLAUSE_FLOAT_BUCKETS`). A command-line flag, where one exists, overrides it. The
+`.` → `_`, e.g. `KLAUSE_BITSET_THRESHOLD`). A command-line flag, where one exists, overrides it. The
 names are derived from a single declaration each (`KlauseConfigSchema` / `CliKnobs`), never spelled
 twice.
 
 - `klause.engine` — default engine for a bare invocation (`-e` overrides).
 - `klause.portfolio.arms` — default portfolio arm-pool size (`--param arms=N` overrides).
 - `klause.lp` — default LP relaxation ceiling spec, parsed like `--lp` (`--lp` overrides).
-- Core compiler/solver knobs from `KlauseConfigSchema`: `klause.pin.absent.opt.vars`,
-  `klause.unbounded.int.lo` / `.hi` (the default int range for unbounded FlatZinc declarations), `klause.unbounded.float.lo` / `.hi`, `klause.float.buckets`, `klause.float.scale`, `klause.lp.max.tableau.cells`,
-  `klause.lp.ceiling.tableau.cells`, `klause.bitset.threshold`.
+- Resource knobs from `KlauseConfigSchema`: `klause.lp.max.tableau.cells`,
+  `klause.lp.ceiling.tableau.cells`, `klause.bitset.threshold`, and preparation controls.
+
+Source declaration bounds, float grids, fixed-point scale and absent optional-value
+policy belong to the format or schema's typed `SemanticOverrides`. Global semantic
+property/env keys are rejected with that migration path. Resource settings retain
+one invocation snapshot independently of the source interpretation.
 
 Presolve pass selection uses `--presolve`, with no environment override. Preparation
 budget defaults use `klause.presolve.budget.ms` and

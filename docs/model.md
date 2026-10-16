@@ -271,7 +271,10 @@ entries use the same policy and resource capture as its declaration builder.
 presolve views and private source-bound projections preserve it. `ProblemBuilder`
 accepts the capture before emitting a model. `SemanticSource<M>` pairs other
 immutable or borrowed-read-only source payloads with the same contract. The IR
-types select no route, theory, engine or resource policy.
+types select no route, theory, engine or resource policy. `KlauseConfig` carries storage and
+preparation resources; schema source interpretation is resolved from its declared
+semantics and per-compilation `SemanticOverrides`. Global semantic property/env
+keys are rejected before resource capture.
 
 Finite enumeration and sampling streams, and accepted witness certificates, retain
 the model's semantic capture through `Sample.semantics`. An unbound sample has no

@@ -178,12 +178,12 @@ class CliModeOptionsTest {
             )
             deleteOnExit()
         }
-        System.setProperty("klause.float.scale", "777")
+        System.setProperty("klause.bitset.threshold", "777")
         try {
             capture { main(arrayOf("-t", "5000", xml.absolutePath)) }
-            assertEquals(777L, KlauseConfig.current.floatScale)
+            assertEquals(777, KlauseConfig.current.bitsetThreshold)
         } finally {
-            System.clearProperty("klause.float.scale")
+            System.clearProperty("klause.bitset.threshold")
             KlauseConfig.current = saved
         }
     }

@@ -10,8 +10,8 @@ import kotlin.properties.ReadOnlyProperty
 private val CAMEL_BOUNDARY = Regex("([a-z0-9])([A-Z])")
 
 /** The dotted property/env key for a knob [name]: camelCase boundaries become `.` under a `klause.`
- *  prefix, e.g. `floatBuckets` → `klause.float.buckets`; the env var is this uppercased with
- *  `.` → `_` (`KLAUSE_FLOAT_BUCKETS`). The single transform from a knob's name — never a literal. */
+ *  prefix, e.g. `bitsetThreshold` → `klause.bitset.threshold`; the env var is this uppercased with
+ *  `.` → `_` (`KLAUSE_BITSET_THRESHOLD`). The single transform from a knob's name — never a literal. */
 fun klausePropertyKey(name: String): String = "klause." + name.replace(CAMEL_BOUNDARY, "$1.$2").lowercase()
 
 /**
@@ -82,22 +82,19 @@ data class DoubleConfigSpec(
  * declared on, never spelled as a literal) and how to apply a raw string value onto a config.
  */
 class ConfigKey internal constructor(
-    /** The knob name, e.g. `floatBuckets` — the [Schema] entry name and the JSON/YAML key. */
+    /** The knob name, e.g. `bitsetThreshold` — the [Schema] entry name and the JSON/YAML key. */
     val name: String,
     private val apply: (KlauseConfig, String) -> KlauseConfig,
 ) {
-    /** This knob's [klausePropertyKey], e.g. `klause.float.buckets`. */
+    /** This knob's [klausePropertyKey], e.g. `klause.bitset.threshold`. */
     val propertyKey: String get() = klausePropertyKey(name)
 
     /** Parse [raw] and fold it onto [config]; an unparseable value leaves [config] untouched. */
     fun applyRaw(config: KlauseConfig, raw: String): KlauseConfig = apply(config, raw)
 }
 
-/** Boolean knob spellings that read as false; any other present value reads as true. */
-private val FALSEY = setOf("0", "false", "off", "no")
-
 /**
- * The schema of env/property/file-overridable [KlauseConfig] knobs. Each `by bool/int/long(...)`
+ * The schema of env/property/file-overridable [KlauseConfig] knobs. Each `by int/long(...)`
  * registers a serialisable [ConfigSpec] under the property's name (via [Schema.register]) and a
  * typed [ConfigKey] in [keys]; the property name is therefore the single source of the knob's name
  * (env var, dotted property and JSON/YAML key all derive from it) and the default comes from
@@ -112,11 +109,6 @@ object KlauseConfigSchema : Schema<ConfigSpec>() {
     /** Every declared knob, in declaration order. */
     val keys: List<ConfigKey> get() = mutableKeys
 
-    private fun bool(default: Boolean, set: (KlauseConfig, Boolean) -> KlauseConfig) =
-        register(BoolConfigSpec(default)) { name ->
-            ConfigKey(name) { c, raw -> set(c, raw.trim().lowercase() !in FALSEY) }.also { mutableKeys += it }
-        }
-
     private fun int(default: Int, set: (KlauseConfig, Int) -> KlauseConfig) = register(IntConfigSpec(default)) { name ->
         ConfigKey(name) { c, raw -> raw.trim().toIntOrNull()?.let { set(c, it) } ?: c }.also { mutableKeys += it }
     }
@@ -126,37 +118,10 @@ object KlauseConfigSchema : Schema<ConfigSpec>() {
             ConfigKey(name) { c, raw -> raw.trim().toLongOrNull()?.let { set(c, it) } ?: c }.also { mutableKeys += it }
         }
 
-    private fun double(default: Double, set: (KlauseConfig, Double) -> KlauseConfig) =
-        register(DoubleConfigSpec(default)) { name ->
-            ConfigKey(name) { c, raw -> raw.trim().toDoubleOrNull()?.takeIf { it.isFinite() }?.let { set(c, it) } ?: c }
-                .also { mutableKeys += it }
-        }
-
-    /** Override for [KlauseConfig.pinAbsentOptVars]. */
-    val pinAbsentOptVars by bool(KlauseConfig.DEFAULT.pinAbsentOptVars) { c, v -> c.copy(pinAbsentOptVars = v) }
-
-    /** Override for [KlauseConfig.unboundedIntLo]. */
-    val unboundedIntLo by long(KlauseConfig.DEFAULT.unboundedIntLo) { c, v -> c.copy(unboundedIntLo = v) }
-
-    /** Override for [KlauseConfig.unboundedIntHi]. */
-    val unboundedIntHi by long(KlauseConfig.DEFAULT.unboundedIntHi) { c, v -> c.copy(unboundedIntHi = v) }
-
     /** Override for [KlauseConfig.largeSpanThreshold]. */
     val largeSpanThreshold by long(KlauseConfig.DEFAULT.largeSpanThreshold) { c, v ->
         c.copy(largeSpanThreshold = v)
     }
-
-    /** Override for [KlauseConfig.floatBuckets]. */
-    val floatBuckets by int(KlauseConfig.DEFAULT.floatBuckets) { c, v -> c.copy(floatBuckets = v) }
-
-    /** Override for [KlauseConfig.floatScale]. */
-    val floatScale by long(KlauseConfig.DEFAULT.floatScale) { c, v -> c.copy(floatScale = v) }
-
-    /** Override for [KlauseConfig.unboundedFloatLo]. */
-    val unboundedFloatLo by double(KlauseConfig.DEFAULT.unboundedFloatLo) { c, v -> c.copy(unboundedFloatLo = v) }
-
-    /** Override for [KlauseConfig.unboundedFloatHi]. */
-    val unboundedFloatHi by double(KlauseConfig.DEFAULT.unboundedFloatHi) { c, v -> c.copy(unboundedFloatHi = v) }
 
     /** Override for [KlauseConfig.lpMaxTableauCells]. */
     val lpMaxTableauCells by long(KlauseConfig.DEFAULT.lpMaxTableauCells) { c, v -> c.copy(lpMaxTableauCells = v) }
