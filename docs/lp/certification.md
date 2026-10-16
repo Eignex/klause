@@ -132,6 +132,14 @@ Lower limits cannot relayout retained dense state; source or target-basis change
 retain the existing authority invalidation rules. Internal points and row combinations
 still require the unchanged original-model certificate checks.
 
+An implicit-layout lane retains a completed negative import conflict check while
+its numerical state is unchanged. Cursor advancement alone does not require another
+full values/epsilon scan. Every lookup and remaining membership/order scan still
+debits and polls the current numerical budget. A completed pivot or row reorder
+invalidates the checkpoint; a partial scan or failed final poll cannot publish one.
+Precision restarts begin unverified. This checkpoint stores no point, conflict or
+certificate, and the feasibility loop still checks its actual current values.
+
 Target and identity admission share a separately bounded per-attempt envelope of
 at most one million work units and 4 MiB. Objective qualification and physical-column
 counts debit that envelope before basis export or identity setup, and failures retain

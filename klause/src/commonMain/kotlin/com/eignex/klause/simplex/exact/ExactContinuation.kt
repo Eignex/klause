@@ -432,6 +432,7 @@ private class RationalContinuationLane<F>(
     override var pivots = 0
         private set
     private var ordered = false
+    private var completedNoConflict = false
     private var scalarPeak = 0
         set(value) {
             field = value
@@ -498,9 +499,10 @@ private class RationalContinuationLane<F>(
         while (position < input.m) {
             findConflict(budget)?.let { return it }
             val target = input.headings[position]
+            if (structuralSlots != null) budget.step(input.m + 1L)
             if (target !in headings) {
                 val row = headings.indices.firstOrNull {
-                    budget.step()
+                    budget.step(if (structuralSlots == null) 1L else input.m + 1L)
                     headings[it] !in input.headings && !ops.isZero(coefficient(it, target))
                 }
                 if (row == null) {
@@ -520,8 +522,10 @@ private class RationalContinuationLane<F>(
         if (!ordered) {
             budget.phase = ContinuationPhase.REPAIR
             budget.step(input.m.toLong(), input.m * 32L)
+            if (structuralSlots != null) budget.step(4L * input.m * input.m + 3L * input.m)
             val remaining = headings.filter { it !in input.headings }.sorted().iterator()
             val order = input.headings.map { if (it in headings) it else remaining.next() }
+            completedNoConflict = false
             table = order.map { table[headings.indexOf(it)] }
             headings = order.toMutableList()
             ordered = true
@@ -551,12 +555,20 @@ private class RationalContinuationLane<F>(
     }
 
     private fun findConflict(budget: ContinuationBudget): LaneResult? {
+        if (structuralSlots != null) {
+            budget.step()
+            if (completedNoConflict) return null
+        }
         val values = values(budget)
         val epsilon = epsilonValues(budget)
         for (row in headings.indices) {
             budget.step()
             val direction = violation(row, values, epsilon, budget)
             if (direction != 0 && entering(row, direction, budget) == null) return conflict(row, direction, budget)
+        }
+        if (structuralSlots != null) {
+            budget.step()
+            completedNoConflict = true
         }
         return null
     }
@@ -706,6 +718,7 @@ private class RationalContinuationLane<F>(
         }
         budget.step()
         val leaving = headings[row]
+        completedNoConflict = false
         seats[leaving] = endpoint(leaving, seat)
         seatEpsilon?.set(leaving, endpointEpsilon(leaving, seat))
         statuses[leaving] = seat

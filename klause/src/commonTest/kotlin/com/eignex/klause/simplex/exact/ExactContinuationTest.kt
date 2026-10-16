@@ -10,6 +10,215 @@ import kotlin.test.assertTrue
 
 class ExactContinuationTest {
     @Test
+    fun `implicit import should retain full points within a single conflict scan allowance`() {
+        val input = ExactContinuationInput(
+            List(10) { if (it == 0) listOf(0 to BigFraction.ONE) else emptyList() },
+            List(4) { BigFraction.ZERO },
+            List(14) { if (it == 0) null else if (it < 10) BigFraction.ONE else BigFraction.ZERO },
+            List(14) { if (it == 0) null else if (it < 10) BigFraction.ONE else BigFraction.ZERO },
+            List(4) { 13 - it },
+            List(14) {
+                when {
+                    it == 0 -> ContinuationStatus.FREE
+                    it < 10 -> ContinuationStatus.FIXED
+                    else -> ContinuationStatus.BASIC
+                }
+            },
+            allowImplicitEmptyColumns = true,
+        )
+        val limits = ExactContinuationLimits(maxCells = 40, maxAllocation = 18000L)
+
+        val implicit = ExactContinuation(input).resume(limits)
+        val dense = ExactContinuation(input).resume(limits.copy(maxCells = 76))
+
+        assertEquals(List(14) { if (it in 1..9) BigFraction.ONE else BigFraction.ZERO }, implicit.values)
+        assertEquals(listOf(13, 12, 11, 10), implicit.headings)
+        assertNull(implicit.metrics.decline)
+        assertTrue(implicit.metrics.allocation <= limits.maxAllocation)
+        assertEquals(ContinuationDecline.ALLOCATION, dense.metrics.decline)
+        assertNull(dense.values)
+    }
+
+    @Test
+    fun `an imported pivot should invalidate a prior negative strict conflict check`() {
+        val two = BigFraction.ofLong(2)
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE, 1 to BigFraction.ONE), listOf(1 to BigFraction.ONE), emptyList()),
+            List(2) { BigFraction.ZERO },
+            listOf(null, BigFraction.ZERO, two, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(null, BigFraction.ONE, two, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(0, 1),
+            listOf(
+                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.FIXED,
+                ContinuationStatus.FIXED, ContinuationStatus.FIXED,
+            ),
+            lowerStrict = listOf(false, true, false, false, false),
+            allowImplicitEmptyColumns = true,
+        )
+
+        val result = ExactContinuation(input).resume(ExactContinuationLimits(maxCells = 14, maxImportPivots = 1))
+
+        assertEquals(listOf(BigFraction.ONE, BigFraction.MINUS_ONE), result.ray)
+        assertNull(result.values)
+        assertNull(result.metrics.decline)
+        assertEquals(1, result.metrics.imports)
+        assertEquals(0, result.metrics.repairs)
+    }
+
+    @Test
+    fun `reordered implicit rows should resume with original global headings`() {
+        val two = BigFraction.ofLong(2)
+        val three = BigFraction.ofLong(3)
+        val input = ExactContinuationInput(
+            listOf(emptyList(), listOf(0 to BigFraction.ONE), emptyList(), listOf(1 to BigFraction.ONE)),
+            listOf(BigFraction.ONE, two),
+            listOf(two, BigFraction.ZERO, three, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(two, null, three, null, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(5, 4),
+            listOf(
+                ContinuationStatus.FIXED, ContinuationStatus.LOWER, ContinuationStatus.FIXED,
+                ContinuationStatus.LOWER, ContinuationStatus.BASIC, ContinuationStatus.BASIC,
+            ),
+            allowImplicitEmptyColumns = true,
+        )
+        val session = ExactContinuation(input)
+        val limits = ExactContinuationLimits(maxCells = 14, maxPivots = 0)
+        val stopped = session.resume(limits)
+
+        val resumed = session.resume(limits.copy(maxPivots = 2))
+
+        assertEquals(ContinuationDecline.PIVOTS, stopped.metrics.decline)
+        assertEquals(2, stopped.metrics.importPosition)
+        assertEquals(0, resumed.metrics.builds)
+        assertEquals(listOf(3, 1), resumed.headings)
+        assertEquals(listOf(two, BigFraction.ONE, three, two, BigFraction.ZERO, BigFraction.ZERO), resumed.values)
+        assertEquals(stopped.metrics.work + resumed.metrics.work, session.usedWork)
+        assertEquals(stopped.metrics.allocation + resumed.metrics.allocation, session.usedAllocation)
+    }
+
+    @Test
+    fun `interrupted import scans should not publish negative checkpoints`() {
+        val two = BigFraction.ofLong(2)
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE, 1 to BigFraction.ONE), listOf(1 to BigFraction.ONE), emptyList()),
+            List(2) { BigFraction.ZERO },
+            listOf(null, BigFraction.ZERO, two, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(null, BigFraction.ONE, two, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(0, 1),
+            listOf(
+                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.FIXED,
+                ContinuationStatus.FIXED, ContinuationStatus.FIXED,
+            ),
+            lowerStrict = listOf(false, true, false, false, false),
+            allowImplicitEmptyColumns = true,
+        )
+        val limits = ExactContinuationLimits(maxCells = 14, maxImportPivots = 0)
+        var probePolls = 0
+        val probe = ExactContinuation(input).resume(limits, Cancellation { probePolls++; false })
+        assertEquals(ContinuationDecline.IMPORT_LIMIT, probe.metrics.decline)
+        for (beforeFinalPoll in listOf(0, 15)) {
+            val session = ExactContinuation(input)
+            var polls = 0
+            val stopped = session.resume(limits, Cancellation { ++polls == probePolls - 2 - beforeFinalPoll })
+            val spent = session.usedAllocation
+
+            val resumed = session.resume(limits.copy(maxAllocation = spent + 1100L))
+
+            assertEquals(ContinuationDecline.CANCELLED, stopped.metrics.decline)
+            assertEquals(ContinuationPhase.IMPORT, stopped.metrics.phase)
+            if (beforeFinalPoll == 0) {
+                assertEquals(probe.metrics.allocation, stopped.metrics.allocation)
+            } else {
+                assertTrue(stopped.metrics.allocation < probe.metrics.allocation)
+            }
+            assertEquals(ContinuationDecline.ALLOCATION, resumed.metrics.decline)
+            assertNull(resumed.values)
+            assertNull(resumed.ray)
+            assertTrue(session.usedAllocation >= spent && session.usedAllocation <= spent + 1100L)
+        }
+    }
+
+    @Test
+    fun `retained negative import checks should honor tighter resume limits`() {
+        val huge = BigFraction.of(BIG_ONE shl 40, BIG_ONE)
+        val two = BigFraction.ofLong(2)
+        val input = ExactContinuationInput(
+            listOf(emptyList(), listOf(0 to huge), emptyList()),
+            listOf(BigFraction.ONE),
+            listOf(two, BigFraction.ZERO, null, BigFraction.ZERO),
+            listOf(two, null, null, BigFraction.ZERO),
+            listOf(1),
+            listOf(
+                ContinuationStatus.FIXED, ContinuationStatus.BASIC, ContinuationStatus.FREE, ContinuationStatus.FIXED,
+            ),
+            allowImplicitEmptyColumns = true,
+        )
+        val limits = ExactContinuationLimits(maxCells = 4, maxImportPivots = 0)
+        val reasons = listOf(
+            ContinuationDecline.DIMENSION, ContinuationDecline.BITS, ContinuationDecline.WORK,
+            ContinuationDecline.ALLOCATION, ContinuationDecline.TIME, ContinuationDecline.CANCELLED,
+        )
+        for (reason in reasons) {
+            val session = ExactContinuation(input)
+            val imported = session.resume(limits)
+            val tighter = when (reason) {
+                ContinuationDecline.DIMENSION -> limits.copy(maxCells = 3)
+                ContinuationDecline.BITS -> limits.copy(maxBits = 24)
+                ContinuationDecline.WORK -> limits.copy(maxWork = session.usedWork)
+                ContinuationDecline.ALLOCATION -> limits.copy(maxAllocation = session.usedAllocation)
+                ContinuationDecline.TIME -> limits.copy(maxTimeNs = 0L)
+                else -> limits
+            }
+            val token = if (reason == ContinuationDecline.CANCELLED) Cancellation { true } else Cancellation.Never
+
+            val stopped = session.resume(tighter, token)
+
+            assertEquals(ContinuationDecline.IMPORT_LIMIT, imported.metrics.decline)
+            assertEquals(reason, stopped.metrics.decline)
+            assertNull(stopped.values)
+            assertNull(stopped.ray)
+        }
+    }
+
+    @Test
+    fun `an interrupted import pivot should retain its preceding numerical checkpoint`() {
+        val huge = BigFraction.of(BIG_ONE shl 40, BIG_ONE)
+        val two = BigFraction.ofLong(2)
+        val input = ExactContinuationInput(
+            listOf(emptyList(), listOf(0 to huge), emptyList()),
+            listOf(BigFraction.ONE),
+            listOf(two, BigFraction.ZERO, null, BigFraction.ZERO),
+            listOf(two, null, null, BigFraction.ZERO),
+            listOf(1),
+            listOf(
+                ContinuationStatus.FIXED, ContinuationStatus.BASIC, ContinuationStatus.FREE, ContinuationStatus.FIXED,
+            ),
+            allowImplicitEmptyColumns = true,
+        )
+        val limits = ExactContinuationLimits(maxCells = 4, maxImportPivots = 1)
+        var probePolls = 0
+        val probe = ExactContinuation(input).resume(
+            limits.copy(maxImportPivots = 0), Cancellation { probePolls++; false },
+        )
+        val session = ExactContinuation(input)
+        var polls = 0
+        val interrupted = session.resume(limits, Cancellation { ++polls == probePolls + 6 })
+
+        val resumed = session.resume(limits)
+
+        assertEquals(ContinuationDecline.IMPORT_LIMIT, probe.metrics.decline)
+        assertEquals(ContinuationDecline.CANCELLED, interrupted.metrics.decline)
+        assertEquals(0, interrupted.metrics.imports)
+        assertEquals(0, interrupted.metrics.importPosition)
+        assertEquals(0, resumed.metrics.builds)
+        assertEquals(1, resumed.metrics.imports)
+        assertEquals(listOf(1), resumed.headings)
+        assertEquals(listOf(two, huge.reciprocal(), BigFraction.ZERO, BigFraction.ZERO), resumed.values)
+        assertEquals(interrupted.metrics.work + resumed.metrics.work, session.usedWork)
+        assertEquals(interrupted.metrics.allocation + resumed.metrics.allocation, session.usedAllocation)
+    }
+
+    @Test
     fun `implicit empty columns should retain finite seats and global pivot order`() {
         val two = BigFraction.ofLong(2)
         for (implicit in listOf(false, true)) {
