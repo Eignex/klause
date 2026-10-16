@@ -40,6 +40,7 @@ import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.minimize
 import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.result.QuadraticOptimizationResult

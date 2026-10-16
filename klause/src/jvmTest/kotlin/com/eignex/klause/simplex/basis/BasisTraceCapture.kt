@@ -5,6 +5,7 @@ import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.RevisedSimplex
@@ -160,12 +161,16 @@ internal object BasisTraceCapture {
     }
 
     private fun prepareSmt(text: String): PreparedCapture {
-        val parsed = SmtLib.parse(text, strictBounds = true)
-        require(parsed.objective == null) { "SMT source-derived optimization capture is unsupported" }
-        require(parsed.model.numBoolVars == 0) {
+        val parsed = SmtLib.parse(text)
+        require(parsed.objective == null && parsed.quadraticObjective == null &&
+            parsed.source.embeddedObjectiveSense == null) { "SMT source-derived optimization capture is unsupported" }
+        val source = requireNotNull(parsed.source.originalSource as? Problem) {
+            "SMT basis capture requires an original factor source"
+        }
+        require(source.numBoolVars == 0) {
             "SMT source-derived capture requires one authoritative asserted branch; Boolean choices are unsupported"
         }
-        val exact = QfLraSystem(parsed.model).build { null }.toExactLpModel()
+        val exact = QfLraSystem(source).build { null }.toExactLpModel()
         val model = requireNotNull(LpExactState(exact).toWorkingModel()) { "SMT exact source has no float projection" }
         val origins = List(model.numVars) { column ->
             if (column < model.n) {

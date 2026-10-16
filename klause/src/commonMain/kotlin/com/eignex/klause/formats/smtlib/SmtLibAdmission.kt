@@ -75,7 +75,8 @@ internal fun parseSmtLibSource(
                         captured.intVarNames, captured.realVarNames, captured.boolVarNames, semantics,
                     )
                     SmtLibProblem(SourceAttachment(source, settings), null,
-                        sourceNames(source.intVarNames), sourceNames(source.boolVarNames), sourceNames(source.realVarNames),
+                        sourceNames(source.intVarNames), sourceNames(source.boolVarNames),
+                        sourceNames(source.realVarNames),
                         captured.objectiveSense, captured.objective)
                 } else {
                     val source = captured.realSource(semantics)

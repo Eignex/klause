@@ -20,8 +20,13 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
@@ -36,6 +41,7 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderProvider
@@ -147,10 +153,10 @@ object EncoderProviderProfile {
                         optimizationPoint(optimization)
                     } else if (entry == "source") {
                         if (engine == "cp") {
-                            BacktrackSolver.source(requireNotNull(problem.source.originalSource as? Problem) { "factor source required" }).withProjectionProviders(providers)
+                            BacktrackSolver.source(factorSource(problem)).withProjectionProviders(providers)
                                 .solve(BacktrackParams(cancellation = stop, randomSeed = seed))
                         } else {
-                            LocalSearchSolver.source(requireNotNull(problem.source.originalSource as? Problem) { "factor source required" }).withProjectionProviders(providers)
+                            LocalSearchSolver.source(factorSource(problem)).withProjectionProviders(providers)
                                 .solve(LocalSearchParams(cancellation = stop, randomSeed = seed))
                         }
                     } else {
@@ -182,13 +188,32 @@ object EncoderProviderProfile {
                             FiniteEngine.BACKTRACK,
                         ).result
 
-                        is SourceProblemRoute.Finite -> BacktrackSolver.source(requireNotNull(problem.source.originalSource as? Problem) { "factor source required" })
-                            .withProjectionProviders(providers).solve(
-                                BacktrackParams(
-                                cancellation = stop,
-                                randomSeed = seed,
-                            )
-                            )
+                        is SourceProblemRoute.Finite -> {
+                            val prepared = FinitePipeline.prepare(FinitePipelineRequest(
+                                route.problem, FiniteEngine.BACKTRACK,
+                                presolveConfig = PresolveConfig.NONE, explicitPresolveConfig = true,
+                                solutionSetSensitive = true, cancellation = stop,
+                                preparedPlan = route.preparedPlan,
+                            ))
+                            if (stop()) {
+                                OpenTheoryResult.Unknown(TerminationReason.Timeout, SolveStats.EMPTY, problem.semantics)
+                            } else if (prepared.presolve?.infeasible == true) {
+                                OpenTheoryResult.Unsat(SolveStats.EMPTY, problem.semantics)
+                            } else {
+                                when (val solved = BacktrackSolver(prepared.problem as BakedProblem).solve(
+                                    BacktrackParams(cancellation = stop, randomSeed = seed),
+                                )) {
+                                    is SolveResult.Sat -> OpenTheoryResult.Sat(
+                                        OpenTheoryAssignment.Sampled(prepared.reconstruct(solved.assignment)),
+                                        solved.stats, problem.semantics,
+                                    )
+                                    is SolveResult.Unsat -> OpenTheoryResult.Unsat(solved.stats, problem.semantics)
+                                    is SolveResult.Unknown -> OpenTheoryResult.Unknown(
+                                        solved.reason, solved.stats, problem.semantics,
+                                    )
+                                }
+                            }
+                        }
 
                         SourceProblemRoute.Refuted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
 
@@ -275,6 +300,9 @@ object EncoderProviderProfile {
         }
     }
 
+    private fun factorSource(problem: SmtLibProblem): Problem =
+        requireNotNull(problem.source.originalSource as? Problem) { "factor source required" }
+
     private fun sourceOptimize(
         problem: SmtLibProblem,
         engine: String,
@@ -286,8 +314,8 @@ object EncoderProviderProfile {
         val spec = requireNotNull(problem.objective)
         val objective = LinearObjective(spec.boolWeights, spec.intCoefficients, spec.constant, spec.realCoefficients)
         val budget = nodeLimit?.let(::NodeBudget)
-        val strategy = if (engine == "cp") BacktrackSolver.source(requireNotNull(problem.source.originalSource as? Problem) { "factor source required" }) else {
-            LocalSearchSolver.source(requireNotNull(problem.source.originalSource as? Problem) { "factor source required" })
+        val strategy = if (engine == "cp") BacktrackSolver.source(factorSource(problem)) else {
+            LocalSearchSolver.source(factorSource(problem))
         }
         val execution = strategy.withProjectionProviders(providers).optimizeOpen(
             objective,

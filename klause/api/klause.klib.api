@@ -2336,85 +2336,6 @@ sealed interface com.eignex.klause.formats.smtlib/SExpr { // com.eignex.klause.f
     }
 }
 
-sealed interface com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput|null[0]
-    final class Linear : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.Linear|null[0]
-        constructor <init>(com.eignex.klause.formats.smtlib/SmtLibProblem) // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.<init>|<init>(com.eignex.klause.formats.smtlib.SmtLibProblem){}[0]
-
-        final val problem // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.problem|{}problem[0]
-            final fun <get-problem>(): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.problem.<get-problem>|<get-problem>(){}[0]
-
-        final fun component1(): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.formats.smtlib/SmtLibProblem = ...): com.eignex.klause.formats.smtlib/SmtLibInput.Linear // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.copy|copy(com.eignex.klause.formats.smtlib.SmtLibProblem){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.toString|toString(){}[0]
-    }
-
-    final class NonlinearInteger : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger|null[0]
-        constructor <init>(com.eignex.klause.ir/NonlinearIntegerProblem) // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.<init>|<init>(com.eignex.klause.ir.NonlinearIntegerProblem){}[0]
-
-        final val problem // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.problem|{}problem[0]
-            final fun <get-problem>(): com.eignex.klause.ir/NonlinearIntegerProblem // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.problem.<get-problem>|<get-problem>(){}[0]
-
-        final fun component1(): com.eignex.klause.ir/NonlinearIntegerProblem // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.ir/NonlinearIntegerProblem = ...): com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.copy|copy(com.eignex.klause.ir.NonlinearIntegerProblem){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.toString|toString(){}[0]
-    }
-
-    final class Polynomial : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial|null[0]
-        constructor <init>(com.eignex.klause.ir/PolynomialRealProblem) // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.<init>|<init>(com.eignex.klause.ir.PolynomialRealProblem){}[0]
-
-        final val problem // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.problem|{}problem[0]
-            final fun <get-problem>(): com.eignex.klause.ir/PolynomialRealProblem // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.problem.<get-problem>|<get-problem>(){}[0]
-
-        final fun component1(): com.eignex.klause.ir/PolynomialRealProblem // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.ir/PolynomialRealProblem = ...): com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.copy|copy(com.eignex.klause.ir.PolynomialRealProblem){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.toString|toString(){}[0]
-    }
-
-    final class Quadratic : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic|null[0]
-        constructor <init>(com.eignex.klause.formats.smtlib/SmtLibInput, com.eignex.klause.ir/QuadraticObjectiveSpec, com.eignex.klause.ir/ObjectiveSense) // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.<init>|<init>(com.eignex.klause.formats.smtlib.SmtLibInput;com.eignex.klause.ir.QuadraticObjectiveSpec;com.eignex.klause.ir.ObjectiveSense){}[0]
-
-        final val objective // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.objective|{}objective[0]
-            final fun <get-objective>(): com.eignex.klause.ir/QuadraticObjectiveSpec // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.objective.<get-objective>|<get-objective>(){}[0]
-        final val sense // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.sense|{}sense[0]
-            final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.sense.<get-sense>|<get-sense>(){}[0]
-        final val source // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.source|{}source[0]
-            final fun <get-source>(): com.eignex.klause.formats.smtlib/SmtLibInput // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.source.<get-source>|<get-source>(){}[0]
-
-        final fun component1(): com.eignex.klause.formats.smtlib/SmtLibInput // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.component1|component1(){}[0]
-        final fun component2(): com.eignex.klause.ir/QuadraticObjectiveSpec // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.component2|component2(){}[0]
-        final fun component3(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.component3|component3(){}[0]
-        final fun copy(com.eignex.klause.formats.smtlib/SmtLibInput = ..., com.eignex.klause.ir/QuadraticObjectiveSpec = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.copy|copy(com.eignex.klause.formats.smtlib.SmtLibInput;com.eignex.klause.ir.QuadraticObjectiveSpec;com.eignex.klause.ir.ObjectiveSense){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.toString|toString(){}[0]
-    }
-
-    final class Transcendental : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental|null[0]
-        constructor <init>(com.eignex.klause.ir/TranscendentalProblem) // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.<init>|<init>(com.eignex.klause.ir.TranscendentalProblem){}[0]
-
-        final val problem // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.problem|{}problem[0]
-            final fun <get-problem>(): com.eignex.klause.ir/TranscendentalProblem // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.problem.<get-problem>|<get-problem>(){}[0]
-
-        final fun component1(): com.eignex.klause.ir/TranscendentalProblem // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.ir/TranscendentalProblem = ...): com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.copy|copy(com.eignex.klause.ir.TranscendentalProblem){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.toString|toString(){}[0]
-    }
-
-    final object Interrupted : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted|null[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted.toString|toString(){}[0]
-    }
-}
-
 sealed interface com.eignex.klause.formats.xcsp3/FExpr { // com.eignex.klause.formats.xcsp3/FExpr|null[0]
     final class Call : com.eignex.klause.formats.xcsp3/FExpr { // com.eignex.klause.formats.xcsp3/FExpr.Call|null[0]
         constructor <init>(kotlin/String, kotlin.collections/List<com.eignex.klause.formats.xcsp3/FExpr>) // com.eignex.klause.formats.xcsp3/FExpr.Call.<init>|<init>(kotlin.String;kotlin.collections.List<com.eignex.klause.formats.xcsp3.FExpr>){}[0]
@@ -7886,30 +7807,33 @@ final class com.eignex.klause.formats.smtlib/SExprReader { // com.eignex.klause.
 }
 
 final class com.eignex.klause.formats.smtlib/SmtLibProblem : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.formats.smtlib/SmtLibProblem|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.ir/LinearObjectiveSpec?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ...) // com.eignex.klause.formats.smtlib/SmtLibProblem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense){}[0]
+    constructor <init>(com.eignex.klause.solver.pipeline/SourceAttachment, com.eignex.klause.ir/LinearObjectiveSpec?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., com.eignex.klause.ir/QuadraticObjectiveSpec? = ...) // com.eignex.klause.formats.smtlib/SmtLibProblem.<init>|<init>(com.eignex.klause.solver.pipeline.SourceAttachment;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.ir.QuadraticObjectiveSpec?){}[0]
 
     final val boolVarNames // com.eignex.klause.formats.smtlib/SmtLibProblem.boolVarNames|{}boolVarNames[0]
         final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]
     final val intVarNames // com.eignex.klause.formats.smtlib/SmtLibProblem.intVarNames|{}intVarNames[0]
         final fun <get-intVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.intVarNames.<get-intVarNames>|<get-intVarNames>(){}[0]
-    final val model // com.eignex.klause.formats.smtlib/SmtLibProblem.model|{}model[0]
-        final fun <get-model>(): com.eignex.klause.ir/Problem // com.eignex.klause.formats.smtlib/SmtLibProblem.model.<get-model>|<get-model>(){}[0]
     final val objective // com.eignex.klause.formats.smtlib/SmtLibProblem.objective|{}objective[0]
         final fun <get-objective>(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.formats.smtlib/SmtLibProblem.objective.<get-objective>|<get-objective>(){}[0]
+    final val quadraticObjective // com.eignex.klause.formats.smtlib/SmtLibProblem.quadraticObjective|{}quadraticObjective[0]
+        final fun <get-quadraticObjective>(): com.eignex.klause.ir/QuadraticObjectiveSpec? // com.eignex.klause.formats.smtlib/SmtLibProblem.quadraticObjective.<get-quadraticObjective>|<get-quadraticObjective>(){}[0]
     final val realVarNames // com.eignex.klause.formats.smtlib/SmtLibProblem.realVarNames|{}realVarNames[0]
         final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
     final val semantics // com.eignex.klause.formats.smtlib/SmtLibProblem.semantics|{}semantics[0]
         final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.formats.smtlib/SmtLibProblem.semantics.<get-semantics>|<get-semantics>(){}[0]
     final val sense // com.eignex.klause.formats.smtlib/SmtLibProblem.sense|{}sense[0]
         final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibProblem.sense.<get-sense>|<get-sense>(){}[0]
+    final val source // com.eignex.klause.formats.smtlib/SmtLibProblem.source|{}source[0]
+        final fun <get-source>(): com.eignex.klause.solver.pipeline/SourceAttachment // com.eignex.klause.formats.smtlib/SmtLibProblem.source.<get-source>|<get-source>(){}[0]
 
-    final fun component1(): com.eignex.klause.ir/Problem // com.eignex.klause.formats.smtlib/SmtLibProblem.component1|component1(){}[0]
+    final fun component1(): com.eignex.klause.solver.pipeline/SourceAttachment // com.eignex.klause.formats.smtlib/SmtLibProblem.component1|component1(){}[0]
     final fun component2(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.formats.smtlib/SmtLibProblem.component2|component2(){}[0]
     final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.component3|component3(){}[0]
     final fun component4(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.component4|component4(){}[0]
     final fun component5(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.component5|component5(){}[0]
     final fun component6(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibProblem.component6|component6(){}[0]
-    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLibProblem.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense){}[0]
+    final fun component7(): com.eignex.klause.ir/QuadraticObjectiveSpec? // com.eignex.klause.formats.smtlib/SmtLibProblem.component7|component7(){}[0]
+    final fun copy(com.eignex.klause.solver.pipeline/SourceAttachment = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., com.eignex.klause.ir/QuadraticObjectiveSpec? = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLibProblem.copy|copy(com.eignex.klause.solver.pipeline.SourceAttachment;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.ir.QuadraticObjectiveSpec?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibProblem.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibProblem.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibProblem.toString|toString(){}[0]
@@ -17466,13 +17390,9 @@ final object com.eignex.klause.formats.opb/Opb { // com.eignex.klause.formats.op
 }
 
 final object com.eignex.klause.formats.smtlib/SmtLib { // com.eignex.klause.formats.smtlib/SmtLib|null[0]
-    final fun parse(com.eignex.klause.util/CharSource, kotlin/Long = ..., kotlin/Long = ..., kotlin/Boolean = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLib.parse|parse(com.eignex.klause.util.CharSource;kotlin.Long;kotlin.Long;kotlin.Boolean;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.SemanticOverrides){}[0]
-    final fun parse(kotlin/String, kotlin/Long = ..., kotlin/Long = ..., kotlin/Boolean = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLib.parse|parse(kotlin.String;kotlin.Long;kotlin.Long;kotlin.Boolean;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.SemanticOverrides){}[0]
-}
-
-final object com.eignex.klause.formats.smtlib/SmtLibAdmission { // com.eignex.klause.formats.smtlib/SmtLibAdmission|null[0]
-    final fun parse(kotlin/Function0<com.eignex.klause.util/CharSource>, kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.smtlib/SmtLibInput // com.eignex.klause.formats.smtlib/SmtLibAdmission.parse|parse(kotlin.Function0<com.eignex.klause.util.CharSource>;kotlin.Long;kotlin.Long;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.util.Cancellation;com.eignex.klause.ir.SemanticOverrides){}[0]
-    final fun parse(kotlin/String, kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.smtlib/SmtLibInput // com.eignex.klause.formats.smtlib/SmtLibAdmission.parse|parse(kotlin.String;kotlin.Long;kotlin.Long;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.util.Cancellation;com.eignex.klause.ir.SemanticOverrides){}[0]
+    final fun parse(com.eignex.klause.util/CharSource, kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLib.parse|parse(com.eignex.klause.util.CharSource;kotlin.Long;kotlin.Long;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.util.Cancellation;com.eignex.klause.ir.SemanticOverrides){}[0]
+    final fun parse(kotlin/Function0<com.eignex.klause.util/CharSource>, kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLib.parse|parse(kotlin.Function0<com.eignex.klause.util.CharSource>;kotlin.Long;kotlin.Long;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.util.Cancellation;com.eignex.klause.ir.SemanticOverrides){}[0]
+    final fun parse(kotlin/String, kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLib.parse|parse(kotlin.String;kotlin.Long;kotlin.Long;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.util.Cancellation;com.eignex.klause.ir.SemanticOverrides){}[0]
 }
 
 final object com.eignex.klause.formats.xcsp3/Xcsp3 { // com.eignex.klause.formats.xcsp3/Xcsp3|null[0]

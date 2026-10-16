@@ -294,8 +294,7 @@ class SmtLibAdmissionTest {
                 StringCharSource("(declare-const x Real) $definition (assert $assertion) (check-sat)")
             })
 
-            val source = assertIs<PolynomialRealProblem>((input).source.originalSource)
-            assertEquals(mapOf("x" to 0), source.realVarNames)
+            assertEquals(mapOf("x" to 0), input.realVarNames)
             assertEquals(1, opens)
         }
     }
