@@ -3,6 +3,7 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -16,6 +17,7 @@ import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -48,6 +50,20 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
+    @Test
+    fun `wide Boolean source rows should retain both reification directions in exact arithmetic`() {
+        val wide = parseBigInt("18446744073709551616")
+        val factor = ReifiedPseudoBoolean(0, arrayOf(wide), intArrayOf(Lit.make(1, false)), PbOp.EQ, wide)
+        val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
+        for (indicator in listOf(false, true)) {
+            val session = SearchSession(listOf(ExactLiraSearchComponent(problem)))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, indicator))))
+
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, indicator))))
+        }
+    }
+
     @Test
     fun `exact mixed witnesses should own their constructor and exported coordinates`() {
         val wide = parseBigInt("9223372036854775808")

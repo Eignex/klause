@@ -1,6 +1,5 @@
 package com.eignex.klause.formats.opb
 
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
@@ -8,6 +7,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
+import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.perCharSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -152,20 +152,31 @@ class OpbTest {
     }
 
     @Test
-    fun `a wide coefficient or bound should route to a wide linear row`() {
-        // 2^63 (one past signed Long) as a coefficient, and an over-Int64 bound: both kept in the wide lane.
+    fun `wide weighted literals should retain one pseudo Boolean relation without integer channels`() {
         val out = Opb.parse("+9223372036854775808 x1 +1 x2 >= 99999999999999999999 ;")
-        val lin = out.problem.factors.filterIsInstance<Linear>().single()
-        assertTrue(lin.wideConstants != null)
-        assertEquals(2, out.problem.numIntVars)
+        val factor = out.problem.factors.filterIsInstance<PseudoBoolean>().single()
+
+        assertEquals(parseBigInt("9223372036854775808"), factor.constants.exactCoeff(0))
+        assertEquals(parseBigInt("99999999999999999999"), factor.constants.exactBound)
+        assertEquals(0, out.problem.numIntVars)
+        assertEquals(1, out.problem.numFactors)
+    }
+
+    @Test
+    fun `wide soft relations should retain an exact reified source body`() {
+        val out = Opb.parse("soft: 5 ; [1] +18446744073709551616 x1 >= 1 ;")
+        val factor = out.problem.factors.filterIsInstance<ReifiedPseudoBoolean>().single()
+
+        assertEquals(parseBigInt("18446744073709551616"), factor.constants.exactCoeff(0))
+        assertEquals(factor.auxBoolVar, factor.activator)
+        assertEquals(0, out.problem.numIntVars)
+        assertNotNull(out.objective)
     }
 
     @Test
     fun `wide values should be rejected where the target cannot be wide`() {
-        // Normalized objective coefficients and WBO soft costs must fit Long; wide soft rows are unsupported.
         assertTrue("64-bit range" in parseError("min: 99999999999999999999 x1 ;\n+1 x1 >= 0 ;\n"))
         assertTrue("64-bit range" in parseError("[99999999999999999999] +1 x1 >= 1 ;"))
-        assertTrue("soft constraint" in parseError("soft: 5 ;\n[1] +18446744073709551616 x1 >= 1 ;"))
     }
 
     @Test

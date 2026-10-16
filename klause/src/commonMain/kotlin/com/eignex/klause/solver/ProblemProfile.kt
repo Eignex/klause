@@ -1,14 +1,16 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.WideConstants
-import com.eignex.klause.factor.arithmetic.LinearIndicator
-import com.eignex.klause.factor.arithmetic.ExactLinear
-import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 
 /** What kind of model a solve faces, the one classification every engine choice and portfolio pool reads. */
 enum class ProblemClass {
@@ -78,6 +80,8 @@ data class ProblemProfile(
             return problem.factors.any {
                 (it is Linear && it.wideConstants != null) || (it is ReifiedLinear && it.wideConstants != null) ||
                     (it is ExactLinear && it.constants is WideConstants) ||
+                    (it is PseudoBoolean && it.constants is WideConstants) ||
+                    (it is ReifiedPseudoBoolean && it.constants is WideConstants) ||
                     (it is LinearIndicator && it.row.constants is WideConstants)
             }
         }

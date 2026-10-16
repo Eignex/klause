@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
@@ -40,7 +41,7 @@ internal fun Factor.equivalentPseudoBoolean(): PseudoBoolean? {
         LinearOp.EQ -> PbOp.EQ
         LinearOp.NE -> return null
     }
-    if (this is PseudoBoolean) return this
+    if (this is PseudoBoolean) return takeIf { permitsLongPseudoBoolean(constants) }
     var lower = 0L
     var upper = 0L
     try {

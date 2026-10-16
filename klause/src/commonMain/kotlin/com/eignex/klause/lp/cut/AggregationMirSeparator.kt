@@ -3,6 +3,7 @@ package com.eignex.klause.lp.cut
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.engine.Cut
@@ -82,6 +83,7 @@ internal class AggregationMirSeparator : CutSeparator {
                 }
 
                 is PseudoBoolean -> {
+                    if (!permitsLongPseudoBoolean(factor.constants)) continue
                     val lits = factor.literals
                     val w = { k: Int -> factor.weights[k] }
                     val b = factor.bound

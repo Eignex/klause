@@ -3,6 +3,7 @@ package com.eignex.klause.lp.cut
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
@@ -42,7 +43,9 @@ internal fun conflictGraph(problem: Problem): ConflictGraph {
 
             is Cardinality -> if (factor.max == 1) atMostOne(factor.literals)
 
-            is PseudoBoolean -> if (factor.op == PbOp.LE && factor.bound == 1L && factor.weights.all { it == 1L }) {
+            is PseudoBoolean -> if (permitsLongPseudoBoolean(factor.constants) && factor.op == PbOp.LE &&
+                factor.bound == 1L && factor.weights.all { it == 1L }
+            ) {
                 atMostOne(factor.literals)
             }
 

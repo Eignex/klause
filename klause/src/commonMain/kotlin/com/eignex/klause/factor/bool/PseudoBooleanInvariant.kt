@@ -125,8 +125,7 @@ internal class PseudoBooleanInvariant(
                 val v = Lit.variable(lit)
                 val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
                 val change = if (isTrue) -weights[i] else weights[i]
-                val effChange = if (Lit.isPositive(lit)) change else -change
-                val newSum = sum + effChange
+                val newSum = sum + change
                 if (op == PbOp.LE && newSum <= bound) {
                     sink.addBoolFlip(v)
                 } else if (op == PbOp.GE && newSum >= bound) {

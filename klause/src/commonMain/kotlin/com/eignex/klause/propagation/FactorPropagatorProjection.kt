@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.*
 import com.eignex.klause.factor.bool.*
+import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.circuit.CircuitPropagator
 import com.eignex.klause.factor.circuit.SubcircuitPropagator
@@ -136,7 +137,11 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
         is Power.Coordinate.Real -> NoPropagator
     }
 
-    is PseudoBoolean -> PseudoBooleanPropagator(boolVars, intVars, weights, literals, op, bound)
+    is PseudoBoolean -> if (permitsLongPseudoBoolean(constants)) {
+        PseudoBooleanPropagator(boolVars, intVars, weights, literals, op, bound)
+    } else {
+        ExactPseudoBooleanPropagator(constants, literals, op)
+    }
 
     is RealAbs -> NoPropagator
 
@@ -159,15 +164,11 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
         is IntegerConstants -> ReifiedLinearPropagator(auxBoolVar, boolVars, intVars, c.coeffs, vars, op, c.bound)
     }
 
-    is ReifiedPseudoBoolean -> ReifiedPseudoBooleanPropagator(
-        auxBoolVar,
-        weights,
-        literals,
-        op,
-        bound,
-        boolVars,
-        intVars,
-    )
+    is ReifiedPseudoBoolean -> if (permitsLongPseudoBoolean(constants)) {
+        ReifiedPseudoBooleanPropagator(auxBoolVar, weights, literals, op, bound, boolVars, intVars)
+    } else {
+        ExactPseudoBooleanPropagator(constants, literals, op, auxBoolVar)
+    }
 
     is ReifiedRealLinear -> NoPropagator
 

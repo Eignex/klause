@@ -883,6 +883,18 @@ captures reject verdict markers and terminal `optimizationStatus` comments, incl
 unattained boundaries; these belong after invocation completion. Integer `int_div`
 and `int_mod` checks use exact truncating arithmetic and reject zero divisors,
 including word-boundary cases without wraparound.
+`checkOpb=true` checks complete PB-competition `v` publications directly against
+original OPB/WBO text using arbitrary-width integral arithmetic. Repeated and
+complementary literals, conjunction products, hard comparisons, source minimization
+terms and soft penalties/top retain their original units. The preceding final `o`
+cost must match the checked model; missing coordinates or unsupported syntax do not
+receive valid credit. Results are retained in `source-check-opb.json` with scope
+`opb-integral`. This is a witness check; a terminal optimum or infeasibility marker
+receives no proof credit. Interrupted captures cannot carry terminal status.
+`com.eignex.klause.bench.profile.OpbStreamChecker` accepts the same saved-record
+array described below, verifies original byte hashes and retains checking outcomes
+without invoking the CLI.
+
 `com.eignex.klause.bench.profile.SmtStreamReplay` checks saved SMT output through a
 lab profile without invoking the CLI again. Its one argument is a base64 JSON array
 of records containing `sourceRevision`, original `source` and `stdout` text, and
