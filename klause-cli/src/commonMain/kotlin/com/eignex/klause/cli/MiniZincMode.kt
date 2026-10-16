@@ -213,6 +213,10 @@ internal class MiniZincOutput(
     private val integerScopeChanged = sourceSemantics?.let {
         it.declared.undeclaredIntegers != it.effective.undeclaredIntegers
     } == true
+    private val realScopeChanged = sourceSemantics?.let {
+        it.declared.undeclaredReals != it.effective.undeclaredReals
+    } == true
+    private val declarationScopeChanged = integerScopeChanged || realScopeChanged
 
     override fun begin(optimize: Boolean, maximize: Boolean) {
         if (integerScopeChanged) {
@@ -220,6 +224,13 @@ internal class MiniZincOutput(
             println(
                 "% klause-source-semantics: unbounded-int-lo=${bounds.lower ?: "open"} " +
                     "unbounded-int-hi=${bounds.upper ?: "open"}",
+            )
+        }
+        if (realScopeChanged) {
+            val bounds = checkNotNull(sourceSemantics?.effective?.undeclaredReals)
+            println(
+                "% klause-source-semantics: unbounded-real-lo=${bounds.lower ?: "open"} " +
+                    "unbounded-real-hi=${bounds.upper ?: "open"}",
             )
         }
     }
@@ -259,6 +270,7 @@ internal class MiniZincOutput(
     }
 
     private fun unattainedLimit(value: SourceValue, sense: ObjectiveSense, strict: Boolean) {
+        if (floatApproximation || declarationScopeChanged) return
         val minimize = sense == ObjectiveSense.MINIMIZE
         val status = if (minimize) "unattained-infimum" else "unattained-supremum"
         val direction = if (minimize) "lower" else "upper"
@@ -275,7 +287,10 @@ internal class MiniZincOutput(
         if (integerScopeChanged) {
             println("% klause-source-claim: caller integer bounds; no default-source proof")
         }
-        when (flatZincSourceVerdict(verdict, floatApproximation || integerScopeChanged)) {
+        if (realScopeChanged) {
+            println("% klause-source-claim: caller real bounds; no default-source proof")
+        }
+        when (flatZincSourceVerdict(verdict, floatApproximation || declarationScopeChanged)) {
             Verdict.SATISFIABLE, Verdict.OPTIMAL -> println("==========")
 
             // Incumbents already streamed; printing `==========` would falsely claim optimality.
@@ -292,6 +307,7 @@ internal class MiniZincOutput(
                 val cause = when {
                     floatApproximation -> "grid search cannot prove the source model"
                     integerScopeChanged -> "caller integer bounds changed source scope"
+                    realScopeChanged -> "caller real bounds changed source scope"
                     else -> context.softVerdictCause()
                 }
                 println("% $cause")

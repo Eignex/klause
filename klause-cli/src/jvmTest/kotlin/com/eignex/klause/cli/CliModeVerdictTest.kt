@@ -1,10 +1,16 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.formats.flatzinc.flatZincSemantics
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
+import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.result.ConflictAnalysisStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
@@ -19,6 +25,8 @@ import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CliModeVerdictTest {
@@ -39,6 +47,51 @@ class CliModeVerdictTest {
             assertTrue("no default-source proof" in out, out)
             assertTrue("=====UNSATISFIABLE=====" !in out && "=====UNBOUNDED=====" !in out, out)
             assertTrue("==========" !in out, out)
+        }
+    }
+
+    @Test
+    fun `caller real bounds should qualify output and withhold default source terminal claims`() {
+        val semantics = flatZincSemantics.resolve(SemanticOverrides(
+            undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(-20))),
+        ))
+        for (verdict in listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED, Verdict.OPTIMAL)) {
+            val out = capture {
+                MiniZincOutput(sourceSemantics = semantics).apply {
+                    begin(optimize = verdict != Verdict.UNSATISFIABLE, maximize = false)
+                    onComplete(verdict)
+                }
+            }
+
+            assertTrue("unbounded-real-lo=-20 unbounded-real-hi=open" in out, out)
+            assertTrue("no default-source proof" in out, out)
+            assertTrue("=====UNSATISFIABLE=====" !in out && "=====UNBOUNDED=====" !in out, out)
+            assertTrue("==========" !in out, out)
+        }
+    }
+
+    @Test
+    fun `unattained bound metadata should retain the caller range qualification`() {
+        for (bounded in listOf(false, true)) {
+            val bounds = if (bounded) BoundsOverride(upper = BoundOverride.Value(SemanticRational.ONE)) else null
+            val program = parseFlatZinc(
+                "var float: x; constraint float_lt(0.0, x); solve minimize x;",
+                semanticOverrides = SemanticOverrides(floats = FloatSemantics.Continuous, undeclaredReals = bounds),
+            )
+            val result = BacktrackSolver.source(program.problem).optimizeOpen(
+                LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            )
+            val linear = assertNotNull(assertIs<OpenTheoryExecution.Optimize>(result).result.linearResult)
+
+            val out = capture {
+                MiniZincOutput(sourceSemantics = program.semantics).apply {
+                    begin(optimize = true, maximize = false)
+                    onLinearResult(linear)
+                }
+            }
+
+            assertEquals(!bounded, "optimizationStatus=unattained-infimum" in out, out)
+            assertEquals(!bounded, "objectiveBound=" in out, out)
         }
     }
 
