@@ -1,6 +1,5 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,17 +41,17 @@ class SourceSemanticsTest {
 
     @Test
     fun `real endpoint replacements should retain exact rationals and the other endpoint`() {
-        val lower = BigFraction.of(bigIntOf(1), bigIntOf(10))
+        val lower = SemanticRational.of(bigIntOf(1), bigIntOf(10))
         val declared = SourceSemantics(
             format = SourceFormat.SMTLIB,
-            undeclaredReals = UndeclaredRealBounds(upper = BigFraction.ONE),
+            undeclaredReals = UndeclaredRealBounds(upper = SemanticRational.ONE),
         )
 
         val resolved = declared.resolve(
             SemanticOverrides(undeclaredReals = BoundsOverride(lower = BoundOverride.Value(lower))),
         )
 
-        assertEquals(UndeclaredRealBounds(lower, BigFraction.ONE), resolved.effective.undeclaredReals)
+        assertEquals(UndeclaredRealBounds(lower, SemanticRational.ONE), resolved.effective.undeclaredReals)
     }
 
     @Test
@@ -88,8 +87,8 @@ class SourceSemanticsTest {
             format = SourceFormat.MPS,
             numericAuthority = NumericAuthority.DECIMAL_LITERALS,
             feasibilityTolerance = SourceTolerance(
-                BigFraction.of(bigIntOf(1), bigIntOf(10_000_000)),
-                BigFraction.of(bigIntOf(1), bigIntOf(10_000_000)),
+                SemanticRational.of(bigIntOf(1), bigIntOf(10_000_000)),
+                SemanticRational.of(bigIntOf(1), bigIntOf(10_000_000)),
             ),
         )
 
@@ -105,12 +104,12 @@ class SourceSemanticsTest {
         val declared = SourceSemantics(
             format = SourceFormat.FLATZINC,
             floats = FloatSemantics.Grid(1024, 1_000_000),
-            undeclaredReals = UndeclaredRealBounds(BigFraction.ofLong(-10), BigFraction.ofLong(10)),
+            undeclaredReals = UndeclaredRealBounds(SemanticRational.ofLong(-10), SemanticRational.ofLong(10)),
         )
 
         val resolved = declared.resolve(SemanticOverrides(floats = FloatSemantics.Continuous))
 
-        assertEquals(UndeclaredRealBounds(BigFraction.ofLong(-10), BigFraction.ofLong(10)), resolved.effective.undeclaredReals)
+        assertEquals(UndeclaredRealBounds(SemanticRational.ofLong(-10), SemanticRational.ofLong(10)), resolved.effective.undeclaredReals)
         assertFalse(resolved.isApproximate)
         assertTrue(declared.resolve().isApproximate)
     }
@@ -143,7 +142,7 @@ class SourceSemanticsTest {
 
     @Test
     fun `tolerance components should reject negative slack`() {
-        for (tolerance in listOf(BigFraction.ofLong(-1), BigFraction.ofLong(-2))) {
+        for (tolerance in listOf(SemanticRational.ofLong(-1), SemanticRational.ofLong(-2))) {
             assertFailsWith<IllegalArgumentException> { SourceTolerance(absolute = tolerance) }
             assertFailsWith<IllegalArgumentException> { SourceTolerance(relative = tolerance) }
         }
@@ -151,7 +150,7 @@ class SourceSemanticsTest {
 
     @Test
     fun `either tolerance component should qualify the source as approximate`() {
-        val slack = BigFraction.of(bigIntOf(1), bigIntOf(10_000_000))
+        val slack = SemanticRational.of(bigIntOf(1), bigIntOf(10_000_000))
 
         for (tolerance in listOf(SourceTolerance(absolute = slack), SourceTolerance(relative = slack))) {
             val declared = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance)
@@ -176,7 +175,7 @@ class SourceSemanticsTest {
 
     @Test
     fun `grid approximation windows should require finite endpoints`() {
-        for (bounds in listOf(UndeclaredRealBounds(), UndeclaredRealBounds(lower = BigFraction.ZERO))) {
+        for (bounds in listOf(UndeclaredRealBounds(), UndeclaredRealBounds(lower = SemanticRational.ZERO))) {
             assertFailsWith<IllegalArgumentException> { FloatSemantics.Grid(8, 1000, bounds) }
         }
     }
