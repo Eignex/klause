@@ -2429,12 +2429,13 @@ public class com/eignex/klause/formats/flatzinc/FlatZincParseException : com/eig
 }
 
 public final class com/eignex/klause/formats/flatzinc/FlatZincProgram {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/EffectiveSourceSemantics;Ljava/util/List;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/EffectiveSourceSemantics;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
 	public final fun component10 ()Ljava/util/Map;
 	public final fun component11 ()Ljava/util/Map;
 	public final fun component12 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun component13 ()Ljava/util/List;
 	public final fun component2 ()Lcom/eignex/klause/formats/flatzinc/SolveDirective;
 	public final fun component3 ()Ljava/util/Map;
 	public final fun component4 ()Ljava/util/Map;
@@ -2443,11 +2444,12 @@ public final class com/eignex/klause/formats/flatzinc/FlatZincProgram {
 	public final fun component7 ()Ljava/util/List;
 	public final fun component8 ()Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;
 	public final fun component9 ()Ljava/util/Map;
-	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
+	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/EffectiveSourceSemantics;Ljava/util/List;)Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/EffectiveSourceSemantics;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getArraysByName ()Ljava/util/Map;
 	public final fun getBoolVarsByName ()Ljava/util/Map;
+	public final fun getDefinitionHints ()Ljava/util/List;
 	public final fun getEnumLabelsByVar ()Ljava/util/Map;
 	public final fun getFloatRepresentations ()Ljava/util/Map;
 	public final fun getFloatVarsByName ()Ljava/util/Map;
@@ -3282,6 +3284,148 @@ public final class com/eignex/klause/ir/ConstListKt {
 	public static final fun getIndices (Lcom/eignex/klause/ir/ConstList;)Lkotlin/ranges/IntRange;
 	public static final fun getNoConsts ()Lcom/eignex/klause/ir/LongConstList;
 	public static final fun longsOrNull (Lcom/eignex/klause/ir/ConstList;)Lcom/eignex/klause/ir/LongConstList;
+}
+
+public abstract interface class com/eignex/klause/ir/DefinitionHint {
+	public abstract fun getOutput ()I
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Abs : com/eignex/klause/ir/DefinitionHint$Integer {
+	public fun <init> (ILcom/eignex/klause/ir/DefinitionHint$Operand;)V
+	public final fun getInput ()Lcom/eignex/klause/ir/DefinitionHint$Operand;
+	public fun getOutput ()I
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public abstract interface class com/eignex/klause/ir/DefinitionHint$Boolean : com/eignex/klause/ir/DefinitionHint {
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Boolean$DefaultImpls {
+	public static fun remap (Lcom/eignex/klause/ir/DefinitionHint$Boolean;Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$BooleanReference : com/eignex/klause/ir/DefinitionHint$Boolean {
+	public fun <init> (II)V
+	public synthetic fun <init> (IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getLiteral ()I
+	public fun getOutput ()I
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$BooleanValue : com/eignex/klause/ir/DefinitionHint$Integer {
+	public fun <init> (II)V
+	public final fun getLiteral ()I
+	public fun getOutput ()I
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Comparison : com/eignex/klause/ir/DefinitionHint$Boolean {
+	public fun <init> (I[J[Lcom/eignex/klause/ir/DefinitionHint$Operand;JLcom/eignex/klause/ir/LinearOp;Z)V
+	public synthetic fun <init> (I[J[Lcom/eignex/klause/ir/DefinitionHint$Operand;JLcom/eignex/klause/ir/LinearOp;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBound ()J
+	public final fun getCoefficients ()[J
+	public final fun getInputs ()[Lcom/eignex/klause/ir/DefinitionHint$Operand;
+	public fun getOutput ()I
+	public final fun getRelation ()Lcom/eignex/klause/ir/LinearOp;
+	public final fun getStrict ()Z
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$DefaultImpls {
+	public static fun remap (Lcom/eignex/klause/ir/DefinitionHint;Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Element : com/eignex/klause/ir/DefinitionHint$Integer {
+	public fun <init> (II[I[JI)V
+	public final fun getIndex ()I
+	public final fun getOffset ()I
+	public fun getOutput ()I
+	public final fun getValues ()[J
+	public final fun getVariables ()[I
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Extreme : com/eignex/klause/ir/DefinitionHint$Integer {
+	public fun <init> (I[Lcom/eignex/klause/ir/DefinitionHint$Operand;Z)V
+	public final fun getInputs ()[Lcom/eignex/klause/ir/DefinitionHint$Operand;
+	public final fun getMaximum ()Z
+	public fun getOutput ()I
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Fold : com/eignex/klause/ir/DefinitionHint$Boolean {
+	public fun <init> (Lcom/eignex/klause/ir/BoolFoldDefinition;)V
+	public final fun getDefinition ()Lcom/eignex/klause/ir/BoolFoldDefinition;
+	public fun getOutput ()I
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public abstract interface class com/eignex/klause/ir/DefinitionHint$Integer : com/eignex/klause/ir/DefinitionHint {
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Integer$DefaultImpls {
+	public static fun remap (Lcom/eignex/klause/ir/DefinitionHint$Integer;Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$IntegerReference : com/eignex/klause/ir/DefinitionHint$Integer {
+	public fun <init> (I)V
+	public fun getOutput ()I
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Linear : com/eignex/klause/ir/DefinitionHint$Integer {
+	public fun <init> (I[J[Lcom/eignex/klause/ir/DefinitionHint$Operand;J)V
+	public final fun getBound ()J
+	public final fun getCoefficients ()[J
+	public final fun getInputs ()[Lcom/eignex/klause/ir/DefinitionHint$Operand;
+	public fun getOutput ()I
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Membership : com/eignex/klause/ir/DefinitionHint$Boolean {
+	public fun <init> (II[J)V
+	public final fun getInput ()I
+	public fun getOutput ()I
+	public final fun getValues ()[J
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public abstract interface class com/eignex/klause/ir/DefinitionHint$Operand {
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Operand$Constant : com/eignex/klause/ir/DefinitionHint$Operand {
+	public fun <init> (J)V
+	public final fun getValue ()J
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Operand$Variable : com/eignex/klause/ir/DefinitionHint$Operand {
+	public fun <init> (I)V
+	public final fun getId ()I
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Plus : com/eignex/klause/ir/DefinitionHint$Integer {
+	public fun <init> (ILcom/eignex/klause/ir/DefinitionHint$Operand;Lcom/eignex/klause/ir/DefinitionHint$Operand;)V
+	public final fun getLeft ()Lcom/eignex/klause/ir/DefinitionHint$Operand;
+	public fun getOutput ()I
+	public final fun getRight ()Lcom/eignex/klause/ir/DefinitionHint$Operand;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Power : com/eignex/klause/ir/DefinitionHint$Integer {
+	public fun <init> (ILcom/eignex/klause/ir/DefinitionHint$Operand;I)V
+	public final fun getBase ()Lcom/eignex/klause/ir/DefinitionHint$Operand;
+	public final fun getExponent ()I
+	public fun getOutput ()I
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
+}
+
+public final class com/eignex/klause/ir/DefinitionHint$Product : com/eignex/klause/ir/DefinitionHint$Integer {
+	public fun <init> (ILcom/eignex/klause/ir/DefinitionHint$Operand;Lcom/eignex/klause/ir/DefinitionHint$Operand;)V
+	public final fun getLeft ()Lcom/eignex/klause/ir/DefinitionHint$Operand;
+	public fun getOutput ()I
+	public final fun getRight ()Lcom/eignex/klause/ir/DefinitionHint$Operand;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/DefinitionHint;
 }
 
 public final class com/eignex/klause/ir/DomainStorageSettings {
@@ -4492,6 +4636,7 @@ public final class com/eignex/klause/localsearch/CrossoverBias$Uniform : com/eig
 
 public final class com/eignex/klause/localsearch/DefinitionalSweep {
 	public static final field Companion Lcom/eignex/klause/localsearch/DefinitionalSweep$Companion;
+	public final fun functionalObjective (Lcom/eignex/klause/solver/objective/LinearObjective;)Lcom/eignex/klause/solver/objective/IncrementalObjective;
 	public final fun functionalObjective ([I[JJZ[I[J)Lcom/eignex/klause/solver/objective/IncrementalObjective;
 	public static synthetic fun functionalObjective$default (Lcom/eignex/klause/localsearch/DefinitionalSweep;[I[JJZ[I[JILjava/lang/Object;)Lcom/eignex/klause/solver/objective/IncrementalObjective;
 	public final fun getSize ()I
@@ -4501,6 +4646,8 @@ public final class com/eignex/klause/localsearch/DefinitionalSweep {
 }
 
 public final class com/eignex/klause/localsearch/DefinitionalSweep$Companion {
+	public final fun fromSource (Lcom/eignex/klause/ir/Problem;Ljava/util/List;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
+	public static synthetic fun fromSource$default (Lcom/eignex/klause/localsearch/DefinitionalSweep$Companion;Lcom/eignex/klause/ir/Problem;Ljava/util/List;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
 	public final fun infer (Lcom/eignex/klause/ir/Problem;[ILjava/util/List;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
 	public final fun infer ([Lcom/eignex/klause/ir/Factor;I[ILjava/util/List;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
 	public static synthetic fun infer$default (Lcom/eignex/klause/localsearch/DefinitionalSweep$Companion;Lcom/eignex/klause/ir/Problem;[ILjava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
