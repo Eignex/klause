@@ -54,7 +54,10 @@ class QfLiraSolverTest {
     fun `wide Boolean source rows should retain both reification directions in exact arithmetic`() {
         val wide = parseBigInt("18446744073709551616")
         val factor = ReifiedPseudoBoolean(0, arrayOf(wide), intArrayOf(Lit.make(1, false)), PbOp.EQ, wide)
-        val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
+        val real = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+            LinearOp.LE, 0.0)
+        val problem = Problem(2, 0, emptyArray(), arrayOf(factor, real),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         for (indicator in listOf(false, true)) {
             val session = SearchSession(listOf(ExactLiraSearchComponent(problem)))
             assertIs<ComponentResult.Consistent>(session.initialize())
