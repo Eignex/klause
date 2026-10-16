@@ -12,7 +12,7 @@ import kotlinx.serialization.json.put
 internal object JvmTaskLogCohortReview {
     private const val MAX_MANIFEST_BYTES = 16L * 1024 * 1024
     private const val MAX_ARCHIVE_BYTES = 2L * 1024 * 1024 * 1024
-    private const val TIMEOUT_SECONDS = 1200L
+    private const val TIMEOUT_SECONDS = 2400L
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -76,7 +76,7 @@ internal object JvmTaskLogCohortReview {
 
     private fun review(out: File, manifest: File, expected: String, archive: File) {
         val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
-        val names = listOf("review_jvm_task_log_cohort.py", "review_jvm_task_log.py",
+        val names = listOf("review_jvm_task_log_cohort.py", "review_jvm_task_log.py", "stream_jvm_task_log.py",
             "review_native_vm_log_identities.py", "review_native_vm_live_arguments.py", "native_vm_event_loss.py")
         for (name in names) File(root, "klause-bench/tools/$name").copyTo(File(out, name))
         val tool = File(root, "klause-bench/tools/review_jvm_task_log_cohort.py")

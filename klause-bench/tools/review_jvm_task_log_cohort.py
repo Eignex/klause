@@ -6,9 +6,9 @@ from pathlib import Path
 import re
 import sys
 import tarfile
-import tempfile
 
 import review_jvm_task_log as single
+import stream_jvm_task_log as streaming
 
 MAX_MANIFEST_BYTES = 16 * 1024 * 1024
 MAX_ARCHIVE_BYTES = 2 * 1024 ** 3
@@ -17,7 +17,8 @@ MAX_MEMBERS = 100000
 MAX_CASES = 4096
 MAX_LOGS = 8192
 MAX_SAVED_LOG_BYTES = 128 * 1024 * 1024
-MAX_STORED_BYTES = 512 * 1024 * 1024
+MAX_STORED_BYTES = 2 * 1024 ** 3
+MAX_REVIEW_BYTES = 512 * 1024 * 1024
 MAX_INDEX_BYTES = 64 * 1024 * 1024
 CHUNK_BYTES = 1024 * 1024
 DENIED = single.DENIED + ('runtimeSourceBindingProven', 'expectedStudyCaseUniverseProven')
@@ -193,23 +194,53 @@ def extract_logs(manifest, archive_path, output, inventory, storage):
 def review_log(row, output, source_sha):
     report = {'completed': False, 'diagnosticOnly': True, 'sourceSha256': source_sha,
               'taskLogReviewerSourceSha256': hashlib.sha256(Path(single.__file__).read_bytes()).hexdigest(),
+              'streamingReaderSourceSha256': hashlib.sha256(Path(streaming.__file__).read_bytes()).hexdigest(),
               'originalMember': row['originalMember'], 'originalIdentity': row['originalIdentity'],
               'caseIndex': row['caseIndex'], 'inputFiles': {row['originalMember']: row['originalIdentity']},
               **{key: False for key in DENIED}}
     try:
         if row['rawCompressedFile'] is None:
             raise ValueError('Original log exceeds raw retention bounds; complete original archive reference retained')
-        if row['originalIdentity']['size'] > single.MAX_INPUT_BYTES:
-            raise ValueError('Complete saved log exceeds unchanged single-log review input bounds')
         with gzip.open(output / row['rawCompressedFile'], 'rb') as stream:
-            raw = stream.read(single.MAX_INPUT_BYTES + 1)
-        if len(raw) != row['originalIdentity']['size'] or hashlib.sha256(raw).hexdigest() != row['originalIdentity']['sha256']:
-            raise ValueError('Retained compressed log differs from original manifest')
-        report.update(single.inspect_text(raw.decode('utf-8')), completed=True)
+            logs, auxiliary = streaming.parse_stream(stream, row['originalIdentity'])
+        report.update(single.inspect_records(logs, auxiliary), completed=True)
     except Exception as error:
         report['error'] = {'type': type(error).__name__, 'message': str(error)}
     report.update({key: False for key in DENIED})
     return report
+
+
+class ReportLimitExceeded(ValueError):
+    pass
+
+
+def write_compressed_report(path, report, storage, maximum):
+    digest, size = hashlib.sha256(), 0
+    buffer = bytearray()
+    encoder = json.JSONEncoder(separators=(',', ':'))
+    with path.open('wb') as target:
+        storage.account(path, 0)
+        with gzip.GzipFile(filename='', mode='wb', fileobj=target, mtime=0) as compressed:
+            for part in encoder.iterencode(report):
+                raw = part.encode('utf-8')
+                for start in range(0, len(raw), CHUNK_BYTES):
+                    chunk = raw[start:start + CHUNK_BYTES]
+                    size += len(chunk)
+                    if maximum is not None and size > maximum:
+                        raise ReportLimitExceeded('Derived report exceeds streaming output bounds')
+                    digest.update(chunk)
+                    buffer.extend(chunk)
+                    if len(buffer) >= CHUNK_BYTES:
+                        compressed.write(buffer)
+                        buffer.clear()
+                        storage.account(path, target.tell())
+            if buffer:
+                compressed.write(buffer)
+    storage.account(path)
+    uncompressed = {'size': size, 'sha256': digest.hexdigest()}
+    if gzip_identity(path, size) != uncompressed:
+        raise ValueError('Retained report gzip differs from complete derived output')
+    return uncompressed
 
 
 def write_log_report(index, row, report, output, storage):
@@ -218,23 +249,19 @@ def write_log_report(index, row, report, output, storage):
     directory.mkdir(exist_ok=True)
     path = directory / f'log-{index:06d}.json.gz'
     limited = False
-    with tempfile.TemporaryDirectory(prefix='klause-log-report-') as temporary:
-        raw_path = Path(temporary) / 'report.json'
-        try:
-            single.write_report(raw_path, report)
-        except ValueError:
-            limited = True
-            negative = json.loads(raw_path.read_text())
-            negative.update({key: False for key in DENIED})
-            raw_path.write_text(json.dumps(negative, indent=2) + '\n')
-        uncompressed = file_identity(raw_path)
-        with raw_path.open('rb') as stream, path.open('xb') as target:
-            with gzip.GzipFile(filename='', mode='wb', fileobj=target, mtime=0) as compressed:
-                while chunk := stream.read(CHUNK_BYTES):
-                    compressed.write(chunk)
-                    storage.account(path, target.tell())
-        if gzip_identity(path, uncompressed['size']) != uncompressed:
-            raise ValueError('Retained report gzip differs from complete derived output')
+    try:
+        uncompressed = write_compressed_report(path, report, storage, MAX_REVIEW_BYTES)
+    except ReportLimitExceeded:
+        limited = True
+        negative = {'completed': False, 'diagnosticOnly': True, 'sourceSha256': report['sourceSha256'],
+                    'inputFiles': report.get('inputFiles', {}),
+                    'error': {'type': 'OutputLimitExceeded', 'message': 'Derived report withheld; complete raw log retained'},
+                    **{key: False for key in DENIED}}
+        for key in ('taskLogReviewerSourceSha256', 'streamingReaderSourceSha256',
+                    'originalMember', 'originalIdentity', 'caseIndex'):
+            if key in report:
+                negative[key] = report[key]
+        uncompressed = write_compressed_report(path, negative, storage, None)
     row.update(reviewCompressedFile=str(path.relative_to(output)), reviewCompressedIdentity=file_identity(path),
                reviewUncompressedIdentity=uncompressed,
                reviewCompleted=report['completed'] and not limited,

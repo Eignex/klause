@@ -84,7 +84,7 @@ class ReviewJvmTaskLogCohortTest(unittest.TestCase):
             output = root / 'out'
             output.mkdir()
 
-            with patch.object(review.single, 'inspect_text') as inspect, self.assertRaisesRegex(ValueError, 'archive differs'):
+            with patch.object(review.streaming, 'parse_stream') as inspect, self.assertRaisesRegex(ValueError, 'archive differs'):
                 review.extract_logs(manifest, archive, output, {'logs': []}, review.StorageBudget(output))
 
             inspect.assert_not_called()
@@ -108,7 +108,7 @@ class ReviewJvmTaskLogCohortTest(unittest.TestCase):
             path.write_text(json.dumps(manifest))
             report = {'completed': False, 'sourceSha256': 'a' * 64}
             output = root / 'out'
-            with patch.object(review.single, 'inspect_text') as inspect, self.assertRaisesRegex(ValueError, 'member bytes differ'):
+            with patch.object(review.streaming, 'parse_stream') as inspect, self.assertRaisesRegex(ValueError, 'member bytes differ'):
                 review.inspect(path, hashlib.sha256(path.read_bytes()).hexdigest(), archive, output, report)
 
             inspect.assert_not_called()
@@ -192,7 +192,7 @@ class ReviewJvmTaskLogCohortTest(unittest.TestCase):
                        'originalIdentity': {'size': len(payload), 'sha256': hashlib.sha256(payload).hexdigest()},
                        'caseIndex': 0, 'rawCompressedFile': compressed.name}
 
-                with patch.object(review.single, 'MAX_INPUT_BYTES', budget):
+                with patch.object(review.streaming, 'MAX_INPUT_BYTES', budget):
                     report = review.review_log(row, output, 'a' * 64)
                 review.write_log_report(0, row, report, output, review.StorageBudget(output))
 
@@ -260,7 +260,7 @@ class ReviewJvmTaskLogCohortTest(unittest.TestCase):
                 path.write_text(json.dumps(manifest))
                 result = {'completed': False, 'sourceSha256': 'a' * 64}
 
-                with patch.object(review, constraint, 1), patch.object(review.single, 'inspect_text') as inspect:
+                with patch.object(review, constraint, 1), patch.object(review.streaming, 'parse_stream') as inspect:
                     with self.assertRaises(ValueError):
                         review.inspect(path, hashlib.sha256(path.read_bytes()).hexdigest(), archive, root / 'out', result)
 
@@ -275,7 +275,7 @@ class ReviewJvmTaskLogCohortTest(unittest.TestCase):
                       'inputFiles': {'original.xml': {'size': 1, 'sha256': 'b' * 64}}, 'taskLogSpans': ['large']}
             row = {}
 
-            with patch.object(review.single, 'MAX_OUTPUT_BYTES', 1):
+            with patch.object(review, 'MAX_REVIEW_BYTES', 1):
                 review.write_log_report(0, row, report, output, review.StorageBudget(output))
 
             self.assertFalse(row['reviewCompleted'])
@@ -313,7 +313,7 @@ class ReviewJvmTaskLogCohortTest(unittest.TestCase):
             output = root / 'out'
             argv = ['review_jvm_task_log_cohort.py', str(manifest), 'a' * 64, str(archive), str(output)]
 
-            with patch.object(review.sys, 'argv', argv), patch.object(review.single, 'inspect_text') as inspect:
+            with patch.object(review.sys, 'argv', argv), patch.object(review.streaming, 'parse_stream') as inspect:
                 with self.assertRaisesRegex(ValueError, 'manifest differs'):
                     review.main()
 
@@ -333,6 +333,41 @@ class ReviewJvmTaskLogCohortTest(unittest.TestCase):
 
                 with patch.object(review, limit, 0), self.assertRaises(ValueError):
                     review.catalog(path, hashlib.sha256(raw).hexdigest())
+
+    def test_complete_large_log_is_reviewed_without_using_the_legacy_input_cap(self):
+        payload = b"<hotspot_log process='100'>" + b' ' * (16 * 1024 * 1024 + 1) + b'</hotspot_log>'
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            compressed = output / 'raw.xml.gz'
+            with gzip.open(compressed, 'wb') as target:
+                target.write(payload)
+            row = {'originalMember': 'profile9/cases/a/hotspot.xml',
+                   'originalIdentity': {'size': len(payload), 'sha256': hashlib.sha256(payload).hexdigest()},
+                   'caseIndex': 0, 'rawCompressedFile': compressed.name}
+
+            result = review.review_log(row, output, 'a' * 64)
+            review.write_log_report(0, row, result, output, review.StorageBudget(output))
+
+            self.assertTrue(row['reviewCompleted'])
+            self.assertTrue(result['completed'])
+            with gzip.open(output / row['reviewCompressedFile'], 'rt') as source:
+                self.assertEqual(result, json.load(source))
+            self.assertFalse(result['compilerElapsedTimeProven'])
+
+    def test_complete_streamed_report_can_exceed_the_legacy_uncompressed_output_cap(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            report = {'completed': True, 'sourceSha256': 'a' * 64, 'retained': 'x' * (64 * 1024 * 1024 + 1)}
+            row = {}
+
+            review.write_log_report(0, row, report, output, review.StorageBudget(output))
+
+            self.assertTrue(row['reviewCompleted'])
+            self.assertGreater(row['reviewUncompressedIdentity']['size'], 64 * 1024 * 1024)
+            with gzip.open(output / row['reviewCompressedFile'], 'rt') as source:
+                self.assertEqual(report, json.load(source))
+            self.assertEqual(row['reviewUncompressedIdentity'],
+                             review.gzip_identity(output / row['reviewCompressedFile'], review.MAX_REVIEW_BYTES))
 
     def test_retained_gzip_must_decode_completely_within_its_declared_byte_identity(self):
         for changed in ['truncated', 'expanded']:
