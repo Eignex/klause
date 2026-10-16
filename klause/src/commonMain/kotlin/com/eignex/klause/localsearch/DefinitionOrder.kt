@@ -67,6 +67,7 @@ internal fun orderedDefinitions(
 }
 
 internal fun Cancellation.definitionStopped(): Boolean {
+    if (this()) return true
     charge(1)
     return this()
 }
