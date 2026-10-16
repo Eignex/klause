@@ -150,7 +150,8 @@ class SourceDrivenStrategy(
         cancellation: Cancellation,
         evaluation: CompletedMoveEvaluation?,
     ): Move? {
-        evaluation?.begin()
+        val greedyFallback = evaluation != null && feasibleAcceptance == AcceptanceRule.GreedyDescent
+        if (!greedyFallback) evaluation?.begin()
         val stall = schedule.noise as? StallSchedule
         val fraction = if ((schedule.weights != null || stall != null) && scoring != MoveScoring.Break) {
             state.cumulativeRepairFraction()
@@ -177,16 +178,18 @@ class SourceDrivenStrategy(
             closure.close(state, proposed, cancellation)?.let { return it }
         }
 
-        val greedyFallback = evaluation != null && feasibleAcceptance == AcceptanceRule.GreedyDescent
         var completionSeed = collectMoves(state, cancellation, stalled,
             if (evaluation == null || greedyFallback) state.cost else 0L, completionSeeds = evaluation != null)
         if (evaluation != null) {
             if (greedyFallback) {
                 val ordinary = selectMove(state, stall, stalled, null)
+                if (ordinary != null && !evaluation.changesFinite(ordinary)) {
+                    evaluation.retainOrdinary(ordinary)
+                    return ordinary
+                }
+                evaluation.begin()
                 if (ordinary != null) {
-                    if (!evaluation.changesFinite(ordinary) ||
-                        (!evaluation.canAttempt() && evaluation.sample(ordinary) == null)
-                    ) {
+                    if (!evaluation.canAttempt() && evaluation.sample(ordinary) == null) {
                         evaluation.retainOrdinary(ordinary)
                         return ordinary
                     }

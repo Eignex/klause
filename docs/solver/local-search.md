@@ -673,7 +673,9 @@ coordinate touching a continuous factor: a channeling-aware flip, neighbor or do
 endpoint, including directions whose direct objective cost rises. Its proposals retain
 that source's configured phase and pool and use only its remaining proposal cap.
 Real-only guesses do not enter numerical move probing: completion already optimizes
-the real coordinates for the current finite pins. Raw continuous feasibility and
+the real coordinates for the current finite pins. Strict greedy real-only selections
+also bypass finite-proposal cache preparation; the next finite pick checks its current
+incumbent before reusing any cached point. Raw continuous feasibility and
 objective deltas order probes without rejecting that exploration. A violated finite-only row whose selected scoring projection declares
 an exact assignment check declines the pinned proposal before numerical completion;
 continuous changes cannot repair that source violation. Heuristic and unsupported
