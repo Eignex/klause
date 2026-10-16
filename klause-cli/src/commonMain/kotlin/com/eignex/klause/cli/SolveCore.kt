@@ -104,9 +104,9 @@ internal object SolveCore {
                 val result = pipeline.request.solve(params, complete) { sample, value ->
                     if (rawSolvable.optimize) {
                         publication.publish(
-                        pipeline.render(OpenTheoryAssignment.Sampled(sample)),
-                        SourceValue.Rational(value),
-                    )
+                            pipeline.render(OpenTheoryAssignment.Sampled(sample)),
+                            SourceValue.Rational(value),
+                        )
                     }
                 }
                 if (rawSolvable.optimize) {
@@ -136,10 +136,10 @@ internal object SolveCore {
                     )
                     if (common.statistics) {
                         output.onStatistics(
-                        result.stats,
-                        result.stats.run.wallMs + rawSolvable.routingElapsedMs,
-                        if (point == null) 0 else 1,
-                    )
+                            result.stats,
+                            result.stats.run.wallMs + rawSolvable.routingElapsedMs,
+                            if (point == null) 0 else 1,
+                        )
                     }
                 }
                 return
@@ -267,15 +267,17 @@ internal object SolveCore {
                             execution.nativeResource?.let { listOf("transcendentalResource" to it) }.orEmpty()
                     } else {
                         listOf(
-                        "nraWork" to native.workSpent.toString(),
-                        "nraProjectedPolynomials" to native.projectedPolynomials.toString(),
-                        "nraLiftedCells" to native.liftedCells.toString(),
-                    ) + listOfNotNull(
-                        native.dyadicAttempts?.let { "nraDyadicAttempts" to it.toString() },
-                        native.dyadicBases?.let { "nraDyadicBases" to it.toString() },
-                        native.coupledWorkDeclines?.let { "nraCoupledWorkDeclines" to it.toString() },
-                        native.dyadicPreExtractionDeclines?.let { "nraDyadicPreExtractionDeclines" to it.toString() },
-                    ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty()
+                            "nraWork" to native.workSpent.toString(),
+                            "nraProjectedPolynomials" to native.projectedPolynomials.toString(),
+                            "nraLiftedCells" to native.liftedCells.toString(),
+                        ) + listOfNotNull(
+                            native.dyadicAttempts?.let { "nraDyadicAttempts" to it.toString() },
+                            native.dyadicBases?.let { "nraDyadicBases" to it.toString() },
+                            native.coupledWorkDeclines?.let { "nraCoupledWorkDeclines" to it.toString() },
+                            native.dyadicPreExtractionDeclines?.let {
+                                "nraDyadicPreExtractionDeclines" to it.toString()
+                            },
+                        ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty()
                     }
                     output.onAllowanceStatistics(pairs)
                 }
@@ -293,9 +295,9 @@ internal object SolveCore {
                 val result = execution.result
                 output.onVerdictContext(
                     VerdictContext(
-                    terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
-                    completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
-                )
+                        terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
+                        completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
+                    ),
                 )
                 when (result) {
                     is OpenTheoryResult.Sat -> {
@@ -315,17 +317,17 @@ internal object SolveCore {
                     )
                     output.onAllowanceStatistics(
                         listOf(
-                        "nraWork" to execution.stats.workSpent.toString(),
-                        "nraProjectedPolynomials" to execution.stats.projectedPolynomials.toString(),
-                        "nraLiftedCells" to execution.stats.liftedCells.toString(),
-                    ) + listOfNotNull(
-                        execution.stats.dyadicAttempts?.let { "nraDyadicAttempts" to it.toString() },
-                        execution.stats.dyadicBases?.let { "nraDyadicBases" to it.toString() },
-                        execution.stats.coupledWorkDeclines?.let { "nraCoupledWorkDeclines" to it.toString() },
-                        execution.stats.dyadicPreExtractionDeclines?.let {
-                            "nraDyadicPreExtractionDeclines" to it.toString()
-                        },
-                    ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty()
+                            "nraWork" to execution.stats.workSpent.toString(),
+                            "nraProjectedPolynomials" to execution.stats.projectedPolynomials.toString(),
+                            "nraLiftedCells" to execution.stats.liftedCells.toString(),
+                        ) + listOfNotNull(
+                            execution.stats.dyadicAttempts?.let { "nraDyadicAttempts" to it.toString() },
+                            execution.stats.dyadicBases?.let { "nraDyadicBases" to it.toString() },
+                            execution.stats.coupledWorkDeclines?.let { "nraCoupledWorkDeclines" to it.toString() },
+                            execution.stats.dyadicPreExtractionDeclines?.let {
+                                "nraDyadicPreExtractionDeclines" to it.toString()
+                            },
+                        ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty(),
                     )
                 }
                 return
@@ -1048,12 +1050,12 @@ internal object SolveCore {
                     withModelObjective(
                         outcome.stats.copy(
                             presolve = (outcome.stats.presolve ?: PresolveStats()).copy(
-                            effort = presolveEffortStats(
-                                request.presolveConfig,
-                                request.presolveBudget,
-                                result.preparationElapsed,
+                                effort = presolveEffortStats(
+                                    request.presolveConfig,
+                                    request.presolveBudget,
+                                    result.preparationElapsed,
+                                ),
                             ),
-                        )
                         ),
                         solvable,
                         outcome.bestSample,
@@ -1181,12 +1183,12 @@ private fun reportOpenTheoryOptimum(
     fun complete(verdict: Verdict, accepted: Boolean) {
         output.onComplete(
             if (accepted) {
-            verdict
-        } else if (publication.solutions > 0L) {
-            Verdict.BEST_FOUND
-        } else {
-            Verdict.UNKNOWN
-        }
+                verdict
+            } else if (publication.solutions > 0L) {
+                Verdict.BEST_FOUND
+            } else {
+                Verdict.UNKNOWN
+            },
         )
     }
     output.onVerdictContext(

@@ -37,9 +37,9 @@ class SourceSetupTest {
         val selections = mutableMapOf<EncodingTarget, Int>()
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            selections[target] = (selections[target] ?: 0) + 1
-            BuiltInEncoderProvider.select(factor, target)
-        }
+                selections[target] = (selections[target] ?: 0) + 1
+                BuiltInEncoderProvider.select(factor, target)
+            },
         )
         val source = Problem(
             0,
@@ -50,10 +50,10 @@ class SourceSetupTest {
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
 
         assertSame(providers, assertNotNull(invocation.preparedPlan).factorProjections?.providers)
@@ -62,18 +62,18 @@ class SourceSetupTest {
         val replacements = mutableMapOf<EncodingTarget, Int>()
         val replacement = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            replacements[target] = (replacements[target] ?: 0) + 1
-            BuiltInEncoderProvider.select(factor, target)
-        }
+                replacements[target] = (replacements[target] ?: 0) + 1
+                BuiltInEncoderProvider.select(factor, target)
+            },
         )
 
         val overridden = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-            providers = replacement,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+                providers = replacement,
+            ),
         )
 
         assertSame(replacement, assertNotNull(overridden.preparedPlan).factorProjections?.providers)
@@ -87,24 +87,37 @@ class SourceSetupTest {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(3), constant = 7)
         for (engine in listOf(FiniteEngine.FIXED, FiniteEngine.BACKTRACK)) {
-            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
-                ExecutionOperation.OPTIMIZE, engine, objective, maximize = true))
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
+                SourceAttachment(source),
+                ExecutionOperation.OPTIMIZE,
+                engine,
+                objective,
+                maximize = true,
+            )
+            )
             val shape = invocation.finiteShape()
             val publications = ArrayList<Sample>()
 
-            val result = FinitePipeline.solve(FiniteSolveRequest(
+            val result = FinitePipeline.solve(
+                FiniteSolveRequest(
                 shape, engine, PresolveConfig.NONE, false, false, Cancellation.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
                 randomSeed = 3, defaultArms = 1, lpConfig = LpConfig.OFF,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
                 solveBudgetMillis = null, allSolutions = false, solutionCap = null, deadlineExceeded = { false },
                 onEvent = null, onPortfolioEvent = null,
-            ), FiniteSolveCallbacks(publications::add, { publications += it.sample }))
+            ),
+                FiniteSolveCallbacks(publications::add, { publications += it.sample })
+            )
 
             assertSame(objective, assertNotNull(invocation.preparedPlan).objective)
-            assertEquals(-13L, assertNotNull(shape.linearObjective).evaluateLong(
+            assertEquals(
+                -13L,
+                assertNotNull(shape.linearObjective).evaluateLong(
                 Sample(BooleanArray(0), longArrayOf(2)),
-            ))
+            )
+            )
             assertEquals(FiniteSolveVerdict.OPTIMAL, assertIs<FiniteSolveOutcome.Completed>(result.outcome).verdict)
             assertEquals(13L, objective.evaluateLong(publications.last()))
         }
@@ -137,10 +150,10 @@ class SourceSetupTest {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.ENUMERATE,
-            FiniteEngine.FIXED,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.ENUMERATE,
+                FiniteEngine.FIXED,
+            ),
         )
         val shape = invocation.finiteShape()
         val publications = ArrayList<Sample>()
@@ -166,17 +179,17 @@ class SourceSetupTest {
     fun `a captured invocation should reject another source or engine binding`() {
         val first = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.FIXED,
-        )
+                SourceAttachment(Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.FIXED,
+            ),
         )
         val second = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.FIXED,
-        )
+                SourceAttachment(Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.FIXED,
+            ),
         )
 
         assertFailsWith<IllegalArgumentException> {
@@ -193,11 +206,11 @@ class SourceSetupTest {
         var stopped = false
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.FIXED,
-            cancellation = Cancellation { stopped },
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.FIXED,
+                cancellation = Cancellation { stopped },
+            ),
         )
         stopped = true
         var publications = 0
@@ -229,32 +242,32 @@ class SourceSetupTest {
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(program.problem, program.definitionHints),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.LOCAL_SEARCH,
-            assertNotNull(program.linearObjective()),
-        )
+                SourceAttachment(program.problem, program.definitionHints),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.LOCAL_SEARCH,
+                assertNotNull(program.linearObjective()),
+            ),
         )
         val shape = invocation.finiteShape()
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
-            shape.problem,
-            FiniteEngine.LOCAL_SEARCH,
-            shape.linearObjective,
-            PresolveConfig.NONE,
-            preparedPlan = shape.preparedPlan,
-        )
+                shape.problem,
+                FiniteEngine.LOCAL_SEARCH,
+                shape.linearObjective,
+                PresolveConfig.NONE,
+                preparedPlan = shape.preparedPlan,
+            ),
         )
 
         val view = assertNotNull(
             invocation.heuristicHints(
-            preparation.problem,
-            preparation.objective,
-            preparation.sourceMapping,
-            Cancellation.Never,
-            setOf(ExecutionStrategy.LOCAL_SEARCH),
-            assertNotNull(preparation.executionPlan).capabilities,
-        )
+                preparation.problem,
+                preparation.objective,
+                preparation.sourceMapping,
+                Cancellation.Never,
+                setOf(ExecutionStrategy.LOCAL_SEARCH),
+                assertNotNull(preparation.executionPlan).capabilities,
+            ),
         )
         val objective = assertNotNull(view.objective)
         val assignment = Assignment(program.problem.numBoolVars, program.problem.numIntVars)
@@ -277,39 +290,39 @@ class SourceSetupTest {
         val t = program.intVarsByName.getValue("t")
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(
-                program.problem,
-                program.definitionHints,
-                SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(t, x)))),
+                SourceAttachment(
+                    program.problem,
+                    program.definitionHints,
+                    SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(t, x)))),
+                ),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.LOCAL_SEARCH,
+                assertNotNull(program.linearObjective()),
             ),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.LOCAL_SEARCH,
-            assertNotNull(program.linearObjective()),
-        )
         )
         val shape = invocation.finiteShape()
 
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
-            shape.problem,
-            FiniteEngine.LOCAL_SEARCH,
-            shape.linearObjective,
-            PresolveConfig.parse("affine"),
-            explicitPresolveConfig = true,
-            preparedPlan = shape.preparedPlan,
-        )
+                shape.problem,
+                FiniteEngine.LOCAL_SEARCH,
+                shape.linearObjective,
+                PresolveConfig.parse("affine"),
+                explicitPresolveConfig = true,
+                preparedPlan = shape.preparedPlan,
+            ),
         )
         val coordinates = assertNotNull(assertNotNull(preparation.sourceMapping).retainedCoordinates())
         val search = assertNotNull(assertNotNull(shape.searchHints).remapped(coordinates, Cancellation.Never))
         val view = assertNotNull(
             invocation.heuristicHints(
-            preparation.problem,
-            preparation.objective,
-            preparation.sourceMapping,
-            Cancellation.Never,
-            setOf(ExecutionStrategy.LOCAL_SEARCH),
-            assertNotNull(preparation.executionPlan).capabilities,
-        )
+                preparation.problem,
+                preparation.objective,
+                preparation.sourceMapping,
+                Cancellation.Never,
+                setOf(ExecutionStrategy.LOCAL_SEARCH),
+                assertNotNull(preparation.executionPlan).capabilities,
+            ),
         )
 
         assertEquals(-1, coordinates.int(t))

@@ -407,10 +407,10 @@ internal fun FinitePipeline.solve(
     } ?: request.cancellation
     if (request.shape.sourceInvocation != null && stop()) {
         return FiniteSolveResult(
-        FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
-        Duration.ZERO,
-        FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
-    )
+            FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
+            Duration.ZERO,
+            FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
+        )
     }
     val preparationStart = TimeSource.Monotonic.markNow()
     val preparation = prepare(

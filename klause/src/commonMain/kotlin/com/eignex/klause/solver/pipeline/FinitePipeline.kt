@@ -137,14 +137,14 @@ object FinitePipeline {
         }
         if (sourcePlan.decline == PreparedPlanDecline.RESOURCE) {
             return FinitePipelinePreparation(
-            prepared.problem,
-            prepared.objective ?: request.objective,
-            { prepared.mapping.reconstructFrom(prepared.problem, it) },
-            prepared.stats,
-        ).also {
-            it.sourceMapping = prepared.mapping
-            it.executionPlan = sourcePlan
-        }
+                prepared.problem,
+                prepared.objective ?: request.objective,
+                { prepared.mapping.reconstructFrom(prepared.problem, it) },
+                prepared.stats,
+            ).also {
+                it.sourceMapping = prepared.mapping
+                it.executionPlan = sourcePlan
+            }
         }
         val plan = requireNotNull(sourcePlan.componentPlan)
         plan.requireFullFiniteProjection(prepared.problem)

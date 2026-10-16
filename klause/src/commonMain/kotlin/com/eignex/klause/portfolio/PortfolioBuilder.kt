@@ -135,10 +135,10 @@ object PortfolioBuilder {
                 }
                 val completion = if (numericalCompletion) {
                     when (admitted) {
-                    is LocalSearchWorkerConfig -> admitted.withNumericalCompletion()
-                    is AlnsWorkerConfig -> admitted.withNumericalCompletion()
-                    else -> admitted
-                }
+                        is LocalSearchWorkerConfig -> admitted.withNumericalCompletion()
+                        is AlnsWorkerConfig -> admitted.withNumericalCompletion()
+                        else -> admitted
+                    }
                 } else {
                     admitted
                 }
@@ -196,9 +196,8 @@ object PortfolioBuilder {
         objective,
     )
 
-    private fun bindRuntime(worker: PortfolioWorker, binding: EngineInvocation): PortfolioWorker =
-        worker.bindSource(
-            SourceWorkerBinding(
+    private fun bindRuntime(worker: PortfolioWorker, binding: EngineInvocation): PortfolioWorker = worker.bindSource(
+        SourceWorkerBinding(
             EngineInvocation(
                 binding.preparedPlan,
                 binding.model,
@@ -207,8 +206,8 @@ object PortfolioBuilder {
             ),
             sharingInvocation = binding,
             provesResults = worker.permitsSourceProofs,
-        )
-        )
+        ),
+    )
 
     /** Materialise each arm of [buildExplicit] via its own [WorkerConfig.materialize]. The arm index offsets
      *  the seed; [armIds] carries each lane's arm identity purely as attribution metadata; [pools], when
@@ -283,10 +282,10 @@ object PortfolioBuilder {
         return SharedPools(
             if (clausePeers) {
                 SharedClausePool(
-                concurrency.lock(),
-                shareMaxLbd = scenario.clauseShareMaxLbd,
-                shareMaxLen = scenario.clauseShareMaxLen,
-            )
+                    concurrency.lock(),
+                    shareMaxLbd = scenario.clauseShareMaxLbd,
+                    shareMaxLen = scenario.clauseShareMaxLen,
+                )
             } else {
                 null
             },
