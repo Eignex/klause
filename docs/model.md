@@ -232,8 +232,18 @@ the declared numeric source values. Integrality stays exact independently.
 feasibility, completeness or proof authority. `hasOverrides` records changes to the
 interpretation, including range replacements. Results referring to an overridden
 source must retain the effective policy rather than claim the original defaults.
-`SemanticSource<M>` pairs an immutable or borrowed-read-only source payload with
-that capture. The IR types select no route, theory, engine or resource policy.
+`SourceSemanticsOwner` exposes that immutable capture on source models.
+`Problem` retains it separately from `ProblemSettings`; source rewrites, baking,
+presolve views and private source-bound projections preserve it. `ProblemBuilder`
+accepts the capture before emitting a model. `SemanticSource<M>` pairs other
+immutable or borrowed-read-only source payloads with the same contract. The IR
+types select no route, theory, engine or resource policy.
+
+Accepted witness certificates retain the model's semantic capture through
+`Sample.semantics`. An unbound sample has no qualification; changing witness
+coordinates discards both the old certificate and its qualification. An unchanged
+copy preserves them. This metadata adds no checking, claim authority or independent
+proof to the existing witness admission contract.
 
 These value types define the source carrier contract. FlatZinc captures its
 [effective declaration policy](formats/flatzinc.md#declared-semantics-and-caller-ranges)

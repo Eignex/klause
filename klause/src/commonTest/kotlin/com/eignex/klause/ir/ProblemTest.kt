@@ -95,4 +95,26 @@ class ProblemTest {
         assertEquals(holey, rewritten.intDomainOrNull(0))
         assertEquals(0, rewritten.numFactors)
     }
+
+    @Test
+    fun `source rewrites and baking should retain effective semantic policy`() {
+        val semantics = SourceSemantics(SourceFormat.XCSP3).resolve()
+        val source = Problem(
+            0, 1, arrayOf(IntDomain(0, 2)), emptyArray(), semantics = semantics,
+        )
+
+        val views = listOf(
+            source.withSettings(ProblemSettings(largeSpanThreshold = 7)),
+            source.withIntDomains(arrayOf(IntDomain(1, 2))),
+            source.withFactors(emptyArray()),
+            source.withDeclaredIntDomains(SourceIntDomains.ofBounds(source.intBounds)),
+            source.bake(),
+        )
+
+        for (view in views) {
+            assertEquals(semantics.declared, view.semantics.declared)
+            assertEquals(semantics.effective, view.semantics.effective)
+        }
+    }
+
 }

@@ -41,6 +41,7 @@ object RootBaker {
         if (extra === problem.baked) return problem
         return BakedProblem(
             settings = problem.settings,
+            semantics = problem.semantics,
             numBoolVars = problem.numBoolVars,
             numIntVars = problem.numIntVars,
             intDomains = problem.rootIntDomains(),
@@ -345,6 +346,7 @@ object RootBaker {
         return reseed(
             BakedProblem(
                 settings = problem.settings,
+                semantics = problem.semantics,
                 numBoolVars = problem.numBoolVars,
                 numIntVars = problem.numIntVars,
                 intDomains = problem.rootIntDomains(),

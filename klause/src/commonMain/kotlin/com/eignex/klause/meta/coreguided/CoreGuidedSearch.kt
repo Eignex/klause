@@ -399,6 +399,7 @@ internal class CoreGuidedSearch(
         if (nextBool == base.numBoolVars && factors.size == initialFactorCount) return base
         val problem = Problem(
             settings = base.settings,
+            semantics = base.semantics,
             numBoolVars = nextBool,
             numIntVars = base.numIntVars,
             intDomains = base.rootIntDomains(),

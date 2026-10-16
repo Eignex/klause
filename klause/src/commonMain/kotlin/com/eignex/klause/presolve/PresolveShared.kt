@@ -125,6 +125,7 @@ internal object PresolveShared {
         // output (the session re-folds via incremental propagation); an eager input yields an eager rebuild.
         val base = BakedProblem(
             settings = problem.settings,
+            semantics = problem.semantics,
             numBoolVars = numBoolVars,
             numIntVars = problem.numIntVars,
             intDomains = intDomains,

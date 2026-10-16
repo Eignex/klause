@@ -1,10 +1,12 @@
 package com.eignex.klause.lowering
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.defaultIrSemantics
 import com.eignex.klause.ir.withStorage
 
 /**
@@ -14,7 +16,10 @@ import com.eignex.klause.ir.withStorage
  * context, emit factors into [factors], and finish with [build]. Source names remain available to
  * callers that need to decode or render a solution, while the built problem stays name-free.
  */
-internal class ProblemBuilder(private val settings: ProblemSettings = ProblemSettings()) : CnfLowering {
+internal class ProblemBuilder(
+    private val settings: ProblemSettings = ProblemSettings(),
+    private val semantics: EffectiveSourceSemantics = defaultIrSemantics,
+) : CnfLowering {
     override val factors = mutableListOf<Factor>()
     override var trueLitCache: Int = -1
 
@@ -88,6 +93,7 @@ internal class ProblemBuilder(private val settings: ProblemSettings = ProblemSet
 
     fun build(): Problem = Problem(
         settings = settings,
+        semantics = semantics,
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         intDomains = allocatedIntDomains.toTypedArray(),

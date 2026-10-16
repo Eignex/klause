@@ -31,7 +31,7 @@ data class FlatZincProgram(
     /** Source float component identities and approximation reasons. */
     val floatRepresentations: Map<String, FloatRepresentation> = emptyMap(),
     /** Declared defaults and effective caller policy captured before lowering. */
-    val semantics: EffectiveSourceSemantics = flatZincSemantics.resolve(),
+    val semantics: EffectiveSourceSemantics = problem.semantics,
 )
 
 /** Bool-indicator layout of one FlatZinc set variable. */

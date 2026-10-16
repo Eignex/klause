@@ -65,7 +65,8 @@ internal class ClausePrimalProjection private constructor(
                 clauses.add(Clause(remaining))
             }
             var reduced = Problem(
-                source.numBoolVars, 0, emptyArray(), clauses.toTypedArray(), settings = source.settings,
+                source.numBoolVars, 0, emptyArray(), clauses.toTypedArray(),
+                settings = source.settings, semantics = source.semantics,
             )
             val rebuilds = mutableListOf<SourceRebuilds>()
             repeat(2) {
@@ -87,7 +88,10 @@ internal class ClausePrimalProjection private constructor(
                     Lit.make(mapping[Lit.variable(literal)], Lit.isPositive(literal))
                 })
             }.toTypedArray()
-            val problem = Problem(variables.size, 0, emptyArray(), compact, settings = source.settings).bake(token)
+            val problem = Problem(
+                variables.size, 0, emptyArray(), compact,
+                settings = source.settings, semantics = source.semantics,
+            ).bake(token)
             if (cancellation()) return Preparation()
             return Preparation(ClausePrimalProjection(problem, fixed, variables, SourceRebuilds.compose(rebuilds)))
         }

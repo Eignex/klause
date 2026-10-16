@@ -117,6 +117,7 @@ internal object IntBitChannel {
         // so a side the source left open is still open here and no consumer reads the box as a declaration.
         val problem = Problem(
             settings = base.settings,
+            semantics = base.semantics,
             numBoolVars = nextBool,
             numIntVars = nextInt,
             intDomains = base.rootIntDomains() + extraDomains.toTypedArray(),

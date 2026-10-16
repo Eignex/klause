@@ -58,7 +58,9 @@ open class Problem(
     val realUpper: DoubleArray = EmptyDoubleArray,
     /** Captured resource policy; independent of the logical model semantics. */
     val settings: ProblemSettings = ProblemSettings(),
-) {
+    /** Declared defaults and effective caller policy captured before source lowering. */
+    override val semantics: EffectiveSourceSemantics = defaultIrSemantics,
+) : SourceSemanticsOwner {
     /**
      * Model-level bounds of the integer columns. Either side may be absent when a finite search domain
      * was closed by an invented fallback bound. Consumers that reason over the model rather than
@@ -138,6 +140,7 @@ open class Problem(
         realLower: DoubleArray = EmptyDoubleArray,
         realUpper: DoubleArray = EmptyDoubleArray,
         settings: ProblemSettings = ProblemSettings(),
+        semantics: EffectiveSourceSemantics = defaultIrSemantics,
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = intBounds.size,
@@ -149,6 +152,7 @@ open class Problem(
         realLower = realLower,
         realUpper = realUpper,
         settings = settings,
+        semantics = semantics,
     )
 
     /**
@@ -174,6 +178,7 @@ open class Problem(
         packedOpenIntHi: Bits? = null,
         modelBounds: IntBounds? = null,
         settings: ProblemSettings = ProblemSettings(),
+        semantics: EffectiveSourceSemantics = defaultIrSemantics,
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
@@ -192,6 +197,7 @@ open class Problem(
         realLower = realLower,
         realUpper = realUpper,
         settings = settings,
+        semantics = semantics,
     )
 
     /** Overload taking factors as a [List]; they are stored as an [Array]. */
@@ -211,6 +217,7 @@ open class Problem(
         packedOpenIntHi: Bits? = null,
         modelBounds: IntBounds? = null,
         settings: ProblemSettings = ProblemSettings(),
+        semantics: EffectiveSourceSemantics = defaultIrSemantics,
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
@@ -222,6 +229,7 @@ open class Problem(
         realLower = realLower,
         realUpper = realUpper,
         settings = settings,
+        semantics = semantics,
         openIntLo = openIntLo,
         openIntHi = openIntHi,
         packedOpenIntLo = packedOpenIntLo,
@@ -241,6 +249,21 @@ open class Problem(
         realLower = realLower,
         realUpper = realUpper,
         settings = settings,
+        semantics = semantics,
+    )
+
+    internal fun withSourceSemantics(semantics: EffectiveSourceSemantics): Problem = Problem(
+        numBoolVars = numBoolVars,
+        numIntVars = numIntVars,
+        declaredIntDomains = declaredIntDomains,
+        factors = factors,
+        impliedFactorMask = impliedFactorMask,
+        hasSymmetryBreaking = hasSymmetryBreaking,
+        numRealVars = numRealVars,
+        realLower = realLower,
+        realUpper = realUpper,
+        settings = settings,
+        semantics = semantics,
     )
 
     /**
@@ -263,6 +286,7 @@ open class Problem(
         realLower = realLower,
         realUpper = realUpper,
         settings = settings,
+        semantics = semantics,
         modelBounds = intBounds,
     )
 
@@ -287,6 +311,7 @@ open class Problem(
         realLower = realLower,
         realUpper = realUpper,
         settings = settings,
+        semantics = semantics,
     )
 
     /**
@@ -308,6 +333,7 @@ open class Problem(
         realLower = realLower,
         realUpper = realUpper,
         settings = settings,
+        semantics = semantics,
     )
 
     /** Total number of factors. */

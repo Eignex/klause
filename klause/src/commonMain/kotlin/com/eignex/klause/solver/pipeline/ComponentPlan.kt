@@ -158,6 +158,7 @@ class ComponentPlan internal constructor(
         return CpProblemProjection(
             BakedProblem(
                 settings = spec.settings,
+                semantics = spec.semantics,
                 numBoolVars = spec.numBoolVars,
                 numIntVars = domains.size,
                 intDomains = domains,

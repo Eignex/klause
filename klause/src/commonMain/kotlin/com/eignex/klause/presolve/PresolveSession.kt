@@ -316,6 +316,7 @@ internal class PresolveSession(
         liveIds = ids.toIntArray()
         val input = BakedProblem(
             settings = base.settings,
+            semantics = base.semantics,
             numBoolVars = base.numBoolVars,
             numIntVars = base.numIntVars,
             // Once infeasible, expose the pre-conflict domains, not the partially-tightened live ones a
@@ -490,6 +491,7 @@ internal class PresolveSession(
         }
         return BakedProblem(
             settings = base.settings,
+            semantics = base.semantics,
             numBoolVars = base.numBoolVars,
             numIntVars = base.numIntVars,
             intDomains = domains,
