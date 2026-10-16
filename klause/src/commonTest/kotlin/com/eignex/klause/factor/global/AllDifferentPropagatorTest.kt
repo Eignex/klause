@@ -24,6 +24,29 @@ import kotlin.test.assertTrue
 class AllDifferentPropagatorTest {
 
     @Test
+    fun `endpoint bounds filtering should remove fixed clashes without overflowing`() {
+        for (endpoint in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
+            val problem = Problem(0, 2, arrayOf(IntDomain(endpoint, endpoint), IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+                arrayOf(AllDifferent(intArrayOf(0, 1), boundsConsistent = true)))
+            val state = PropagationState(problem, Assumptions.None)
+            state.currentFactor = 0
+
+            assertTrue(problem.propagators[0].propagate(state, 0))
+            assertFalse(endpoint in state.intDomains[1])
+        }
+    }
+
+    @Test
+    fun `wide excepted globals should reject a repeated fixed nonexcepted value`() {
+        val problem = Problem(0, 3, arrayOf(IntDomain(1, 1), IntDomain(1, 1), IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2), exceptSet = longArrayOf(0))))
+        val state = PropagationState(problem, Assumptions.None)
+        state.currentFactor = 0
+
+        assertFalse(problem.propagators[0].propagate(state, 0))
+    }
+
+    @Test
     fun `hall interval should prune the bounds of other vars`() {
         val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 6)
         val problem = Problem(

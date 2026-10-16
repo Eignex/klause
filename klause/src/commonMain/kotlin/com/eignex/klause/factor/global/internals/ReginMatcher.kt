@@ -59,7 +59,8 @@ internal fun reginFilter(
     // the span-safe bounds-consistency filter for plain alldifferent; for the except variant (excepted
     // values may repeat, which bounds consistency cannot model) skip filtering — sound, just no prune.
     if (filteredVars.any { state.intDomains[it].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null }) {
-        return if (exceptSet.isEmpty()) boundsAllDifferentFilter(state, filteredVars, premises, tag) else null
+        return if (exceptSet.isEmpty()) boundsAllDifferentFilter(state, filteredVars, premises, tag)
+        else filterFixedDistinctness(state, filteredVars, exceptSet, premises)
     }
 
     // Unchanged-domains fast path: if the previous fire on this var set succeeded (returned null,

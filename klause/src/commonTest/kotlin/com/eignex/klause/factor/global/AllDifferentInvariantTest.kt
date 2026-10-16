@@ -3,6 +3,7 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.Compound
 import com.eignex.klause.localsearch.Move.IntSet
@@ -14,6 +15,39 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class AllDifferentInvariantTest {
+
+    @Test
+    fun `sparse matching should seed domains spanning the signed word range`() {
+        val problem = Problem(0, 3, arrayOf(
+            IntDomain(Long.MIN_VALUE, Long.MAX_VALUE),
+            IntDomain(Long.MIN_VALUE, Long.MIN_VALUE),
+            IntDomain(Long.MIN_VALUE + 1, Long.MAX_VALUE),
+        ), arrayOf(AllDifferent(intArrayOf(0, 1, 2))))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+
+        assertTrue(state.factors[0].seedFeasible(state, 0))
+        state.recompute()
+
+        assertEquals(Long.MIN_VALUE, state.assignment.intValue(1))
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `wide domain repairs should propose unused values without walking the interval`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1000000000) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2))))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setInt(0, 5)
+        state.assignment.setInt(1, 5)
+        state.assignment.setInt(2, 0)
+        state.recompute()
+        val sink = MoveSink()
+
+        state.factors[0].proposeRepairMoves(state, 0, sink)
+
+        assertTrue(sink.list.isNotEmpty())
+        for (move in sink.list) assertEquals(-1L, state.netDelta(move))
+    }
 
     @Test
     fun `matching seed should succeed where first-fit greedy fails on tight domains`() {

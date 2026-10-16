@@ -4,6 +4,7 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.SymmetricAllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.Relation
@@ -42,6 +43,16 @@ class AllDifferentSeparatorTest {
         val relaxation = CpToLpRelaxation(p, obj).build(session)
         val solution = requireNotNull(RevisedSimplex(relaxation.model).solve())
         return Triple(p, relaxation, solution)
+    }
+
+    @Test
+    fun `optional and excepted globals should not imply unconditional Hall cuts`() {
+        val problem = Problem(1, 3, Array(3) { IntDomain(0, 2) }, arrayOf(
+            AllDifferent(intArrayOf(0, 1, 2), presents = IntArray(3) { Lit.make(0, true) }),
+            AllDifferent(intArrayOf(0, 1, 2), exceptSet = longArrayOf(0)),
+        ))
+
+        assertTrue(allDifferentGroups(problem).isEmpty())
     }
 
     @Test

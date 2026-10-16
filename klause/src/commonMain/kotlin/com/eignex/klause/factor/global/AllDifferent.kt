@@ -9,14 +9,11 @@ import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.FactorReduction.Rewrite
 import com.eignex.klause.ir.FactorReduction.Unchanged
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.ir.hashRemappedKey
-import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -25,10 +22,10 @@ import com.eignex.klause.util.EmptyLongArray
  * `vars(i) != vars(j)` for every pair `i < j` of present positions, except where both take a value of
  * [exceptSet].
  *
- * Propagation is GAC via bipartite matching plus SCC support pruning over the definitely-present
- * positions; positions whose presence is not yet pinned are skipped, so the filtering stays sound if they
- * go absent. With [boundsConsistent], and no presence literals or excepted values, a bounds-consistency
- * filter runs instead.
+ * Finite propagation uses bipartite matching and SCC pruning when live domains can be enumerated,
+ * with bounds or fixed-value deductions for wider domains. Only definitely-present positions filter.
+ * With [boundsConsistent], and no presence literals or excepted values, propagation uses bounds
+ * consistency where endpoint arithmetic permits it.
  *
  * Local search counts, per value, how many present vars hold it; the graded violation is
  * `Σ max(0, count - 1)` — the number of vars that must move to clear every clash — and it is the
@@ -37,10 +34,6 @@ import com.eignex.klause.util.EmptyLongArray
 class AllDifferent(
     /** Integer variable ids required to be pairwise distinct. */
     val vars: IntArray,
-    /** Minimum value across the shared value domain. */
-    val domainMin: Long,
-    /** Number of values in the shared value domain. */
-    val domainSize: Int,
     /** Per-position presence literals; empty for the non-opt fast path. When non-empty,
      *  only present positions are required pairwise-different, and matching-based filtering treats
      *  unpinned-presence positions as "may yet be absent" — they neither demand a matching
@@ -58,9 +51,20 @@ class AllDifferent(
 ) : Factor,
     OptionalFactor {
 
+    /** Retain a distinctness relation from a caller supplying a finite value-window hint. */
+    constructor(
+        vars: IntArray,
+        @Suppress("UNUSED_PARAMETER") domainMin: Long,
+        domainSize: Int,
+        presents: IntArray = EmptyIntArray,
+        exceptSet: LongArray = EmptyLongArray,
+        boundsConsistent: Boolean = false,
+    ) : this(vars, presents, exceptSet, boundsConsistent) {
+        require(domainSize >= 1) { "AllDifferent domainSize must be >= 1, got $domainSize" }
+    }
+
     init {
         require(vars.size >= 2) { "AllDifferent needs at least two variables" }
-        require(domainSize >= 1) { "AllDifferent domainSize must be >= 1, got $domainSize" }
         require(presents.isEmpty() || presents.size == vars.size) {
             "AllDifferent: presents must be empty or match vars arity"
         }
@@ -70,19 +74,13 @@ class AllDifferent(
     private val exceptSorted: LongArray =
         if (exceptSet.isEmpty()) EmptyLongArray else exceptSet.distinct().sorted().toLongArray()
 
-    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.ALL_DIFFERENT, ::buildKey)
-
-    override fun remapStructuralHash(mapping: VarRemap): Int =
-        hashRemappedKey(FactorKind.ALL_DIFFERENT, mapping, ::buildKey)
-
-    private fun buildKey(sink: KeySink) {
-        sink.long(domainMin)
-        sink.int(domainSize)
-        sink.sortedIntVars(vars)
-        sink.sortedBoolLits(presents)
-        sink.constLongs(exceptSorted)
-        sink.bool(boundsConsistent)
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.ALL_DIFFERENT) {
+        pairsByKey(vars) { presents.getOrElse(it) { -1 }.toLong() }
+        longs(exceptSorted)
+        bool(boundsConsistent)
     }
+
+    override fun remapStructuralHash(mapping: VarRemap): Int = remap(mapping).structuralKey().hashCode()
 
     /** Plain distinctness ignores which values are used — invariant under any value relabeling;
      *  an excepted-value set names those values, so it is not value-anonymous. */
@@ -95,8 +93,6 @@ class AllDifferent(
     } else {
         AllDifferent(
             vars,
-            domainMin,
-            domainSize,
             presents,
             LongArray(exceptSet.size) { valueMap(exceptSet[it]) },
             boundsConsistent,
@@ -105,8 +101,6 @@ class AllDifferent(
 
     override fun remap(mapping: VarRemap): Factor = AllDifferent(
         mapping.ints(vars),
-        domainMin,
-        domainSize,
         mapping.lits(presents),
         exceptSet,
         boundsConsistent,
@@ -155,21 +149,10 @@ class AllDifferent(
         val replacement = ArrayList<Factor>(components.size)
         for (group in components) {
             if (group.size < 2) continue
-            var lo = Long.MAX_VALUE
-            var hi = Long.MIN_VALUE
-            for (v in group) {
-                lo = minOf(lo, domains[v].min)
-                hi = maxOf(hi, domains[v].max)
-            }
-            // domainSize is an Int-sized value-span used to size occurrence/matching scratch; a
-            // component whose value range overflows Int can't be represented, so leave the whole
-            // constraint intact rather than emit an unsound split (matching GAC still runs on it).
-            val span = hi - lo + 1
-            if (span > Int.MAX_VALUE) return Unchanged
-            replacement.add(AllDifferent(group.toIntArray(), domainMin = lo, domainSize = span.toInt()))
+            replacement.add(AllDifferent(group.toIntArray()))
         }
         return Rewrite(replacement)
     }
 
-    override val variables: VarList = MixedVars(spanInts = vars, boolVars = OptPresence.presenceVarIds(presents))
+    override val variables: VarList = MixedVars(boundInts = vars, boolVars = OptPresence.presenceVarIds(presents))
 }

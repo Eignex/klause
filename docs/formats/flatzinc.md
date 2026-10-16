@@ -194,3 +194,13 @@ literals, set accumulation, comprehension output and single-generator Cartesian
 products are limited to 1,000,000 elements; one-dimensional concatenation and 2D
 rendering row counts use the same limit. Unsupported sizes, invalid constructors
 and invalid subscripts raise `OznParseException`.
+
+## Wide integer distinctness
+
+`all_different_int` and `alldifferent_except_0` retain `AllDifferent` across finite
+signed-word ranges without an Int-sized union window or pairwise frontend rows.
+The bounds annotation remains factor intent. Native propagation and local search
+select their own bounded or sparse mechanisms; excluded values and source positions
+survive reconstruction. The independent FlatZinc source checker checks plain
+and except-zero distinctness directly from the original coordinates. [Distinct integer positions](../model.md#distinct-integer-positions)
+defines finite enforcement and arithmetic-completion composition.
