@@ -13,6 +13,13 @@ for finite factor and rational coordinate checks. Their exact source restriction
 and specialized affine, algebraic and symbolic checks retain their existing scope;
 a runtime publication or heuristic score supplies no additional authority.
 
+`SourceProofContext.semantics` optionally retains its source owner's typed
+interpretation. Original-IR factories capture it before solving; affine, numeric,
+quadratic and restriction contexts preserve it. Linear source results retain the
+same qualification, including interruption without a witness or claim. This metadata
+adds no premises or checking authority. `SourceScope` continues to delimit revision,
+conditions and objective; a raw context without a semantic owner remains unbound.
+
 `SourceScope` captures original revision and declared semantics, exact invocation
 restrictions, objective identity and direction. Every check compares this scope
 before considering the derivation. Imports must name the same revision, semantics

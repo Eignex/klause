@@ -339,6 +339,13 @@ Native polynomial, nonlinear-integer and transcendental source verdicts retain
 their declared owner's capture. Shared private polynomial views preserve that
 interpretation independently of their execution coordinates.
 
+Direct `OpenTheoryEngine.solve` and `OpenTheoryMinimizer.minimize` results retain
+the model's capture, including early cancellation. `SourceProofContext` captures
+the interpretation when a known source owner builds it; context decoration and
+restriction preserve that capture. `LinearOptimizationResult` retains the context's
+qualification separately from its revision, conditions, checked bounds and terminal
+claim. A manually assembled context can remain unbound.
+
 These value types define the source carrier contract. FlatZinc captures its
 [effective declaration policy](formats/flatzinc.md#declared-semantics-and-caller-ranges)
 before lowering; other frontends still use their format-specific parameters.
