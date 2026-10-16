@@ -693,6 +693,9 @@ the original objective on completed samples, and improving tabu aspiration uses 
 comparison. The recipe retains its acceptance, configuration, schedule and restart
 policies. A selected finite move and completed reals commit as one compound transition;
 its authoritative sample is retained for publication without repeating completion.
+Yielding an incumbent retains that completion's processed identity, avoiding another
+real-coordinate adoption and exact objective comparison when the stream resumes at
+the same point. A different completion is processed before selection or publication.
 Sampled picks at the same completed incumbent retain up to two successful proposal completions;
 changing that incumbent invalidates the cache. Undecided attempts remain retryable.
 An accepted source completion supplies feasible-phase authority even when floating
