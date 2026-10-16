@@ -99,9 +99,11 @@ internal class QfNraQuery(
             yield(null)
             var refuted = false
             val witness = work.probe {
-                refuted = realCount <= MAX_WITNESS_REALS && refutePolynomialSigns(
-                    normalized, arithmetic, MAX_WITNESS_ATOMS, MAX_WITNESS_TERMS,
-                )
+                refuted = realCount <= MAX_WITNESS_REALS && (
+                    refutePolynomialSigns(normalized, arithmetic, MAX_WITNESS_ATOMS, MAX_WITNESS_TERMS) ||
+                        refutePolynomialMagnitudes(normalized, arithmetic, MAX_WITNESS_ATOMS, MAX_WITNESS_TERMS,
+                            MAX_WITNESS_DEGREE, MAX_WITNESS_BITS)
+                    )
                 if (refuted) null else WitnessProbe(normalized, boolCount, arithmetic, algebraic, work)
                     .probeWitness(realCount, fixed, work::coupled)
             }
