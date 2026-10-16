@@ -2205,6 +2205,17 @@ work prefixes, and their component timings establish no default-route speedup.
 Use the alternating bounded-probe profile for deterministic observed/plain parity;
 pair phase attribution with source-matched ordinary CLI records.
 
+Add `pipeline=true` as a second argument to observe source admission and the same
+MIXED/P1/seed3 satisfaction execution used by default CLI polynomial requests.
+That mode records the common termination reason, native/resource and search
+statistics, caller charges and the first containing deadline stack. Its single
+60-second deadline covers admission, preparation and execution. It records a
+pipeline trace instead of direct-query checkpoints or a separate gate inspection.
+The source must select polynomial admission; a linear route fails explicitly.
+Pipeline caller charges include source/search preparation and are separate from
+the native arithmetic snapshot. This mode does not render a CLI model or independently
+validate a source witness. Keep ordinary CLI records for publication/control evidence.
+
 ### Table profiling
 
 ```sh
