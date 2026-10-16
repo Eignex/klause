@@ -321,12 +321,13 @@ Qualification preserves the native verdict and the exact accepted-incumbent rece
 the receipt remains separate from a limit or ray certificate's private witness.
 An execution over a source without a semantic owner remains unbound.
 
-These value types define the source carrier contract. FlatZinc captures its
-[effective declaration policy](formats/flatzinc.md#declared-semantics-and-caller-ranges)
-before lowering; other frontends still use their format-specific parameters.
-Frontend migration and the shared result-qualification surface remain incomplete.
-Implemented publication rules remain in [input semantics](formats.md). Capturing
-the value types alone does not establish witness validity or proof authority.
+File frontends resolve the [common CLI source controls](cli.md#flags) against their
+declared policies and pass typed overrides before lowering. FlatZinc retains its
+[effective declaration policy](formats/flatzinc.md#declared-semantics-and-caller-ranges),
+SMT-LIB its exact declaration ranges, and MPS its effective decimal feasibility policy.
+Formats without an applicable field reject its replacement. Result qualification
+and protocol comments preserve the effective interpretation; publication authority
+remains governed by [input semantics](formats.md) and checked source evidence.
 
 ## Engine projections and factor capabilities
 

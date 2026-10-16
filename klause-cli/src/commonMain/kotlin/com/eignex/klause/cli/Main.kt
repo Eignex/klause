@@ -58,6 +58,9 @@ internal fun runCli(args: Array<String>): Int = try {
     errPrintln("klause-cli: UNSOUND: ${e.message}")
     errPrintln(e.stackTraceToString())
     EXIT_UNSOUND
+} catch (e: IllegalArgumentException) {
+    errPrintln("klause-cli: ${e.message}")
+    EXIT_ERROR
 }
 
 private fun run(args: Array<String>) {

@@ -179,11 +179,10 @@ Solver-control flags are common to **every** mode:
   `lp-root-cuts=false` disables root cut harvesting independently of node separation.
 - `--lp-pricing <policy>` — zero-objective LP entering selection:
   `min-bound-support` (default) or `largest-pivot`.
-- `--exact` — preserve continuous FlatZinc floats and their open bounds; use the shared LRA/LIRA
-  route for supported linear satisfaction models and exact LP certification for continuous objectives.
-  Float constraints without exact lowering are declined. For MPS, require exact certificates instead
-  of accepting continuous leaves by source tolerance. Decimal lowering differences select an exact
-  original-source arithmetic model.
+- `--exact` — require continuous float interpretation and zero source feasibility tolerance
+  for the policies the selected format declares. Already-exact formats retain their exact
+  interpretation. An explicit grid or positive tolerance conflicts with this request. Unsupported
+  exact lowering is declined explicitly. MPS requires source-certified execution under zero tolerance.
 - `--format <name>` / `--mode <name>` — force a mode regardless of file extension.
 - `--param <key>=<value>` — repeatable engine params (unknown/malformed keys are a usage
   error, exit 2):
@@ -357,11 +356,33 @@ MiniZinc-mode-only flags:
 
 - `--ozn FILE` — render output with klause's native `.ozn` applier instead of MiniZinc's
   `solns2out`.
-- `--unbounded-int-lo N` / `--unbounded-int-hi N` — default domain for unbounded `var int`
-  declarations.
-- `--unbounded-float-lo N` / `--unbounded-float-hi N` — search bounds for bucketed `var float`
-  declarations without a range, including array elements. Defaults are `-1000000.0` and `1000000.0`;
-  finite choices and `--exact` preserve open float bounds instead.
+
+Common source controls resolve against the selected format's declared semantics before lowering.
+A control that does not apply is a usage error, including in formats with no matching declarations.
+Each endpoint replaces its default independently; an omitted endpoint retains its default. Explicit
+source bounds remain authoritative.
+
+| Control | Interpretation |
+|---|---|
+| `--unbounded-int-lo N` / `--unbounded-int-hi N` | Default integer declaration endpoints; `open` removes an endpoint, and finite Long extrema stay finite |
+| `--unbounded-real-lo N` / `--unbounded-real-hi N` | Default real declaration endpoints, separate from grid windows; `open` removes an endpoint |
+| `--float-semantics continuous\|grid` | Continuous values or the format's declared grid interpretation |
+| `--float-buckets N` / `--float-scale N` | Default grid point count and float-linear coefficient scale |
+| `--float-grid-lo N` / `--float-grid-hi N` | Finite approximation window for unranged grid floats; aliases `--unbounded-float-lo` / `--unbounded-float-hi` |
+| `--source-absolute-tolerance N` / `--source-relative-tolerance N` | Independently replace source feasibility slack components, retaining the other component |
+| `--pin-absent-optional-values true\|false` | Schema absent-value canonicalization; current file modes reject this inapplicable policy |
+
+Real values accept exact decimals, scientific notation and `numerator/denominator` rationals.
+Decimal source-option exponents are bounded by the input representation; a value is rejected rather
+than rounded. A format can decline precision it cannot represent. Source tolerance uses
+`max(absolute, relative * scale)` with exact integrality, as defined in the
+[typed source contract](model.md#typed-source-semantics).
+
+FlatZinc and SMT-LIB support undeclared numeric defaults. Grid controls apply to FlatZinc;
+SMT-LIB requires continuous values. MPS declares decimal source feasibility tolerance; its parsed
+mathematical bounds are source data. Boolean and finite XCSP3 formats reject inapplicable numeric
+policies. A nondefault effective interpretation is printed as a protocol comment before results,
+including exact rational endpoints. That qualification adds no proof authority.
 
 The [FlatZinc float contract](formats/flatzinc.md#flatzinc-floats) defines finite images,
 conditional linear rows, bucket fallback, expansion limits and exact-mode declines.

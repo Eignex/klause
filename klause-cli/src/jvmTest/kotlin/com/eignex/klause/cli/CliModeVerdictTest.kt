@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.formats.flatzinc.flatZincSemantics
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.FloatSemantics
@@ -30,6 +31,24 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CliModeVerdictTest {
+    @Test
+    fun `source-qualified output should retain rational policy and the selected protocol terminal`() {
+        val semantics = smtLibSemantics.resolve(SemanticOverrides(undeclaredReals = BoundsOverride(
+            upper = BoundOverride.Value(SemanticRational.of(bigIntOf(1), bigIntOf(3))),
+        )))
+
+        val out = capture {
+            SmtLibOutput().sourceQualified(semantics, ";").apply {
+                begin(optimize = false, maximize = false)
+                onComplete(Verdict.UNSATISFIABLE)
+            }
+        }
+
+        assertTrue("; klause-source-semantics: format=SMTLIB" in out, out)
+        assertTrue("unbounded-real-lo=open unbounded-real-hi=1/3" in out, out)
+        assertTrue(out.endsWith("unsat\n"), out)
+    }
+
     @Test
     fun `caller integer bounds should qualify output and withhold default source terminal claims`() {
         val semantics = flatZincSemantics.resolve(
