@@ -17,7 +17,6 @@ internal actual fun <T> parallelRun(tasks: List<() -> T>): List<T> {
     if (tasks.size == 1) return listOf(tasks[0]())
     val workers = List(tasks.size) { Worker.start() }
     try {
-        // Launch each task on its own worker, then join the futures in order.
         val launched = List(tasks.size) { i ->
             workers[i].execute(TransferMode.SAFE, { tasks[i] }) { it() }
         }

@@ -426,7 +426,7 @@ internal fun OpenBooleanCandidate.hints(): SearchCandidateHints =
     SearchCandidateHints.ofLiterals(IntArray(boolVars.size) { Lit.make(boolVars[it], values[it]) })
 
 /**
- * A hint that draws its proposal only once [minSplits] splits have consulted it.
+ * A hint that draws its proposal on the [minSplits]-th split that consults it.
  *
  * The producer costs work before the traversal can use anything, and a model whose Boolean columns
  * propagation settles reaches almost no split at all — so drawing up front spends the allowance exactly
@@ -435,8 +435,8 @@ internal fun OpenBooleanCandidate.hints(): SearchCandidateHints =
  * consultations are the evidence. Nothing is refused for its size, and a search that never reaches the
  * threshold simply never pays.
  *
- * The first [minSplits] splits keep the default order, which is what a hint that had not been drawn yet
- * would have given them anyway.
+ * The splits before that keep the default order, which is what a hint that had not been drawn yet would
+ * have given them anyway.
  */
 internal class DeferredCandidateHints(private val minSplits: Long, private val draw: () -> SearchCandidateHints) :
     SearchCandidateHints {
@@ -539,10 +539,11 @@ internal fun ComponentPlan.booleanSkeleton(
  * Draw one unverified Boolean proposal from this plan's shared clauses, proposing nothing when there is
  * nothing to propose — no shared clause, no assignment reached within [params], or a cancelled draw.
  *
- * The recipe is probSAT: the skeleton is a pure clause model, so a break-driven walk is the arm that fits
- * it, and a fixed seed under a fixed allowance makes the draw reproducible. Root propagation ruling the
- * skeleton out is one more way to have nothing to propose, not a refutation of [source] — the clauses are
- * only part of the model.
+ * The recipe is probSAT (Balint and Schöning, "Choosing Probability Distributions for Stochastic Local
+ * Search and the Role of Make versus Break", SAT 2012, https://doi.org/10.1007/978-3-642-31612-8_3): the
+ * skeleton is a pure clause model, so a break-driven walk is the arm that fits it, and a fixed seed under a
+ * fixed allowance makes the draw reproducible. Root propagation ruling the skeleton out is one more way to
+ * have nothing to propose, not a refutation of [source] — the clauses are only part of the model.
  */
 internal fun ComponentPlan.openBooleanDraw(
     source: Problem,

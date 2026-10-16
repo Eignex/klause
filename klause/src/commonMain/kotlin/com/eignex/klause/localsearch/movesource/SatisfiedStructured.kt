@@ -20,8 +20,8 @@ import com.eignex.klause.localsearch.MoveSink
  *    in the maintained violated set. Iterates only the small elected set, so it stays cheap while
  *    the search is still closing violations.
  *
- * Default CBLS and optimizing SA reserve the first sampled draw for an elected structural global.
- * An empty elected set uses ordinary sampling.
+ * The CBLS and SA-optimizer recipes reserve the first sampled draw for an elected structural global;
+ * an empty elected set uses ordinary sampling.
  *
  * All scopes belong to [Phase.Feasible]: structured moves only matter once the search is at
  * `cost == 0` looking for objective-improving steps.

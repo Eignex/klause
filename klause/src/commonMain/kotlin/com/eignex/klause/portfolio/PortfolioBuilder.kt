@@ -165,11 +165,9 @@ object PortfolioBuilder {
             binding.executionObjective, executionAssumptions = worker.executionAssumptions ?: Assumptions.None),
             sharingInvocation = binding, provesResults = worker.permitsSourceProofs))
 
-    /** Materialise each composed arm via its own [WorkerConfig.materialize] — the shared body of
-     *  [build] and [buildExplicit]. The arm index offsets the seed;
-     *  [armIds] carries each lane's composed-arm identity (replicas share one, see [build]) purely as
-     *  attribution metadata; [pools], when non-null, is shared by every backtrack arm for clause and
-     *  cut exchange. */
+    /** Materialise each arm of [buildExplicit] via its own [WorkerConfig.materialize]. The arm index offsets
+     *  the seed; [armIds] carries each lane's arm identity purely as attribution metadata; [pools], when
+     *  non-null, is shared by every arm. */
     private fun materialize(
         problem: BakedProblem,
         arms: List<WorkerConfig>,
@@ -217,7 +215,7 @@ object PortfolioBuilder {
 
     /**
      * The shared pools for [scenario], or null when sharing doesn't apply (an LS-only portfolio
-     * ignores both). Created once per build and handed to every backtrack arm. The lock is derived
+     * ignores both). Created once per build and handed to every arm. The lock is derived
      * from the executor's concurrency: a no-op on one lane (`Concurrency.None`, zero overhead — the clause pool
      * is just cross-segment memory there) and a platform mutex for several lanes' concurrent writers. The clause
      * pool is present when multiple backtrack workers can exchange clauses; the cut pool only when

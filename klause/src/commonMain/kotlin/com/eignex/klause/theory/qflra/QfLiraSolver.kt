@@ -1655,8 +1655,9 @@ private fun LinearRow.truthUnder(bools: IntArray): Boolean? {
     }
 }
 
-/** The bounded transformed system proves this Boolean/disjunction leaf impossible. */
+/** Outcome of the Double-Bounded Reduction at one Boolean/disjunction leaf. */
 private sealed interface ExactLiraReduction {
+    /** The bounded transformed system proves this leaf impossible. */
     data object Infeasible : ExactLiraReduction
 
     class Bounded(
@@ -1913,9 +1914,11 @@ private data class ExactLiraReductionKey(
 )
 
 /**
- * The bounded phase of Double-Bounded Reduction in mixed-echelon/Hermite coordinates.
+ * The bounded phase of the Double-Bounded Reduction in mixed-echelon/Hermite coordinates; M. Bromberger,
+ * "A Reduction from Unbounded Linear Mixed Arithmetic Problems into Bounded Problems", IJCAR 2018,
+ * https://doi.org/10.1007/978-3-319-94205-6_22.
  *
- * Only nonzero integer columns of the transformed double-bounded system are branched.  Lemma 8
+ * Only nonzero integer columns of the transformed double-bounded system are branched. Lemma 8 of that paper
  * makes each of those coordinates finite; zero columns are deliberately absent from this search and
  * are filled by [ExactLiraReduction.Bounded.extend] after the bounded witness is found.
  */

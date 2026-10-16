@@ -80,6 +80,13 @@ internal class DifferencePathScratch(size: Int) {
     }
 }
 
+/**
+ * Dijkstra shortest paths from [origin] over reduced weights `w(e) + potential(u) - potential(v)`, which
+ * are non-negative under a feasible [potential] (D. B. Johnson, "Efficient algorithms for shortest paths in
+ * sparse networks", J. ACM 24(1), 1977, https://doi.org/10.1145/321992.321993; E. W. Dijkstra, "A note on
+ * two problems in connexion with graphs", Numer. Math. 1, 1959, https://doi.org/10.1007/BF01386390).
+ * Stops once every [needed] node is settled; a negative reduced weight or overflow declines the search.
+ */
 @Suppress("LongParameterList", "ReturnCount")
 internal fun differenceShortestPaths(
     edges: DifferencePathEdges,
@@ -134,7 +141,7 @@ internal fun checkedDifferenceSubtract(a: Long, b: Long): Long? {
     return if (((a xor b) and (a xor difference)) < 0L) null else difference
 }
 
-/* Indexed binary min-heap over [Long] keys; `decrease-key` in place so a vertex is queued once. */
+/** Indexed binary min-heap over [Long] keys; `decrease-key` in place so a vertex is queued once. */
 internal class DifferenceLongHeap(capacity: Int) {
     private val heap = IntArray(capacity)
     private val pos = IntArray(capacity) { -1 }

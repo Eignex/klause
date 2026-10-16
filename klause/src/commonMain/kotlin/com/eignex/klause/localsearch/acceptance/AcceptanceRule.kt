@@ -68,8 +68,9 @@ sealed interface AcceptanceRule {
     }
 
     /**
-     * WalkSAT-style noisy greedy (Selman 1994): with probability [noise] take a uniformly-random
-     * move from the noise pool, otherwise the greedy best over both pools.
+     * WalkSAT-style noisy greedy: with probability [noise] take a uniformly-random move from the noise
+     * pool, otherwise the greedy best over both pools. B. Selman, H. Kautz, B. Cohen, "Noise strategies
+     * for improving local search", AAAI 1994, https://mlanthology.org/aaai/1994/selman1994aaai-noise.
      */
     data class WalkSatNoise(
         /** Probability of taking a uniformly-random noise-pool move instead of the greedy best. */
@@ -90,15 +91,18 @@ sealed interface AcceptanceRule {
             return bestBy(rng, noisePool, scorePool, score)
         }
 
-        /** The adaptive-noise WalkSAT: the steered level *is* the noise probability (Hoos 2002). */
+        /** Adaptive-noise WalkSAT: the steered level *is* the noise probability. H. H. Hoos, "An adaptive
+         *  noise mechanism for WalkSAT", AAAI 2002, https://www.cs.ubc.ca/~hoos/Publ/Hoos02c-err.pdf. */
         override fun steered(level: Double): AcceptanceRule = WalkSatNoise(level)
     }
 
     /**
-     * probSAT roulette (Balint and Schöning 2012): sample the noise pool with weight
-     * `(eps + score + shift)^(-cb)` — low-scored moves get exponentially more mass; the `shift` keeps
-     * the base non-negative when scores go negative. Falls back to the deterministic best over the
-     * score-only pool when the noise pool is empty (score-only moves are never roulette-drawn).
+     * probSAT roulette: sample the noise pool with the polynomial weight `(eps + score + shift)^(-cb)`,
+     * so low-scored moves get more mass; the `shift` keeps the base non-negative when scores go
+     * negative. Falls back to the deterministic best over the score-only pool when the noise pool is
+     * empty (score-only moves are never roulette-drawn). A. Balint, U. Schöning, "Choosing probability
+     * distributions for stochastic local search and the role of make versus break", SAT 2012,
+     * https://doi.org/10.1007/978-3-642-31612-8_3.
      */
     data class ProbSat(
         /** Break exponent: higher sharpens the distribution toward the lowest-scored moves. */
@@ -142,9 +146,11 @@ sealed interface AcceptanceRule {
     }
 
     /**
-     * Skewed-VNS (Hansen et al. 2010): greedy on `score + alpha·moveSize`, admitting a
-     * slightly-worsening move whose spatial reach is small — the mechanism for crossing plateau
-     * lakes. `alpha == 0.0` is exactly [Greedy].
+     * Skewed-VNS acceptance: greedy on `score + alpha·moveSize`, admitting a slightly-worsening move
+     * whose spatial reach is small — the mechanism for crossing plateaus. `alpha == 0.0` is exactly
+     * [Greedy]. P. Hansen, N. Mladenović, J. A. Moreno Pérez, "Variable neighbourhood search: methods
+     * and applications", Annals of Operations Research 175, 2010,
+     * https://doi.org/10.1007/s10479-009-0657-6.
      */
     data class Skew(
         /** Skew weight on move size; larger admits smaller worsening moves (0.0 = strict greedy). */
@@ -170,7 +176,9 @@ sealed interface AcceptanceRule {
      * (`ScheduleBundle.temperature`). The rule is pure: it owns no schedule and does not cool — the
      * driver advances the temperature schedule per pick, keeping acceptance and schedule as
      * independent axes. Falls back to the deterministic best over the score-only pool when the noise
-     * pool is empty (score-only moves are never accepted stochastically).
+     * pool is empty (score-only moves are never accepted stochastically). S. Kirkpatrick, C. D. Gelatt,
+     * M. P. Vecchi, "Optimization by simulated annealing", Science 220, 1983,
+     * https://doi.org/10.1126/science.220.4598.671.
      */
     data object Metropolis : AcceptanceRule {
         override fun choose(

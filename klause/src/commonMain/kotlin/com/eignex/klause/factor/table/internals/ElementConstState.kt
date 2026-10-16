@@ -188,7 +188,7 @@ internal class ElementConstState(
             }
         }
         if (!state.restrictIntToSurvivors(result, resSurvivors.toSortedLongArray())) return false
-        // idxDom.forEach is ascending, so the collected survivors are already sorted for the restriction.
+        // Positions are walked in ascending order, so the collected survivors are already sorted.
         val idxSurvivors = LongArrayList()
         for (pos in 0 until len) {
             val iv = indexOffset + pos.toLong()
@@ -254,7 +254,7 @@ internal class ElementConstState(
     }
 
     // idx removals → decrement support → result values that dropped to zero support. Each of a round's two scans is
-    // its own method so each compiles apart: in one body every loop entered on-stack recompiled the whole of it.
+    // its own method so each compiles apart: in one body, on-stack replacement of any loop recompiles all of it.
     private fun unsupportedResults(state: PropagationState, idxRem: LongArrayList): LongArrayList {
         val resultToExclude = LongArrayList()
         for (i in 0 until idxRem.size) {

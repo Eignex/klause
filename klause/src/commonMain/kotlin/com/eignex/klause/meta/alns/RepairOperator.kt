@@ -42,10 +42,8 @@ internal fun interface RepairOperator {
     fun repair(context: RepairContext): Sample?
 
     companion object {
-        /** Default operator menu: three flip-budget profiles for the inner LS plus a
-         *  greedy-construction filler. The bandit learns which fits the current problem
-         *  class — quick LS probes for problems where a few flips suffice, deep LS repair
-         *  for harder pins, greedy construction for problems with clear local choices. */
+        /** Default operator menu: three flip-budget profiles for the inner LS plus a pure and a noisy
+         *  greedy-construction filler. The bandit learns which fits the current problem. */
         val Defaults: List<RepairOperator> = listOf(
             InnerLsRepair(label = "standard"),
             InnerLsRepair(label = "quick", flipsOverride = 200L),
@@ -93,8 +91,7 @@ internal class InnerLsRepair(val label: String = "standard", val flipsOverride: 
     override fun repair(context: RepairContext): Sample? {
         val params = if (flipsOverride != null) context.params.copy(maxFlips = flipsOverride) else context.params
         val merged = params.withAssumptions(context.pinAssumptions)
-        // Prefer the session when present so weight learning + activity recency
-        // accumulate across iterations; fall back to the bare inner Optimizer otherwise.
+        // The session carries weight learning and activity recency across iterations.
         val result = context.session?.minimize(context.objective, merged)
             ?: context.inner.minimize(context.objective, merged)
         context.recordInnerWork?.invoke(
@@ -109,7 +106,7 @@ internal class InnerLsRepair(val label: String = "standard", val flipsOverride: 
 /**
  * CP repair via the backtrack LCG+LP engine — the hybrid LS+CP move. Pins the complement of the
  * freed set as root assumptions and runs a small bounded branch-and-bound over the freed neighbourhood,
- * so the fragment gets full GAC filtering, clause learning, and LP bounding, unlike the LS/greedy
+ * so the fragment gets full propagation, clause learning, and LP bounding, unlike the LS/greedy
  * repairs. The incumbent objective is wired as [BacktrackParams.objectiveBoundSupplier] so the search
  * prunes against best-known and abandons a hopeless fragment early; only a strictly-improving completion
  * comes back (else null, which ALNS treats as a rejected iteration). [maxDecisions] is the repair budget
@@ -118,8 +115,7 @@ internal class InnerLsRepair(val label: String = "standard", val flipsOverride: 
  */
 internal class BacktrackRepair(val label: String = "standard", val maxDecisions: Long = 2_000L) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
-        // Persistent path: reuse one session + LP across fragments, pruning against the monotone
-        // best-so-far cutoff (the reused session's accumulated objective bounds stay monotone-tightening).
+        // The reused session's accumulated objective bounds only tighten, so it needs the monotone cutoff.
         context.repairSearch?.let {
             val record = context.recordInnerWork
             val before = if (record != null) it.stats.search.nodes.sum.toLong() else 0L
@@ -129,7 +125,6 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
             record?.invoke(it.stats.search.nodes.sum.toLong() - before, 0L)
             return sample
         }
-        // Fallback: a fresh bounded solve per repair, pruning against this iteration's incumbent.
         val engine = context.backtrack ?: return null
         val base = context.backtrackParams ?: return null
         val incumbentObjective = context.objective.evaluate(context.incumbent)
@@ -180,7 +175,7 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
  */
 internal class GreedyConstructionRepair(
     val intDomainSampleCap: Int = 20,
-    /** Textbook ALNS insertion noise (Ropke & Pisinger): each candidate's score is perturbed by a uniform
+    /** ALNS insertion noise (Ropke and Pisinger, see [Alns]): each candidate's score is perturbed by a uniform
      *  draw in `±noise · maxObjectiveCoefficient`, so the greedy fill occasionally takes a non-locally-best
      *  value and diversifies. `0.0` (default) is pure greedy; `~0.1` is the usual diversifying setting. */
     val noise: Double = 0.0,
@@ -194,8 +189,7 @@ internal class GreedyConstructionRepair(
 
         val shaping = context.params.costShaping
         fun currentScore(): Double = shaping.shape(state.cost, context.objective.evaluate(state.assignment.snapshot()))
-        // Noise scaled to the objective magnitude; a fresh signed jitter per candidate. Added to a finite
-        // score only — an infeasible +∞ stays worst, so noise diversifies but never accepts infeasibility.
+        // Added to a finite score only: an infeasible +∞ stays worst, so noise never accepts infeasibility.
         val noiseScale = noise * objectiveScale(context.objective)
         fun jittered(score: Double): Double = if (noiseScale > 0.0 && score.isFinite()) {
             score + noiseScale * (2.0 * context.rng.nextDouble() - 1.0)
@@ -244,17 +238,13 @@ internal class GreedyConstructionRepair(
 }
 
 /**
- * Regret-based repair (Potvin & Rousseau 1993, adapted to CP/LS). For each freed integer
- * variable, compute the *regret* — the gap between the cost of its best feasible value and
- * its second-best. Assign variables in descending regret order: vars with large regret
- * are critical (the wrong choice costs a lot) and should be locked in first; small-regret
- * vars are flexible and slot in later. Booleans assign by best-flip score in arbitrary
- * order — regret is a continuous-domain heuristic.
- *
- * Compared to [GreedyConstructionRepair] (which orders freed vars by shuffle), regret
- * uses problem-aware ordering. On scheduling / packing problems where each var's value
- * has dramatically different costs, regret typically reaches a feasible incumbent in fewer
- * inner LS rounds.
+ * Regret-based repair, after the regret insertion of J.-Y. Potvin and J.-M. Rousseau, "A parallel route
+ * building algorithm for the vehicle routing and scheduling problem with time windows", European Journal
+ * of Operational Research 66(3), 1993, https://doi.org/10.1016/0377-2217(93)90221-8. For each freed
+ * integer variable, the *regret* is the gap between the score of its best sampled value and its
+ * second-best, both measured against the starting assignment; the best values are then applied in
+ * descending regret order. Booleans take a single best-flip pass, as regret over a two-value domain
+ * reduces to that.
  */
 internal class RegretRepair(
     val intDomainSampleCap: Int = 20,
@@ -276,13 +266,11 @@ internal class RegretRepair(
         } else {
             score
         }
-        // Booleans: greedy single pass (regret on a 2-value domain reduces to best-flip).
         for (b in context.freed.bools) {
             val baseline = currentScore()
             state.apply(Move.BoolFlip(b))
             if (jittered(currentScore()) >= baseline) state.apply(Move.BoolFlip(b))
         }
-        // Integers: compute regret per var, sort desc, assign best value in that order.
         data class Slot(val v: Int, val best: Long, val bestScore: Double, val regret: Double)
         val slots = ArrayList<Slot>(context.freed.ints.size)
         for (i in context.freed.ints) {

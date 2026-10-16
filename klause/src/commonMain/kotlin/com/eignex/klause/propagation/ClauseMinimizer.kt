@@ -58,16 +58,15 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
     }
 
     /**
-     * Self-subsuming-resolution clause minimization. After 1UIP produces the learned
-     * clause, any literal `l` whose variable has antecedents fully implied by the rest
-     * of the clause is *redundant* — dropping it yields a strictly stronger clause
-     * (subset of the original under standard resolution rules).
+     * Recursive self-subsuming-resolution clause minimization (N. Sörensson, A. Biere, "Minimizing
+     * Learned Clauses", SAT 2009, https://doi.org/10.1007/978-3-642-02777-2_23). After 1UIP produces
+     * the learned clause, any literal `l` whose variable has antecedents fully implied by the rest
+     * of the clause is *redundant* — dropping it yields a strictly stronger clause.
      *
      * The UIP literal (at [currentLevel]) is never dropped — it's the asserting literal
      * the engine relies on at the backjump level. Other literals are checked via
      * [isRedundant], which walks antecedents recursively with a per-call cache to keep
      * the cost linear in the implication graph reached.
-
      */
     private fun minimize(learned: IntArrayList, currentLevel: Int): IntArrayList {
         if (learned.size <= 1) return learned
@@ -78,8 +77,7 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
             val v = Lit.variable(learned[i])
             if (v < universeSize) inClause[v] = true
         }
-        // Per-call redundancy memo: -1 absent, 0 = non-redundant, 1 = redundant. A primitive
-        // int map avoids boxing the var key and the Boolean value per cached node.
+        // Per-call redundancy memo: -1 absent, 0 = non-redundant, 1 = redundant.
         val cache = redundancyCache
         cache.clear()
         toDrop = scratch(toDrop, universeSize)
@@ -169,9 +167,8 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
      * variable that's *already in the learned clause* ([inClause]) or a level-0 fact.
      * Decision-style leaves (variables with `null` antecedents) make `v` non-redundant.
      *
-     * Cached per variable for the duration of a single [minimize] call — the recursion
-     * depth is bounded by the size of the implication graph reached, but the cache
-     * keeps the total work linear.
+     * Cached per variable for the duration of a single [minimize] call, which keeps the total
+     * work linear in the implication graph reached.
      */
     private fun isRedundant(root: Int, inClause: BooleanArray, cache: MutableIntIntMap): Boolean {
         val numBoolVars = state.problem.numBoolVars
@@ -182,8 +179,8 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
             return false
         }
         // Iterative post-order DFS over the implication graph — recursion overflows the call
-        // stack on deep graphs. The stack holds the root-to-current
-        // path; a node is redundant iff all its antecedents are redundant / in-clause / level-0.
+        // stack on deep graphs. The stack holds the root-to-current path; a node is redundant
+        // iff all its antecedents are redundant / in-clause / level-0.
         redVarStack.clear()
         redIdxStack.clear()
         redAntStack.clear()

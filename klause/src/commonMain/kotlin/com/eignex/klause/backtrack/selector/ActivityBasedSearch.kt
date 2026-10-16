@@ -8,7 +8,8 @@ import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 
 /**
- * Activity-based search (Michel–Van Hentenryck 2012). Picks `argmax activity(v) / dom(v)`
+ * Activity-based search (Michel and Van Hentenryck, "Activity-Based Search for Black-Box Constraint
+ * Programming Solvers", CPAIOR 2012, https://doi.org/10.1007/978-3-642-29828-8_15). Picks `argmax activity(v) / dom(v)`
  * over unpinned variables. [PropagationResult.Implied] bumps variables forced into singletons;
  * partial domain reductions do not contribute.
  *
@@ -29,8 +30,7 @@ internal class ActivityBasedSearch(
 
     private var increment: Double = 1.0
 
-    // Combined bool+int heap keyed on raw activity; dom(v) divider applied at pick time.
-    // Shares [pickByActivityWithDomDivider] with [DomWdeg].
+    // Combined bool+int heap keyed on raw activity; the dom(v) divider applies at pick time.
     private var heap: IndexedMaxHeap? = null
     private var numBoolCached: Int = 0
     private var numIntCached: Int = 0

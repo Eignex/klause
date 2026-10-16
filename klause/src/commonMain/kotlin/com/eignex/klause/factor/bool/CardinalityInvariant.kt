@@ -17,7 +17,7 @@ internal class CardinalityInvariant(
     private val max: Int,
 ) : Invariant {
 
-    /** Signed contribution of each variable to the count, built from [literals]. */
+    /** Signed contribution of each variable to the count. */
     private val signedByVar: IntLongMap = buildSignedLitsByVar(literals)
 
     private fun signedForVar(v: Int): Long = signedByVar[v]
@@ -30,8 +30,8 @@ internal class CardinalityInvariant(
         state.longPayload[factorId] = count
     }
 
-    /** Cached max |`signedByVar[v]`| across `boolVars`. Bounds the change `n` can
-     *  see from a single flip, used by [updateBoolBreakMakeForFlip]'s early-out. */
+    /** max |signedByVar(v)| over [boolVars]: bounds the count change of a single flip, for
+     *  [updateBoolBreakMakeForFlip]'s early-out. */
     private val maxAbsSigned: Long = run {
         var m = 0L
         for (v in boolVars) {
@@ -150,8 +150,8 @@ internal class CardinalityInvariant(
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
-    /** Adjust break/make counts after [flippedVar] has been flipped. Fast-path early-out
-     *  when both pre- and post-flip counts sit strictly inside the interior. */
+    /** Adjust break/make counts after [flippedVar] has been flipped. Early-out when both pre- and post-flip
+     *  counts sit at least [maxAbsSigned] inside `[min, max]`, where no single flip can change violation. */
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val signedFlipped = signedForVar(flippedVar)
         if (signedFlipped == 0L) return

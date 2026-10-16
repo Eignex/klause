@@ -86,8 +86,8 @@ internal class RegularExplainer(
             markCanAccept()
         }
 
-        // The two sweeps are separate methods so each compiles apart: in the initializer every loop entered on-stack
-        // recompiled the whole of it.
+        // The two sweeps are separate methods so each compiles apart: in one initializer, on-stack replacement of
+        // any loop recompiles all of it.
         private fun markReachable() {
             if (q0 in 1..numStates) fwd[0][q0] = true
             for (i in 0 until n) {

@@ -36,12 +36,10 @@ internal class ReifiedLinearInvariant(
         return reifiedDegreeFor(sum, aux, state.violationSoftCap)
     }
 
-    /** Violation degree for the reified linear given [sum], reification value [aux], and [softCap]. */
     private fun reifiedDegreeFor(sum: Long, aux: Boolean, softCap: Int): Int =
         reifiedDegree(aux, linearHolds(sum, op, bound)) { linearDegree(sum, op, bound, softCap) }
 
-    // The pre-move degree `degreeFor(sum, aux)` is the factor's current violation degree, already
-    // maintained in factorDegree — reuse it instead of re-running the residual/compression.
+    // The pre-move degree is already maintained in factorDegree; reuse it instead of recomputing.
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val sum = state.longPayload[factorId]
         val aux = state.assignment.boolValue(auxBoolVar)
@@ -99,7 +97,7 @@ internal class ReifiedLinearInvariant(
             if (c == 0L) continue
             val cur = state.assignment.intValue(v)
             val sumWithout = sum - c * cur
-            // Same-aux snap: shift body so the predicate matches the current aux.
+            // Shift the body so the predicate matches the current aux.
             val targetSame = snapLinearTarget(op, bound, c, sumWithout, aux)
             if (targetSame != null) {
                 val clamped = state.rootDomains[v].clamp(targetSame)
@@ -107,8 +105,7 @@ internal class ReifiedLinearInvariant(
                     sink.addChannelingIntSet(state, v, clamped)
                 }
             }
-            // Toggle-driven sub-region exploration: flip aux *and* shift body so the
-            // predicate matches the flipped aux.
+            // Flip aux and shift the body so the predicate matches the flipped aux.
             val targetOpp = snapLinearTarget(op, bound, c, sumWithout, !aux)
             if (targetOpp != null) {
                 val clamped = state.rootDomains[v].clamp(targetOpp)

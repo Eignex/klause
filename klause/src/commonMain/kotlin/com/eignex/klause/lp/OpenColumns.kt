@@ -55,8 +55,10 @@ internal fun relationOfLinear(f: Linear): Relation? = when (f.op) {
     else -> null
 }
 
-/** Row terms over the split column pairs: a variable represented `x = x⁺ − x⁻` contributes both halves.
- *  Only a 64-bit integer row has terms this builds. */
+/**
+ * Row terms over the split column pairs: a variable represented `x = x⁺ − x⁻` contributes both halves.
+ * Null for a row without 64-bit integer coefficients.
+ */
 internal fun splitTerms(f: Linear, posCol: IntArray, negCol: IntArray): Pair<IntArray, LongArray>? {
     val row = f.integerConstants ?: return null
     var extra = 0

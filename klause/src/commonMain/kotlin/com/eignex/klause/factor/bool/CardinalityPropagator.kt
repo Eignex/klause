@@ -14,10 +14,9 @@ internal class CardinalityPropagator(
     private val max: Int,
 ) : Propagator {
 
-    /** Number of literals to watch on the at-least-min side (0 if min == 0, else min+1).
-     *  Capped to [literals].size; oversize means "all literals must be true" which the
-     *  watched scheme can't represent, in which case [initialBoolWatchers] returns null
-     *  and the general scanner handles it. */
+    /** Number of literals to watch on the at-least-min side (0 if min == 0, else min+1), or -1 when
+     *  `min + 1` exceeds the literal count ("all literals must be true"), which the watched scheme
+     *  can't represent; [initialBoolWatchers] is then null and the general scanner handles it. */
     private val atLeastWatchSize: Int =
         if (min == 0) 0 else (min + 1).let { if (it > literals.size) -1 else it }
 
@@ -31,7 +30,9 @@ internal class CardinalityPropagator(
         }
 
     /**
-     * Watched-literal opt-in. Generalises clause's two-watch scheme to cardinality:
+     * Watched-literal opt-in. Generalises the clause two-watch scheme to cardinality (Chai and Kuehlmann,
+     * "A fast pseudo-Boolean constraint solver", IEEE TCAD 24(3), 2005,
+     * https://doi.org/10.1109/TCAD.2004.842808):
      *  - At-least-min side: watch `min + 1` literals; the constraint stays alive while
      *    all are non-false. When one becomes false and no non-false replacement exists,
      *    the remaining `min` must all be true → unit-propagate them.
@@ -40,7 +41,7 @@ internal class CardinalityPropagator(
      *    replacement exists, the remaining `n - max` must all stay false → force them.
      *
      * Falls back to occurrence-list wakeup (returns `null`) when either side wants
-     * more watches than the clause has literals (degenerate: `min == n` or `max == 0`),
+     * more watches than the constraint has literals (degenerate: `min == n` or `max == 0`),
      * or when both sides are trivial (`min == 0 && max == n`). The general scanner in
      * [propagate] handles those cases correctly without watched-literal bookkeeping.
      */
@@ -49,7 +50,7 @@ internal class CardinalityPropagator(
         if (atLeastWatchSize == 0 && atMostWatchSize == 0) return@run null
         val out = IntArray(atLeastWatchSize + atMostWatchSize)
         var w = 0
-        // At-least watch set: positive literals at the first `min + 1` positions.
+        // At-least watch set: the first `min + 1` literals.
         for (i in 0 until atLeastWatchSize) out[w++] = literals[i]
         // At-most watch set: negations of the first `n - max + 1` positions.
         for (i in 0 until atMostWatchSize) out[w++] = Lit.negate(literals[i])
@@ -145,7 +146,6 @@ internal class CardinalityPropagator(
             }
         }
         if (!found) return false
-        // Forced-true own-literal ⇒ at-least side needed it; forced-false ⇒ at-most side.
         return if (occ == forcedLit) loadAtLeast() else loadAtMost()
     }
 

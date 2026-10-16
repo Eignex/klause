@@ -65,8 +65,7 @@ interface SolverParams {
  *    timeout, etc.).
  */
 sealed interface SolveResult {
-    /** Snapshot of solver-side counters for this run. Defaults to [SolveStats.EMPTY] for
-     *  backends that haven't opted in; populated by backends that have. */
+    /** Snapshot of solver-side counters for this run; [SolveStats.EMPTY] from backends that record none. */
     val stats: SolveStats
 
     /** Optional original-source claims and derivations; null when capture was not requested. */
@@ -81,9 +80,8 @@ sealed interface SolveResult {
     ) : SolveResult
 
     /**
-     * Proven infeasible. [core] is an optional jointly-unsat subset of factor ids; backends
-     * that compute one populate it, backends that don't leave
-     * it `null`. `Unsat()` (no core) is a valid construction.
+     * Proven infeasible. [core] is an optional jointly-unsat subset of factor ids, `null` from
+     * backends that do not compute one.
      */
     data class Unsat(
         val core: UnsatCore? = null,

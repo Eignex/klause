@@ -70,7 +70,6 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
         repeat(numVars) {
             val dist = shortestPath(prevEdge) ?: return Result.infeasible()
             total = addExact(total, dist)
-            // Augment one unit along the path source→sink.
             var v = sink
             while (v != source) {
                 val e = prevEdge[v]

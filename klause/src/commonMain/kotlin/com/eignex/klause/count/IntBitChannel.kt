@@ -23,8 +23,8 @@ import com.eignex.klause.util.EmptyIntArray
  *
  * The map value → bits is a bijection on the in-domain values (binary representation is unique, and
  * `x`'s own domain rules out any pattern that lands outside `[min, max]` or on a hole). So counting
- * distinct feasible bit patterns equals counting distinct integer values — the exactness argument
- * that bit-blasting relied on, kept while every original constraint stays native.
+ * distinct feasible bit patterns equals counting distinct integer values, while every original
+ * constraint stays native.
  *
  * Only the requested `intVars` are channelled; all other variables and every factor are carried
  * through unchanged, so globals keep their own propagators.
@@ -79,8 +79,8 @@ internal object IntBitChannel {
                 continue
             }
 
-            // Linear: 1·x + Σ (-2^i)·c(i) == min  ⇔  x = min + Σ 2^i·c(i). Long bit weights: `1 shl i`
-            // overflows Int past bit 30, and a wide domain needs a ~50-bit channel.
+            // Linear: 1·x + Σ (-2^i)·c(i) == min  ⇔  x = min + Σ 2^i·c(i). Long bit weights: a wide
+            // domain needs a channel past bit 30, where `1 shl i` overflows Int.
             val coeffs = LongArray(width + 1)
             val vars = IntArray(width + 1)
             coeffs[0] = 1

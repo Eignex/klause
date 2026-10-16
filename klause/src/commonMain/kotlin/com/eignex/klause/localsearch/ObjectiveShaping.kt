@@ -36,7 +36,7 @@ class ObjectiveShaping {
      * [LinearObjective], leaf vars of a [FunctionalObjective], empty for any other shape or a
      * satisfiability problem. Recomputed only when [objective] changes. This is the *objective*
      * hot-spot set: the feasible-phase analogue of the violated-factor bias the infeasibility-phase
-     * sources already use, so an objective-descent structural move can concentrate on variables that
+     * sources use, so an objective-descent structural move can concentrate on variables that
      * actually move the objective rather than swapping objective-irrelevant pairs.
      */
     val objectiveIntVars: IntArray

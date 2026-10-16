@@ -7,8 +7,7 @@ import com.eignex.klause.solver.incumbent.IncumbentExchange
  * One local-search-class engine's two-way participation in the shared verified-incumbent
  * [IncumbentExchange]: [publish] offers each improvement the engine finds, [poll] hands one back when
  * it is *fresh* (a version this caller has not imported) and strictly better than the caller's own
- * best. [LocalSearchSolver] adopts the assignment as a restart anchor. ALNS validates startup and
- * neighborhood imports against its captured assumptions through the shared finite witness checker.
+ * best. [LocalSearchEngine] adopts the assignment as a restart anchor.
  *
  * Publication goes through [IncumbentExchange.offer] and nowhere else, so what becomes an incumbent is
  * decided by the exchange's verifier and its strict-improvement test — never by the engine's local

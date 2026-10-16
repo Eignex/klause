@@ -17,23 +17,23 @@ import kotlin.random.Random
  * Bake-time root probing, owned by the presolve lane rather than the immutable model.
  *
  * The propagation projection performs the cheap unconditional base bake. The heavier failed-literal /
- * SAC probing tiers — which are only ever enabled by the compile / presolve layers — live here so the
- * engine never depends on `presolve` (the `solver → presolve → solver` cycle the package split exists
- * to prevent).
+ * singleton arc consistency (SAC) probing tiers, enabled only by the compile / presolve layers, live here
+ * so the engine never depends on `presolve`.
  *
  * [bake] runs the probing fixpoint against an already-base-baked [BakedProblem] and returns the accumulated
- * deductions. The pipeline builds a fresh [BakedProblem] with them, so the propagation projection
- * carries the probing pins, bound tightenings, and holes.
+ * deductions; [reseed] builds a [BakedProblem] carrying them.
+ *
+ * SAC: Debruyne and Bessière, "Some Practicable Filtering Techniques for the Constraint Satisfaction
+ * Problem", IJCAI 1997, https://mlanthology.org/ijcai/1997/debruyne1997ijcai-some
  */
 object RootBaker {
 
     /**
      * Re-seed a base-baked [problem] with the [config]-enabled probing tiers: run [bake] and, when it
-     * found extra deductions, return a fresh folded [BakedProblem] over the same factors and domains.
-     * Returns [problem] unchanged when no tier is enabled, the problem is
-     * an already-folded pass view (which never bakes), or the base bake is already `Unsat`. This is
-     * the central re-probe point for the presolve fresh path and the LP harvest — the kernel never
-     * initiates it, so no `solver → presolve` cycle.
+     * found extra deductions, return a folded [BakedProblem] over the same factors and domains.
+     * Returns [problem] unchanged when no tier is enabled, the problem is an already-folded pass view
+     * (which never bakes), or the base bake is already `Unsat`. The kernel never initiates it, so the
+     * engine carries no dependency on presolve.
      */
     fun reseed(problem: BakedProblem, config: BakeConfig): BakedProblem {
         if (!config.anyEnabled || problem.alreadyFolded) return problem
@@ -73,8 +73,6 @@ object RootBaker {
         val base = problem.baked
         if (base !is PropagationResult.Implied) return base
         if (!config.anyEnabled) return base
-        // SAC probing fires `propagate` repeatedly; stop entering new probe phases once the bake
-        // deadline has passed (each phase below also polls between its own probes).
         if (problem.cancellation()) return base
         var result: PropagationResult = base
         if (config.probeFailedLiterals) {
@@ -123,8 +121,6 @@ object RootBaker {
                 val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
                 if (curMin >= curMax) continue
                 val accAsAssumptions = acc.toAssumptions()
-                // Build a per-var hole-set once so the `alreadyHole` lookup in the k-loop is O(1)
-                // instead of a linear scan of acc.intHoleVarIds for every probed k.
                 val existingHoles = LongHashSet()
                 for (i in 0 until acc.intHoleVarIds.size) {
                     if (acc.intHoleVarIds[i] == v) existingHoles.add(acc.intHoleValues[i])
@@ -157,12 +153,11 @@ object RootBaker {
         return acc
     }
 
-    /** Probe-order heuristic: wdeg / dom — sort descending by `Σ factorWeights(f) / dom(v)` so the
-     *  budget is spent first on vars that are heavily-constrained relative to their remaining domain.
-     *  Each Unsat probe bumps the weights of the factors in its conflict via [bumpFactorWeights], so
-     *  failing probes steer the next pass toward related vars (the classic wdeg adaptation). Ties break
-     *  by a per-pass random key (deterministic for a given seed) — this avoids the deterministic-id-order
-     *  bias the prior dom-sized order would inherit when every var has the same dom and weight. */
+    /** Probe order: descending `Σ factorWeights(f) / dom(v)`, so the budget is spent first on vars that
+     *  are heavily constrained relative to their remaining domain. Each Unsat probe bumps the weights of
+     *  the factors in its conflict via [bumpFactorWeights], steering the next pass toward related vars
+     *  (Boussemart, Hemery, Lecoutre and Sais, "Boosting Systematic Search by Weighting Constraints",
+     *  ECAI 2004). Ties break by a seeded per-pass random key, avoiding variable-id order bias. */
     private fun sacProbeOrder(
         problem: BakedProblem,
         acc: PropagationResult.Implied,
@@ -193,9 +188,7 @@ object RootBaker {
         return IntArray(numIntVars) { boxed[it] }
     }
 
-    /** Bump every factor implicated in an Unsat conflict by 1.0. This is the wdeg update rule: factors
-     *  that repeatedly fail under hypothetical pins gain weight and steer the SAC probe order toward the
-     *  vars they mention on subsequent passes. */
+    /** Bump every factor implicated in an Unsat conflict by 1.0, the wdeg update rule. */
     private fun bumpFactorWeights(unsat: PropagationResult.Unsat, factorWeights: DoubleArray) {
         for (f in unsat.conflictFactors) {
             if (f in factorWeights.indices) factorWeights[f] += 1.0
@@ -204,7 +197,7 @@ object RootBaker {
 
     /**
      * Bound-SAC fixed-point loop. Probes the min and max of each multi-value int var under the current
-     * [base]; an Unsat result lets us tighten that bound by one and re-probe. Returns the strengthened
+     * [base]; an Unsat result tightens that bound by one and re-probes. Returns the strengthened
      * [PropagationResult.Implied], or `Unsat` if the problem turns out to be infeasible.
      */
     private fun probeBoundSac(
@@ -347,7 +340,7 @@ object RootBaker {
                 factors.add(Clause(intArrayOf(Lit.make(0, false)))) // b0 = false
             }
 
-            else -> return problem // no variable to pin a contradiction on (a variable-free problem)
+            else -> return problem // no variable to pin a contradiction on
         }
         return reseed(
             BakedProblem(

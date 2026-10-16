@@ -7,12 +7,13 @@ import kotlin.random.Random
  * stalls (no strict cost drop for [bumpAfter] steps) it **bumps** every currently-violated factor's
  * weight by [increment] (resistant constraints get heavier, reshaping the gradient) and optionally
  * **relaxes** every weight back toward its seeded baseline (so stale escalations fade and the
- * gradient doesn't grow without bound).
- * Raw/weighted source-driven repair also recognizes a lower unweighted Cumulative fraction
- * at equal cost, so within-bucket overload reductions postpone bumps.
+ * gradient doesn't grow without bound). A lower unweighted Cumulative fraction at equal cost also
+ * counts as progress, so within-bucket overload reductions postpone bumps.
  *
- * It unifies two weight regimes of the same family — `Cbls`'s SAPS-style bump + probabilistic
- * smoothing and `FeasibilityJump`'s bump + geometric decay. Both relaxations are
+ * It unifies two weight regimes of the same family — `Cbls`'s bump + probabilistic smoothing (after
+ * F. Hutter, D. A. D. Tompkins, H. H. Hoos, "Scaling and probabilistic smoothing: efficient dynamic
+ * local search for SAT", CP 2002, https://doi.org/10.1007/3-540-46135-3_16) and `FeasibilityJump`'s
+ * bump + geometric decay. Both relaxations are
  * `w ← target + (w − target)·`[relaxKeep] with `target =` [relaxTargetScale]`·base`:
  *
  *  - **FeasibilityJump**: [relaxKeep]`= weightDecay`, [relaxTargetScale]`= 1`, [relaxProbability]`= 1`,

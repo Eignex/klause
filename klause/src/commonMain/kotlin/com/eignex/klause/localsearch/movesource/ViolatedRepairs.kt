@@ -41,7 +41,7 @@ class ViolatedRepairs(
         /** Catalog id for the extended variant (opt-in richer repairs). */
         val EXTENDED_ID: MoveSourceId = MoveSourceId("extended-repairs")
 
-        /** Single-factor draw — the WalkSAT/probSAT opener. */
+        /** Single-factor draw, the focused WalkSAT/probSAT/SA opener. */
         val SINGLE: ViolatedRepairs = ViolatedRepairs(sampleCount = 1)
 
         /** Extended (opt-in) variant drawing each factor's extended repair moves. */

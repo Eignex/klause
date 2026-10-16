@@ -58,8 +58,8 @@ sealed interface SatisfyResult {
  * On `Unsat`, the assumption subset returned in [SatisfyResult.UnsatUnderAssumptions.core]
  * is sound (jointly infeasible with the hard constraints) but not guaranteed minimal.
  * The [BacktrackSolver] override drives the seed phase manually so seed-time conflicts
- * yield the applied prefix as a core; deeper conflicts (after seed succeeded) fall back to the
- * full input assumption set.
+ * yield the applied prefix as a core; deeper conflicts use the engine's assumption core, falling
+ * back to the full input assumption set (minimized when [minimizeCore] is set) when it has none.
  */
 fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
     assumptions: Assumptions,
@@ -94,8 +94,8 @@ fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
  * Backtrack-specific path: run the bake check + seed phase by hand so a seed-time
  * conflict retains the applied prefix of [assumptions], including the transitive premises
  * of propagated deductions. If the seed succeeds we fall through
- * to a normal `solve(withAssumptions)` for the DFS phase; an exhaustive-UNSAT verdict
- * there returns the full assumption set (conservative but sound).
+ * to a normal `solve(withAssumptions)` for the DFS phase; an UNSAT verdict there returns the
+ * engine's assumption core, or the full assumption set when it reports none.
  */
 private fun satisfyUnderAssumptionsBacktrack(
     solver: BacktrackSolver,
@@ -127,7 +127,6 @@ private fun satisfyUnderAssumptionsBacktrack(
             projectSeedConflictToAssumptions(assumptions, seedResult.conflictLevels),
         )
     }
-    // Seed cleanly applied — defer to the engine's normal solve path for the DFS phase.
     // Engine cores retain a refuted seed prefix or the full input after tree exhaustion.
     val merged = params.withAssumptions(assumptions)
     return when (val r = solver.solve(merged)) {

@@ -63,7 +63,7 @@ class EncodingAffineExpression(
 
 /** Complete Boolean structure over exact comparisons, including private formula names. */
 sealed class LinearEncodingFormula {
-    /** A source-coordinate conjunction or disjunction with its existing reification semantics. */
+    /** A source-coordinate conjunction or disjunction with its reification semantics. */
     class Relation(
         /** Complete relation in source coordinates. */
         val form: LinearForm,
@@ -79,7 +79,7 @@ sealed class LinearEncodingFormula {
         /** Whether an inequality excludes equality. */
         val strict: Boolean = false,
     ) : LinearEncodingFormula()
-    /** A private guard's complete defining formula. */
+    /** A reference to a private guard, standing for its defining formula. */
     class Guard(
         /** Name allocated and defined by this installation. */
         val guard: EncodingGuard,

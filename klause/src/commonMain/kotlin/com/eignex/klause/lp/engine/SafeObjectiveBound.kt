@@ -66,9 +66,9 @@ internal fun BigFraction.lowerBoundDouble(): Double? {
  * unbounded in that direction. The model's objective must be that single column with cost `±1` and no
  * constant (max is set up as minimizing `−x`). Rigorous under float error via [safeObjectiveLowerBound],
  * then floored (max) / ceiled (min) to an integer. Retained models read live endpoints in their exact
- * source coordinates. **Reject-at-cap:** an optimum that only rode the
- * column to its [LP_UNBOUNDED_PROBE] frontier — the private stand-in for `±∞` on a [LpBuilder.addFreeVar]
- * side — is reported unbounded (null), never as a spurious bound at the probe magnitude. [clamped]
+ * source coordinates. **Reject-at-cap:** an optimum that only rode the column to its
+ * [LP_UNBOUNDED_PROBE] frontier — the private stand-in for `±∞` on a [LpBuilder.addFreeVar] side — is
+ * reported unbounded (null), never as a spurious bound at the probe magnitude. [clamped]
  * overrides which probe flag guards that rejection — a variable represented split (`x = x⁺ − x⁻`)
  * descends by `x⁻` riding *its* upper probe, which [objectiveCol]'s own flags cannot see.
  */
@@ -160,9 +160,8 @@ internal fun LpModel.tightVariableBound(
  * bound over its scaled-integer rationalization ([rationalizedDualLowerBoundCeil]), so mixed real models
  * retain supported scaling. The ceiling requires a verified integer source objective lattice;
  * otherwise this helper declines, since a ceiling may exceed a continuous objective's optimum. Null on a
- * 128-bit certification overflow or a
- * model that does not rationalize. Retained models evaluate their exact authority directly, including
- * objective scaling and external constants, without a legacy conversion.
+ * 128-bit certification overflow or a model that does not rationalize. Retained models evaluate their
+ * exact authority directly, including objective scaling and external constants.
  */
 internal fun LpModel.exactObjectiveLowerBoundCeil(y: DoubleArray, observer: LpCertificationObserver? = null): Long? =
     if (!hasIntegralObjective()) {
@@ -180,8 +179,8 @@ internal fun LpModel.exactObjectiveLowerBoundCeil(y: DoubleArray, observer: LpCe
  * The tightest sound lower bound on [model]'s minimized objective from the approximate duals [y]: the
  * larger of the projected [safeObjectiveLowerBound] and the exact [exactObjectiveLowerBoundCeil] — the
  * objective-level twin of [tightVariableBound]. The projection and integer ceiling may lose different
- * information. The ceiling is used only for a verified integer source objective. Null
- * only when neither side is available.
+ * information. The ceiling is used only for a verified integer source objective. Null only when neither
+ * side is available.
  */
 internal fun tightObjectiveLowerBound(
     model: LpModel,

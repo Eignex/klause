@@ -177,6 +177,11 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
             if (evaluate(sequence[0], interval.upper).isZero) 1 else 0
     }
 
+    /**
+     * Isolating intervals of the distinct real roots in increasing order, by bisecting a Cauchy-style root
+     * bound and counting roots in each open interval with the Sturm sequence. A root of a linear
+     * polynomial, or one hit by a bisection point, comes back as a point interval.
+     */
     fun isolate(value: RationalPolynomial): List<RationalInterval> {
         arithmetic.step()
         require(!value.isZero) { "zero polynomial has no finite root list" }

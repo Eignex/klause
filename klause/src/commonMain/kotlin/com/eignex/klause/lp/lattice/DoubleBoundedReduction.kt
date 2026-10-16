@@ -17,10 +17,11 @@ internal class DoubleBoundedRow(val coefficients: SparseIntRow, val lower: BigIn
 /**
  * An exact, lattice-preserving rewrite of a double-bounded integer system.
  *
- * Bromberger's Double-Bounded Reduction separates an arbitrary system into an unbounded part and a
- * double-bounded part. This type owns the latter's column transformation: the caller retains the row
- * ranges, while `x = V·y` preserves every integer point exactly. It deliberately does not decide which
- * source rows are bounded; that requires the full active mixed-arithmetic system and belongs above this
+ * The Double-Bounded Reduction of M. Bromberger, *A Reduction from Unbounded Linear Mixed Arithmetic Problems into
+ * Bounded Problems*, IJCAR 2018, https://doi.org/10.1007/978-3-319-94205-6_22, separates an arbitrary system into an
+ * unbounded part and a double-bounded part. This type owns the latter's column transformation: the caller retains the
+ * row ranges, while `x = V·y` preserves every integer point exactly. It deliberately does not decide which source rows
+ * are bounded; that requires the full active mixed-arithmetic system and belongs above this
  * leaf package.
  */
 internal class DoubleBoundedReduction(val rows: List<DoubleBoundedRow>, val transform: UnimodularTransform) {

@@ -36,8 +36,7 @@ internal sealed interface OpenSourcePreparation {
  * Prepare this source model, then select its complete open route from what preparation produced.
  *
  * Planning after preparation is what lets a source rewrite move factor ownership with the factors: a
- * plan selected ahead of the phase is indexed by factors the prepared model no longer has, which is why
- * this order is the whole boundary rather than a detail of it.
+ * plan selected ahead of the phase is indexed by factors the prepared model may not have.
  */
 internal fun Problem.prepareOpenSource(
     objective: LinearObjective? = null,

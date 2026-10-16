@@ -79,7 +79,9 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
     }
 
     // Every learned clause is implied by the root problem, so forgetting one only weakens propagation.
-    // Glue clauses, clauses that propagated since the last reduction, and units are retained.
+    // Glue clauses, clauses that propagated since the last reduction, and units are retained; the rest are
+    // dropped highest-LBD first (Audemard and Simon, "Predicting Learnt Clauses Quality in Modern SAT
+    // Solvers", IJCAI 2009, https://www.ijcai.org/Proceedings/09/Papers/074.pdf).
     private fun reduceLearnedDb() {
         val cap = learnedDb.maxClauses ?: return
         // Reduction renumbers clauses, so it waits until no clause is queued for its first

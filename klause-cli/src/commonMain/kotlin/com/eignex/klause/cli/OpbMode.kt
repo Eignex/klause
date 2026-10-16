@@ -26,7 +26,7 @@ internal object OpbMode : CliMode {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} factors=${parsed.problem.numFactors}"
             }
             // Only the declared x1..xN belong in the `v` line — not the Tseitin/soft indicators that
-            // [Problem.numBoolVars] also counts.
+            // `Problem.numBoolVars` also counts.
             val render: (Sample) -> String = { s -> renderPbModel(parsed.numDeclaredVars, s) }
             // OPB objectives are minimisations; there is no maximisation form.
             return linearSolvable(

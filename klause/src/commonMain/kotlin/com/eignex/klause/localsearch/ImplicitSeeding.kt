@@ -23,8 +23,7 @@ class ImplicitSeeding(
     /** Factor ids elected for implicit-solving structured neighbourhoods — structural globals whose
      *  [Invariant.proposeStructuredMoves] preserves their own feasibility (see
      *  [Invariant.providesImplicitNeighbourhood]). The engine draws their feasibility-preserving moves
-     *  even during infeasibility, and seeds them feasible at search start. Built once on first
-     *  access. */
+     *  even during infeasibility, and seeds them feasible at search start. */
     val electedImplicit: IntArray
         get() = preparedElected ?: electImplicitFactors().also { preparedElected = it }
 
@@ -42,9 +41,9 @@ class ImplicitSeeding(
      *  `v`, or `-1` if `v` is searched freely. A variable is owned once [seedImplicitFeasible] seeds
      *  its [implicitSeedFactors] global feasibly; from then on only that global's structure-preserving
      *  [Invariant.proposeStructuredMoves] may change it, so the generic neighbourhood can never break
-     *  the implicitly-solved constraint. `null` until the first seeding pass, and only ever populated
-     *  when implicit feasible-init is enabled — so a search that does not seed implicitly is
-     *  unaffected. The [MoveSink] enforces the filter via [MoveSink.setOwners]. */
+     *  the implicitly-solved constraint. `null` until the first seeding pass, and populated only
+     *  when implicit feasible-init is enabled. The [MoveSink] enforces the filter via
+     *  [MoveSink.setOwners]. */
     var ownerInt: IntArray? = null
         private set
 
@@ -53,9 +52,8 @@ class ImplicitSeeding(
      *  propagation). Built once on first access — the implication-aware move sources
      *  ([com.eignex.klause.localsearch.movesource.FlipAndPropagate]) bundle a flip's forced
      *  literals into one atomic move. Probing is bounded to [maxImplicationCandidates] free Booleans
-     *  (in id order), mirroring the presolve implication-graph pass: an uncapped `numBoolVars` harvest
-     *  materialises an O(numBoolVars²) adjacency that exhausts the heap on Boolean-heavy models. Seeds
-     *  past the cap simply find no forced literals, so the move source degrades to lone flips. */
+     *  (in id order); seeds past the cap find no forced literals, so the move source degrades to
+     *  lone flips. */
     val implicationGraph: Array<IntArray> by lazy {
         problem.propagatedImplicationGraph(maxImplicationCandidates, Cancellation.Never)
     }
@@ -164,7 +162,6 @@ class ImplicitSeeding(
 
 /** Free-Boolean probe cap for [ImplicitSeeding.implicationGraph], mirroring the presolve
  *  implication-graph pass: each candidate costs up to two `propagate` calls to harvest its outgoing
- *  implications, and the uncapped full-`numBoolVars` build materialised an O(numBoolVars²) adjacency
- *  that OOM'd on Boolean-heavy CSP instances (only [com.eignex.klause.localsearch.movesource.FlipAndPropagate]
- *  forces the build). */
+ *  implications, and an uncapped build materialises an O(numBoolVars²) adjacency that exhausts the
+ *  heap on Boolean-heavy models. */
 private const val IMPLICATION_SEED_MAX_CANDIDATES = 2_048

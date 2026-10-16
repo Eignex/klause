@@ -70,15 +70,12 @@ internal object SolveCore {
             ?.let { parseEngine(it) ?: usageError("unknown engine `$it`; expected ${engineIds()}") }
             ?: if (common.freeSearch) FiniteEngine.BACKTRACK else defaultEngine()
         // Presolve once, before any worker is built, so every engine and portfolio worker shares
-        // the one transformed problem. Solution-set-altering passes (symmetry breaking, value
-        // precedence) are dropped for a pure-LS engine (their ordering constraints are believed to
-        // hurt local search); solutions are reconstructed at render time. An explicit `--presolve`
-        // overrides this default verbatim, so an LS run can be benchmarked *with* those passes on
-        // (the A/B that decides whether the LS-specific stripping is worth keeping).
+        // the one transformed problem. The pipeline drops solution-set-altering passes (symmetry
+        // breaking, value precedence) for a pure-LS engine unless `--presolve` is explicit;
+        // solutions are reconstructed at render time.
         val base = common.presolve?.let { PresolveConfig.parse(it) } ?: common.config.presolveConfig()
-        // `affine-pivot-order` selects how affine elimination orders its pivots. A cost knob only — the
-        // orders differ in what they fold first, never in what the problem means — exposed so the choice
-        // can be A/B'd on a corpus rather than argued about.
+        // `affine-pivot-order` selects how affine elimination orders its pivots. A cost knob only: the
+        // orders differ in what they fold first, never in what the problem means.
         val pivotPlan = affinePivotOrderParam(common)?.let { base.withAffinePivotOrder(it) } ?: base
         val config = presolveEffortParams(common.engineParams, pivotPlan)
         // Symmetry breaking collapses symmetric solutions, so disable it (via auto resolution) when
@@ -607,8 +604,8 @@ internal object SolveCore {
     /**
      * The presolve phase's allowance, as a [Cancellation] for the phase and a [PresolveBudget] the round
      * engine slices per pass. Derived by [derivedPresolveBudgetMs] as a share of the run's own `-t`
-     * budget rather than a flat figure, and counted in work. An explicit `klause.presolve.budget.ms` still
-     * wins. A shared elapsed ceiling also reserves time for search when work underprices preparation.
+     * budget rather than a flat figure, and counted in work. An explicit `klause.presolve.budget.ms` takes
+     * precedence. A shared elapsed ceiling also reserves time for search when work underprices preparation.
      */
     internal fun presolveAllowance(
         common: CommonOptions,
@@ -633,21 +630,11 @@ internal object SolveCore {
         deadline: Long?,
         nodeBudget: NodeBudget?,
     ) {
-        // `--lp CEILING` selects the LP emphasis for the naked engine too (it powers the single-engine
-        // LP-success measurement under `-s`); the flag wins, then the `klause.lp` env default, else the
-        // route default.
-        //
-        // This route is propagation only, for every input. It exists for the CSP/COP fixed-search
-        // track, where a model states its own search and a relaxation bound is not among the permitted
-        // deductions; no other format has an interpretation of it at all. Making that unconditional
-        // rather than keying it on whether an annotation was found is the point: a rule that holds for
-        // some inputs and not others is what let an `engine=fixed` sweep silently measure a solver with
-        // no LP, and read the result as a property of the LP.
-        //
-        // So an explicit `--lp` asking for anything but `off` is refused rather than quietly dropped —
-        // the treatment the selector `--param`s already get here. A relaxation on one deterministic
-        // solver is `-e cp --param bt-arm=<label>`, which is a pool of one and takes the portfolio's
-        // LP surface with it.
+        // This route is propagation only, for every input, whether or not the model carries a search
+        // annotation. It serves the CSP/COP fixed-search track, where a model states its own search and
+        // a relaxation bound is not among the permitted deductions. An explicit `--lp` asking for
+        // anything but `off` is refused rather than quietly dropped. A relaxation on one deterministic
+        // solver is `-e cp --param bt-arm=<label>`, a pool of one with the portfolio's LP surface.
         if (common.lp != null) {
             val asked = runCatching { LpConfig.parse(common.lp!!) }
                 .getOrElse { e -> usageError("--lp: ${e.message}") }
@@ -698,8 +685,7 @@ internal object SolveCore {
 
     /**
      * The work [budget] was charged since [before], beside the [elapsed] it took and the whole allowance's
-     * standing — the figures that relate the work unit to time, so the work-per-millisecond rate can be
-     * measured on any corpus. Empty when presolve ran without a budget.
+     * standing, relating the work unit to time. Empty when presolve ran without a budget.
      */
     private fun presolveWorkText(budget: PresolveBudget?, before: Long, elapsed: Duration): String = budget?.let {
         ", work ${it.spent() - before} in ${elapsed.inWholeMilliseconds}ms (${it.spent()} of ${it.allowance})"
@@ -774,9 +760,8 @@ internal object SolveCore {
             }
         }
         // Read the verdict presolve already reached. Asking the problem for its own `baked` instead forces
-        // a lazy that a rebuilt (already-folded) problem has never run, so the report pays a fresh root
-        // fixpoint over every factor - after the whole summary has printed, which from outside reads as
-        // the process hanging rather than as the diagnostic costing anything.
+        // a lazy that a rebuilt (already-folded) problem has never run, paying a fresh root fixpoint over
+        // every factor after the summary has printed.
         if (stats?.infeasible == true) {
             errPrintln("  INFEASIBLE: presolve proved the problem unsatisfiable")
         }
@@ -825,7 +810,7 @@ internal object SolveCore {
     /**
      * Integer columns no factor needs a finite domain for, so nothing about them has to be enumerated.
      *
-     * Eligible is not the same as decidable: an MPS model is entirely [Linear] rows and reads as fully
+     * Eligible is not the same as decidable: an MPS model is entirely `Linear` rows and reads as fully
      * eligible, yet its integers still have to be searched until something decides them. The actionable
      * figure is the second one — a theory-eligible column with an open source side.
      */
@@ -1034,16 +1019,15 @@ internal object SolveCore {
     }
 
     /** Re-express the LS incumbent objective in the model's orientation, reusing the same sign-corrected
-     *  [Solvable.objectiveValue] that renders solutions and arm attribution. The engine records the
-     *  incumbent in its internal "lower is better" frame (maximisation via a negated coefficient); the
-     *  objective lambda reads the canonical objective variable in original units, which also reconciles
-     *  the LS functional gradient view back to the linear objective. No-op for satisfy / infeasible
-     *  runs (no incumbent) and non-MiniZinc modes without an objective lambda. */
+     *  [Solvable.objectiveValue] that renders solutions. The engine records the incumbent in its internal
+     *  "lower is better" frame (maximisation via a negated coefficient); the objective lambda reads the
+     *  canonical objective variable in original units. Only the routing LP stats are merged for runs
+     *  without an incumbent or without an objective lambda. */
     private fun withModelObjective(s: SolveStats, solvable: Solvable, sample: Sample?): SolveStats {
         val routed = s.copy(lp = s.lp.mergedWith(solvable.routingLpStats))
         if (sample == null || s.ls.incumbentObjective.isNaN()) return routed
-        // The statistic is already a Double, so it reports the continuous contribution where there is
-        // one rather than the discrete part the `o` line stopped reporting alone.
+        // The statistic is a Double, so it reports the continuous contribution where there is one
+        // rather than the discrete part alone.
         solvable.continuousObjectiveValue?.let { exact ->
             return routed.copy(ls = routed.ls.copy(incumbentObjective = exact(sample)))
         }

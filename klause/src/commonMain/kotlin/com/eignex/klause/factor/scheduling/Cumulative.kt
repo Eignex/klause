@@ -25,8 +25,8 @@ import com.eignex.klause.util.IntIntMap
  * `starts(i)`, fixed duration `durations(i) ≥ 0`, fixed resource demand `resources(i) ≥ 0`.
  *
  * The unit-resource / capacity-1 special case (no two tasks overlap) is the disjunctive
- * (one-machine) constraint; select it with [Cumulative.unary], which flips [unary] to dispatch the
- * stronger disjunctive propagator and invariant. See [unary] for the reasoning it enables.
+ * (one-machine) constraint; build it with [Cumulative.unary], which sets [unary] to dispatch the
+ * stronger disjunctive propagator and invariant.
  *
  * Semantics:
  *  - Task `i` occupies the half-open interval `[starts(i), starts(i) + durations(i))`.
@@ -35,33 +35,26 @@ import com.eignex.klause.util.IntIntMap
  *  - Any task with `resources(i) > capacity` makes the problem trivially infeasible (the
  *    factor still reports a graded overage cost when LS hits such a placement).
  *
- * LS cost is graded:
- *   `cost = Σ_t max(0, usage(t) − capacity)`
- * — broken assignments rank by total energy overflow rather than by a flat boolean,
- * giving the search a real gradient toward the cumulative bound. This energy overage is
- * the factor's [Invariant.violationDegree] (run through `compressViolation` so a deeply-overloaded
- * profile can't dominate the global cost); [Invariant.deltaIfIntSet] / [Invariant.applyIntSet] and the
- * bool-flip paths return its compressed delta. The raw overage is also mirrored to
- * `state.intPayload(factorId)` for strategies that read it directly (as ALNS does).
+ * LS cost is graded: `cost = Σ_t max(0, usage(t) − capacity)`, so broken assignments rank by total
+ * energy overflow rather than by a flat boolean. This overage, run through `compressViolation` so a
+ * deeply overloaded profile can't dominate the global cost, is the factor's [Invariant.violationDegree].
  *
- * Propagation: **time-tabling**. For every task with overlap window `[lst_i, ect_i)`
- * (latest-start to earliest-completion), `resources[i]` is *mandatory* throughout that
+ * Propagation: **time-tabling**. For every task with compulsory part `[lst_i, ect_i)`
+ * (latest start to earliest completion), `resources(i)` is *mandatory* throughout that
  * window. The summed mandatory profile is built event-by-event in O(n log n); any time
  * point with `Σ mandatory > capacity` proves infeasibility. For each non-fixed task `i`,
- * any candidate start `s` that would push the *post-i* profile (mandatory + r_i during
- * `[s, s+d_i)`) above capacity at some time point is forbidden — the standard
- * time-tabling deduction. Bounds are tightened at the candidate-domain endpoints,
- * mirroring the rest of the factor catalog's bounds-consistency style.
+ * a start bound `s` that would push the profile (mandatory + r_i during `[s, s+d_i)`) above
+ * capacity is shaved from either end of the start domain.
  *
- * Time-tabling is the baseline, paired here with an O(n²) Vilím Θ-tree edge-finder
- * (Vilím 2009 / Schutt-Feydy-Stuckey 2009) running off `CumulativeThetaTree`. The
- * edge-finder catches energy-overflow deductions on subsets that have no compulsory
- * profile, which time-tabling cannot see.
+ * Time-tabling is paired with Θ-tree edge-finding (P. Vilím, "Edge Finding Filtering Algorithm for
+ * Discrete Cumulative Resources in O(kn log n)", CP 2009, https://doi.org/10.1007/978-3-642-04244-7_62),
+ * which catches energy-overflow deductions on subsets that have no compulsory profile, and with
+ * energetic reasoning that also fires while durations, demands or capacity are still ranges. Each
+ * deduction carries an explanation in the style of A. Schutt, T. Feydy, P. J. Stuckey and M. G. Wallace,
+ * "Explaining the cumulative propagator", Constraints 16(3), 2011, https://doi.org/10.1007/s10601-010-9103-2.
  *
- * Cost model is dense: the LS payload allocates an `IntArray` of size
- * `horizon = max_i(starts[i].max + durations[i]) − min_i(starts[i].min)`. For Challenge
- * instances this is typically a few hundred; if your horizon explodes past ~1M, prefer a
- * Linear-per-timepoint decomposition.
+ * The LS payload is dense: it allocates a usage array over the horizon
+ * `max_i(starts(i).max + durations(i)) − min_i(starts(i).min)`.
  */
 class Cumulative(
     /** Task start-time variable ids. */
@@ -74,9 +67,8 @@ class Cumulative(
     /** Capacity: constant fallback / upper bound (when [capacityVar] ≥ 0 holds the var's ub). */
     val capacity: Long,
     /** Per-task presence literals; empty for the non-opt fast path. Absent tasks contribute
-     *  zero energy / zero compulsory part. Theta-tree leaves stay inactive for
-     *  definitely-absent tasks; unpinned-presence tasks are excluded from edge-finding too
-     *  (they may yet go absent, so they can't sharpen Ω-energy deductions). */
+     *  zero energy and no compulsory part; propagation uses only definitely present tasks, since
+     *  an unpinned task may yet go absent. */
     override val presents: IntArray = EmptyIntArray,
     /** Per-task duration variables; empty = use [durations] as constants. When set, the
      *  factor reads the current duration from `state.assignment.intValue(durationVars(i))`
@@ -200,7 +192,6 @@ class Cumulative(
         capacityVar < 0 && capacity == 1L && resourceVars.isEmpty() && resources.all { it == 1L }
 
     // Var id → its position in the corresponding array (-1 when the var is not in that role).
-    // IntIntMap keeps the lookup unboxed and array-backed for the dense var ids these hold.
     private val startPos: IntIntMap = IntIntMap.build(starts, IntArray(starts.size) { it }, absent = -1)
     private val durPos: IntIntMap = IntIntMap.build(durationVars, IntArray(durationVars.size) { it }, absent = -1)
     private val resPos: IntIntMap = IntIntMap.build(resourceVars, IntArray(resourceVars.size) { it }, absent = -1)
@@ -218,8 +209,7 @@ class Cumulative(
     companion object {
         /**
          * The no-overlap (unary-resource / one-machine) special case: unit demands over capacity 1, the
-         * [unary] shape. Tasks may not overlap in time. Dispatches the stronger disjunctive propagator;
-         * see the class KDoc's mode note.
+         * [unary] shape. Tasks may not overlap in time. Dispatches the stronger disjunctive propagator.
          */
         fun unary(
             starts: IntArray,

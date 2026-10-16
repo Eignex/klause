@@ -4,8 +4,7 @@ package com.eignex.klause.ir
  * A canonical identity for a constraint up to variable identity: same factor type, same constants
  * (coefficients, bounds, polarities), and the same multiset of variables — independent of internal
  * ordering — compare equal. [equals] / [hashCode] are structural and [compareTo] is a total order, so
- * keys serve as hash-bucket keys and can be sorted into a canonical multiset. Built with `StructuralKey.of`;
- * A constraint's `structuralKey` returns `null` for an unkeyed factor.
+ * keys serve as hash-bucket keys and can be sorted into a canonical multiset. Built with `StructuralKey.of`.
  */
 class StructuralKey internal constructor(private val kind: FactorKind, private val payload: LongArray) :
     Comparable<StructuralKey> {
@@ -200,8 +199,8 @@ internal class StructuralKeyBuilder(expectedWords: Int = 0) {
 
 /** Above this arity the index sort switches from in-place insertion sort to the O(n log n) packed
  *  sort; below it insertion sort's lack of allocation wins. A high-arity factor (a wide linear row or
- *  knapsack) whose [StructuralKey] is rebuilt for every incident variable each WL-refinement round
- *  made the quadratic sort dominate presolve, so the crossover bounds that to `n log n`. */
+ *  knapsack) has its [StructuralKey] rebuilt for every incident variable each refinement round, where a
+ *  quadratic sort would dominate presolve. */
 private const val INDEX_SORT_INSERTION_MAX = 32
 
 /** Sort [order] (a permutation of its own indices) by `keys[order[i]]` ascending, without boxing — the

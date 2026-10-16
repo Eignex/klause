@@ -57,16 +57,11 @@ internal fun PropagationState.factorAt(fid: Int): Propagator = when {
 }
 
 /**
- * Register a learned clause and return its assigned factor id. Performs four things:
- *   - append to [LearnedClauseDb.store];
- *   - record the clause's [lbd] in [LearnedClauseDb.lbds] (parallel array);
- *   - grow [PropagationState.refPayloadStore] by one slot so [ClausePropagator.propagate]'s
- *     `state.refPayload[factorId]` access stays in-bounds;
- *   - install the clause's initial watch literals in [BoolWatcherIndex.byLit] so it
- *     participates in the wakeup index.
+ * Register a learned clause and return its assigned factor id: append it to [LearnedClauseDb.store] with its
+ * policy columns, grow [PropagationState.refPayloadStore] by one slot so the clause's `refPayload[factorId]`
+ * access stays in bounds, and install its initial watches.
  *
- * Does NOT eagerly propagate — that's the session-level
- * [PropagationSession.addLearnedClause]'s job. Returns the new factor id.
+ * Does not propagate; [PropagationSession.addLearnedClause] does.
  */
 internal fun PropagationState.addLearnedClause(
     clause: ClausePropagator,
@@ -92,9 +87,9 @@ internal fun PropagationState.addLearnedClause(
 /**
  * Register a learned pseudo-Boolean constraint `Σ weightsᵢ·literalsᵢ ≥ degree` and return
  * its factor id. Stored in the same [LearnedClauseDb] as clauses (as a [LearnedPropagator]), with the
- * forgetting policy columns. A PB constraint has no watched-literal scheme, so it wakes on *every* literal
- * going false — install a watch on each literal (the ≥-form only tightens when a positive-weight literal
- * turns false), which is sound and keeps the constraint firing on any relevant change.
+ * forgetting policy columns. Watches cover only the weighted covering set from
+ * [PseudoBooleanPropagator.selectWatched], kept in the factor's `refPayload` slot; the constraint wakes when a
+ * watched literal goes false.
  */
 internal fun PropagationState.addLearnedPb(
     weights: LongArray,
@@ -120,8 +115,6 @@ internal fun PropagationState.addLearnedPb(
     learned.usedFlags.add(0)
     learned.origins.add(OWN_ORIGIN)
     refPayloadStore.add(null)
-    // Install only the weighted covering watch set; the constraint wakes when a watched literal goes
-    // false, not on every literal change.
     val watched = prop.selectWatched(this)
     for (lit in watched) installLitWatch(lit, newFid, NO_BLOCKER)
     refPayload[newFid] = watched
@@ -201,15 +194,13 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
  * Prune the learned-clause database. The [keep] predicate decides per (learnedIndex,
  * lbd) whether to retain that clause; dropped clauses' factor ids vanish and the
  * remaining clauses are renumbered contiguously starting at `problem.numFactors`.
- * Three things are rebuilt:
- *   - [LearnedClauseDb.store] / [LearnedClauseDb.lbds] compacted to the kept entries in order;
- *   - the learned-clause tail of [PropagationState.refPayloadStore] compacted similarly;
- *   - every list in [BoolWatcherIndex.byLit] walked once, with learned factor ids
- *     remapped through `oldFid → newFid` or removed when dropped.
+ * The [LearnedClauseDb] columns and the learned tail of [PropagationState.refPayloadStore] are
+ * compacted in order; the bool and atom watcher lists, the propagation queues and the per-variable
+ * reason fields have their learned factor ids remapped through `oldFid → newFid` or dropped.
  *
  * Watchers' positions inside each clause's `refPayload[fid]` are watch *indices*
  * (into `clause.literals`), not factor ids — they survive the compaction unchanged.
- * Cost is amortised across infrequent calls (typical: once per Luby restart).
+ * Cost is amortised across infrequent calls (typically once per restart).
  */
 internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
     nativeEngine?.let {
@@ -225,9 +216,6 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     }
     if (newCount == n) return // nothing dropped
 
-    // Compact the clause store and its parallel columns in place using a two-pointer walk —
-    // every kept entry slides down to its new position; tail beyond newCount is
-    // trimmed at the end.
     var w = 0
     for (i in 0 until n) {
         if (remap[i] >= 0) {
@@ -247,8 +235,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     learned.usedFlags.truncateTo(newCount)
     learned.origins.truncateTo(newCount)
 
-    // Compact the learned tail of refPayloadStore similarly. Static-factor entries stay
-    // at indices [0, problem.numFactors) untouched.
+    // Static-factor entries at [0, problem.numFactors) stay untouched.
     val refBase = problem.numFactors
     var rw = refBase
     for (i in 0 until n) {
@@ -259,8 +246,6 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     }
     while (refPayloadStore.size > rw) refPayloadStore.removeAt(refPayloadStore.size - 1)
 
-    // Remap each per-literal watcher list. Static fids pass through; learned fids
-    // either rewrite to their new factor id or get dropped.
     for (lit in watches.byLit.indices) {
         val list = watches.byLit[lit]
         val blockers = watches.blockersByLit[lit] // compacted in lockstep so indices stay aligned
@@ -284,9 +269,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     }
 
     // Atom-literal watcher lists carry learned fids too — a learned clause watching a
-    // bound atom registers here, not in the bool-var lists. Skipping this remap left
-    // stale fids pointing past the compacted clause array, crashing the next atom wake
-    // on any model whose conflicts learn atom-literal clauses.
+    // bound atom registers here, not in the bool-var lists.
     for (list in atoms.watchersByLit) {
         if (list == null) continue
         var wi = 0
@@ -323,7 +306,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     // or a learned unit that propagated at the root — survive the restart's pop-to-root, so
     // their reason fids outlive this renumber. Left unremapped, the next conflict's
     // [extractConflictFactors] would dereference a stale learned fid through [factorAt] and
-    // index past the compacted clause array (the php8 crash). Remap them like the watchers:
+    // index past the compacted clause array. Remap them like the watchers:
     // a kept clause's reason rewrites to its new id, a dropped clause's reason clears to -1.
     remapReasons(boolReason, remap, refBase)
     remapReasons(intMinReason, remap, refBase)

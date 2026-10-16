@@ -29,10 +29,6 @@ import com.eignex.klause.util.MutableLongIntMap
  *  - **Transitive reduction**: a binary clause `a -> b` whose conclusion is already reachable from
  *    `a` through *other* binary clauses is entailed by that chain, so propagation still derives it and
  *    the clause can be dropped.
- *
- * Clique discovery from the graph (deriving at-most-one sets from the implication structure) is
- * **deferred**: it does not compose cleanly with the substitution rename here and is better built on a
- * dedicated clique store.
  */
 internal object ImplicationGraph {
 
@@ -169,13 +165,12 @@ internal object ImplicationGraph {
      * harvested graph. Cycles are the strongly-connected components of the literal graph; the smallest
      * variable id in a component is its representative.
      *
-     * **Polarity scope.** Only same-polarity equivalence is merged. The existing
-     * `Factor.remap` renames a variable id while preserving literal polarity
-     * and cannot express the polarity flip an anti-equivalence `r ⇔ ¬w` needs (a reification aux var is
-     * a raw id, not a literal, so there is no polarity to flip), so anti-equivalent literals are
-     * detected but deliberately left unmerged. A component that contains both polarities of one
-     * variable (`u+` and `u-` together) would assert `u ⇔ ¬u`, i.e. an inconsistency; that variable is
-     * skipped and left to [Probing]'s failed-literal handling.
+     * **Polarity scope.** Only same-polarity equivalence is merged. `Factor.remap` renames a variable id
+     * while preserving literal polarity and cannot express the polarity flip an anti-equivalence `r ⇔ ¬w`
+     * needs (a reification aux var is a raw id, not a literal, so there is no polarity to flip), so
+     * anti-equivalent literals are detected but deliberately left unmerged. A component that contains both
+     * polarities of one variable (`u+` and `u-` together) would assert `u ⇔ ¬u`, i.e. an inconsistency;
+     * that variable is skipped and left to [Probing]'s failed-literal handling.
      *
      * A variable the objective reads ([objectiveBoolVars]) is never merged in either direction: the
      * presolved problem leaves a merged variable unconstrained, and an objective term over it must keep
@@ -230,7 +225,8 @@ internal object ImplicationGraph {
         return out
     }
 
-    /** Keep an SCC substitution within the factor representations supported by this pass. */
+    /** [candidates] minus any merge that would rename a [ReifiedPseudoBoolean]'s auxiliary and one of its
+     *  body variables onto the same variable; both are kept as themselves instead. */
     private fun compatibleMerges(problem: Problem, candidates: List<BoolMerge>): List<BoolMerge> {
         if (candidates.isEmpty()) return candidates
         val boolMap = IntArray(problem.numBoolVars) { it }
@@ -352,7 +348,8 @@ internal object ImplicationGraph {
         return false
     }
 
-    /** Tarjan strongly-connected components over the literal graph: `component[l]` is a stable
+    /** Strongly-connected components over the literal graph (R. Tarjan, "Depth-first search and linear graph
+     *  algorithms", SIAM J. Comput. 1972, https://doi.org/10.1137/0201010): `component(l)` is a stable
      *  component id shared by exactly the literals on a mutual-implication cycle with `l`. A literal
      *  with no edges is its own singleton component. Iterative (explicit stack) so a deep implication
      *  chain cannot overflow the call stack on the native targets. */
@@ -424,8 +421,7 @@ internal object ImplicationGraph {
         val key: Long get() = (first.toLong() shl Int.SIZE_BITS) or (second.toLong() and 0xFFFF_FFFFL)
     }
 
-    /** Adjacency list over literal nodes `0 until [nodeCount]`, built incrementally. Parallel
-     *  neighbour lists per node; reads expose a plain [IntArray] view for the SCC walk. */
+    /** Adjacency list over literal nodes `0 until [nodeCount]`, built incrementally. */
     private class Adjacency(val nodeCount: Int) {
         private val out = Array(nodeCount) { IntArrayList() }
 

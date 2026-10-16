@@ -9,11 +9,15 @@ import kotlin.math.ln
 import kotlin.random.Random
 
 /**
- * Approximate model counting (ApproxMC2; Chakraborty, Meel & Vardi) over a Boolean sampling set.
+ * Approximate projected model counting (ApproxMC2) over the sampling set resolved by [CellContext].
  *
- * Native path: XOR hashes are appended as `Xor` factors and solved on the same backend via
- * `Solver.deriveFor`. Returns a count within a multiplicative `(1 ± ε)` factor with probability
- * at least `1 - δ`.
+ * S. Chakraborty, K. S. Meel, M. Y. Vardi, "Algorithmic Improvements in Approximate Counting for
+ * Probabilistic Inference: From Linear to Logarithmic SAT Calls", IJCAI 2016,
+ * https://www.ijcai.org/Abstract/16/503
+ *
+ * XOR hashes are appended as one [com.eignex.klause.factor.bool.GaussianXor] system and each cell is
+ * enumerated by the backtrack solver. Returns a count within a multiplicative `(1 ± ε)` factor with
+ * probability at least `1 - δ`.
  *
  * Outer loop runs `t = ⌈17·log2(3/δ)⌉` (odd) independent iterations and reports the median.
  * Each iteration draws a nested sequence of hashes and finds the smallest prefix length `m`
@@ -27,7 +31,6 @@ internal object ApproxMC {
         val eps = config.epsilon
         val thresh = threshold(eps)
 
-        // Cheap short-circuit: if the whole problem has ≤ thresh projected models, count exactly.
         val base = cellCount(ctx, hashes = emptyList(), cap = thresh)
         if (base.complete) {
             val c = base.count.toLong()

@@ -51,7 +51,7 @@ internal class RegularInvariant(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         if (state.assignment.intValue(intVar) == oldValue) return 0
-        // Apply runs once per accepted move, so it can afford a full two-layer rebuild (O(n·Q·Σ)); that
+        // Apply runs once per accepted move, so it can afford a full forward/backward rebuild (O(n·Q·Σ)); that
         // keeps the per-candidate delta at O(Q·Σ).
         val before = state.factorDegree[factorId]
         val rebuilt = buildState(state)
@@ -374,7 +374,7 @@ internal fun regularRepairPath(
  *  O(Q·Σ) instead of resweeping the whole DP. */
 internal class RegularLsState(val forward: Array<IntArray>, val backward: Array<IntArray>, var distance: Int)
 
-/** `forward[i][q]` = min symbol changes over positions `0 until i` to reach state `q` from `q0`,
+/** `forward(i)(q)` = min symbol changes over positions `0 until i` to reach state `q` from `q0`,
  *  where [getSym] is position i's current symbol. */
 internal fun regularForwardLayers(
     n: Int,
@@ -403,7 +403,7 @@ internal fun regularForwardLayers(
     return fwd
 }
 
-/** `backward[i][q]` = min symbol changes over positions `i until n` to drive state `q` to an
+/** `backward(i)(q)` = min symbol changes over positions `i until n` to drive state `q` to an
  *  accepting state, where [getSym] is position i's current symbol. */
 internal fun regularBackwardLayers(
     n: Int,

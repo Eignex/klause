@@ -25,7 +25,7 @@ internal class IntArrayList(initialCapacity: Int = 8) {
 
     /** Insert [value] at [index], shifting the tail right. */
     fun insertAt(index: Int, value: Int) {
-        add(0) // grow by one (value irrelevant; overwritten by the shift)
+        add(0)
         for (i in size - 1 downTo index + 1) data[i] = data[i - 1]
         data[index] = value
     }
@@ -35,10 +35,8 @@ internal class IntArrayList(initialCapacity: Int = 8) {
         data[index] = data[--size]
     }
 
-    /** Find the first occurrence of [value] and swap-remove it (O(1) removal, O(n) find);
-     *  returns true if found. Hoists [data] / [size] into locals so the scan is a tight
-     *  primitive-array loop with no per-iteration accessor or field reload — this is the
-     *  hot watcher-list removal in `moveBoolWatcher`. */
+    /** Find the first occurrence of [value] and swap-remove it; returns true if found. The scan
+     *  reads locals rather than fields because it is the hot watcher-list removal in `moveBoolWatcher`. */
     fun removeValue(value: Int): Boolean {
         val d = data
         val n = size
@@ -56,17 +54,14 @@ internal class IntArrayList(initialCapacity: Int = 8) {
         size = 0
     }
 
-    /** Truncate to [newSize], dropping the suffix. No-op if [newSize] is `>= size`.
-     *  Used by snapshot/restore call-sites that need to rewind an append-only journal
-     *  back to a prior watermark without reallocating. */
+    /** Truncate to [newSize], dropping the suffix. No-op if [newSize] is `>= size`. */
     fun truncateTo(newSize: Int) {
         if (newSize < size) size = newSize
     }
 
     fun toIntArray(): IntArray = data.copyOf(size)
 
-    /** Snapshot the current contents as a `Set<Int>` (deduplicating). Boxes — intended for
-     *  occasional use (e.g. building a conflict-reason set), not hot loops. */
+    /** Snapshot the current contents as a `Set<Int>`. Boxes, so not for hot loops. */
     fun toSet(): Set<Int> {
         val s = HashSet<Int>(size)
         for (i in 0 until size) s.add(data[i])
@@ -115,11 +110,10 @@ internal class IntArrayList(initialCapacity: Int = 8) {
         for (i in 0 until size) action(this[i])
     }
 
-    /** Sort the live elements in place by an integer [key], delegating the ordering to stdlib
-     *  [LongArray.sort]. Each element is packed with its key into a single `Long` (key in the
-     *  high word, element in the low) so the primitive sort orders by key with no boxing and no
-     *  per-element comparator; ties break by element value. [descending] reverses the result.
-     *  Keys and elements are both `Int`, so the low-word round-trip via [toInt] is exact. */
+    /** Sort the live elements in place by an integer [key]. Each element is packed with its key
+     *  into one `Long` (key in the high word, element in the low) so a primitive sort orders by key
+     *  with no boxing or comparator; ties break by the element's unsigned bits. [descending]
+     *  reverses the result. */
     inline fun sortByIntKey(descending: Boolean = false, key: (Int) -> Int) {
         val d = backingData
         val n = size
@@ -132,7 +126,6 @@ internal class IntArrayList(initialCapacity: Int = 8) {
         }
     }
 
-    // Exposed for the inline [sortByIntKey]; not part of the public contract. The live region is
-    // `[0, size)`; sorting never grows the list so reading the current array once is safe.
+    // Exposed for the inline [sortByIntKey]; sorting never grows the list, so reading it once is safe.
     @PublishedApi internal val backingData: IntArray get() = data
 }

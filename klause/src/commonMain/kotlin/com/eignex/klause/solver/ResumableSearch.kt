@@ -14,8 +14,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * [com.eignex.klause.portfolio.Portfolio] uses this seam to retain work between segments.
  *
  * Backtrack retains its trail and local search retains its assignment, random state and restart policy.
- * The handle is **single-threaded and stateful**; drive it from one
- * thread, one [runSlice] at a time.
+ * The handle is **single-threaded and stateful**; drive it from one thread, one [runSlice] at a time.
  *
  * Obtain one from a [ResumableOptimizer]. [close] releases per-search resources and is idempotent.
  * A closed pending handle rejects slices; a terminal verdict remains readable after close.
@@ -28,8 +27,7 @@ interface ResumableSearch : AutoCloseable {
      * as it lands (objective strictly improving on the best seen so far).
      *
      * Returns the **terminal verdict** ([MinimizeResult.Optimal] / [MinimizeResult.Unbounded] /
-     * [MinimizeResult.Infeasible], or a
-     * [MinimizeResult.BestFound] / [MinimizeResult.Unknown] with
+     * [MinimizeResult.Infeasible], or a [MinimizeResult.BestFound] / [MinimizeResult.Unknown] with
      * [com.eignex.klause.solver.result.TerminationReason.SearchExhausted] when an external bound
      * supplier makes the absolute proof unsound from this arm's vantage) if the search **completed**
      * during this slice; otherwise `null` — the slice elapsed (or [global] fired) with search still

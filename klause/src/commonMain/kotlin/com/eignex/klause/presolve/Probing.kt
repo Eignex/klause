@@ -45,11 +45,13 @@ internal object Probing {
      *
      * Binary implications are dropped; this pass persists only units and unconditional bounds.
      *
-     * Idempotent: a derived unit already present is not re-added and a bound already at least as
-     * tight is not re-applied, so the round engine reaches a fixpoint instead of churning. Bounded
-     * by [maxCandidates] free Booleans per invocation (in id order) so a model with very many
-     * Booleans cannot blow up presolve time; the round engine re-enters the pass after other passes
-     * fire, and a later round picks up where bumping units shifted the free set.
+     * Idempotent: a Boolean already pinned by a unit clause is not probed and a bound already at least
+     * as tight is not re-applied, so the round engine reaches a fixpoint instead of churning. Bounded by
+     * [maxCandidates] free Booleans per invocation (in id order); a later round re-enters with the units
+     * this one derived excluded from the free set.
+     *
+     * Savelsbergh, "Preprocessing and probing techniques for mixed integer programming problems",
+     * ORSA J. Computing 6(4), 1994, https://doi.org/10.1287/ijoc.6.4.445
      */
     fun probe(problem: BakedProblem, maxCandidates: Int, cancellation: Cancellation): PassDelta {
         val pinned = IntHashSet()
@@ -119,10 +121,9 @@ internal object Probing {
         return probe.delta()
     }
 
-    /** Fold the intersection of the bounds implied under each polarity into [domains]; return whether
-     *  any domain was strictly tightened. A bound implied under both `v = true` and `v = false` holds
-     *  in every solution, so the tighter side of the lower bounds and the looser-clamping side of the
-     *  upper bounds are both globally valid. */
+    /** Fold the bounds implied under both polarities into [domains]; return whether any domain was
+     *  strictly tightened. Every solution lies under `v = true` or `v = false`, so the union of the two
+     *  ranges (the smaller lower bound, the larger upper bound) is globally valid. */
     private fun harvestCommonBounds(
         whenTrue: PropagationResult.Implied,
         whenFalse: PropagationResult.Implied,

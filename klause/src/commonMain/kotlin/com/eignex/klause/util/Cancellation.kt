@@ -45,13 +45,11 @@ fun interface Cancellation {
     /** True iff cancellation has been requested. */
     fun isCancelled(): Boolean
 
-    /** Makes the token callable as `cancellation()` — natural shorthand for a
-     *  predicate-shaped value. Forwards to [isCancelled]. */
+    /** Makes the token callable as `cancellation()`; forwards to [isCancelled]. */
     operator fun invoke(): Boolean = isCancelled()
 
-    /** The wall-clock instant this token fires at when it is deadline-backed ([after] / [until]); `null`
-     *  for a plain predicate (including [Never]). Lets a token's remaining budget be read without a
-     *  separate numeric channel, so budgets like [shorten] can be derived from the token itself. */
+    /** The instant this token fires at when it is deadline-backed ([after] / [until]); `null` for a plain
+     *  predicate (including [Never]). [shorten] derives its budget from it. */
     fun deadline(): ComparableTimeMark? = null
 
     /** The deterministic work budget this token stops on, or `null` when it stops on something else. */
@@ -112,10 +110,8 @@ fun interface Cancellation {
         }
 
         /**
-         * Cancel after [duration] has elapsed from this call. Backed by KMP-safe
-         * [TimeSource.Monotonic], so it works on both JVM and Native without
-         * a clock-source per platform. The deadline is captured eagerly here; calling
-         * this twice yields two independent tokens.
+         * Cancel after [duration] has elapsed from this call, measured on [TimeSource.Monotonic]. The
+         * deadline is captured eagerly, so two calls yield two independent tokens.
          */
         fun after(duration: Duration): Cancellation = until(TimeSource.Monotonic.markNow() + duration)
 

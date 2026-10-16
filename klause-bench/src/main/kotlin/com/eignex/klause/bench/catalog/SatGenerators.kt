@@ -8,7 +8,7 @@ import kotlin.random.Random
 /**
  * Parametric SAT generators returning a [Problem] through the DIMACS parser.
  * [php] generates unsatisfiable pigeonhole instances; [random3Sat] samples uniform
- * 3-SAT at the requested clause/variable [ratio].
+ * 3-SAT at the requested clause/variable ratio.
  */
 internal object SatGenerators {
     fun php(n: Int): Problem = Dimacs.parse(phpCnf(n)).toProblem()

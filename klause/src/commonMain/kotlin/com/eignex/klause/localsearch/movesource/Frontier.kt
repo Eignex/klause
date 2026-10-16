@@ -6,7 +6,7 @@ import com.eignex.klause.localsearch.MoveSink
 /**
  * Plateau-escape frontier moves. When the violated-only repair pool traps the search, every repair
  * of a violated factor breaks a satisfied neighbour, and the moves that would first re-arrange those
- * neighbours are never generated. This injects bounded ±1 int-steps and bool flips on the variables
+ * neighbours are never generated. This injects adjacent-value int steps and bool flips on the variables
  * of factors that neighbour a violated factor (share a variable), giving the search moves to step
  * through the basin wall.
  *
@@ -53,7 +53,7 @@ class Frontier(
         }
     }
 
-    /** Emit ±1 int-steps and bool flips for every variable of factor [nf], spending from and
+    /** Emit adjacent-value int steps and bool flips for every variable of factor [nf], spending from and
      *  returning the remaining [budget]. */
     private fun addNeighbourMoves(state: LocalSearchState, sink: MoveSink, nf: Int, budget: Int): Int {
         var b = budget

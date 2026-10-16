@@ -52,8 +52,8 @@ internal class MddInvariant(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         if (state.assignment.intValue(intVar) == oldValue) return 0
-        // Apply runs once per accepted move, so it can afford a full two-layer rebuild; that keeps the
-        // per-candidate delta at O(Q·Σ).
+        // Apply runs once per accepted move, so it can afford a full forward/backward rebuild; that keeps the
+        // per-candidate delta to one layer's transitions.
         val before = state.factorDegree[factorId]
         val rebuilt = buildState(state)
         state.refPayload[factorId] = rebuilt
@@ -544,7 +544,7 @@ internal fun mddRepairPath(
  *  O(Q·Σ) instead of resweeping the whole DP. */
 internal class MddLsState(val forward: Array<IntArray>, val backward: Array<IntArray>, var distance: Int)
 
-/** `forward[i][q]` = min symbol changes over layers `0 until i` to reach state `q` from [initial],
+/** `forward(i)(q)` = min symbol changes over layers `0 until i` to reach state `q` from [initial],
  *  where [getSym] is layer i's current symbol. */
 internal fun mddForwardLayers(
     n: Int,
@@ -576,7 +576,7 @@ internal fun mddForwardLayers(
     return fwd
 }
 
-/** `backward[i][q]` = min symbol changes over layers `i until n` to drive state `q` to an accepting
+/** `backward(i)(q)` = min symbol changes over layers `i until n` to drive state `q` to an accepting
  *  state, where [getSym] is layer i's current symbol. */
 internal fun mddBackwardLayers(
     n: Int,

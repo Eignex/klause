@@ -7,27 +7,24 @@ import com.eignex.klause.util.LongArrayList
 /**
  * Bound-atom registry for [PropagationState] (LCG with virtual int-bound literals).
  *
- * An "atom" represents a fact like `[x ≥ k]` or `[x ≤ k]`. Each atom gets a virtual variable id
+ * An "atom" represents a fact `[x ≥ k]`, `[x ≤ k]` or `[x = k]`. Each atom gets a virtual variable id
  * past the bool var space (`numBoolVars + atomId`), so atom *literals* — encoded with `Lit.make`
  * using that virtual id — slot into the same array structure the analyzer already understands.
- * Allocation is lazy: an atom only enters the registry when a factor first references it as an
- * antecedent or conflict-reason literal (`allocAtom` in `PropagationState`).
+ * Allocation is lazy: an atom only enters the registry when first referenced (`allocAtom` in `Atoms.kt`).
  *
  * Each materialized order literal carries the same trail metadata a bool var does: stored truth
  * ([truth]), the decision level it was established at ([lvl]) and the literal-form antecedents of
- * the force ([ant]) — stored at the moment the bound crosses the threshold rather than re-derived
- * from a bound-change history, and undone on backtrack alongside the int-domain change that set
- * them. The channeling and wake logic lives in `Atoms.kt`.
+ * the force ([ant]) — stored at the moment the bound crosses the threshold and undone on backtrack
+ * alongside the int-domain change that set them. The channeling and wake logic lives in `Atoms.kt`.
  */
 internal class AtomStore(numIntVars: Int) {
-    /** Atom id → int variable. Stored here for fast iteration; the reverse (var, kind, threshold) →
-     *  atom lookup is an exact per-variable search over the sorted threshold index. */
+    /** Atom id → int variable. The reverse (var, kind, threshold) → atom lookup searches the
+     *  per-variable sorted threshold index ([byIntVar]). */
     val intVar: IntArrayList = IntArrayList()
 
     /** The relational form of each atom, parallel to [intVar] / [threshold]. */
     val kind: ArrayList<AtomKind> = ArrayList()
 
-    /** Threshold value `k` for the atom. */
     val threshold: LongArrayList = LongArrayList()
 
     /** Stored truth of this order literal — a BCP-cheap forward cache that avoids re-deriving it
@@ -64,10 +61,8 @@ internal class AtomStore(numIntVars: Int) {
      *  materialised for this var yet". */
     val byIntVar: Array<VarAtomIndex?> = arrayOfNulls(numIntVars)
 
-    /** Per-var sorted thresholds that some factor actually watches (either polarity of the atom's
-     *  literal). Bound moves wake watchers by walking only this index — the full atom table grows
-     *  with every reason ever materialised, but only watched atoms need eager transition wakeups;
-     *  everything else is derived on demand. Dense-indexed like [byIntVar]. */
+    /** Per-var sorted thresholds that some factor watches (either polarity of the atom's literal),
+     *  registered by `markAtomWatched` at watch installation. Dense-indexed like [byIntVar]. */
     val watchedByVar: Array<VarAtomIndex?> = arrayOfNulls(numIntVars)
 
     /** Factor ids woken by atom-lit transitions during the current propagation step.

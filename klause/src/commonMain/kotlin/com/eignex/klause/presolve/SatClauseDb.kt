@@ -9,19 +9,16 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /**
- * A mutable clause database over the pure-SAT part of a `Problem` — the shared substrate for the
- * SAT-part presolve passes (bounded variable elimination and blocked-clause elimination).
- * It holds only clean all-Boolean [Clause]s (`allLiteralsBool`);
- * every other factor is left untouched, and any Boolean variable those factors touch is marked
- * ineligible so the passes never rewrite a variable they cannot reconstruct.
+ * A mutable clause database over the pure-SAT part of a `Problem`, shared by bounded variable elimination
+ * and blocked-clause elimination. It holds only clean all-Boolean [Clause]s (`allLiteralsBool`); every
+ * other factor is left untouched, and any Boolean variable those factors touch is marked ineligible so the
+ * passes never rewrite a variable they cannot reconstruct.
  *
- * Clauses live in slots (`clause(s)` is `null` once removed); [add] appends a derived clause and
- * [remove] retires one. A per-literal occurrence index ([occ]) maps each Lit to the slots that
- * mention it — the query at the heart of every SAT-preprocessing technique — with removed slots
- * skipped lazily on read. Tautological input clauses are always true and recorded as vacuous drops
- * rather than entered.
+ * Clauses live in slots (`clause(s)` is `null` once removed). A per-literal occurrence index ([occ]) maps
+ * each literal to the slots that mention it, with removed slots skipped lazily on read. Tautological input
+ * clauses are recorded as vacuous drops rather than entered.
  *
- * [eligible]`[v]` is true when Boolean variable `v` is safe for a pass to eliminate or flip: it is
+ * `eligible(v)` is true when Boolean variable `v` is safe for a pass to eliminate or flip: it is
  * objective-free and appears **only** in clean clauses, so setting it during reconstruction affects
  * nothing but this database. Eligibility is computed by scanning all factors directly (not the
  * deductive occurrence index, which omits invariant-only factors), so an LS-only factor cannot make a

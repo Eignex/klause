@@ -1264,6 +1264,10 @@ internal class WitnessProbe(
     }
 }
 
+// Depth-first lifting over cylindrical algebraic decomposition cells: per coordinate, the projection
+// polynomials' roots split the line into sections and sectors, each sampled once. Collins, "Quantifier
+// elimination for real closed fields by cylindrical algebraic decomposition", LNCS 33, 1975.
+// https://doi.org/10.1007/3-540-07407-4_17
 private fun searchCells(
     formula: PolynomialFormula,
     projection: PolynomialProjection,

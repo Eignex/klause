@@ -50,14 +50,14 @@ private fun collectCliques(factors: List<Factor>, includeKnapsacks: Boolean): Li
  *  `null` when none of size ≥ 2 exists. Two literals `i, j` cannot both hold when `wᵢ + wⱼ > b`;
  *  taking the literals in *descending* weight, the largest prefix whose two smallest members still
  *  sum past `b` is pairwise exclusive — an at-most-one clique. Only `≤` and `=` bound the activity
- *  from above (a lone `≥` does not); negative weights and `b < 0` are skipped (not a clean cover). */
+ *  from above (a lone `≥` does not); non-positive weights and `b < 0` are skipped. */
 private fun pbKnapsackClique(pb: PseudoBoolean): Set<Int>? {
     if (pb.op != PbOp.LE && pb.op != PbOp.EQ) return null
     if (pb.literals.size < 2 || pb.bound < 0) return null
     val order = pb.weights.indices.sortedBy { pb.weights[it] } // ascending weight
     for (i in order) if (pb.weights[i] <= 0) return null
-    // Ascending weights: the suffix from the first index whose pair-sum with its neighbour exceeds
-    // the bound is a clique (its two smallest members already exceed b, so every pair does too).
+    // The suffix from the first index whose pair-sum with its neighbour exceeds the bound is a clique:
+    // its two smallest members already exceed b, so every pair does too.
     val b = pb.bound
     for (start in 0 until order.size - 1) {
         if (pb.weights[order[start]] + pb.weights[order[start + 1]] > b) {
@@ -98,7 +98,8 @@ internal fun maximalPersistentAmoCliques(
  * at-most-one cliques (e.g. three binary clauses forming a triangle collapse to one size-3 clique).
  * Cliques that end up a subset of another are dropped. Deterministic (cliques in input order,
  * literals in id order) and sound because a literal joins only when it conflicts with every current
- * member.
+ * member. Clique merging as in Achterberg, Bixby, Gu, Rothberg and Weninger, "Presolve Reductions in
+ * Mixed Integer Programming", INFORMS J. Comput. 2020, https://doi.org/10.1287/ijoc.2018.0857.
  *
  * Extension is metered against [CLIQUE_MERGE_WORK_BUDGET] and stops on [cancellation]: a clique
  * whose own extension would overrun what is left is kept as it came in. That only forgoes further

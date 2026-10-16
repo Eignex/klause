@@ -144,9 +144,7 @@ private fun Lowering.presenceSubstituted(
  *  for each candidate value `v`, build the indicator `∃i (p_i ∧ x_i = v)`. Sum the
  *  indicators and compare against `n` per `mode`. */
 internal fun Lowering.reifyNValueOpt(expr: NValueExprOpt): Int {
-    // Compute the union of static domains for each x_i. Each xs entry must lift to a
-    // bare IntRef so we can look up its domain — non-bare arithmetic on opt vars at this
-    // position isn't supported (matches the non-opt convention).
+    // Union of the static domains of the lifted xs.
     val unionSet = LongHashSet()
     for (i in expr.xs.indices) {
         val xLifted = lift(expr.xs[i])
@@ -164,9 +162,8 @@ internal fun Lowering.reifyNValueOpt(expr: NValueExprOpt): Int {
     val op = when (expr.mode) {
         NValueMode.EQ -> IntCmpOp.EQ
 
-        NValueMode.AT_LEAST -> IntCmpOp.LE
+        NValueMode.AT_LEAST -> IntCmpOp.LE // n ≤ |distinct|
 
-        // n ≤ |distinct|
         NValueMode.AT_MOST -> IntCmpOp.GE // n ≥ |distinct|
     }
     return reifyIntCompare(IntCompare(expr.n, op, sum))
@@ -238,9 +235,8 @@ private fun pairwiseNoOverlap(si: IntExpr, di: Int, sj: IntExpr, dj: Int): BoolE
 
 /** `b ↔ cumulative(starts, durations, resources, capacity)` (non-opt). Time-tabling
  *  decomposition: at every integer t in the static horizon, the sum of `r_i ·
- *  runs_i(t)` must stay under capacity. The horizon spans `[minEst, maxLct)` derived from
- *  the static start-var domains; absent that information the lowering can't bound the
- *  number of time-point constraints, so each start must lift to a bare [com.eignex.klause.model.IntRef]. */
+ *  runs_i(t)` must stay within capacity. The horizon spans `[minEst, maxLct)` derived from
+ *  the static domains of the lifted starts. */
 internal fun Lowering.reifyCumulative(expr: CumulativeExpr): Int =
     cumulativeTimeTabling(expr.starts, expr.durations, expr.resources, expr.capacity, presents = null)
 
@@ -250,7 +246,9 @@ internal fun Lowering.reifyCumulativeOpt(expr: CumulativeExprOpt): Int =
     cumulativeTimeTabling(expr.starts, expr.durations, expr.resources, expr.capacity, presents = expr.presents)
 
 /**
- * `b ↔ circuit(succ, valueOffset)`. MTZ-style position-vector decomposition: the
+ * `b ↔ circuit(succ, valueOffset)`. Position-vector decomposition after Miller, Tucker and Zemlin,
+ * "Integer Programming Formulation of Traveling Salesman Problems", JACM 1960
+ * (https://doi.org/10.1145/321043.321046): the
  * successor array must be a permutation with no self-loops, and a single visit order
  * exists such that following `succ` from node 0 traverses every node before returning
  * to 0. Cost: `O(n)` extra constraints + `n - 1` aux position vars + the AllDifferent
@@ -290,13 +288,11 @@ internal fun Lowering.reifyCircuit(expr: CircuitExpr): Int {
 }
 
 /**
- * `b ↔ subcircuit(succ, valueOffset)`. Like [reifyCircuit] but `succ[i] = i + offset`
+ * `b ↔ subcircuit(succ, valueOffset)`. Like [reifyCircuit] but `succ(i) = i + offset`
  * marks node `i` excluded; the included nodes (non-self-loops) form a single Hamiltonian
- * cycle in the induced sub-graph. We still enforce AllDifferent over `succ` and a chain
- * structure on position vars, except the chain advance is relaxed to
- * `pos[succ[i]] = pos[i] + 1 ∨ pos[succ[i]] = pos[i]` so excluded nodes (self-loops) don't force a
- * contradiction. Closing the included sub-cycle is handled by allowing
- * `pos[succ[i]] = 0` when the edge closes the loop.
+ * cycle in the induced sub-graph. AllDifferent over `succ` still holds, and each node satisfies
+ * `excluded(i) ∨ pos(succ(i)) = pos(i) + 1 ∨ pos(succ(i)) = 0`: self-loops are exempt from the
+ * chain, and the last included edge closes the loop at position zero.
  */
 internal fun Lowering.reifySubcircuit(expr: SubcircuitExpr): Int {
     val n = expr.succ.size
@@ -311,7 +307,6 @@ internal fun Lowering.reifySubcircuit(expr: SubcircuitExpr): Int {
     for (i in 0 until n) {
         val isExcluded = IntCompare(expr.succ[i], IntCmpOp.EQ, IntLit(i + offset))
         val posAtSucc = IntElement(succIndex0[i], posVars)
-        // Included edge: pos[succ[i]] = pos[i] + 1, or pos[succ[i]] = 0 to close the loop.
         val advance = IntCompare(posAtSucc, IntCmpOp.EQ, IntSum(listOf(posVars[i], IntLit(1))))
         val closing = IntCompare(posAtSucc, IntCmpOp.EQ, IntLit(0))
         pieces += Or(listOf(isExcluded, advance, closing))
@@ -338,7 +333,7 @@ private fun Lowering.cumulativeTimeTabling(
     capacity: Int,
     presents: List<BoolExpr>?,
 ): Int {
-    // Bound the horizon via static domains: [minEstAcrossTasks, maxLctAcrossTasks).
+    // Horizon from the static domains: [min est, max lct).
     var horizonLo = Long.MAX_VALUE
     var horizonHi = Long.MIN_VALUE
     for (i in starts.indices) {
@@ -368,7 +363,6 @@ private fun Lowering.cumulativeTimeTabling(
             } else {
                 And(listOf(presents[i], runsAt))
             }
-            // r * indicator. Scale via IntIfThenElse(gated, r, 0).
             terms += IntIfThenElse(gated, IntLit(r), IntLit(0))
         }
         if (terms.isEmpty()) continue

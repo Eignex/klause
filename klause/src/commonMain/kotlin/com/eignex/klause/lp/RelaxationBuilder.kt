@@ -23,10 +23,9 @@ class LpAuxiliaryColumn(
 }
 
 /**
- * The sink an LP factor projection emits its relaxation into. A factor
- * states linear constraints over the problem's integer variables by raw id; the driver behind this
- * interface maps each variable to its LP column, caps the model, and tracks row provenance — a factor
- * never touches the underlying tableau.
+ * The sink an LP factor projection emits its relaxation into. A factor states linear constraints over the
+ * problem's integer variables by raw id; the driver behind this interface maps each variable to its LP
+ * column, caps the model, and tracks row provenance — a factor never touches the underlying tableau.
  */
 interface RelaxationBuilder {
     /**

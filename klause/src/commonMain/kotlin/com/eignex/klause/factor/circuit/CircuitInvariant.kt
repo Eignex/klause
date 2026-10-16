@@ -77,7 +77,8 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
      * Each reversal is emitted as one atomic [Move.Compound] over the reversed segment's successor
      * variables. Feasibility-preserving (reversing a segment of a valid tour yields a valid tour), so
      * it belongs with the structured moves; if the successor array is not a single Hamiltonian cycle
-     * (mid-repair) the move is undefined and nothing is emitted.
+     * (mid-repair) the move is undefined and nothing is emitted. Croes, "A method for solving
+     * traveling-salesman problems", Oper. Res. 6(6), 1958, https://doi.org/10.1287/opre.6.6.791.
      */
     private fun proposeReversalMoves(state: LocalSearchState, sink: MoveSink) {
         if (n < 4) return

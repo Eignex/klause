@@ -392,7 +392,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
         while (peekPunct(",")) {
             // Disambiguate `i, j in ...` (same generator) from `i in ..., j in ...`.
             val save = pos
-            advance() // consume comma
+            advance()
             if (peek().kind == OznTokenKind.IDENT) {
                 val nxt = peek().text
                 advance()
@@ -400,7 +400,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
                     names.add(nxt)
                     continue
                 } else {
-                    pos = save // rewind
+                    pos = save
                     break
                 }
             } else {

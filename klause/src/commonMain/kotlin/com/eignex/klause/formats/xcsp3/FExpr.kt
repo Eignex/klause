@@ -98,7 +98,7 @@ sealed interface FExpr {
             val tok = readToken()
             skipWs()
             return if (pos < s.length && s[pos] == '(') {
-                pos++ // consume '('
+                pos++
                 val args = ArrayList<FExpr>()
                 skipWs()
                 require(pos < s.length) { "expected ')' in '$s'" }
@@ -123,7 +123,7 @@ sealed interface FExpr {
         }
 
         private fun parseSet(): FExpr {
-            pos++ // consume '{'
+            pos++
             val values = ArrayList<Int>()
             val elem = StringBuilder()
             fun flush() {

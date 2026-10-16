@@ -29,8 +29,7 @@ internal fun interface DestroyOperator {
     ): FreedVars
 
     companion object {
-        /** Free a uniformly-random subset of `fraction * totalVars` variables. The classic
-         *  diversifying baseline; every destroy palette includes it. */
+        /** Free a uniformly-random subset of `fraction * totalVars` variables: the diversifying baseline. */
         val Random: DestroyOperator = DestroyOperator { rng, problem, _, _, fraction ->
             val totalVars = problem.numBoolVars + problem.numIntVars
             if (totalVars == 0) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
@@ -67,11 +66,11 @@ internal fun interface DestroyOperator {
          *  the other variables in those factors, until `fraction` of the variable pool
          *  is reached. Captures the problem's coupling structure: re-optimising a
          *  related cluster surfaces dependencies that a uniformly-random subset misses
-         *  (the "Shaw-related" pattern from LNS 1998 / ALNS 2006).
+         *  (relatedness removal from P. Shaw, "Using Constraint Programming and Local Search Methods
+         *  to Solve Vehicle Routing Problems", CP 1998, https://doi.org/10.1007/3-540-49481-2_30).
          *
-         *  Falls back gracefully on disconnected problems: when BFS exhausts the
-         *  connected component before reaching the target size, it re-seeds from an
-         *  unvisited variable. */
+         *  When BFS exhausts a connected component before reaching the target size, it
+         *  re-seeds from a variable not yet freed. */
         val AdjacencyRelated: DestroyOperator = DestroyOperator { rng, problem, _, _, fraction ->
             val projection = LocalSearchProblem(problem)
             val totalVars = problem.numBoolVars + problem.numIntVars
@@ -119,17 +118,12 @@ internal fun interface DestroyOperator {
             split(freedIds, problem.numBoolVars)
         }
 
-        /** Free variables that participate in factors *currently violated by the incumbent*.
-         *  Locally-feasible incumbents (cost = 0) leave nothing to free here, so the
-         *  operator returns an empty `FreedVars` — useful only when the ALNS incumbent
-         *  is genuinely partial / infeasible (e.g. mid-iteration after a destroyed phase,
-         *  or in soft-constraint settings). Caller should fall back to another operator
-         *  when this returns empty. */
+        /** Free variables that participate in factors *currently violated by the incumbent*,
+         *  subsampled to `fraction` of the variables. A feasible incumbent violates nothing, so
+         *  the operator returns an empty `FreedVars`, which [Alns] scores as a rejected iteration. */
         val CurrentlyViolated: DestroyOperator = DestroyOperator { rng, problem, incumbent, _, fraction ->
             val totalVars = problem.numBoolVars + problem.numIntVars
             if (totalVars == 0) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
-            // Build a scratch state seeded with the incumbent; ask each factor whether it
-            // is violated under that assignment.
             val scratch = LocalSearchState(problem, rng)
             for (b in 0 until problem.numBoolVars) scratch.assignment.setBool(b, incumbent.boolValue(b))
             for (i in 0 until problem.numIntVars) scratch.assignment.setInt(i, incumbent.intValue(i))
@@ -142,7 +136,6 @@ internal fun interface DestroyOperator {
                 for (v in f.boolVars) freedSlots.add(v)
                 for (v in f.intVars) freedSlots.add(problem.numBoolVars + v)
             }
-            // Subsample down to the fraction-sized target if the violated set is larger.
             val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
             val pool = freedSlots.toIntArray().toList()
             val picked = if (pool.size <= k) pool else pool.shuffled(rng).take(k)
@@ -178,11 +171,9 @@ internal fun interface DestroyOperator {
                 split(sorted, problem.numBoolVars)
             }
 
-        /** Default operator palette: random + worst-objective + adjacency-related. Three
-         *  operators gives the bandit a non-trivial menu to learn from; callers can add
-         *  problem-specific operators (e.g. [CurrentlyViolated] when the incumbent is
-         *  expected to be partially-infeasible, or [activityBiased] when ALNS runs over
-         *  a [LocalSearchSession] that accumulates recency). */
+        /** Default operator palette: random, worst-objective and adjacency-related. Callers can add
+         *  problem-specific operators (e.g. [CurrentlyViolated] when the incumbent may be infeasible,
+         *  or [activityBiased] when ALNS runs over a [LocalSearchSession] that accumulates recency). */
         val Defaults: List<DestroyOperator> = listOf(Random, WorstObjective, AdjacencyRelated)
 
         /** Free every int var whose current value lies in a randomly-chosen contiguous
@@ -195,7 +186,6 @@ internal fun interface DestroyOperator {
             require(windowSize > 0) { "windowSize must be > 0, got $windowSize" }
             val n = problem.numIntVars
             if (n == 0) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
-            // Pick the window start uniformly across the smallest..largest int var domain.
             var globalLo = Long.MAX_VALUE
             var globalHi = Long.MIN_VALUE
             for (i in 0 until n) {
@@ -224,7 +214,6 @@ internal fun interface DestroyOperator {
                 val ints = IntArray(cap) { all[it] }
                 return@DestroyOperator FreedVars(EmptyIntArray, ints)
             }
-            // Honour `fraction` as a cap on how many of the in-window vars to free.
             val cap = ((problem.numBoolVars + n) * fraction).toInt().coerceAtLeast(1)
             val take = minOf(cap, inWindow.size)
             val idxs = IntArray(inWindow.size) { it }.also { it.shuffle(rng) }

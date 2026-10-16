@@ -19,7 +19,7 @@ enum class LpTiming {
     MEDIUM,
 
     /** Expensive add-ons on top of the simplex: cut separation rounds, the convex-hull column
-     *  models, the time-indexed reformulation, the rounding probe / fixpoint. */
+     *  models, the time-indexed reformulation. */
     EXHAUSTIVE,
 }
 
@@ -82,19 +82,41 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
     /** Cumulative / Disjunctive time-indexed `x_{i,t}` reformulation over a bounded horizon. */
     CUMULATIVE_TIME_INDEXED("cumulative-time-indexed", LpTiming.EXHAUSTIVE),
 
-    /** ArrayMinMax Anderson big-M tight face on top of the envelope. */
+    /**
+     * ArrayMinMax big-M tight face on top of the envelope.
+     *
+     * R. Anderson, J. Huchette, W. Ma, C. Tjandraatmadja and J. P. Vielma, "Strong mixed-integer
+     * programming formulations for trained neural networks", Mathematical Programming 183, 2020.
+     * https://doi.org/10.1007/s10107-020-01474-5
+     */
     LINMAX_TIGHT("linmax-tight", LpTiming.EXHAUSTIVE),
 
-    /** Product `result = a·b` McCormick envelope (square ⇒ secant/tangent). */
+    /**
+     * Product `result = a·b` McCormick envelope (square ⇒ secant/tangent).
+     *
+     * G. P. McCormick, "Computability of global solutions to factorable nonconvex programs: Part I —
+     * Convex underestimating problems", Mathematical Programming 10, 1976. https://doi.org/10.1007/BF01580665
+     */
     PRODUCT_MCCORMICK("product-mccormick", LpTiming.EXHAUSTIVE),
 
-    /** Boolean RLT: knapsack-row × binary products with McCormick. */
+    /**
+     * Boolean RLT: knapsack-row × binary products with McCormick.
+     *
+     * H. D. Sherali and W. P. Adams, "A hierarchy of relaxations between the continuous and convex hull
+     * representations for zero-one programming problems", SIAM J. Discrete Math. 3(3), 1990.
+     * https://doi.org/10.1137/0403036
+     */
     BOOLEAN_RLT("boolean-rlt", LpTiming.EXHAUSTIVE),
 
     /** Implied-bound cuts from the probing implication graph; a cut family. */
     IMPLIED_BOUND("implied-bound", LpTiming.EXHAUSTIVE),
 
-    /** Single-node flow-cover cuts from VUB / capacity structure; a cut family. */
+    /**
+     * Single-node flow-cover cuts from VUB / capacity structure; a cut family.
+     *
+     * M. W. Padberg, T. J. Van Roy and L. A. Wolsey, "Valid linear inequalities for fixed charge
+     * problems", Operations Research 33(4), 1985. https://doi.org/10.1287/opre.33.4.842
+     */
     FLOW_COVER("flow-cover", LpTiming.EXHAUSTIVE),
     ;
 
@@ -133,11 +155,11 @@ enum class LpEmphasis(
      *  makespan row). No cut rounds or hull models. The shipped single-config default. */
     DEFAULT("default", setOf(LpTiming.FAST, LpTiming.MEDIUM), aliases = listOf("auto")),
 
-    /** + the expensive add-ons (cuts, hulls, time-indexed, probe / fixpoint). */
+    /** + the expensive add-ons (cuts, hulls, time-indexed). */
     AGGRESSIVE("aggressive", setOf(LpTiming.FAST, LpTiming.MEDIUM, LpTiming.EXHAUSTIVE)),
     ;
 
-    /** Token lookup and the id listing for spec parsing / help (single source of truth). */
+    /** Token lookup and the id listing for spec parsing / help. */
     companion object {
         private val byToken: Map<String, LpEmphasis> =
             entries.flatMap { e -> (listOf(e.id) + e.aliases).map { it to e } }.toMap()

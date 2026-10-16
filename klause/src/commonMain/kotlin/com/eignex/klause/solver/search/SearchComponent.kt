@@ -44,9 +44,8 @@ sealed interface SearchDecision {
     /**
      * A theory-owned split or assertion whose representation is opaque to the shared engine.
      *
-     * This is how arbitrary-precision arithmetic, arrays, functions, and quantified instantiation
-     * components retain their native terms while still sharing one decision level and backtracking
-     * lifecycle with CP and Boolean reasoning.
+     * This is how exact and nonlinear arithmetic components retain their native terms while still sharing
+     * one decision level and backtracking lifecycle with CP and Boolean reasoning.
      */
     data class Theory(
         /** Theory-local assertion payload. */
@@ -550,9 +549,8 @@ interface SearchModel {
 /**
  * A typed source-model location whose value can be contributed by exactly one search component.
  *
- * The standard scalar keys below cover the current fragments. The interface remains open so an array,
- * function, or quantified-theory component can define its own source-symbol key without extending the
- * shared engine or exposing private theory state.
+ * The interface is open so a component can define its own source-symbol key without extending the shared
+ * engine or exposing private theory state.
  */
 interface SearchValueKey
 

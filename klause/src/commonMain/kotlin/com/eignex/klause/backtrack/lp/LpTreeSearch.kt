@@ -46,7 +46,7 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 
-// Probe exhaustion supplies no source verdict, bound or recession claim.
+// Only a primal candidate: exhausting the probe proves no verdict, bound or unbounded direction.
 internal class LpTreeSeed(val sample: Sample)
 
 internal fun LpEngine.lbTreeSearch(

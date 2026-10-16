@@ -43,9 +43,8 @@ internal object DuplicateColumns {
      * linear form, so dropping `y`'s term while keeping `x`'s coefficient yields a row with identical
      * activity to the original pair whenever `z = x + y`. Widening to the Minkowski sum admits exactly
      * the reachable aggregate values. Reconstruction ([DuplicateColumnMerge.reconstruct]) splits the
-     * aggregate `z` back into a feasible `(x, y)`: with both declared domains contiguous, an
-     * `x ∈ [min(x), max(x)]` with
-     * `y = z − x ∈ [min(y), max(y)]` exists for every admitted `z`, so a solution of the reduced
+     * aggregate `z` back into a feasible `(x, y)`: with both domains contiguous, an `x ∈ [min(x), max(x)]`
+     * with `y = z − x ∈ [min(y), max(y)]` exists for every admitted `z`, so a solution of the reduced
      * problem maps to a solution of the original — the SAT verdict and the optimum are preserved.
      *
      * **What is *not* merged** (each would break the argument above):
@@ -60,9 +59,9 @@ internal object DuplicateColumns {
      *    but not `y` makes `y`'s coefficient there `0 ≠ a_f`): the columns are then not equal and the
      *    aggregate would not reproduce the rows.
      *
-     * At most one duplicate is folded into each representative per pass; a third duplicate column
-     * re-signs against the widened aggregate and is picked up on a later round, keeping every merge a
-     * two-variable aggregate over *declared* domains that the contiguous split reconstructs exactly.
+     * A class of K duplicates folds in K − 1 batches, one fold per representative per batch, each over the
+     * representative's domain as widened by the batches before it; reconstruction undoes the batches
+     * last-first, so every split is a two-variable split over contiguous domains.
      */
     fun mergeDuplicateColumns(
         problem: BakedProblem,
@@ -73,26 +72,21 @@ internal object DuplicateColumns {
         if (problem.numIntVars < 2) return PassDelta()
         val n = problem.numIntVars
         // Inter-round fast-bail. On a re-run the engine supplies the variables whose factors changed since
-        // dup-columns last ran. A duplicate-column class collapses fully when the pass fires (every member
-        // but the representative is folded away, leaving pairwise-distinct signatures), so a *new* class can
-        // only form on a column whose factor membership or a coefficient changed — i.e. a touched variable.
-        // If no touched variable is column-eligible the pass is fruitless this firing, byte-identical to the
-        // full scan below (which would re-derive the same all-singleton classes). Only a re-run passes a
-        // non-null [incrementalTouchedVars]; the first firing (and the fresh path) scans in full.
+        // the pass last ran. A duplicate-column class collapses fully when the pass fires, so a new class can
+        // only form on a column whose factor membership or a coefficient changed, i.e. a touched variable.
+        // If no touched variable is column-eligible the full scan below would find only singleton classes.
+        // A null [incrementalTouchedVars] means a full scan.
         if (incrementalTouchedVars != null && sharedIntOcc != null &&
             !anyTouchedColumnEligible(incrementalTouchedVars, sharedIntOcc, problem, objectiveIntVars)
         ) {
             return PassDelta()
         }
-        // Column duplication is a structural (row-support + coefficient) property, and folding one duplicate
-        // into its representative removes only the dropped column's own term — every surviving column stays
-        // in the same factors with the same coefficient, so no column's signature or eligibility changes.
-        // Eligibility and signatures are therefore computed once over the input rather than re-derived after
-        // each fold: a class of K identical columns collapses in a single O(n) scan instead of K scans.
+        // Folding one duplicate into its representative removes only the dropped column's own term, so no
+        // surviving column's signature or eligibility changes: both are computed once over the input.
         val domains = problem.rootIntDomains()
         val eligible = eligibleColumns(problem.factors, n, domains, objectiveIntVars)
         val signatures = columnSignatures(problem.factors, n, eligible)
-        // Group eligible columns by signature in ascending-id order; the first is the representative.
+        // Ascending-id order: the first member of a class is its representative.
         val classes = LinkedHashMap<List<Long>, IntArrayList>()
         for (v in 0 until n) {
             if (!eligible[v]) continue
@@ -101,11 +95,10 @@ internal object DuplicateColumns {
         }
         val maxClassSize = classes.values.maxOfOrNull { it.size } ?: 0
         if (maxClassSize < 2) return PassDelta()
-        // Fold in per-round batches: round k folds the k-th duplicate of every class into its representative
-        // (one fold per representative per round), widening the aggregate's domain to the running Minkowski
-        // sum. Batches undo last-first, which is what makes the reconstruction split exact.
-        val keepOf = IntArray(n) { it } // drop → its aggregate representative
-        val batches = ArrayList<List<ColumnMerge>>() // in application order; reconstruction undoes them last-first
+        // Batch k folds the k-th duplicate of every class into its representative, widening the aggregate's
+        // domain to the running Minkowski sum. Batches undo last-first, which makes the split exact.
+        val keepOf = IntArray(n) { it }
+        val batches = ArrayList<List<ColumnMerge>>()
         for (k in 1 until maxClassSize) {
             val merges = ArrayList<ColumnMerge>()
             for (members in classes.values) {
@@ -113,23 +106,19 @@ internal object DuplicateColumns {
                 val rep = members[0]
                 val drop = members[k]
                 val keep = domains[rep]
-                // The Minkowski sum must be representable: two columns pinned at the open-domain clamp
-                // (2^62 each) sum to 2^63, which wraps to Long.MIN_VALUE — a well-formed aggregate at the
-                // wrong value, so the model is declared UNSAT with nothing to show the bound was lost.
-                // Saturating instead would admit a `z` no `(x, y)` can realise, which reconstruction
-                // could not split, so the pair is left unmerged.
+                // The Minkowski sum must be representable: two columns at the open-domain clamp (2^62 each)
+                // sum to 2^63, which wraps to Long.MIN_VALUE and would wrongly refute the model. Saturating
+                // instead would admit a `z` no `(x, y)` can realise, so the pair is left unmerged.
                 val lo = addExactOrNull(keep.min, domains[drop].min) ?: continue
                 val hi = addExactOrNull(keep.max, domains[drop].max) ?: continue
                 merges.add(ColumnMerge(keep = rep, drop = drop, keepDomain = keep, dropDomain = domains[drop]))
                 keepOf[drop] = rep
-                // Widen the aggregate to the Minkowski sum; the session reseeds on this widen via [PassDelta.domains].
+                // The session reseeds on this widen via [PassDelta.domains].
                 domains[rep] = IntDomain(lo, hi)
             }
             batches.add(merges)
         }
         val workFactors = Array(problem.factors.size) { aggregateColumns(problem.factors[it], keepOf) }
-        // Delta by identity against the input: a slot whose final rewrite differs from the input factor is
-        // a drop+add; an untouched slot contributes nothing.
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         problem.factors.forEachIndexed { i, f ->
@@ -278,7 +267,7 @@ internal object DuplicateColumns {
         val keptCoeffs = LongArrayList(linear.vars.size)
         for (i in linear.vars.indices) {
             val v = linear.vars[i]
-            if (keepOf[v] != v) continue // a dropped duplicate: its term is absorbed by the representative's
+            if (keepOf[v] != v) continue
             keptVars.add(v)
             keptCoeffs.add(row.coeff(i))
         }
@@ -287,10 +276,9 @@ internal object DuplicateColumns {
 
     /** Whether any variable in [touched] is column-eligible with at least one [Linear] occurrence — the
      *  cheap re-run gate. Eligibility is the same local test [eligibleColumns] applies (not an objective
-     *  variable, a contiguous domain, and no non-[Linear] occurrence), read here per variable off the
-     *  session's occurrence index so a barren re-run costs O(occurrences of touched) rather than the
-     *  O(all occurrences) full signature build. A variable in no [Linear] factor gets a `null` signature
-     *  in the full scan and can never match, so it is not counted here. */
+     *  variable, a contiguous domain, and no non-[Linear] occurrence), read per variable off the session's
+     *  occurrence index so a barren re-run costs O(occurrences of touched). A variable in no [Linear]
+     *  factor can never match, so it is not counted. */
     private fun anyTouchedColumnEligible(
         touched: IntArray,
         occ: SharedIntOccurrence,
@@ -316,8 +304,7 @@ internal object DuplicateColumns {
 
     /** Per-variable eligibility: every occurrence is a [Linear] factor (a global / reified row reads a
      *  variable value-wise, not as a column coefficient), the domain is contiguous (the reconstruction
-     *  split must not land in a hole), and the variable is not read by the objective. The factor list is
-     *  scanned once to mark every variable a non-[Linear] factor mentions. */
+     *  split must not land in a hole), and the variable is not read by the objective. */
     private fun eligibleColumns(
         factors: Array<Factor>,
         numIntVars: Int,
@@ -357,7 +344,7 @@ internal object DuplicateColumns {
         return Array(numIntVars) { entries[it]?.takeIf { e -> e.isNotEmpty() } }
     }
 
-    /** `a + b`, or null when it overflows [Long]. Overflow iff the operands share a sign the sum does not. */
+    /** `a + b`, or null when it overflows [Long]. */
     private fun addExactOrNull(a: Long, b: Long): Long? {
         val r = a + b
         return if (((a xor r) and (b xor r)) < 0L) null else r
@@ -366,23 +353,18 @@ internal object DuplicateColumns {
     private fun IntDomain.isContiguous(): Boolean = holeCount == 0L
 }
 
-/** A single duplicate-column aggregation: the surviving aggregate [keep] absorbs [drop]. Both
- *  variables' *declared* domains ([keepDomain], [dropDomain]) are needed to split the aggregate value
- *  back into a feasible pair at reconstruction. */
+/** A single duplicate-column aggregation: the surviving aggregate [keep] absorbs [drop]. Both variables'
+ *  domains at merge time ([keepDomain], [dropDomain]) split the aggregate value back into a feasible pair. */
 internal class ColumnMerge(val keep: Int, val drop: Int, val keepDomain: IntDomain, val dropDomain: IntDomain)
 
-/**
- * The duplicate-column aggregations [Presolve] made, holding the data to split
- * each aggregate variable back into its two originals. Pass a solution of the reduced problem through
- * [reconstruct] to recover a solution of the original.
- */
+/** One batch of the duplicate-column aggregations [Presolve] made, holding the data to split each
+ *  aggregate back into its two originals. */
 internal class DuplicateColumnMerge(private val merges: List<ColumnMerge>) {
     /** Recover the dropped variables in a solution [sample] of the reduced problem. The aggregate `keep` holds
      *  `z = x + y`; a feasible split needs `x ∈ [min(x), max(x)]` and `y = z − x ∈ [min(y), max(y)]`,
      *  i.e. `x ∈ [max(min(x), z − max(y)), min(max(x), z − min(y))]`, non-empty for every `z` the
-     *  aggregate admits when both originals are contiguous. Take its lower end. Each merge has a
-     *  distinct `keep` and `drop` (no `keep` is another merge's `drop` this pass), so the split order
-     *  is immaterial. */
+     *  aggregate admits when both originals are contiguous. Take its lower end. Within a batch each merge
+     *  has a distinct `keep` and `drop`, so the split order is immaterial. */
     fun reconstruct(sample: Sample): Sample {
         if (merges.isEmpty()) return sample
         val ints = sample.ints
@@ -397,11 +379,9 @@ internal class DuplicateColumnMerge(private val merges: List<ColumnMerge>) {
 }
 
 /**
- * Reconstruction for a fixpoint run of [DuplicateColumns.mergeDuplicateColumns], which folds a chain of
- * duplicate columns over several internal iterations. Each iteration's aggregate is built on the previous
- * iteration's (possibly already-widened) representative domain, so the splits must be undone in reverse
- * iteration order — the same last-batch-first order the round engine produced when it re-invoked the pass
- * once per iteration and composed the per-round reconstructions with `foldRight`.
+ * Reconstruction for [DuplicateColumns.mergeDuplicateColumns], which folds a class of duplicate columns over
+ * several batches. Each batch's aggregate is built on the previous batch's widened representative domain,
+ * so the splits are undone in reverse batch order.
  */
 internal class DuplicateColumnMerges(private val batches: List<List<ColumnMerge>>) {
     fun reconstruct(sample: Sample): Sample {

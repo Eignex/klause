@@ -11,15 +11,16 @@ import com.eignex.klause.propagation.Propagator
 
 /**
  * A *system* of parity (XOR) constraints propagated jointly by Gauss-Jordan elimination over
- * GF(2). Each constraint is `XOR(vars) == rhs`; the factor owns all of them as one matrix.
+ * GF(2) (Soos, Nohl and Castelluccia, "Extending SAT Solvers to Cryptographic Problems", SAT 2009,
+ * https://doi.org/10.1007/978-3-642-02777-2_24). Each constraint is `XOR(vars) == rhs`; the factor
+ * owns all of them as one matrix.
  *
  * Unlike a single [Xor] factor — which can only force a variable once a constraint has exactly
  * one unassigned variable left — Gaussian elimination *combines* equations, so it detects an
  * inconsistency (`0 = 1`) or forces a variable as soon as the linear system implies it. That is
  * what makes XOR-hash model counting / sampling tractable: without it, the parity subspace has
- * no short clausal refutations and the search thrashes on every infeasible branch (klause has no
- * clausal Gaussian reasoning otherwise). With it, enumerating a hashed cell visits essentially
- * only its real solutions.
+ * no short clausal refutations and the search thrashes on every infeasible branch. With it,
+ * enumerating a hashed cell visits essentially only its real solutions.
  *
  * Each [Propagator.propagate] substitutes the current partial assignment, reduces the residual system to
  * row-echelon form, and pins every variable the system forces (rows that collapse to a single
@@ -42,8 +43,8 @@ class GaussianXor(
 
     /** A system of parity equations is order-insensitive, so the constraints are encoded as a sorted
      *  multiset — each as its target parity and its literal set. */
-    // Not migrated to the KeySink allocation-free hash: the key sorts nested sub-constraints by their
-    // own (remapped) structuralKey, which the linear sink walk can't reproduce.
+    // No allocation-free KeySink hash: the key sorts nested sub-constraints by their own (remapped)
+    // structuralKey, which the linear sink walk can't reproduce.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.GAUSSIAN_XOR) {
         int(constraints.size)
         for (c in constraints.sortedBy { it.structuralKey() }) {

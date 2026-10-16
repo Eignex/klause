@@ -75,9 +75,7 @@ internal inline fun reifiedDegree(aux: Boolean, holds: Boolean, violatedDegree: 
 
 internal class CoalescedTerms(val vars: IntArray, val coeffs: LongArray)
 
-// Int-coefficient convenience: widen and delegate. Most callers build small Int coefficients; the
-// frontends that can produce coefficients beyond Int range (SMT cut lemmas, dense affine folds) build
-// a `LongArray` and call the wide form directly.
+// Callers whose coefficients can pass the Int range (SMT cut lemmas, dense affine folds) use the LongArray form.
 internal fun coalesceLinearTerms(vars: IntArray, coeffs: IntArray): CoalescedTerms =
     coalesceLinearTerms(vars, LongArray(coeffs.size) { coeffs[it].toLong() })
 
@@ -94,10 +92,9 @@ internal fun coalesceLinearTerms(vars: IntArray, coeffs: LongArray): CoalescedTe
     }
     if (!hasDuplicate) return CoalescedTerms(vars, coeffs)
 
-    // Coalesce in first-occurrence order with primitive maps. A boxed `HashMap<Int, Long>` here
-    // dominated presolve on dense linear systems, where affine folding builds one coalesced row per
-    // eliminated-variable incidence. `slotOf` maps a variable to its slot in [order]; [sums] accumulates
-    // per slot. A zero-sum term is kept (a variable that appears stays), matching the boxed version.
+    // Coalesce in first-occurrence order with primitive maps: affine folding builds one coalesced row per
+    // eliminated-variable incidence, so boxing would dominate presolve on dense linear systems. A zero-sum
+    // term is kept (a variable that appears stays).
     val order = IntArrayList(vars.size)
     val slotOf = MutableIntIntMap(vars.size * 2)
     val sums = LongArray(vars.size)
@@ -398,8 +395,8 @@ internal fun propagatePbBounds(
     }
     // Every pin implied below is forced by the same pre-loop assignment: the feasibility tests all read
     // the frozen pre-loop ranges [r], and each pinned var is free pre-loop so appears in no antecedent.
-    // So all pins in this fire share one false-form antecedent — build it lazily once rather than
-    // rescanning the literals per pin, which turned a wide-WBO fixpoint fire into O(pins × literals).
+    // So all pins in this fire share one false-form antecedent, built lazily once; rescanning the literals
+    // per pin would make a wide fire O(pins × literals).
     var ant: IntArray? = null
     var antReady = false
     for (i in 0 until literals.size) {

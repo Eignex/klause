@@ -18,12 +18,11 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 
 /**
- * Shared OLL (relax-by-selector) scaffolding for the core-guided MaxSAT drivers
- * [CoreGuidedOptimizer] (Fu-Malik / RC2) and [TotalizerOptimizer] (totalizer / PB
- * threshold chain). Both need the same selector-per-soft, relaxer-clause
- * `(origLit ∨ selector)`, project-core-to-softs and `lb += wMin` bookkeeping; holding it in one
- * place keeps the two drivers from drifting apart, which is how a spent-soft
- * sample-vs-bound mismatch can end up fixed in one driver and not the other.
+ * Shared relax-by-selector scaffolding for the core-guided MaxSAT drivers [CoreGuidedOptimizer]
+ * (Fu-Malik with weight splitting), [TotalizerOptimizer] (cardinality / PB threshold chain) and
+ * [CoreGuidedSearch]: selector-per-soft relaxer clauses `(origLit ∨ selector)`, core projection onto
+ * softs, and recovery of a sample whose true cost matches the bound, kept in one place so the drivers
+ * agree on all three.
  */
 internal object Oll {
 
@@ -81,15 +80,15 @@ internal object Oll {
     }
 
     /**
-     * Given an OLL witness [sample] proved optimal at lower bound [lb], return a sample
+     * Given a core-guided witness [sample] proved optimal at lower bound [lb], return a sample
      * whose *true* soft cost equals [lb]. The core-guided relaxer machinery can hand
      * back a witness whose true cost exceeds [lb] — a spent soft may be relaxed "for free"
      * by a per-core blocker forced true for another core's sake, so the recovered
      * assignment violates more softs than the reported bound. Callers that read the
      * assignment (rather than only the cost) then see a non-optimal sample.
      *
-     * If the witness already costs exactly [lb] it is returned unchanged. Otherwise we
-     * re-solve the hard problem under an explicit cap on the true cost,
+     * If the witness already costs exactly [lb] it is returned unchanged. Otherwise this
+     * re-solves the hard problem under an explicit cap on the true cost,
      * `Σ wᵢ·¬softLitᵢ ≤ lb`, which is feasible (lb is the proven optimum, so a cost-`lb`
      * model exists) and forces any recovered sample to a cost of exactly [lb].
      *

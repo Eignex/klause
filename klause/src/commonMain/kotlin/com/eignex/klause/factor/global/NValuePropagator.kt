@@ -82,10 +82,11 @@ internal class NValuePropagator(
         state.propagatorFailures.remove(this)
         if (state.cpGateShouldSkip(factorId)) return true
 
-        // atLeast / eq: the distinct count cannot exceed the maximum number of variables that can be
-        // assigned pairwise-distinct values — a maximum bipartite var↦value matching. Tighter than
-        // |union of domains|, which ignores that there are only `xs.size` variables. When the count is
-        // pinned to that maximum, a maximum matching is mandatory, so matching-support pruning applies.
+        // atLeast / eq: the distinct count cannot exceed the size of a maximum bipartite var↦value matching
+        // (Bessière, Hebrard, Hnich, Kiziltan, Walsh, "Filtering Algorithms for the NValue Constraint",
+        // Constraints 11(4), 2006, https://doi.org/10.1007/s10601-006-9001-9). Tighter than |union of
+        // domains|. When the count is pinned to that maximum, a maximum matching is mandatory, so
+        // matching-support pruning applies.
         if (mode != NValue.Mode.AtMost) {
             // The matching build enumerates each variable's domain. On a domain too large to walk fall
             // back to the trivial sound upper bound (distinct values ≤ number of variables) and skip the
@@ -111,7 +112,7 @@ internal class NValuePropagator(
                 return failOn(state, IntArray(0), n)
             }
         }
-        // atMost / eq: O(n+d) bound-consistency — the count is at least the size of a
+        // atMost / eq: bound-consistency — the count is at least the size of a
         // maximal set of pairwise-disjoint value windows, and when that lower bound meets `n`'s upper
         // bound every variable is forced into the window of its kernel representative.
         if (mode != NValue.Mode.AtLeast) {
@@ -331,7 +332,8 @@ internal class NValuePropagator(
     }
 
     /**
-     * Bound-consistency for atMost (Beldiceanu, "Filtering Algorithms for the NValue Constraint")
+     * Bound-consistency for atMost (N. Beldiceanu, "Pruning for the minimum constraint family and for the
+     * number of distinct values constraint family", CP 2001, https://doi.org/10.1007/3-540-45578-7_15)
      * over kernels of disjoint bound windows: a kernel is a maximal set
      * of pairwise-disjoint `[lb, ub]` windows; its size lower-bounds the distinct count, and when it
      * equals `n`'s upper bound each variable is squeezed into the window of its kernel representative.

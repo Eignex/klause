@@ -11,8 +11,8 @@ import java.net.URI
  *
  *  - [ProblemSource.Vendored] → a path under the workspace root (tracked in git).
  *  - [ProblemSource.External] → a path inside a cached clone/download of an
- *    [ExternalCollection]; the collection is fetched **on first use** (automatically and
- *    transparently, with a clear log line) into [cacheRoot] and reused thereafter.
+ *    [ExternalCollection]; the collection is fetched on first use into [cacheRoot] and reused
+ *    thereafter.
  *  - [ProblemSource.InCode] has no file and is resolved by the solver layer, not here.
  *
  * Fetched instances are stored zstd-compressed (see [CorpusFiles]), so a resolved file may be
@@ -24,8 +24,8 @@ internal object CorpusFetcher {
      *  of the recompression to zstd. */
     private val DECOMPRESS_TOOLS = mapOf("xz" to "unxz", "bz2" to "bunzip2", "gz" to "gunzip", "lzma" to "unlzma")
 
-    /** Resolve the workspace root. Honors `-Dklause.workspace.root`; otherwise walks up from
-     *  the working directory looking for the `klause-mzn-lib/` marker. */
+    /** The workspace root: `-Dklause.workspace.root`, otherwise the nearest ancestor of the working
+     *  directory holding `klause-mzn-lib/`. */
     fun workspaceRoot(): File {
         System.getProperty("klause.workspace.root")?.let { return File(it) }
         var cur: File? = File(".").absoluteFile
@@ -215,7 +215,7 @@ internal object CorpusFetcher {
     }
 
     /** Drop extracted files over [ExternalCollection.maxFileMb] (measured on the still-compressed
-     *  size) before the `.gz` expansion, so a huge archive's giant members never inflate the cache. */
+     *  size) before decompression, so a huge archive's giant members never inflate the cache. */
     private fun dropOversized(c: ExternalCollection, dir: File) {
         val cap = c.maxFileMb?.let { it * 1024L * 1024 } ?: return
         val victims = dir.walkTopDown().filter { it.isFile && it.length() > cap }.toList()

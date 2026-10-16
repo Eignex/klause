@@ -13,7 +13,8 @@ import com.eignex.klause.util.IntHashSet
  * subset among the other learned clauses is dropped, and a clause whose subset match holds with
  * exactly one literal negated is strengthened by resolving that literal away. Runs on both clause
  * stores — the general database and the native-SAT arena's learned buffer — over pure-Boolean,
- * non-permanent clauses.
+ * non-permanent clauses. Self-subsuming resolution follows Eén and Biere, "Effective Preprocessing
+ * in SAT Through Variable and Clause Elimination", SAT 2005 (https://doi.org/10.1007/11499107_5).
  *
  * Soundness is direction-free: every participating clause is learned, hence implied by the base
  * formula, so dropping one never loses models and a self-subsuming resolvent (implied by the two

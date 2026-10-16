@@ -22,7 +22,9 @@ internal data class CrashBasisMetrics(
 internal class CrashBasisAttempt(val basis: Basis?, val metrics: CrashBasisMetrics)
 
 /**
- * Proposes a deterministic GLPK-style triangular root basis in source-column coordinates.
+ * Proposes a deterministic triangular crash root basis in source-column coordinates (in the spirit of
+ * Bixby, "Implementing the simplex method: the initial basis", ORSA J. Comput. 1992,
+ * https://doi.org/10.1287/ijoc.4.3.267).
  *
  * This is only a proposal: [RevisedSimplex] factorizes it, admits repaired headings in full, and
  * checks the actual reduced-cost signs before the dual pass. Selecting only exact zero-cost basics

@@ -4,9 +4,8 @@ package com.eignex.klause.localsearch.movesource
  * The named sources axis of an LS recipe: a registry mapping a stable label to a default-configured
  * [MoveSource], and a parser turning a `sources=…` spec into the [ConfiguredSource] list a
  * source-driven strategy draws from. The single place a source label resolves to an instance with
- * its default numeric params, so the CLI selector and the cross-product arm generator share one
- * catalog rather than hard-coding constructors. Per-source numeric overrides are a caller concern
- * layered on top.
+ * its default numeric params, so recipe axis edits ([com.eignex.klause.localsearch.strategy.AxisEdits])
+ * never hard-code constructors. Per-source numeric overrides are a caller concern layered on top.
  */
 object MoveSourceCatalog {
 

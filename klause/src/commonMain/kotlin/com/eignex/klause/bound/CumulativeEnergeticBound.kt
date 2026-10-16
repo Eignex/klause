@@ -15,13 +15,15 @@ import com.eignex.klause.util.subExact
  * Energetic-reasoning infeasibility check for Cumulative globals. For a time window
  * `[t1, t2)`, every task must spend at least its *mandatory* energy inside the window no matter where
  * it is placed; if the summed mandatory energy of the tasks exceeds `capacity·(t2 − t1)`, no schedule
- * fits and the node is infeasible (Baptiste–Le Pape–Nuijten / Lopez energetic reasoning).
+ * fits and the node is infeasible. Energetic reasoning as in Baptiste, Le Pape and Nuijten,
+ * "Satisfiability tests and time-bound adjustments for cumulative scheduling problems", Annals of
+ * Operations Research 1999 (https://doi.org/10.1023/A:1018995000688), after Lopez, Erschler and
+ * Esquirol (1992).
  *
  * This is a pure feasibility test (objective-independent), used as a node prune. It is deliberately
  * conservative so it stays sound: required energy uses each task's **minimum** demand, **minimum**
  * duration and only **definitely-present** tasks (a lower bound on what must fit), while capacity uses
  * its **maximum** (an upper bound on what is available) — so a reported overflow is always real.
-
  */
 internal class CumulativeEnergeticBound(
     problem: Problem,
@@ -74,8 +76,8 @@ internal class CumulativeEnergeticBound(
         val dur = LongArray(n)
         val dem = LongArray(n)
         val present = BooleanArray(n)
-        val starts = LongArrayList() // candidate window left edges
-        val ends = LongArrayList() // candidate window right edges
+        val starts = LongArrayList()
+        val ends = LongArrayList()
         for (i in 0 until n) {
             if (c.presents.isNotEmpty() && session.litTruth(c.presents[i]) != true) continue // maybe absent
             val sd = session.intDomain(c.starts[i])

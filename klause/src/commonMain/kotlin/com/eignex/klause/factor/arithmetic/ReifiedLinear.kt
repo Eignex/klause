@@ -26,9 +26,9 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.util.BigInt
 
 /**
- * `auxBoolVar ↔ (Σ coeffs[i] * intVars[i] ⟨op⟩ bound)`. Created by the compiler when a
+ * `auxBoolVar ↔ (Σ coeff(i)·vars(i) ⟨op⟩ bound)`. Created by the compiler when a
  * multi-variable [com.eignex.klause.model.IntCompare] appears non-top-level so the rest of the
- * Tseitin lowering can treat its truth as a Boolean literal. Payload at `intPayload[factorId]`
+ * Tseitin lowering can treat its truth as a Boolean literal. Payload at `longPayload(factorId)`
  * is the current weighted sum, mirrored from [Linear]. Terms pair [vars] with the coefficients in
  * [constants]; the sum is compared by [op] against that shape's bound.
  */
@@ -92,7 +92,7 @@ class ReifiedLinear private constructor(
     constructor(auxBoolVar: Int, coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int) :
         this(auxBoolVar, coalesceLinearTerms(vars, coeffs), op, bound.toLong())
 
-    /** Wide form: coefficients and bound that may exceed 32-bit range. */
+    /** 64-bit form: coefficients and bound that may exceed the 32-bit range. */
     constructor(auxBoolVar: Int, coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long) :
         this(auxBoolVar, coalesceLinearTerms(vars, coeffs), op, bound)
 
@@ -137,10 +137,9 @@ class ReifiedLinear private constructor(
         }
     }
 
-    // A wide row has no 64-bit [longPayload] to read: local search is gated off entirely for a problem
-    // with any wide factor (LocalSearchSolver bails on hasWideFactor), so these are unreachable for one;
-    // the conservative "always violated" / max-residual values cannot let LS accept an assignment that
-    // breaks it.
+    // A wide row has no 64-bit payload to read; local search scores it with an exact-sum invariant instead.
+    // The conservative "always violated" / max-residual values cannot let a caller accept an assignment
+    // that breaks it.
     override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean =
         integerConstants?.let { linearHolds(state.longPayload[factorId], op, it.bound) } ?: false
 

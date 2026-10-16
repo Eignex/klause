@@ -85,10 +85,10 @@ class CardinalitySearchComponent(cardinalities: Iterable<Cardinality>) : SearchC
     /**
      * Counts every cardinality once more at a candidate leaf.
      *
-     * Propagation already refutes a violated count, so this repeats work on the path where the session is
-     * about to surface a model. It stays because the component's own reachability argument — that every
-     * assignment of a literal wakes the cardinalities holding it — is the kind a later change to how the
-     * session publishes Boolean facts could quietly break, and a wrong verdict is what that would cost.
+     * Propagation already refutes a violated count, so this repeats work only where the session is about
+     * to surface a model. It guards the component's reachability argument — that every assignment of a
+     * literal wakes the cardinalities holding it — which rests on how the session publishes Boolean facts;
+     * a gap there would otherwise surface as a wrong verdict.
      */
     override fun check(context: SearchContext): ComponentCheck {
         val previous = active

@@ -38,6 +38,7 @@ import com.eignex.klause.solver.result.SampleResult
  * Three call kinds, each accepting a [LocalSearchParams]:
  *
  *  - [solve] — return a single [SolveResult]; root propagation is its only source of refutation.
+ *  - [minimize] / [improvements] — best-effort optimisation of a linear objective.
  *  - [sample] / [enumerate] — both stream independent feasible draws with replacement.
  *    Local search has no notion of a "next" model, so enumerate is just a sample stream;
  *    duplicates may appear. Use [com.eignex.klause.backtrack.BacktrackSolver] when
@@ -46,28 +47,25 @@ import com.eignex.klause.solver.result.SampleResult
 class LocalSearchSolver(
     override val problem: BakedProblem,
     /** SourceDrivenStrategy for the satisfy phase (and, when [optimizeStrategy] is null, the minimize
-     *  phase too, via its [SourceDrivenStrategy.feasibleDescent]). Default is [Cbls] — its
+     *  phase too, via its [SourceDrivenStrategy.feasibleDescent]). Default is [Cbls], whose
      *  [FeasibleDescent.SelfOwned] descent (greedy over its objective / structured / pair-swap sources)
-     *  runs the objective optimize, so a bare `LocalSearchSolver(problem).minimize(...)` optimizes with
-     *  no extra wiring. Override for a
-     *  different arm — `ProbSat.adaptive()` for a boolean core (ratcheted on a COP by the portfolio),
-     *  `SimulatedAnnealing.optimizer(...)` to anneal. */
+     *  optimizes with no extra wiring. Override for a different arm — `ProbSat.adaptive()` for a boolean
+     *  core (ratcheted on a COP by the portfolio), `SimulatedAnnealing.optimizer(...)` to anneal. */
     val strategy: SourceDrivenStrategy = Cbls(),
-    /** SourceDrivenStrategy for the feasibility-fight phase of [minimize]. `null` reuses [strategy].
-     *  Override to decouple satisfy-mode and minimize-mode strategies; e.g. satisfy [ProbSat.adaptive] +
-     *  minimize [Cbls] for decomposed CP problems, where CBLS's weighted-violation gradient descends the
-     *  objective on instances where probSAT plateaus. */
+    /** SourceDrivenStrategy driving both phases of [minimize]; `null` reuses [strategy]. Override to
+     *  decouple satisfy-mode and minimize-mode strategies, e.g. satisfy [ProbSat.adaptive] + minimize [Cbls]. */
     val optimizeStrategy: SourceDrivenStrategy? = null,
     /** Restart policy controlling diversification. */
     val restartPolicy: RestartPolicy = FixedCadenceRestart(),
-    /** When true (default), restarts run a greedy-repair pass after randomizing so the search starts
-     *  closer to feasibility. The pass walks vars in randomized order and picks the value that
-     *  minimizes immediate violation contribution. Idempotent and bounded by the variable count. */
+    /** When true (default), restarts on models of at least 32 variables run a greedy-repair pass after
+     *  randomizing so the search starts closer to feasibility: one pass over the vars in randomized order,
+     *  each set to the value that minimizes the current cost
+     *  ([com.eignex.klause.localsearch.movesource.GreedyInit]). */
     val greedyRepairOnRestart: Boolean = true,
     /** Optional definitional sweep (see [DefinitionalSweep]): after every restart's randomization,
      *  defined (aux) vars are *evaluated* bottom-up from the free decision vars instead of left
      *  random, so decomposed models start each restart at the "only real constraints violated"
-     *  frontier. Null = behavior unchanged. */
+     *  frontier. */
     val definitionalSweep: DefinitionalSweep? = null,
     /** Per-move one-way invariants (opt-in): maintain [definitionalSweep]'s definitions incrementally
      *  after every applied move and exclude defined vars from move generation, shrinking the move
@@ -120,11 +118,7 @@ class LocalSearchSolver(
         completion = completion,
     )
 
-    /** Objective-as-constraint ratchet handle (opt-in). Set non-null only for an arm whose [problem]
-     *  carries an [com.eignex.klause.factor.objective.ObjectiveBoundFactor] sharing this bound: on each
-     *  feasible incumbent the minimize loop tightens it below the incumbent, so the objective slack
-     *  re-enters the violation set and the feasibility fight repairs it — the SAT→optimization ratchet
-     *  for the violation-native arms (probSAT / WalkSAT). Null leaves objective handling unchanged. */
+    /** Objective-as-constraint ratchet handle; see [LocalSearchEngine.objectiveBound]. */
     internal var objectiveBound: MutableObjectiveBound?
         get() = engine.objectiveBound
         set(value) {
@@ -180,9 +174,8 @@ class LocalSearchSolver(
     ): SearchStream<MinimizeResult> =
         engine.openImprovements(objective, params, warm = null)
 
-    /** Return a [LocalSearchSession] that persists DDFW-style factor weights across
-     *  calls and maintains an assumption stack. Backend-specific override of
-     *  [Solver.session]'s default `StatelessSession`. */
+    /** Return a [LocalSearchSession] that persists learned factor weights across calls and maintains an
+     *  assumption stack. */
     override fun session(): LocalSearchSession = LocalSearchSession(this)
 
     /**
@@ -199,13 +192,13 @@ class LocalSearchSolver(
     /** Solve once and return a [SolveResult]. */
     fun solve(): SolveResult = solve(LocalSearchParams())
 
-    /** Draw a single diverse sample, or null if none exists. */
+    /** Draw a single sample. */
     fun sample(): SampleResult = sample(LocalSearchParams())
 
     /** Lazily draw diverse samples. */
     fun samples(): Sequence<Sample> = samples(LocalSearchParams())
 
-    /** Lazily enumerate distinct models. */
+    /** Lazily draw samples; unlike a complete enumeration, duplicates may appear. */
     fun enumerate(): Sequence<Sample> = enumerate(LocalSearchParams())
 
     /** Optimise against [objective] under the hard constraints. */

@@ -11,12 +11,12 @@ import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 
 /**
- * `lex_less(xs, ys)` / `lex_lesseq(xs, ys)` — lexicographic ordering on equal-length int
- * vectors. [strict] = `true` for strict less-than, `false` for less-or-equal.
+ * `lex_less(xs, ys)` / `lex_lesseq(xs, ys)` — lexicographic ordering on int vectors. [strict] =
+ * `true` for strict less-than, `false` for less-or-equal.
  *
- *  - Strict: `xs <ₗₑₓ ys`  iff  there exists `k` with `xs`k` < ys`k`` and `xs`i` = ys`i``
+ *  - Strict: `xs <ₗₑₓ ys`  iff  there exists `k` with `xs(k) < ys(k)` and `xs(i) = ys(i)`
  *    for all `i < k`.
- *  - Non-strict: `xs ≤ₗₑₓ ys`  iff  the strict version holds *or* `xs`i` = ys`i`` for all `i`.
+ *  - Non-strict: `xs ≤ₗₑₓ ys`  iff  the strict version holds *or* `xs(i) = ys(i)` for all `i`.
  *
  * If `xs.size != ys.size` the shorter array is treated as a prefix: a proper prefix
  * compares strictly less than the longer one (MiniZinc semantics).

@@ -26,9 +26,10 @@ import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 
 /**
- * Sound LP makespan lower bound for the scheduling globals ([Cumulative]).
- *
- * Couples task energy to the makespan variable through an energetic makespan inequality.
+ * Sound LP makespan lower bound for the scheduling globals ([Cumulative], and [Diffn] projected onto
+ * its axes), coupling task energy to the makespan variable through an energetic makespan inequality.
+ * See Baptiste, Le Pape and Nuijten, *Constraint-Based Scheduling* (Springer, 2001),
+ * https://doi.org/10.1007/978-1-4615-1479-4.
  *
  * ## The bound
  * Fix a makespan variable `M` that is provably ≥ the end of every task in a set `T` (`M ≥ startᵢ +
@@ -58,7 +59,7 @@ import com.eignex.klause.util.subExact
  * link is proven. Energy uses each task's **minimum** resource and its (constant) duration, capacity
  * uses its declared **maximum**, and `t1 ≤ M` is enforced because `M ≥ ectᵢ` for every counted task.
  * All products are checked ([mulExact] / [addExact]); an overflow degrades the row to the trivial
- * declared bound `M ≥ minDeclared`, never to a wrapped value. The row is [LpModel.rowGlobal] when its
+ * root bound `cap·M ≥ cap·M.rootMin`, never to a wrapped value. The row is [LpModel.rowGlobal] when its
  * earliest-starts are still the declared ones (so it holds at every solution) and otherwise records
  * the live start lower bounds it leaned on as [LpRowPremises], mirroring the live-big-M `ReifiedLinear`
  * rows.
@@ -120,8 +121,8 @@ internal class CumulativeRelaxation(
 
     /**
      * The makespan row for [plan] under the live [domains]: `capacity·M ≥ rhs`. The `rhs` is the best
-     * energetic left edge over the live earliest-starts; on overflow it degrades to the declared
-     * `capacity · M.declaredMin`. The row is global iff every counted task's live earliest-start is
+     * energetic left edge over the live earliest-starts; on overflow it degrades to
+     * `capacity · M.rootMin`. The row is global iff every counted task's live earliest-start is
      * still its declared one; otherwise the tightened starts it used are recorded as premises.
      */
     fun rowSpec(plan: AreaPlan, domains: RelaxationDomains): RowSpec {
@@ -377,7 +378,7 @@ internal class CumulativeRelaxation(
             if (f.op == LinearOp.LE || f.op == LinearOp.EQ) addGeForm(a, -ca, b, -cb, -bound)
         }
 
-        /** From `ca·a + cb·b ≥ rhs`, record `w ≥ s + rhs` when the coefficients are a `(+1, −1)` pair. */
+        /** From `ca·a + cb·b ≥ rhs`, record `w ≥ v + rhs` when the coefficients are a `(+1, −1)` pair. */
         private fun addGeForm(a: Int, ca: Long, b: Int, cb: Long, rhs: Long) {
             if (ca == 1L && cb == -1L) add(w = a, v = b, c = rhs)
             if (ca == -1L && cb == 1L) add(w = b, v = a, c = rhs)

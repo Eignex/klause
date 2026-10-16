@@ -7,17 +7,17 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.propagation.propagatedImplicationGraph
 
 /**
- * Implied-bound cuts from the binary **implication graph**. Probing
- * derives implications `litA ⇒ litB` that hold at every solution but are not explicit binary clauses
- * (those already enter the LP as clause rows). Each such implication is the linear inequality
- * `litVal(A) ≤ litVal(B)` — where `litVal` of a positive literal over Boolean column `c` is `xₑ` and of
- * a negative literal is `1 − xₑ` — valid at every integer solution (if `A` holds so must `B`, so
+ * Implied-bound cuts from the binary **implication graph**. Probing derives implications
+ * `litA ⇒ litB` that hold at every solution; those of explicit binary clauses already enter the LP as
+ * clause rows and so never separate. Each implication is the linear inequality
+ * `litVal(A) ≤ litVal(B)` — where `litVal` of a positive literal over Boolean column `c` is `x_c` and of
+ * a negative literal is `1 − x_c` — valid at every integer solution (if `A` holds so must `B`, so
  * `litVal(A) ≤ litVal(B)` always). The separator emits the ones the fractional LP point violates.
  *
  * The implication graph is computed once (probing is expensive) from the root problem and cached; it is
  * literal-indexed (`graph[lit]` = the literals `lit` implies). Cuts are [Cut.global] — probing
  * implications are problem-wide. Sound: every emitted cut holds at every solution, so it only tightens
- * the relaxation, never removes a feasible point (validated by brute enumeration in the tests).
+ * the relaxation, never removes a feasible point.
  */
 internal class ImpliedBoundSeparator(private val maxCandidates: Int = DEFAULT_MAX_CANDIDATES) : CutSeparator {
 
@@ -39,7 +39,7 @@ internal class ImpliedBoundSeparator(private val maxCandidates: Int = DEFAULT_MA
         return cuts
     }
 
-    /** The LP value of [lit]: `xₑ` for a positive literal over Boolean column `c`, `1 − xₑ` for a negative one. */
+    /** The LP value of [lit]: `x_c` for a positive literal over Boolean column `c`, `1 − x_c` for a negative one. */
     private fun litValue(lit: Int, boolColOf: IntArray, ctx: CutContext): Double {
         val col = boolColOf[Lit.variable(lit)]
         val x = ctx.primalOf(col)

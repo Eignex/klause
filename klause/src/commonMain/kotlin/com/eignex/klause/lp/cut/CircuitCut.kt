@@ -14,8 +14,8 @@ import com.eignex.klause.util.LongHashSet
  * fractional arc values back and separate subtour-elimination cuts.
  *
  * Arcs are stored **sparsely** — parallel per-arc arrays, one entry per candidate arc — so the model
- * is O(arcs), not O(n²). That lets the relaxation scale to large but sparse routing graphs (small
- * per-node successor domains) instead of being capped at a small node count.
+ * is O(arcs), not O(n²), and scales to large but sparse routing graphs (small per-node successor
+ * domains).
  */
 internal class CircuitArcModel(
     /** Number of nodes. */
@@ -34,7 +34,10 @@ internal class CircuitArcModel(
  * arc solution a permutation — a disjoint union of cycles. A Hamiltonian circuit is the single-cycle
  * case, so the gap to feasibility is exactly the subtours, removed by the directed cutset inequality
  *
- *   `Σ_{i∈S, j∉S} y_ij ≥ 1`   for every proper node subset `S` (the cycle must leave `S`).
+ *   `Σ_{i∈S, j∉S} y_ij ≥ 1`   for every proper node subset `S` (the cycle must leave `S`)
+ *
+ * (Dantzig, Fulkerson and Johnson, "Solution of a large-scale traveling-salesman problem", Oper. Res.
+ * 1954, https://doi.org/10.1287/opre.2.4.393).
  *
  * There are exponentially many such `S`; they are separated exactly by max-flow. With the fractional
  * `y` as directed arc capacities, the minimum `root → t` cut equals the max flow; a value below 1
@@ -111,11 +114,12 @@ internal class CircuitSeparator : CutSeparator {
     }
 
     /**
-     * Edmonds–Karp max flow from [s] to [t] over the paired-adjacency residual graph
+     * Edmonds–Karp max flow (Edmonds and Karp, J. ACM 1972, https://doi.org/10.1145/321694.321699)
+     * from [s] to [t] over the paired-adjacency residual graph
      * ([eHead] / [eTo] / [eNext] / [capOrig]; the reverse of edge `e` is `e xor 1`, and `eTo(e xor 1)`
      * is therefore the tail of `e`). Returns the flow value and writes the source-reachable set of the
-     * residual graph into [scratch] — the minimum cut's source side. The capacities are copied per call, so the
-     * separator can reuse the same graph across every sink.
+     * residual graph into [scratch] — the minimum cut's source side. The capacities are copied per call,
+     * so the separator can reuse the same graph across every sink.
      */
     @Suppress("LongParameterList")
     private fun maxFlowMinCut(

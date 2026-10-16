@@ -23,8 +23,8 @@ internal class BitsetDomain(
 
     init {
         require(min <= max) { "Empty domain: $min..$max" }
-        // The endpoints must be members — a violation here means a caller built the bit array wrong
-        // (the span-overflow class of bug), and catching it at construction names the culprit.
+        // The endpoints must be members; a violation means a caller built the bit array wrong (e.g. a span
+        // overflow), and catching it at construction names the culprit.
         check(Bits.has(bitset, (min - bitsetLo).toInt())) { "min $min is not a member (lo=$bitsetLo)" }
         check(Bits.has(bitset, (max - bitsetLo).toInt())) { "max $max is not a member (lo=$bitsetLo)" }
     }
@@ -133,7 +133,7 @@ internal class BitsetDomain(
         if (from > to) return
         // Holes are the *zero* bits in [from, to]. Iterate word by word and emit the set bits of the
         // inverted (range-masked) word: an all-ones word inverts to 0 and is skipped in one step, so a
-        // dense domain with few holes costs O(span/64 + holes) instead of a value-by-value O(span) scan.
+        // dense domain with few holes costs O(span/64 + holes).
         val fromBit = (from - bitsetLo).toInt()
         val toBit = (to - bitsetLo).toInt()
         val firstWord = fromBit ushr 6

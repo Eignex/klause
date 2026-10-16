@@ -17,7 +17,9 @@ import kotlin.random.Random
 
 /**
  * Contextual-bandit variable heuristic: a kumulant [RegressionContextualBandit]
- * (LinUCB over a Bayesian linear-regression posterior) learns, **per session**, a value function
+ * (LinUCB over a Bayesian linear-regression posterior; Li, Chu, Langford and Schapire, "A
+ * contextual-bandit approach to personalized news article recommendation", WWW 2010,
+ * https://doi.org/10.1145/1772690.1772758) learns, **per session**, a value function
  * over per-variable branching features and picks the unassigned variable with the highest LinUCB
  * score. It is a learned generalisation of the hand-tuned heuristics: where [Vsids] attributes
  * activity to variables and [DomWdeg] weight to constraints, this fits a linear model to features
@@ -106,7 +108,7 @@ class RegressionVariableSelector private constructor(
             1.0
         } else {
             val delta = (session.propagationCount - pendingPropCount).coerceAtLeast(0L).toDouble()
-            // Squash propagation yield into [0,1): 0 → 0, large → ~1. (delta / (delta + k))
+            // Squash propagation yield into [0,1): 0 → 0, large → ~1.
             (delta / (delta + PROP_SQUASH)).coerceIn(0.0, 1.0)
         }
         bandit.update(0, DenseVector.of(f), reward, 1.0)
@@ -128,7 +130,7 @@ class RegressionVariableSelector private constructor(
             all.add(Candidate(VarRef.IntVar(v), d.valueCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()))
         }
         if (all.size <= scoreCap) return all
-        // Too many to score; keep the scoreCap smallest-domain candidates (fail-first prior).
+        // Fail-first prior: score only the smallest domains.
         return all.sortedBy { it.domSize }.subList(0, scoreCap)
     }
 
@@ -149,7 +151,7 @@ class RegressionVariableSelector private constructor(
             ln((c.domSize + 1).toDouble()) / lnDomScale, // domain scale ÷ the instance's max
             min(degree / degreeScale, 1.0), // constraint degree ÷ the instance's max degree
             min(session.decisionLevel / depthScale, 1.0), // depth ÷ var count (max possible depth)
-            if (isBool) 1.0 else 0.0, // variable kind
+            if (isBool) 1.0 else 0.0,
             act, // conflict activity — weight→1 here recovers VSIDS branching
             recency, // last-conflict recency — weight→1 here recovers LastConflict branching
         )

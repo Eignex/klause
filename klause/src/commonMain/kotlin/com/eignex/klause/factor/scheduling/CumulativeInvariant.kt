@@ -32,10 +32,7 @@ import com.eignex.klause.util.argsortBy
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * LS invariant for [Cumulative]. Constructed by the local-search projection and maintains the
- * usage timeline and computes graded overage deltas.
- */
+/** LS invariant for [Cumulative]: maintains the usage timeline and computes graded overage deltas. */
 internal class CumulativeInvariant(
     private val starts: IntArray,
     private val durations: LongArray,
@@ -109,9 +106,8 @@ internal class CumulativeInvariant(
         state.intPayload[factorId] = clampOverage(ov)
     }
 
-    // The int payload mirrors the raw overage for the `isViolated` / repair-guard checks (and ALNS
-    // reads it directly); saturate at Int range since a wide profile can exceed 32 bits — overage is
-    // non-negative, so `> 0` / `== 0` are preserved exactly.
+    // The int payload mirrors the raw overage for the `isViolated` / repair-guard checks; saturate at Int
+    // range since a wide profile can exceed 32 bits — overage is non-negative, so `> 0` / `== 0` hold exactly.
     private fun clampOverage(ov: Long): Int = ov.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
     private fun overageDegree(state: LocalSearchState, overage: Long): Int =

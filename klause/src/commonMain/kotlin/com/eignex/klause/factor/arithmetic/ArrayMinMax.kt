@@ -21,8 +21,7 @@ import com.eignex.klause.ir.materializeKey
  *
  * Propagation tightens [result] against the bound of [xs] and pushes back from [result]
  * to every `xs(i)` (for max: every `xs(i).max <= result.max`; for min the dual). LS keeps
- * a payload holding the index of the current best operand and its value, with a fallback
- * full scan when the best slot changes.
+ * the current extremum in an [ArrayMinMaxState] payload, recomputed by a full scan on each move.
  */
 class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor {
 

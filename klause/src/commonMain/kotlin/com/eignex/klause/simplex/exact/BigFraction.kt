@@ -49,7 +49,8 @@ class BigFraction private constructor(
     /** Returns this fraction minus [other]. */
     operator fun minus(other: BigFraction): BigFraction = sum(-other.num, other.den)
 
-    // `num/den + n/d` for a reduced `n/d`, normalized by Knuth's method (TAOCP 4.5.1): the gcds run on the
+    // `num/den + n/d` for a reduced `n/d`, normalized by Knuth's method (D. E. Knuth, The Art of Computer
+    // Programming, Vol. 2, §4.5.1, https://www-cs-faculty.stanford.edu/~knuth/taocp.html): the gcds run on the
     // denominators and their quotient instead of on the full cross products, and vanish when a denominator is 1
     // or the denominators are coprime, since a reduced sum over coprime denominators is already reduced.
     private fun sum(n: BigInt, d: BigInt): BigFraction {

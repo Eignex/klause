@@ -77,7 +77,7 @@ class Assignment private constructor(
         reals[varId] = value
     }
 
-    /** Randomize every variable uniformly within its domain. */
+    /** Randomize every Boolean and integer variable within its domain; real values are left unchanged. */
     fun randomize(rng: Random, intDomains: Array<IntDomain>) {
         // Direct word fill — much faster than a per-var coin flip via bits.set / clear.
         randomizeBoolWords(rng, 0, boolWordCount)
@@ -133,8 +133,8 @@ class Assignment private constructor(
 
 /**
  * Owned immutable assignment snapshot. Constructor inputs and exported arrays are copied;
- * scalar accessors read the snapshot without allocation. [exactInts], [exactReals] and [algebraicReals]
- * carry exact coordinate authority.
+ * scalar accessors read the snapshot without allocation. [exactInts], [exactReals], [algebraicReals]
+ * and [symbolicReals] carry exact coordinate authority.
  */
 class Sample private constructor(
     bools: BooleanArray,

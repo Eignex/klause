@@ -7,7 +7,7 @@ import com.eignex.klause.util.Int128
 /** A bound the objective cutoff proves on an integer variable: `varId ≤ hi`. */
 internal class CutoffBound(val varId: Int, val hi: Long)
 
-/*
+/**
  * Bounds open integer columns using the incumbent cutoff `Σ c·x + constant ≤ incumbent − 1`.
  * For `c_j > 0`, propagation gives `lo_j + ⌊(incumbent − 1 − L) / c_j⌋`, where `L` is the
  * objective minimum over declared domains. Every other term is at least its own minimum,
@@ -20,8 +20,8 @@ internal class CutoffBound(val varId: Int, val hi: Long)
  * with an invented lower endpoint are skipped because the formula would bound the search box
  * rather than the source model.
  *
- * Crowder, Johnson, Padberg, "Solving Large-Scale Zero-One Linear Programming Problems",
- * Operations Research 31(5), 1983.
+ * H. Crowder, E. L. Johnson, M. Padberg, "Solving Large-Scale Zero-One Linear Programming Problems",
+ * Operations Research 31(5), 1983, https://doi.org/10.1287/opre.31.5.803.
  */
 internal fun objectiveCutoffBounds(
     problem: BakedProblem,

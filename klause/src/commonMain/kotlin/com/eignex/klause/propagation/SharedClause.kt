@@ -54,7 +54,7 @@ class SharedClause internal constructor(
  * Engine hook the backtrack solver invokes at each restart boundary (decision level 0, where an
  * imported clause's literals are not all-false so it can be registered safely). A portfolio supplies
  * an implementation that imports pending shared nogoods into the session and exports the session's
- * new glue clauses to the shared pool. `null` on [com.eignex.klause.backtrack.BacktrackParams]
+ * new glue clauses to the shared pool. `null` on [com.eignex.klause.backtrack.BacktrackParams.clauseExchange]
  * (the default) means no sharing — a standalone solve is unaffected.
  */
 interface ClauseExchange {

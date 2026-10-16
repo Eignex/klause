@@ -9,9 +9,9 @@ import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
 
 /**
- * Bromberger, *A Reduction from Unbounded Linear Mixed Arithmetic Problems into Bounded Problems*
- * (IJCAR 2018): the Mixed-Echelon-Hermite half of the pair of transformations that turn an unbounded
- * system into an equisatisfiable bounded one, in polynomial time and without a priori bounds.
+ * M. Bromberger, *A Reduction from Unbounded Linear Mixed Arithmetic Problems into Bounded Problems*, IJCAR 2018,
+ * https://doi.org/10.1007/978-3-319-94205-6_22: the Mixed-Echelon-Hermite half of the pair of transformations that turn
+ * an unbounded system into an equisatisfiable bounded one, in polynomial time and without a priori bounds.
  *
  * A system rewritten in the variables `y`, together with the change of variables that produced it.
  *

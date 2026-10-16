@@ -14,6 +14,8 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.util.Cancellation
 
+// Theory propagation of open guards whose edge would close a negative cycle, as in Cotton and Maler,
+// "Fast and Flexible Difference Constraint Propagation for DPLL(T)", SAT 2006, https://doi.org/10.1007/11814948_19.
 @Suppress("ReturnCount")
 internal class DifferenceGuardPropagation private constructor(
     private val base: DifferenceFragment,
@@ -181,7 +183,7 @@ internal class DifferenceGuardPropagation private constructor(
                 val reason = reason(edge, path, context, stop, forcePoll)
                     ?: if (stop()) return ComponentResult.Indeterminate else continue
                 if (forcePoll()) return ComponentResult.Indeterminate
-                // The new guard changes the source snapshot; let the ordinary fixpoint reconcile it first.
+                // The implied guard changes the source snapshot; let the ordinary fixpoint reconcile it first.
                 reset = true
                 scratch.completion = DifferencePathCompletion.Declined
                 return context.imply(Lit.negate(guard), reason)
@@ -222,11 +224,11 @@ internal class DifferenceGuardPropagation private constructor(
     }
 
     internal companion object {
-        // External cancellation remains cooperative; attached meters retain eager polls after every debit.
+        // External cancellation is polled every POLL_INTERVAL units; an attached work meter after every debit.
         private const val POLL_INTERVAL = 64
-        // Each open origin costs one sparse query, matching the finite difference refutation sweep.
+        // Each open origin costs one sparse query; matches the finite difference propagator's sweep budget.
         private const val HEAD_SWEEP_BUDGET = 64
-        // Optional primitive indexes share the existing private difference incidence envelope.
+        // Optional index: declined above this edge count, like the other private difference indexes.
         private const val MAX_EDGES = 65_536
 
         private fun nodeOf(fragment: DifferenceFragment, endpoint: Int, stop: Cancellation): Int {

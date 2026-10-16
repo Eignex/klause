@@ -18,6 +18,11 @@ import kotlin.random.Random
  * evidence has faded.
  *
  * Rewards are read as Bernoulli success probabilities, so they must lie in `[0, 1]`.
+ *
+ * Thompson sampling: W. R. Thompson, "On the likelihood that one unknown probability exceeds another in view of the
+ * evidence of two samples", Biometrika 25(3-4), 1933, https://doi.org/10.1093/biomet/25.3-4.285. Discounting the
+ * Beta evidence follows V. Raj, S. Kalyani, "Taming non-stationary bandits: a Bayesian approach", 2017,
+ * https://arxiv.org/abs/1707.09727.
  */
 internal class DiscountedThompson(
     override val nbrArms: Int,

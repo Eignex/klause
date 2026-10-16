@@ -11,9 +11,9 @@ import com.eignex.klause.util.EmptyIntArray
  * Local search scores a model through its invariants, and on some models that scoring is not exact: a
  * continuous column it moves in floating point, an incremental sum past the 64-bit range, a row whose
  * coefficients outrun the invariant's width. On those models zero violation is a proposal rather than a
- * proof, and this is what decides it. Optimization can also admit a bounded set of finite moves for
- * continuous completion before scoring their completed objectives. Each attempt retains the containing
- * cancellation and work allowance; candidates are private until the completion accepts them.
+ * proof, and this is what decides it. Optimization may also complete a bounded set of candidate moves to score
+ * their completed objectives. Each call runs under the search's cancellation and work allowance; a candidate stays
+ * private until the completion accepts it.
  */
 fun interface CandidateCompletion {
     /** Decide [candidate] under the search's [cancellation]: a [Completion.Witness] is a solution of the model,
@@ -30,9 +30,9 @@ sealed interface Completion {
     val work: Long
 
     /**
-     * [sample] meets the completion's configured source witness guarantee, with the candidate's discrete values
-     * and any completed reals. Floating coordinates accepted by an explicit source tolerance policy remain
-     * approximate; this result supplies no optimality or exact-coordinate authority.
+     * [sample] carries the candidate's discrete values and any completed reals, and meets the completion's
+     * configured witness guarantee. Reals accepted under a source tolerance policy are approximate; a witness
+     * claims neither optimality nor exact coordinates.
      */
     class Witness(val sample: Sample, override val work: Long = 0L) : Completion
 

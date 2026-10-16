@@ -3,7 +3,9 @@ package com.eignex.klause.bound
 import com.eignex.klause.propagation.PropagationSession
 
 /**
- * A Lagrangian dual relaxation bound with a persistent multiplier vector warm-started across nodes.
+ * A Lagrangian dual relaxation bound with a persistent multiplier vector warm-started across nodes
+ * (Fisher, "The Lagrangian Relaxation Method for Solving Integer Programming Problems", Management
+ * Science 1981, https://doi.org/10.1287/mnsc.27.1.1).
  * Implemented by [LagrangianBound] and [KnapsackLagrangianBound]; the backtrack LP prune
  * cascade drives both through one arm that threads the multipliers.
  */

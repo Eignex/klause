@@ -35,8 +35,8 @@ sealed interface Publication<out A, out V> {
  * makes it correct under the parallel executor's concurrent writers and free under the sequential one's
  * single writer, without either having to pick a locking discipline.
  *
- * The exchange holds the best only. A diversity pool would be a different type: nothing here retains a
- * superseded incumbent, and [offer] is the only way in.
+ * The exchange holds the best only: nothing here retains a superseded incumbent, and [offer] is the only
+ * way in.
  */
 class IncumbentExchange<A, V>(
     /** Strict improvement over the standing incumbent: `improves(candidate, standing)`. Must be irreflexive

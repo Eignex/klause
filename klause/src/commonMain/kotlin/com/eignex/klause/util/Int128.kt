@@ -153,10 +153,11 @@ internal class Int128 {
     /**
      * The **exact** quotient `value / d` as a `Long`, or null when [overflow] latched, [d] is zero, the
      * division is not exact (nonzero remainder), or the quotient does not fit a `Long`. Unlike
-     * [floorDivPositive] this never rounds — it is for fraction-free (Bareiss) elimination, where each
-     * step's division is guaranteed exact and the result must be carried as an exact integer; a nonzero
-     * remainder or an out-of-range quotient signals the exact solve cannot continue in 128 bits (the
-     * caller then declines, keeping soundness).
+     * [floorDivPositive] this never rounds. It serves fraction-free elimination, where each step's
+     * division is exact; a nonzero remainder or an out-of-range quotient means the exact solve cannot
+     * continue in 128 bits and the caller declines. Bareiss, "Sylvester's identity and multistep
+     * integer-preserving Gaussian elimination", Math. Comp. 22(103), 1968.
+     * https://doi.org/10.1090/S0025-5718-1968-0226829-0
      */
     fun divExactByLong(d: Long): Long? {
         if (overflow || d == 0L) return null
@@ -177,8 +178,7 @@ internal class Int128 {
         var qLo = 0uL
         var rem = 0uL
         for (bit in 127 downTo 0) {
-            // Guard the remainder shift: dd ≤ 2⁶³ (|Long|), so rem stays below 2⁶⁴ across the loop only
-            // when dd fits 63 bits; a full-64-bit |d| (Long.MIN_VALUE magnitude 2⁶³) still fits since rem < dd ≤ 2⁶³.
+            // rem < dd ≤ 2⁶³ (the magnitude of Long.MIN_VALUE), so the shift keeps rem below 2⁶⁴.
             rem = rem shl 1
             val nextBit = if (bit >= 64) (uHi shr (bit - 64)) and 1uL else (uLo shr bit) and 1uL
             rem = rem or nextBit
@@ -202,19 +202,16 @@ internal class Int128 {
 
     /**
      * `⌊ value / d ⌋` for a **positive** divisor [d], as a `Long`, or null when [overflow] latched or the
-     * quotient does not fit a `Long`. Exact floored (toward −∞) division — used for the reduced-cost
-     * fixing step count, where the quotient must be a sound (never-too-large) integer bound. The
+     * quotient does not fit a `Long`. Exact floored (toward −∞) division, so the quotient is a sound
+     * (never-too-large) integer bound, as reduced-cost fixing and cut rounding require. The
      * unsigned 128÷64 inner division is a restoring bit-by-bit long division; it relies on `d ≤ 2⁶³−1`
      * (every positive `Long`) so the running remainder stays below `2⁶³` and never overflows.
      */
     fun floorDivPositive(d: Long): Long? {
         require(d > 0L) { "divisor must be positive: $d" }
         if (overflow) return null
-        // Fast path: a dividend that already fits a `Long` needs only native floored division. Its
-        // quotient is no larger in magnitude, so it always fits a `Long`, and the result is identical to
-        // the 128-bit restoring loop (validated by the `BigInteger` oracle). This is the common case in
-        // reduced-cost fixing — most reduced-cost numerators are well within 64 bits — so it avoids the
-        // unconditional 128-iteration loop on every nonbasic column.
+        // A dividend that fits a `Long` has a quotient no larger in magnitude, so native floored division
+        // gives the same result and skips the 128-iteration loop in the common case.
         if (fitsLong()) return lo.floorDiv(d)
         val negative = hi < 0L
         val uLo: ULong

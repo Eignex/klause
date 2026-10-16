@@ -28,8 +28,7 @@ object IndomainRandom : ValueSelector {
                 d.isFixed -> sequenceOf(d.min)
 
                 eager != null -> {
-                    // Small domain: materialise the non-hole values and Fisher-Yates shuffle in
-                    // place (cheaper than the lazy coroutine + map for a handful of values).
+                    // Cheaper than the lazy coroutine + map for a handful of values.
                     val arr = LongArray(eager.size) { eager.valueAt(it) }
                     for (i in arr.size - 1 downTo 1) {
                         val j = rng.nextInt(i + 1)
@@ -50,9 +49,8 @@ object IndomainRandom : ValueSelector {
                 else -> sequence {
                     // Lazy Fisher-Yates over domain indices: emit a uniform random permutation
                     // doing O(consumed) work, not O(n). Branch nodes typically read only the first
-                    // value (IntNode bound-splits around it), so eagerly shuffling a large domain
-                    // is almost pure waste — it dominates large-domain CSP profiles (e.g. gbac at
-                    // ~77%). `swap` records only the touched index slots (≈ O(consumed)).
+                    // value (splitIntAlternatives bound-splits around it), so eagerly shuffling a large
+                    // domain is almost pure waste. `swap` records only the touched index slots.
                     val swap = MutableIntIntMap()
                     for (k in 0 until n) {
                         val j = k + rng.nextInt(n - k)

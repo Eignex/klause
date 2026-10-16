@@ -33,8 +33,7 @@ internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {
 }
 
 /** Post a linear relation as a hard [Linear], or a [ReifiedLinear] onto [reifyLit] when non-null
- *  ([reifyLit] is a bool literal; its variable channels the relation's truth). The single lowering
- *  point every `*_lin_*` / linear-compare emitter funnels through, hard or `_reif`. */
+ *  ([reifyLit] is a bool literal; its variable channels the relation's truth). */
 internal fun FlatZincCompiler.postLinear(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long, reifyLit: Int?) {
     factors.add(
         if (reifyLit != null) {

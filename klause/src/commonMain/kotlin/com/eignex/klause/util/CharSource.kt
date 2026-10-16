@@ -25,8 +25,7 @@ class StringCharSource(text: String) : CharSource {
     override fun next(): String? = remaining.also { remaining = null }
 }
 
-/** Materialize the whole [CharSource] into a [String] — the bridge for a front-end not yet converted to
- *  incremental consumption. Streams the chunks into one builder rather than re-reading. */
+/** Materialize the whole [CharSource] into a [String], for consumers that need the full text at once. */
 fun CharSource.readText(): String {
     val first = next() ?: return ""
     val second = next() ?: return first // the common single-chunk (in-memory) case allocates nothing extra

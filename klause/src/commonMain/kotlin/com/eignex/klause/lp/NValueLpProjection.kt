@@ -11,8 +11,9 @@ import com.eignex.klause.util.MutableLongIntMap
 /**
  * One-hot value model: a per-value "used" column `y_v ∈ [0,1]`, a one-hot selector `z_iv ∈ [0,1]`
  * per variable/value with `Σ_v z_iv = 1` and the channel `Σ_v v·z_iv = xs(i)`, and `y_v ≥ z_iv`. The
- * distinct count `Σ_v y_v` relates to `n` by the mode (`Eq → =`, `AtMost → ≥`, `AtLeast → ≤`), so
- * minimising `n` reads a real lower bound. Large encodings and optional-presence forms are skipped.
+ * distinct count `Σ_v y_v` relates to `n` by the mode (`Eq`: `Σ_v y_v = n`, `AtMost`: `Σ_v y_v ≤ n`,
+ * `AtLeast`: `Σ_v y_v ≥ n`), so minimising `n` reads a real lower bound. Large encodings and
+ * optional-presence forms are skipped.
  *
  * The selectors enumerate each variable's root box and the channel then confines the column to what was
  * enumerated, so over a side the model leaves open the encoding would exclude values the model admits —
@@ -74,7 +75,6 @@ internal fun NValue.emitLpRelaxation(builder: RelaxationBuilder) {
         builder.row(cCols, cVals, LinearOp.EQ, 0L, Contribution.HULL)
     }
     if (yCols.isEmpty()) return
-    // (Σ_v y_v) − n  {EQ | LE | GE}  0, per the mode (see KDoc).
     val op = when (mode) {
         NValue.Mode.Eq -> LinearOp.EQ
         NValue.Mode.AtMost -> LinearOp.LE

@@ -12,14 +12,12 @@ import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.mulExact
 
 /**
- * Lagrangian-augmented LP cut: the objective-weighted AllDifferent bound. For an
- * AllDifferent over variables `V`, the minimum of `Σ_{i∈V} c_i·x_i` subject to all-different is the
- * exact min-cost assignment of the objective coefficients to distinct values ([MinCostAssignment]) —
- * a stronger statement than the unweighted Hall sum cut whenever the `c_i` differ. Emitting
- * `Σ_{i∈V} c_i·x_i ≥ assignmentMin` as a cut injects that global, integral bound into the LP, which
- * is exactly the synergy the Lagrangian-augmented LP path provides: a plain multiplier→coefficient
- * adjustment buys nothing for an LP relaxation (LP strong duality), but the integral assignment bound
- * does. The cut is emitted only when the LP point violates it.
+ * The objective-weighted AllDifferent bound as an LP cut. For an AllDifferent over variables `V`, the
+ * minimum of `Σ_{i∈V} c_i·x_i` subject to all-different is the exact min-cost assignment of the objective
+ * coefficients to distinct values ([MinCostAssignment]) — stronger than the unweighted Hall sum cut
+ * whenever the `c_i` differ. Emitting `Σ_{i∈V} c_i·x_i ≥ assignmentMin` injects that integral bound into
+ * the LP; a plain multiplier→coefficient adjustment would buy nothing (LP strong duality). The cut is
+ * emitted only when the LP point violates it.
  */
 internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSeparator {
     private val tol = 1e-6
@@ -28,7 +26,6 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
         val cuts = ArrayList<Cut>()
         for (vars in allDifferentGroups(ctx.problem)) {
             if (vars.size < 2) continue
-            // Need a column for every variable and at least one nonzero objective coefficient.
             if (vars.any { ctx.relaxation.intColOf[it] < 0 }) continue
             if (vars.none { intCoef.getOrElse(it) { 0L } != 0L }) continue
 
@@ -64,9 +61,8 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
         val valueIndex = MutableLongIntMap()
         val values = LongArrayList()
         for (v in vars) {
-            // Abort before walking a domain that is too large to assign over — in particular a wide
-            // (>2^31-span) domain, whose `sizeLong` saturates well past the cap, so it is never
-            // enumerated value-by-value. Sound: no cut is produced, only strengthening is skipped.
+            // Abort before walking a domain wider than the cap, so a wide domain is never enumerated
+            // value-by-value. Sound: no cut is produced, only strengthening is skipped.
             if (session.intDomain(v).spanOrNull(MAX_VALUES.toLong()) == null) return null
             session.intDomain(v).values.forEach { value ->
                 if (!valueIndex.containsKey(value)) {

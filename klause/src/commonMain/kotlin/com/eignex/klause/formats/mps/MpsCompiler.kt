@@ -400,7 +400,7 @@ data class MpsSourceWitness(
     val objective: BigFraction,
 )
 
-/** Primal feasibility tolerance of MPS results under tolerance semantics, the HiGHS default. */
+/** Primal feasibility tolerance of MPS results under tolerance semantics. */
 const val MPS_TOLERANCE: Double = 1e-7
 
 private val MPS_TOLERANCE_EXACT = BigFraction.of(BIG_ONE, bigIntOf(10_000_000L))
@@ -1135,7 +1135,7 @@ private fun MpsModel.buildObjective(
         }
     }
     return LinearObjectiveSpec(
-        // Indicator guards carry no objective weight, but the weight vector may not outrun `numBoolVars`.
+        // The weight vector may not outrun `numBoolVars`.
         boolWeights = if (numBool == 0) EmptyLongArray else LongArray(numBool),
         intCoefficients = intCoefficients,
         constant = scale.scale(objective.constant),

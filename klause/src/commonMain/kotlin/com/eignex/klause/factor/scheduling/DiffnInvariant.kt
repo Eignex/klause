@@ -10,10 +10,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
 
-/**
- * LS invariant for [Diffn]. Constructed by the local-search projection and maintains an
- * overlapping-pair count, computing deltas using the affected-pair trick.
- */
+/** LS invariant for [Diffn]: maintains the overlapping-pair count, with affected-pair deltas. */
 internal class DiffnInvariant(
     private val xs: IntArray,
     private val ys: IntArray,
@@ -26,7 +23,7 @@ internal class DiffnInvariant(
     private val varToRectOf: (Int) -> Int,
 ) : Invariant {
 
-    // Effective rectangle components applying an optional (overrideVar → overrideVal).
+    // Rectangle components under an optional single-variable override (ov → nv).
     private fun rx(s: LocalSearchState, i: Int, ov: Int, nv: Long): Long = if (xs[i] == ov) {
         nv
     } else {
@@ -128,12 +125,10 @@ internal class DiffnInvariant(
         state.violationSoftCap,
     )
 
-    /** Affected-pair delta: a single-var move (position OR size) only changes the overlap
+    /** Affected-pair delta: a single-var move (position or size) only changes the overlap
      *  status of pairs that include the moved rectangle, so the new total is
-     *  `overlappingPairs − oldPairsInvolving(r) + newPairsInvolving(r)` in O(n). The stored
-     *  [DiffnLsState.overlappingPairs] is kept exact by [applyIntSet]'s full recount, so this fast
-     *  path needs no drift correction. Falls back to the O(n²) recount when the moved var is
-     *  shared across rectangles (`varToRectOf == -1`). */
+     *  `overlappingPairs − oldPairsInvolving(r) + newPairsInvolving(r)` in O(n). Falls back to the
+     *  O(n²) recount when the moved var is shared across rectangles (`varToRectOf == -1`). */
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val s = state.refPayload[factorId] as DiffnLsState
         val r = varToRectOf(intVar)
@@ -152,10 +147,8 @@ internal class DiffnInvariant(
         val s = state.refPayload[factorId] as DiffnLsState
         if (state.assignment.intValue(intVar) == oldValue) return 0
         val before = s.overlappingPairs
-        // Mirror the affected-pair delta: the move is already applied, so the after-pairs involving
-        // the moved rectangle are read from the current assignment and the before-pairs by overriding
-        // the moved variable back to oldValue. Only pairs touching that rectangle changed, so this is
-        // O(n) — the full O(n^2) recount is kept only for a variable shared across rectangles.
+        // The move is already applied, so the after-pairs are read from the current assignment and the
+        // before-pairs by overriding the moved variable back to oldValue.
         val r = varToRectOf(intVar)
         s.overlappingPairs = if (r < 0) {
             countOverlaps(state, ov = -1, nv = 0L)

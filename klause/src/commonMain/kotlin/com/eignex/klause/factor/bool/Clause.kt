@@ -23,11 +23,12 @@ import kotlin.concurrent.Volatile
 /**
  * Disjunction of Boolean literals.
  *
- * Uses two-watched-literal scheme (Zhang–Stickel 1996). Two indices
- * into [literals] are watched at any time; the clause is satisfied iff at least one watched
- * literal evaluates to true. When an accepted flip turns a watched literal false, we scan the
- * unwatched literals for a true one to rewatch, finishing in O(1) amortized when most flips
- * leave the watches alone. Single-literal clauses have only one watch (`w2 = -1`).
+ * Local search scores it with a two-watched-literal scheme (Moskewicz et al., "Chaff: engineering an
+ * efficient SAT solver", DAC 2001, https://doi.org/10.1145/378239.379017). Two indices into [literals]
+ * are watched at any time; the clause is satisfied iff at least one watched literal evaluates to true.
+ * When an accepted flip turns a watched literal false, the unwatched literals are scanned for a true one
+ * to rewatch, O(1) amortized when most flips leave the watches alone. Single-literal clauses have only
+ * one watch (`w2 = -1`).
  *
  * Repeated literals are folded at construction. A variable may occur with both polarities, in
  * which case the clause is tautological.
@@ -47,8 +48,8 @@ class Clause(literals: IntArray) :
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.CLAUSE, ::buildKey)
 
-    // Allocation-free per-incidence key hash via the two-mode [KeySink]: symmetry refinement rebuilds
-    // this once per incident variable each round, so avoiding the remapped clause + its key matters.
+    // Allocation-free: symmetry refinement rebuilds this once per incident variable each round, so
+    // avoiding the remapped clause and its key matters.
     override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.CLAUSE, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {

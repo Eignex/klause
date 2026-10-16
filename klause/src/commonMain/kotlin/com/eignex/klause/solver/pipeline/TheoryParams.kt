@@ -56,8 +56,8 @@ data class TheoryParams(
      * Other built-in linear point guidance and compound source-clause preferences use
      * this opt-in. Zero permits bounded construction observations
      * but publishes no component preference; a positive value permits indexed preferences after caller
-     * or deferred hints decline. Construction and arithmetic comparisons retain their existing owners
-     * and limits; this flip ceiling supplies no separate allowance for them.
+     * or deferred hints decline. Construction and arithmetic comparisons keep their own owners and
+     * limits; this flip ceiling supplies no separate allowance for them.
      *
      * This is a ceiling on the draw, not an allowance beside [openWorkLimit]: the draw may spend only
      * what that budget has left and what it spends is charged there, so the traversal of a hinted run
@@ -67,9 +67,8 @@ data class TheoryParams(
     /**
      * Boolean branching for each feasibility traversal.
      *
-     * Automatic selects activity for a complete mixed worker with one default point owner.
-     * Other openings retain source order, including private queries and explicit hint allowances.
-     * Explicit source-order and activity selections retain their selected policy.
+     * [OpenBranching.Automatic] selects activity for a complete mixed worker with one default point owner,
+     * and source order for other openings, including private queries and explicit hint allowances.
      * The theory decides the arithmetic residual at a leaf.
      */
     val openBranching: OpenBranching = OpenBranching.Automatic,

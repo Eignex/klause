@@ -19,11 +19,9 @@ import com.eignex.klause.util.signum
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 
-/**
- * Wide-valued `abs`, `div`, `mod` and `ite` auxiliaries. Each quantity is represented
- * by digit variables with `Long` domains and weights `2^(width*i)`, allowing values
- * beyond 64 bits while preserving exact operand relations through [IntComb.Wide].
- */
+// Wide-valued auxiliaries for `abs`, `div`, `mod` and `ite`. A quantity past 64 bits is represented by
+// digit variables with `Long` domains and weights `2^(width·i)`, preserving exact operand relations
+// through IntComb.Wide.
 
 private val LONG_MAX = bigIntOf(Long.MAX_VALUE)
 
@@ -34,7 +32,8 @@ private fun Compiler.Builder.domainBounds(v: Int): Pair<Long?, Long?> = when (va
 }
 
 /**
- * An open side has no finite magnitude. The open theory pipeline carries the fresh quantity as an open
+ * The exact range `[lo, hi]` of [w] over the current presolve domains, or null when a side is open. An
+ * open side has no finite magnitude: the open theory pipeline carries the fresh quantity as an open
  * ordinary integer; only the finite CP pipeline needs a digit vector for a genuinely wide finite range.
  */
 internal fun Compiler.Builder.wideRange(w: WideLinComb): Pair<BigInt, BigInt>? {

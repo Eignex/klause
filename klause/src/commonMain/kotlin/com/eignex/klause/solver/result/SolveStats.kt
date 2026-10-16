@@ -42,14 +42,11 @@ internal fun mergeDepthMean(a: WeightedMeanResult, b: WeightedMeanResult): Weigh
 
 /**
  * Snapshot of solver-side counters and distributions from a single solve. Carried as a sidecar on
- * [com.eignex.klause.solver.SolveResult] (and on the `MinimizeResult` variants for branch-and-bound
- * runs); populated by backends that opt in, left at its empty defaults by ones that don't.
+ * [com.eignex.klause.solver.SolveResult] and the `MinimizeResult` variants; backends that don't
+ * populate it leave the empty defaults.
  *
- * A composition of per-concern records — the run envelope ([run]), tree search ([search]),
- * conflict analysis ([ca]), LP bounding ([lp]), scheduling bounds ([scheduling]), local search ([ls]),
- * and the optional [presolve] summary — each owning its own fields and merge. Built on kumulant's
- * result types so two snapshots (portfolio workers / parallel restarts) merge additively; [mergedWith]
- * folds them by delegating to each record.
+ * A composition of per-concern records, each owning its own fields and merge, built on kumulant's
+ * result types so snapshots from portfolio workers or parallel restarts merge additively.
  */
 data class SolveStats(
     /** Run envelope: backend tag, wall time, timed-out flag. See [RunStats]. */
@@ -86,8 +83,7 @@ data class SolveStats(
     /**
      * Combine two run snapshots by delegating to each record's own merge — counters add, maxes max,
      * depth means weight-combine, wall time takes the max, backend degrades to `"mixed"` on mismatch,
-     * and `presolve` keeps the first non-null. [EMPTY] is the identity. The portfolio folds
-     * heterogeneous worker snapshots through this.
+     * and `presolve` keeps the first non-null. [EMPTY] is the identity.
      */
     fun mergedWith(other: SolveStats): SolveStats {
         if (this == EMPTY) return other
@@ -130,18 +126,14 @@ internal fun SolveStats.withPresolve(presolve: PresolveStats?): SolveStats {
 }
 
 /**
- * Mutable accumulator that backends update during a solve. Snapshots into a [SolveStats]
- * record when the solve terminates.
+ * Mutable accumulator that backends update during a solve and snapshot into a [SolveStats].
  *
- * Concurrency: scoped to a single solve / single thread; no internal locking. Backends
- * that fan out across threads (LS portfolio, parallel restarts) should keep one sink per
- * worker and merge their [SolveStats] snapshots after.
+ * Single-threaded with no internal locking: a backend fanning out across threads keeps one sink per
+ * worker and merges the snapshots.
  */
 internal class SolveStatsSink(var backend: String, lpProbeRoute: LpRoute = LpRoute.NODE) {
     val search: SearchStatsSink = SearchStatsSink()
     val ca: ConflictAnalysisStatsSink = ConflictAnalysisStatsSink()
-
-    /** LP-bounding counters + timing; observe via `sink.lp.observeSolve()`, etc. */
     val lp: LpStatsSink = LpStatsSink(lpProbeRoute)
     val scheduling: SchedulingStatsSink = SchedulingStatsSink()
     val ls: LocalSearchStatsSink = LocalSearchStatsSink()
@@ -169,14 +161,12 @@ internal class SolveStatsSink(var backend: String, lpProbeRoute: LpRoute = LpRou
     /** Elapsed ms since [start] — used by the LS loop to stamp time-to-best as incumbents land. */
     fun elapsedMs(): Long = startMark?.elapsedNow()?.inWholeMilliseconds ?: 0L
 
-    /** Snapshot the current accumulator state into an immutable [SolveStats]. Wall time uses the most
-     *  recent [start] / [stop] window; if [stop] hasn't been called yet, elapsed uses the current clock. */
+    /** Wall time uses the most recent [start] / [stop] window, or the current clock before [stop]. */
     fun snapshot(): SolveStats {
         val elapsedMs = endElapsedMs
             ?: startMark?.elapsedNow()?.inWholeMilliseconds
             ?: 0L
-        // LS folds its restart count into the shared search restarts field (it never touches the search
-        // CountStat); complete backends report their own.
+        // LS never touches the search restart counter, so its own count stands in for it.
         val searchStats = search.snapshot().let {
             if (ls.restarts > 0L) it.copy(restarts = SumResult(ls.restarts.toDouble())) else it
         }

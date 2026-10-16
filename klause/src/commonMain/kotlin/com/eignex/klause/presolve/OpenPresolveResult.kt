@@ -153,11 +153,9 @@ internal fun Problem.closeOpenBounds(
     if (openLpInfeasible(declared, intRows, cancellation, lpStats?.certificationObserver(LpRoute.STANDALONE))) {
         return OpenPresolveResult.Refuted
     }
-    // Only now is there nothing left to do: closing is what a model with no open side does not need, and
-    // refuting is a separate job it may still deserve. Returning before the exact pass above conflates
-    // them — a model whose sides something else already closed comes back looking feasible, and on this
-    // route there is no bake behind it to catch what was skipped. Only the exact pass reaches such a
-    // model; the relaxation next to it declines a system with nothing open, so its verdict here is fixed.
+    // A model with no open side needs no closing but may still deserve refuting, so this exit sits after
+    // the exact pass: on this route there is no bake behind it to catch a skipped refutation. Only the
+    // exact pass reaches such a model; the relaxation declines a system with nothing open.
     if (declared.none { it.lo == null || it.hi == null }) {
         return OpenPresolveResult.Tightened(problem, closedSides = 0)
     }

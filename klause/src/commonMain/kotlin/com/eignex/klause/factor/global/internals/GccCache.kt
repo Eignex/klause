@@ -53,10 +53,9 @@ internal class GccPropCache(val cachedDoms: Array<IntDomain?>) {
 
     // Persistent flow-network structure for the fixed-bound, no-other, plain path. The edge set is
     // built once for the first-fire (root, widest) domains and reused across every later fire — later
-    // domains are subsets, so no edge is ever missing; a fire just zeroes the capacity of var→cover
-    // edges whose value has left, restores the rest, and recomputes the flow. Backtrack-invariant (the
-    // structure spans the root domains), so it needs no reversibility; only the flow (recomputed each
-    // fire from the reversible `flowAssign` warm start) and the domains vary.
+    // domains are subsets, so no edge is ever missing; a fire blocks the var→cover edges whose value has
+    // left. The structure spans the root domains, so it needs no reversibility; the flow itself lives on
+    // the trail (see [GccFlowBuilder.freeze]).
     var structBuilt = false
 
     /** True once the flow network has been built at least once. The persistent structure may only be
@@ -73,10 +72,9 @@ internal class GccPropCache(val cachedDoms: Array<IntDomain?>) {
     var sRequiredSSFlow = 0
     var pXToCov = IntArray(0) // persistent i*m + k → edge id (-1 = no edge), spans root domains
 
-    // Reused per-fire flow-network scratch, grown on demand and refilled each fire — the network is
-    // rebuilt every fire but reusing the backing arrays avoids re-allocating them (`excess` per node,
-    // the flattened `x→cover` edge-index map per var·cover, the per-var `x→other` edge index). Holds
-    // no cross-fire state; every entry is written before it is read, so reuse is behaviour-identical.
+    // Per-fire flow-network scratch for the rebuild path, grown on demand and refilled each fire (`excess`
+    // per node, the flattened `x→cover` edge-index map per var·cover, the per-var `x→other` edge index).
+    // Holds no cross-fire state; every entry is written before it is read.
     private var excessBuf = IntArray(0)
     private var xToCovBuf = IntArray(0)
     private var xToOtherBuf = IntArray(0)

@@ -27,12 +27,12 @@ internal data class ResolvedProblem(
      *  provides one (see `LocalSearchParams.lsObjective`). Null ⇒ LS descends [objective]. */
     val lsObjective: IncrementalObjective? = null,
     /** Definitional sweep for the LS engine (see [com.eignex.klause.localsearch.DefinitionalSweep]);
-     *  carried from `FlatZincProgram.definitionalSweep` by the MiniZinc runner, null elsewhere. */
+     *  carried from `FlatZincExecutionProgram.definitionalSweep` by the MiniZinc runner, null elsewhere. */
     val definitionalSweep: DefinitionalSweep? = null,
     /** Search heuristics from the model's `solve :: int_search(...)` annotation (see
-     *  `FlatZincProgram.defaultBacktrackParams`); null when the model has none. Metrics
-     *  merge their budget/seed/restart config into this so benchmark runs honour the
-     *  model author's intended search the same way the competition CLI does. */
+     *  `FlatZincProgram.searchHints`); null when the model has none. Metrics merge their
+     *  budget/seed/restart config into this so benchmark runs honour the model author's
+     *  intended search the same way the CLI does. */
     val searchParams: BacktrackParams? = null,
     val hasFloats: Boolean = false,
     val floatApproximation: Boolean = false,
@@ -61,7 +61,7 @@ internal interface Runner {
     fun resolve(ref: ProblemRef): ResolvedProblem
 }
 
-/** Resolves in-process formats (DIMACS / OPB / JSON-Schema / XCSP3 / SMT-LIB) and `InCode` builders. */
+/** Resolves every format whose `ProblemFormat.inProcess` holds, and `InCode` builders. */
 internal object InProcessRunner : Runner {
     override val id = "in-process"
 

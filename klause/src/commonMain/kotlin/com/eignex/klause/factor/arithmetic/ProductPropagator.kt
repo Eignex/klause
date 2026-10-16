@@ -158,8 +158,7 @@ internal class ProductPropagator(
     }
 
     private fun tightenLong(state: PropagationState, v: Int, lo: Long, hi: Long, ant: IntArray? = null): Boolean {
-        // Domains are 64-bit: the product range is a valid tightening even when it exceeds 32-bit range;
-        // the mutator no-ops when it doesn't constrain the current (Long) domain.
+        // A saturated corner bound is still sound; the mutator no-ops when it does not constrain the domain.
         if (!state.tightenIntMin(v, lo, ant)) return false
         if (!state.tightenIntMax(v, hi, ant)) return false
         return true

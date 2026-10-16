@@ -11,7 +11,8 @@ import kotlin.random.Random
 
 /**
  * Conflict-history branching using exponential recency weighted averages (Liang, Ganesh,
- * Poupart and Czarnecki, "Learning Rate Based Branching Heuristics for SAT Solvers", SAT 2016).
+ * Poupart and Czarnecki, "Learning Rate Based Branching Heuristic for SAT Solvers", SAT 2016,
+ * https://doi.org/10.1007/978-3-319-40970-2_9).
  * Each variable carries `Q(v) ← (1 − α)·Q(v) + α·r`, with
  * `r = multiplier / (conflicts − lastConflict(v) + 1)`.
  *
@@ -43,7 +44,7 @@ class Chb(
     private var conflicts: Long = 0
 
     // Combined index space: 0..numBool-1 are bool ids; numBool..numBool+numInt-1 are int ids
-    // offset by numBool. Mirrors [Vsids] exactly so picks are O((1 + pinned-skip)·log n).
+    // offset by numBool. Picks are O((1 + pinned-skip)·log n).
     private var heap: IndexedMaxHeap? = null
     private var lastConflict: LongArray = EmptyLongArray
     private var numBoolCached: Int = 0
@@ -106,7 +107,6 @@ class Chb(
             is VarRef.IntVar -> if (varRef.varId !in conflict.ints) bumpConflict(h, idOfInt(varRef.varId))
             null -> Unit
         }
-        // Decay the learning rate toward the floor as conflicts accumulate.
         if (alpha > alphaFloor) alpha = (alpha - alphaStep).coerceAtLeast(alphaFloor)
     }
 

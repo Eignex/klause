@@ -24,8 +24,7 @@ internal class WideIntColumns(val columns: IntArray, val width: Int) {
 internal fun wideIntColumns(magnitude: BigInt, maxCoeff: BigInt, fresh: (Long, Long) -> Int): WideIntColumns? {
     val width = WideIntDigits.widthFor(maxCoeff)
     if (width == WideIntDigits.NO_ROOM) return null
-    // One position beyond the magnitude's own digits, so the leading signed digit has room for the sign
-    // without borrowing range from the value.
+    // One position beyond the magnitude's own digits gives the signed leading digit room for the sign.
     val count = WideIntDigits.digitCount(magnitude, width) + 1
     val max = (WideIntDigits.pow2(width) - BIG_ONE).toLongExact()
     val cols = IntArray(count) { i -> if (i == count - 1) fresh(-max - 1, max) else fresh(0L, max) }

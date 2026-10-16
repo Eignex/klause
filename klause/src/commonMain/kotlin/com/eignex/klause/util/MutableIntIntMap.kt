@@ -99,8 +99,7 @@ internal class MutableIntIntMap(initialCapacity: Int = 8) {
     fun isEmpty(): Boolean = size == 0
 
     fun clear() {
-        // Only the occupancy bitmap needs resetting; stale key/value entries are unreachable
-        // while their slot is marked free.
+        // Stale key/value entries are unreachable while their slot is marked free.
         used.fill(false)
         size = 0
     }
@@ -120,9 +119,8 @@ internal class MutableIntIntMap(initialCapacity: Int = 8) {
 
     @PublishedApi internal val usedInternal: BooleanArray get() = used
 
-    /** Backward-shift deletion (Knuth 6.4 algorithm R): after freeing slot [start], pull any
-     *  later probe-chain entry forward (per [mustStayDuringShift]) so the chain stays contiguous
-     *  and no tombstone is needed. */
+    /** Backward-shift deletion: after freeing slot [start], pull later probe-chain entries forward
+     *  (per [mustStayDuringShift]) so the chain stays contiguous without tombstones. */
     private fun deleteSlot(start: Int) {
         var i = start
         used[i] = false

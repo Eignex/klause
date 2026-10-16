@@ -6,8 +6,9 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
-// Classical 1UIP clause resolvent. It shares the ReasonGraph level and antecedent view with the pivot
-// scan and minimizer.
+// Classical 1UIP clause resolvent (L. Zhang, C. F. Madigan, M. W. Moskewicz, S. Malik, "Efficient Conflict
+// Driven Learning in a Boolean Satisfiability Solver", ICCAD 2001, https://doi.org/10.1109/ICCAD.2001.968634).
+// It shares the ReasonGraph level and antecedent view with the pivot scan and minimizer.
 internal class ClauseResolvent(private val state: PropagationState, private val graph: ReasonGraph) :
     ConflictResolvent {
 
@@ -55,10 +56,10 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
     // with.
     private val substituted = IntHashSet()
 
-    // O(1) membership index for the leaf-literal dedup in [resolve] / [drainFrontier], replacing
-    // per-literal linear scans of `learned` that made analysis quadratic in clause size. Every
-    // literal added is `Lit.make(v, !currentTruth(v))` — one literal per variable, so this is
-    // equivalent to a by-variable dedup. Reused across analyses, cleared per call.
+    // O(1) membership index for the leaf-literal dedup in [resolve] / [drainFrontier], so analysis
+    // stays linear rather than quadratic in clause size. Every literal added is
+    // `Lit.make(v, !currentTruth(v))` — one literal per variable, so this is equivalent to a by-variable
+    // dedup. Reused across analyses, cleared per call.
     private val litsInLearned = IntHashSet()
 
     // The accumulating nogood (disjunction of literals). Reused across analyses (cleared per call)
@@ -163,7 +164,6 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
             val lvl = graph.levelOf(v)
             if (lvl <= 0) continue
             seen[v] = true
-            // Record for the VSIDS bump set (every conflict-side var).
             if (v < numBoolVars) {
                 bumpBoolVars.add(v)
             } else {
@@ -231,7 +231,7 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
     }
 
     /**
-     * Apply self-subsuming-resolution minimization, then compute backjump level + LBD on the final
+     * Apply [ClauseMinimizer.reduce], then compute backjump level + LBD on the final
      * clause and wrap into [ConflictAnalyzer.AnalysisResult.Learned]. Single tail call from every exit
      * path of the driver so all exit shapes get the same post-processing.
      */
@@ -258,8 +258,7 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
         )
     }
 
-    /** Sorted-ascending array of distinct decision levels touched by [learned]. Shares its scan with
-     *  `lbdOf` (whose count is just `levels.size`); finalize computes both in one pass via this helper. */
+    /** Sorted-ascending array of distinct decision levels touched by [learned]; its size is the LBD. */
     private fun distinctLevelsOf(learned: IntArrayList): IntArray {
         if (learned.size == 0) return EmptyIntArray
         val seen = IntHashSet(learned.size)
@@ -270,10 +269,9 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
     }
 
     /**
-     * Backjump target: the second-highest decision level among the learned literals' variables. The
-     * asserting literal (UIP) sits at [currentLevel], the clause's highest level; we want to pop back to the
-     * level just past the next-highest, so the learned clause becomes unit (only the UIP literal remains
-     * undetermined) and propagation can re-fire it as a forced pin.
+     * Backjump target: the highest decision level below [currentLevel] (the clause's highest level, where
+     * the asserting literal sits) among the learned literals' variables, or 0. Popping back to it leaves the
+     * learned clause unit, so propagation re-fires it as a forced pin.
      */
     private fun backjumpLevelOf(learned: IntArrayList, currentLevel: Int): Int {
         var best = 0

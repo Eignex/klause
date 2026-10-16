@@ -6,7 +6,10 @@ import com.eignex.klause.localsearch.MoveSink
 
 /**
  * Feasibility-Jump / ViolationLS candidate generation. Selects hot-spot jumps by the complete
- * weighted violation change of their coordinated assignments.
+ * weighted violation change of their coordinated assignments. B. Luteberget, G. Sartor, "Feasibility
+ * Jump: an LP-free Lagrangian MIP heuristic", Mathematical Programming Computation 15, 2023,
+ * https://doi.org/10.1007/s12532-023-00234-8; T. O. Davies, F. Didier, L. Perron, "ViolationLS:
+ * Constraint-Based Local Search in CP-SAT", CPAIOR 2024, https://doi.org/10.1007/978-3-031-60597-0_16.
  *
  * Per call it samples [candidateVars] variables biased toward currently-violated factors (a random
  * violated factor → a random variable of it) and emits the best admissible coordinated move for each:

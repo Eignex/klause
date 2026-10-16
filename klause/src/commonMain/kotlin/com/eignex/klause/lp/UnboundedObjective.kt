@@ -24,8 +24,9 @@ import com.eignex.klause.util.magnitudeBitLength
  * polyhedron that contains the witness and is contained in the model, and a rational direction of that
  * polyhedron's recession cone along which the objective strictly decreases is a ray of the model itself.
  * The cone of a rational polyhedron holding a mixed-integer point is the cone of its mixed-integer hull
- * (Meyer), so such a direction scales to one whose integer steps are integral and the objective takes
- * every value below the witness's.
+ * (R. R. Meyer, "On the existence of optimal solutions to integer and mixed-integer programming problems",
+ * Math. Programming 7, 1974, https://doi.org/10.1007/BF01585518), so such a direction scales to one whose
+ * integer steps are integral and the objective takes every value below the witness's.
  *
  * Three-valued, because a refusal and an undecided run justify different things: `false` says this
  * witness's own branch carries no such direction, which a bounded branch of an unbounded model answers

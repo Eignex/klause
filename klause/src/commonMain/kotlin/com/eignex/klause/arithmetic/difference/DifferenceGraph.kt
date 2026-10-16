@@ -31,6 +31,11 @@ internal sealed interface ShortestPaths {
     data object Abandoned : ShortestPaths
 }
 
+/**
+ * Difference constraints `to - from <= weight` as a weighted edge list. Cycle and potential searches are
+ * Bellman-Ford relaxations (R. Bellman, "On a routing problem", Quart. Appl. Math. 16(1), 1958,
+ * https://doi.org/10.1090/qam/102435).
+ */
 internal class DifferenceGraph(val numVars: Int) {
     private val from = IntArrayList()
     private val to = IntArrayList()

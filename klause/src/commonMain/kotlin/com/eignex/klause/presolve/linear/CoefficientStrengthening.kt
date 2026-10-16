@@ -51,7 +51,7 @@ internal object CoefficientStrengthening {
         var infeasible = false
         val factors = problem.factors
         for (i in factors.indices) {
-            // Poll the presolve deadline: on a multi-million-row model (Coprime) the per-factor strengthen
+            // Poll the presolve deadline: on a multi-million-row model the per-factor strengthen
             // is O(factors) and must be interruptible. Bailing returns the strengthenings made so far — a
             // partial pass is sound (each rewrite is feasible-set-preserving; the rest stay unstrengthened).
             if ((i and STRENGTHEN_CANCEL_POLL_MASK) == 0 && cancellation()) break
@@ -165,7 +165,10 @@ internal object CoefficientStrengthening {
 
     /**
      * Coefficient lifting for an inequality [Linear] over bounded-integer variables
-     * `xⱼ ∈ [lⱼ, uⱼ]` — the MIP coefficient-tightening of Savelsbergh / Achterberg, which
+     * `xⱼ ∈ [lⱼ, uⱼ]` — MIP coefficient tightening (M. W. P. Savelsbergh, "Preprocessing and Probing
+     * Techniques for Mixed Integer Programming Problems", ORSA J. Computing 1994,
+     * https://doi.org/10.1287/ijoc.6.4.445; T. Achterberg et al., "Presolve Reductions in Mixed Integer
+     * Programming", INFORMS J. Computing 2020, https://doi.org/10.1287/ijoc.2018.0857), which
      * generalises the 0/1 cover-dual clamp of [liftKnapsack] to `uⱼ > 1`.
      *
      * Reduce to a positive-coefficient bounded knapsack `Σ a̅ⱼ zⱼ ≤ B`, `zⱼ ∈ [0, cⱼ]` with
@@ -288,8 +291,7 @@ internal object CoefficientStrengthening {
      * `Σ min(wⱼ,d) − d`. Exact (feasible-set-preserving), and it both shrinks coefficients and
      * tightens the relaxation beyond what GCD reduction reaches. `d ≤ 0` ⟹ the constraint is always
      * satisfied (dropped). A `≥` constraint is first complemented to `≤`; an `=` constraint
-     * can't be lifted by clamping (it ties both directions) and is left untouched, as are
-     * out-of-Int-range slacks.
+     * can't be lifted by clamping (it ties both directions) and is left untouched.
      */
     private fun liftKnapsack(input: PseudoBoolean): Factor? {
         // GE → ≤ by complementing literals: Σwⱼlⱼ ≥ b ⟺ Σwⱼ¬lⱼ ≤ Σwⱼ − b. EQ can't be lifted by

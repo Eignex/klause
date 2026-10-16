@@ -22,8 +22,7 @@ eignexPublish {
 // Native and Apple mobile are not published.
 //
 // Default is host-only (jvm + linuxX64): the targets whose tests run on the linux runner, so
-// local build/check and CI use the same target set. Only the
-// release does the full sweep — it opts in via -Ptargets.full.
+// local build/check and CI use the same target set. The release builds every target via -Ptargets.full.
 val fullTargets = providers.gradleProperty("targets.full").isPresent
 
 kotlin {

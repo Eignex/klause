@@ -6,9 +6,9 @@ import kotlinx.serialization.json.Json
 import java.io.File
 
 /**
- * Shared reporting primitives for every metric: environment capture, the serializable result
- * envelopes, and JSON / ns formatting helpers. Each metric owns its per-row result type but
- * reuses [EnvInfo], [Reports.json], and [Reports.writeJson] for a consistent output shape.
+ * Shared reporting primitives for every metric: the JSON encoder and JSON/Markdown writers. Each
+ * metric owns its per-row result type but reuses [EnvInfo], [Reports.json] and [Reports.writeJson]
+ * for a consistent output shape.
  */
 object Reports {
     internal val json: Json = Json {

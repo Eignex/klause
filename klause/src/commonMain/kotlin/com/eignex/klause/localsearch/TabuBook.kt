@@ -6,14 +6,14 @@ import com.eignex.klause.ir.Problem
  * Tabu / activity bookkeeping for an ongoing solve: the accepted-move [step] clock, the per-variable
  * last-touched stamps ([lastTouched]) driving the tabu window, and the cross-epoch [touchCount]
  * activity histogram. [LocalSearchState]'s apply path advances all three; strategies read them for
- * tabu / CCA-window decisions.
+ * tabu decisions.
  */
 class TabuBook private constructor(
     problem: Problem,
     /** Step at which each variable was last flipped or set. Bool var ids in `[0, numBoolVars)`; int
      *  var ids offset by `numBoolVars`; real var ids offset by `numBoolVars + numIntVars`. Reset to
-     *  zero on [reset] — used only for tabu / CCA-window
-     *  decisions within a single restart epoch. For cross-epoch activity, see [touchCount]. */
+     *  zero on [reset] — used only for tabu decisions within a single restart epoch. For cross-epoch
+     *  activity, see [touchCount]. */
     val lastTouched: LongArray,
     /** Cumulative count of moves applied to each variable, same indexing as [lastTouched]. Survives
      *  [reset] so it measures activity across the whole search run. Captured by

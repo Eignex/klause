@@ -440,7 +440,7 @@ internal fun FlatZincCompiler.emitDistribute(c: FznConstraint) {
     factors.add(GlobalCardinality(xs = base, cover = value, countVars = card))
 }
 
-/** Emit `klause_count_eq(x, y, c)` for constant `y` through GCC. */
+/** Emit `count_eq(x, y, c)` for constant `y` through GCC. */
 internal fun FlatZincCompiler.emitCountEq(c: FznConstraint) {
     expectArity(c, 3)
     val xs = evalIntVarArray(c.args[0])

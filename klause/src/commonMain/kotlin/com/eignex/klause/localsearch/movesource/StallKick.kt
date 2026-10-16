@@ -19,11 +19,10 @@ import com.eignex.klause.util.IntHashSet
  * the feasibility fight, fired on a certified-stuck window, not by the noise draw.
  */
 class StallKick(
-    /** Variables randomized per kick when [kickSize] is null; otherwise the distribution's mean. */
+    /** Variables randomized per kick; unused when [kickSize] is set. */
     private val kickVars: Int,
     /** Optional move-size distribution: when set, each kick draws its variable budget from it instead
-     *  of using the fixed [kickVars], so kick strength varies over a principled mix rather than a
-     *  constant. Null keeps the fixed-size behaviour. */
+     *  of using the fixed [kickVars], so kick strength varies over a mix rather than a constant. */
     private val kickSize: MoveSizeDistribution? = null,
 ) : MoveSource {
     init {
@@ -50,7 +49,6 @@ class StallKick(
         var budget = size
         var attempts = size * ATTEMPTS_PER_KICK
         while (budget > 0 && attempts-- > 0) {
-            // Step 1: a random variable of the current factor.
             val scope = state.problem.factors[factorId]
             val nInts = scope.intVars.size
             val nBools = scope.boolVars.size
@@ -74,11 +72,9 @@ class StallKick(
                 budget--
                 occ = state.projection.boolOccurrences[v]
             }
-            // Step 2: hop to a random factor sharing that variable and continue the walk.
             if (occ.isEmpty()) break
             factorId = occ[state.rng.nextInt(occ.size)]
         }
-        // Flatten everything queued into one atomic perturbation, first-write-wins per slot.
         val parts = ArrayList<Move>()
         val seenSlots = IntHashSet()
         fun addPart(p: Move) {

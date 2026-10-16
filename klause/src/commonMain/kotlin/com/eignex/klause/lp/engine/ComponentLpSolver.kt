@@ -16,7 +16,7 @@ import com.eignex.klause.util.IntArrayList
  *
  * Structural columns in no row ([isolated]) need no solve at all: each rides to whichever of its
  * bounds its cost prefers; an isolated column that prefers an infinite bound makes the LP unbounded,
- * reported as a failed solve exactly like the monolithic engine would.
+ * reported as a null result with an unbounded-candidate termination, as the monolithic engine does.
  *
  * The warm-start handle is not split across blocks — a decomposed solve cold-starts each block
  * (small by construction, which is the point); the warm contract permits this (it changes only the

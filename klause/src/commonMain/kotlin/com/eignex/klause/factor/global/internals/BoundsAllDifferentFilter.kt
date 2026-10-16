@@ -10,10 +10,12 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /**
- * Bounds-consistency filtering for `all_different ::bounds`. This is the López-Ortiz / Quimper /
- * van Beek / Tremblay / Marchand "fast and simple" algorithm (CP-AI-OR 2003): two O(n log n) sweeps
- * over the variable bounds (the second on the negated bounds) that raise lower bounds and lower
- * upper bounds to the edges of Hall intervals, using union-find chains over the sorted endpoints.
+ * Bounds-consistency filtering for `all_different ::bounds`: two O(n log n) sweeps over the variable
+ * bounds (the second on the negated bounds) that raise lower bounds and lower upper bounds to the edges
+ * of Hall intervals, using union-find chains over the sorted endpoints.
+ *
+ * López-Ortiz, Quimper, Tromp, van Beek, "A fast and simple algorithm for bounds consistency of the
+ * alldifferent constraint", IJCAI 2003, https://mlanthology.org/ijcai/2003/lopezortiz2003ijcai-fast
  *
  * Returns the involved variables as a conflict reason when a Hall interval is over-full, or `null`
  * when filtering succeeds.
@@ -143,7 +145,7 @@ private fun overfullInterval(lo: LongArray, hi: LongArray, vars: IntArray): IntA
 /**
  * Pure core of [boundsAllDifferentFilter]: given variable lower/upper bounds, fill [newLo]/[newHi]
  * with the bounds-consistent tightened bounds and return `true` if feasible, `false` if a Hall
- * interval is over-full. López-Ortiz / Quimper / van Beek / Tremblay / Marchand (CP-AI-OR 2003).
+ * interval is over-full (López-Ortiz et al., IJCAI 2003).
  */
 internal fun computeBoundsAllDifferent(lo: LongArray, hi: LongArray, newLo: LongArray, newHi: LongArray): Boolean {
     val n = lo.size

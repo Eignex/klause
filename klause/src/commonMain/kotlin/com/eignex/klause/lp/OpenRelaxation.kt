@@ -7,8 +7,8 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.util.EmptyDoubleArray
 
 /**
- * The LP relaxation of a system over its **genuinely open** integer ranges, shared by everything that has
- * to reason about a model with open integer bounds: [tightenOpenIntBounds].
+ * The LP relaxation of a system over its **genuinely open** integer ranges, built for
+ * [tightenOpenIntBounds].
  *
  * A variable open below enters split, `x = x⁺ − x⁻` with both parts non-negative, never as a probe-
  * magnitude lower bound: the double view folds each column's lower bound into the row rhs in doubles, and

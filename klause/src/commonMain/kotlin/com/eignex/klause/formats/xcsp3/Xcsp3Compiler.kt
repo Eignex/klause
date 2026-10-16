@@ -107,15 +107,14 @@ internal object Compiler {
         internal var objective: LinearObjectiveSpec? = null
         internal var objectiveMaximize = false
 
-        // A fixed var for an integer constant is shared across its occurrences. An Element/sum `<list>`
-        // can repeat a constant tens of thousands of times (WordSquare), and a fresh `{c}` var each time
-        // bloated the problem to millions of vars. A constant var is single-valued (never branched), so
-        // sharing it is solve-neutral.
         // Vars the front-end knows are functionally defined by a constraint it emitted (e.g. a `(eq, v)`
         // sum makes v its value). These are the sound `defines_var` hints local search uses to derive
         // them instead of searching them; the factor IR alone cannot tell an equality's output apart.
         internal val definedVars = IntArrayList()
 
+        // A fixed var for an integer constant is shared across its occurrences: an Element/sum `<list>`
+        // can repeat a constant tens of thousands of times, and a fresh var each time would multiply the
+        // variable count. A constant var is single-valued (never branched), so sharing it is solve-neutral.
         private val constVars = MutableLongIntMap()
         internal fun constVar(value: Long): Int {
             val existing = constVars.getOrDefault(value, -1)
@@ -137,7 +136,7 @@ internal object Compiler {
         // Same reuse for a `<group>`'s positive `<extension>` template: the parsed short-support tuple
         // arrays depend only on the shared `<supports>` text, so cache them by reference identity and
         // share them across every row's [Table] (which treats its tuples as read-only) instead of
-        // re-parsing an identical high-arity table per row — that accumulation exhausted the heap.
+        // re-parsing and retaining an identical high-arity table per row, which can exhaust the heap.
         internal var cachedSupportsText: String? = null
         internal var cachedSupportTemplate: SupportTemplate? = null
 
@@ -459,10 +458,8 @@ internal object Compiler {
                 factors.add(Linear(coeffs, vars, op, k))
             } else {
                 factors.add(Linear(coeffs + -1, vars + rhsVar, op, k))
-                // `(eq, v)` makes v the sum's value: v = Σ coeffs·vars. Record it as a functional
-                // definition so local search derives v from the sum rather than searching it (the sound
-                // `defines_var` hint the factor IR alone can't recover — orienting a bare equality could
-                // pick a decision var as the output).
+                // `(eq, v)` makes v the sum's value: v = Σ coeffs·vars. Orienting a bare equality could
+                // pick a decision var as the output, so the front-end records the definition itself.
                 if (op == LinearOp.EQ) definedVars.add(rhsVar)
             }
         }
@@ -723,8 +720,7 @@ internal object Compiler {
 
         internal class RelParts(val rel: LinRelation, val op: LinearOp)
 
-        /** Lower `rel(lhs, rhs)` to the coalesced linear components. When both sides share the same
-         *  variable terms they cancel to an empty var list, leaving the constant relation `0 op bound`. */
+        /** Lower a binary relation call `rel(lhs, rhs)` to its coalesced linear components. */
         internal fun relationParts(node: FExpr.Call): RelParts {
             val (op, delta) = relOp(node.fn) ?: throw UnsupportedXcsp3Exception("relation '${node.fn}'")
             // Only eq is n-ary in XCSP3, and its callers fold it pairwise before reaching here.
@@ -1003,30 +999,25 @@ internal object Compiler {
 
         // A `<list>` entry may be a declared variable (possibly a wildcard/range over cells), a constant,
         // a reified relation, or an arithmetic expression; [termVar] resolves each to an int var
-        // (fast-pathing declared variables). Builds an [IntArray] directly — a large `<list>` (WordSquare's
-        // thousands-entry element lists) would otherwise box every resolved id into a `List<Int>`.
+        // (fast-pathing declared variables). Builds an [IntArray] directly: a large `<list>` would otherwise
+        // box every resolved id into a `List<Int>`.
         internal fun refList(text: String): IntArray {
             val out = IntArrayList()
             for (tok in text.splitWs()) for (name in expandNames(tok)) out.add(termVar(name))
             return out.toIntArray()
         }
 
-        /** Expand an array reference token into the declared cell names it denotes. Each `[...]`
-         *  group is a fixed index `[i]`, a range `[lo..hi]`, or a wildcard `[]` (any index), in
-         *  any position and dimensionality — e.g. `x[]`, `x[][]`, `x[2][]`, `x[0..1][0]`. A plain
-         *  reference with no wildcard or range is returned as-is (resolved later by [ref]). */
-        // Declared cell names grouped by array base (the prefix before the first `[`), built lazily on
-        // the first wildcard/range reference — by which point every variable is declared. A wildcard
-        // pattern `^base\[…]$` can only match cells of that base, so expansion filters this bucket
-        // instead of every declared variable, turning an O(references × variables) scan (pathological
-        // with a large array) into O(cells of the base).
         // Each cell name paired with its bracket indices, parsed once at index-build time so reference
-        // expansion never re-parses a cell's `[i][j]` per token — the array-heavy hot path (BusScheduling).
+        // expansion never re-parses a cell's `[i][j]` per token.
         private class BaseCells {
             val names = ArrayList<String>()
             val indices = ArrayList<IntArray>()
         }
 
+        // Declared cell names grouped by array base (the prefix before the first `[`), built lazily on
+        // the first wildcard/range reference, by which point every variable is declared. A wildcard can
+        // only match cells of its base, so expansion filters this bucket instead of every declared
+        // variable: O(cells of the base) rather than O(references × variables).
         private val cellsByBase: HashMap<String, BaseCells> by lazy(LazyThreadSafetyMode.NONE) {
             val index = HashMap<String, BaseCells>()
             for (name in varIds.keys) {
@@ -1039,6 +1030,10 @@ internal object Compiler {
             index
         }
 
+        /** Expand an array reference token into the declared cell names it denotes. Each `[...]`
+         *  group is a fixed index `[i]`, a range `[lo..hi]`, or a wildcard `[]` (any index), in
+         *  any position and dimensionality — e.g. `x[]`, `x[][]`, `x[2][]`, `x[0..1][0]`. A plain
+         *  reference with no wildcard or range is returned as-is (resolved later by [ref]). */
         internal fun expandNames(tok: String): List<String> {
             if ("[]" !in tok && ".." !in tok) return listOf(tok)
             val br = tok.indexOf('[')
@@ -1048,7 +1043,7 @@ internal object Compiler {
             // When the base is a declared array of matching rank, generate exactly the referenced cell
             // names from the per-dimension index ranges (a wildcard spanning `0 until size`) — O(selected)
             // — instead of scanning every declared cell of the array. Row-major generation matches the
-            // declaration order [declareCells] used, so positional list semantics are preserved.
+            // declaration order [declareVar] used, so positional list semantics are preserved.
             val dims = arrayDims[base]
             if (dims != null && dims.size == specs.size) {
                 val out = ArrayList<String>()
@@ -1177,7 +1172,7 @@ internal object Compiler {
         }
 
         /** Stream a `<group>`: materialize the (first, bounded) template, then instantiate one `<args>` row
-         *  at a time — the memory win, since a group over millions of rows never holds them all at once. */
+         *  at a time, so a group over millions of rows never holds them all at once. */
         private fun streamGroup(reader: XmlReader) {
             require(reader.enterPeeked()) { "group without a template constraint" }
             val firstTag = reader.nextChildTag()

@@ -31,49 +31,49 @@ data class FlatZincSearchTier(
 
 /** Parsed MiniZinc variable heuristic name. */
 enum class FlatZincSearchVarSelector {
-    /** Parse `input_order` as a variable selection heuristic. */
+    /** `input_order`. */
     InputOrder,
 
-    /** Parse `first_fail`, `most_constrained`, or `dom_w_deg` as a variable heuristic. */
+    /** `first_fail` or `most_constrained`; within a tier also `dom_w_deg` and `occurrence`. */
     SmallestDomain,
 
-    /** Parse `anti_first_fail` or `occurrence` as a variable heuristic. */
+    /** `anti_first_fail`; as the fallback selector also `occurrence`. */
     LargestDomain,
 
-    /** Parse `dom_w_deg` when used as fallback-only variable selection. */
+    /** `dom_w_deg` as the fallback selector. */
     DomWdeg,
 
-    /** Parse `smallest` as a variable selection heuristic. */
+    /** `smallest`. */
     SmallestLowerBound,
 
-    /** Parse `largest` as a variable selection heuristic. */
+    /** `largest`. */
     LargestUpperBound,
 
-    /** Parse `max_regret` as a variable selection heuristic. */
+    /** `max_regret`. */
     MaxRegret,
 
-    /** Parse `random_order` as a variable selection heuristic. */
+    /** `random_order`. */
     RandomOrder,
 }
 
 /** Parsed MiniZinc value heuristic name. */
 enum class FlatZincSearchValueSelector {
-    /** Parse `indomain_min` as a value selection heuristic. */
+    /** `indomain_min` or `indomain`. */
     IndomainMin,
 
-    /** Parse `indomain_max` as a value selection heuristic. */
+    /** `indomain_max`. */
     IndomainMax,
 
-    /** Parse `indomain_middle` as a value selection heuristic. */
+    /** `indomain_middle`. */
     IndomainMiddle,
 
-    /** Parse `indomain_median` as a value selection heuristic. */
+    /** `indomain_median`. */
     IndomainMedian,
 
-    /** Parse `indomain_split` as a value selection heuristic. */
+    /** `indomain_split`. */
     IndomainSplit,
 
-    /** Parse `indomain_random` as a value selection heuristic. */
+    /** `indomain_random`. */
     IndomainRandom,
 }
 

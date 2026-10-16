@@ -11,6 +11,9 @@ internal data class ForrestTomlinWork(
     val transformEntries: Int,
 )
 
+// Forrest-Tomlin update of the LU factors: J. J. H. Forrest and J. A. Tomlin, "Updated triangular factors of the
+// basis to maintain sparsity in the product form simplex method", Math. Program. 2, 1972,
+// https://doi.org/10.1007/BF01584548.
 // T L^-1 P B Q0 = V; V(order, order) is triangular. Labels are initial LU coordinates.
 // Row transforms multiply on the left, so their transposes apply in reverse order in BTRAN.
 internal class ForrestTomlinFactors(factors: LuFactors) {

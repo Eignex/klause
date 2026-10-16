@@ -493,9 +493,9 @@ internal class LpCapture internal constructor(
     }
 
     companion object {
-        /** Freeze [model] and caller-recorded [events] at this call. Wave 0.4 intentionally has no
-         * instrumented producer: callers record only events exposed by their public engine seam. The
-         * capture contains no factorization snapshot or other solver-private cache. */
+        /** Freeze [model] and caller-recorded [events] at this call. There is no instrumented producer:
+         * callers record only events exposed by their public engine seam. The capture contains no
+         * factorization snapshot or other solver-private cache. */
         fun capture(model: ExactLpModel, settings: LpReplaySettings, events: List<LpReplayEvent>): LpCapture = capture(
             requireNotNull(model.toLegacy()) { "exact model is outside capture v1 authority" },
             settings,

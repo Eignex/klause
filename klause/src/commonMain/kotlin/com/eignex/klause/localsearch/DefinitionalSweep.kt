@@ -77,11 +77,12 @@ class DefinitionalSweep internal constructor(
         return result.toIntArray()
     }
 
-    /** Factory for sweeps inferred from the factor IR (as opposed to front-end annotations). */
+    /** Factory for sweeps inferred from the factor IR. */
     companion object {
         /** Infer definitions using the source domains to recognize hinted binary literal channels.
          * Unique unit unary predicates used only by those channels are maintained with them.
-         * Hinted native [com.eignex.klause.factor.table.Element] results follow their indexes and selected cells.
+         * Hinted native [com.eignex.klause.factor.table.Element] results follow their indexes and selected cells,
+         * and [com.eignex.klause.factor.arithmetic.DivMod] quotients and remainders follow their operands.
          * Competing definitions and cyclic cones remain searched. */
         fun infer(
             problem: Problem,
@@ -99,10 +100,11 @@ class DefinitionalSweep internal constructor(
          *  decision vars instead of searching them. Supported sources:
          *  - every integer [Abs] defines its output from its operand;
          *  - every `Product(a, b, out)` defines `out = a·b` (a product always determines its output);
+         *  - every [Power] with an integer base defines its output from that base;
          *  - a `Linear` equality is oriented to define var v ONLY when v is in [definedHints] — the
          *    front-end's `defines_var` info (e.g. a `(eq, v)` sum). Orienting a bare equality without that
          *    hint could pick a decision var as the output and derive it to an infeasible value, so it is
-         *    never done unhinted.
+         *    never done unhinted;
          *  - hinted min/max expression cones and their affine operands and aliases.
          *  - hinted affine indexes read by Elements or unit unary equality predicates.
          *  A var claimed by more than one definition, or transitively by itself, is left searched. Nodes
@@ -258,7 +260,7 @@ class DefinitionalSweep internal constructor(
 
     /**
      * Build a [FunctionalObjective] `Σ termCoeffs·terms + Σ boolTermCoeffs·[boolTerm holds] + constant`
-     * (already "lower is better") over this sweep's int and bool cones, so local search descends the
+     * in the direction given by [minimize] over this sweep's int and bool cones, so local search descends the
      * objective on the decision (leaf) vars rather than the functionally-defined ones. Returns null
      * when no term is defined here or a reachable definition has no exact objective evaluator.
      */
@@ -358,7 +360,7 @@ class DefinitionalSweep internal constructor(
         }
 
         /** An int definition from the functional-objective node algebra (abs / min / max /
-         *  times / plus / lin_eq), domain-clamped. */
+         *  times / plus / power / lin_eq), domain-clamped. */
         class IntDef internal constructor(
             internal val node: FunctionalObjective.Node,
             override val intInputs: IntArray,

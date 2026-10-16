@@ -18,9 +18,10 @@ import com.eignex.klause.util.toSortedIntArray
  *
  * A generator permutes integer and Boolean variables independently (detection is kind-preserving),
  * so the lex sequence orders the integer support in id order, then the Boolean support in id order;
- * each position compares a variable against its image of the same kind. The filtering is the
- * Frisch–Hnich–Kiziltan–Miguel–Walsh `α`/`β` lex rule (α = first undecided position, β = start of
- * the forced `≥` suffix) generalised
+ * each position compares a variable against its image of the same kind. The filtering is the `α`/`β`
+ * lex rule (α = first undecided position, β = start of the forced `≥` suffix) of Frisch, Hnich,
+ * Kiziltan, Miguel and Walsh, "Propagation algorithms for lexicographic ordering constraints",
+ * Artificial Intelligence 170(10), 2006, https://doi.org/10.1016/j.artint.2006.03.002, generalised
  * over typed positions: a Boolean reads
  * as the domain `[0,1]` (`true` ⇒ `[1,1]`, `false` ⇒ `[0,0]`), so a bound tightening at a Boolean
  * position is a pin. Reasons cite the fixed-equal prefix, the deciding pair, and — when the step is
@@ -59,7 +60,9 @@ internal class SymmetryPropagator(
      * order's first unfixed position (the frontier; later positions follow as search fixes this one),
      * this prunes using the whole group's stabiliser structure, not just the propagated generators —
      * the strength that survives beyond the bounded generator expansion on large groups. Sound by
-     * construction (every orbit element comes from a genuine group element fixing the prefix).
+     * construction (every orbit element comes from a genuine group element fixing the prefix). After
+     * Margot, "Exploiting orbits in symmetric ILP", Math. Program. 98, 2003,
+     * https://doi.org/10.1007/s10107-003-0394-6.
      */
     @Suppress("ReturnCount")
     private fun orbitalFix(state: PropagationState): Boolean {

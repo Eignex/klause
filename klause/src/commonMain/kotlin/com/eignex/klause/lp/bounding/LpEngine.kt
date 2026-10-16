@@ -88,15 +88,14 @@ internal class GatedResidual(
  * Per-node relaxation-bounding runtime for branch-and-bound. Owns the whole LP-relaxation family
  * state — the [CpToLpRelaxation] relaxer, structural cut separators and the harvested global-cut
  * pool, the Lagrangian / knapsack-Lagrangian / energetic / cumulative-flow bounds with their
- * multiplier vectors and check counters, the adaptive auto-off gate, the per-depth warm-start basis
+ * multiplier vectors and check counters, the adaptive effort ladder, the per-depth warm-start basis
  * cache, LP branching hints and the pending LP-learned nogood pool — all derived from [problem],
  * [objective] and [params].
  *
  * [pruneNode] is the per-node cascade (lower bound → scheduling-feasibility bounds → Lagrangian
- * bounds → LP relaxation): it returns true when the node is provably dominated/infeasible, with the
- * same ordering and side effects ([sink] telemetry, nogood collection, multiplier updates, warm-start
- * basis caching, [lastBackjump]) the search engine relied on inline. Internal fields are null/empty
- * when their feature flag is off, so the cascade simply skips those arms.
+ * bounds → LP relaxation): it returns true when the node is provably dominated/infeasible, recording
+ * [sink] telemetry, nogoods, multiplier updates, warm-start bases and [lastBackjump] along the way.
+ * Internal fields are null/empty when their feature flag is off, so the cascade skips those arms.
  */
 internal class LpEngine(
     val problem: Problem,
@@ -211,8 +210,7 @@ internal class LpEngine(
 
     /** The relaxation-bound family resolved from the high-level emphasis ([LpParams.lpConfig])
      *  against this problem's structure; with no emphasis set, the explicit
-     *  [LpParams.lpPlan] is used verbatim. Resolving here makes the engine the single home for
-     *  the intent→plan step, so callers carry only the intent and never a separately-resolved copy. */
+     *  [LpParams.lpPlan] is used verbatim. Callers carry only the intent, never a resolved copy. */
     var params: LpParams = params0
         private set
 
@@ -294,8 +292,7 @@ internal class LpEngine(
     var lpRelaxer: CpToLpRelaxation? = null
         private set
 
-    // Structure-based cut separators run on the sparse LP point; circuit cuts are deferred
-    // until the arc model is rebuilt on the sparse relaxation.
+    // Structure-based cut separators, run against the sparse LP point.
     var lpSeparators: List<CutSeparator> = emptyList()
         private set
 
@@ -387,9 +384,8 @@ internal class LpEngine(
     private var lpCheckCounter = 0
 
     // Cumulative LP work allowance: the count-based [lpLadder] below needs a warmup window of solves to
-    // demote, so it can never shed an LP whose single solve is enormous — that LP just spends the whole
-    // budget bounding nothing (elitserien/cyclic-rcpsp: lpMs≈budget, prunes=0, too few solves to warm up).
-    // When the total solve budget is known, root and node LP work together may spend at most
+    // demote, so it can never shed an LP whose single solve is enormous and that spends the whole budget
+    // bounding nothing. When the total solve budget is known, root and node LP work together may spend at most
     // `fraction × budget` worth of work ([lpWorkAllowance]) before optional node LP work stops and the arm
     // runs as a bare combinatorial search. Each solve is capped at what is left ([nodeWorkBudget]), so one
     // solve cannot run far past the allowance before the ledger sees it. See [LpEffortGovernor].
@@ -512,7 +508,7 @@ internal class LpEngine(
 
     /**
      * The work a solve of this model ought to cost, from its shape alone: roughly one dense pass per
-     * column-derived iteration, on the same `/40` scale CP-SAT uses for its iteration baseline.
+     * column-derived iteration, with `columns / SIZE_BUDGET_DIVISOR` iterations.
      */
     private fun sizeBudget(columns: Int, rows: Int): Long {
         if (columns <= 0 || rows <= 0) return MIN_NODE_WORK_OPS
@@ -540,10 +536,8 @@ internal class LpEngine(
     internal fun lpWorkAllowanceSpent(additionalWork: Long = 0L): Boolean =
         lpEffortGovernor.allowanceSpent || lpEffortGovernor.remainingWork()?.let { it <= additionalWork } == true
 
-    // Adaptive LP effort ladder: the emphasis sets the ceiling
-    // rung (cuts when enabled, else the bare bound), and a rolling prune-rate window descends one rung
-    // at a time — shedding during-search cuts before the bound — re-probing upward on backoff. Sound:
-    // every rung is a valid bound / off, so the gate only changes work, never solutions.
+    // Adaptive LP effort ladder: the emphasis sets the ceiling rung (cuts when enabled, else the bare
+    // bound), and a tumbling prune-rate window descends one rung at a time, re-probing upward on backoff.
     private lateinit var lpLadder: LpEffortLadder
     lateinit var lpSeparatorGate: LpSeparatorGate
         private set
@@ -561,7 +555,7 @@ internal class LpEngine(
     private var persistentRelaxer: CpToLpRelaxation? = null
     private var persistentRelaxation: LpRelaxation? = null
 
-    // The current legacy fallback owner remains live for metrics until replacement or engine close.
+    // The fallback node solver stays live for metrics until it is replaced or the engine closes.
     internal var nodeSimplex: PersistentLpSolver? = null
     internal var nodeUsesTrail: Boolean = false
 
@@ -612,8 +606,8 @@ internal class LpEngine(
 
     // Gated residual float filter (pure-real models): a structurally node-invariant relaxation whose
     // rows toggle by per-row enforcement alone, plus ONE simplex instance that re-solves it with its
-    // kept LU factorization — the per-node build+factorize that dominated the satisfaction path
-    // collapses to a few dual pivots. Exact certificates read the retained source rows and live bounds.
+    // kept LU factorization, so a node costs a few dual pivots instead of a build and factorization.
+    // Exact certificates read the retained source rows and live bounds.
     private var gatedResolved = false
     private var gatedFilter: GatedResidual? = null
 
@@ -643,9 +637,6 @@ internal class LpEngine(
                 }
                 gatedFilter = GatedResidual(
                     built,
-                    // A long eta chain: the persistent instance's pivots accumulate ACROSS nodes
-                    // (reconciliation + dual repair after each pin flip), so the default limit would
-                    // refactorize the full basis every few nodes — the exact cost this filter removes.
                     simplex,
                     enforced,
                 )
@@ -744,9 +735,9 @@ internal class LpEngine(
 
     /**
      * Per-node prune cascade. Returns true when this node is provably dominated by the incumbent
-     * ([effectiveBound]) or infeasible. The cascade order and every side effect (check-counter
-     * increments, [sink] telemetry, [lpNogoods] collection, multiplier reassignments, warm-start
-     * basis caching and the [lastBackjump] assignment) are preserved exactly.
+     * ([effectiveBound]) or infeasible. Arms run in cascade order and stop at the first prune; each
+     * records its own side effects (check counters, [sink] telemetry, [lpNogoods], multipliers,
+     * warm-start bases and [lastBackjump]).
      */
     fun pruneNode(
         session: PropagationSession,
@@ -844,7 +835,7 @@ internal class LpEngine(
         }
     }
 
-    /** LP-relaxation simplex bound with depth/freq/auto-off gating, warm-start basis caching and
+    /** LP-relaxation simplex bound with depth/cadence/effort-ladder gating, warm-start basis caching and
      *  LP-learned backjump/nogood recording. Sets the outer [lpBackjump] when it derives an
      *  asserting clause. */
     private inner class LpSimplexBound : RelaxationBound {
@@ -973,7 +964,7 @@ internal class LpEngine(
         const val HULL_PRUNE_TOL = 1e-6
 
         /** One disabler per prunable hull that is **not** per-factor (emitted by the driver, not a
-         *  Linearizer, so it carries no [com.eignex.klause.lp.Contribution] tag): returns the plan
+         *  factor projection, so it carries no [com.eignex.klause.lp.Contribution] tag): returns the plan
          *  with that family off, or null when it is already off. The per-factor convex hulls are pruned
          *  individually by [pruneIneffectiveHulls]; the base relaxation, objective cone and circuit arcs
          *  are not hulls and are excluded. */
@@ -1116,8 +1107,9 @@ internal class LpEngine(
 private const val RESIDUAL_MAX_ROWS = 1000
 
 /** Eta-chain length of the persistent gated-residual simplex before it refactorizes: its pivots
- *  accumulate across nodes, so the chain must span many node re-solves for the kept factorization to
- *  pay; each eta costs one extra sparse pass per FTRAN/BTRAN, bounding the drift. */
+ *  (reconciliation and dual repair after each pin flip) accumulate across nodes, so the chain must span
+ *  many node re-solves for the kept factorization to pay; each eta costs one extra sparse pass per
+ *  FTRAN/BTRAN, bounding the drift. */
 private const val GATED_UPDATE_LIMIT = 400
 
 /** Floor on the adaptive node LP work budget ([LpWorkBudget]). A floor rather than an off switch: with a
@@ -1131,7 +1123,7 @@ private const val MAX_NODE_WORK_OPS = 100_000_000L
 /** Where the adaptive budget starts, before any solve has reported. */
 private const val INITIAL_NODE_WORK_OPS = 1_000_000L
 
-/** Divisor on the size-derived work baseline, mirroring CP-SAT's `num_cols / 40` iteration baseline. */
+/** Divisor on the size-derived work baseline: `columns / 40` iterations. */
 private const val SIZE_BUDGET_DIVISOR = 40L
 
 /** Floor on a leaf solve's work cap: a small model's cold solve costs more than its shape alone suggests,
@@ -1142,9 +1134,8 @@ private const val MIN_LEAF_WORK_OPS = 1_000_000L
  *  assignment: its verdict is the answer for that branch, not a bound the next node can improve on. */
 private const val MAX_LEAF_WORK_OPS = 1_000_000_000L
 
-// LP work (simplex plus the node-LP overhead the engine charges) done in about one millisecond of LP time: the
-// median ratio of LP work to LP milliseconds with the default LP arm over 13 MIPLIB 2017 models with continuous
-// columns was 18.7k (spread 6.4k to 72.8k).
+// LP work (simplex plus the node-LP overhead the engine charges) done in about one millisecond of LP time,
+// calibrated on MIPLIB 2017 models with continuous columns (median 18.7k, spread 6.4k to 72.8k).
 private const val LP_WORK_PER_MILLI = 20_000L
 
 /** The LP work allowance for [fraction] of a [budgetMillis] solve, or 0 (none) when either is unknown or off. */

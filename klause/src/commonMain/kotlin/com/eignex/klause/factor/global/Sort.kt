@@ -11,12 +11,8 @@ import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 
 /**
- * `sort(xs, ys)` — [ys] is the non-decreasing sorted permutation of [xs] (same multiset
- * of values). Two constraints together: pairwise `ys(i) ≤ ys(i+1)` AND the multisets of
- * `xs` and `ys` are equal.
- *
- * Propagation: chain bound-tightening on `ys` (non-decreasing) and matching bounds
- * between `ys(0)` ↔ `min(xs)` / `ys(n-1)` ↔ `max(xs)`.
+ * `sort(xs, ys)` — [ys] is the non-decreasing sorted permutation of [xs]: `ys(i) ≤ ys(i+1)` and the
+ * multisets of `xs` and `ys` are equal. Propagation is bound-consistent over both arrays.
  */
 class Sort(val xs: IntArray, val ys: IntArray) : Factor {
 
@@ -27,8 +23,7 @@ class Sort(val xs: IntArray, val ys: IntArray) : Factor {
 
     override fun remap(mapping: VarRemap): Factor = Sort(mapping.ints(xs), mapping.ints(ys))
 
-    /** `ys` is the sorted permutation of `xs`: the input multiset ignores order (so `xs` is sorted in
-     *  the key), while `ys` is position-faithful (`ys(0) <= ys(1) <= ...`) and kept in order. */
+    /** The input multiset ignores order, so `xs` is sorted in the key; `ys` is positional and kept in order. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.SORT, ::buildKey)
 
     override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.SORT, mapping, ::buildKey)

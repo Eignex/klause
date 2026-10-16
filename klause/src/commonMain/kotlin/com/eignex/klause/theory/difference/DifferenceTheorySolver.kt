@@ -24,7 +24,7 @@ class DifferenceTheorySolver(
     override val model: Problem,
     projections: PreparedFactorProjections,
 ) : Theory<Sample> {
-    /** Open the built-in or source-retained selection with the original service constructor. */
+    /** Encode through [model]'s own selected factor projections. */
     constructor(model: Problem) : this(model, model.selectedFactorProjections())
 
     private val encoded = requireNotNull(projections.linearTheoryModel(EncodingTarget.DIFFERENCE)) {

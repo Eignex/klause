@@ -26,7 +26,7 @@ object ExecutionOptionsProfile {
     @Volatile
     private var retained: Any? = null
 
-    /** Measure captured typed plans and legacy request adaptation with identical resolved settings. */
+    /** Measure planning from typed, parsed and raw `key=value` options that resolve to identical settings. */
     @JvmStatic
     fun main(args: Array<String>) {
         val settings = args.associate { it.substringBefore('=') to it.substringAfter('=') }

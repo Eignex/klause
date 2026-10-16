@@ -29,13 +29,13 @@ import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 
 // Real-arithmetic lowering for the SMT-LIB front-end (LRA / the real half of LIRA): real variables
-// become LP-only continuous columns and top-level linear real constraints become real Linear rows —
-// no discretisation. Coefficients are folded as exact rationals (BigFraction), and each emitted row
-// is multiplied through by the least common denominator so the row's doubles are exact integers:
-// the LP-side certifiers then reason about precisely the asserted constraint. Fragment: conjunctive
-// real atoms, strict or not (strictness rides the delta-rational exact deciders), plus real OMT
-// objectives; distinct and real atoms under boolean structure reject with a clear message until the
-// real-atom reification lands.
+// become LP-only continuous columns and linear real constraints become real Linear rows, with no
+// discretisation. Coefficients are folded as exact rationals (BigFraction), and each emitted row is
+// multiplied through by the least common denominator so the row's doubles are exact integers: the
+// LP-side certifiers then reason about precisely the asserted constraint. Strict atoms keep their
+// strictness for the delta-rational exact deciders (Dutertre and de Moura, "A Fast Linear-Arithmetic
+// Solver for DPLL(T)", CAV 2006, https://doi.org/10.1007/11817963_11). Real atoms under boolean
+// structure reify through [ReifiedRealLinear].
 
 /** The integer combination this real term embeds, or null when any coefficient is fractional or
  *  a real column appears — the inverse of [toRealComb], for `to_int` over an integral real term. */
@@ -123,8 +123,7 @@ internal fun parseRealLiteral(s: String): BigFraction? {
 }
 
 /** Post a top-level real relation as hard LP-only rows; strictness rides through to the delta-rational
- *  deciders. An n-ary chain `(op a1 … an)` posts its n−1 consecutive relations. `distinct` needs the
- *  real-atom machinery and rejects. */
+ *  deciders. An n-ary chain `(op a1 … an)` posts its n−1 consecutive relations. */
 internal fun Compiler.Builder.assertRealLinear(node: SExpr.SList) {
     val op = node.atomAt(0, "relation operator")
     requireChainableRelation(node, op)

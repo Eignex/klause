@@ -113,8 +113,8 @@ fun gcc(vars: List<IntTerm>, valueCounts: Map<Int, IntRange>): BoolExpr {
 }
 
 /**
- * Lexicographic less-or-equal: `a` is no greater than `b` when read left-to-right. Empty lists
- * are equal (true). Lists must be the same length.
+ * Lexicographic less-or-equal: `a` is no greater than `b` when read left-to-right. Lists must be
+ * non-empty and of equal length.
  */
 fun lexLeq(a: List<IntTerm>, b: List<IntTerm>): BoolExpr = lexChain(a, b, strict = false)
 
@@ -126,8 +126,7 @@ private fun lexChain(a: List<IntTerm>, b: List<IntTerm>, strict: Boolean): BoolE
     require(a.isNotEmpty()) { "lex: empty lists are not supported" }
     val ax = a.map { it.toIntExpr() }
     val bx = b.map { it.toIntExpr() }
-    // Tail recursion: lex(a, b) ⟺ a[0] < b[0] ∨ (a[0] = b[0] ∧ lex(a[1..], b[1..])).
-    // Base case at the last index: <= becomes a[k] ≤ b[k], < becomes a[k] < b[k].
+    // lex(a, b) ⟺ a(0) < b(0) ∨ (a(0) = b(0) ∧ lex(a(1..), b(1..))), built from the last index inward.
     var result: BoolExpr = if (strict) {
         IntCompare(ax.last(), IntCmpOp.LT, bx.last())
     } else {
@@ -155,7 +154,7 @@ fun circuit(succ: List<IntTerm>, valueOffset: Int = 0): BoolExpr {
 fun circuit(vararg succ: IntTerm): BoolExpr = circuit(succ.toList(), valueOffset = 0)
 
 /**
- * Subcircuit: like [circuit], but `succ[i] = i + valueOffset` marks node `i` excluded.
+ * Subcircuit: like [circuit], but `succ(i) = i + valueOffset` marks node `i` excluded.
  * Included nodes form a single cycle.
  */
 fun subcircuit(succ: List<IntTerm>, valueOffset: Int = 0): BoolExpr {
@@ -164,7 +163,7 @@ fun subcircuit(succ: List<IntTerm>, valueOffset: Int = 0): BoolExpr {
 }
 
 /**
- * Cumulative scheduling constraint: `Σ {resources[i] : starts[i] ≤ t < starts[i] + durations[i]} ≤ capacity`
+ * Cumulative scheduling constraint: `Σ {resources(i) : starts(i) ≤ t < starts(i) + durations(i)} ≤ capacity`
  * at every integer time point `t`. Durations / resources / capacity are constants.
  */
 fun cumulative(starts: List<IntTerm>, durations: List<Int>, resources: List<Int>, capacity: Int): BoolExpr {
@@ -174,10 +173,7 @@ fun cumulative(starts: List<IntTerm>, durations: List<Int>, resources: List<Int>
     return CumulativeExpr(starts.map { it.toIntExpr() }, durations, resources, capacity)
 }
 
-/**
- * Disjunctive (one-machine / no-overlap) scheduling constraint. Durations are constants.
- * Tasks may not overlap in time.
- */
+/** Disjunctive (one-machine / no-overlap) scheduling constraint: no two tasks overlap. Durations are constants. */
 fun disjunctive(starts: List<IntTerm>, durations: List<Int>): BoolExpr {
     require(starts.size == durations.size) {
         "disjunctive(): starts and durations must have the same length"
@@ -185,30 +181,28 @@ fun disjunctive(starts: List<IntTerm>, durations: List<Int>): BoolExpr {
     return DisjunctiveExpr(starts.map { it.toIntExpr() }, durations)
 }
 
-/**
- * `sort(xs, ys)` — [ys] is the non-decreasing sorted permutation of [xs] (same multiset).
- */
+/** [ys] is the non-decreasing sorted permutation of [xs] (same multiset). */
 fun sort(xs: List<IntTerm>, ys: List<IntTerm>): BoolExpr {
     require(xs.size == ys.size) { "sort(): xs and ys must have the same length" }
     return SortExpr(xs.map { it.toIntExpr() }, ys.map { it.toIntExpr() })
 }
 
-/** `increasing(xs)` — [xs] is a non-decreasing chain (`xs[0] ≤ xs[1] ≤ …`). */
+/** [xs] is a non-decreasing chain (`xs(0) ≤ xs(1) ≤ …`). */
 fun increasing(xs: List<IntTerm>): BoolExpr = IncreasingExpr(xs.map { it.toIntExpr() }, strict = false)
 
-/** `strictlyIncreasing(xs)` — [xs] is a strictly increasing chain (`xs[0] < xs[1] < …`). */
+/** [xs] is a strictly increasing chain (`xs(0) < xs(1) < …`). */
 fun strictlyIncreasing(xs: List<IntTerm>): BoolExpr = IncreasingExpr(xs.map { it.toIntExpr() }, strict = true)
 
-/** `decreasing(xs)` — [xs] is a non-increasing chain (`xs[0] ≥ xs[1] ≥ …`), posted as the reverse. */
+/** [xs] is a non-increasing chain (`xs(0) ≥ xs(1) ≥ …`), posted as the reversed increasing chain. */
 fun decreasing(xs: List<IntTerm>): BoolExpr = IncreasingExpr(xs.reversed().map { it.toIntExpr() }, strict = false)
 
-/** `strictlyDecreasing(xs)` — [xs] is a strictly decreasing chain (`xs[0] > xs[1] > …`). */
+/** [xs] is a strictly decreasing chain (`xs(0) > xs(1) > …`). */
 fun strictlyDecreasing(xs: List<IntTerm>): BoolExpr =
     IncreasingExpr(xs.reversed().map { it.toIntExpr() }, strict = true)
 
 /**
- * `diffn(x, y, widths, heights)` — rectangles at `(x[i], y[i])` of size `widths[i] × heights[i]`
- * do not overlap. Widths and heights are constants (the common case).
+ * Rectangles at `(x(i), y(i))` of size `widths(i) × heights(i)` do not overlap. Widths and heights
+ * are constants.
  */
 fun diffn(x: List<IntTerm>, y: List<IntTerm>, widths: List<Int>, heights: List<Int>): BoolExpr {
     require(x.size == y.size && x.size == widths.size && x.size == heights.size) {
@@ -218,8 +212,7 @@ fun diffn(x: List<IntTerm>, y: List<IntTerm>, widths: List<Int>, heights: List<I
 }
 
 /**
- * `regular(seq, numStates, alphabetSize, transitions, q0, accepting)` — [seq] is accepted by the
- * DFA with states `1..numStates`, symbols `1..alphabetSize`, row-major [transitions] (0 = no
+ * [seq] is accepted by the DFA with states `1..numStates`, symbols `1..alphabetSize`, row-major [transitions] (0 = no
  * transition), start state [q0] and [accepting] states.
  */
 fun regular(
@@ -324,8 +317,8 @@ fun gccOpt(
 }
 
 /**
- * `symmetric_all_different(xs)` — the map `i -> xs[i] − indexOffset` is a self-inverse
- * permutation: `xs[i] = j + indexOffset` iff `xs[j] = i + indexOffset`.
+ * The map `i -> xs(i) − indexOffset` is a self-inverse permutation:
+ * `xs(i) = j + indexOffset` iff `xs(j) = i + indexOffset`.
  */
 fun symmetricAllDifferent(xs: List<IntTerm>, indexOffset: Int = 0): BoolExpr {
     require(xs.size >= 2) { "symmetricAllDifferent: need at least two terms" }
@@ -333,7 +326,7 @@ fun symmetricAllDifferent(xs: List<IntTerm>, indexOffset: Int = 0): BoolExpr {
 }
 
 /**
- * `inverse(f, g)` — mutual-inverse channeling: `f[i] = j + gOffset` iff `g[j] = i + fOffset`.
+ * Mutual-inverse channeling: `f(i) = j + gOffset` iff `g(j) = i + fOffset`.
  */
 fun inverse(f: List<IntTerm>, g: List<IntTerm>, fOffset: Int = 0, gOffset: Int = 0): BoolExpr {
     require(f.size == g.size) { "inverse: f and g must have equal length" }
@@ -342,7 +335,7 @@ fun inverse(f: List<IntTerm>, g: List<IntTerm>, fOffset: Int = 0, gOffset: Int =
 }
 
 /**
- * `mdd(seq, layers)` — sequence-acceptance through a layered multi-valued decision diagram.
+ * [seq] is accepted by a layered multi-valued decision diagram.
  * The `transitions` list is a flat row-major sequence of `(src, value, dst)` triples per
  * layer; [layerStarts] holds the start index per layer (with sentinel for the end).
  */
@@ -362,7 +355,10 @@ fun mdd(
     accepting = accepting,
 )
 
-/** `cost_regular(seq, Q, S, transitions, weights, q0, F, cost)`. */
+/**
+ * [seq] is accepted by the DFA as in [regular], and [cost] is the sum of the per-`(state, symbol)`
+ * [weights] along the accepted run.
+ */
 fun costRegular(
     seq: List<IntTerm>,
     numStates: Int,
@@ -385,7 +381,7 @@ fun costRegular(
     symbolOffset = symbolOffset,
 )
 
-/** `cost_mdd(seq, ..., cost)` — like [mdd] with `(src, val, dst, weight)` rows. */
+/** Like [mdd] with `(src, val, dst, weight)` rows; [cost] is the total weight of the accepted path. */
 fun costMdd(
     seq: List<IntTerm>,
     numStatesPerLayer: List<Int>,

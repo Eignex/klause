@@ -69,7 +69,7 @@ class SourceDrivenStrategy(
     val schedule: ScheduleBundle = ScheduleBundle(),
     /** Tabu filter applied to the combined candidate pool before selection. */
     val tabu: TabuFilter = TabuFilter.Disabled,
-    /** Configuration checking (CCASat): restrict candidates to variables whose configuration changed
+    /** Configuration checking: restrict candidates to variables whose configuration changed
      *  since their last flip, falling back to the full pool when all are CC-blocked. */
     val configurationChecking: Boolean = false,
     /** Optional perturbation: consulted once per pick before generation; a non-null result is taken
@@ -315,8 +315,9 @@ class SourceDrivenStrategy(
         // noise-free rules ignore the level.
         val noiseSchedule = schedule.noise as? NoiseSchedule
         val effectiveAcceptance = when {
-            // Feasible phase: descend the objective with the strategy's own feasible-phase acceptance
-            // (CBLS: strict-improvement greedy) instead of the noisy feasibility-fight acceptance.
+            // Feasible phase, or completed-move scores: descend the objective with the strategy's own
+            // feasible-phase acceptance (CBLS: strict-improvement greedy) instead of the noisy feasibility-fight
+            // acceptance.
             (state.cost == 0L || evaluation != null) && feasibleAcceptance != null -> feasibleAcceptance
 
             noiseSchedule != null && (noiseMoves.isNotEmpty() || scoreMoves.isNotEmpty()) -> {

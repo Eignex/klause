@@ -20,8 +20,8 @@ import com.eignex.klause.util.toSortedIntArray
  * Each generator is a kind-preserving permutation given as `(intImage, boolImage)` over the current
  * variable ids (`intImage[i]` / `boolImage[b]` is the image of integer / Boolean variable `i` / `b`;
  * an identity entry means the variable is fixed). The factor watches only the moved variables (the
- * group's support). It has no local-search role — its local-search projection is [NoInvariant] — so local search
- * skips it entirely (symmetry breaking is a backtrack-only device).
+ * group's support). Its local-search projection is [NoInvariant]: symmetry breaking is a backtrack-only
+ * device, so local search skips it.
  */
 class SymmetryHandling(
     /** The generators, each `(intImage, boolImage)` over the current variable ids. */
@@ -123,7 +123,7 @@ class SymmetryHandling(
         return out
     }
 
-    // Not migrated to the KeySink allocation-free hash: the key encodes generator permutation arrays,
+    // Builder form rather than the allocation-free KeySink: the key encodes generator permutation arrays,
     // not plain variable references, so the sink's var/const split doesn't model it.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.SYMMETRY_HANDLING) {
         int(generators.size)

@@ -2,11 +2,10 @@ package com.eignex.klause.backtrack
 
 /**
  * Decision-level moving-average restart: restart when a recent window of conflict decision levels runs
- * higher than the long-run average — the search is diving deep
- * before conflicting, a sign the current region is unproductive and it should re-pick. The complement of
- * [GlucoseRestart]'s LBD signal: LBD measures learned-clause quality, decision level measures how deep
- * the search drove to hit the conflict. The decision level is the trail depth at the conflict (klause's
- * [com.eignex.klause.solver.search.SearchRun] passes the decision-node count).
+ * higher than the long-run average — the search is diving deep before conflicting, a sign the current
+ * region is unproductive and it should re-pick. The complement of [GlucoseRestart]'s LBD signal: LBD
+ * measures learned-clause quality, decision level measures how deep the search drove to hit the conflict.
+ * [com.eignex.klause.solver.search.SearchRun] reports the session's decision level at each conflict.
  *
  *  - [window] — recent-window capacity; the restart check is gated on the window being full, so tiny
  *    searches never restart.

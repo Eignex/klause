@@ -19,11 +19,12 @@ import com.eignex.klause.util.LongArrayList
  * only the vertices whose potential actually has to move rather than re-deriving the whole system.
  *
  * The same invariant makes the reduced weight `π(u) + w − π(v)` non-negative, so [shortestPathsFrom]
- * can run Dijkstra over a system whose real weights are negative (Johnson's transformation). Those
+ * can run Dijkstra over a system whose real weights are negative (D. B. Johnson, "Efficient Algorithms for
+ * Shortest Paths in Sparse Networks", JACM 24(1), 1977, https://doi.org/10.1145/321992.321993). Those
  * shortest paths are what let a consumer see a cycle *before* the edge closing it is asserted.
  *
  * Scott Cotton and Oded Maler, "Fast and Flexible Difference Constraint Propagation for DPLL(T)",
- * SAT 2006, LNCS 4121.
+ * SAT 2006, LNCS 4121, https://doi.org/10.1007/11814948_19.
  */
 internal class IncrementalDifferenceGraph(
     val numNodes: Int,

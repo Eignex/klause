@@ -6,7 +6,7 @@ import com.eignex.klause.solver.Sample
 
 /** An original-source checked assignment with exact transcendental expression coordinates. */
 class TranscendentalAssignment internal constructor(
-    /** Owned compatibility sample, retaining symbolic real authority. */
+    /** Owned sample, carrying the symbolic real coordinates. */
     val sample: Sample,
 ) : OpenTheoryAssignment {
     override fun boolValue(id: Int): Boolean = sample.boolValue(id)

@@ -212,7 +212,7 @@ private fun checkedIntegralMpsFloat(compiled: MpsCompiled, sample: Sample): MpsS
     return witness.takeIf { it.objective == compiled.sourceObjective(sample.ints, sample.reals) }
 }
 
-/** Render an MPS solution line: `v name=value` per column, a continuous column shown as its LP value. */
+/** Render an MPS solution line: `v name=value` per column, each value from the exact source witness. */
 internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String =
     renderMpsWitness(compiled, compiled.sourceWitness(s.ints, s.exactReals))
 

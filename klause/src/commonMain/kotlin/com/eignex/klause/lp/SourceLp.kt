@@ -181,7 +181,7 @@ internal class SourceLpBudget(
                 }
             }
             if (rhs.any { !admit(it) }) return null
-            // Hadamard: a minor of the scaled rows has at most their bits plus log2(n)/2 per row, so this
+            // Hadamard's inequality: a minor of the scaled rows has at most their bits plus log2(n)/2 per row, so this
             // bounds every exact basis intermediate without charging a fixed width per row.
             val dimension = variables + rowCount
             val width = if (pairing) {

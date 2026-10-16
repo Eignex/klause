@@ -40,8 +40,8 @@ import kotlin.time.TimeSource
 /**
  * Bandit-scheduled portfolio of [PortfolioWorker] arms built by [PortfolioBuilder], mixing local
  * search, backtrack and ALNS. Each lane claims an arm selected by [UnivariateBandit], runs one
- * segment and settles its reward. An arm runs on at most one lane at a time. Scheduled
- * lanes protect complete-search elapsed opportunity until a witness is accepted, then favor progress.
+ * segment and settles its reward. An arm runs on at most one lane at a time. Until a witness is
+ * accepted, scheduled lanes owe complete-search arms their share of elapsed time; then they favor progress.
  * With a lane per arm, each arm runs for the whole solve.
  *
  * The shared incumbent cutoff prunes backtrack arms and its assignment warm-starts local-search
@@ -686,7 +686,8 @@ class Portfolio(
         private var continuingPreparation = -1
         private var nextPreparationArm = 0
 
-        // Segment time each arm has run, and all arms together, for the shares [minShares] owes.
+        // Segment time each arm has run ([armNanos]) and all arms together ([totalNanos]), for the shares
+        // [minShares] owes.
         private val armNanos = LongArray(workers.size)
         private val activeSince = arrayOfNulls<TimeMark>(workers.size)
         private val armWork = DoubleArray(workers.size)
@@ -873,7 +874,7 @@ class Portfolio(
             val elapsed = active.associateWith {
                 armNanos[it].toDouble() + (activeSince[it]?.elapsedNow()?.inWholeNanoseconds ?: 0L)
             }
-            // A bootstrap and its local-search peers share one feasibility family.
+            // LNS and local search count as one feasibility family: an LNS bootstrap competes within local search.
             val activeFamilyCount = active.map {
                 if (workers[it].family.observable) ArmFamily.LocalSearch else ArmFamily.Backtrack
             }.distinct().size

@@ -23,16 +23,14 @@ import com.eignex.klause.util.toLongExact
  */
 internal object WideIntDigits {
 
-    /** Largest exponent whose products stay inside `Long`; below this the encoding would not help. */
+    /** Widest digit, whose bound `2^width` still fits a signed `Long`. */
     private const val MAX_WIDTH = 62
 
-    /** Narrowest useful digit. A coefficient so large that even this overflows leaves no room at all —
-     *  [widthFor] reports that with [NO_ROOM] rather than returning a width whose products still wrap. */
+    /** Narrowest digit; a coefficient that overflows even this yields [NO_ROOM]. */
     private const val MIN_WIDTH = 1
 
-    /** Returned by [widthFor] when no digit width keeps `coeff × 2^width` inside `Long`. Such a row must
-     *  be handled as a WIDE COEFFICIENT (which the wide linear propagators already do) rather than by
-     *  decomposing the variable, since the coefficient itself is the thing out of range. */
+    /** Returned by [widthFor] when no digit width keeps `coeff × 2^width` inside `Long`; such a row stays
+     *  a wide-coefficient row, since the coefficient itself is out of range. */
     const val NO_ROOM = -1
 
     /**
@@ -51,7 +49,8 @@ internal object WideIntDigits {
         return if (k >= MIN_WIDTH) k else NO_ROOM
     }
 
-    /** Number of [width]-bit digits needed to represent every value in `[-magnitude, magnitude]`. */
+    /** Number of unsigned [width]-bit digits needed to represent `|magnitude|`; [wideIntColumns] adds the
+     *  signed leading digit. */
     fun digitCount(magnitude: BigInt, width: Int): Int {
         val m = magnitude.abs()
         var n = 1
@@ -66,9 +65,7 @@ internal object WideIntDigits {
     /**
      * The digits of a non-negative [value] at [width], least significant first, padded to [count].
      *
-     * Negative values are not encoded here: a signed quantity is carried as the difference of two
-     * non-negative digit vectors, which keeps every digit's domain a plain `[0, 2^width)` and leaves the
-     * sign to the linear row rather than to the encoding.
+     * Negative values are not encoded here; [WideIntColumns] carries the sign in its leading digit.
      */
     fun digitsOf(value: BigInt, width: Int, count: Int): LongArray {
         require(value.signum() >= 0) { "digitsOf takes a non-negative value" }
@@ -88,6 +85,6 @@ internal object WideIntDigits {
         return acc
     }
 
-    /** `2^k`, which the bignum library expresses as a shift of one. */
+    /** `2^k`. */
     fun pow2(k: Int): BigInt = BIG_ONE.shl(k)
 }

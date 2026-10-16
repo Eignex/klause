@@ -12,9 +12,10 @@ import com.eignex.klause.propagation.removeBoolWatch
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 
-/** CP propagator for [PseudoBoolean]: bounds propagation for `Σ weights_i * lit_i ⟨op⟩ bound`.
+/** CP propagator for [PseudoBoolean]: bounds propagation for `Σ weights(i)·literals(i) ⟨op⟩ bound`.
  *
- *  [watched] enables a weighted watched-literal wakeup scheme, used for learned
+ *  [watched] enables a weighted watched-literal wakeup scheme (Chai and Kuehlmann, "A fast pseudo-Boolean
+ *  constraint solver", IEEE TCAD 24(3), 2005, https://doi.org/10.1109/TCAD.2004.842808), used for learned
  *  `≥` constraints so they don't wake on every literal change. While the summed weight of the non-false
  *  watched literals is at least `bound + maxCoeff`, the constraint has slack ≥ every coefficient and can
  *  neither propagate nor conflict — so it only needs to fire when a *watched* literal goes false. Base
@@ -90,16 +91,14 @@ internal class PseudoBooleanPropagator(
      * cutting-planes conflict analysis. `GE` loads directly; `LE` flips every literal's
      * polarity and sets the degree to `Σweights − bound`. An `EQ` is two `≥` constraints — the relevant
      * half is the one that forced [forcedLit] (forced-true own-literal ⇒ lower `≥` bound; forced-false ⇒
-     * upper `≤` bound); with no forced literal (a seed) the direction is ambiguous and it falls back to
-     * the clause-form reason. Also returns false on overflow.
+     * upper `≤` bound); with no forced literal (a seed) the violated half is read from [state]. Returns
+     * false on overflow.
      */
     fun loadReason(acc: PbAccumulator, forcedLit: Int, state: PropagationState): Boolean = when (op) {
         PbOp.GE -> acc.loadPb(weights, literals, geBound = bound)
 
         PbOp.LE -> loadLe(acc)
 
-        // An equality is two `≥` constraints. A resolved pivot picks the half by its forced polarity; a
-        // seed (forcedLit == Lit.NONE, the conflicting constraint) picks the violated half from [state].
         PbOp.EQ -> when {
             forcedLit != Lit.NONE -> if (forcedByGeSide(
                     forcedLit,

@@ -9,7 +9,7 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.lineSequence
 import com.eignex.klause.util.parseBigInt
 
-/** Syntax parser for OPB/WBO. It only validates and represents the input; lowering is format-neutral. */
+/** Syntax parser for OPB/WBO. It only validates and represents the input; [OpbDecoder] lowers it. */
 internal object OpbSyntax {
 
     fun parse(source: CharSource): OpbDocument {

@@ -22,10 +22,6 @@ internal class ContiguousDomain(
         require(min <= max) { "Empty domain: $min..$max" }
     }
 
-    // Saturates at Int.MAX_VALUE for spans beyond 32-bit: a wide contiguous domain is never enumerated,
-    // so callers that read size on it want "very large", not an exact (unrepresentable) count. A full
-    // Long.MIN..Long.MAX span overflows `max - min` to a negative value, so treat a negative span as
-    // "very large" too rather than letting it wrap to a bogus small count.
     override fun spanOrNull(maxValues: Long): IntSpan? {
         val span = max - min
         // Never past Int range whatever the caller asks for: a span indexes its values with an Int.
@@ -35,6 +31,8 @@ internal class ContiguousDomain(
         return if (span >= 0 && span < cap) this else null
     }
 
+    // Saturates at Int.MAX_VALUE for spans beyond 32 bits: a wide contiguous domain is never enumerated.
+    // A full Long.MIN..Long.MAX span wraps `max - min` negative, which also reads as "very large".
     override val size: Int get() {
         val span = max - min
         return if (span < 0L || span >= Int.MAX_VALUE.toLong()) Int.MAX_VALUE else (span + 1L).toInt()

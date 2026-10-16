@@ -184,12 +184,6 @@ internal class LagrangianBound(
      *  block variable took (indexed over [vars]); [feasible] is false when any block has no assignment. */
     private class Eval(val feasible: Boolean, val cost: Long, val values: LongArray)
 
-    /**
-     * Compute the Lagrangian bound at the current node. [incumbent] is the best objective to beat
-     * (`+∞` if none — then the subgradient is skipped and only the base bound / infeasibility is
-     * reported). [startMultipliers] warm-starts λ from a parent node. Returns null when the bound is
-     * unavailable here (no eligible global, value set too large, or arithmetic overflow).
-     */
     override fun computeBound(
         session: PropagationSession,
         incumbent: Double,
@@ -206,9 +200,8 @@ internal class LagrangianBound(
             val index = blockValueIndex[j]
             val list = blockValueList[j]
             for (pos in blockStart[j] until blockStart[j + 1]) {
-                // Abort before walking a domain too large to assign over — notably a wide (>2^31-span)
-                // domain, whose `sizeLong` saturates past the cap, so it is never enumerated. Sound: the
-                // Lagrangian bound is simply skipped (null), never a wrong bound.
+                // A domain too large to assign over, wide ones included, is never enumerated; skipping
+                // the bound (null) is sound.
                 if (session.intDomain(vars[pos]).spanOrNull(MAX_VALUES.toLong()) == null) return null
                 session.intDomain(vars[pos]).values.forEach { value ->
                     if (!index.containsKey(value)) {
@@ -232,7 +225,7 @@ internal class LagrangianBound(
 
         val p = LongArray(multiplierCount) { startMultipliers.getOrElse(it) { 0L } }
         var bestNum = Long.MIN_VALUE
-        // Previous ascent direction, for deflected (conjugate) subgradient stabilization.
+        // Previous ascent direction, for deflected subgradient stabilization.
         val prevDir = DoubleArray(multiplierCount)
 
         try {
@@ -296,11 +289,12 @@ internal class LagrangianBound(
 
     /**
      * One deflected (conjugate) subgradient ascent step on the multipliers; false if the subgradient
-     * is zero. The lightweight bundle-style stabilization (Camerini–Fratta–Maffioli with γ = 1):
-     * the step direction is `d = g + β·prevDir` with `β = max(0, −(g·prevDir)/‖prevDir‖²)`, which by
-     * Cauchy–Schwarz keeps `d·g ≥ 0` (a valid ascent direction) while damping the zigzag that slows
-     * plain subgradient. A full proximal-bundle master is deferred — it needs a free-variable QP/LP
-     * solver klause does not have, and the bound is exact for any λ regardless of how λ is chosen.
+     * is zero. Deflection after Camerini, Fratta and Maffioli, "On improving relaxation methods by
+     * modified gradient techniques", Math. Programming Study 1975 (https://doi.org/10.1007/BFb0120697),
+     * with γ = 1: the direction is `d = g + β·prevDir` with `β = max(0, −(g·prevDir)/‖prevDir‖²)`, which
+     * keeps `d·g ≥ 0` (a valid ascent direction) while damping the zigzag that slows plain subgradient.
+     * The step length is Polyak's (https://doi.org/10.1016/0041-5553(69)90061-5). The bound is exact
+     * for any λ, so the step choice affects only tightness.
      */
     private fun subgradientStep(
         values: LongArray,
@@ -321,7 +315,6 @@ internal class LagrangianBound(
             gNorm2 += (gr.toDouble() * gr.toDouble())
         }
         if (gNorm2 == 0.0) return false // multipliers optimal for this subproblem
-        // Deflection: combine with the previous direction to suppress zigzagging.
         var gDotPrev = 0.0
         var prevNorm2 = 0.0
         for (r in 0 until multiplierCount) {
@@ -337,7 +330,7 @@ internal class LagrangianBound(
             prevDir[r] = d[r]
         }
         if (dNorm2 == 0.0) return false
-        // Polyak along the deflected direction: t = (UB − L) / ‖d‖²; p_r += round(Q·t·d_r), projected.
+        // Polyak along the deflected direction: t = (UB − L) / ‖d‖²; p_r += trunc(Q·t·d_r), projected.
         val lValue = num.toDouble() / Q.toDouble()
         val t = (incumbent - lValue) / dNorm2
         for (r in 0 until multiplierCount) {
@@ -374,9 +367,9 @@ internal class LagrangianBound(
 
                     pinned == false -> 0L
 
+                    // free: cheapest is true when the weight is negative
                     w < 0L -> w
 
-                    // free: cheapest is true when the weight is negative
                     else -> 0L
                 },
             )
@@ -391,7 +384,7 @@ internal class LagrangianBound(
         return total
     }
 
-    /** Smallest objective that still beats [incumbent]; `Long.MIN_VALUE` headroom when none. */
+    /** `ceil(incumbent)`, or `Long.MAX_VALUE` when there is no finite incumbent. */
     private fun incumbentCeil(incumbent: Double): Long =
         if (incumbent.isFinite()) ceil(incumbent).toLong() else Long.MAX_VALUE
 

@@ -17,16 +17,14 @@ import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.util.IntArrayList
 
 /*
- * Global-constraint decompositions into Boolean and integer primitives. Top-level assertions use
- * [assertExpr]; reified contexts use [lowerToLit]. Auxiliary integer variables come from [newAuxIntVar].
- *
- * MDD, cost_regular, cost_mdd, path and tree require per-layer state variables and use dedicated
- * assertion helpers. They are unsupported in reified contexts.
+ * Layered-automaton globals (MDD, cost_mdd, cost_regular). Each posts the native [Mdd] factor when its
+ * sequence is all bare variables, and always also posts a decomposition over per-layer state variables
+ * so pipelines that skip the propagation-only factor still see primitive Table + Linear constraints.
+ * They are unsupported in reified contexts.
  */
 
 
-/** Helper: build the [Mdd] factor and emit it when
- *  `seq` is all bare IntRefs. Falls back to the table-based decomposition. */
+/** Emit the [Mdd] factor when `seq` is all bare IntRefs; returns whether it was emitted. */
 internal fun Lowering.assertMddNative(
     seqExpr: List<IntExpr>,
     numStatesPerLayer: List<Int>,
@@ -75,7 +73,7 @@ internal fun Lowering.assertMdd(expr: MddExpr) {
 
 internal fun Lowering.assertMddDecomposed(expr: MddExpr) {
     val n = expr.seq.size
-    // Allocate per-layer state vars: state[0..n]. state[0] = initial; state[n] ∈ accepting.
+    // state(0) = initial, state(n) ∈ accepting.
     val stateRefs = Array(n + 1) { i ->
         val ns = expr.numStatesPerLayer[i]
         require(ns >= 1) { "mdd: numStatesPerLayer[$i] must be ≥ 1" }
@@ -89,7 +87,7 @@ internal fun Lowering.assertMddDecomposed(expr: MddExpr) {
         assertExpr(Or(expr.accepting.map { a -> IntCompare(stateRefs[n], IntCmpOp.EQ, IntLit(a)) }))
     }
 
-    // Per-layer transitions as table((state[i], seq[i], state[i+1]), allowed).
+    // Per-layer transitions as table((state(i), seq(i), state(i+1)), allowed).
     for (i in 0 until n) {
         val start = expr.layerStarts[i]
         val end = expr.layerStarts[i + 1]
@@ -192,7 +190,7 @@ internal fun Lowering.assertCostRegular(expr: CostRegularExpr) {
     val numSymbols = expr.numSymbols
     val off = expr.symbolOffset
 
-    // Try the native MDD path first — expand uniform DFA transitions into per-layer tables.
+    // The native MDD path expands the uniform DFA transitions into identical per-layer tables.
     val liftedSeq = expr.seq.map { lift(it) }
     val liftedCost = lift(expr.cost)
     if (liftedSeq.all { it is IntRef } && liftedCost is IntRef) {

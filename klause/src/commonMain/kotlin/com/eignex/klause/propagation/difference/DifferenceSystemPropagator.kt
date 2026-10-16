@@ -50,7 +50,7 @@ private const val HUB_REFUTATION_FAILED = -1
  * which is what lets a refutation routed that way still name the guards on each segment.
  *
  * Scott Cotton and Oded Maler, "Fast and Flexible Difference Constraint Propagation for DPLL(T)",
- * SAT 2006, LNCS 4121.
+ * SAT 2006, LNCS 4121, https://doi.org/10.1007/11814948_19.
  */
 internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propagator {
 

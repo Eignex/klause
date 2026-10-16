@@ -10,10 +10,19 @@ internal interface LpDeductionCertificate {
     fun exactObjectiveBound(): BigFraction
     fun integralObjectiveRows(): IntArray? = null
     fun usesRationalArithmetic(): Boolean = false
+
+    /** Whether row [row] carries nonzero dual weight, so its premises are cited by a deduction. */
     fun dualNonzeroRow(row: Int): Boolean
+
+    /** Sign of column [col]'s reduced cost: -1, 0 or +1. */
     fun reducedCostSign(col: Int): Int
+
+    /** `⌈objective + extraConstant⌉`, or null when it does not fit a `Long` (the caller keeps the node). */
     fun objectiveBoundCeil(extraConstant: Long): Long?
+
+    /** Whether `improvingMax ≥ objective + sourceConstant`, i.e. the fixing gap is non-negative. */
     fun improvingGapNonNegative(improvingMax: Long, sourceConstant: Long): Boolean
+
     fun fixSteps(col: Int, improvingMax: Long, sourceConstant: Long): Long?
     fun rationalFixingWork(col: Int, cutoff: BigFraction): Long {
         val bits = maxOf(Long.SIZE_BITS, exactBits(listOf(cutoff, exactObjectiveBound(), exactReducedCost(col))))

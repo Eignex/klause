@@ -304,7 +304,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         return true
     }
 
-    // The nodes [root] reaches over non-self candidate arcs ([forward]), or that reach it.
+    // Reverse adjacency of the non-self candidate arcs, in compressed rows, for the backward reachability pass.
     private fun buildPredecessors(state: PropagationState, work: Work) {
         work.revHead.fill(0)
         for (i in 0 until n) {
@@ -322,6 +322,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         }
     }
 
+    // The nodes [root] reaches over non-self candidate arcs ([forward]), or that reach it.
     private fun reachable(state: PropagationState, root: Int, forward: Boolean, work: Work): BooleanArray {
         val seen = BooleanArray(n)
         val stack = IntArrayList()

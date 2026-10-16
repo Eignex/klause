@@ -17,19 +17,15 @@ import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.lowering.wideConstHolds
 
-// `=` is an arithmetic (integer) equality iff its operands are integer-sorted — i.e. not
-// boolean. Deciding by the first operand's sort (via the scope- and ite-aware [isBoolExpr])
-// is more robust than head-op matching, which misjudged an int-sorted `ite`/`let`/nested `=`
-// operand as boolean and then compiled an int subterm as Bool.
+/** Whether a relation node is arithmetic rather than boolean, decided by its first operand's sort via the
+ *  scope- and `ite`-aware [isBoolExpr]: head-op matching alone misjudges an int-sorted `ite`/`let` operand. */
 internal fun Compiler.Builder.isArithmeticRelation(t: SExpr.SList): Boolean {
     val arg = t.items.getOrNull(1) ?: return false
     return !isBoolExpr(arg)
 }
 
-/** Assert a linear relation; when all terms cancel to a constant it is trivially true (post
- *  nothing) or false (post the false literal ⇒ unsat) rather than an empty [Linear]. An n-ary chain
- *  `(op a1 … an)` is the conjunction of its n−1 consecutive relations, per the SMT-LIB chainable
- *  semantics — `a1 op a2 ∧ … ∧ a(n−1) op an`, with no direct relation between non-adjacent operands. */
+/** Assert a linear relation. An n-ary chain `(op a1 … an)` is the conjunction of its n−1 consecutive
+ *  relations, per the SMT-LIB chainable semantics, with no direct relation between non-adjacent operands. */
 internal fun Compiler.Builder.assertLinear(t: SExpr.SList) {
     val op = t.atomAt(0, "relation operator")
     requireChainableRelation(t, op)

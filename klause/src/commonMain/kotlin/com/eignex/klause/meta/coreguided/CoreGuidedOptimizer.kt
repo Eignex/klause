@@ -22,11 +22,15 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 
 /**
- * Core-guided MaxSAT optimiser — Fu-Malik MSU3 (unweighted) extended to RC2 (weighted +
- * stratified). Iteratively calls [satisfyUnderAssumptions] on a sliding assumption set;
- * each unsat core triggers a "relax-one-of-these-softs" cardinality constraint and bumps
- * the cost lower bound by the core's min weight. Termination is `Sat` under the current
- * assumption set, at which point the lower bound equals the cost of the returned sample.
+ * Core-guided MaxSAT optimiser: Fu-Malik (Z. Fu and S. Malik, "On Solving the Partial MAX-SAT Problem",
+ * SAT 2006, https://doi.org/10.1007/11814948_25) with the weight splitting of WPM1 (C. Ansótegui,
+ * M. L. Bonet and J. Levy, "Solving (Weighted) Partial MaxSAT through Satisfiability Testing", SAT 2009,
+ * https://doi.org/10.1007/978-3-642-02777-2_39) and weight stratification (C. Ansótegui, M. L. Bonet,
+ * J. Gabàs and J. Levy, "Improving SAT-Based Weighted MaxSAT Solvers", CP 2012,
+ * https://doi.org/10.1007/978-3-642-33558-7_9). Iteratively calls [satisfyUnderAssumptions] on a sliding
+ * assumption set; each unsat core triggers a "relax-one-of-these-softs" cardinality constraint and bumps
+ * the cost lower bound by the core's min weight. Termination is `Sat` under the current assumption set,
+ * at which point the lower bound equals the cost of the returned sample.
  *
  * Per-soft state across cores:
  *  - Each soft gets one fresh **initial selector** `r_i` baked into its relaxer clause
@@ -36,7 +40,7 @@ import com.eignex.klause.util.MutableIntIntMap
  *    the per-core ExactlyOne below), allocates fresh per-core blockers `{b_K}`, extends
  *    each cored soft's relaxer clause with its core's blocker, and adds the cardinality
  *    `ExactlyOne(b_K) = 1` — forcing exactly one relaxation per core.
- *  - RC2 weight-split: when a cored soft's weight strictly exceeds the core's `wMin`,
+ *  - Weight split: when a cored soft's weight strictly exceeds the core's `wMin`,
  *    the residual `(weight − wMin)` is shed as a fresh independent soft with its own
  *    initial selector; the residual is scheduled into the stratum queue so it gets
  *    revisited when the threshold drops.
@@ -97,10 +101,8 @@ internal class CoreGuidedOptimizer(val baseProblem: BakedProblem) {
             // are now the only relaxation channel, gated by the ExactlyOne constraints
             // that accumulate across cores. Keeping r_i in the clause after the soft
             // is spent would leave it as a free relaxation switch (it has no other
-            // constraint), letting the SAT solver satisfy the relaxer without honouring
-            // any soft — the cost lower bound stays correct but the recovered sample
-            // doesn't reflect the optimum (cost-bound test relied on this, sample test
-            // didn't).
+            // constraint): the cost lower bound stays correct but the sample does not
+            // reflect the optimum.
             val size = (if (spent) 1 else 2) + extraBlockers.size
             val arr = IntArray(size)
             arr[0] = origLit
@@ -183,10 +185,8 @@ internal class CoreGuidedOptimizer(val baseProblem: BakedProblem) {
                     for (idx in coreSoftIdx) {
                         val w = workings[idx]
                         if (w.weight > wMin) {
-                            // RC2 split: shed (w − wMin) as an independent fresh soft so
-                            // its cost stays accounted for in later rounds. Schedule
-                            // the residual weight into the stratum queue so we revisit
-                            // it once the current stratum's heavier cores settle.
+                            // Shed (w − wMin) as an independent fresh soft so its cost stays
+                            // accounted for, revisited once its stratum is reached.
                             val residual = Working(
                                 origLit = w.origLit,
                                 weight = w.weight - wMin,
@@ -199,9 +199,8 @@ internal class CoreGuidedOptimizer(val baseProblem: BakedProblem) {
                         val b = nextBoolId++
                         w.extraBlockers.add(b)
                         freshBlockers.add(b)
-                        // Mark this soft "spent": its initialSelector ¬r_i assumption
-                        // is dropped from the active set; the soft can be relaxed via
-                        // its per-core blocker now subject to the ExactlyOne.
+                        // A spent soft drops its ¬r_i assumption; it relaxes only through
+                        // its per-core blockers under the ExactlyOne constraints.
                         w.spent = true
                     }
                     workings.addAll(newSplits)
@@ -230,8 +229,8 @@ internal class CoreGuidedOptimizer(val baseProblem: BakedProblem) {
     }
 
     /** Softs that are active at the current weight stratum AND haven't already been
-     *  consumed by a core. Spent softs have empty assumptions — their relaxer is now
-     *  the per-core ExactlyOne. */
+     *  consumed by a core. Spent softs carry no assumption; the per-core ExactlyOne
+     *  constraints govern their relaxation. */
     private fun collectActive(workings: List<Working>, threshold: Long): IntArray {
         val out = IntArrayList()
         for (i in workings.indices) {
@@ -280,8 +279,6 @@ internal class CoreGuidedOptimizer(val baseProblem: BakedProblem) {
     }
 
     private fun projectCoreToSofts(workings: List<Working>, activeIdx: IntArray, core: Assumptions): IntArray {
-        // Map each active soft's initial selector back to its working index, then defer to
-        // the shared core projection so both drivers agree on what a core "covers".
         val selectorToSoft = MutableIntIntMap(activeIdx.size)
         for (i in activeIdx) selectorToSoft.put(workings[i].initialSelector, i)
         return Oll.projectCoreToSofts(core, selectorToSoft)

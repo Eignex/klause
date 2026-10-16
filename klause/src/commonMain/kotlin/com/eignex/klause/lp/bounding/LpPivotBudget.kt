@@ -11,8 +11,8 @@ package com.eignex.klause.lp.bounding
  * [warmupSolves] solves without a single prune. A prune lifts the budget and restarts the window it is
  * judged over, on the same rule [LpEffortGovernor]'s per-node ratio uses and for the same reason:
  * a prune says the judgement was wrong, so the cap applies again only once another warmup of prunable
- * solves goes by without one. Latching it instead left a relaxation that pruned once early uncapped for
- * the rest of the run, however expensive it became.
+ * solves goes by without one. Latching instead would leave a relaxation that pruned once early uncapped
+ * for the rest of the run, however expensive it became.
  *
  * Kept off [LpEngine] as a small value so the decision is deterministic and unit-testable;
  * `cap <= 0` disables it, leaving the size-derived budget that on most models never binds.

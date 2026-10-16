@@ -8,7 +8,8 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.OriginCounts
 
 /**
- * Two-watched-literal BCP for arena-packed pure-Boolean problems. A trail-pointer literal sweep
+ * Two-watched-literal BCP (Moskewicz et al., "Chaff: engineering an efficient SAT solver", DAC 2001,
+ * https://doi.org/10.1145/378239.379017) for arena-packed pure-Boolean problems. A trail-pointer literal sweep
  * avoids factor dispatch and order-literal atoms. The general lane's trail, pin machinery,
  * antecedents and [ConflictAnalyzer] remain shared.
  *
@@ -312,11 +313,10 @@ internal class NativeSatState(private val state: PropagationState) {
         for (i in 0 until learnedCount) {
             remap[i] = if (keep(i, learnedLbd[i])) survivors++ else -1
         }
-        if (survivors == learnedCount) return // nothing dropped
+        if (survivors == learnedCount) return
 
         state.remapReasons(state.boolReason, remap, baseCount)
 
-        // Remap/prune watch-list entries that name a learned handle; base handles pass through.
         for (lit in watchEntries.indices) {
             val entries = watchEntries[lit]
             var w = 0
@@ -324,7 +324,7 @@ internal class NativeSatState(private val state: PropagationState) {
                 val entry = entries[r]
                 val h = entry.toInt()
                 val newH = if (h < baseCount) h else remap[h - baseCount].let { if (it < 0) -1 else baseCount + it }
-                if (newH < 0) continue // dropped clause — skip
+                if (newH < 0) continue
                 entries[w++] = packWatch(newH, (entry ushr 32).toInt())
             }
             watchSizes[lit] = w
@@ -490,7 +490,7 @@ internal class NativeSatState(private val state: PropagationState) {
     }
 
     private companion object {
-        // Poll the deadline every 4096 propagated literals — matches the general fixpoint's cadence.
+        // Poll the deadline every 4096 propagated literals.
         const val CANCEL_POLL_MASK = 0xFFF
     }
 }

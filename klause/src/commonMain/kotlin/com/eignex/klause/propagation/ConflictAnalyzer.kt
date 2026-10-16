@@ -6,7 +6,8 @@ import com.eignex.klause.util.IntArrayList
 
 /**
  * First-UIP (Unique Implication Point) conflict analyzer — the classical CDCL clause-learning
- * routine (Marques-Silva-Sakallah 1996). Walks the
+ * routine (J. P. Marques-Silva, K. A. Sakallah, "GRASP: A Search Algorithm for Propositional
+ * Satisfiability", IEEE Trans. Computers 48(5), 1999, https://doi.org/10.1109/12.769433). Walks the
  * implication graph backwards from a conflict, resolving each step against the antecedent
  * literals of the resolved variable, until exactly one variable at the current decision level
  * remains — the UIP. The conjunction of negated literals on the learned clause is forbidden by
@@ -108,8 +109,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             /** True iff the clause is a proper 1UIP clause — exactly one literal at the
              *  conflict level — so that after popping to [backjumpLevel] it becomes unit
              *  and forces its asserting literal. When false (a conflict that genuinely rests on
-             *  more than one literal at the conflict level — rare since order literals became
-             *  trail-resident), the engine must fall back to chronological backtracking
+             *  more than one literal at the conflict level), the engine must fall back to chronological backtracking
              *  instead of trying to assert a non-unit clause. */
             override val asserting: Boolean = true,
         ) : LearnedConstraint {
@@ -155,7 +155,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                     "backjumpLevel=$backjumpLevel, lbd=$lbd)"
         }
 
-        /** Analysis couldn't produce a usable nogood (no conflict reason, or non-Clause failure). */
+        /** Analysis couldn't produce a usable nogood (no conflict reason, or a conflict at the root). */
         data object NotApplicable : AnalysisResult
     }
 
@@ -164,9 +164,8 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * level is the deepest decision level among the seed reason's own literals, read through
      * the bound-history-accurate [levelOf] — not `state.currentLevel`, which
      * runToFixpoint sets from `maxLevelForVars` over *all* of the failing factor's variables
-     * (a superset of the reason). That
-     * attribution can name a level no reason literal actually sits at, which makes the 1UIP
-     * loop find no pivot at the conflict level and degenerate into a non-asserting clause
+     * (a superset of the reason). That attribution can name a level no reason literal actually sits at,
+     * which makes the 1UIP loop find no pivot at the conflict level and degenerate into a non-asserting clause
      * (lost learning) or mis-target backjumpLevelOf. Taking the max over the reason's own
      * literals pins the conflict level exactly at its deepest literal. (The engine's levelling
      * is max-antecedent based, so no reason literal — nor any antecedent resolved in below —

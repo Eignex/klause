@@ -54,8 +54,8 @@ sealed interface CostShaping {
         /** Linear blend without saturation. */
         fun linear(lambda: Double): CostShaping = Linear(lambda)
 
-        /** Linear blend with a cap on the violation contribution (one violation can't
-         *  dominate). Useful when individual violations are cheap relative to objective. */
+        /** Linear blend with a cap on the total violation contribution, so violations cannot
+         *  dominate the objective. */
         fun saturating(lambda: Double, cap: Double): CostShaping = Linear(lambda, ViolationPenalty.Saturating(cap))
 
         /** Linear blend with square-root scaling on violations. Sub-linear: each extra
@@ -76,7 +76,7 @@ sealed interface ViolationPenalty {
 
     /** Violation penalty capped at a maximum contribution. */
     data class Saturating(
-        /** Maximum penalty any single violation count contributes. */
+        /** Maximum penalty the violation term contributes. */
         val cap: Double,
     ) : ViolationPenalty {
         init {

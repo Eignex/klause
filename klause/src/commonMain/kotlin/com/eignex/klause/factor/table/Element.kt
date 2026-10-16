@@ -23,12 +23,12 @@ import com.eignex.klause.ir.VarRemap
  * selected var). [idx] is `[indexOffset]`-based — `1` for MiniZinc's default, so position 0
  * of [arr] is selected by `idx = 1`.
  *
- * Stateless (no payload): every query reads the live assignment, O(1) for the selected
- * element. Graded violation `|result − arr(idx)|` (run through `compressViolation`) gives a
- * descent gradient that pushes `result` toward the selected element (or the element toward
- * `result`); an out-of-range `idx` is graded by its distance back into range. Repair moves
- * snap `result` to the selected element, snap the selected element to `result`, or re-point
- * `idx` at a position whose value already equals `result`.
+ * Violation queries read the live assignment, O(1) for the selected element. Graded violation
+ * `|result − arr(idx)|` (run through `compressViolation`) gives a descent gradient that pushes
+ * `result` toward the selected element (or the element toward `result`); an out-of-range `idx` is
+ * graded by its distance back into range. Repair moves snap `result` to the selected element, snap
+ * the selected element to `result`, or re-point `idx` at a position whose value already equals
+ * `result`.
  */
 class Element private constructor(
     /** Index variable id. */
@@ -97,7 +97,7 @@ class Element private constructor(
     // rather than sorting. Encodes every distinguishing field — array kind, offset, idx, result,
     // and the ordered array (var ids when [arrIsVars], else constant values) — so two non-equivalent
     // Elements never collide (a coarser key would let symmetry verification accept a false swap).
-    // Not migrated to the KeySink allocation-free hash: when arrIsVars the array's variable ids live
+    // Builder form rather than the allocation-free KeySink: when arrIsVars the array's variable ids live
     // inside the cached [arrKey] fragment, which the sink can't remap without rebuilding it.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.ELEMENT) {
         bool(arrIsVars)

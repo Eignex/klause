@@ -1,20 +1,16 @@
 package com.eignex.klause.lowering
 
 /**
- * An integer linear combination `Σ coeffs[v]·v + constant` over variable ids — the shared term the
- * SMT-LIB (QF_LIA) and XCSP3 parsers both fold expressions into before lowering a relation to a
- * `Factor`. Each parser keeps its own AST walk and its own operator/error
- * conventions; only this algebra ([plus], [scaled], [asSimpleVar], and [linCombDiff]) is shared.
+ * An integer linear combination `Σ coeffs(v)·v + constant` over variable ids, the term the SMT-LIB and
+ * XCSP3 parsers fold expressions into before lowering a relation to a `Factor`.
  */
 internal data class LinComb(val coeffs: Map<Int, Long>, val constant: Long) {
-    /** Sum of two combinations (coefficients added per variable, constants added). */
     fun plus(other: LinComb): LinComb {
         val m = HashMap(coeffs)
         for ((v, c) in other.coeffs) m[v] = addExact(m[v] ?: 0L, c)
         return LinComb(m, addExact(constant, other.constant))
     }
 
-    /** This combination scaled by [k]. */
     fun scaled(k: Long): LinComb = LinComb(coeffs.mapValues { mulExact(it.value, k) }, mulExact(constant, k))
 
     /** The single variable id when this is exactly `1·v` (no constant, one unit coefficient), else null. */
@@ -37,9 +33,9 @@ internal fun linCombDiff(a: LinComb, b: LinComb, delta: Long = 0L): Triple<IntAr
 }
 
 /**
- * Checked 64-bit arithmetic for term folding. Integer terms in SMT-LIB and XCSP3 are conceptually
- * unbounded, so a wrapped `Long` result would silently corrupt the folded value; these throw
- * [ArithmeticException] on overflow so the parser can reject the term instead.
+ * Checked 64-bit arithmetic for term folding. Integer terms in SMT-LIB and XCSP3 are unbounded, so a
+ * wrapped `Long` would silently corrupt the folded value; these throw [ArithmeticException] on overflow
+ * so the caller can promote the fold to [IntComb.Wide] or reject the term.
  */
 internal fun addExact(a: Long, b: Long): Long {
     val r = a + b

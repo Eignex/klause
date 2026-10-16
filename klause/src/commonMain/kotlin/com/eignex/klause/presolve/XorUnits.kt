@@ -20,9 +20,8 @@ import com.eignex.klause.util.rem
 internal object XorUnits {
 
     /** Work budget for the one-shot GF(2) elimination, as `rows × pivots × words` (its asymptotic cost).
-     *  Past it the elimination is skipped — on a system this large it would dominate presolve and rarely
-     *  pays off, while small parity systems (where xor-derived units matter) stay orders of magnitude
-     *  below it. */
+     *  Past it the elimination is skipped; the parity rows still propagate normally, only their
+     *  globally implied root units go underived. */
     private const val XOR_ELIMINATION_WORK_CAP = 100_000_000L
 
     /**
@@ -49,11 +48,6 @@ internal object XorUnits {
         val indexOf = HashMap<Long, Int>(vars.size * 2)
         for (i in vars.indices) indexOf[vars[i]] = i
         val words = (vars.size + 63) ushr 6
-        // The dense GF(2) elimination below is O(rows × pivots × words). On a large parity system that work
-        // dominates presolve, so skip it past a budget (sound — the parity rows still propagate normally,
-        // only their globally-implied root units go underived), mirroring the size guards on the other
-        // presolve searches (clique merge, SAC probing). The reduction matters on small parity systems,
-        // which stay far under the cap.
         val rowCount = system.rows.size
         if (rowCount.toLong() * minOf(rowCount, vars.size) * words > XOR_ELIMINATION_WORK_CAP) return SourceDelta()
         val rows = Array(rowCount) { LongArray(words) }

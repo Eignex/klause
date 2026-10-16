@@ -46,8 +46,7 @@ internal expect fun exitCli(code: Int): Nothing
  *  the source instead of the whole-file [String], so a huge instance is never fully resident. */
 internal expect fun openFileSource(path: String): CharSource
 
-/** Read [path] fully into a [String] — the bridge for a front-end that still parses a materialized
- *  [String]. A thin adapter over [openFileSource]; a converted front-end takes the source directly. */
+/** Read [path] fully into a [String] through [openFileSource], for a consumer that needs the whole text. */
 internal fun readTextFile(path: String): String = openFileSource(path).readText()
 
 private val timeOrigin = TimeSource.Monotonic.markNow()
@@ -58,8 +57,8 @@ internal fun nowMillis(): Long = timeOrigin.elapsedNow().inWholeMilliseconds
 internal fun fileName(path: String): String = path.substringAfterLast('/').substringAfterLast('\\')
 
 /** Compression suffix → the external decompress-to-stdout command. Shelling out to the system tools
- *  (the mature reference implementations, ubiquitous on any bench/competition box) keeps the CLI free
- *  of a compression dependency; [readTextFile] pipes the file through the matching command. */
+ *  keeps the CLI free of a compression dependency; [openFileSource] pipes the file through the matching
+ *  command. */
 internal val DECOMPRESSORS = mapOf(
     "xz" to listOf("xz", "-dc"),
     "gz" to listOf("gzip", "-dc"),

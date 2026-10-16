@@ -242,7 +242,7 @@ class CpSearchComponent(
             ?.let(::SearchExplanation),
     )
 
-    /** Publish Boolean facts from a CP fixpoint without exposing finite-domain deductions. */
+    /** Publish a CP fixpoint's Boolean facts and integer bounds, each with its CP premise, to [context]. */
     fun publish(
         result: PropagationResult.Implied,
         context: com.eignex.klause.solver.search.SearchContext,

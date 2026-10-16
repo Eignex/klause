@@ -9,11 +9,11 @@ import com.eignex.klause.solver.objective.LinearObjective
  * Objective-direction seed moves. Without it, a fully-satisfied state where no factor proposes a
  * structured move has zero candidates and the strategy returns null, spuriously restarting. This
  * seeds single-variable moves directly on the objective's decision variables:
- *  - [LinearObjective]: a ±1 step on each nonzero-weight var in the direction its coefficient says
- *    reduces the objective, plus a flip on each nonzero-weight bool.
+ *  - [LinearObjective]: a step to the adjacent domain value of each nonzero-weight int var in the
+ *    direction its coefficient says reduces the objective, plus a flip on each nonzero-weight bool.
  *  - [FunctionalObjective]: Boolean leaf flips and geometric integer steps
- *    (±1, ±2, ±4, …, plus the domain endpoints). Its gradient lives in `deltaIfApplied`,
- *    so we seed a spread of jump sizes and let the scoring keep the best.
+ *    (±1, ±2, ±4, … up to ±4096, plus the domain endpoints). Its gradient lives in `deltaIfApplied`,
+ *    so a spread of jump sizes is seeded and the scoring keeps the best.
  *  - other objective shapes: nothing (no per-var direction without inspecting the shape).
  *
  * [Phase.Feasible]: the objective gradient only matters at `cost == 0`.
@@ -35,8 +35,6 @@ class ObjectiveSeed : MoveSource {
                     if (obj.intCoefficientValues[v] == 0L) continue
                     val cur = state.assignment.intValue(v)
                     val d = state.rootDomains[v]
-                    // Step toward smaller objective; channeling-aware so int-move + indicator
-                    // updates stay atomic.
                     if (obj.intCoefficientValues[v] > 0 && cur > d.min) {
                         sink.addChannelingIntSet(state, v, d.lower(cur))
                     }
@@ -48,9 +46,7 @@ class ObjectiveSeed : MoveSource {
 
             is FunctionalObjective -> {
                 for (v in obj.boolLeafVars) sink.addBoolFlip(v)
-                // No per-var direction a priori (gradient lives in deltaIfApplied), so seed
-                // geometric steps on each leaf var and let scoring keep the best. Pure ±1 descends
-                // a wide-domain coordinate objective far too slowly.
+                // Pure ±1 steps descend a wide-domain coordinate objective far too slowly.
                 for (v in obj.leafVars) {
                     val cur = state.assignment.intValue(v)
                     val d = state.rootDomains[v]

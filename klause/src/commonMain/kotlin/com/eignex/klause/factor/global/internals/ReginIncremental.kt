@@ -171,8 +171,8 @@ private fun reginSccReachPrune(
     return pruneUnsupportedEdges(state, vars, cache, inc, valuesPerVar, adj, reached, premises)
 }
 
-// The passes are separate methods so each compiles apart: in one body every loop entered on-stack recompiled the
-// whole of it.
+// The passes are separate methods so each compiles apart: one body holding every loop is recompiled whole for each
+// loop it enters on-stack.
 private fun orientMatchedGraph(
     inc: ReginIncrementalState,
     valuesPerVar: Array<IntArray>,

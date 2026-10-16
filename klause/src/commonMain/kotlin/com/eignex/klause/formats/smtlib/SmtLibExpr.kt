@@ -38,7 +38,7 @@ internal fun Compiler.Builder.assert(top: SExpr) {
         // A `let`-bound Bool that nothing has asked for a literal yet can be asserted rather than
         // reified: substituting its term here sends it back through this loop, where `and`, the
         // comparisons and `distinct` each have a direct posting that allocates no auxiliary literal.
-        // Once its literal exists the binding is shared as before, so a name used elsewhere is unaffected.
+        // Once its literal exists the binding is shared, so a name used elsewhere is unaffected.
         if (node is SExpr.Atom) {
             val bound = lookup(node.text)
             val src = bound?.takeIf { it.isBool && it.lit == null }?.srcBool

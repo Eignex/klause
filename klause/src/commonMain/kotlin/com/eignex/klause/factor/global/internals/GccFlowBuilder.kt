@@ -7,9 +7,8 @@ import com.eignex.klause.util.IntArrayList
 
 /**
  * Integer max-flow (level graph + blocking flow) over a graph stored as parallel arrays. Edges come
- * in forward/reverse
- * pairs; even indices are forward edges (original capacity), odd indices are residual reverses
- * (initially zero). Flow pushed on edge `e` is `originalCap - cap(e)` for forward edges.
+ * in forward/reverse pairs; even indices are forward edges (original capacity), odd indices are
+ * residual reverses (initially zero). Flow pushed on edge `e` is `originalCap - cap(e)` for forward edges.
  *
  * Two lifetimes:
  *  - **Rebuild** ([reset] + [addEdge]): the structure and residual capacities live in plain
@@ -17,8 +16,8 @@ import com.eignex.klause.util.IntArrayList
  *  - **Persistent** ([freeze]): after a build the residual capacities are copied onto the engine undo
  *    trail ([RevIntArray]), so the flow *survives across fires and restores on backtrack* — the
  *    variable→value edge set is invariant (built for the root, widest domains), and a fire only blocks
- *    the edges whose value left ([blockEdge]) and tops the flow back up. This removes the per-fire
- *    network rebuild and the O(n) warm-start replay.
+ *    the edges whose value left ([blockEdge]), rerouting any unit they carried ([recoverEdge]), with
+ *    no per-fire network rebuild or warm-start replay.
  */
 internal class GccFlowBuilder {
     private var adj: Array<IntArrayList> = emptyArray()
@@ -89,8 +88,8 @@ internal class GccFlowBuilder {
 
     /** Mark forward edge [eIdx] (and its reverse) removed — its value left the domain. Reversible: it
      *  reads as capacity/flow 0 until a backtrack restores it. Sound only for an edge carrying no flow
-     *  ([flowOf] `== 0`); the caller rebuilds when a flow-carrying edge is removed, since re-routing that
-     *  variable's unit is what the rebuild does. */
+     *  ([flowOf] `== 0`); the caller first reroutes a flow-carrying edge's unit with [recoverEdge], or
+     *  re-solves when no alternate path exists. */
     fun blockEdge(eIdx: Int) {
         val r = removed ?: return
         r[eIdx] = 1
@@ -262,7 +261,10 @@ internal class GccFlowBuilder {
      * a blocking flow (a DFS that advances a per-node edge cursor so each edge is examined once per phase).
      * `O(V²E)` in general and near `O(E√V)` on the unit-capacity variable→value matching graphs the GCC
      * propagator builds. Any maximum flow is equally valid for the residual-SCC GAC filtering that reads the final
-     * residual graph, so the value is unchanged.
+     * residual graph.
+     *
+     * Dinitz, "Algorithm for solution of a problem of maximum flow in networks with power estimation",
+     * Soviet Math. Doklady 11, 1970.
      */
     fun maxFlow(source: Int, sink: Int): Int {
         var total = 0
@@ -333,11 +335,13 @@ internal class GccFlowBuilder {
 
     /**
      * Residual-SCC labels over nodes `0 until limit`, written into [sccId]. An iterative index/lowlink
-     * pass run *directly* over the residual edges (`adj[v]` filtered by `capGet(e) > 0` and
-     * `edgeTo(e) < limit`) with no materialized adjacency — materializing `nodeAdj` per fire is a top
-     * cost on cardinality-heavy propagation. Visitation order matches the materialized form, and the
-     * prune only reads the SCC partition (not label values), so pruning is unaffected. Scratch buffers
-     * are reused across fires.
+     * pass run directly over the residual edges (`adj(v)` filtered by `capGet(e) > 0` and
+     * `edgeTo(e) < limit`) with no materialized adjacency, which would be a top cost on cardinality-heavy
+     * propagation. The prune only reads the SCC partition, not label values. Scratch buffers are reused
+     * across fires.
+     *
+     * Tarjan, "Depth-first search and linear graph algorithms", SIAM J. Comput. 1(2), 1972,
+     * https://doi.org/10.1137/0201010
      */
     fun computeSccResidual(limit: Int, sccId: IntArray) {
         if (sccIndex.size < limit) {

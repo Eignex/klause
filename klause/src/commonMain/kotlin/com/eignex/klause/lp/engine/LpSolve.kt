@@ -828,7 +828,7 @@ private fun certifyLpResultWithin(
         ray,
         conflict,
         model.hasIntegralObjective(),
-        // Freeze the value before mutable objective/bound arrays can change; evaluation is opt-in.
+        // The remembered copy carries no safe bound; the returned result evaluates it lazily from a frozen snapshot.
         safeBound = { null },
     )
     counterResults?.remember(model, certified, policy)

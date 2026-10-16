@@ -1,8 +1,9 @@
 package com.eignex.klause.factor.scheduling.internals
 
 /**
- * Θ-tree for cumulative scheduling envelope reasoning — the data-structure half of a
- * Schutt-Feydy-Stuckey edge-finding propagator on `Cumulative`.
+ * Θ-tree for cumulative scheduling envelope reasoning — the data-structure half of the edge-finding
+ * propagator on `Cumulative` (P. Vilím, "Edge Finding Filtering Algorithm for Discrete Cumulative
+ * Resources in O(kn log n)", CP 2009, https://doi.org/10.1007/978-3-642-04244-7_62).
  *
  * Tasks are addressed by a stable id `0..n-1` set at construction. The id is *not* a leaf
  * position — callers pass the per-leaf order to [setLeafOrder] (typically `argsort` by
@@ -158,7 +159,7 @@ class CumulativeThetaTree(private val n: Int, capacity: Long) {
         }
     }
 
-    /** Factory and shared constants for this factor. */
+    /** Shared constants. */
     companion object {
         /** Sentinel representing "no envelope" (subtree contains no active leaf). Chosen
          *  far enough below zero that adding any non-negative `e(R)` keeps the value

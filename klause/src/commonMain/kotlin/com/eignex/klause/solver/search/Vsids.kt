@@ -4,12 +4,12 @@ import com.eignex.klause.util.IndexedMaxHeap
 import kotlin.random.Random
 
 /**
- * Variable State Independent Decaying Sum (Moskewicz et al., Chaff 2001). The
+ * Variable State Independent Decaying Sum (Moskewicz, Madigan, Zhao, Zhang and Malik, "Chaff:
+ * Engineering an Efficient SAT Solver", DAC 2001, https://doi.org/10.1145/378239.379017). The
  * activity counter for each variable is bumped on every conflict the variable is implicated
- * in, with the bump amount `increment` growing geometrically over time so recent conflicts
- * dominate. Equivalent to per-bump multiplicative decay by a factor of [decay] applied
- * uniformly to every prior activity, but cheaper (we only mutate the increment, not every
- * activity entry). Periodically rescales when `increment` approaches [Double] overflow.
+ * in, with the bump amount `increment` growing geometrically so recent conflicts dominate.
+ * Equivalent to multiplicative decay of every prior activity by [decay] per conflict, but only the
+ * increment is mutated. Rescales when `increment` passes `rescaleThreshold`.
  *
  * Picks the unpinned variable with the highest activity. Ties follow the heap order. Activities persist
  * across [onRestart], so learning carries over.
@@ -41,10 +41,9 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
     private var numIntCached: Int = 0
 
     // Identity of the state pick() last ran against. pick() removes assigned vars from the
-    // heap and relies on onUnassign (per backtrack) to re-insert them; a solve that ends on a
-    // leaf or timeout leaves the heap partial. When the same Vsids instance is reused for a
-    // fresh search (optimisation B&B, repeated solves), re-offer every removed var on the
-    // first pick — keeping their stored activities so VSIDS stays warm across iterations.
+    // heap and relies on onUnassign to re-insert them, so a solve that ends on a leaf or timeout
+    // leaves the heap partial. A fresh search on the same instance re-offers every removed var on
+    // its first pick, keeping their stored activities warm.
     private var lastState: BranchingState? = null
 
     private fun ensureSized(numBool: Int, numInt: Int) {
@@ -66,11 +65,10 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
             val total = numBoolCached + numIntCached
             for (id in 0 until total) if (!h.contains(id)) h.restore(id)
         }
-        // Decision pop: extract the max-activity id and *keep it out* of the
-        // heap. Already-pinned ids surfacing here (a propagated var sitting near the top) are
-        // dropped, not restored — [onUnassign] re-inserts every variable a backtrack frees, so
-        // the heap holds (roughly) only unassigned variables and pick stays O(log n) regardless
-        // of trail depth, instead of re-skipping every pinned var per pick.
+        // Extract the max-activity id and keep it out of the heap. Already-pinned ids surfacing here
+        // are dropped, not restored — [onUnassign] re-inserts every variable a backtrack frees, so
+        // the heap holds roughly only unassigned variables and pick stays O(log n) regardless of
+        // trail depth.
         //
         // The bool branch fully assigns the picked var (true/false), so it can stay removed. An
         // int branch may only *narrow* the domain (still size > 1 after), so the picked int var
@@ -89,13 +87,10 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
                     }
                 }
             }
-            // The pop-on-pick scheme (a var leaves the heap when it surfaces assigned, re-added by
-            // [onUnassign] on backtrack) can strand an open variable out of the heap if a re-add is
-            // missed across a restart/backtrack. Reporting `null` then would tell the engine "all
-            // assigned" and let it commit an incomplete assignment as a solution. Before that, rescan
-            // the live variables and re-offer every still-open one; retry so the max-activity one
-            // wins. Runs only when the heap empties (a candidate leaf), so the O(log n) fast path is
-            // untouched — `null` provably means every variable is determined.
+            // Pop-on-pick can strand an open variable out of the heap if a re-add is missed across a
+            // restart or backtrack, and returning `null` then would commit an incomplete assignment
+            // as a solution. Rescan and re-offer every still-open variable before giving up; this runs
+            // only when the heap empties, so `null` provably means every variable is determined.
             var refilled = false
             for (v in 0 until numBoolCached) {
                 if (state.boolValue(v) == null && !h.contains(v)) {
@@ -124,8 +119,7 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
 
     override fun onConflict(varRef: VarRef?, conflict: BranchingConflict) {
         val h = heap ?: return
-        // Bump every variable the substrate implicated, plus the failed decision itself (in case it
-        // isn't already in the set — typically it is).
+        // The failed decision is bumped too when the substrate did not already implicate it.
         for (b in conflict.bools) bumpBool(h, b)
         for (i in conflict.ints) bumpInt(h, i)
         when (varRef) {
@@ -133,8 +127,7 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
             is VarRef.IntVar -> if (varRef.varId !in conflict.ints) bumpInt(h, varRef.varId)
             null -> Unit
         }
-        // Grow the increment for the next conflict — implicit multiplicative decay of
-        // every prior activity by `decay`, without touching the keys.
+        // Implicit multiplicative decay of every prior activity by `decay`, without touching the keys.
         increment /= decay
         if (increment > rescaleThreshold) rescaleAll(h)
     }
@@ -150,9 +143,8 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
         h.updateKey(id, h.keyOf(id) + increment)
     }
 
-    /** Scale every activity (and `increment`) by `1/rescaleThreshold` so the relative
-     *  ordering is preserved but we step well clear of `Double.MAX_VALUE`. The heap's
-     *  [IndexedMaxHeap.scaleKeys] applies the uniform factor without resifting. */
+    /** Scale every activity and `increment` by `1/rescaleThreshold`, preserving their order while staying
+     *  clear of `Double.MAX_VALUE`; a uniform factor needs no resifting. */
     private fun rescaleAll(h: IndexedMaxHeap) {
         val k = 1.0 / rescaleThreshold
         h.scaleKeys(k)

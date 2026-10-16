@@ -41,10 +41,7 @@ internal fun Lowering.materializeSet(expr: SetExpr): SetLayout = when (expr) {
         ?: error("Unknown set variable '${expr.name}'")
 
     is SetLiteral -> {
-        // Constant set: allocate indicator-shaped layout with each indicator pinned to its
-        // constant value via a unit clause. The downstream lowering doesn't care that the
-        // indicators are constants — it just emits clauses against them, and the unit
-        // clauses we add here are enough to propagate the truth.
+        // Constant set: an ordinary layout whose indicators are pinned true by unit clauses.
         val sorted = expr.elements.distinct().sorted()
         require(sorted.isNotEmpty()) { "set literal must be non-empty" }
         val ids = IntArray(sorted.size) { newBoolVar() }
@@ -53,16 +50,12 @@ internal fun Lowering.materializeSet(expr: SetExpr): SetLayout = when (expr) {
     }
 
     is SetNominalLiteral -> {
-        // The compiler can't resolve nominal labels without knowing which nominal-set var
-        // they're being compared against. We require [SetNominalLiteral] only appear as
-        // operand of [SetEq] / [SetSubsetOf] etc. against a [SetRef] over a nominal-set
-        // var, in which case [reifySetWithNominalLiteral] handles the lookup explicitly.
-        // Reaching here means the literal is being materialised standalone, which we
-        // don't support — surface a clear error instead of silently fabricating a layout.
+        // Labels map to indices only through a specific nominal-set var's label order, which a
+        // standalone literal lacks, so it is rejected rather than given a fabricated layout.
         error("nominal set literal cannot be materialised without a nominal-set var operand on the other side")
     }
 
-    // out ↔ (left[v] ∨ right[v]); result universe is both operands'.
+    // out ↔ (left(v) ∨ right(v)); result universe is both operands'.
     is SetUnion -> materializeSetBinary(expr.left, expr.right, fullUnion = true) { outLit, ll, rl ->
         when {
             ll != null && rl != null -> {
@@ -85,7 +78,7 @@ internal fun Lowering.materializeSet(expr: SetExpr): SetLayout = when (expr) {
         }
     }
 
-    // out ↔ (left[v] ∧ right[v]); elements in only one universe can never be in the intersection.
+    // out ↔ (left(v) ∧ right(v)); elements in only one universe can never be in the intersection.
     is SetIntersect -> materializeSetBinary(expr.left, expr.right, fullUnion = true) { outLit, ll, rl ->
         if (ll != null && rl != null) {
             factors += Clause(intArrayOf(Lit.negate(outLit), ll))
@@ -96,7 +89,7 @@ internal fun Lowering.materializeSet(expr: SetExpr): SetLayout = when (expr) {
         }
     }
 
-    // S \ T: out ↔ (left[v] ∧ ¬right[v]); result universe is S's, so `ll` is always present.
+    // S \ T: out ↔ (left(v) ∧ ¬right(v)); result universe is S's, so `ll` is always present.
     is SetDiff -> materializeSetBinary(expr.left, expr.right, fullUnion = false) { outLit, ll, rl ->
         requireNotNull(ll) { "set diff: left indicator missing for a result-universe element" }
         if (rl != null) {
@@ -146,14 +139,12 @@ private fun unionUniverse(a: IntArray, b: IntArray): IntArray {
     return out
 }
 
-// `assertExpr` calls into these for set BoolExprs that appear as direct top-level
-// constraints; `lowerToLit` calls the [reify*] variants below when the same expression
-// shows up inside a sub-expression position.
+// `assertExpr` calls the assert* forms for top-level set constraints; `lowerToLit` calls the
+// reify* forms in sub-expression positions.
 
 internal fun Lowering.assertSetIn(expr: SetIn) {
     val set = materializeSet(expr.set)
-    // x ∈ S  ≡  ∨_{e ∈ universe(S)} (x = e ∧ S[e])
-    // Top-level form: emit `∨_{e} (x = e ∧ S[e])` via Tseitin disjunction, then assert it.
+    // x ∈ S  ≡  ∨_{e ∈ universe(S)} (x = e ∧ S(e))
     val pieces = mutableListOf<BoolExpr>()
     for (i in set.universe.indices) {
         val e = set.universe[i]
@@ -179,14 +170,13 @@ internal fun Lowering.assertSetNominalIn(expr: SetNominalIn) {
         ?: error("set '$setName' is an integer-universe set; use `intVar inSet $setName` instead")
     val idx = labels.indexOf(expr.label)
     require(idx >= 0) { "label '${expr.label}' not in nominal-set '$setName'" }
-    // For a nominal set, "label ∈ S" is simply: S[idx] = true.
     factors += Clause(intArrayOf(Lit.make(set.indicatorBoolIds[idx], positive = true)))
 }
 
 internal fun Lowering.assertSetSubsetOf(expr: SetSubsetOf) {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
-    // ∀ e ∈ universe(L): if e ∈ universe(R) then L[e] → R[e], else L[e] = false.
+    // ∀ e ∈ universe(L): if e ∈ universe(R) then L(e) → R(e), else L(e) = false.
     for (i in l.universe.indices) {
         val v = l.universe[i]
         val ll = Lit.make(l.indicatorBoolIds[i], positive = true)
@@ -203,7 +193,7 @@ internal fun Lowering.assertSetSubsetOf(expr: SetSubsetOf) {
 internal fun Lowering.assertSetDisjoint(expr: SetDisjoint) {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
-    // ∀ e ∈ universe(L) ∩ universe(R): ¬(L[e] ∧ R[e]).
+    // ∀ e ∈ universe(L) ∩ universe(R): ¬(L(e) ∧ R(e)).
     for (i in l.universe.indices) {
         val v = l.universe[i]
         val ri = r.indexOf(v)
@@ -218,7 +208,6 @@ internal fun Lowering.assertSetEq(expr: SetEq) {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
     val union = unionUniverse(l.universe, r.universe)
-    // Per-element biconditional over the unified universe.
     for (v in union) {
         val li = l.indexOf(v)
         val ri = r.indexOf(v)
@@ -332,13 +321,11 @@ internal fun Lowering.liftSetCard(expr: SetCard): IntRef {
     val n = layout.size
     val aux = newAuxIntVar(IntDomain(0, n.toLong()))
     val auxId = intVarOf(aux)
-    // Channel each indicator bool to a 0/1 int via ReifiedLinear (PB factor takes bool
-    // literals only, but the count here is an int var), then assert Σ ints − count = 0.
+    // Channel each indicator bool to a 0/1 int (a PB factor cannot equate to an int var),
+    // then assert Σ ints − count = 0.
     val indicatorIntVars = IntArray(n) { i ->
         val intName = newAuxIntVar(IntDomain(0, 1))
         val id = intVarOf(intName)
-        // id = 1 ⟺ indicator[i] is true. Channel via ReifiedLinear on a fresh aux bool
-        // tied to indicator[i] via clauses.
         val boolId = layout.indicatorBoolIds[i]
         val auxBool = newBoolVar()
         // auxBool ↔ (id = 1)
@@ -349,27 +336,22 @@ internal fun Lowering.liftSetCard(expr: SetCard): IntRef {
             LinearOp.EQ,
             1,
         )
-        // auxBool ↔ indicator[i]: two clauses.
+        // auxBool ↔ indicator(i)
         val auxLit = Lit.make(auxBool, positive = true)
         val indLit = Lit.make(boolId, positive = true)
         factors += Clause(intArrayOf(Lit.negate(auxLit), indLit))
         factors += Clause(intArrayOf(Lit.negate(indLit), auxLit))
         id
     }
-    // Σ indicatorInts - count = 0.
     val coeffs = IntArray(n + 1) { if (it < n) 1 else -1 }
     val vars = IntArray(n + 1) { if (it < n) indicatorIntVars[it] else auxId }
     factors += Linear(coeffs, vars, LinearOp.EQ, 0)
     return IntRef(aux)
 }
 
-/** Wrap a bool var id (allocated for a set indicator) as a [BoolExpr] reusable in the
- *  AST-level Tseitin pipeline. Each indicator gets a synthetic name so the existing
- *  `BoolRef` machinery can route it through the standard bool-lookup path. */
+/** Wrap a set-indicator bool var id as a [BoolExpr] for the AST-level Tseitin pipeline. [BoolRef]
+ *  resolves by name, so an unnamed indicator gets a synthetic name registered on demand. */
 private fun Lowering.indicatorBoolExpr(boolId: Int): BoolExpr {
-    // The bool var already exists in [boolVarIdByName] indirectly via the set layout —
-    // but the table is keyed by name, not id. Synthesise a name and register the
-    // back-link on demand so [lowerToLit]/[BoolRef] work uniformly.
     val name = idToBoolName[boolId]
         ?: run {
             val synth = "__set_ind_$boolId"

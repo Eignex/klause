@@ -109,7 +109,7 @@ internal sealed interface SearchOutcome {
         val core: UnsatCore? = null,
         val touchedAssumptionLevels: IntArray = EmptyIntArray,
         /** True when a leaf was reached whose residual LP-only continuous relaxation could not be
-         *  certified feasible or infeasible (see `leafRealFeasibility`), so the tree is not provably
+         *  certified feasible or infeasible (see `LpEngine.leafCertify`), so the tree is not provably
          *  all-infeasible — the terminal verdict must be `unknown`, not UNSAT. */
         val indeterminate: Boolean = false,
     ) : SearchOutcome

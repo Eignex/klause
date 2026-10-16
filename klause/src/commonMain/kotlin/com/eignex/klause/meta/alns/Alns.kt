@@ -39,7 +39,9 @@ import kotlin.time.TimeSource
 
 /**
  * Adaptive Large Neighborhood Search meta-optimizer on top of an arbitrary
- * [Optimizer] over [LocalSearchParams]. Each iteration:
+ * [Optimizer] over [LocalSearchParams] (S. Ropke and D. Pisinger, "An Adaptive Large Neighborhood Search
+ * Heuristic for the Pickup and Delivery Problem with Time Windows", Transportation Science 40(4), 2006,
+ * https://doi.org/10.1287/trsc.1050.0135). Each iteration:
  *
  *   1. Pick a destroy operator from [destroyOperators] via [destroyBandit] (kumulant
  *      [UnivariateBandit] — defaults to [RouletteWheelBandit]; swap in
@@ -64,7 +66,7 @@ import kotlin.time.TimeSource
  * which lives inside the LS engine and re-anchors the assignment between flips — ALNS
  * is an *outer* loop: it repeatedly calls a repair operator with shrinking assumption
  * sets and lets the bandits learn which destroy/repair combo exposes the most rewarding
- * neighbourhood for this problem. Composes naturally with Session + assumption primitives.
+ * neighbourhood for this problem.
  *
  * Specialised to [LocalSearchParams] to override `maxFlips` per iteration.
  *
@@ -122,8 +124,9 @@ internal class Alns(
      *  accepts as a new best is offered to it, and only a candidate the exchange verifies *and* finds
      *  strictly better than the standing one is installed. Before each iteration ALNS adopts a not-yet-seen
      *  installed incumbent that beats its own, so the next neighbourhood is destroyed from the globally-best
-     *  assignment. Startup and retained bootstrap slices also acquire incumbents; source validation checks
-     *  coordinates and active assumptions before adoption. Null leaves the run private. */
+     *  assignment. Startup and each bootstrap slice also acquire incumbents, each verified against the source
+     *  problem under the active assumptions before adoption. Null falls back to
+     *  [LocalSearchParams.pooledIncumbents]. */
     val pooledIncumbents: IncumbentExchange<Sample, Double>? = null,
     private val literalSweep: DefinitionalSweep? = null,
 ) : ResumableOptimizer<LocalSearchParams> {
@@ -318,8 +321,7 @@ internal class Alns(
 
             while (iter < maxIterations && (instructionBudget == null || instructionsUsed < instructionBudget)) {
                 if (params.cancellation() || nodeBudget?.allowance?.movesLeft() == 0L) break
-                // This iteration's repair allowance: flipsPerIteration, clipped to whatever budget remains
-                // so the last counted iteration can't overshoot by a whole flipsPerIteration.
+                // Clipped to the remaining budget so the last iteration can't overshoot by a whole flipsPerIteration.
                 val iterFlips = minOf(
                     flipsPerIteration,
                     instructionBudget?.let { it - instructionsUsed } ?: Long.MAX_VALUE,
@@ -327,16 +329,13 @@ internal class Alns(
                 )
                 val perIterParams = params.copy(
                     maxFlips = iterFlips,
-                    // Each iteration's RNG seed varies via the bandit's RNG; explicit null lets the
-                    // inner solver draw its own per-call seed.
+                    // Null lets the inner solver draw its own per-call seed.
                     randomSeed = null,
                     // The iteration's allowance is charged below, whatever its repair spends.
                     nodeBudget = null,
                 )
-                // Charge the iteration's allowance up front — a destroy that frees nothing, or a repair
-                // that rejects, still consumed the bandit picks and (for a repair op that ran) whatever
-                // portion of iterFlips it used; charging the declared unit keeps counting deterministic
-                // and independent of what happened inside, same as LocalSearchSolver's counted restart.
+                // Charging the declared allowance up front, whatever the destroy or repair then does, keeps
+                // counting deterministic, as LocalSearchSolver's counted restart does.
                 instructionsUsed += iterFlips
                 telemetry.outerAllowance += iterFlips
                 nodeBudget?.allowance?.spendMoves(iterFlips)
@@ -345,7 +344,6 @@ internal class Alns(
                 }
                 val destroyIdx = destroyBandit.choose()
                 val repairIdx = repairBandit.choose()
-                // Randomized degree of destruction: a fresh fraction each iteration (textbook ALNS).
                 val destroyFraction = if (maxDestroyFraction > minDestroyFraction) {
                     minDestroyFraction + rng.nextDouble() * (maxDestroyFraction - minDestroyFraction)
                 } else {
@@ -447,7 +445,7 @@ internal class Alns(
      * The first incumbent for the destroy/repair loop. For a hybrid ALNS (a backtrack engine is present)
      * seed it with a *budget-bounded complete solve*: complete search reaches a first feasible fast on both
      * easy and feasibility-tight problems — where local search flails and leaves ALNS with no incumbent at
-     * all (bench-mined) — and hands over a CP-quality start. It is capped to a fraction of the run's budget
+     * all — and hands over a CP-quality start. It is capped to a fraction of the run's budget
      * (via [com.eignex.klause.util.Cancellation.shorten]) so destroy/repair keeps the rest, with
      * [BOOTSTRAP_DECISIONS] as the safeguard for a budget-less (deadline-free) run. A pure-LS ALNS (no
      * backtrack engine), or a fragment the bootstrap can't seed, falls back to local search.

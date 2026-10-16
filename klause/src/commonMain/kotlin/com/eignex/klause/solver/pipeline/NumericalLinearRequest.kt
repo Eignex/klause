@@ -76,7 +76,7 @@ class NumericalLinearRequest(
     /**
      * Traverse source integer splits using numerical relaxations and checked source derivations.
      * Unresolved leaves retain witnesses and root bounds without a terminal claim.
-     * [complete] withholds bounds and terminals for witness-only callers.
+     * Passing `false` for [complete] withholds bounds and terminals for witness-only callers.
      */
     fun solve(
         params: TheoryParams = TheoryParams(),

@@ -29,7 +29,7 @@ internal object ScipReference {
     private const val MEMORY_LIMIT_MB = "6000"
     private const val DOCKER_INSPECT_WAIT_MS = 5_000L
 
-    /** SCIP's `infinity` (1e20); a primal bound at or above it means no incumbent was found. */
+    /** Threshold below SCIP's `infinity` (1e20); a reported bound at or beyond it means SCIP has none. */
     private const val SCIP_INFINITY = 1e19
 
     /** Unique suffix per container `--name`, so the watchdog can `docker kill` the exact container. */

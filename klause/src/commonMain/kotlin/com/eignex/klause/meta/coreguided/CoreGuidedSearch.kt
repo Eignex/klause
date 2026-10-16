@@ -49,6 +49,13 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
+/**
+ * Resumable core-guided minimization of a Boolean objective by OLL soft cardinality constraints
+ * (A. Morgado, C. Dodaro and J. Marques-Silva, "Core-Guided MaxSAT with Soft Cardinality Constraints",
+ * CP 2014, https://doi.org/10.1007/978-3-319-10428-7_41): each core raises the lower bound by its minimum
+ * weight and adds a reified `≥ 2` threshold over its literals as a new soft, whose successor threshold
+ * enters once it is spent.
+ */
 internal class CoreGuidedSearch(
     private val base: BakedProblem,
     private val objective: LinearObjective,

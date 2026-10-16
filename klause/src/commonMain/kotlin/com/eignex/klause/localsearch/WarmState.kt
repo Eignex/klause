@@ -14,10 +14,8 @@ internal class WarmState {
     internal var factorWeights: DoubleArray? = null
 
     /** Per-variable cumulative touch count, size = `numBoolVars + numIntVars` (bool ids
-     *  first, int ids offset by `numBoolVars`). Larger values mean "touched more often
-     *  during the search run". `null` if no call has completed yet. Used by ALNS destroy
-     *  operators that pick high-activity variables for re-optimisation. Cumulative across
-     *  restart epochs within a call — survives [LocalSearchState.restart]. */
+     *  first, int ids offset by `numBoolVars`), or `null` if no call has completed yet. Read by
+     *  the ALNS `activityBiased` destroy operator. Survives [LocalSearchState.restart]. */
     internal var activityTouches: IntArray? = null
 
     /** Lowest [LocalSearchState.cost] observed across every call made through the session.
@@ -25,15 +23,13 @@ internal class WarmState {
      *  not just the current call's watermark. `Long.MAX_VALUE` until the first apply. */
     internal var bestCostSeen: Long = Long.MAX_VALUE
 
-    /** Read-only view onto activity counts for tests / destroy operators. Returns an
-     *  empty array when no data has been captured yet. */
+    /** Activity counts, or an empty array when none have been captured yet. */
     fun activityTouches(): IntArray = activityTouches ?: EmptyIntArray
 
-    /** Read-only handle for tests / diagnostics. Returns `Long.MAX_VALUE` if no apply has
-     *  happened yet through this session. */
+    /** `Long.MAX_VALUE` until the first apply through this session. */
     fun bestCostSeen(): Long = bestCostSeen
 
-    /** Discard all warm state. The next session call starts from defaults. */
+    /** Discard all warm state so the next session call starts from defaults. */
     fun reset() {
         factorWeights = null
         activityTouches = null
@@ -41,11 +37,8 @@ internal class WarmState {
     }
 
     /** Sync warm weights, activity counts, and the best-cost watermark into [state]
-     *  before the search loop starts. Size-mismatched warm state is silently dropped —
-     *  the new Problem's factor / var count overrides. Restoring [activityTouches] lets
-     *  touch counts accumulate across session calls (which is what `activityBiased`
-     *  ALNS destroy keys on); restoring [bestCostSeen] lets `OrImprovesBestEver`
-     *  aspiration see the full-history low. */
+     *  before the search loop starts. Warm arrays whose size does not match the current
+     *  problem's factor or variable count are dropped. */
     internal fun applyTo(state: LocalSearchState) {
         applySteps(state).forEach { }
     }
@@ -78,15 +71,13 @@ internal class WarmState {
      *  restart, so they reflect the whole call regardless of restart cadence.
      *
      *  Skips the weight copy when the state never allocated [FactorWeightBook.factorWeights]
-     *  — happens whenever the strategy was weight-blind (WalkSat, ProbSat, etc.).
-     *  Capturing a freshly-allocated all-1.0 default would force the allocation we just
-     *  avoided. */
+     *  (weight-blind strategies such as WalkSat or ProbSat); capturing the all-1.0 default
+     *  would force that allocation. */
     internal fun captureFrom(state: LocalSearchState) {
         if (state.weights.allocated) {
             factorWeights = state.weights.factorWeights.copyOf()
         }
         activityTouches = state.tabu.touchCount.copyOf()
-        // Monotone-decreasing: never let the warm watermark go up between calls.
         if (state.bestCostSeen < bestCostSeen) bestCostSeen = state.bestCostSeen
     }
 }

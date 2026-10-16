@@ -7,7 +7,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /**
- * Bounded variable elimination (BVE, Eén–Biere) over the pure-SAT part of the model. A Boolean
+ * Bounded variable elimination (BVE) over the pure-SAT part of the model. A Boolean
  * variable `v` is eliminated by resolving every clause containing `v` against every clause containing
  * `¬v` and replacing all of them with the (non-tautological) resolvents — the projection of `v` out of
  * the clause set — but only when that does not increase the clause count (the *bounded* rule). A
@@ -18,6 +18,9 @@ import com.eignex.klause.util.IntHashSet
  * objective-free and appearing solely in clean all-Boolean clauses. The eliminated `v` is left
  * unconstrained in the reduced problem, so this is **not** solution-set preserving (a complete
  * enumerator over-counts); its value is recovered from the removed clauses by [asRebuilds].
+ *
+ * N. Eén, A. Biere, "Effective preprocessing in SAT through variable and clause elimination", SAT 2005,
+ * https://doi.org/10.1007/11499107_5.
  */
 internal object BoundedVariableElimination {
 

@@ -136,7 +136,7 @@ internal class CommonOptions {
     var timeLimitMs: Long? = null
 
     /** Absolute wall-clock instant (in [nowMillis] units) at which the `-t` budget expires,
-     *  anchored once at process start. A single deadline shared by the construction-time bake
+     *  anchored once before the input is loaded. A single deadline shared by the construction-time bake
      *  ([CliMode.load]) and the solve phase ([SolveCore]) so the two phases don't each spend a
      *  fresh full budget (which would let `-t` overshoot ~2×). Null when no `-t` is given. */
     var deadlineAtMs: Long? = null
@@ -177,7 +177,8 @@ internal class CommonOptions {
     /** `--lp-pricing POLICY`: entering-column policy for zero-objective LP solves. */
     var lpPricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT
 
-    /** Raw repeatable `--param key=value` engine params; interpreted per engine (see [EngineParams]). */
+    /** Raw repeatable `--param key=value` engine params; interpreted per engine (see
+     *  [com.eignex.klause.solver.pipeline.EngineParams]). */
     val engineParams = mutableListOf<String>()
 
     /** `--help` / `-h`: print usage and exit 0 (checked before any input file is required). */
@@ -487,7 +488,7 @@ private fun parseShortCluster(token: String, args: Array<String>, i: Int, byName
     return i + 1
 }
 
-/** A command-line usage error. [main] catches it to print the message and exit 2; throwing (rather
+/** A command-line usage error. [runCli] catches it to print the message and exit 2; throwing (rather
  *  than exiting in place) keeps arg parsing testable and unwinds cleanly through the CLI. */
 internal class CliUsageException(message: String) : RuntimeException(message)
 
@@ -534,9 +535,6 @@ internal class VerdictContext(
 /**
  * The cause of a soft verdict: out of time, out of a pool that could have proved anything, or neither —
  * in which case the caller learns only that it was not reached.
- *
- * Every format reports this, so a census of `unknown` by cause covers whatever corpus it is run over
- * rather than only the formats that happened to implement it.
  */
 internal fun VerdictContext.softVerdictCause(): String = when {
     !completePool -> "no arm in the pool can prove a verdict"

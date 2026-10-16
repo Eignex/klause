@@ -9,9 +9,9 @@ import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 
 /**
- * Domain-over-weighted-degree (Boussemart-Hemery-Lecoutre-Sais 2004). Maintains a
- * per-factor *failure weight* that's bumped every
- * time the factor participates in a conflict — read off
+ * Domain-over-weighted-degree (Boussemart, Hemery, Lecoutre and Sais, "Boosting Systematic Search by
+ * Weighting Constraints", ECAI 2004, pp. 146–150). Maintains a per-factor *failure weight* that is bumped
+ * every time the factor participates in a conflict — read off
  * [PropagationResult.Unsat.conflictFactors], which carries the full propagation-graph
  * attribution. The variable score is then
  *     wdeg(v) / dom(v)
@@ -21,11 +21,9 @@ import kotlin.random.Random
  *
  * Compared to [Vsids]: dom/wdeg attributes "hardness" to *constraints* (so two variables
  * touched by the same hard constraint are both prioritised), while VSIDS attributes
- * directly to *variables*. Empirically dom/wdeg wins on CSPs with structured propagators;
- * VSIDS wins on SAT-style problems. They compose — a portfolio bandit can pick between
- * them per restart.
+ * directly to *variables*.
  *
- * Weights persist across [onRestart]; that's intentional, mirroring VSIDS's persistence.
+ * Weights persist across [onRestart].
  * Resizes the factor-weights array across problems for instance reuse.
  */
 internal class DomWdeg : VariableSelector {
@@ -55,7 +53,6 @@ internal class DomWdeg : VariableSelector {
         val numInt = problem.numIntVars
         val h = IndexedMaxHeap(numBool + numInt)
         val projection = session.projection
-        // Seed each var's key with Σ factorWeights[f] over its occurrence list.
         for (v in 0 until numBool) {
             var sum = 0.0
             for (fid in projection.boolOccurrences[v]) sum += factorWeights[fid]
@@ -70,7 +67,6 @@ internal class DomWdeg : VariableSelector {
         problemRef = problem
         numBoolCached = numBool
         numIntCached = numInt
-        // Drain any conflict bumps that arrived before initialization.
         if (pendingBumps.size > 0) {
             for (i in 0 until pendingBumps.size) {
                 val fid = pendingBumps[i]
@@ -93,10 +89,8 @@ internal class DomWdeg : VariableSelector {
     }
 
     override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
-        // Every factor implicated in the conflict gets +1. The reason set was assembled
-        // by a backward BFS through the propagation graph (see
-        // PropagationState.extractConflictFactors), so this captures all contributing
-        // constraints, not just the single failing one.
+        // conflictFactors comes from a backward walk of the reason trail, so every contributing
+        // constraint gets +1, not just the single failing one.
         val problem = problemRef
         for (fid in unsat.conflictFactors) {
             if (problem == null) {

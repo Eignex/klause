@@ -180,6 +180,7 @@ internal class PolynomialArithmetic(
         return quotient
     }
 
+    /** The resultant in [variable], as the determinant of the Sylvester matrix of [left] and [right]. */
     fun resultant(left: Polynomial, right: Polynomial, variable: Int): Polynomial {
         step()
         if (left.isZero || right.isZero) return Polynomial.ZERO
@@ -338,6 +339,11 @@ internal class PolynomialArithmetic(
         }
     }
 
+    /**
+     * Fraction-free determinant by Bareiss elimination: each update divides exactly by the previous pivot
+     * (E. H. Bareiss, "Sylvester's identity and multistep integer-preserving Gaussian elimination",
+     * Math. Comp. 22(103), 1968, https://doi.org/10.1090/S0025-5718-1968-0226829-0).
+     */
     private fun determinant(matrix: Array<Array<Polynomial>>): Polynomial {
         var previous = Polynomial.ONE
         var negative = false

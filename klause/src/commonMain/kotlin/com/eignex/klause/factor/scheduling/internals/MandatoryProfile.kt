@@ -14,12 +14,12 @@ import kotlin.math.min
  * present tasks (each weighted by its resource demand) yields the mandatory profile: a
  * set of disjoint segments `[from, to)` each at a constant resource level. A level above
  * the capacity proves infeasibility, and a candidate placement that would push any
- * segment over capacity can be shaved.
+ * segment over capacity can be shaved. Time-tabling after Aggoun and Beldiceanu,
+ * "Extending CHIP in order to solve complex scheduling and placement problems",
+ * Math. Comput. Modelling 17(7), 1993, https://doi.org/10.1016/0895-7177(93)90068-A.
  *
- * Consolidating the event build, the `(time asc, delta desc)` sort, the segment-build
- * sweep, and the `ownsMandatory` discount in [overloadsAt] into one place keeps the subtle
- * own-part discount from having to be kept in sync by hand. Disjunctive is the capacity-1,
- * unit-resource specialization (`build(cap = 1)`, `overloadsAt(..., r = 1, cap = 1, ...)`).
+ * Disjunctive is the capacity-1, unit-resource specialization (`build(cap = 1)`,
+ * `overloadsAt(..., r = 1, cap = 1, ...)`).
  *
  * One instance covers a single profile (build once, then query); callers needing several
  * profiles (e.g. one per machine) allocate one instance each.
@@ -120,10 +120,8 @@ internal class MandatoryProfile {
         lstI: Long,
         ectI: Long,
     ): Boolean {
-        // Segments are sorted ascending by time (see [build]), so binary-search the first one
-        // that ends past [s] instead of scanning every segment — this runs once per task per
-        // propagation and dominated dense-Cumulative profiles. Then walk forward while segments
-        // still start before [sPlusD] (the overlapping window).
+        // Segments are sorted by time, so binary-search the first one ending past [s]: this runs
+        // once per task per propagation, and a linear scan dominates dense-Cumulative profiles.
         var lo = 0
         var hi = segCount
         while (lo < hi) {

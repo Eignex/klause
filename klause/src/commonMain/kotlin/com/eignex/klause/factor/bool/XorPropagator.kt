@@ -14,7 +14,7 @@ internal class XorPropagator(
     private val targetParity: Int,
 ) : Propagator {
 
-    /** Per-var parity contribution: precomputed `(occurrences in `literals`) and 1` per `boolVar`. */
+    /** Per-variable parity contribution: its occurrence count in [literals], mod 2. */
     private val parityByVar: CoeffLookup = buildParityByVar(boolVars, literals)
 
     private fun parityOf(v: Int): Int = parityByVar.coeffOf(v)
@@ -64,20 +64,15 @@ internal class XorPropagator(
     }
 
     /**
-     * Clause-form nogood when [propagate] returns false. XOR parity errors aren't natively
-     * clause-form (an n-arity XOR needs 2^(n-1) clauses for full equivalence); we emit
-     * the weak but sound "at least one of these currently-pinned literals must flip"
-     * clause — i.e., the disjunction of currently-*false* literals across all assigned
-     * vars. Blocks re-exploring the exact dead-end assignment; subsequent propagations
-     * of the same XOR will still re-derive parity inferences from new pin paths.
+     * Clause-form nogood when [propagate] returns false. An n-ary XOR needs 2^(n-1) clauses for full
+     * equivalence, so this is the weak but sound "at least one currently-pinned literal must flip" clause:
+     * the disjunction of currently-*false* literals across all assigned vars.
      */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         parityAntecedents(state, excludeVar = -1)
 
-    /** Collect one currently-false literal per pinned variable (excluding [excludeVar]).
-     *  Each entry is the literal whose value is false under the current assignment for
-     *  that variable; together they describe "the partial assignment that forced this
-     *  pin / drove parity to violation". */
+    /** One currently-false literal per pinned variable except [excludeVar]: the partial assignment that
+     *  forced a pin or drove parity to violation. */
     private fun parityAntecedents(state: PropagationState, excludeVar: Int): IntArray? {
         var n = 0
         for (v in boolVars) {

@@ -90,7 +90,7 @@ internal class OznLexer(private val source: String) {
             }
         }
         if (pos >= source.length) throw OznParseException("unterminated string literal at line $ln")
-        pos++ // consume the closing quote
+        pos++
         return OznToken(OznTokenKind.STRING, sb.toString(), ln)
     }
 
@@ -102,7 +102,7 @@ internal class OznLexer(private val source: String) {
             pos + 1 < source.length && source[pos + 1].isDigit()
         ) {
             isFloat = true
-            pos++ // dot
+            pos++
             while (pos < source.length && source[pos].isDigit()) pos++
         }
         // Optional exponent `e`/`E` with an optional sign and at least one digit; a trailing `e` with no

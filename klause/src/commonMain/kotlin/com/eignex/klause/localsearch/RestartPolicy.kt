@@ -48,11 +48,10 @@ class FixedCadenceRestart(
 }
 
 /** Perturbation strategy used by [IteratedLocalSearchRestart] when kicking out of a
- *  local optimum. [Uniform] is the original behaviour (random vars across the whole
- *  problem). [BasinHopping] focuses the kick on a randomly-picked factor's neighbourhood
- *  — every variable touched by that factor is randomised — producing a coordinated
- *  multi-variable jump more likely to land in a different basin than scattered single
- *  flips would. */
+ *  local optimum. [Uniform] re-randomises random vars across the whole problem.
+ *  [BasinHopping] kicks the scopes of randomly-picked factors — every Boolean of a picked
+ *  factor is flipped and every int redrawn — producing a coordinated multi-variable jump more
+ *  likely to land in a different basin than scattered single flips would. */
 enum class PerturbationKind {
     /** Re-randomise a uniform random subset of variables. */
     Uniform,
@@ -63,8 +62,8 @@ enum class PerturbationKind {
 
 /**
  * Copy [anchor] into [state]'s assignment, apply [perturbationStrength] mutations
- * according to [kind], then recompute the cost. Shared between [AdaptivePerturbationRestart]
- * and [IteratedLocalSearchRestart].
+ * according to [kind], re-apply the assumption pins, then recompute the cost. Shared by
+ * [AdaptivePerturbationRestart], [StagnationRestart] and [IteratedLocalSearchRestart].
  */
 internal fun anchorAndPerturb(
     state: LocalSearchState,
@@ -83,8 +82,6 @@ internal fun anchorAndPerturb(
             }
 
             PerturbationKind.BasinHopping -> {
-                // Pick `perturbationStrength` factors at random; randomise every variable in each
-                // factor's scope, for a coordinated kick across a single decision-graph subregion.
                 val numFactors = problem.numFactors
                 if (numFactors == 0) {
                     repeat(perturbationStrength) { kickRandomVar(state) }
@@ -127,8 +124,7 @@ private fun kickRandomVar(state: LocalSearchState) {
  *    to `bestSoFar`. Higher values widen the search neighbourhood (closer to a full
  *    restart); lower values stay close to the anchor.
  *
- *  Falls back to a full random restart when `bestSoFar` is null (i.e. no feasible
- *  sample has been seen yet — we have nothing to anchor to).
+ *  Falls back to a full random restart when `bestSoFar` is null.
  */
 class AdaptivePerturbationRestart(val maxFlipsBeforeRestart: Int = 10_000, val perturbationStrength: Int = 5) :
     RestartPolicy {
@@ -194,12 +190,13 @@ class StagnationRestart(
 /**
  * Luby–Sinclair–Zuckerman restart schedule: cadence follows the Luby sequence
  * `1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, …`, each term scaled by [unit] flips.
- * Universally optimal in expectation for Las Vegas algorithms with unknown runtime
- * distribution — short bursts dominate, but occasional long runs let a hard subproblem
- * converge.
+ * Within a logarithmic factor of the optimal restart schedule for a Las Vegas algorithm with
+ * unknown runtime distribution — short bursts dominate, but occasional long runs let a hard
+ * subproblem converge. M. Luby, A. Sinclair, D. Zuckerman, "Optimal speedup of Las Vegas algorithms",
+ * Information Processing Letters 47, 1993, https://doi.org/10.1016/0020-0190(93)90029-9.
  *
- * `factorWeights` and DDFW-style learnt state survive (`state.restart()` doesn't touch
- * them); only the assignment, `lastTouched`, and `step` reset.
+ * Learnt `factorWeights` survive (`state.restart()` doesn't touch them); only the assignment,
+ * the tabu clock and the configuration-checking flags reset.
  */
 class LubyRestart(val unit: Int = 100) : RestartPolicy {
     private val luby = LubyIterator()

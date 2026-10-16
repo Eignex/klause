@@ -143,6 +143,9 @@ private const val DEFAULT_TOLERANCE = 1e-9
  *  Fibonacci numbers, which pass 2⁴⁰ by the sixtieth. */
 private const val MAX_TERMS = 64
 
+// Denominator bound for rational reconstruction of a refined iterate, following Gleixner, Steffy and Wolter,
+// "Iterative Refinement for Linear Programming", INFORMS J. Comput. 28(3), 2016,
+// https://doi.org/10.1287/ijoc.2016.0692.
 internal fun reconstructionDenominator(
     violation: BigFraction,
     correction: BigFraction,

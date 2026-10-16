@@ -2,7 +2,7 @@ package com.eignex.klause.util
 
 /**
  * Primitive Int deque backed by a growing power-of-two ring buffer. End operations
- * are amortized O(1); `*OrSentinel` variants use caller-provided empty sentinels.
+ * are amortized O(1); [removeFirstOr] returns a caller-provided sentinel when empty.
  * Not thread-safe.
  */
 internal class IntArrayDeque(initialCapacity: Int = 8) {

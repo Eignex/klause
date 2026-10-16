@@ -13,13 +13,8 @@ internal class SymmetricAllDifferentPropagator(
     private val indexOffset: Int,
 ) : Propagator {
 
-    /**
-     * Advisor subscription: `propagate` reads only each variable's `min`/`max` — it tightens
-     * into the index range, detects clashes among already-fixed variables, and forces the involution
-     * mirror of a fixed variable. An interior hole moves no bound and fixes nothing, so the factor
-     * subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] per variable and skips interior
-     * `VALUE_REMOVED` wakes (fixing collapses both bounds, so it is covered).
-     */
+    // Reads only bounds: an interior hole moves no bound and fixes nothing (fixing collapses both bounds),
+    // so interior `VALUE_REMOVED` wakes are skipped.
     override val initialIntEventWatches: IntArray = run {
         val distinct = intVars.toHashSet()
         val out = IntArray(distinct.size * 2)
@@ -33,7 +28,6 @@ internal class SymmetricAllDifferentPropagator(
 
     // The variables the last failed [propagate] rests on: two fixed to one value, or a fixed one and the mirror
     // it could not pin.
-
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         state.propagatorFailures[this]?.let { state.composeIntVarAtomAntecedents(it) }
             ?: collectLinearTightenAntecedents(state, xs, excludeIdx = -1, extraLit = 0)

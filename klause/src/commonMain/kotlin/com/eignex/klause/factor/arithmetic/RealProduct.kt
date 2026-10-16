@@ -23,9 +23,12 @@ import com.eignex.klause.propagation.NoPropagator
  *    leaf relaxation models the product **exactly**, and the leaf feasibility verdict over it is sound.
  *  - **Free** (a wider domain, e.g. the root/persistent build) the four McCormick envelope inequalities
  *    over `[lo, hi] × [realOperandLo, realOperandHi]` — a valid outer relaxation that tightens the node
- *    bound and can prove infeasibility, but never certifies the product exactly. Emitted only when the
- *    real operand's bounds are finite (an unbounded envelope has no valid linear form; the product is
- *    then simply absent from the relaxation there, a sound weakening).
+ *    bound and can prove infeasibility, but never certifies the product exactly. Emitted only when both
+ *    integer bounds are stated by the model and the real operand's bounds are finite; otherwise the
+ *    product is absent from the relaxation there, a sound weakening.
+ *
+ * McCormick, "Computability of global solutions to factorable nonconvex programs: Part I — Convex
+ * underestimating problems", Math. Programming 10, 1976, https://doi.org/10.1007/BF01580665.
  */
 class RealProduct(
     /** Integer CP operand variable id. */
@@ -55,8 +58,8 @@ class RealProduct(
 
     private fun buildKey(sink: KeySink) {
         sink.intVar(intOperand)
-        // Keyed so two products over the same integer operand but different real operands / results /
-        // envelopes do not collide into a false symmetry.
+        // Two products over the same integer operand but different real operands, results or envelopes
+        // must not collide into a false symmetry.
         sink.realVar(realOperand)
         sink.realVar(result)
         sink.long(realOperandLo.toRawBits())

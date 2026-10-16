@@ -23,9 +23,8 @@ import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 
 /**
- * CP propagator for [Cumulative]. Constructed by the propagation projection and holds the
- * time-tabling and Θ-tree edge-finding logic so those data structures are only allocated
- * when a CP engine is initialised.
+ * CP propagator for [Cumulative]: energetic reasoning, profile-based height pruning, Θ-tree edge-finding
+ * in both directions, and time-tabling.
  *
  * Each deduction cites only the tasks it rests on, recorded lazily and built when conflict analysis reads it
  * from the bounds as they stood ([explain]): a time-table shave the compulsory parts that block the skipped
@@ -144,9 +143,8 @@ internal class CumulativePropagator(
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         state.propagatorFailures.remove(this)
         if (n == 0) return true
-        // Energetic-reasoning pass runs first and on variable durations/heights/capacity — unlike the
-        // time-tabling / edge-finding below it does not need a fully fixed snapshot, so it is the only
-        // filtering that fires while resource demands or durations are still ranges.
+        // The energetic and profile-height passes do not need a fixed duration/demand/capacity snapshot, so
+        // they are the only filtering that fires while those are still ranges.
         if (!energeticNaivePass(state)) return false
         if (!profileHeightPass(state)) return false
         val eff = effectiveSnapshot(state) ?: return true
@@ -224,7 +222,8 @@ internal class CumulativePropagator(
         if (capacityVar < 0) capacity else state.intDomains[capacityVar].max
 
     /**
-     * Naive energetic reasoning (after Baptiste–Le Pape–Nuijten). For
+     * Naive energetic reasoning (after P. Baptiste, C. Le Pape and W. Nuijten, "Constraint-Based
+     * Scheduling", Springer 2001, https://doi.org/10.1007/978-1-4615-1479-4). For
      * the running window `[xMin, xMax]` spanned by the tasks seen so far in non-decreasing latest
      * completion order, every such task's whole execution lies inside the window, so their minimum
      * energies sum to at most `capacity · |window|`. That bounds the current task's resource height

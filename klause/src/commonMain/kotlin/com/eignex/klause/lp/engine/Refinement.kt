@@ -88,7 +88,7 @@ internal data class LpRefinementMetrics(
     val elapsed: Duration = Duration.ZERO,
     val decline: LpRefinementDecline? = null,
 ) {
-    // These counters and the later call's summed, with its decline.
+    // Sums both calls' counters and keeps the later call's decline.
     fun plus(later: LpRefinementMetrics): LpRefinementMetrics = LpRefinementMetrics(
         eligible = eligible || later.eligible,
         strictAttempts = strictAttempts + later.strictAttempts,
@@ -927,7 +927,7 @@ private class RefinementRun(
     ) {
         checkBasis(a.model, basis, cache, output)
         if (a === source && output.attained) return
-        // The public bound package deliberately contains no raw BTRAN vector.
+        // The basis check returns no raw BTRAN vector, so the exact duals are solved from the cached factors.
         exactVectors(a, basis, cache, allowBuild = false) { authority, factors, budget ->
             budget.phase = ExactBasisPhase.DUAL
             output.dual = exactSolve(factors, authority.costs, true, budget)
@@ -1311,6 +1311,9 @@ private fun exactRecession(
     return ExactLpUnboundedness(point, integralRay.take(a.source.n))
 }
 
+// Iterative refinement: each round solves a scaled residual LP in floating point and corrects the exact iterate.
+// Gleixner, Steffy and Wolter, "Iterative Refinement for Linear Programming", INFORMS J. Comput. 28(3), 2016,
+// https://doi.org/10.1287/ijoc.2016.0692.
 @Suppress("TooGenericExceptionCaught")
 internal fun refineLp(
     model: LpModel,

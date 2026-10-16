@@ -150,13 +150,13 @@ internal class LinearInvariant(
     }
 
     /** Self-preserving move suggestions during objective descent. For [LinearOp.EQ] the
-     *  natural structured move is a pair-shift `(IntSet(a, va-Δ), IntSet(b, vb+Δ))` chosen
-     *  so `coeffs[a]·Δa + coeffs[b]·Δb = 0` — the equality stays satisfied while the
+     *  natural structured move is a pair-shift `(IntSet(a, va+Δa), IntSet(b, vb+Δb))` chosen
+     *  so `coeffs(a)·Δa + coeffs(b)·Δb = 0` — the equality stays satisfied while the
      *  individual var values change. This is the heart of "swap one item between bins"
      *  for exactly-one decompositions and the analogous "shift Δ between two summed
-     *  vars" for weighted equalities. For LE/GE we propose unilateral shifts that
-     *  consume / restore slack; the engine scores each by objective delta and applies
-     *  the best feasibility-preserving one.
+     *  vars" for weighted equalities. For LE/GE we propose unilateral shifts within the
+     *  slack; the engine scores each by objective delta and applies the best
+     *  feasibility-preserving one.
      *
      *  Bounded: we sample up to [PAIR_SAMPLE_CAP] random pairs (or all of them when the
      *  factor's arity is small) rather than enumerate Θ(n²) which would dominate the
@@ -170,10 +170,10 @@ internal class LinearInvariant(
         }
     }
 
-    /** EQ pair-shift: for each sampled pair (a, b) with non-zero coefficients, propose
-     *  the smallest integer Δ such that `coeffs[a]·Δ = -coeffs[b]·Δ'` for some integer
-     *  Δ' that fits both vars' domains. Equal-coefficient case (e.g. exactly-one decomp
-     *  with all c=1) collapses to a 0/1 value swap. */
+    /** EQ pair-shift: for each sampled pair (a, b) with non-zero coefficients and each
+     *  `Δa ∈ {-1, +1}`, propose the compound move when `Δb = -coeffs(a)·Δa / coeffs(b)` is an
+     *  integer and both new values lie in their domains. Equal-coefficient case (e.g.
+     *  exactly-one decomp with all c=1) collapses to a 0/1 value swap. */
     private fun proposeEqPairShifts(state: LocalSearchState, sink: MoveSink) {
         val n = vars.size
         val tryPair = { a: Int, b: Int ->
@@ -182,9 +182,6 @@ internal class LinearInvariant(
             if (ca != 0L && cb != 0L) {
                 val va = state.assignment.intValue(vars[a])
                 val vb = state.assignment.intValue(vars[b])
-                // For each Δ ∈ {-1, +1}, the matching Δb is -ca/cb · Δa; if integer and in
-                // domain on both sides, propose the compound. Covers the common pure-bool
-                // exactly-one decomposition (ca=cb=1, swap 0/1).
                 for (delta in intArrayOf(-1, 1)) {
                     if (cb == 0L) continue
                     val needNumerator = -ca * delta
@@ -205,7 +202,6 @@ internal class LinearInvariant(
                 }
             }
         }
-        // Exhaustive on small arity; sampled on large.
         if (n * (n - 1) / 2 <= PAIR_SAMPLE_CAP) {
             for (a in 0 until n) for (b in a + 1 until n) tryPair(a, b)
         } else {
@@ -220,11 +216,10 @@ internal class LinearInvariant(
         }
     }
 
-    /** LE/GE slack-aware shifts: when slack > 0, propose individual var moves whose
-     *  direction consumes some slack. For LE: `sum ≤ bound` has slack `bound - sum`;
-     *  we can increase any var with positive coefficient or decrease any with negative
-     *  coefficient by up to floor(slack / |c|). For GE: symmetric. Single-var moves —
-     *  not pairs — since the inequality direction lets us absorb the delta in slack. */
+    /** LE/GE slack-aware shifts: when slack > 0, move each var by `floor(slack / |c|)` in the
+     *  direction that grows the slack (for LE `sum ≤ bound`, decrease a positive-coefficient
+     *  var or increase a negative one; GE mirrored), clamped to its domain. The move keeps the
+     *  row satisfied, so single-var moves suffice and the engine scores them by objective delta. */
     private fun proposeBoundedSlackShifts(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val curSum = state.longPayload[factorId]
         val slack = when (op) {
@@ -242,8 +237,6 @@ internal class LinearInvariant(
             val maxStep = slack / absC
             if (maxStep <= 0L) return@inner
             val dom = state.rootDomains[v]
-            // For LE: positive c → decrease v (frees more slack), negative c → increase v.
-            // For GE: opposite. Either way, the move stays feasible because |Δ·c| ≤ slack.
             val direction = when (op) {
                 LinearOp.LE -> if (c > 0) -1 else 1
                 LinearOp.GE -> if (c > 0) 1 else -1

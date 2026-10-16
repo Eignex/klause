@@ -15,7 +15,6 @@ fun reifiedIntCompare(auxBoolVar: Int, intVar: Int, op: IntCmpOp, bound: Int): R
     val (linOp, adjustedBound) = when (op) {
         IntCmpOp.LE -> LinearOp.LE to bound
 
-        // bound ∓ 1 widened to Long so a bound at Int.MIN/MAX doesn't wrap.
         IntCmpOp.LT -> LinearOp.LE to checkedBound(bound.toLong() - 1, op, bound)
 
         IntCmpOp.GE -> LinearOp.GE to bound

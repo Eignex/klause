@@ -27,8 +27,8 @@ internal class IndexedMaxHeap(val capacity: Int) {
         siftUp(size - 1)
     }
 
-    /** Push id back in at its stored key. Used after [extractMax] / [remove] when the
-     *  caller couldn't use the popped id and wants it back in contention. */
+    /** Reinsert [id] at its stored key, e.g. after [extractMax] / [remove] popped an id the caller
+     *  could not use. */
     fun restore(id: Int) {
         if (pos[id] >= 0) return
         heap[size] = id
@@ -86,18 +86,16 @@ internal class IndexedMaxHeap(val capacity: Int) {
         siftUp(p)
     }
 
-    /** Scale every key by [factor] in place. O(n). Used by VSIDS-style rescales. Heap order
-     *  is preserved by a uniform positive multiplier so no resifting is needed. */
+    /** Scale every key by [factor] in place in O(n). A uniform positive multiplier preserves heap
+     *  order, so no resifting is needed. */
     fun scaleKeys(factor: Double) {
         require(factor > 0.0) { "scale factor must be positive, got $factor" }
         for (i in 0 until capacity) keys[i] *= factor
     }
 
-    /** Reset every id's key to [value] and rebuild the heap in ascending id order, so
-     *  equal-key ties resolve to the lowest id — the deterministic tie-break the variable pickers
-     *  (ABS, DomWdeg) depend on after a key reset. Requires `size == capacity` —
-     *  callers in the variable-picker world hold the full set between picks (skip buffers
-     *  get restored before pick returns). O(n). */
+    /** Reset every id's key to [value] and rebuild the heap in ascending id order in O(n), so
+     *  equal-key ties resolve to the lowest id deterministically. Requires `size == capacity`: callers
+     *  restore skipped ids before a pick returns, so the heap holds the full set between picks. */
     fun resetAllKeysInIdOrder(value: Double) {
         require(size == capacity) {
             "resetAllKeysInIdOrder requires full heap (size=$size, capacity=$capacity)"

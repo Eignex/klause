@@ -13,18 +13,19 @@ import com.eignex.klause.util.addExact
 
 /**
  * Knapsack cover cuts for a `Σ w_i·x_i ≤ b` PseudoBoolean row with positive weights over
- * 0/1 variables — the shape the dropped `Knapsack` factor decomposes to, so these recover its
- * strength. A *cover* `C` is a set of items with `Σ_{C} w_i > b`: no feasible 0/1 point can set all of
+ * 0/1 variables. A *cover* `C` is a set of items with `Σ_{C} w_i > b`: no feasible 0/1 point can set all of
  * `C`, so `Σ_{i∈C} x_i ≤ |C| − 1` is a valid inequality. Separation finds a violated cover greedily by
  * fractional value: take the highest-`x*` items until their weight exceeds `b`; if the resulting
  * cover's `Σ x*` exceeds `|C| − 1` the cut is violated and emitted. The cover is then minimised and
  * **lifted**: every non-cover variable is up-lifted by sequential lifting — its coefficient is
  * `αₖ = (|C| − 1) − max{ Σ aᵢxᵢ : Σ wᵢxᵢ ≤ b − wₖ }` over the already-lifted items, where the max is a
- * small DP. When an at-most-one clique graph is present (binary clauses / AMO factors), the max is
- * solved as a GUB knapsack (at most one item per clique), shrinking it and so strengthening the lift —
+ * small DP (Crowder, Johnson and Padberg, "Solving large-scale zero-one linear programming problems",
+ * Oper. Res. 1983, https://doi.org/10.1287/opre.31.5.803). When an at-most-one clique graph is present
+ * (binary clauses / AMO factors), the max is solved as a GUB knapsack (at most one item per clique),
+ * shrinking it and so strengthening the lift —
  * such cuts are valid in conjunction with the clique rows, which are global and in the relaxation.
- * Mixed-sign rows (negated literals or non-positive weights) are skipped — their cover form needs
- * complementing, deferred.
+ * Mixed-sign rows (negated literals or non-positive weights) are skipped, since their cover form needs
+ * complementing.
  */
 internal class KnapsackCoverSeparator : CutSeparator {
     private val tol = 1e-6

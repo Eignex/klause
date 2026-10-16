@@ -10,11 +10,14 @@ import com.eignex.klause.localsearch.schedule.WeightSchedule
 import com.eignex.klause.localsearch.scoring.MoveScoring
 
 /**
- * Feasibility-Jump / ViolationLS strategy (Davies et al., CPAIOR 2024) as a [SourceDrivenStrategy]
- * recipe pinned to the jump-and-reweight regime:
+ * Feasibility-Jump / ViolationLS strategy as a [SourceDrivenStrategy] recipe pinned to the
+ * jump-and-reweight regime (B. Luteberget, G. Sartor, "Feasibility Jump: an LP-free Lagrangian MIP
+ * heuristic", Mathematical Programming Computation 15, 2023, https://doi.org/10.1007/s12532-023-00234-8;
+ * T. O. Davies, F. Didier, L. Perron, "ViolationLS: Constraint-Based Local Search in CP-SAT", CPAIOR
+ * 2024, https://doi.org/10.1007/978-3-031-60597-0_16):
  *
  *  - **sources** = `{`[ArgminJump]`}` — every step jumps a hot-spot variable directly to its
- *    weighted-violation argmin, rather than stepping by a flip or ±1.
+ *    weighted-violation argmin, rather than stepping to an adjacent value.
  *  - **scoring** = [MoveScoring.Weighted] — the greedy descent is on the weighted-violation delta.
  *  - **acceptance** = [AcceptanceRule.Greedy] — take the most-negative weighted delta, no noise draw;
  *    FJ escapes minima by reweighting, not by a stochastic walk.
@@ -77,8 +80,6 @@ class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> M
     private var lastCost: Long = Long.MAX_VALUE
 
     override fun invoke(state: LocalSearchState): Move? {
-        // Stall tracking off the engine step counter: the window resets on a restart and on every
-        // strict cost decrease.
         if (state.step < lastSeenStep) {
             lastDropStep = state.step
             lastCost = state.cost

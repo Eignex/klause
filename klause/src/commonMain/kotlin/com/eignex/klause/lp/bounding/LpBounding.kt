@@ -96,10 +96,10 @@ internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: Propagatio
 
 /**
  * The `Σ_b contribution(b)` bool part of [linearLowerBound]. Maintained incrementally on the reversible
- * trail once installed at the root — an O(1) read instead of the O(numBoolVars) rescan that dominated
- * CPU on large pseudo-Boolean optimization; identical value either way. Before the root install is
- * possible (not at level 0), it rescans directly. Throws [CheckedLongOverflowException] via [addExact] on the
- * rescan path so the caller falls back to no bound.
+ * trail once installed at the root — an O(1) read instead of an O(numBoolVars) rescan, which matters on
+ * large pseudo-Boolean optimization. Before the root install is possible (not at level 0), it rescans
+ * directly. Throws [CheckedLongOverflowException] via [addExact] on the rescan path so the caller falls
+ * back to no bound.
  */
 private fun LpEngine.boolLowerBoundPart(obj: LinearObjective, session: PropagationSession): Long {
     if (session.installObjectiveBoolBound(obj.boolWeightValues)) return session.objectiveBoolLowerBound()
@@ -147,7 +147,7 @@ internal fun LpEngine.dualSimplex(
 
 /*
  * Source nodes use their retained scoped owner. An external model installs separate exact authority;
- * legacy models without that authority use a bounded fresh solve.
+ * models without that authority use a bounded fresh solve.
  * Warm hints apply only to a fresh solve; a retained scoped owner already has its basis factorized.
  */
 // Replacement cleanup must preserve arbitrary solve and close failures.
@@ -214,7 +214,7 @@ private fun LpEngine.observeSolveCost(sink: SolveStatsSink, solver: LpSolver) {
 }
 
 /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an
- *  optional learned nogood (the sparse path is reason-less, so it is null). */
+ *  optional learned nogood (null when learning is off or the prune has no expressible reason). */
 internal class LpNodeOutcome(val prune: Boolean, val basis: Basis?, val explanation: IntArray? = null)
 
 /*
@@ -246,10 +246,10 @@ internal class LpNogoodPool(private val cap: Int = 4096) {
 
 /**
  * LP-relaxation bounding, reduced-cost fixing and infeasibility pruning for one search node,
- * over the sparse revised-simplex pipeline (the only LP path). Builds the relaxation, solves it in
- * float, and prunes when it is infeasible (exact Farkas certificate) or its safe objective bound
- * reaches the incumbent; also propagates the objective variable and fixes reduced-cost-dominated
- * variables. Determinant overflow during the relaxation build keeps the node soundly.
+ * over the sparse revised-simplex pipeline. Builds the relaxation, solves it in float, and prunes when
+ * it is infeasible (exact Farkas certificate) or its safe objective bound reaches the incumbent; also
+ * propagates the objective variable and fixes reduced-cost-dominated variables. A 64-bit overflow
+ * during the relaxation build falls back to [sparseCertifiedPrune].
  */
 @Suppress("LongParameterList")
 internal fun LpEngine.lpBoundAndFix(
@@ -352,9 +352,12 @@ private fun LpEngine.solveSelectedCuts(
  * then the tighter of the Neumaier–Shcherbina safe bound and the certificate's integer-multiplier one
  * ([certifiedTightObjectiveLowerBound]) — both O(nnz), so the per-node cost is bounded and `-t` is honored.
  * Prunes when the relaxation is infeasible (exact Farkas certificate) or that bound reaches the
- * incumbent, tightens an ascending objective variable up to its ceiling (reason-less, a sound
- * conflict-analysis leaf), and fixes reduced-cost-dominated variables off their bounds. Any solver
- * failure keeps the node.
+ * incumbent, tightens an ascending objective variable up to its ceiling (with the reduced-cost reason
+ * when learning, otherwise reason-less), and fixes reduced-cost-dominated variables off their bounds.
+ * Any solver failure keeps the node.
+ *
+ * Safe bound: A. Neumaier and O. Shcherbina, "Safe bounds in linear and mixed-integer linear
+ * programming", Mathematical Programming 99, 2004. https://doi.org/10.1007/s10107-003-0433-3
  */
 @Suppress("LongParameterList")
 internal fun LpEngine.sparseSafePrune(
@@ -374,12 +377,10 @@ internal fun LpEngine.sparseSafePrune(
     // Gated residual fast path (pure-real satisfaction models): re-solve the persistent, structurally
     // node-invariant gated model with its kept LU factorization — a feasible node (the common case
     // along a dive) costs a few dual pivots instead of a fresh build + factorization. Any other
-    // outcome (candidate infeasibility, cancellation, a bailed solve) falls through to the per-node
-    // pin-consulting build below, whose certificates and magnitudes are unchanged. Sound as a filter:
-    // the gated rows' inactive forms are implied by the box, so the gated and active models have the
-    // same feasible set, and a feasible verdict deduces nothing the sat path needs beyond "keep" —
-    // which is why the path is taken only when there is no incumbent to prune against and no
-    // objective to propagate (the satisfaction check).
+    // outcome falls through to the per-node build below. Sound as a filter: the gated rows' inactive
+    // forms are implied by the box, so the gated and active models have the same feasible set, and a
+    // feasible verdict deduces nothing beyond "keep" — hence only when there is no incumbent to prune
+    // against and no objective to propagate.
     val satisfactionOnly = !bound.isFinite() && !(objectiveVar >= 0 && objectiveAscending)
     if (satisfactionOnly) {
         gatedResidual(session)?.let { filter ->
@@ -544,14 +545,11 @@ internal fun LpEngine.sparseSafePrune(
             is LpCutOutcome.Solved -> LpNodeOutcome(false, outcome.result.basis)
         }
     }
-    // During-search separation: at a gated shallow node, tighten this node's relaxation with the
-    // cuts its LP point violates. Global cuts are persisted into the pool (descendants inherit them);
-    // node-local cuts retain their complete source proof and follow the owner's row trail.
-    // The bound, certificate and reduced-cost fixing below read the tightened immutable relaxation.
-    // The pooled global cuts this node's LP point violates are folded in first: the
-    // most-effective, mutually-orthogonal subset chosen by CutPool.select, re-solved once. A subset of
-    // globally-valid cuts only tightens the bound, and selecting against the live point loads just the
-    // cuts that move it — bounding the per-node cut count by efficacy instead of the whole pool.
+    // Pooled global cuts the LP point violates are folded in first (see foldSelectedCuts). Then, at a
+    // gated shallow node, separation tightens the relaxation further: global cuts are persisted into
+    // the pool (descendants inherit them); node-local cuts retain their complete source proof and
+    // follow the owner's row trail. The bound, certificate and reduced-cost fixing below read the
+    // tightened immutable relaxation.
     val cutOutcome = foldSelectedCuts(session, relaxation, result, cancellation, sink, learn)
     if (cutOutcome is LpCutOutcome.Pruned) return LpNodeOutcome(true, null, cutOutcome.explanation)
     val cutSolved = cutOutcome as LpCutOutcome.Solved
@@ -1208,7 +1206,7 @@ private fun LpEngine.sourceObjectiveCutoff(
     return if (relaxation.model.hasIntegralObjective()) {
         null
     } else {
-        // A continuous source value can round to the cutoff from above, even in a small Double bin.
+        // A continuous incumbent can lie above its Double rounding in any bin; the upper neighbor encloses it.
         BigFraction.ofDouble(bound.nextUp())
     }
 }
@@ -1371,8 +1369,8 @@ internal fun LpEngine.rootLpObjective(
  * Harvest a persistent pool of **global** cuts from the root relaxation on the sparse
  * revised-simplex path. Each round solves the (cut-augmented) root LP, separates violated cuts from the
  * LP point, and keeps the fresh ones whose source proof or separator scope is global. A root box may
- * close a source-open side, so root separation alone does not make a cut global. Determinant overflow
- * keeps whatever global cuts stayed within 64 bits.
+ * close a source-open side, so root separation alone does not make a cut global. A 64-bit overflow
+ * keeps the global cuts already pooled.
  */
 @Suppress("LongParameterList", "TooGenericExceptionCaught") // root ownership must preserve arbitrary solver failures
 internal fun LpEngine.harvestRootCuts(
@@ -1502,7 +1500,8 @@ internal const val SEARCH_CUT_ROUNDS: Int = 4
  */
 internal const val LP_HARVEST_MAX_RELAXATION_COST = 250_000L
 
-/** Inward relative rhs perturbation applied to strict rows for the float filter solve. */
+// Exact solve for a relaxation with strict rows: prunes on an exact infeasibility verdict or a lower bound
+// reaching the cutoff; null defers to the float path.
 private fun LpEngine.strictSourcePrune(
     relaxation: LpRelaxation,
     session: PropagationSession,
@@ -1559,6 +1558,7 @@ private fun LpEngine.strictSourcePrune(
     return null
 }
 
+/** Inward relative rhs perturbation applied to strict rows for the gated float filter solve. */
 private const val STRICT_FILTER_EPS = 1e-7
 
 /** [this] model, with an exact pass over it charged to [engine]: the certificates below work in rationals. */

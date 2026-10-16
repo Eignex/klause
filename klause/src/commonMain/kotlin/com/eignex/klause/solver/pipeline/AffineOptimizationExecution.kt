@@ -7,7 +7,7 @@ import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 /**
  * Optimize an affine source objective with exact rational or algebraic results.
  * The quadratic source executor preserves attainment, strict limits and objective direction.
- * [minimize] retains the finite-objective API; this entry point also accepts continuous costs.
+ * [minimize] rejects continuous objective costs; this entry point accepts them.
  */
 fun OpenTheoryPipeline.optimize(
     request: PolynomialTheoryRequest,

@@ -11,9 +11,6 @@ package com.eignex.klause.util
  * escapes (e.g. SMT-LIB's `""` embedded quote).
  */
 class CharReader(private val source: CharSource) {
-    // The live window of pulled-but-not-yet-dropped characters; `pos` is the read cursor within it.
-    // Consumed prefix is periodically dropped (see [compact]) so the buffer tracks the lookahead window,
-    // not the whole input.
     private val buf = StringBuilder()
     private var pos = 0
     private var drained = false
@@ -29,8 +26,7 @@ class CharReader(private val source: CharSource) {
         return if (want < buf.length) buf[want].code else -1
     }
 
-    /** Consume one character, advancing the cursor. Compacts the buffer once the consumed prefix grows,
-     *  so long inputs never accumulate. */
+    /** Consume one character, compacting the buffer once the consumed prefix grows. */
     fun advance() {
         pos++
         if (pos >= COMPACT_THRESHOLD) compact()
@@ -39,7 +35,6 @@ class CharReader(private val source: CharSource) {
     /** True once the cursor has reached end of input. */
     fun eof(): Boolean = peek() < 0
 
-    // Drop the consumed prefix so the buffer holds only the live (unread) tail.
     private fun compact() {
         buf.deleteRange(0, pos)
         pos = 0

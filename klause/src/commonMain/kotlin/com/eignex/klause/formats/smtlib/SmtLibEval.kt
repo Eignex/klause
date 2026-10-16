@@ -21,14 +21,7 @@ import com.eignex.klause.util.maxOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.math.abs
 
-/**
- * Iterative evaluator for SMT-LIB terms: folds an [SExpr] tree into either a boolean literal or an
- * integer [LinComb], driven by an explicit heap work-stack rather than the call stack. SMT-LIB
- * formulas nest thousands of operators deep, so a recursive `compileBool`/`linearTerm` overflows the
- * JVM stack on degenerate input; this keeps the whole descent on the heap. `let` scoping is handled
- * inline via [Frame.MakeScope]/[Frame.PopScope] frames (never a nested [evalTerm] call), so even a
- * deeply nested chain of `let`-bound values stays off the stack.
- */
+/** The sort a term is folded to by [evalTerm]. */
 internal enum class Sort { BOOL, INT, REAL }
 
 /** A folded term result: a boolean literal ([B]), an integer linear combination ([I]), or a real
@@ -63,7 +56,12 @@ private sealed interface Frame {
     object PopScope : Frame
 }
 
-/** Fold [root] to a [Res] of the requested [sort] with no unbounded call-stack recursion. */
+/**
+ * Fold [root] to a [Res] of the requested [sort], driven by an explicit heap work-stack rather than the
+ * call stack: SMT-LIB formulas nest thousands of operators deep, which overflows the stack under
+ * recursion. `let` scoping is handled inline via [Frame.MakeScope]/[Frame.PopScope] frames, so deeply
+ * nested `let` chains stay off the stack too.
+ */
 internal fun Compiler.Builder.evalTerm(root: SExpr, sort: Sort): Res {
     val work = ArrayDeque<Frame>()
     val vals = ArrayDeque<Res>()
@@ -425,7 +423,7 @@ private fun Compiler.Builder.combineInt(head: String, args: List<Res>): Res = wh
     else -> smtUnsupported("unsupported int op '$head'")
 }
 
-/** `div`/`mod` on the 64-bit path when both operands fit it, at arbitrary precision otherwise. */
+/** Integer `div`/`mod` with SMT-LIB's Euclidean semantics. */
 private fun Compiler.Builder.divModRes(a: IntComb, b: IntComb, quotient: Boolean): Res =
     Res.I(wideDivModTerm(a, b, quotient))
 
@@ -502,7 +500,7 @@ private fun absHi(lo: Long?, hi: Long?): Long? {
 }
 
 /** The value range `[lo, hi]` of [lin] over the current presolve domains; a side is null when
- *  unbounded (an open domain or an arithmetic overflow) — infinity is structural, no `±Long/4`. */
+ *  unbounded (an open domain or an arithmetic overflow). */
 internal fun Compiler.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
     var lo: Long? = lin.constant
     var hi: Long? = lin.constant

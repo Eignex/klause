@@ -6,10 +6,10 @@ import com.eignex.klause.util.MutableLongIntMap
 
 /**
  * Per-literal wakeup index for factors opting into [Propagator.initialBoolWatchers], plus the
- * blocking-literal and back-pointer companions held in lockstep. Mutation lives in
- * `Watches.kt` (`installLitWatch` / `moveBoolWatcher`) and the `forgetLearnedClauses` compaction.
+ * blocking-literal and back-pointer companions held in lockstep. Mutation lives in `installLitWatch`,
+ * `moveBoolWatcher` / `removeBoolWatch` and the `forgetLearnedClauses` compaction.
  *
- * Like `refPayload`, the index drifts across snapshot / restore on purpose. After a pop the watches
+ * The index drifts across snapshot / restore on purpose. After a pop the watches
  * reflect their state at the deepest level reached — that's still sound, since the invariant is
  * "watch is on a non-false literal", and pop reverts pins which only *adds* non-false literals.
  */
@@ -41,15 +41,15 @@ internal class BoolWatcherIndex(
         preparedBlockers ?: Array(2 * numBoolVars) { IntArrayList(initialCapacity = 2) }
 
     /**
-     * Back-pointer index for O(1) `moveBoolWatcher` removal: maps `pack(fid, lit)` to
+     * Back-pointer index for O(1) watch removal: maps `pack(fid, lit)` to
      * `fid`'s position inside `byLit[lit]`, so removing a moved watch is a swap-pop at a known
      * index instead of a linear scan of a possibly-long popular-literal list.
      *
      * Kept in sync at every list mutation: `installLitWatch` records the appended position,
-     * `moveBoolWatcher` swap-pops and fixes the swapped element's recorded position, and
+     * `removeBoolWatch` swap-pops and fixes the swapped element's recorded position, and
      * `forgetLearnedClauses` rebuilds it wholesale after compacting/remapping the lists.
      *
-     * Correctness guard: `moveBoolWatcher` verifies `list[pos] == fid` before swap-popping and
+     * Correctness guard: `removeBoolWatch` verifies `list[pos] == fid` before swap-popping and
      * falls back to the linear scan on any mismatch — a desynced index can never silently remove
      * the wrong watcher.
      */

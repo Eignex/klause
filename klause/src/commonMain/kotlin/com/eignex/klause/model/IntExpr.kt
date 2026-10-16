@@ -141,7 +141,3 @@ data class SetCard(
 // Boolean expressions. The compiler reads each [BoolExpr] as a presence literal, threads
 // it into the corresponding factor's `presents: IntArray`, and the factor handles the
 // rest natively (see [com.eignex.klause.factor.OptPresence]).
-//
-// AllDifferentOpt over zero or one present element is trivially true and emits no factor;
-// the constructor still requires `terms.size >= 2` because the compiler uses the same
-// pair-by-pair pigeonhole guard as the non-opt form for non-empty cases.

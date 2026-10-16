@@ -147,7 +147,7 @@ object PresolvePipeline {
         }
         val objective = linearObjective ?: LinearObjective()
 
-        // Coefficient strengthening ran first in the source phase — before [RootBaker.reseed] forces the
+        // Coefficient strengthening runs in the source phase, before [RootBaker.reseed] forces the
         // root bake: a gcd-indivisible equality is infeasible regardless of the (possibly very wide)
         // variable bounds, so it is caught in O(factors). The bake would otherwise narrow it toward the
         // empty domain one step per round — O(span) on a wide clamped domain — before any pass runs.
@@ -156,7 +156,7 @@ object PresolvePipeline {
         // difference cycle `x < y ∧ y < x`) in O(one LP solve) — before [RootBaker.reseed]'s bound
         // propagation would grind it out one step per round (O(span)). [lpRootInfeasible] builds the root
         // relaxation straight from the declared domains (no bake fixpoint) and certifies infeasibility via
-        // an exact Farkas ray; a true result contains every integer solution, so it is the same verdict the
+        // an exact Farkas ray; the relaxation contains every integer solution, so it is the same verdict the
         // bake would reach. Coupled wide columns can feed repeated bound narrowing; an isolated
         // wide output with bounded integer inputs uses the ordinary bake instead.
         val sourceProjections = projections?.forEngineView(sourceProblem)
@@ -190,11 +190,11 @@ object PresolvePipeline {
             ).also { it.mapping = prepared.mapping }
         }
 
-        // On a wide but feasible domain the LP still can't be skipped like the infeasible case, but its
-        // optimum-based bound tightening (OBBT, [lpRootBounds]) collapses each variable's clamped domain in
-        // one solve per bound — so the root bake starts from the tightened domains instead of narrowing them
-        // one step per round (O(span)). Solution-set-preserving, so it is sound before the bake. Gated on
-        // coupled wide columns so bounded inputs of an isolated output use ordinary propagation.
+        // On a wide but feasible domain the LP's optimization-based bound tightening (OBBT, [lpRootBounds])
+        // collapses each variable's clamped domain in one solve per bound — so the root bake starts from the
+        // tightened domains instead of narrowing them one step per round (O(span)). Solution-set-preserving,
+        // so it is sound before the bake. Gated on coupled wide columns so bounded inputs of an isolated
+        // output use ordinary propagation.
         val rootBounds = if (wideCoupling) {
             lpRootBoundsReporting(
                 sourceProblem,
@@ -282,7 +282,7 @@ object PresolvePipeline {
         // re-runs it. So when no pass fired ([current] === [seeded]) and neither the OBBT pre-bake ([prebaked]
         // === [sourceProblem]) nor the probing reseed ([seeded] === [baked]) tightened anything beyond that base
         // fold, report no change and let the caller keep its raw problem — preserving object identity for a
-        // genuine no-op presolve, exactly as an already-baked input did before the bake became a fresh type.
+        // genuine no-op presolve.
         val onlyBaseBake = current === seeded && prebaked === sourceProblem && seeded === baked
         // The joint difference system is appended here rather than by a round pass: it mentions every
         // variable its edges touch, so between rounds it would hold those variables against affine
@@ -296,9 +296,8 @@ object PresolvePipeline {
         if ((current === sourceProblem || onlyBaseBake) && sourceProblem === problem && !infeasible &&
             posted === reduced
         ) {
-            // The step-0 bake still ran, and reporting it as zero leaves its cost folded into the phase
-            // total. That mis-attribution lands on exactly the runs anyone would investigate, since
-            // "presolve changed nothing" is what makes a run interesting in the first place.
+            // The step-0 bake still ran; reporting its time keeps that cost from being misattributed to
+            // the rest of the phase on a no-op presolve.
             return PresolveOutcome(
                 problem,
                 { it },

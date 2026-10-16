@@ -75,7 +75,7 @@ class TieredVariableSelector(
     val fallback: VariableSelector,
 ) : VariableSelector {
 
-    // Built per problem from its int_search annotation, then used for one search; not reused.
+    // Built per problem from its search annotations, then used for one search; not reused.
     override fun fresh() = this
 
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
@@ -173,8 +173,8 @@ class TieredVariableSelector(
 /**
  * Per-tier value ordering companion to [TieredVariableSelector]: variables owned by a
  * tier use that tier's [SearchTier.valueSelector]; everything else uses [fallback].
- * Hooks broadcast to every tier heuristic plus the fallback so stateful wrappers
- * (solution-guided, impact) stay coherent regardless of which tier consulted them.
+ * Conflict and commit hooks go to the owning selector; restart and solution hooks broadcast to
+ * every tier heuristic plus the fallback so stateful wrappers (solution-guided, impact) stay coherent.
  */
 class TieredValueSelector(
     /** The search phases, in ownership-priority order. */

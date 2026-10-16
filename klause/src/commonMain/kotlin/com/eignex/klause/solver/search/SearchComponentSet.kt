@@ -17,7 +17,7 @@ class SearchComponentSet(
     private val branchers: List<SearchBrancher> = emptyList(),
     proposals: List<SearchBranchProposal>,
 ) {
-    /** Retain the installed-component and legacy brancher ordering. */
+    /** A set with no separate branch proposals. */
     constructor(components: List<SearchComponent>, branchers: List<SearchBrancher> = emptyList()) :
         this(components, branchers, emptyList())
 

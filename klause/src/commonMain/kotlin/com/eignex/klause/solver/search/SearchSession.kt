@@ -22,7 +22,7 @@ class SearchSession(
     proposals: List<SearchBranchProposal>,
 ) : SearchContext,
     ClauseWatchHost {
-    /** Open a session with cancellation-only controls and the existing native traversal defaults. */
+    /** Open a session with cancellation-only controls and no separate branch proposals. */
     constructor(
         components: List<SearchComponent>,
         maxChecks: Long = Long.MAX_VALUE,
@@ -40,7 +40,7 @@ class SearchSession(
         SearchExecutionControlAdapter(cancellation),
     )
 
-    /** Open a session with explicit execution controls and the existing proposal order. */
+    /** Open a session with explicit execution controls and no separate branch proposals. */
     constructor(
         components: List<SearchComponent>,
         maxChecks: Long = Long.MAX_VALUE,
@@ -469,7 +469,8 @@ class SearchSession(
      * Components use this for certificates such as a guarded difference-logic negative cycle. The
      * analyzer resolves latest implied literals at the conflict level through their trailed reasons
      * until one first-UIP literal remains. Retracting to the second-highest level then makes that
-     * literal unit.
+     * literal unit (Zhang, Madigan, Moskewicz and Malik, "Efficient Conflict Driven Learning in a
+     * Boolean Satisfiability Solver", ICCAD 2001, https://doi.org/10.1109/ICCAD.2001.968634).
      */
     internal fun explainedConflict(explanation: SearchExplanation?): SearchConflictResolution? {
         var clause = namedExplanation(explanation)?.literals?.toList() ?: return null
@@ -630,7 +631,7 @@ class SearchSession(
     }
 
     /**
-     * Compatibility verdict surface for callers that use only Boolean decisions.
+     * Verdict surface for callers that use only Boolean decisions.
      *
      * The traversal itself is [solve], so Boolean, finite, hybrid, and theory-only configurations share
      * one engine and one restart/budget lifecycle.
@@ -644,8 +645,8 @@ class SearchSession(
     /**
      * Drive Boolean and component-provided decisions through one shared search loop.
      *
-     * Boolean variables are selected first for compatibility with the existing SAT and theory
-     * fragments. Once they are assigned, a [SearchBrancher] may split its remaining local state.
+     * Boolean variables are split first. Once they are assigned, a [SearchBrancher] may split its
+     * remaining local state.
      * A component with no branch is expected to decide its residual in [SearchComponent.check].
      *
      * [candidateHints] steer which side of a Boolean split is tried first and nothing else, so the

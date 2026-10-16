@@ -7,7 +7,7 @@ import com.eignex.klause.util.times
 import kotlin.math.abs
 import kotlin.math.max
 
-/** Primal and dual feasibility tolerance of float LP evidence, the HiGHS default. */
+/** Primal and dual feasibility tolerance of float LP evidence. */
 internal const val FLOAT_EVIDENCE_TOLERANCE: Double = 1e-7
 
 // Unit roundoff of binary64: a reduced cost summed from k terms, each a double standing in for an exact cost or

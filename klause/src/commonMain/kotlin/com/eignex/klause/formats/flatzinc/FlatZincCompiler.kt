@@ -32,7 +32,7 @@ internal class FlatZincCompiler(
     internal val model: FznModel,
     internal val floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
     internal val floatScale: Long = DEFAULT_FLOAT_SCALE,
-    /** When true, skip redundant/symmetry annotations for LS-track behavior. */
+    /** When true, drop `redundant_constraint` / `symmetry_breaking_constraint` wrappers for local search. */
     internal val forLocalSearch: Boolean = false,
     /** Default domain for unbounded `var int` declarations. */
     internal val unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
@@ -140,8 +140,8 @@ internal class FlatZincCompiler(
         } else {
             BooleanArray(factors.size).also { mask -> impliedFactorIds.forEach { i -> mask[i] = true } }
         }
-        // A plain base-baked `Problem`; the SAC / failed-literal probing resolved from the presolve
-        // config runs later in the presolve lane via [RootBaker] (the kernel never probes itself).
+        // A raw `Problem`; the SAC / failed-literal probing resolved from the presolve config runs later
+        // in the presolve lane via [RootBaker].
         val problem = Problem(
             settings = settings,
             numBoolVars = numBoolVars,
@@ -539,7 +539,7 @@ internal class FlatZincCompiler(
             is FznExpr.BoolLit -> {
                 val name = "__obj_const_${e.value}"
                 if (name !in boolVars) {
-                    allocBool(name) /* pin via Clause below */
+                    allocBool(name)
                     factors.add(
                         Clause(
                             intArrayOf(Lit.make(boolVars.getValue(name), e.value)),

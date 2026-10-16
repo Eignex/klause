@@ -18,12 +18,11 @@ internal object CliKnobs {
     /** Default LP relaxation ceiling spec (parsed by `LpConfig.parse`): `klause.lp` / `KLAUSE_LP`. */
     val lp by propertyKnob()
 
-    /** Presolve phase budget, in milliseconds: `klause.presolve.budget.ms`
-     *  / `KLAUSE_PRESOLVE_BUDGET_MS`. Applied as an elapsed ceiling and converted to work units at
-     *  [PRESOLVE_WORK_PER_MS]; the round engine and long-running passes charge their work against it
-     *  and bail with the reductions
-     *  made so far, so a pathologically large model can't spend unbounded effort in presolve. `0` or
-     *  negative disables both the work and elapsed phase caps. Defaults to [DEFAULT_PRESOLVE_BUDGET_MS]. */
+    /** Presolve phase budget, in milliseconds: `klause.presolve.budget.ms` / `KLAUSE_PRESOLVE_BUDGET_MS`.
+     *  Applied as an elapsed ceiling and converted to work units at [PRESOLVE_WORK_PER_MS]; the round engine
+     *  and long-running passes charge their work against it and bail with the reductions made so far, so a
+     *  pathologically large model can't spend unbounded effort in presolve. `0` or negative disables both
+     *  the work and elapsed phase caps. Defaults to [DEFAULT_PRESOLVE_BUDGET_MS]. */
     val presolveBudgetMs by propertyKnob()
 
     /** Share of the solve budget presolve may spend: `klause.presolve.budget.fraction` /
@@ -52,9 +51,9 @@ internal object CliKnobs {
     const val MAX_PRESOLVE_BUDGET_SHARE = 0.25
 
     /** Presolve work units one millisecond of presolve budget buys, so the millisecond policy above keeps
-     *  its reach through deterministic work accounting. The median weighted work per
-     *  millisecond of an uncapped presolve, over the calibration sample's models whose presolve ran at least a
-     *  second (33 of 60 MIPLIB 2017, 40 QF_LIA and 40 MiniZinc Challenge), was 274,665 (p25 177,850, p75
-     *  390,977); shorter runs are dominated by warm-up no unit can charge, so they are left out. */
+     *  its reach through deterministic work accounting. The median weighted work per millisecond of an
+     *  uncapped presolve, over calibration models whose presolve runs at least a second (33 of 60 MIPLIB 2017,
+     *  40 QF_LIA and 40 MiniZinc Challenge), is 274,665 (p25 177,850, p75 390,977); shorter runs are
+     *  dominated by warm-up no unit can charge, so they are left out. */
     const val PRESOLVE_WORK_PER_MS = 275_000L
 }

@@ -20,8 +20,8 @@ import com.eignex.klause.util.MutableIntIntMap
  * Two rectangles non-overlap iff they're disjoint on at least one axis.
  *
  * Sizes may be **constant or variable**. When [widthVars] / [heightVars] are non-null the
- * dimensions are themselves variables (read from the assignment, and part of [intVars] so the
- * search may resize as well as move); otherwise the constant [widths] / [heights] are used.
+ * dimensions are themselves variables (part of [variables], so the search may resize as well as
+ * move); otherwise the constant [widths] / [heights] are used.
  * The two axes are independent — e.g. constant widths with variable heights is allowed.
  *
  * [nonStrict] = true treats zero-width / zero-height rectangles as never overlapping
@@ -29,9 +29,9 @@ import com.eignex.klause.util.MutableIntIntMap
  * dimensional rectangles must satisfy the non-overlap criterion.
  */
 class Diffn(
-    /** Variable ids the constraint ranges over. */
+    /** Lower-left x-coordinate variable ids. */
     val xs: IntArray,
-    /** Second-vector variable ids. */
+    /** Lower-left y-coordinate variable ids. */
     val ys: IntArray,
     val widths: LongArray,
     val heights: LongArray,
@@ -85,13 +85,9 @@ class Diffn(
     /** Whether the search can resize rectangles (var dimensions present). */
     val varSize: Boolean = widthVars != null || heightVars != null
 
-    /** var id → the single rectangle index it belongs to, or `-1` when the same id is shared
-     *  by ≥2 distinct rectangles (a degenerate model). The affected-pair delta only touches
-     *  the moved rectangle, which is exact iff the moved var maps to exactly one rectangle;
-     *  a shared id forces the O(n²) full-recount fallback to preserve exact semantics. */
-    // Var id → its rectangle index, or -1 when the id is shared across rectangles (the moved-rect
-    // fast path can't apply). IntIntMap keeps the per-move lookup unboxed; -1 doubles as the
-    // absent sentinel, which the read site already treats the same as a shared id (`r < 0`).
+    // Var id → its rectangle index, or -1 when the id is shared by ≥2 rectangles or absent. The
+    // affected-pair delta only touches the moved rectangle, which is exact iff the moved var maps to exactly
+    // one rectangle; a shared id forces the O(n²) full recount.
     private val varToRect: IntIntMap = run {
         val m = MutableIntIntMap(n * 2)
         fun record(v: Int, i: Int) {

@@ -4,7 +4,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
-/** Smallest value first (a.k.a. `indomain_min`). For bools: `false` then `true`. */
+/** Smallest value first (`indomain_min`). For bools: `false` then `true`. */
 object IndomainMin : ValueSelector {
     override fun fresh() = this
 

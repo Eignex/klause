@@ -350,6 +350,10 @@ private interface ContinuationLane {
     ): LaneResult
 }
 
+// Bounded-variable feasibility simplex with Bland's smallest-index rule on both the leaving and entering choice
+// (R. G. Bland, "New finite pivoting rules for the simplex method", Math. Oper. Res. 2(2), 1977,
+// https://doi.org/10.1287/moor.2.2.103). Strict sides carry a symbolic infinitesimal as in B. Dutertre and
+// L. de Moura, "A fast linear-arithmetic solver for DPLL(T)", CAV 2006, https://doi.org/10.1007/11817963_11.
 private class RationalContinuationLane<F>(
     private val input: ExactContinuationInput,
     private val ops: FracOps<F>,

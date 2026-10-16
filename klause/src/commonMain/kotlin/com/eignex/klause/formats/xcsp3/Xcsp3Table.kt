@@ -48,7 +48,9 @@ private const val COMPLEMENT_MATERIALIZE_CEILING = 1_000_000L
 /** Post a negative `<conflicts>` table. When the variables' domain Cartesian product is small enough
  *  ([COMPLEMENT_MATERIALIZE_CEILING]), complement it to a positive [Table] — STR2 propagates that at GAC
  *  strength, which matters for dense binary negatives (e.g. FRB) where forward checking is far too weak.
- *  Otherwise lower to nogood clauses (forward-checking strength) to avoid materializing a large complement. */
+ *  Otherwise lower to nogood clauses (forward-checking strength) to avoid materializing a large complement.
+ *  STR2: C. Lecoutre, "STR2: optimized simple tabular reduction for table constraints", Constraints 16(4),
+ *  2011, https://doi.org/10.1007/s10601-011-9107-6. */
 internal fun Compiler.Builder.postConflicts(vars: IntArray, text: String) {
     val rows = parseShortRows(text, vars.size)
     var product = 1L
@@ -67,9 +69,9 @@ internal fun Compiler.Builder.postConflictComplement(vars: IntArray, rows: Short
     val nRows = rows.lo.size / arity
 
     // A tuple of per-column domain indices encodes to a single mixed-radix [Long] in `[0, product)`,
-    // where the domain product is bounded (this path is only taken below [COMPLEMENT_MATERIALIZE_CEILING]). So the
-    // ground forbidden rows live in a primitive [LongHashSet] and the enumeration probes it by a code
-    // maintained incrementally down the recursion — no boxed tuple per row nor per enumerated point.
+    // bounded by [COMPLEMENT_MATERIALIZE_CEILING]. Ground forbidden rows live in a primitive [LongHashSet]
+    // and the enumeration probes it by a code maintained incrementally down the recursion, so no tuple is
+    // boxed per row or per enumerated point.
     val stride = LongArray(arity)
     var acc = 1L
     for (c in 0 until arity) {
@@ -180,8 +182,7 @@ private fun Compiler.Builder.buildSupportTemplate(arity: Int, text: String): Sup
         }
         if (allFree) return SupportTemplate(triviallySat = true, tuples = LongArray(0), hi = null)
     }
-    // Ground (all points) ⇒ no upper-bound array, keeping the fast path byte-identical. The parse already
-    // knows whether it saw an interval cell, so this is a flag rather than a rescan of both arrays.
+    // Ground (all points) ⇒ no upper-bound array, so the table takes the point-only path.
     return SupportTemplate(triviallySat = false, tuples = rows.lo, hi = if (rows.short) rows.hi else null)
 }
 
@@ -197,9 +198,9 @@ internal fun Compiler.Builder.postConflictClauses(vars: IntArray, rows: ShortRow
             val lo = rows.lo[r * arity + c]
             val hiC = rows.hi[r * arity + c]
             when {
+                // `*`: forbids regardless — omit
                 lo == Long.MIN_VALUE && hiC == Long.MAX_VALUE -> Unit
 
-                // `*`: forbids regardless — omit
                 lo == hiC -> lits.add(
                     Lit.negate(reifyLinear(intArrayOf(1), intArrayOf(vars[c]), LinearOp.EQ, lo.toInt())),
                 )
@@ -262,8 +263,8 @@ internal fun Compiler.Builder.parseShortRows(text: String, arity: Int): ShortRow
     }
 
     // A cell is read from the source in place (no substring per field): a `*` wildcard, a `lo..hi`
-    // interval, or a point value — the parse of a multi-MB table dominated the ingestion, so it must
-    // not allocate a MatchResult per tuple nor a String per field.
+    // interval, or a point value. Parsing dominates ingestion of a multi-MB table, so it allocates no
+    // MatchResult per tuple nor String per field.
     fun addCell(from: Int, to: Int) {
         var a = from
         var b = to
@@ -274,9 +275,8 @@ internal fun Compiler.Builder.parseShortRows(text: String, arity: Int): ShortRow
             return
         }
         // Single pass: parse the first integer, stopping at the first non-digit. If that is `..` the cell
-        // is a `lo..hi` interval; otherwise it is a point value already fully read. A point cell (the bulk
-        // of a numeric table) is thus scanned once, not twice — parsing digits and separately hunting for
-        // `..` doubled the per-cell work on a multi-MB table.
+        // is a `lo..hi` interval; otherwise it is a point value already fully read, so a point cell (the
+        // bulk of a numeric table) is scanned once.
         var p = a
         val neg = p < b && text[p] == '-'
         if (neg || (p < b && text[p] == '+')) p++

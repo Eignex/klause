@@ -81,7 +81,7 @@ data class SmtStats(
     val lpPointHintCaptures: Long = 0L,
     /** Live default consultations that released a graph-first opening's optional hints. */
     val defaultGraphHintReleases: Long = 0L,
-    /** Compiled Boolean coordinates in the complete traversal at its smallest observed unresolved count. */
+    /** Compiled Boolean count of the complete traversal that observed [completeSearchMinUnassignedBooleans]. */
     val completeSearchBooleanVariables: Int? = null,
     /** Smallest unresolved compiled Boolean count observed by a complete traversal, excluding private queries. */
     val completeSearchMinUnassignedBooleans: Int? = null,

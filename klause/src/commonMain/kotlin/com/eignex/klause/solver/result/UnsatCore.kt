@@ -3,16 +3,15 @@ package com.eignex.klause.solver.result
 import com.eignex.klause.util.EmptyIntArray
 
 /**
- * A jointly-infeasible subset of `Problem.factors`, identified by factor id. Mirrors
- * SMT-LIB's `get-unsat-core`: when a complete backend (e.g. BacktrackSolver) proves UNSAT, it can
- * point back at the constraints whose conjunction is already unsat — useful for
- * minimisation, explanation, and assumption-style debugging.
+ * A jointly-infeasible subset of `Problem.factors`, identified by factor id, in the sense of SMT-LIB's
+ * `get-unsat-core`: the constraints whose conjunction a complete backend proved unsat.
  *
- * `factorIds` is sorted ascending and contains no duplicates. The core is **not**
- * guaranteed minimal; callers wanting a minimal unsatisfiable subset (MUS) should run a
- * separate minimisation pass (deletion-based, QuickXplain, etc.) on top.
+ * [factorIds] is sorted ascending and contains no duplicates. The core is **not** guaranteed minimal;
+ * a minimal unsatisfiable subset needs a separate minimisation pass on top, such as deletion-based
+ * filtering or QuickXplain (Junker, "QUICKXPLAIN: Preferred Explanations and Relaxations for
+ * Over-Constrained Problems", AAAI 2004, https://mlanthology.org/aaai/2004/junker2004aaai-quickxplain).
  *
- * Backends that don't compute cores leave the result-type's `core` field as `null`.
+ * Backends that don't compute cores leave the result's `core` field `null`.
  */
 data class UnsatCore(
     /** Ids of the factors forming the core. */

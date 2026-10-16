@@ -31,11 +31,10 @@ internal object DiophantineReduction {
      *  so a wide domain never triggers an O(size) sweep. */
     private const val SIZE_CAP = 4096
 
-    /** `true` when `|v| < 2³¹`, so a product of two such values stays below 2⁶² — the overflow gate. */
-
     // Work charged per equality scanned, scaled by its length: the residue scan is linear in the row.
     private const val DIOPHANTINE_WORK_WEIGHT = 10L
 
+    /** `true` when `|v| < 2³¹`, so a product of two such values stays below 2⁶² — the overflow gate. */
     private fun fitsHalfLong(v: Long): Boolean = v > -(1L shl 31) && v < (1L shl 31)
 
     private fun gcd(a: Long, b: Long): Long {
@@ -178,8 +177,7 @@ internal object DiophantineReduction {
         return if (out == null) PassDelta() else PassDelta(domains = out)
     }
 
-    /** Two contradictory unit equalities on [v] — jointly unsatisfiable, so the bake reports `Unsat`
-     *  (mirrors [CoefficientStrengthening]'s handling of a `g ∤ b` equality). */
+    /** Two contradictory unit equalities on [v], which together make the problem unsatisfiable. */
     private fun contradiction(problem: BakedProblem, v: Int): PassDelta {
         val c = problem.rootIntDomain(v).min
         return PassDelta(

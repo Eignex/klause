@@ -22,14 +22,17 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 
 /**
- * `intVars(i) != intVars(j)` for every pair `i < j`. Stored payload:
+ * `vars(i) != vars(j)` for every pair `i < j` of present positions, except where both take a value of
+ * [exceptSet].
  *
- *   `refPayload(factorId)` = State (counts: IntArray, excess: Int)
+ * Propagation is GAC via bipartite matching plus SCC support pruning over the definitely-present
+ * positions; positions whose presence is not yet pinned are skipped, so the filtering stays sound if they
+ * go absent. With [boundsConsistent], and no presence literals or excepted values, a bounds-consistency
+ * filter runs instead.
  *
- * `counts` is indexed by `value - domainMin` and tracks how many vars currently hold each
- * value across the union domain `[domainMin, domainMin + domainSize)`. `excess` is the graded
- * violation `Σ max(0, count - 1)` — the number of vars that must move to clear every clash; the
- * factor is violated iff that's positive, and it is the [Invariant.violationDegree] CBLS descends.
+ * Local search counts, per value, how many present vars hold it; the graded violation is
+ * `Σ max(0, count - 1)` — the number of vars that must move to clear every clash — and it is the
+ * [Invariant.violationDegree] CBLS descends.
  */
 class AllDifferent(
     /** Integer variable ids required to be pairwise distinct. */
@@ -45,13 +48,12 @@ class AllDifferent(
     override val presents: IntArray = EmptyIntArray,
     /** Values exempt from the distinctness requirement: any number of variables may share a
      *  value in this set (the `alldifferent_except` / `alldifferent_except_0` family). Empty for
-     *  plain all-different. Excepted values are modelled inside `reginFilter` as capacity-n value
+     *  plain all-different. Excepted values are modelled inside `reginFilter` as `n` capacity-1 value
      *  copies, so the exact Hall/matching machinery applies unchanged. */
     val exceptSet: LongArray = EmptyLongArray,
-    /** When true, the constraint carried the FlatZinc `::bounds` annotation — the modeller
-     *  asked for bounds-consistency rather than full GAC (e.g. ghoulomb's `distinct ::bounds`,
-     *  the matching/SCC/Hall machinery is then skipped in favour of a much cheaper
-     *  filter, trading pruning strength for per-node throughput as the model intends. */
+    /** When true, the constraint carried the FlatZinc `::bounds` annotation — the modeller asked for
+     *  bounds-consistency rather than full GAC. The matching/SCC machinery is then skipped in favour of
+     *  a much cheaper Hall-interval filter, trading pruning strength for per-node throughput. */
     val boundsConsistent: Boolean = false,
 ) : Factor,
     OptionalFactor {
@@ -67,12 +69,6 @@ class AllDifferent(
     /** Canonical excepted values (deduped, sorted) for [structuralKey] / [remap]. */
     private val exceptSorted: LongArray =
         if (exceptSet.isEmpty()) EmptyLongArray else exceptSet.distinct().sorted().toLongArray()
-
-    // Propagation strength: full GAC via bipartite matching plus SCC support pruning over the
-    // definitely-present positions. IntDomain supports interior holes, so non-matching
-    // value pruning lands at the variable domain level. Opt-aware: definitely-absent
-    // positions are skipped entirely; unpinned-presence positions are skipped too, so any
-    // filtering remains sound under "this position might still go absent".
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.ALL_DIFFERENT, ::buildKey)
 

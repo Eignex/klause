@@ -13,7 +13,7 @@ internal class XorInvariant(
     private val targetParity: Int,
 ) : Invariant {
 
-    /** Per-var parity contribution: precomputed `(occurrences in `literals`) and 1` per `boolVar`. */
+    /** Per-variable parity contribution: its occurrence count in [literals], mod 2. */
     private val parityByVar: CoeffLookup = buildParityByVar(boolVars, literals)
 
     private fun parityOf(v: Int): Int = parityByVar.coeffOf(v)
@@ -55,9 +55,8 @@ internal class XorInvariant(
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
-    /** O(arity) — but typically the loop body is one branch. The parity model collapses
-     *  to: if the flipped var's parity contribution is 0, nothing changed; otherwise
-     *  violation flips and every parity-contributing var swaps break↔make. */
+    /** If the flipped var's parity contribution is 0 nothing changes; otherwise violation flips and every
+     *  parity-contributing var swaps break↔make. */
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         if (parityOf(flippedVar) == 0) return
         val newParity = state.intPayload[factorId]

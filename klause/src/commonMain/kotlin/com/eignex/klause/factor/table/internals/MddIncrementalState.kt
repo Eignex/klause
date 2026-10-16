@@ -33,10 +33,10 @@ internal class MddIncrementalState(
 
     // Each layer's reachability bitset is packed to its OWN width (`ceil(numStatesPerLayer / 64)` words)
     // rather than a uniform `max(numStatesPerLayer)` width. A layered diagram whose middle layers are far
-    // wider than its ends (word MDDs, e.g. WordDesign2 with one 175k-state layer over ~32k average) would
-    // otherwise pay the widest layer for every layer — a several-fold blow-up per factor, decisive when a
-    // group holds thousands of factors over one diagram. [layerBase] is the prefix-sum word offset of each
-    // layer into [fwd]/[bwd]; [layerWords] its word count; [w] the widest layer's word count (scratch size).
+    // wider than its ends (word MDDs) would otherwise pay the widest layer for every layer — a several-fold
+    // blow-up per factor, decisive when a group holds thousands of factors over one diagram. [layerBase] is the
+    // prefix-sum word offset of each layer into [fwd]/[bwd]; [layerWords] its word count; [w] the widest
+    // layer's word count (scratch size).
     private val layerWords = IntArray(seq.size + 1) { (numStatesPerLayer[it] + 63) ushr 6 }
     private val layerBase = IntArray(seq.size + 2).also { for (i in 0..seq.size) it[i + 1] = it[i] + layerWords[i] }
     private val totalWords = layerBase[seq.size + 1]
@@ -45,7 +45,7 @@ internal class MddIncrementalState(
     // Held for the deferred [fwd]/[bwd] construction below; every other reversible cell is built here.
     private val owner = state
 
-    // Two `totalWords`-long reversible bitsets per factor — on a wide diagram (WordDesign2: ~2.4M states)
+    // Two `totalWords`-long reversible bitsets per factor — on a wide diagram of millions of states
     // that is hundreds of KB each, and a `<group>` holds one factor per row over the same diagram. A row
     // that only ever reuses the shared root snapshot never reads them, so they are built on first real
     // use rather than at construction. Single-threaded per [PropagationState], hence the unsynchronized
@@ -115,7 +115,7 @@ internal class MddIncrementalState(
         return changed
     }
 
-    /** fwd[i+1] = { dst : (src,sym,dst) ∈ layer i, src ∈ fwd[i], sym ∈ [min,max](seq[i]) }. */
+    /** fwd(i+1) = { dst : (src,sym,dst) ∈ layer i, src ∈ fwd(i), sym ∈ [min,max](seq(i)) }. */
     private fun recomputeForward(state: PropagationState, i: Int, scratch: LongArray): Boolean {
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
@@ -138,7 +138,7 @@ internal class MddIncrementalState(
         return writeLayer(fwd, i + 1, scratch)
     }
 
-    /** bwd[i] = { src ∈ fwd[i] : (src,sym,dst) ∈ layer i, dst ∈ bwd[i+1], sym ∈ [min,max](seq[i]) }. */
+    /** bwd(i) = { src ∈ fwd(i) : (src,sym,dst) ∈ layer i, dst ∈ bwd(i+1), sym ∈ [min,max](seq(i)) }. */
     private fun recomputeBackward(state: PropagationState, i: Int, scratch: LongArray): Boolean {
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
@@ -217,7 +217,7 @@ internal class MddIncrementalState(
         return true
     }
 
-    /** bwd[n] = accepting ∩ fwd[n]. */
+    /** bwd(n) = accepting ∩ fwd(n). */
     private fun recomputeAcceptLayer(scratch: LongArray): Boolean {
         scratch.fill(0L)
         val numN = numStatesPerLayer[n]

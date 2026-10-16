@@ -1,8 +1,8 @@
 package com.eignex.klause.localsearch
 
 /**
- * A primitive change applied to a single variable. Strategies enumerate moves, score each
- * via factor delta methods, then commit one through the LS engine's `apply`.
+ * A change to the assignment: a primitive single-variable move, or a [Compound] of them. Strategies
+ * enumerate moves, score each via factor delta methods, then commit one through [LocalSearchState.apply].
  */
 sealed interface Move {
     /** Flip a Boolean variable's current value. */

@@ -10,12 +10,10 @@ import com.eignex.klause.util.IntArrayList
  * unique implication point is reached ([liveAtCurrentLevel]), and how the finished nogood materialises
  * ([finalizeResult]).
  *
- * Splitting the resolvent from the graph walk is the single generalization that lets one CDCL core serve
- * more than one learned-constraint algebra. The default and only implementation is
- * [ClauseResolvent] — a disjunction of literals resolved by the classical set-union step. A pseudo-Boolean
- * cutting-planes resolvent, whose [resolve] is coefficient cancellation with rounding and saturation and
- * whose [liveAtCurrentLevel] is a slack condition, slots in as a second implementation without touching
- * the driver, the trail, VSIDS, or the learned-constraint database.
+ * Splitting the resolvent from the graph walk lets one CDCL core serve more than one learned-constraint
+ * algebra: [ClauseResolvent] (the default) resolves a disjunction of literals by the classical set-union
+ * step, and [PbConflictResolvent] does pseudo-Boolean cutting-planes resolution, without either touching the
+ * driver, the trail, VSIDS, or the learned-constraint database.
  */
 internal interface ConflictResolvent {
     /** Begin a fresh analysis over a [universe]-sized variable space (bool vars followed by atom vars);

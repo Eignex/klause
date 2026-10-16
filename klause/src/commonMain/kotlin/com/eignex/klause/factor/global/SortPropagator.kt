@@ -11,24 +11,21 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /**
- * CP propagation logic for `sort` — bound-consistency via the Mehlhorn–Thiel algorithm
- * ("Faster Algorithms for Bound-Consistency of the Sortedness and the Alldifferent Constraint",
- * CP'00). The relation is `ys = sorted(xs)`: `ys` is non-decreasing and shares `xs`'s multiset.
+ * CP propagation logic for `sort` — bound-consistency via K. Mehlhorn and S. Thiel, "Faster Algorithms
+ * for Bound-Consistency of the Sortedness and the Alldifferent Constraint", CP 2000,
+ * https://doi.org/10.1007/3-540-45349-0_23. The relation is `ys = sorted(xs)`: `ys` is non-decreasing
+ * and shares `xs`'s multiset.
  *
  * The filter (a) normalizes `ys` to a non-decreasing bound chain, (b) builds two perfect
  * matchings `f` / `f'` between sorted positions and the `xs` (smallest-upper-bound and
  * largest-lower-bound greedy matchings) to tighten each `ys` bound, then (c) condenses the
  * `xy`-intersection graph into strongly connected components and tightens each `xs` bound to the
- * range its component's `ys` can take. Steps (a)/(b) alone subsume endpoint-only reasoning; the SCC
- * step (c) is what lets a middle `xs` learn bounds from its sorted position.
+ * range its component's `ys` can take. The SCC step (c) is what lets a middle `xs` learn bounds from
+ * its sorted position.
  *
- * The propagator itself holds only the immutable constraint scope. All per-search working state —
- * the matchings, the SCC scratch, the priority queue and the two stacks — lives in a [SortWork]
- * held in `state.refPayload[factorId]`, because a [Propagator] instance is cached once per
- * `Problem` and shared across every [PropagationState], including the
- * concurrently-running arms of a parallel portfolio. Scratch as propagator fields would race across
- * those arms; keyed off `refPayload` each search owns its own copy (mirrors
- * [com.eignex.klause.factor.table.internals.ElementConstState] and `VpState`).
+ * All per-search working state lives in a [SortWork] held in `state.refPayload[factorId]`, because a
+ * [Propagator] instance is cached once per `Problem` and shared across every [PropagationState],
+ * including concurrently running portfolio arms; scratch as propagator fields would race across them.
  */
 internal class SortPropagator(
     val boolVars: IntArray,
@@ -37,11 +34,7 @@ internal class SortPropagator(
     private val ys: IntArray,
 ) : Propagator {
 
-    /**
-     * Advisor subscription: the sort propagator reads only each variable's `min`/`max` and
-     * never inspects interior holes, so it subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED]
-     * per variable and skips interior `VALUE_REMOVED` wakes.
-     */
+    // Reads only bounds, so it subscribes to bound events and skips interior `VALUE_REMOVED` wakes.
     override val initialIntEventWatches: IntArray = run {
         val distinct = intVars.toHashSet()
         val out = IntArray(distinct.size * 2)
@@ -65,16 +58,13 @@ internal class SortPropagator(
 }
 
 /**
- * Per-search working state and filtering loop for one [SortPropagator]. Allocated lazily on the first
- * fire and reused across fires of the same [PropagationState] — the scratch is fully reset at the top
- * of each pass, so nothing survives between fires and no trail participation is needed. Held in
- * `refPayload` (never as propagator fields) so parallel portfolio arms don't share it.
+ * Per-search working state and filtering loop for one [SortPropagator]. The scratch is fully reset at
+ * the top of each pass, so nothing survives between fires and no trail participation is needed.
  */
 internal class SortWork(private val xs: IntArray, private val ys: IntArray, private val intVars: IntArray) {
 
     private val n = xs.size
 
-    // Scratch state, allocated once and reused across fires of the owning search.
     private val f = IntArray(n)
     private val fPrime = IntArray(n)
     private val xyGraph = Array(n) { IntArray(n) }
@@ -443,7 +433,6 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
         }
     }
 
-    /** A bounded LIFO stack of ints. */
     private class IntStack(capacity: Int) {
         private val data = IntArray(capacity)
         var size = 0

@@ -18,7 +18,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.model.PbOp
 
 /**
- * `auxBoolVar ↔ (Σ weights(i) * lit(i) ⟨op⟩ bound)`. Payload at `intPayload(factorId)` is the
+ * `auxBoolVar ↔ (Σ weights(i)·literals(i) ⟨op⟩ bound)`. Payload at `longPayload(factorId)` is the
  * current weighted sum. Terms pair [weights] with [literals]; the sum is compared by [op] against
  * [bound].
  */

@@ -33,7 +33,7 @@ data class FlatZincProgram(
 
 /** Bool-indicator layout of one FlatZinc set variable. */
 data class SetVarLayout(
-    /** Set the variable name. */
+    /** Set variable name. */
     val name: String,
     /** Sorted universe values. */
     val elements: IntArray,
@@ -85,7 +85,7 @@ sealed interface SolveDirective {
         /** Integer objective. */
         Int,
 
-        /** Float objective via bucketed int variable. */
+        /** Float objective, a bucketed int variable or a real column. */
         Float,
     }
 }
@@ -154,7 +154,7 @@ sealed interface FlatZincArray {
             /** Integer elements. */
             Int,
 
-            /** Float elements represented by bucket indices. */
+            /** Float elements, as bucket indices or real columns. */
             Float,
         }
     }

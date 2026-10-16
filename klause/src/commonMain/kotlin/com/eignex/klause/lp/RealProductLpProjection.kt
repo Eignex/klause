@@ -11,6 +11,9 @@ import com.eignex.klause.ir.LinearOp
  * own: over a side the model leaves open the live box is the finite lane's invention, the column enters
  * the root LP genuinely open, and the envelope would cut off products the model admits. The real
  * operand is declined the same way, by its own infinite bounds.
+ *
+ * McCormick, "Computability of global solutions to factorable nonconvex programs: Part I — Convex
+ * underestimating problems", Mathematical Programming 10 (1976), https://doi.org/10.1007/BF01580665.
  */
 internal fun RealProduct.emitLpRelaxation(builder: RelaxationBuilder) {
     if (!builder.statesBothBounds(intOperand)) return // decline before a column is seated for a dead row

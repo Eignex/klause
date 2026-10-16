@@ -15,19 +15,20 @@ import kotlin.random.Random
  * Restart-level heuristic portfolio with bandit-driven arm selection. Composes a fixed set
  * of `(VariableSelector, ValueSelector)` configurations into one logical "search strategy
  * picker" that learns which configuration works best on the current instance and switches
- * between them at every Luby restart.
+ * between them at every restart.
  *
  * Each `arm` is one named strategy. The [bandit] (any kumulant [MultiArmedBandit] — UCB1,
  * UCB1Tuned, ThompsonSampling, etc.) is consulted at construction to pick the initial arm,
- * and at every restart to update the previous arm's reward and choose the next arm.
+ * and at every restart to update the previous arm's reward and choose the next arm. UCB1 is from
+ * Auer, Cesa-Bianchi and Fischer, "Finite-time Analysis of the Multiarmed Bandit Problem", Machine
+ * Learning 47, 2002 (https://doi.org/10.1023/A:1013689704352).
  *
  *  - [variableSelector] / [valueSelector] expose the portfolio as drop-in slots for
  *    [BacktrackParams]. **Both slots must reference the same `SelectorPortfolio` instance
  *    to share state**; treat the portfolio as the unit, not the two slots.
  *  - At restart, the variable-heuristic delegate is responsible for the bandit update +
  *    arm switch; the value-heuristic delegate just forwards `onRestart` to the newly
- *    selected arm's inner value heuristic. Engine fires var first, then value, which matches this
- *    convention.
+ *    selected arm's inner value heuristic. The engine fires the variable hook before the value hook.
  *
  * Reward signal:
  *  - [rewardFn] receives [RunStats] for the run that just ended and returns a Double the
@@ -69,7 +70,7 @@ internal class SelectorPortfolio(
     /** One strategy in the portfolio's palette. */
     data class Arm(val label: String, val variableSelector: VariableSelector, val valueSelector: ValueSelector)
 
-    /** Statistics passed to [rewardFn] at the end of every Luby-restart-bounded run. */
+    /** Statistics passed to [rewardFn] at the end of every restart-bounded run. */
     data class RunStats(
         /** Number of [VariableSelector.onConflict] events during the run. */
         val conflicts: Int,
@@ -111,8 +112,6 @@ internal class SelectorPortfolio(
             current.variableSelector.onSolution(snapshot)
         }
         override fun onRestart() {
-            // Update the bandit on the just-ended run, switch to the next arm, then forward
-            // restart to the newly selected arm's variable heuristic for its own decay/reset.
             updateAndSwitch()
             current.variableSelector.onRestart()
         }
@@ -127,8 +126,7 @@ internal class SelectorPortfolio(
         override fun onCommit(varRef: VarRef, value: Long) = current.valueSelector.onCommit(varRef, value)
         override fun onSolution(snapshot: Sample) = current.valueSelector.onSolution(snapshot)
         override fun onRestart() {
-            // Bandit update is owned by the variable-heuristic delegate (fired first by the
-            // engine). Here we just forward restart to the newly selected arm's value heuristic.
+            // The variable-heuristic delegate, fired first, already switched arms.
             current.valueSelector.onRestart()
         }
     }

@@ -20,6 +20,14 @@ import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.util.Cancellation
 import kotlin.math.ceil
 
+/**
+ * Completes a local-search candidate over LP-only continuous columns the way a backtrack leaf is completed: pin every
+ * Boolean and integer column to the candidate's value and solve the residual LP over the continuous columns.
+ *
+ * The candidate's own continuous values are floating-point guesses; the residual LP decides whether a completion
+ * exists. [objective], when given, is what that LP minimizes. An exact point is a witness outright; a tolerance-only
+ * point is one only when [toleranceCheck] accepts it. A solve that cancellation cuts short decides nothing.
+ */
 internal class LeafRealCompletion(
     private val problem: Problem,
     private val objective: LinearObjective?,

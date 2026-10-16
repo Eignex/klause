@@ -39,8 +39,8 @@ internal class IntEventMachinery private constructor(
      * [Propagator.initialIntEventWatches], read by `enqueueForIntChange` to wake only the factors that
      * care about the kind of change that just happened. The base factors' subscriptions are held as a
      * CSR ([baseOffsets] / [baseFlat]) built once at construction rather than one [IntArrayList] per
-     * `numIntVars * IntEvent.COUNT` slot: on a large model most slots have no subscriber, and the wide
-     * array of tiny lists dominated [PropagationState] construction. The CSR is one prefix-sum pass plus
+     * `numIntVars * IntEvent.COUNT` slot, since on a large model most slots have no subscriber and
+     * allocating a list per slot would dominate [PropagationState] construction. The CSR is one prefix-sum pass plus
      * one fill pass over the base propagators, both O(subscriptions); reads are a contiguous slice with
      * ascending base factor ids. Mid-life factors ([PropagationState.addMidlifeFactor]) subscribe into
      * [overflow].

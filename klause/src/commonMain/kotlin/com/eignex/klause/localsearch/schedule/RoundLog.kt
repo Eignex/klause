@@ -43,8 +43,10 @@ data class RoundLog(
 
 /**
  * Mutable collector for one round's move statistics; [snapshot] freezes it to a [RoundLog]. Cost
- * mean/variance use Welford's online algorithm, so a long round stays overflow-safe and needs no
- * second pass. [clear] resets the counters for the next round.
+ * mean/variance use Welford's online algorithm (B. P. Welford, "Note on a method for calculating
+ * corrected sums of squares and products", Technometrics 4, 1962,
+ * https://doi.org/10.1080/00401706.1962.10490022), so a long round stays numerically stable and needs
+ * no second pass. [clear] resets the counters for the next round.
  */
 class RoundAccumulator {
     /** Moves proposed so far this round. */

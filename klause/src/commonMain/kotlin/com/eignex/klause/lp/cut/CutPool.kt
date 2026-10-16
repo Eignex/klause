@@ -14,7 +14,7 @@ import kotlin.math.sqrt
  * An activity-managed cut pool. Portable entries retain their source proof and become available only
  * while their guards hold in [remap]'s context. Raw cuts belong to their original column layout and
  * become unavailable after remapping. Eviction only loosens a relaxation; insertion order breaks
- * activity ties, and [retainMostActive] enforces the existing [maxCuts] cap.
+ * activity ties, and [retainMostActive] enforces the [maxCuts] cap.
  */
 internal class CutPool(
     val maxCuts: Int = DEFAULT_MAX_CUTS,
@@ -170,13 +170,14 @@ internal class CutPool(
     /**
      * Select up to [max] pooled cuts to add to the LP at the current point [primal]: rank by
      * **efficacy plus objective parallelism**: the normalised violation
-     * `violation / ‖coeffs‖₂` is added to the absolute cosine with the objective direction, following
-     * CP-SAT's linear-constraint-manager policy. Candidates are then added greedily,
+     * `violation / ‖coeffs‖₂` is added to the absolute cosine with the objective direction (Achterberg,
+     * "Constraint Integer Programming", PhD thesis, TU Berlin 2007,
+     * https://nbn-resolving.org/urn:nbn:de:kobv:83-opus-16117). Candidates are then added greedily,
      * skipping a candidate that is near-parallel to one already chosen (an **orthogonality** filter on
      * the cosine of their coefficient vectors). A cut the point already satisfies (efficacy below
      * [minEfficacy]) is dropped — adding it would not move the bound. The returned cuts are a subset of
      * the pool, so the relaxation stays valid: selecting fewer cuts only loosens the bound, never
-     * removes a feasible point. Insertion order breaks ties (the efficacy sort is stable).
+     * removes a feasible point. Insertion order breaks ties (the score sort is stable).
      *
      * @param primal the current LP point cuts are scored against.
      * @param objective the LP objective direction used for parallelism scoring.
@@ -240,10 +241,8 @@ internal class CutPool(
         val violation = when (cut.rel) {
             Relation.GE -> cut.rhs - lhs
 
-            // `Σ ≥ rhs` violated when below
             Relation.LE -> lhs - cut.rhs
 
-            // `Σ ≤ rhs` violated when above
             Relation.EQ -> abs(lhs - cut.rhs)
         }
         if (violation <= 0.0) return 0.0
@@ -270,7 +269,6 @@ internal class CutPool(
         val na = a.norm
         val nb = b.norm
         if (na == 0.0 || nb == 0.0) return 0.0
-        // Map b's columns for an O(|a|) shared-support dot product.
         val bIndex = cosineIndex
         bIndex.clear()
         for (k in b.cut.cols.indices) bIndex.put(b.cut.cols[k], b.cut.coeffs[k])

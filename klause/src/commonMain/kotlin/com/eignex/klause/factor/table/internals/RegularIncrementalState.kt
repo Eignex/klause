@@ -14,6 +14,9 @@ import com.eignex.klause.util.LongArrayList
  * from q0 and backward-reachable to accepting states. A symbol at position i survives iff a
  * forward-reachable state at i transitions on it to a backward-reachable state at i+1.
  *
+ * Pesant, "A Regular Language Membership Constraint for Finite Sequences of Variables", CP 2004,
+ * https://doi.org/10.1007/978-3-540-30201-8_36.
+ *
  * Layer bitsets live on the undo trail ([RevLongArray]), so backtracking restores changed words.
  * The forward sweep starts at the lowest dirty position and stops at an unchanged layer;
  * the backward sweep descends from the deepest affected layer with the same stopping rule.
@@ -81,7 +84,7 @@ internal class RegularIncrementalState(
         return changed
     }
 
-    /** fwd[i+1] = { δ(q,s) : q ∈ fwd[i], s ∈ dom(seq[i]) }. Returns whether fwd[i+1] changed. */
+    /** fwd(i+1) = { δ(q,s) : q ∈ fwd(i), s ∈ dom(seq(i)) }. Returns whether fwd(i+1) changed. */
     private fun recomputeForward(state: PropagationState, i: Int, scratch: LongArray): Boolean {
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
@@ -94,7 +97,7 @@ internal class RegularIncrementalState(
         return writeLayer(fwd, i + 1, scratch)
     }
 
-    /** bwd[i] = { q ∈ fwd[i] : ∃ s ∈ dom(seq[i]), δ(q,s) ∈ bwd[i+1] }. Returns whether bwd[i] changed. */
+    /** bwd(i) = { q ∈ fwd(i) : ∃ s ∈ dom(seq(i)), δ(q,s) ∈ bwd(i+1) }. Returns whether bwd(i) changed. */
     private fun recomputeBackward(state: PropagationState, i: Int, scratch: LongArray): Boolean {
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
@@ -109,7 +112,7 @@ internal class RegularIncrementalState(
         return writeLayer(bwd, i, scratch)
     }
 
-    /** bwd[n] = accepting ∩ fwd[n]. Returns whether it changed. */
+    /** bwd(n) = accepting ∩ fwd(n). Returns whether it changed. */
     private fun recomputeAcceptLayer(scratch: LongArray): Boolean {
         scratch.fill(0L)
         for (q in accepting) {
@@ -158,7 +161,7 @@ internal class RegularIncrementalState(
         return if (valid.value == 0) rebuild(state) else delta(state, dirty)
     }
 
-    /** Full forward+backward build (mirrors the original one-shot propagator), then prune all. */
+    /** Full forward+backward build, then prune all positions. */
     private fun rebuild(state: PropagationState): Boolean {
         val scratch = LongArray(w)
         for (k in 0 until (n + 1) * w) {
@@ -239,7 +242,7 @@ internal class RegularIncrementalState(
         }
         if (!testBit(bwd, 0, q0 - 1)) return false
 
-        // Re-prune the affected position window (fwd[i] or bwd[i+1] may have moved). A superset is
+        // Re-prune the affected position window (fwd(i) or bwd(i+1) may have moved). A superset is
         // sound — an unchanged position simply finds nothing to remove.
         val lo = maxOf(0, minOf(minD, firstBwdChanged - 1))
         val hi = minOf(n - 1, maxOf(maxD, lastFwdChanged))

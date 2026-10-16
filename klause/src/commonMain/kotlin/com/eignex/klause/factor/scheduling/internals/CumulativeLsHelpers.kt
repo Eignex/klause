@@ -9,8 +9,8 @@ import kotlin.math.min
  * Visit every timeline slot whose load changes when an equal-length task footprint moves from
  * `[oldStart, +d)` to `[newStart, +d)`. The two footprints share the overlap `[overlapLo,
  * overlapHi)`, whose load is unchanged, so only the symmetric difference is visited: [onRemove]
- * for slots the task leaves, [onAdd] for slots it enters. Work is `O(|newStart − oldStart|)`,
- * not `O(d)` — a one-step shift touches two slots regardless of duration. Slots are clamped to
+ * for slots the task leaves, [onAdd] for slots it enters. Work is `O(min(|newStart − oldStart|, d))`,
+ * so a one-step shift touches two slots regardless of duration. Slots are clamped to
  * the timeline `[0, size)`.
  */
 internal inline fun forEachStartShiftSlot(
