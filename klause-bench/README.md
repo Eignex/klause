@@ -319,6 +319,14 @@ complementary names under the unchanged registry limit. This is isolated naming
 demand: it neither captures the actual rebound fragment nor reproduces earlier
 component registrations, initializes a solver, or proves the opening's refusal cause.
 
+With `inspect=compiler-expansion`, the tool performs a separate default frontend
+compilation before starting the opening deadline. It requires matching source names,
+bounds, contiguous declared domains and ordered factor keys against canonical admission,
+then records the shared comparison visit limit, usage, caches and definition counts.
+Its row histogram includes defining rows and selection channels, without attributing
+ownership or a refusal cause. This additional compilation supplies no timing,
+CLI-equivalence or verdict claim and starts no additional numerical operation.
+
 `bench.profile.SourceAgreementProfile` compares one combined exact linear owner with
 explicit registered linear peers over original real, wide-integer, strict and guarded
 sources. Pass `repeats=N warmups=N cases=<comma-separated names>`; defaults are three

@@ -42,7 +42,7 @@ internal object LinearRootOpeningProfile {
         val required = setOf("suite", "problem", "sha256")
         require(options.keys == required || options.keys == required + "inspect")
         val inspection = options["inspect"]
-        require(inspection == null || inspection == "disjunction-names")
+        require(inspection == null || inspection in setOf("disjunction-names", "compiler-expansion"))
         val expected = options.getValue("sha256")
         require(expected.matches(Regex("[0-9a-f]{64}")))
         val reference = Catalog.uncapped(options.getValue("suite")).problems
@@ -61,6 +61,7 @@ internal object LinearRootOpeningProfile {
         }
         val parsingNs = System.nanoTime() - parsingStarted
         require(compiled.objective == null) { "only satisfaction openings are supported" }
+        if (inspection == "compiler-expansion") SmtLibCompilationInspection.inspect(bytes.decodeToString(), compiled, out)
         val deadlineStarted = System.nanoTime()
         val stop = Cancellation.after(OPENING_BUDGET_MS.milliseconds)
         val params = TheoryParams(timeout = stop, randomSeed = SEED)
@@ -94,6 +95,7 @@ internal object LinearRootOpeningProfile {
                 put("sourceAdmission", admitted.javaClass.simpleName)
                 put("cliRoutingEquivalence", "unverified")
                 put("sourceVerdictClaim", false)
+                put("additionalCompilationBeforeDeadline", inspection == "compiler-expansion")
                 put("traversalAdvanced", false)
                 put("processors", Runtime.getRuntime().availableProcessors())
                 put("seed", SEED)
