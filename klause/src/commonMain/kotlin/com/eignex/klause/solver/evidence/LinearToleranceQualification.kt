@@ -73,7 +73,7 @@ internal class LinearToleranceQualification(
     }
 
     private fun slack(bound: BigFraction, magnitude: BigFraction = BigFraction.ZERO): BigFraction =
-        maxOf(absolute, relative * maxOf(bound.absolute(), magnitude))
+        larger(absolute, relative * larger(bound.absolute(), magnitude))
 
     private fun ranges(): List<Pair<BigFraction?, BigFraction?>> {
         val ranges = variableBounds.mapIndexed { index, (lower, upper) ->
@@ -99,10 +99,10 @@ internal class LinearToleranceQualification(
                     val (lo, hi) = if (coefficient.signum() > 0) lower to upper else upper to lower
                     val (beforeLow, beforeHigh) = ranges[column]
                     val afterLow = lowerPoint(lo, integers[column])?.let {
-                        if (beforeLow == null) it else maxOf(it, beforeLow)
+                        if (beforeLow == null) it else larger(it, beforeLow)
                     } ?: beforeLow
                     val afterHigh = upperPoint(hi, integers[column])?.let {
-                        if (beforeHigh == null) it else minOf(it, beforeHigh)
+                        if (beforeHigh == null) it else smaller(it, beforeHigh)
                     } ?: beforeHigh
                     val after = afterLow to afterHigh
                     if (after != ranges[column]) {
@@ -117,7 +117,7 @@ internal class LinearToleranceQualification(
     }
 
     // For one term, sum(abs(a(i) * x(i))) equals abs(activity); solve each slack branch exactly.
-    private fun acceptedLower(bound: BigFraction): BigFraction = minOf(
+    private fun acceptedLower(bound: BigFraction): BigFraction = smaller(
         bound - absolute,
         bound - relative * bound.absolute(),
         bound / (if (bound.signum() >= 0) BigFraction.ONE + relative else BigFraction.ONE - relative),
@@ -187,8 +187,8 @@ internal class LinearToleranceQualification(
             if (low == null || high == null) return null
             val first = coefficient * low
             val last = coefficient * high
-            minimum += minOf(first, last)
-            maximum += maxOf(first, last)
+            minimum += smaller(first, last)
+            maximum += larger(first, last)
         }
         return minimum to maximum
     }
@@ -217,7 +217,7 @@ internal class LinearToleranceQualification(
                 nonpositive = nonpositive && (if (positive) high?.signum()?.let { it <= 0 } else
                     low?.signum()?.let { it >= 0 }) == true
                 magnitude = if (low == null || high == null) null else
-                    magnitude?.plus(coefficient.absolute() * maxOf(low.absolute(), high.absolute()))
+                    magnitude?.plus(coefficient.absolute() * larger(low.absolute(), high.absolute()))
             }
         }
         var divisor = BIG_ZERO
@@ -229,3 +229,14 @@ internal class LinearToleranceQualification(
             coefficients.count { !it.isZero } == 1 || nonnegative || nonpositive)
     }
 }
+
+private fun BigFraction.absolute(): BigFraction = if (signum() < 0) negated() else this
+
+private operator fun BigFraction.div(other: BigFraction): BigFraction = this * other.reciprocal()
+
+private fun larger(first: BigFraction, second: BigFraction): BigFraction = if (first >= second) first else second
+
+private fun smaller(first: BigFraction, second: BigFraction): BigFraction = if (first <= second) first else second
+
+private fun smaller(first: BigFraction, second: BigFraction, third: BigFraction): BigFraction =
+    smaller(smaller(first, second), third)
