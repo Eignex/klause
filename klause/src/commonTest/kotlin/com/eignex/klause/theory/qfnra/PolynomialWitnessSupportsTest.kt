@@ -297,6 +297,30 @@ class PolynomialWitnessSupportsTest {
     }
 
     @Test
+    fun `zero factors need no irrelevant intermediate power growth`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const zero Real) (declare-const b Real) (declare-const fixed Real)
+            (assert (and (= (* zero fixed fixed) 0) (= (* b b) 1)))
+            """.trimIndent(),
+        )
+        val arithmetic = PolynomialArithmetic()
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val atoms = assertNotNull(formula.conjunctiveAtoms(arithmetic, 128))
+
+        val point = assertNotNull(PolynomialWitnessSupports(arithmetic, 2048, 8, 3, 4).point(
+            atoms, atoms.map { it.polynomial.terms }, source.realCount, mapOf(2 to BigFraction.ofLong(3)),
+            { true }, { true },
+        ))
+
+        val coordinates = point.mapValues { algebraic.rational(it.value) }
+        for (atom in atoms) {
+            assertTrue(atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))))
+        }
+    }
+
+    @Test
     fun `source root isolation retains the caller dense coefficient limit`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const a Real) (declare-const b Real) (assert (and (= (* a a) 4) (= (* b b) 9)))",
