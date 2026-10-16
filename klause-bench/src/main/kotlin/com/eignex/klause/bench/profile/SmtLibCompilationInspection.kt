@@ -12,7 +12,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal object SmtLibCompilationInspection {
-    fun inspect(text: String, canonical: SmtLibProblem, out: File) {
+    fun inspect(text: String, canonical: SmtLibProblem, out: File, ownership: Boolean = false) {
         val stateType = Class.forName("com.eignex.klause.formats.smtlib.SmtLibConditionalEquality")
         val state = stateType.getDeclaredConstructor(Int::class.javaPrimitiveType)
             .apply { isAccessible = true }.newInstance(65_536)
@@ -28,7 +28,8 @@ internal object SmtLibCompilationInspection {
         }.apply { isAccessible = true }
         val reader = SExprReader(text)
         while (true) command.invoke(builder, reader.readCommandOrNull() ?: break)
-        val parsed = builderType.declaredMethods.single {
+        val parsed = if (ownership) SmtLibDefinitionOwnershipInspection.compile(builder, state, canonical, out)
+        else builderType.declaredMethods.single {
             it.name.substringBefore('$') == "build" && it.parameterCount == 0
         }.apply { isAccessible = true }.invoke(builder) as SmtLibProblem
         require(parsed.objective == null && canonical.objective == null)
@@ -36,8 +37,11 @@ internal object SmtLibCompilationInspection {
             parsed.realVarNames == canonical.realVarNames) { "source names or mappings differ" }
         requireSameModel(parsed.model, canonical.model)
         val definitions = field(state, "definitions") as Map<*, *>
-        val comparisons = field(state, "comparisons") as Map<*, *>
-        val byOperator = comparisons.keys.groupingBy { field(requireNotNull(it), "op") as String }.eachCount()
+        val comparisonField = if (stateType.declaredFields.any { it.name == "comparisons" }) "comparisons" else "equalities"
+        val comparisons = field(state, comparisonField) as Map<*, *>
+        val byOperator = comparisons.keys.groupingBy { key ->
+            if (key!!.javaClass.declaredFields.any { it.name == "op" }) field(key, "op") as String else "="
+        }.eachCount()
         val guards = definitions.values.map { (field(requireNotNull(it), "guards") as List<*>).size }
         val images = definitions.values.map { field(requireNotNull(it), "image") as? Set<*> }
         val limit = field(state, "workLimit") as Int
@@ -70,8 +74,11 @@ internal object SmtLibCompilationInspection {
             put("cachedComparisonsByOperator", buildJsonObject {
                 for ((op, count) in byOperator.toSortedMap()) put(op, count)
             })
-            put("pendingComparisonsAfterBuild", (field(state, "pendingComparisons") as Map<*, *>).size)
-            put("pendingQueueAfterBuild", (field(state, "pendingOrder") as Collection<*>).size)
+            val pendingField = if (comparisonField == "comparisons") "pendingComparisons" else "pendingEqualities"
+            put("pendingComparisonsAfterBuild", (field(state, pendingField) as Map<*, *>).size)
+            if (stateType.declaredFields.any { it.name == "pendingOrder" }) {
+                put("pendingQueueAfterBuild", (field(state, "pendingOrder") as Collection<*>).size)
+            }
             put("compiledIntegers", canonical.model.numIntVars)
             put("compiledBooleans", canonical.model.numBoolVars)
             put("compiledFactors", canonical.model.factors.size)
@@ -84,7 +91,7 @@ internal object SmtLibCompilationInspection {
         out.resolve("compiler-expansion.json").writeText(report.toString() + "\n")
     }
 
-    private fun requireSameModel(left: Problem, right: Problem) {
+    internal fun requireSameModel(left: Problem, right: Problem) {
         require(left.numIntVars == right.numIntVars && left.numBoolVars == right.numBoolVars &&
             left.numRealVars == right.numRealVars && left.factors.size == right.factors.size)
         require(left.realLower.contentEquals(right.realLower) && left.realUpper.contentEquals(right.realUpper))

@@ -327,6 +327,16 @@ Its row histogram includes defining rows and selection channels, without attribu
 ownership or a refusal cause. This additional compilation supplies no timing,
 CLI-equivalence or verdict claim and starts no additional numerical operation.
 
+With `inspect=compiler-ownership`, the separate compilation stages satisfaction-only
+integer lowering through its existing private entry points. It snapshots definition
+owners before compaction, checks its dependency closure against the compiler's actual
+removed columns and factors, and requires the final model to match canonical admission
+by the same source names, bounds and ordered factor keys. It records external numeric
+consumers separately from integer defining factors. This mode declines objectives,
+real columns and open product operands; it changes no solver code or allowance.
+Its additional compilation is before the opening deadline and supplies no timing,
+CLI-equivalence, refusal-cause or source-verdict claim.
+
 `bench.profile.SourceAgreementProfile` compares one combined exact linear owner with
 explicit registered linear peers over original real, wide-integer, strict and guarded
 sources. Pass `repeats=N warmups=N cases=<comma-separated names>`; defaults are three
