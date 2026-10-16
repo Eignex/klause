@@ -40,6 +40,7 @@ internal class LeafRealCompletion(
     constructor(problem: Problem, objective: LinearObjective?) : this(problem, objective, null)
 
     private val encoders = problem.selectedFactorProjections()
+    private val encoding = LinearCompletionEncoding(encoders)
     private val absCompletion = if (problem.factors.any { it is RealAbs }) AbsRealCompletion(problem) else null
     var observeLp: ((LpVerdict, LpStats) -> Unit)? = null
     var observeFloat: ((Sample) -> Unit)? = null
@@ -67,13 +68,14 @@ internal class LeafRealCompletion(
                 }
             }
         }
+        val encoded = encoding.modelFor(candidate, cancellation) ?: return Completion.Undecided(movesFor(0.0))
         val sink = LpStatsSink(LpRoute.STANDALONE)
         val check = if (observeFloat == null) toleranceCheck else { sample: Sample ->
             observeFloat?.invoke(sample)
             toleranceCheck?.invoke(sample) == true
         }
         val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink,
-            context = context, toleranceCheck = check, encoders = encoders)
+            context = context, toleranceCheck = check, encoders = encoders, sourceEncoding = encoded)
         val stats = sink.snapshot()
         val pointWork = stats.phases["EXACT_POINT_RECOVERY_STANDALONE"]?.work?.toDouble() ?: 0.0
         val work = movesFor(stats.standaloneWorkOps.sum + pointWork)

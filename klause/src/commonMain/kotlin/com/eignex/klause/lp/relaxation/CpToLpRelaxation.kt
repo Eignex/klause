@@ -393,8 +393,9 @@ internal fun leafRealFeasibility(
     pricing: LpPricingOptions = LpPricingOptions(),
     toleranceCheck: ((Sample) -> Boolean)? = null,
     encoders: PreparedFactorProjections = problem.selectedFactorProjections(),
+    sourceEncoding: Problem? = null,
 ): LeafRealResult {
-    val encoded = encoders.finiteLinearModel(sample, cancellation)
+    val encoded = sourceEncoding ?: encoders.finiteLinearModel(sample, cancellation)
         ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
     val relaxation = CpToLpRelaxation(problem, objective, projections = null).build(SampleDomains(sample))
     // Bound the residual-LP solve by the search deadline: on a continuous-heavy model a single leaf LP is a
