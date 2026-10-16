@@ -4,13 +4,12 @@ import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_LO
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.klause.config.MINIZINC_UNBOUNDED_DEFAULT
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.FloatSemantics
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -30,29 +29,51 @@ import com.eignex.klause.util.toSortedIntArray
 /** Compile parsed FlatZinc AST into solver data structures. */
 internal class FlatZincCompiler(
     internal val model: FznModel,
-    internal val floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
-    internal val floatScale: Long = DEFAULT_FLOAT_SCALE,
+    floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
+    floatScale: Long = DEFAULT_FLOAT_SCALE,
     /** When true, drop `redundant_constraint` / `symmetry_breaking_constraint` wrappers for local search. */
     internal val forLocalSearch: Boolean = false,
     /** Default domain for unbounded `var int` declarations. */
-    internal val unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
-    internal val unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
-    internal val unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
-    internal val unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
-    internal val exactFloats: Boolean = false,
-    private val settings: ProblemSettings = ProblemSettings(),
+    unboundedIntLo: Long? = null,
+    unboundedIntHi: Long? = null,
+    unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
+    unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
+    exactFloats: Boolean = false,
+    private val settings: ProblemSettings = KlauseConfig.current.problemSettings(),
     internal val floatChoiceLimit: Int = DEFAULT_FLOAT_CHOICE_LIMIT,
     internal val booleanZeroSumClauseLimit: Int = 32_768,
     private val forFloatPlanning: Boolean = false,
+    private val semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ) : CnfLowering {
+    internal val sourceSemantics = FlatZincSemanticArguments(
+        floatBuckets = floatBuckets,
+        floatScale = floatScale,
+        unboundedIntLo = unboundedIntLo,
+        unboundedIntHi = unboundedIntHi,
+        unboundedFloatLo = unboundedFloatLo,
+        unboundedFloatHi = unboundedFloatHi,
+        exactFloats = exactFloats,
+    ).resolve(semanticOverrides)
+    private val integerSemantics = checkNotNull(sourceSemantics.effective.undeclaredIntegers)
+    private val gridSemantics = sourceSemantics.gridDefaults()
+    internal val floatBuckets = gridSemantics.buckets
+    internal val floatScale = gridSemantics.linearScale
+    internal val unboundedIntLo = integerSemantics.lower ?: Long.MIN_VALUE
+    internal val unboundedIntHi = integerSemantics.upper ?: Long.MAX_VALUE
+    internal val unboundedFloatLo = checkNotNull(gridSemantics.unrangedBounds.lower).gridFloat()
+    internal val unboundedFloatHi = checkNotNull(gridSemantics.unrangedBounds.upper).gridFloat()
+    internal val exactFloats = sourceSemantics.effective.floats == FloatSemantics.Continuous
+    private val openIntegerLower = IntHashSet()
+    private val openIntegerUpper = IntHashSet()
+
     init {
-        require(floatBuckets > 0) { "floatBuckets must be positive" }
-        require(floatScale > 0) { "floatScale must be positive" }
+        require(this.floatBuckets > 0) { "floatBuckets must be positive" }
+        require(this.floatScale > 0) { "floatScale must be positive" }
         require(booleanZeroSumClauseLimit >= 0) { "booleanZeroSumClauseLimit must be nonnegative" }
         require(floatChoiceLimit > 0) { "floatChoiceLimit must be positive" }
-        if (!exactFloats) {
+        if (!this.exactFloats) {
             require(
-                unboundedFloatLo.isFinite() && unboundedFloatHi.isFinite() && unboundedFloatLo <= unboundedFloatHi,
+                this.unboundedFloatLo <= this.unboundedFloatHi,
             ) { "unbounded float search bounds must be finite and ordered" }
         }
     }
@@ -122,6 +143,7 @@ internal class FlatZincCompiler(
         floatChoiceLimit = floatChoiceLimit,
         booleanZeroSumClauseLimit = booleanZeroSumClauseLimit,
         forFloatPlanning = true,
+        semanticOverrides = semanticOverrides,
     ).also { it.processDeclarations() }
 
     internal fun processDeclarations() {
@@ -173,6 +195,12 @@ internal class FlatZincCompiler(
             numRealVars = realLo.size,
             realLower = realLo.toDoubleArray(),
             realUpper = realHi.toDoubleArray(),
+            openIntLo = if (openIntegerLower.isEmpty()) null else BooleanArray(intDomains.size) {
+                it in openIntegerLower
+            },
+            openIntHi = if (openIntegerUpper.isEmpty()) null else BooleanArray(intDomains.size) {
+                it in openIntegerUpper
+            },
         )
         return FlatZincProgram(
             problem = problem,
@@ -186,6 +214,7 @@ internal class FlatZincCompiler(
             enumLabelsByVar = enumLabelsByVar.toMap(),
             setVarsByName = setVarsByName.toMap(),
             floatRepresentations = floatRepresentations,
+            semantics = sourceSemantics,
         )
     }
 
@@ -208,11 +237,7 @@ internal class FlatZincCompiler(
         when (val t = d.type) {
             FznType.Bool -> allocBool(d.name)
 
-            FznType.IntAny -> allocInt(
-                d.name,
-                unboundedIntLo.coerceIn(-MINIZINC_UNBOUNDED_DEFAULT, MINIZINC_UNBOUNDED_DEFAULT),
-                unboundedIntHi.coerceIn(-MINIZINC_UNBOUNDED_DEFAULT, MINIZINC_UNBOUNDED_DEFAULT),
-            )
+            FznType.IntAny -> allocUndeclaredInt(d.name)
 
             is FznType.IntRange -> allocInt(d.name, t.lo, t.hi)
 
@@ -243,6 +268,8 @@ internal class FlatZincCompiler(
                     postFalseFactor()
                 } else {
                     intDomains[id] = intDomainFromSurvivors(values, settings.storage)
+                    openIntegerLower.remove(id)
+                    openIntegerUpper.remove(id)
                 }
                 intVars[name] = id
             }
@@ -250,6 +277,8 @@ internal class FlatZincCompiler(
             is FznType.IntRange -> {
                 val id = resolveIntVar(rhs)
                 intDomains[id] = intDomains[id].withMinAtLeast(type.lo).withMaxAtMost(type.hi)
+                openIntegerLower.remove(id)
+                openIntegerUpper.remove(id)
                 intVars[name] = id
             }
 
@@ -388,7 +417,7 @@ internal class FlatZincCompiler(
                     requireNotNull(bucketings).add(floatVars.getValue(elemName))
                 }
 
-                FznType.IntAny -> unsupportedHere("array `$name`: unbounded element type")
+                FznType.IntAny -> varIds[i] = allocUndeclaredInt(elemName)
 
                 is FznType.SetOfInt -> unsupportedHere("array `$name`: array of set-of-int not supported")
 
@@ -433,6 +462,13 @@ internal class FlatZincCompiler(
         factors.add(Clause(intArrayOf(Lit.make(f, true))))
         factors.add(Clause(intArrayOf(Lit.make(f, false))))
     }
+    private fun allocUndeclaredInt(name: String): Int {
+        val id = allocInt(name, unboundedIntLo, unboundedIntHi)
+        if (integerSemantics.lower == null) openIntegerLower.add(id)
+        if (integerSemantics.upper == null) openIntegerUpper.add(id)
+        return id
+    }
+
     internal fun allocInt(name: String, lo: Long, hi: Long): Int {
         val id = intDomains.size
         intDomains.add(IntDomain(lo, hi, settings.storage))
@@ -680,12 +716,13 @@ fun parseFlatZinc(
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
     floatScale: Long = DEFAULT_FLOAT_SCALE,
     forLocalSearch: Boolean = false,
-    unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
-    unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+    unboundedIntLo: Long? = null,
+    unboundedIntHi: Long? = null,
     unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
     unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
     settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+    semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ): FlatZincProgram = parseFlatZinc(
     StringCharSource(source),
     floatBuckets = floatBuckets,
@@ -697,6 +734,7 @@ fun parseFlatZinc(
     unboundedFloatHi = unboundedFloatHi,
     exactFloats = exactFloats,
     settings = settings,
+    semanticOverrides = semanticOverrides,
 )
 
 /** Parse and compile FlatZinc from a streamed [source], pulling one token at a time so the whole file
@@ -707,12 +745,13 @@ fun parseFlatZinc(
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
     floatScale: Long = DEFAULT_FLOAT_SCALE,
     forLocalSearch: Boolean = false,
-    unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
-    unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+    unboundedIntLo: Long? = null,
+    unboundedIntHi: Long? = null,
     unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
     unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
     settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+    semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ): FlatZincProgram = parseFlatZincWithMetadata(
     source,
     floatBuckets,
@@ -724,6 +763,7 @@ fun parseFlatZinc(
     unboundedFloatHi,
     exactFloats,
     settings,
+    semanticOverrides,
 ) { _, _ -> }
 
 internal fun parseFlatZincWithMetadata(
@@ -731,12 +771,13 @@ internal fun parseFlatZincWithMetadata(
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
     floatScale: Long = DEFAULT_FLOAT_SCALE,
     forLocalSearch: Boolean = false,
-    unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
-    unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+    unboundedIntLo: Long? = null,
+    unboundedIntHi: Long? = null,
     unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
     unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
     settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+    semanticOverrides: SemanticOverrides = SemanticOverrides(),
     onLowered: (FlatZincCompiler, SolveDirective) -> Unit,
 ): FlatZincProgram {
     val model = FlatZincParser(FlatZincLexer(CharReader(source))).parse()
@@ -751,5 +792,6 @@ internal fun parseFlatZincWithMetadata(
         unboundedFloatHi = unboundedFloatHi,
         exactFloats = exactFloats,
         settings = settings,
+        semanticOverrides = semanticOverrides,
     ).compile(onLowered)
 }

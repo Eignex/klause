@@ -1,5 +1,8 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
+
 import com.eignex.klause.formats.flatzinc.OznApplier
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
@@ -7,6 +10,7 @@ import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.formats.flatzinc.toSearchHints
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -35,6 +39,7 @@ internal object MiniZincMode : CliMode {
         private var unboundedIntHi: Long? = null
         private var outputObjective = false
         private var floatApproximation = false
+        private var sourceSemantics: EffectiveSourceSemantics? = null
         private var unboundedFloatLo: Double? = null
         private var unboundedFloatHi: Double? = null
 
@@ -84,13 +89,14 @@ internal object MiniZincMode : CliMode {
                 source = openFileSource(path),
                 floatBuckets = config.floatBuckets,
                 floatScale = config.floatScale,
-                unboundedIntLo = unboundedIntLo ?: config.unboundedIntLo,
-                unboundedIntHi = unboundedIntHi ?: config.unboundedIntHi,
+                unboundedIntLo = unboundedIntLo ?: config.unboundedIntLo.takeUnless { it == DEFAULT_UNBOUNDED_INT_LO },
+                unboundedIntHi = unboundedIntHi ?: config.unboundedIntHi.takeUnless { it == DEFAULT_UNBOUNDED_INT_HI },
                 unboundedFloatLo = floatLo,
                 unboundedFloatHi = floatHi,
                 exactFloats = common.exact,
             )
             val program = executionProgram.program
+            sourceSemantics = program.semantics
             floatApproximation = program.floatVarsByName.values.any { !it.lpOnly }
             cliLogger(common.verbose).v {
                 "parsed $path: bools=${program.problem.numBoolVars} ints=${program.problem.numIntVars} " +
@@ -191,13 +197,29 @@ internal object MiniZincMode : CliMode {
         private fun parseFloatBound(raw: String): Double = raw.toDoubleOrNull()?.takeIf { it.isFinite() }
             ?: usageError("unbounded float bounds must be finite numbers, got `$raw`")
 
-        override fun output(common: CommonOptions): OutputProtocol = MiniZincOutput(floatApproximation)
+        override fun output(common: CommonOptions): OutputProtocol = MiniZincOutput(floatApproximation, sourceSemantics)
     }
 }
 
 /** MiniZinc's standard FZN solution protocol. */
-internal class MiniZincOutput(private val floatApproximation: Boolean = false) : OutputProtocol {
+internal class MiniZincOutput(
+    private val floatApproximation: Boolean = false,
+    private val sourceSemantics: EffectiveSourceSemantics? = null,
+) : OutputProtocol {
     private var context: VerdictContext = VerdictContext()
+    private val integerScopeChanged = sourceSemantics?.let {
+        it.declared.undeclaredIntegers != it.effective.undeclaredIntegers
+    } == true
+
+    override fun begin(optimize: Boolean, maximize: Boolean) {
+        if (integerScopeChanged) {
+            val bounds = checkNotNull(sourceSemantics?.effective?.undeclaredIntegers)
+            println(
+                "% klause-source-semantics: unbounded-int-lo=${bounds.lower ?: "open"} " +
+                    "unbounded-int-hi=${bounds.upper ?: "open"}",
+            )
+        }
+    }
 
     override fun onVerdictContext(context: VerdictContext) {
         this.context = context
@@ -247,7 +269,10 @@ internal class MiniZincOutput(private val floatApproximation: Boolean = false) :
         if (floatApproximation) {
             println("% klause-float-claim: grid search; source witness check required; no source proof")
         }
-        when (flatZincSourceVerdict(verdict, floatApproximation)) {
+        if (integerScopeChanged) {
+            println("% klause-source-claim: caller integer bounds; no default-source proof")
+        }
+        when (flatZincSourceVerdict(verdict, floatApproximation || integerScopeChanged)) {
             Verdict.SATISFIABLE, Verdict.OPTIMAL -> println("==========")
 
             // Incumbents already streamed; printing `==========` would falsely claim optimality.
@@ -261,8 +286,11 @@ internal class MiniZincOutput(private val floatApproximation: Boolean = false) :
             // standard terminator without changing what the protocol promises.
             Verdict.UNKNOWN -> {
                 println("=====UNKNOWN=====")
-                val cause = if (floatApproximation) "grid search cannot prove the source model" else
-                    context.softVerdictCause()
+                val cause = when {
+                    floatApproximation -> "grid search cannot prove the source model"
+                    integerScopeChanged -> "caller integer bounds changed source scope"
+                    else -> context.softVerdictCause()
+                }
                 println("% $cause")
             }
         }
