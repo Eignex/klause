@@ -48,6 +48,12 @@ rendered objective values remain in source units when working rows or costs are 
 
 ## Source correspondence
 
+`MpsModel.toLinearSourceProblem` captures original rational declarations, row sides,
+separate source terms, integer indicators and the affine objective before engine
+normalization. Caller declaration defaults and feasibility tolerance resolve once
+for that snapshot. Cancellation withholds an interrupted capture. Its copied term
+containers retain their numbers when the parsed model's coefficient arrays change.
+
 MPS lowering returns an engine-neutral `Problem` with its source columns, numbers
 and effective semantics retained for validation. The model-facing LP layer assembles
 numerical models and certificates from factor views. The format constructs no
