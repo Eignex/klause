@@ -45,7 +45,7 @@ internal class FlatZincCompiler(
     private val forFloatPlanning: Boolean = false,
     private val semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ) : CnfLowering {
-    internal val sourceSemantics = FlatZincSemanticArguments(
+    internal val sourceSemantics = FlatZincSemantics(
         floatBuckets = floatBuckets,
         floatScale = floatScale,
         unboundedIntLo = unboundedIntLo,
@@ -67,8 +67,8 @@ internal class FlatZincCompiler(
     private val openIntegerUpper = IntHashSet()
 
     init {
-        require(this.floatBuckets > 0) { "floatBuckets must be positive" }
-        require(this.floatScale > 0) { "floatScale must be positive" }
+        require(floatBuckets > 0) { "floatBuckets must be positive" }
+        require(floatScale > 0) { "floatScale must be positive" }
         require(booleanZeroSumClauseLimit >= 0) { "booleanZeroSumClauseLimit must be nonnegative" }
         require(floatChoiceLimit > 0) { "floatChoiceLimit must be positive" }
         if (!this.exactFloats) {

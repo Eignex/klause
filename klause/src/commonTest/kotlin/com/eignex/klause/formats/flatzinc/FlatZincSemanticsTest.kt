@@ -45,7 +45,10 @@ class FlatZincSemanticsTest {
                 assertEquals(-2_000_000L, program.problem.intBounds.lower(id))
                 assertEquals(3_000_000L, program.problem.intBounds.upper(id))
             }
-            assertEquals(UndeclaredIntegerBounds(-2_000_000, 3_000_000), program.semantics.effective.undeclaredIntegers)
+            assertEquals(
+                UndeclaredIntegerBounds(-2_000_000, 3_000_000),
+                program.semantics.effective.undeclaredIntegers,
+            )
             assertTrue(program.semantics.hasOverrides)
         }
     }
@@ -80,7 +83,9 @@ class FlatZincSemanticsTest {
 
     @Test
     fun `legacy integer arguments should use the same replacement contract`() {
-        val program = parseFlatZinc("var int: x; solve satisfy;", unboundedIntLo = -2_000_000, unboundedIntHi = 3_000_000)
+        val program = parseFlatZinc(
+            "var int: x; solve satisfy;", unboundedIntLo = -2_000_000, unboundedIntHi = 3_000_000,
+        )
 
         assertEquals(-2_000_000L, program.problem.intBounds.lower(0))
         assertEquals(3_000_000L, program.problem.intBounds.upper(0))
@@ -116,7 +121,9 @@ class FlatZincSemanticsTest {
             undeclaredIntegers = BoundsOverride(BoundOverride.Open, BoundOverride.Open),
         )
         for (range in listOf("-2..5", "{-2, 5}")) {
-            val program = parseFlatZinc("var int: x; var $range: y = x; solve satisfy;", semanticOverrides = overrides)
+            val program = parseFlatZinc(
+                "var int: x; var $range: y = x; solve satisfy;", semanticOverrides = overrides,
+            )
 
             val id = program.intVarsByName.getValue("x")
             assertEquals(-2L, program.problem.intBounds.lower(id))

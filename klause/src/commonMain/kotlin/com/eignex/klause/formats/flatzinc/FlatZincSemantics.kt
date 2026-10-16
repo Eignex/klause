@@ -24,7 +24,7 @@ val flatZincSemantics: SourceSemantics = SourceSemantics(
     undeclaredIntegers = UndeclaredIntegerBounds(-MINIZINC_UNBOUNDED_DEFAULT, MINIZINC_UNBOUNDED_DEFAULT),
 )
 
-internal class FlatZincSemanticArguments(
+internal class FlatZincSemantics(
     private val floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
     private val floatScale: Long = DEFAULT_FLOAT_SCALE,
     private val unboundedIntLo: Long? = null,

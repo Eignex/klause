@@ -89,8 +89,10 @@ internal object MiniZincMode : CliMode {
                 source = openFileSource(path),
                 floatBuckets = config.floatBuckets,
                 floatScale = config.floatScale,
-                unboundedIntLo = unboundedIntLo ?: config.unboundedIntLo.takeUnless { it == DEFAULT_UNBOUNDED_INT_LO },
-                unboundedIntHi = unboundedIntHi ?: config.unboundedIntHi.takeUnless { it == DEFAULT_UNBOUNDED_INT_HI },
+                unboundedIntLo = unboundedIntLo
+                    ?: config.unboundedIntLo.takeUnless { it == DEFAULT_UNBOUNDED_INT_LO },
+                unboundedIntHi = unboundedIntHi
+                    ?: config.unboundedIntHi.takeUnless { it == DEFAULT_UNBOUNDED_INT_HI },
                 unboundedFloatLo = floatLo,
                 unboundedFloatHi = floatHi,
                 exactFloats = common.exact,
