@@ -603,6 +603,23 @@ class MpsModeTest {
     }
 
     @Test
+    fun `exact one-sided real optimization should retain the rational optimum`() {
+        val source = File.createTempFile("mps-exact-one-sided", ".mps").apply {
+            writeText("ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 10\nRHS\n RHS R 1\nENDATA\n")
+            deleteOnExit()
+        }
+
+        val text = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--exact", source.absolutePath)))
+        }
+
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("o 0.1" in text.lines(), text)
+        assertTrue("v X=0.1" in text.lines(), text)
+        assertTrue("c optimizationStatus=attained-optimum" in text.lines(), text)
+    }
+
+    @Test
     fun `default bounded decimal optimization should separate exact feasibility from tolerance optimality`() {
         val source = File.createTempFile("mps-finite-tolerance", ".mps").apply {
             writeText(
