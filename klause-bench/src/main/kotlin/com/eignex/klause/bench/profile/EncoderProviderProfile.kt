@@ -15,6 +15,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -56,11 +58,15 @@ object EncoderProviderProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys.all { it in setOf("inputs", "repeats", "warmups", "seed", "parser") })
+        require(options.keys.all { it in setOf("inputs", "repeats", "warmups", "seed", "parser", "entry", "engine") })
         val repeats = options["repeats"]?.toInt() ?: 3
         val warmups = options["warmups"]?.toInt() ?: 1
         val parser = options["parser"] ?: "admission"
         require(parser in setOf("admission", "factor"))
+        val entry = options["entry"] ?: "pipeline"
+        val engine = options["engine"] ?: "cp"
+        require(entry in setOf("pipeline", "source") && engine in setOf("cp", "ls"))
+        require(entry == "source" || engine == "cp") { "LS requires the source facade entry" }
         val seed = options["seed"]?.toLong() ?: 1L
         require(repeats in 1..100 && warmups in 0..10)
         val output = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
@@ -78,6 +84,8 @@ object EncoderProviderProfile {
             put("javaOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
             put("processors", Runtime.getRuntime().availableProcessors())
             put("parser", parser)
+            put("entry", entry)
+            put("engine", engine)
             put("seed", seed)
             put("repeats", repeats)
             put("warmups", warmups)
@@ -107,6 +115,7 @@ object EncoderProviderProfile {
                 require(parsed is SmtLibInput.Linear) { "input is not a factor-admitted SMT source: $input" }
                 parsed.problem
             }
+            require(entry != "source" || problem.objective == null) { "source facade controls require satisfaction" }
             resourceControl(problem, bytes, output.resolve("$index-resource").apply { mkdirs() })
             for (round in -warmups until repeats) {
                 val results = ArrayList<String>()
@@ -124,13 +133,22 @@ object EncoderProviderProfile {
                     }
                     val providers = providers(alternate) { installations++ }
                     val started = System.nanoTime()
+                    val result = if (entry == "source") {
+                        if (engine == "cp") {
+                            BacktrackSolver.source(problem.model).withProjectionProviders(providers)
+                                .solve(BacktrackParams(cancellation = stop, randomSeed = seed))
+                        } else {
+                            LocalSearchSolver.source(problem.model).withProjectionProviders(providers)
+                                .solve(LocalSearchParams(cancellation = stop, randomSeed = seed))
+                        }
+                    } else {
                     val route = problem.model.pipelineRoute(
                         providers,
                         routePureRealToTheory = true,
                         routeLinearToTheory = true,
                         boundCancellation = stop,
                     )
-                    val result = when (route) {
+                    when (route) {
                         is SourceProblemRoute.NativeFormula -> error("factor routing selected a native formula")
 
                         is SourceProblemRoute.OpenTheory -> {
@@ -167,6 +185,7 @@ object EncoderProviderProfile {
                         is SourceProblemRoute.UnsupportedOpen ->
                             error("unsupported source route: ${route.preparedPlan.decline}")
                     }
+                    }
                     val elapsed = System.nanoTime() - started
                     val verdict = when (result) {
                         is OpenTheoryResult.Sat -> "sat"
@@ -188,6 +207,9 @@ object EncoderProviderProfile {
                         put("mode", if (alternate) "private" else "default")
                         put("round", round)
                         put("verdict", verdict)
+                        put("entry", entry)
+                        put("engine", engine)
+                        put("reportedBackend", result.stats.run.backend)
                         put("elapsedNs", elapsed)
                         put("nativeWork", work)
                         put("installations", installations)
@@ -210,7 +232,8 @@ object EncoderProviderProfile {
                     }
                     }
                     println(
-                        "source=$index alternate=$alternate round=$round verdict=$verdict " +
+                        "source=$index alternate=$alternate round=$round " +
+                            "entry=$entry engine=$engine verdict=$verdict " +
                             "elapsedNs=$elapsed nativeWork=$work installations=$installations",
                     )
                 }
