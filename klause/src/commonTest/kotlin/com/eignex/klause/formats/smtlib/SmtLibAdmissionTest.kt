@@ -39,6 +39,25 @@ import kotlin.test.assertTrue
 
 class SmtLibAdmissionTest {
     @Test
+    fun `a provided closeable source should close when admission is already interrupted`() {
+        var reads = 0
+        var closes = 0
+        val source = object : CharSource, AutoCloseable {
+            override fun next(): String? {
+                reads++
+                return null
+            }
+
+            override fun close() { closes++ }
+        }
+
+        assertFailsWith<CancellationException> { SmtLib.parse(source, cancellation = Cancellation { true }) }
+
+        assertEquals(0, reads)
+        assertEquals(1, closes)
+    }
+
+    @Test
     fun `all SMT source representations should retain supplied settings`() {
         val settings = ProblemSettings()
         val texts = listOf(
