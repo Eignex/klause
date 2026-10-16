@@ -6,7 +6,6 @@ import com.eignex.klause.formats.mps.MpsLoweringException
 import com.eignex.klause.formats.mps.MpsSourceWitness
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
-import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -49,9 +48,9 @@ internal object MpsMode : CliMode {
             val source = Mps.parse(openFileSource(path))
             val settings = common.config.problemSettings()
             val semanticOverrides = if (common.exact) {
-                SemanticOverrides(feasibilityTolerance = SourceTolerance())
+                common.semanticOverrides.copy(feasibilityTolerance = SourceTolerance())
             } else {
-                SemanticOverrides()
+                common.semanticOverrides
             }
             val lowered = try {
                 source.toProblem(settings, semanticOverrides)

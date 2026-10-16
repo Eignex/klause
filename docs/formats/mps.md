@@ -24,6 +24,11 @@ The compatibility `toExactSourceProblem` entry defaults to zero;
 its explicit overrides and internal exact-row fallback retain their resolved policy.
 Source representation and the permitted feasibility slack are separate properties.
 
+The CLI loader captures shared typed caller overrides before lowering. `--exact`
+replaces the feasibility tolerance with zero while preserving other fields for
+applicability checking. Finite leaf checks and numerical source publication use
+that captured policy throughout the loaded source's lifetime.
+
 ## Source correspondence
 
 The MPS parser retains decimal source metadata, integer markers, bounds and
