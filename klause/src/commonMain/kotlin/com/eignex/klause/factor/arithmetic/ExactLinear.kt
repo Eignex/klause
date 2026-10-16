@@ -105,7 +105,9 @@ class ExactLinear private constructor(
             strict: Boolean = false,
             activator: Int = LinearRow.ALWAYS,
         ): ExactLinear {
-            require(!strict || relation == LinearOp.LE || relation == LinearOp.GE) { "strict row must be an inequality" }
+            require(!strict || relation == LinearOp.LE || relation == LinearOp.GE) {
+                "strict row must be an inequality"
+            }
             require(activator >= LinearRow.ALWAYS) { "invalid row activator" }
 
             require(refs.size == coefficients.size)
