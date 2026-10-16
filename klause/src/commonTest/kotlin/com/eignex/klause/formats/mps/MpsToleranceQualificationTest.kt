@@ -14,6 +14,22 @@ import kotlin.test.assertTrue
 
 class MpsToleranceQualificationTest {
     @Test
+    fun `a rounded equality should retain an accepted bound below its nominal float optimum`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 3.0000000000000001\nRHS\n RHS R 1\nENDATA",
+        ).toProblem()
+        val expected = BigFraction.of(bigIntOf(9999999000000000L), bigIntOf(30000000000000001L))
+
+        val bound = compiled.toleranceObjectiveBound()
+        val witness = compiled.sourceWitness(listOf(expected))
+
+        assertEquals(expected, bound)
+        assertEquals(expected, witness.objective)
+        assertFalse(witness.exact)
+        assertTrue(expected < checkNotNull(BigFraction.ofDouble(0.3333333333333333)))
+    }
+
+    @Test
     fun `enabled one term rows should preserve an empty tolerance accepted set`() {
         val source = Mps.parse(
             "ROWS\n N COST\n G A\n L B\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 0\n" +
