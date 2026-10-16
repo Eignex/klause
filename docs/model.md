@@ -173,7 +173,9 @@ all operand coordinates are known. Local search grades collisions exactly over
 finite integer/Boolean points; real-coordinate scores describe the supplied
 binary64 point and require separate exact source checking. Original-coordinate
 witness checks compare affine values exactly, including arbitrary-width integers
-and rational reals. Distinctness supplies no unconditional numerical relaxation.
+and rational reals. A checked ray preserves every affine separation; false
+reification requires a permanent affine collision. Distinctness supplies no
+unconditional numerical relaxation.
 
 ## Published assignments and objectives
 

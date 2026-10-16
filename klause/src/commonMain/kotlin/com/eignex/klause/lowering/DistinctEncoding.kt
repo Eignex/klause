@@ -18,6 +18,7 @@ import com.eignex.klause.theory.LinearEncodingFormula
 import com.eignex.klause.util.Cancellation
 
 internal fun distinctLinearFormula(factor: Distinct, cancellation: Cancellation): LinearEncodingFormula? {
+    if (cancellation()) return null
     val operands = factor.operands
     val differences = ArrayList<LinearEncodingFormula>()
     val collisions = ArrayList<LinearEncodingFormula>()
@@ -59,6 +60,7 @@ internal fun distinctPolynomialFormula(
     conditional: (PolynomialRealFormula, PolynomialExpression, PolynomialExpression) -> PolynomialExpression,
     cancellation: Cancellation,
 ): PolynomialRealFormula? {
+    if (cancellation()) return null
     val values = ArrayList<PolynomialExpression>()
     for (operand in factor.operands) {
         val terms = arrayListOf<PolynomialExpression>(PolynomialRealLowering.constant(operand.constant))
