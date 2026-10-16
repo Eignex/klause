@@ -372,6 +372,20 @@ ceilings. Substitution, hinting, reconstruction and complete original-formula ch
 share the same native prefix as coupled guidance, without renewing it. A rejected
 proposal supplies no refutation and leaves the ordinary producer and CAD available.
 
+SAT-only definition guidance can also collect unconditional atoms from conjunctions
+while leaving Boolean alternatives and negated compound formulas with the full
+source checker. This collection does not replace complete conjunction admission
+used by refutations. A private prepared reconstruction retains its residual
+free-coordinate atoms and original definitions across proposals. Exact univariate
+roots of nonlinear residual atoms guide rational proposals from successively refined
+isolating endpoints. Every proposal reconstructs all dependent coordinates and checks
+the complete original formula, including strict and guarded obligations. Fixed and
+unused declarations remain captured. Root isolation, refinement, reconstruction and
+checking share the existing coupled half-prefix, axis and proposal limits;
+specialized coefficients and reconstructed rationals retain the same bit admission.
+An incomplete preparation or rejected point supplies no source verdict or domain
+restriction.
+
 Nonlinear numeric conjunctions also propose coupled exact lines from positive
 rational and zero centers on referenced unfixed coordinates. Source monomial co-occurrence
 selects coordinate groups. Unconditional affine
