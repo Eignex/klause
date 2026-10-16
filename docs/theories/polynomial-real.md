@@ -335,9 +335,10 @@ signs; coefficient signs, monomial parity and exact sign addition/multiplication
 then enclose each polynomial's possible signs. A relation disjoint from that enclosure
 refutes the conjunction. Opposite-sign sums retain cancellation, and non-strict
 premises retain zero. Boolean alternatives supply no unconditional sign premises.
-This check shares the witness producer's coordinate, atom, term and native-work limits;
-a decline retains spent work and leaves witness probing and complete CAD available.
-It introduces no coordinate bounds or finite domains and exports no proof artifact.
+This check shares the witness producer's coordinate, atom, term and native-work limits.
+Admission decline leaves witness probing available; prefix exhaustion retains spent
+work and leaves complete CAD available. It introduces no coordinate bounds or finite
+domains and exports no proof artifact.
 
 Before projection, bounded witness probing checks complete exact points and can
 repair one coordinate at a time using roots of an equality specialized at all other
