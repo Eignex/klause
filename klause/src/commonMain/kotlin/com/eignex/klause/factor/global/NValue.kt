@@ -15,9 +15,10 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 
 /**
- * `nvalue(n, xs)` — `n` equals the count of distinct values appearing in [xs]. Plus
+ * `nvalue(n, xs)` — `n` equals the count of distinct values appearing in [xs], excluding [exceptSet]. Plus
  * variants:
  *
  *  - [Mode.Eq] (default): `n = |distinct(xs)|`.
@@ -36,6 +37,8 @@ class NValue(
     val mode: Mode = Mode.Eq,
     /** Per-index presence literals; empty for the non-opt fast path. */
     override val presents: IntArray = EmptyIntArray,
+    /** Values omitted from the distinct-value count. */
+    val exceptSet: LongArray = EmptyLongArray,
 ) : Factor,
     OptionalFactor {
 
@@ -58,14 +61,16 @@ class NValue(
         }
     }
 
+    private val exceptSorted = exceptSet.distinct().sorted().toLongArray()
+
     override fun remap(mapping: VarRemap): Factor =
-        NValue(mapping.int(n), mapping.ints(xs), mode, mapping.lits(presents))
+        NValue(mapping.int(n), mapping.ints(xs), mode, mapping.lits(presents), exceptSet)
 
     // A fixed distinct-count target degenerates the exact `nvalue` into a simpler global: `n = |xs|`
     // forces all values distinct (an [AllDifferent] over the union domain), and `n = 1` forces them all
     // equal (a chain of equalities). Solution-set exact; only the non-optional `Eq` mode qualifies.
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
-        if (mode != Mode.Eq || presents.isNotEmpty()) return Unchanged
+        if (mode != Mode.Eq || presents.isNotEmpty() || exceptSet.isNotEmpty()) return Unchanged
         val nDom = domains[n]
         if (nDom.min != nDom.max) return Unchanged
         val target = nDom.min
@@ -99,6 +104,7 @@ class NValue(
     // a remappable Boolean literal, which the KeySink constant-value pair methods cannot remap.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.NVALUE) {
         enum(mode)
+        longs(exceptSorted)
         int(n)
         pairsByKey(xs) { presents.getOrElse(it) { -1 }.toLong() }
     }

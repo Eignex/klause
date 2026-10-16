@@ -26,6 +26,7 @@ internal class NValuePropagator(
     private val xs: IntArray,
     private val mode: NValue.Mode,
     private val presents: IntArray,
+    private val exceptValues: Set<Long>,
     private val initialIntEventWatchesVal: IntArray?,
     private val consumesIntEventDeltaVal: Boolean,
     private val definitelyAbsentNvFn: (Int, PropagationState) -> Boolean,
@@ -74,12 +75,11 @@ internal class NValuePropagator(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        // The optional-presence variant keeps the order-insensitive greedy bounds: a presence flip
-        // changes the count without an int-domain event, so the stronger domain-driven filtering
-        // (which assumes every counted variable is present) does not apply cleanly.
-        if (presents.isNotEmpty()) return propagateGreedy(state)
-
         state.propagatorFailures.remove(this)
+        // Optional or excepted positions need not contribute a value, so mandatory matching and
+        // kernel filtering cannot count every position as a required representative.
+        if (presents.isNotEmpty() || exceptValues.isNotEmpty()) return propagateGreedy(state)
+
         if (state.cpGateShouldSkip(factorId)) return true
 
         // atLeast / eq: the distinct count cannot exceed the size of a maximum bipartite var↦value matching
@@ -152,28 +152,33 @@ internal class NValuePropagator(
         return (0 until nv).filter { seenVar[it] }.map { xs[it] }.toIntArray()
     }
 
-    /** Order-insensitive greedy bounds, the fallback for the optional-presence variant. */
     private fun propagateGreedy(state: PropagationState): Boolean {
         // The union / disjoint-window scans below enumerate each variable's domain. On a domain too large
         // to walk use a bounds-only bound instead: the distinct count is at most the number of possibly-
-        // present variables (sound). No cheap sound lower bound here, so leave the minimum untightened
-        // (sound, just weaker) — the AtMost mode, which only tightens the minimum, is a no-op.
+        // present variables. Definitely-present fixed non-excepted values supply a lower bound.
         val nonAbsent = xs.indices.filter { !definitelyAbsentNvFn(it, state) }
         if (nonAbsent.any { state.intDomains[xs[it]].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null }) {
             val boundsAnt = OptionalPresence.withPresencePremises(
                 presents, state, collectHoleAndBoundAntecedents(state, xs),
             )
-            return when (mode) {
-                NValue.Mode.Eq, NValue.Mode.AtLeast -> state.tightenIntMax(n, nonAbsent.size.toLong(), boundsAnt)
-                NValue.Mode.AtMost -> true
+            val fixedValues = LongHashSet()
+            for (i in xs.indices) {
+                val domain = state.intDomains[xs[i]]
+                if (definitelyPresentNvFn(i, state) && domain.min == domain.max && domain.min !in exceptValues) {
+                    fixedValues.add(domain.min)
+                }
             }
+            if (mode != NValue.Mode.AtLeast && !state.tightenIntMin(n, fixedValues.size.toLong(), boundsAnt)) {
+                return false
+            }
+            return mode == NValue.Mode.AtMost || state.tightenIntMax(n, nonAbsent.size.toLong(), boundsAnt)
         }
         val unionValues = LongHashSet()
         for (i in xs.indices) {
             if (definitelyAbsentNvFn(i, state)) continue
-            state.intDomains[xs[i]].values.forEach { unionValues.add(it) }
+            state.intDomains[xs[i]].values.forEach { if (it !in exceptValues) unionValues.add(it) }
         }
-        val maxDistinct = unionValues.size
+        val maxDistinct = minOf(unionValues.size, nonAbsent.size)
         val present = IntArrayList(xs.size)
         for (i in xs.indices) if (definitelyPresentNvFn(i, state)) present.add(xs[i])
         present.sortByIntKey { state.intDomains[it].values.size }
@@ -182,7 +187,7 @@ internal class NValuePropagator(
         for (idx in 0 until present.size) {
             val d = state.intDomains[present[idx]]
             var disjoint = true
-            d.values.forEach { if (covered.contains(it)) disjoint = false }
+            d.values.forEach { if (it in exceptValues || covered.contains(it)) disjoint = false }
             if (disjoint) {
                 minDistinct++
                 d.values.forEach { covered.add(it) }

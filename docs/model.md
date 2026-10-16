@@ -35,6 +35,24 @@ the source relation.
 Generic `Problem` polynomial composition keeps its [finite integer boundary](theories/polynomial-real.md#scope-and-boundaries);
 admitted open/wide SMT powers retain their exact nonlinear source snapshots.
 
+## Distinct-value counts
+
+`NValue` retains its counted integer positions, target, comparison mode, optional
+presence literals and excluded values. Exclusions are a set of source values;
+repeated positions and aliases retain their roles. Remapping preserves exclusions,
+and structural identity distinguishes them. Fixed-target reductions to equality or
+all-different apply only without exclusions or optional positions.
+
+Finite propagation bounds the count of definitely-present non-excluded values and
+checks the exact count at a complete assignment. Matching and kernel filters serve
+the mandatory form; optional or excluded positions use conservative count bounds.
+Wide domains use fixed-value lower bounds and a position-count upper bound without
+enumeration. Local search maintains exact non-excluded counts, move deltas and
+count-preserving class merges. Its scores do not establish proof authority.
+The optional LP value hull keeps selectors for excluded values while omitting those
+values from the count sum. This remains a relaxation, with finite propagation owning
+the complete relation. Open arithmetic encoders do not claim NValue coverage.
+
 ## Integer division relations
 
 `factor.arithmetic.DivMod` retains a dividend, a literal or variable divisor and both

@@ -18,6 +18,7 @@ internal class NValueEliminationMoves(
     private val xs: IntArray,
     private val mode: NValue.Mode,
     private val presents: IntArray,
+    private val exceptValues: Set<Long>,
     private val present: (LocalSearchState, Int) -> Boolean,
 ) {
     fun propose(
@@ -95,7 +96,8 @@ internal class NValueEliminationMoves(
         val values = LongHashSet()
         val representatives = ArrayList<Int>()
         for (i in xs.indices) {
-            if (present(state, i) && values.add(state.assignment.intValue(xs[i]))) representatives += xs[i]
+            val value = state.assignment.intValue(xs[i])
+            if (present(state, i) && value !in exceptValues && values.add(value)) representatives += xs[i]
         }
         return representatives
     }
@@ -298,7 +300,8 @@ internal class NValueEliminationMoves(
         if (presents.any { Lit.variable(it) in flips }) return false
         val values = LongHashSet()
         for (i in xs.indices) {
-            if (present(state, i)) values.add(targets[xs[i]] ?: state.assignment.intValue(xs[i]))
+            val value = targets[xs[i]] ?: state.assignment.intValue(xs[i])
+            if (present(state, i) && value !in exceptValues) values.add(value)
         }
         if (values.size != expectedDistinct) return false
         val count = targets[n] ?: state.assignment.intValue(n)

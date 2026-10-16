@@ -227,6 +227,7 @@ private fun NValue.nValuePropagator(): Propagator {
         xs,
         mode,
         presents,
+        exceptSet.toSet(),
         watches,
         presents.isEmpty(),
         { idx, state -> OptionalPresence.isDefinitelyAbsent(presents, idx, state) },

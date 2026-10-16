@@ -34,6 +34,56 @@ class NValuePropagatorTest {
     }
 
     @Test
+    fun `excepted values should not contribute to count bounds`() {
+        for (mode in NValue.Mode.entries) {
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 4,
+                intDomains = arrayOf(IntDomain(0, 0), IntDomain(2, 2), IntDomain(2, 2), IntDomain(0, 3)),
+                factors = arrayOf(NValue(3, intArrayOf(0, 1, 2), mode, exceptSet = longArrayOf(0))),
+            )
+            val state = PropagationState(problem, Assumptions.None)
+            state.currentFactor = 0
+
+            assertTrue(problem.propagators[0].propagate(state, 0))
+            assertEquals(if (mode == NValue.Mode.AtLeast) 0L else 1L, state.intDomains[3].min)
+            assertEquals(if (mode == NValue.Mode.AtMost) 3L else 1L, state.intDomains[3].max)
+        }
+    }
+
+    @Test
+    fun `an optional or excepted value should not force a positive count`() {
+        val problem = Problem(
+            numBoolVars = 1,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(2, 2), IntDomain(0, 0)),
+            factors = arrayOf(NValue(2, intArrayOf(0, 1), presents = intArrayOf(
+                Lit.make(0, true), Lit.make(0, false),
+            ), exceptSet = longArrayOf(0, 1, 2))),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.currentFactor = 0
+
+        assertTrue(problem.propagators[0].propagate(state, 0))
+        assertEquals(0L, state.intDomains[2].max)
+    }
+
+    @Test
+    fun `excepted count deductions should retain their domain premises`() {
+        for (mode in NValue.Mode.entries) {
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 3,
+                intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+                factors = arrayOf(NValue(2, intArrayOf(0, 1), mode, exceptSet = longArrayOf(0))),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "excepted-$mode") { state ->
+                state.excludeIntValue(0, 0) && state.setInt(1, 0)
+            }
+        }
+    }
+
+    @Test
     fun `equal minimum signed word values should require only one distinct value`() {
         for (mode in listOf(NValue.Mode.Eq, NValue.Mode.AtMost)) {
             val problem = nvalueProblem(
