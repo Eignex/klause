@@ -197,7 +197,9 @@ internal class SmtLibPolynomialCompiler(
         var evaluator = SmtLibPolynomialEvaluator(
             lowering, allowWidePowers = allowIntegers, cancellation = cancellation, functions = functions,
         )
-        val declarationBounds = smtPolynomialDeclarationBounds(semantics, intNames.values, realNames.values, cancellation)
+        val declarationBounds = smtPolynomialDeclarationBounds(
+            semantics, intNames.values, realNames.values, cancellation,
+        )
         var formulas = assertions.map { (expression, environment) ->
             evaluator.evaluate(expression, environment).boolean()
         } + declarationBounds

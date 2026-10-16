@@ -74,7 +74,9 @@ object SmtLibAdmission {
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         cancellation: Cancellation = Cancellation.Never,
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
-    ): SmtLibInput = parse({ StringCharSource(text) }, unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides)
+    ): SmtLibInput = parse(
+        { StringCharSource(text) }, unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides,
+    )
 
     /**
      * Admit a streamed source. [openSource] must recreate the same input for each attempted lowering.
@@ -107,7 +109,9 @@ object SmtLibAdmission {
             } catch (_: UnsupportedSmtException) {
                 if (cancellation()) throw PolynomialSourceInterrupted()
                 val polynomial = withSource(openSource, cancellation) { source ->
-                    SmtLibPolynomial.parse(source, cancellation, allowIntegers = true, allowFunctions = true, semantics = semantics)
+                    SmtLibPolynomial.parse(
+                        source, cancellation, allowIntegers = true, allowFunctions = true, semantics = semantics,
+                    )
                 }
                 if (polynomial.transcendental != null) SmtLibInput.Transcendental(polynomial.transcendental)
                 else {

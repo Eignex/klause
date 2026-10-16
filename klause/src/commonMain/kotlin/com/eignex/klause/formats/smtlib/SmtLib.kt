@@ -41,7 +41,9 @@ object SmtLib {
         strictBounds: Boolean = false,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
-    ): SmtLibProblem = parse(StringCharSource(text), unboundedIntLo, unboundedIntHi, strictBounds, settings, semanticOverrides)
+    ): SmtLibProblem = parse(
+        StringCharSource(text), unboundedIntLo, unboundedIntHi, strictBounds, settings, semanticOverrides,
+    )
 
     /** Decode and lower a streamed SMT-LIB [source], retaining only one top-level command at a time. */
     fun parse(

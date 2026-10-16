@@ -79,7 +79,9 @@ class SmtLibSemanticsTest {
     @Test
     fun `rational real declaration endpoints should preserve exact source feasibility`() {
         val third = SemanticRational.of(bigIntOf(1), bigIntOf(3))
-        val overrides = SemanticOverrides(undeclaredReals = BoundsOverride(BoundOverride.Value(third), BoundOverride.Value(third)))
+        val overrides = SemanticOverrides(undeclaredReals = BoundsOverride(
+            BoundOverride.Value(third), BoundOverride.Value(third),
+        ))
         val source = SmtLib.parse("(declare-const x Real) (assert (< x (/ 1 3)))", semanticOverrides = overrides)
 
         val result = BacktrackSolver.source(source.model).solve()
@@ -90,7 +92,9 @@ class SmtLibSemanticsTest {
 
     @Test
     fun `polynomial fallback should enforce caller bounds beside original nonlinear constraints`() {
-        val overrides = SemanticOverrides(undeclaredReals = BoundsOverride(upper = BoundOverride.Value(SemanticRational.ZERO)))
+        val overrides = SemanticOverrides(undeclaredReals = BoundsOverride(
+            upper = BoundOverride.Value(SemanticRational.ZERO),
+        ))
         val input = SmtLibAdmission.parse(
             "(declare-const x Real) (assert (= (* x x) 1)) (assert (> x 0))",
             semanticOverrides = overrides,

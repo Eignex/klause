@@ -3074,7 +3074,7 @@ public final class com/eignex/klause/formats/smtlib/SmtLibProblem : com/eignex/k
 	public final fun getModel ()Lcom/eignex/klause/ir/Problem;
 	public final fun getObjective ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
 	public final fun getRealVarNames ()Ljava/util/Map;
-	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -3596,7 +3596,7 @@ public final class com/eignex/klause/ir/NonlinearIntegerProblem : com/eignex/kla
 	public final fun getBoolVarNames ()Ljava/util/Map;
 	public final fun getIntVarNames ()Ljava/util/Map;
 	public final fun getRealVarNames ()Ljava/util/Map;
-	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 }
 
 public final class com/eignex/klause/ir/NumericAuthority : java/lang/Enum {
@@ -3724,7 +3724,7 @@ public final class com/eignex/klause/ir/PolynomialRealFormula$Or : com/eignex/kl
 public final class com/eignex/klause/ir/PolynomialRealProblem : com/eignex/klause/ir/SourceSemanticsOwner {
 	public final fun getBoolVarNames ()Ljava/util/Map;
 	public final fun getRealVarNames ()Ljava/util/Map;
-	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public final fun getSourceBoolCount ()I
 	public final fun getSourceRealCount ()I
 }
@@ -4146,7 +4146,7 @@ public final class com/eignex/klause/ir/TranscendentalProblem : com/eignex/klaus
 	public final fun getIntVarNames ()Ljava/util/Map;
 	public final fun getObjectiveSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun getRealVarNames ()Ljava/util/Map;
-	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 }
 
 public final class com/eignex/klause/ir/UndeclaredIntegerBounds {
