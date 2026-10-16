@@ -151,7 +151,8 @@ FlatZinc exposes canonical real data through `FlatZincProgram.sourceProgram` and
 caller's original source request while selecting the historical finite view when
 representable. Automatic `prepareSourceExecution(request)` preserves an admitted original
 complete arm; only its absence permits a private view. `parseFlatZincExecution` exposes the captured invocation beside its
-native hint data. Historical FlatZinc model/decoder access remains lazy; the callable
+native hint data. Automatic CLI loading reads only canonical metadata before binding
+its containing controls. Historical FlatZinc model/decoder access remains lazy; the callable
 constructor/copy/component descriptors are retained, while Kotlin `isData` changes.
 
 `SourceSetup.execute(SourceExecutionRequest(invocation, ...))` dispatches that captured

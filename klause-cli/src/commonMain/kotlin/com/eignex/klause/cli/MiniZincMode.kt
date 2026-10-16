@@ -2,16 +2,13 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.formats.flatzinc.OznApplier
 import com.eignex.klause.formats.flatzinc.SolveDirective
-import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import com.eignex.klause.formats.flatzinc.flatZincSemantics
 import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.prepareSourceExecution
 import com.eignex.klause.formats.flatzinc.sourceAttachment
-import com.eignex.klause.formats.flatzinc.toSearchHints
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.ir.EffectiveSourceSemantics
-import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -20,8 +17,6 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.NativeGridOutcome
-import com.eignex.klause.solver.pipeline.PreparedPlanDecline
-import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
@@ -71,36 +66,19 @@ internal object MiniZincMode : CliMode {
                 source = openFileSource(path),
                 semanticOverrides = overrides,
             )
-            val exactFloats = program.semantics.effective.floats == FloatSemantics.Continuous
-            sourceSemantics = program.semantics
-            floatApproximation = program.floatVarsByName.values.any { !it.lpOnly }
+            val original = program.sourceProgram
+            sourceSemantics = original.semantics
             cliLogger(common.verbose).v {
-                "parsed $path: bools=${program.problem.numBoolVars} ints=${program.problem.numIntVars} " +
-                    "factors=${program.problem.numFactors}"
+                "parsed $path: bools=${original.problem.numBoolVars} ints=${original.problem.numIntVars} " +
+                    "factors=${original.problem.numFactors}"
             }
             val applier = oznPath?.let { OznApplier(readTextFile(it)) }
-            val render: (Sample) -> String =
-                { s -> applier?.render(program, s) ?: writeFlatZincSolution(program, s, outputObjective) }
-
-            if (exactFloats || program.problem.numRealVars > 0) {
-                return sourceSolvable(
-                    program.problem,
-                    program.linearObjective(),
-                    program.solve is SolveDirective.Maximize,
-                    common,
-                    render,
-                    { assignment ->
-                        applier?.render(program, assignment)
-                            ?: writeFlatZincSolution(program, assignment, outputObjective)
-                    },
-                    definitionHints = program.definitionHints,
-                    searchHints = program.searchHints?.toSearchHints(),
-                )
+            val render: (Sample) -> String = { sample ->
+                applier?.render(original, sample) ?: writeFlatZincSolution(original, sample, outputObjective)
             }
 
-            val original = program.sourceProgram
             val objective = original.linearObjective()
-            val maximize = program.solve is SolveDirective.Maximize
+            val maximize = original.solve is SolveDirective.Maximize
             val sourceObjective = if (maximize) objective?.negated() else objective
             val operation = when {
                 objective != null -> ExecutionOperation.OPTIMIZE
@@ -118,6 +96,7 @@ internal object MiniZincMode : CliMode {
                     boundCancellation = common.routingCancellation(),
                 ),
             )
+            floatApproximation = invocation.floatProjection != null
             if (invocation.floatProjection != null) {
                 val realObjective = sourceObjective?.takeIf {
                     it.realCoefficients.any { coefficient -> coefficient != 0.0 }
@@ -132,43 +111,11 @@ internal object MiniZincMode : CliMode {
                     },
                 )
             }
-            if (floatApproximation) {
-                floatApproximation = false
-                val renderOriginal: (Sample) -> String = { sample ->
-                    applier?.render(original, sample) ?: writeFlatZincSolution(original, sample, outputObjective)
-                }
-                return preparedSourceSolvable(invocation, renderOriginal, { assignment ->
-                    applier?.render(original, assignment)
-                        ?: writeFlatZincSolution(original, assignment, outputObjective)
-                })
-            }
-            return when (val route = invocation.route) {
-                is SourceProblemRoute.NativeFormula ->
-                    unsupportedFiniteSource("FlatZinc finite admission selected a native formula")
-
-                is SourceProblemRoute.Finite -> Solvable(
-                    finite = invocation.finiteShape(),
-                    render = render,
-                    objectiveValue = sourceObjective?.let { linear -> { sample -> linear.evaluateLong(sample) } },
-                )
-
-                SourceProblemRoute.Refuted -> refutedSolvable()
-
-                is SourceProblemRoute.UnsupportedOpen -> if (
-                    route.preparedPlan.decline == PreparedPlanDecline.RESOURCE
-                ) {
-                    Solvable(null, render, null, pipeline = SolvablePipeline.Interrupted(TerminationReason.Cancelled))
-                } else {
-                    unsupportedFiniteSource("FlatZinc source has no finite execution route")
-                }
-
-                is SourceProblemRoute.OpenTheory, is SourceProblemRoute.PolynomialTheory ->
-                    unsupportedFiniteSource("FlatZinc source requires an arithmetic execution route")
-            }
+            return preparedSourceSolvable(invocation, render, { assignment ->
+                applier?.render(original, assignment)
+                    ?: writeFlatZincSolution(original, assignment, outputObjective)
+            })
         }
-
-        private fun unsupportedFiniteSource(message: String): Nothing =
-            throw UnsupportedFlatZincException(message, 0, 0)
 
         override fun output(common: CommonOptions): OutputProtocol = MiniZincOutput(floatApproximation, sourceSemantics)
     }
@@ -180,7 +127,9 @@ internal class MiniZincOutput(
     private val sourceSemantics: EffectiveSourceSemantics? = null,
 ) : OutputProtocol {
     private var context: VerdictContext = VerdictContext()
-    private var checkedGridPoints = false
+    private var nativeGridSeen = false
+    private var pointPublished = false
+    private val checkedGridPoints: Boolean get() = nativeGridSeen && pointPublished
     private val integerScopeChanged = sourceSemantics?.let {
         it.declared.undeclaredIntegers != it.effective.undeclaredIntegers
     } == true
@@ -212,16 +161,19 @@ internal class MiniZincOutput(
     }
 
     override fun onSolution(rendered: String, objective: Long?, continuousObjective: Double?) {
+        pointPublished = true
         // `writeFlatZincSolution` / `OznApplier.render` already include the per-solution
         // `----------` terminator; objective is carried in the rendered text.
         print(rendered)
     }
 
     override fun onExactSolution(rendered: String, objective: BigFraction) {
+        pointPublished = true
         print(rendered)
     }
 
     override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+        pointPublished = true
         println("% objective=${arithmeticObjectiveText(objective)}")
         print(rendered)
         flushCliOutput()
@@ -290,7 +242,7 @@ internal class MiniZincOutput(
     }
 
     override fun onNativeGridOutcome(result: NativeGridOutcome) {
-        checkedGridPoints = true
+        nativeGridSeen = true
         val outcome = result.outcome as? FiniteSolveOutcome.Completed ?: return
         println("% klause-grid-verdict: ${outcome.verdict}; scope=private-grid")
         println("% klause-grid-solutions: ${outcome.solutions}")

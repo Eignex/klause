@@ -77,7 +77,7 @@ private fun selectFloatGrid(
         return SelectedFloatGridPreparation.Declined(SelectedGridDecline.SOURCE_REFUTED)
     }
     if (purpose == FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY &&
-        preservesOriginalCompleteArm(invocation)
+        SourceSetup.preservesOriginalCompleteArm(invocation)
     ) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.CONSUMER)
     if (invocation.operation !in setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE,
             ExecutionOperation.ENUMERATE) ||
