@@ -5,6 +5,72 @@ import kotlin.test.assertEquals
 
 class ProfilerTest {
     @Test
+    fun `model caller paths should retain source ancestors beyond mechanism packages`() {
+        val callers = Profiler.cliModelCallers(listOf(
+            "java.util.HashMap.getNode",
+            "com.eignex.klause.util.OrCancellation.isCancelled",
+            "com.eignex.klause.bench.tools.Profiler.summarizeCli",
+            "com.eignex.klause.lp.engine.LpExactState.<init>",
+            "com.eignex.klause.lp.lattice.IntegerEchelon.reduce",
+            "com.eignex.klause.simplex.exact.BigFraction.plus",
+            "com.eignex.klause.arithmetic.difference.DifferenceGraph.potentials",
+            "com.eignex.klause.theory.qflra.LiveQfLraSystem.assertComparison",
+            "com.eignex.klause.solver.search.SearchSession.propagate",
+        ))
+
+        assertEquals(
+            "com.eignex.klause.theory.qflra.LiveQfLraSystem.assertComparison <- " +
+                "com.eignex.klause.solver.search.SearchSession.propagate",
+            callers,
+        )
+    }
+
+    @Test
+    fun `model caller paths should retain at most four captured frames`() {
+        val stack = listOf("First", "Second", "Third", "Fourth", "Fifth")
+            .map { "com.eignex.klause.lp.$it.run" }
+
+        val callers = Profiler.cliModelCallers(stack)
+
+        assertEquals(
+            "com.eignex.klause.lp.First.run <- com.eignex.klause.lp.Second.run <- " +
+                "com.eignex.klause.lp.Third.run <- com.eignex.klause.lp.Fourth.run",
+            callers,
+        )
+    }
+
+    @Test
+    fun `package filters should preserve model-facing arithmetic and LP owners`() {
+        for (frame in listOf(
+            "com.eignex.klause.factor.arithmetic.Linear.computeViolation",
+            "com.eignex.klause.lp.relaxation.CpToLpRelaxation.prepare",
+            "com.eignex.klause.bound.KnapsackLagrangianBound.compute",
+        )) {
+            val callers = Profiler.cliModelCallers(listOf(
+                "com.eignex.klause.simplex.exact.BigFraction.plus",
+                frame,
+            ))
+
+            assertEquals(frame, callers)
+        }
+    }
+
+    @Test
+    fun `stacks without model callers should retain an explicit unknown label`() {
+        for (stack in listOf(emptyList(), listOf("java.util.HashMap.getNode"), listOf(
+            "com.eignex.klause.util.OrCancellation.isCancelled",
+            "com.eignex.klause.lp.engine.LpExactState.<init>",
+            "com.eignex.klause.lp.lattice.IntegerEchelon.reduce",
+            "com.eignex.klause.simplex.exact.BigFraction.plus",
+            "com.eignex.klause.arithmetic.difference.DifferenceGraph.potentials",
+        ))) {
+            val callers = Profiler.cliModelCallers(stack)
+
+            assertEquals("no captured model-facing caller", callers)
+        }
+    }
+
+    @Test
     fun `operation caller paths should preserve captured order beyond utilities`() {
         val callers = Profiler.cliOperationCallers(listOf(
             "java.util.HashMap.getNode",
