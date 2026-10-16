@@ -82,6 +82,10 @@ arithmetic, scalar growth, storage and verification share the continuation's
 cumulative allowances, with unchanged dimension and pivot caps. Nonzero objectives
 retain closure continuation and their existing strict-refinement policy.
 
+Continuation phase accounting accumulates in primitive counters and materializes
+report maps at observation boundaries. A declined charge leaves totals and phase
+reports at the accepted prefix; reports retain zero charges and first-visit order.
+
 Reconstruction converts signed single-word fractions directly between
 `BigFraction` and `Frac128`; wider values use both words. Both paths retain the
 same bit checks, work charges, allocation allowance and cancellation checks.

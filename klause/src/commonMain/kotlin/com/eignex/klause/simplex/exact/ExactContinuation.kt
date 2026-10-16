@@ -117,8 +117,13 @@ internal class ContinuationBudget(val limits: ExactContinuationLimits, val token
     var allocation = 0L
         private set
     var phase = ContinuationPhase.INPUT
-    val workByPhase = mutableMapOf<ContinuationPhase, Long>()
-    val allocationByPhase = mutableMapOf<ContinuationPhase, Long>()
+    private val phaseWork = LongArray(ContinuationPhase.entries.size)
+    private val phaseAllocation = LongArray(ContinuationPhase.entries.size)
+    private val phaseSeen = BooleanArray(ContinuationPhase.entries.size)
+    private val phaseOrder = IntArray(ContinuationPhase.entries.size)
+    private var phaseCount = 0
+    val workByPhase: Map<ContinuationPhase, Long> get() = phaseSnapshot(phaseWork)
+    val allocationByPhase: Map<ContinuationPhase, Long> get() = phaseSnapshot(phaseAllocation)
     val elapsedNs get() = started.elapsedNow().inWholeNanoseconds
 
     @Suppress("ThrowsCount")
@@ -129,8 +134,20 @@ internal class ContinuationBudget(val limits: ExactContinuationLimits, val token
         if (bytes > limits.maxAllocation - allocation) throw ContinuationStop(ContinuationDecline.ALLOCATION)
         work += units
         allocation += bytes
-        workByPhase[phase] = (workByPhase[phase] ?: 0L) + units
-        allocationByPhase[phase] = (allocationByPhase[phase] ?: 0L) + bytes
+        val index = phase.ordinal
+        if (!phaseSeen[index]) {
+            phaseSeen[index] = true
+            phaseOrder[phaseCount++] = index
+        }
+        phaseWork[index] += units
+        phaseAllocation[index] += bytes
+    }
+
+    private fun phaseSnapshot(values: LongArray): Map<ContinuationPhase, Long> = buildMap {
+        for (position in 0 until phaseCount) {
+            val index = phaseOrder[position]
+            put(ContinuationPhase.entries[index], values[index])
+        }
     }
 
     fun fraction(value: BigFraction): BigFraction {
