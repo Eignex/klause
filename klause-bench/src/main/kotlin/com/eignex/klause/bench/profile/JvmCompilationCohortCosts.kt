@@ -23,16 +23,19 @@ internal object JvmCompilationCohortCosts {
             it.substringBefore('=') to it.substringAfter('=')
         }
         val required = setOf("manifest", "manifest-sha256", "archive")
-        require(args.size == required.size && options.keys == required)
+        val withMapping = required + setOf("mapping", "mapping-sha256")
+        require(args.size == options.size && options.keys in listOf(required, withMapping))
         val expected = options.getValue("manifest-sha256")
         require(expected.matches(Regex("[0-9a-f]{64}")))
         for (name in listOf("manifest", "archive")) validatedUri(options.getValue(name))
+        options["mapping"]?.let { validatedUri(it) }
+        options["mapping-sha256"]?.let { require(it.matches(Regex("[0-9a-f]{64}"))) }
         ProfileCaptureArchive.run {
             val out = File(requireNotNull(System.getenv("OUT"))).canonicalFile.apply { mkdirs() }
             File(out, "input-origins.json").writeText(
                 buildJsonObject {
-                for ((name, value) in options) put(name, value)
-            }.toString() + "\n"
+                    for ((name, value) in options) put(name, value)
+                }.toString() + "\n"
             )
             val temporary = Files.createTempDirectory("klause-jfr-costs-").toFile()
             try {
@@ -41,7 +44,11 @@ internal object JvmCompilationCohortCosts {
                 val archive = File(temporary, "census-archive.tar.gz")
                 val archiveHash = download(options.getValue("archive"), archive, MAX_ARCHIVE_BYTES)
                 File(out, "downloaded-archive.sha256").writeText("$archiveHash\n")
-                review(out, manifest, expected, archive, temporary)
+                options["mapping"]?.let { address ->
+                    val mapping = File(out, "captured-phase-mapping.json")
+                    require(download(address, mapping, MAX_MANIFEST_BYTES) == options.getValue("mapping-sha256"))
+                }
+                review(out, manifest, options, archive, temporary)
             } finally {
                 check(temporary.deleteRecursively()) { "Cannot remove owned saved-census input staging" }
             }
@@ -78,14 +85,14 @@ internal object JvmCompilationCohortCosts {
         return uri
     }
 
-    private fun review(out: File, manifest: File, expected: String, archive: File, temporary: File) {
+    private fun review(out: File, manifest: File, options: Map<String, String>, archive: File, temporary: File) {
         val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
-        val names =
-            listOf(
-                "report_jvm_compilation_cohort.py", "review_jvm_compilation_cohort.py", "jvm_compilation_events.py",
+        val names = listOf(
+            "report_jvm_compilation_cohort.py", "review_jvm_compilation_cohort.py", "jvm_compilation_events.py",
+            "jvm_compilation_mapping.py",
             "review_jvm_task_log_cohort.py", "review_jvm_task_log.py", "stream_jvm_task_log.py",
             "review_native_vm_log_identities.py", "review_native_vm_live_arguments.py", "native_vm_event_loss.py",
-            )
+        )
         for (name in names) File(root, "klause-bench/tools/$name").copyTo(File(out, name))
         val runtime = File(System.getProperty("java.home")).canonicalFile
         val bench = File(requireNotNull(System.getenv("KLAUSE_BENCH"))).canonicalFile
@@ -93,24 +100,28 @@ internal object JvmCompilationCohortCosts {
         InstalledBuild.writeManifest(provenance, bench, runtime)
         File(out, "observer-runtime.json").writeText(
             buildJsonObject {
-            put("javaHome", System.getProperty("java.home"))
-            put("runtimeVersion", System.getProperty("java.runtime.version"))
-            put("vendor", System.getProperty("java.vendor"))
-            put(
-                "scope",
-                "Saved-census observer runtime; original CLI source/runtime/control identities remain historical",
-            )
-        }.toString() + "\n"
+                put("javaHome", System.getProperty("java.home"))
+                put("runtimeVersion", System.getProperty("java.runtime.version"))
+                put("vendor", System.getProperty("java.vendor"))
+                put(
+                    "scope",
+                    "Saved-census observer runtime; original CLI source/runtime/control identities remain historical",
+                )
+            }.toString() + "\n"
         )
         val command = listOf(
             "python3",
             File(root, "klause-bench/tools/report_jvm_compilation_cohort.py").path,
             manifest.path,
-            expected,
+            options.getValue("manifest-sha256"),
             archive.path,
             out.path,
             temporary.path,
-        )
+        ) + if ("mapping" in options) {
+            listOf(File(out, "captured-phase-mapping.json").path, options.getValue("mapping-sha256"))
+        } else {
+            emptyList()
+        }
         val process = ProcessBuilder(command).directory(root)
             .redirectOutput(File(out, "compilation-costs.stdout"))
             .redirectError(File(out, "compilation-costs.stderr")).start()

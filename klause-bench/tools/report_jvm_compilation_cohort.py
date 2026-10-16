@@ -10,6 +10,7 @@ import sys
 import tarfile
 import tempfile
 
+import jvm_compilation_mapping as mapping
 import review_jvm_task_log_cohort as cohort
 
 MAX_JSON_BYTES = 512 * 1024 * 1024
@@ -152,7 +153,9 @@ def summaries(pairs):
         result.append({'family': key[0], 'engine': key[1], 'mode': key[2], 'recipe': key[3],
             'totalOriginalPairs': len(rows),
             'observedDeclaredPhaseAndSourceEligiblePairs': sum(row['observedDeclaredPhaseAndSourceEligible'] for row in rows),
-            'excludedPairContexts': [{name: row[name] for name in ('index', 'repetition', 'exclusions')}
+            'excludedPairContexts': [{**{name: row[name] for name in ('index', 'repetition', 'exclusions')},
+                'armExclusions': {arm: [{'case': value.get('case'), 'exclusions': value.get('exclusions', [])}
+                                       for value in values] for arm, values in row['arms'].items()}}
                                      for row in rows if row['exclusions']],
             'metrics': metrics, 'acceptedSavingsCredit': False})
     return result
@@ -209,7 +212,8 @@ def authenticate(manifest_path, expected, archive_path, scratch):
                 raise ValueError('Complete census archive expansion differs or exceeds bounds')
             name = member.name.removeprefix(prefix) if member.name.startswith(prefix) else ''
             chosen = name == 'compilation-cohort.json' or bool(re.fullmatch(
-                r'(?:compilation-[0-9]{6}\.json|original-(?:cases|boolean-source-checks|linear-source-checks)\.json)\.gz', name))
+                r'(?:compilation-[0-9]{6}\.json|xml-[0-9]{6}-[0-9]{3}\.json|'
+                r'original-(?:cases|compilation-families|study-builds|boolean-source-checks|linear-source-checks)\.json)\.gz', name))
             if chosen:
                 stored += member.size
                 if stored > cohort.MAX_STORED_BYTES:
@@ -236,7 +240,7 @@ def authenticate(manifest_path, expected, archive_path, scratch):
     return selected, manifest, prefix
 
 
-def inspect(selected, manifest, prefix):
+def inspect(selected, manifest, prefix, declaration=None):
     index = load_json(selected['compilation-cohort.json'])
     measurements = load_json(selected['original-cases.json.gz'], True)
     originals = index['originalMetadataFiles']
@@ -260,7 +264,9 @@ def inspect(selected, manifest, prefix):
                 if key in checks:
                     raise ValueError('Ambiguous original source checker identity')
                 checks[key] = checker_status(entry)
-    rows, recordings, represented = [], [], set()
+    mapped_families = mapping.bind(declaration, selected, index, manifest, load_json, MAX_JSON_BYTES) \
+        if declaration is not None else None
+    rows, recordings, represented, mapped_rows, represented_xml = [], [], set(), [], set()
     cohort_complete = index.get('completed') is True and index.get('allCaseCensusesComplete') is True and \
         not index.get('metadataOnlyCaseNames') and not index.get('archivedCasesMissingMetadata') and \
         set(metadata) == {row['caseDirectory'] for row in index['cases']}
@@ -270,6 +276,14 @@ def inspect(selected, manifest, prefix):
             raise ValueError('Archived case has no original measurement metadata')
         if measurements[case['originalCaseMetadataIndex']] != metadata[name]:
             raise ValueError('Original case metadata ordinal differs from census')
+        xml, mapping_errors = {}, []
+        if mapped_families is not None:
+            for entry in case.get('xmlInputs', []):
+                path = entry['retainedMetadata']['path']
+                if path in represented_xml:
+                    raise ValueError('Repeated retained XML metadata identity')
+                represented_xml.add(path)
+            xml, mapping_errors = mapping.snapshots(case, selected, load_json, MAX_JSON_BYTES)
         for recording in case['recordings']:
             retained = recording['report']
             path = selected[retained['path']]
@@ -291,10 +305,23 @@ def inspect(selected, manifest, prefix):
                 'unresolvedSuccessfulInliningEventIndices': report.get('unresolvedSuccessfulInliningEventIndices'),
                 'familyNames': list(report.get('families', {}))})
             rows.extend(observations(case, metadata[name], report, checks, retained, cohort_complete))
+            if mapped_families is not None:
+                mapped = mapping.reform(report, mapped_families, metadata[name].get('arm'), xml)
+                new_rows = observations(case, metadata[name], mapped, checks, retained, cohort_complete)
+                for row in new_rows:
+                    row['mappedFamilyCensus'] = row.pop('familyCensusCopiedVerbatim')
+                    row['originalFamilyCensusCopiedVerbatim'] = report.get('families', {}).get(row['family'])
+                    row['exclusions'].extend(mapping_errors)
+                    row['observedDeclaredPhaseAndSourceEligible'] = not row['exclusions']
+                mapped_rows.extend(new_rows)
     census_files = {name for name in selected if re.fullmatch(r'compilation-[0-9]{6}\.json\.gz', name)}
     if census_files != represented:
         raise ValueError('Unrepresented census report files')
+    if mapped_families is not None and represented_xml != \
+            {name for name in selected if re.fullmatch(r'xml-[0-9]{6}-[0-9]{3}\.json\.gz', name)}:
+        raise ValueError('Unrepresented retained XML metadata files')
     pairs = paired(rows)
+    mapped_pairs = paired(mapped_rows)
     return {'completed': True, 'sourceSha256': cohort.file_identity(Path(__file__))['sha256'],
         'completeArchiveMemberBytesVerified': True, 'inputArchive': manifest['archive'],
         'inputCensusPrefix': prefix, 'producerCohortProtocolCopiedVerbatim': index,
@@ -303,26 +330,51 @@ def inspect(selected, manifest, prefix):
         'recordingsWithoutFamilyCensus': [row for row in recordings if not row['familyNames']],
         'familyCaseObservations': rows, 'allOriginalContextPairs': pairs,
         'observedComparisonSummaries': summaries(pairs),
+        'phaseMapping': {'declarationCopiedVerbatim': declaration,
+            'sourceClosure': {path.name: cohort.file_identity(path) for path in
+                              (Path(mapping.__file__), Path(mapping.events.__file__))},
+            'familyCaseObservations': mapped_rows, 'allOriginalContextPairs': mapped_pairs,
+            'observedComparisonSummaries': summaries(mapped_pairs),
+            'runtimeSourceBindingProven': False, 'fullSourcePhaseCoverageProven': False,
+            'acceptedSavingsCredit': False,
+            'scope': 'Separate source-declared mapping over all retained compilation/inlining roots and XML metadata. '
+                     'Recorded source-head equality does not prove the loaded runtime or exhaustive source coverage. '
+                     'Original declarations, original comparisons and all their exclusions remain unchanged.'}
+            if declaration is not None else None,
         'compilerElapsedTimeProven': False, 'rootCensusProven': False, 'codeSizeProven': False,
         'runtimeSourceBindingProven': False, 'acceptedSavingsCredit': False,
         'scope': 'Historical observed all-tier standard-JFR duration/codeSize comparisons under original declared phases and source outcomes only. Full successful inlining roots are nonadditive across families; every ordinary/OSR/failed/replaced/unresolved/queued root and excluded pair remains in the authenticated census. Declared-phase eligibility does not prove exhaustive source phases, global loss-free lifetime, current runtime/allocation/RNG/work controls, independent confirmation or compiler benefit.'}
 
 
 def main():
-    manifest, expected, archive, output, scratch = sys.argv[1:]
+    manifest, expected, archive, output, scratch, *mapping_options = sys.argv[1:]
+    if len(mapping_options) not in (0, 2):
+        raise ValueError('A phase mapping requires its file and SHA-256')
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     result = {'completed': False, 'acceptedSavingsCredit': False}
     try:
         with tempfile.TemporaryDirectory(prefix='census-costs-', dir=scratch) as temporary:
             selected, inventory, prefix = authenticate(Path(manifest), expected, Path(archive), Path(temporary))
-            result = inspect(selected, inventory, prefix)
+            declaration = None
+            if mapping_options:
+                path, digest = mapping_options
+                path = Path(path)
+                if path.stat().st_size > cohort.MAX_MANIFEST_BYTES or \
+                        not re.fullmatch('[0-9a-f]{64}', digest) or cohort.file_identity(path)['sha256'] != digest:
+                    raise ValueError('Phase mapping differs from pinned identity or exceeds bounds')
+                declaration = load_json(path)
+            result = inspect(selected, inventory, prefix, declaration)
+            result['phaseMappingIdentity'] = cohort.file_identity(Path(mapping_options[0])) if mapping_options else None
     except Exception as error:
         result['error'] = {'type': type(error).__name__, 'message': str(error)}
         raise
     finally:
         summary = {key: result.get(key) for key in ('completed', 'sourceSha256',
                    'observedComparisonSummaries', 'error', 'scope', 'acceptedSavingsCredit')}
+        summary['phaseMappingIdentity'] = result.get('phaseMappingIdentity')
+        mapped = result.get('phaseMapping')
+        summary['mappedComparisonSummaries'] = mapped['observedComparisonSummaries'] if mapped is not None else None
         raw = (json.dumps(summary, indent=2) + '\n').encode()
         if len(raw) > cohort.MAX_INDEX_BYTES:
             raise ValueError('Complete observed comparison summary exceeds bounds')

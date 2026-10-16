@@ -252,6 +252,211 @@ class ReportJvmCompilationCohortTest(unittest.TestCase):
             self.assertEqual([-3, -3], summary['metrics']['reportedElapsedNanos']['pairDifferenceRange'])
             self.assertFalse(result['acceptedSavingsCredit'])
 
+    def test_separate_mapping_compares_complete_saved_roots_without_replacing_original_excluded_results(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            identity = {'size': 1, 'sha256': 'a' * 64}
+            heads = {'control': 'a' * 40, 'candidate': 'b' * 40}
+            measurements = [{'case': arm, 'engine': 'cp', 'index': 0, 'repetition': 0, 'mode': 'profile',
+                'recipe': None, 'arm': arm, 'sourceHashesMatch': True, 'exit': 0,
+                'problem': {'format': 'MINIZINC'}, 'record': {'stats': {'sourceValidation': 'valid'}}} for arm in heads]
+            original_families = {'f': {'methods': ['p.C'], 'ordinaryPhase': {arm: ['p.C.work'] for arm in heads}}}
+            builds = [{'arm': arm, 'expectedHead': head, 'actualHead': head} for arm, head in heads.items()]
+            selected, originals, cases = {}, {}, []
+            for name, value in [('cases', measurements), ('compilation-families', original_families), ('study-builds', builds)]:
+                raw = json.dumps(value).encode()
+                path = root / ('original-' + name + '.json.gz')
+                path.write_bytes(gzip.compress(raw))
+                selected[path.name] = path
+                originals[name] = {'path': path.name, 'compressed': review.cohort.file_identity(path),
+                    'originalIdentity': {'size': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}}
+            for ordinal, (arm, elapsed) in enumerate([('control', 8), ('candidate', 5)]):
+                roots = [{'eventIndex': index, 'id': index + 1, 'method': method, 'level': 4, 'osr': False,
+                          'succeeded': True, 'reportedElapsedNanos': duration,
+                          'reportedSuccessfulCodeBytes': 10, 'errors': []}
+                         for index, (method, duration) in enumerate([('p.C.work()V', elapsed), ('outside.C.call()V', 2)])]
+                family = {'requiredOrdinaryPhases': [], 'inclusiveRootEventIndices': [0],
+                    'missingRequiredOrdinaryPhases': [], 'unresolvedSuccessfulInliningEventIndices': [],
+                    'unmeasuredAllTierXmlSnapshotReferences': [], 'conflictingXmlSnapshotReferences': [],
+                    'observedAllTierMetrics': {'reportedElapsedNanos': elapsed, 'maxReportedElapsedNanos': elapsed,
+                        'reportedSuccessfulCodeBytes': 10, 'failedRootEventIndices': [], 'unknownOutcomeRootEventIndices': []},
+                    'observedC2Metrics': {}}
+                report = {'completed': True, 'originalMember': 'p/cases/' + arm + '/cli.jfr',
+                    'originalIdentity': identity, 'originalCaseDirectory': arm, 'compilations': roots,
+                    'inlining': [{'eventIndex': 9, 'id': 2, 'caller': 'outside.C.call()V',
+                                 'callee': 'p.Helper.part()V', 'succeeded': True, 'errors': []}],
+                    'eventCounts': {'jdk.Compilation': 2, 'jdk.CompilerInlining': 1}, 'families': {'f': family}}
+                retained = []
+                for name, value in [(f'compilation-{ordinal:06d}.json.gz', report),
+                                    (f'xml-{ordinal:06d}-000.json.gz', {'completed': True, 'metadata': {}, 'error': None})]:
+                    path = root / name
+                    path.write_bytes(gzip.compress(json.dumps(value).encode()))
+                    selected[name] = path
+                    retained.append({'path': name, 'compressed': review.cohort.file_identity(path),
+                                     'uncompressed': review.cohort.gzip_identity(path, review.MAX_JSON_BYTES)})
+                cases.append({'caseDirectory': arm, 'completed': True, 'originalCaseMetadataIndex': ordinal,
+                    'recordings': [{'originalMember': report['originalMember'], 'originalIdentity': identity, 'report': retained[0]}],
+                    'xmlInputs': [{'originalMember': 'p/cases/' + arm + '/hotspot.xml', 'completed': True,
+                                   'retainedMetadata': retained[1]}]})
+            index = {'completed': True, 'allCaseCensusesComplete': True, 'cases': cases, 'originalMetadataFiles': originals}
+            selected['compilation-cohort.json'] = root / 'index.json'
+            selected['compilation-cohort.json'].write_text(json.dumps(index))
+            declaration = {'schema': 1, 'inputCensusArchive': identity, 'sourceHeads': heads,
+                'originalFamiliesIdentity': originals['compilation-families']['originalIdentity'],
+                'originalStudyBuildsIdentity': originals['study-builds']['originalIdentity'],
+                'families': {'f': {'methods': ['p.C', 'p.Helper'],
+                    'ordinaryPhase': {arm: ['p.C.work', 'p.Helper.part'] for arm in heads},
+                    'ordinaryPhaseAll': {arm: ['p.C.work', 'p.Helper.part'] for arm in heads}}}}
+
+            result = review.inspect(selected, {'archive': identity}, 'profile1/', declaration)
+
+            self.assertEqual(0, result['observedComparisonSummaries'][0]['observedDeclaredPhaseAndSourceEligiblePairs'])
+            self.assertEqual(1, result['phaseMapping']['observedComparisonSummaries'][0]['observedDeclaredPhaseAndSourceEligiblePairs'])
+            row = result['phaseMapping']['familyCaseObservations'][0]
+            self.assertEqual([0, 1], row['mappedFamilyCensus']['inclusiveRootEventIndices'])
+            self.assertEqual([0], row['originalFamilyCensusCopiedVerbatim']['inclusiveRootEventIndices'])
+            self.assertEqual(10, row['observedMetrics']['reportedElapsedNanos'])
+            self.assertFalse(result['phaseMapping']['fullSourcePhaseCoverageProven'])
+            self.assertFalse(result['acceptedSavingsCredit'])
+
+    def test_mapping_metadata_requires_both_compressed_and_original_byte_identities(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'original.json.gz'
+            raw = b'{"f":{"methods":["p.C"]}}'
+            path.write_bytes(gzip.compress(raw))
+            record = {'path': path.name, 'compressed': review.cohort.file_identity(path),
+                      'originalIdentity': {'size': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}}
+            index = {'originalMetadataFiles': {'original': record}}
+            selected = {path.name: path}
+
+            value, identity = review.mapping.original_metadata(selected, index, path.name, review.load_json, 1024)
+
+            self.assertEqual(json.loads(raw), value)
+            self.assertEqual(record['originalIdentity'], identity)
+            for key in ('compressed', 'originalIdentity'):
+                changed = copy.deepcopy(index)
+                changed['originalMetadataFiles']['original'][key]['sha256'] = '0' * 64
+                with self.subTest(key=key), self.assertRaisesRegex(ValueError, 'producer identity'):
+                    review.mapping.original_metadata(selected, changed, path.name, review.load_json, 1024)
+            duplicate = {'originalMetadataFiles': {'one': record, 'two': record}}
+            with self.assertRaisesRegex(ValueError, 'missing or ambiguous'):
+                review.mapping.original_metadata(selected, duplicate, path.name, review.load_json, 1024)
+
+    def test_mapping_binds_both_recorded_heads_and_original_metadata_to_the_complete_input_archive(self):
+        identity = {'size': 1, 'sha256': '1' * 64}
+        heads = {'control': 'a' * 40, 'candidate': 'b' * 40}
+        builds = [{'arm': arm, 'expectedHead': head, 'actualHead': head} for arm, head in heads.items()]
+        families = {'f': {'methods': ['p.C'], 'ordinaryPhase': {}, 'ordinaryPhaseAll': {}}}
+        declaration = {'schema': 1, 'inputCensusArchive': identity, 'originalFamiliesIdentity': identity,
+                       'originalStudyBuildsIdentity': identity, 'sourceHeads': heads, 'families': families}
+        for field, value in [('inputCensusArchive', {}), ('originalFamiliesIdentity', {}),
+                             ('originalStudyBuildsIdentity', {}), ('schema', True),
+                             ('sourceHeads', dict(heads, candidate='c' * 40))]:
+            with self.subTest(field=field), patch.object(review.mapping, 'original_metadata',
+                    side_effect=[(families, identity), (builds, identity)]), self.assertRaises(ValueError):
+                review.mapping.bind(dict(declaration, **{field: value}), {}, {}, {'archive': identity}, review.load_json, 1024)
+        for invalid in [builds + [builds[0]], [builds[0], builds[0]],
+                        [dict(builds[0], expectedHead='c' * 40), builds[1]]]:
+            with self.subTest(builds=invalid), patch.object(review.mapping, 'original_metadata',
+                    side_effect=[(families, identity), (invalid, identity)]), self.assertRaises(ValueError):
+                review.mapping.bind(declaration, {}, {}, {'archive': identity}, review.load_json, 1024)
+        with patch.object(review.mapping, 'original_metadata', side_effect=[(families, identity), (builds, identity)]):
+            self.assertEqual(families, review.mapping.bind(declaration, {}, {}, {'archive': identity}, review.load_json, 1024))
+
+    def test_mapping_cannot_drop_families_supporting_selectors_or_required_phase_declarations(self):
+        identity = {'size': 1, 'sha256': '1' * 64}
+        heads = {'control': 'a' * 40, 'candidate': 'b' * 40}
+        builds = [{'arm': arm, 'expectedHead': head, 'actualHead': head} for arm, head in heads.items()]
+        original = {'f': {'methods': ['p.C', 'p.Helper'], 'ordinaryPhase': {}}}
+        family = {'methods': ['p.C', 'p.Helper'], 'ordinaryPhase': {'control': ['p.C.work']},
+                  'ordinaryPhaseAll': {'control': ['p.C.work']}}
+        declaration = {'schema': 1, 'inputCensusArchive': identity, 'originalFamiliesIdentity': identity,
+                       'originalStudyBuildsIdentity': identity, 'sourceHeads': heads}
+        variants = [{}, {'f': dict(family, methods=['p.C'])},
+                    {'f': dict(family, ordinaryPhaseAll={'control': ['p.C.other']})},
+                    {'f': dict(family, ordinaryPhase={'unknown': ['p.C.work']})},
+                    {'f': dict(family, ordinaryPhase={'control': ['p.C.work', 'p.C.work']})},
+                    {'f': dict(family, acceptedSavingsCredit=True)}]
+        for families in variants:
+            with self.subTest(families=families), patch.object(review.mapping, 'original_metadata',
+                    side_effect=[(original, identity), (builds, identity)]), self.assertRaises(ValueError):
+                review.mapping.bind(dict(declaration, families=families), {}, {}, {'archive': identity}, review.load_json, 1024)
+
+    def test_mapped_roots_include_all_tiers_replacements_osr_and_successful_outside_callers(self):
+        roots = [{'eventIndex': ordinal, 'id': ordinal + 1, 'method': method, 'level': level,
+                  'osr': osr, 'succeeded': True, 'reportedElapsedNanos': ordinal + 1,
+                  'reportedSuccessfulCodeBytes': 10, 'errors': []}
+                 for ordinal, (method, level, osr) in enumerate([
+                     ('p.Helper.part()V', 1, False), ('p.C.work()V', 4, False),
+                     ('p.C.work()V', 4, True), ('outside.C.caller()V', 3, False),
+                     ('p.C.work()V', 4, False)])]
+        original = {'completed': True, 'compilations': roots, 'families': {'old': {'retained': True}},
+                    'eventCounts': {'jdk.Compilation': 5, 'jdk.CompilerInlining': 1},
+                    'inlining': [{'eventIndex': 8, 'id': 4, 'caller': 'outside.C.caller()V',
+                                 'callee': 'p.Helper.part()V', 'succeeded': True, 'errors': []}]}
+        before = copy.deepcopy(original)
+        families = {'f': {'methods': ['p.C', 'p.Helper'], 'ordinaryPhase': {'control': ['p.C.work', 'p.Helper.part']},
+                         'ordinaryPhaseAll': {'control': ['p.C.work', 'p.Helper.part']}}}
+        xml = {'queued': [{'compileId': 99, 'rawAttributes': {'method': 'p/C work ()V'}}]}
+
+        mapped = review.mapping.reform(original, families, 'control', xml)
+
+        self.assertEqual(before, original)
+        value = mapped['families']['f']
+        self.assertEqual([0, 1, 2, 3, 4], value['inclusiveRootEventIndices'])
+        self.assertEqual([3], value['successfulInliningRootEventIndices'])
+        self.assertEqual([0, 3], value['ordinaryPhaseMethodRootEventIndices']['p.Helper.part'])
+        self.assertEqual([], value['missingRequiredOrdinaryPhases'])
+        self.assertEqual(15, value['observedAllTierMetrics']['reportedElapsedNanos'])
+        self.assertEqual(10, value['observedC2Metrics']['reportedElapsedNanos'])
+        self.assertEqual([{'collection': 'queued', 'index': 0}], value['unmeasuredAllTierXmlSnapshotReferences'])
+        self.assertFalse(mapped['acceptedSavingsCredit'])
+        self.assertFalse(mapped['runtimeSourceBindingProven'])
+
+    def test_mapping_keeps_missing_xml_and_incomplete_recordings_as_explicit_exclusions(self):
+        case = {'caseDirectory': 'c', 'completed': False}
+        for inputs in ([], [{'originalMember': 'p/cases/c/hotspot.xml'}] * 2):
+            with self.subTest(inputs=inputs):
+                xml, exclusions = review.mapping.snapshots(dict(case, xmlInputs=inputs), {}, review.load_json, 1024)
+                self.assertEqual({}, xml)
+                self.assertTrue(exclusions)
+        families = {'f': {'methods': ['p.C'], 'ordinaryPhase': {'control': ['p.C.work']},
+                         'ordinaryPhaseAll': {'control': ['p.C.work']}}}
+        report = review.mapping.reform({'completed': False}, families, 'control', {})
+        metadata = {'case': 'c', 'engine': 'cp', 'index': 0, 'repetition': 0, 'mode': 'profile',
+                    'arm': 'control', 'sourceHashesMatch': True, 'exit': 0,
+                    'problem': {'format': 'MINIZINC'}, 'record': {'stats': {'sourceValidation': 'valid'}}}
+
+        row = review.observations(case, metadata, report, {}, {}, False)[0]
+
+        self.assertFalse(row['observedDeclaredPhaseAndSourceEligible'])
+        self.assertIn('Incomplete original case or recording census', row['exclusions'])
+        self.assertIn('missingRequiredOrdinaryPhases', row['exclusions'])
+        self.assertIsNone(row['observedMetrics']['reportedElapsedNanos'])
+
+    def test_retained_xml_mapping_rejects_tampering_and_keeps_parser_failures_excluded(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'xml.json.gz'
+            for completed in (True, False):
+                raw = json.dumps({'completed': completed, 'metadata': {'queued': []},
+                                  'error': None if completed else {'type': 'ParseError'}}).encode()
+                path.write_bytes(gzip.compress(raw))
+                retained = {'path': 'xml-000000-000.json.gz', 'compressed': review.cohort.file_identity(path),
+                            'uncompressed': review.cohort.gzip_identity(path, 1024)}
+                case = {'caseDirectory': 'c', 'xmlInputs': [{'originalMember': 'p/cases/c/hotspot.xml',
+                        'completed': completed, 'retainedMetadata': retained}]}
+                selected = {retained['path']: path}
+
+                xml, exclusions = review.mapping.snapshots(case, selected, review.load_json, 1024)
+
+                self.assertEqual({'queued': []} if completed else {}, xml)
+                self.assertEqual(not completed, bool(exclusions))
+                for key in ('compressed', 'uncompressed'):
+                    changed = copy.deepcopy(case)
+                    changed['xmlInputs'][0]['retainedMetadata'][key]['sha256'] = '0' * 64
+                    with self.subTest(completed=completed, key=key), self.assertRaisesRegex(ValueError, 'producer identity'):
+                        review.mapping.snapshots(changed, selected, review.load_json, 1024)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

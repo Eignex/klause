@@ -2278,6 +2278,26 @@ complete saved-census archive. It authenticates every member before interpreting
 the cohort index, original case metadata and complete per-recording census files.
 It performs no original JVM or solver replay and does not run `jfr print`.
 
+Optional `mapping=<https-url>` and `mapping-sha256=<sha256>` arguments supply a
+separate phase declaration. Both are required together. The bounded JSON object
+uses `schema=1`, `inputCensusArchive` (size and SHA-256), `originalFamiliesIdentity`
+and `originalStudyBuildsIdentity` (uncompressed original sizes and SHA-256 values),
+`sourceHeads` (control and candidate Git heads) and `families`. Original metadata
+gzip identities and both recorded expected/actual heads must match. The family
+universe and every original supporting method selector must be retained. Each
+family declares `methods`, `ordinaryPhase` and `ordinaryPhaseAll`; required phases
+must be declared for their arm. Empty declarations retain their exclusions.
+
+The observer authenticates the complete retained XML metadata and reforms mapped
+families from all saved compilation and inlining rows, including successful
+outside roots. Missing or incomplete XML stays excluded; ambiguous IDs, queued or
+unmeasured roots, OSR, failures and conflicts retain the census rules. The report
+keeps the original comparisons unchanged and adds `phaseMapping` observations,
+pairs and summaries. Plain summaries include `mappedComparisonSummaries` alongside
+the original summaries. The mapping input and its hash remain captured. Recorded
+head equality establishes metadata scope only; it does not prove loaded classes,
+descriptors, synthetic ownership or exhaustive source-phase coverage.
+
 `compilation-cost-comparison.json.gz` retains every original family/case row and
 pair, original source-check status, whole recording/tier costs and report recovery
 identities. Pair keys include engine, input index, repetition, mode and recipe.
@@ -2299,7 +2319,8 @@ All full-root, elapsed-time, code-size and saving proof flags remain false.
 Resource bounds are 2 GiB compressed archives, 16 GiB complete member expansion,
 512 MiB selected compressed metadata, 512 MiB per expanded census JSON and
 512 MiB complete compressed output. Transport staging is removed after the child
-finishes. The observer retains its installed build/JDK identity, exact nine-file
+finishes. Optional mapping inputs are bounded to 16 MiB. The observer retains its
+installed build/JDK identity, exact ten-file
 Python closure, original input identities and actual child streams/exit.
 
 ### Polynomial witness work checkpoints
