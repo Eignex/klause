@@ -32,6 +32,19 @@ define exact overflow, remapping and consumer support.
 
 ## Schema floats
 
+`schemaSemantics` declares binary64 literal authority, grid defaults and absent-value
+canonicalization. Both schema compile entries resolve `SemanticOverrides` before
+lowering and retain the result on `Problem.semantics`. Integer and real declarations
+require explicit ranges, so undeclared-range overrides are inapplicable. The legacy
+configuration arguments adapt their float bucket and absent-value choices into the
+same capture; resource settings remain separate. The float-linear scale currently
+supports its declared default only and rejects replacements.
+
+An omitted `FloatSpec.buckets` or DSL bucket argument remains unspecified until
+compilation, which applies the effective grid default. An explicit count retains
+that variable's declared grid size. Compiled float decoders hold resolved counts;
+evaluating an unresolved source grid directly requires compilation first.
+
 Schema float rows join the names they reference into components. Top-level
 non-strict linear equalities and inequalities use real columns unless their component
 also contains a strict/disequal row or an optional float. Such a component uses its
@@ -39,6 +52,9 @@ declared integer grid; unrelated Boolean constraints and float components do not
 change that choice. Nested reified schema float expressions still decline. Shared
 `lowering.SetLayout` owns sorted indicator universes and membership lookup; source
 names, labels and set expressions stay with their callers.
+An explicit continuous-only policy rejects a component requiring a grid rather than
+admitting its approximation. A bucket count selects grid resolution when that
+component needs a grid; it does not force an otherwise exact component onto one.
 
 Schema and FlatZinc compilers expose `FloatRepresentation` by source name, with component identity
 and an explicit approximation reason. A null reason denotes source correspondence,
