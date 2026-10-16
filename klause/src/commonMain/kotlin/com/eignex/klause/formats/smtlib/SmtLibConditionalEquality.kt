@@ -346,6 +346,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                     if (frame.variable !in cyclic && frame.definition.image == null) {
                         val definition = frame.definition
                         val image = constantImage(definition.arms, definition.default, definition.guardTests)
+                        if (builder.sourceCancellation()) throw PolynomialSourceInterrupted()
                         if (!image.isNullOrEmpty()) definition.image = image
                     }
                 }
