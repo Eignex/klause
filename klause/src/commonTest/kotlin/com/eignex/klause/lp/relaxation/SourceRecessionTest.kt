@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -10,6 +11,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -125,5 +127,28 @@ class SourceRecessionTest {
             Case("true atom bounds the ray", listOf(atom), listOf(1L, 0L), listOf(1L, 0L)),
         )
         for (case in cases) assertEquals(false, proves(case), case.name)
+    }
+
+    @Test
+    fun `strict exact row rays should reject an excluded initial boundary`() {
+        val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+            LinearOp.GE, BigFraction.ZERO, strict = true)
+        val cases = listOf(
+            Case("strict interior", listOf(row), listOf(1L, 0L), listOf(1L, 0L)) to true,
+            Case("excluded initial point", listOf(row), listOf(0L, 0L), listOf(1L, 0L)) to false,
+        )
+
+        for ((case, expected) in cases) assertEquals(expected, proves(case), case.name)
+    }
+
+    @Test
+    fun `reified exact row rays should preserve the selected complement boundary`() {
+        val cases = listOf(false, true).map { strict ->
+            val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ZERO, strict = strict, activator = 0)
+            Case("false boundary strict $strict", listOf(row), listOf(0L, 0L), listOf(1L, 0L), aux = false) to strict
+        }
+
+        for ((case, expected) in cases) assertEquals(expected, proves(case), case.name)
     }
 }
