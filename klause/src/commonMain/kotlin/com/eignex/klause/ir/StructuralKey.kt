@@ -111,6 +111,7 @@ internal enum class FactorKind {
     GRID_POWER,
     EXACT_LINEAR,
     LINEAR_INDICATOR,
+    DISTINCT,
 }
 
 // Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments into a

@@ -89,6 +89,8 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
 
     is LexLess -> LexLessInvariant(xs, ys, strict)
 
+    is Distinct -> scoringView()
+
     is ExactLinear -> scoringView()
 
     is LinearIndicator -> scoringView()
