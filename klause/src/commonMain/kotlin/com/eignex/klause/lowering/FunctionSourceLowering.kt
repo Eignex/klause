@@ -1,9 +1,11 @@
 package com.eignex.klause.lowering
 
+import com.eignex.klause.ir.PolynomialDistinct
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.SourceBoolId
+import com.eignex.klause.ir.TranscendentalDistinct
 import com.eignex.klause.ir.TranscendentalExpression
 import com.eignex.klause.ir.TranscendentalFormula
 import com.eignex.klause.ir.TranscendentalFunction
@@ -132,6 +134,7 @@ internal class FunctionSourceLowering(
         is PolynomialRealFormula.BooleanVariable -> booleanDefinitions[node.id.index]?.let {
             listOf(it.condition, it.whenTrue, it.whenFalse)
         } ?: emptyList()
+        is PolynomialDistinct -> node.operands
         is PolynomialRealFormula.Atom -> listOf(node.left, node.right)
         is PolynomialSelection -> listOf(
             PolynomialExpression.Variable(node.result), node.condition, node.whenTrue, node.whenFalse,
@@ -184,6 +187,7 @@ internal class FunctionSourceLowering(
         is PolynomialRealFormula.Atom -> TranscendentalFormula.Atom(
             expressions.getValue(node.left), node.relation, expressions.getValue(node.right),
         )
+        is PolynomialDistinct -> TranscendentalDistinct(node.operands.map(expressions::getValue))
         is PolynomialSelection -> TranscendentalFormula.Atom(
             expressions.getValue(PolynomialExpression.Variable(node.result)),
             com.eignex.klause.ir.PolynomialRelation.EQ,

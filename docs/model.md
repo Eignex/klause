@@ -156,8 +156,9 @@ Unconditional Hall and assignment cuts apply only to plain mandatory distinctnes
 Excepted and optional relations retain finite enforcement without those cuts;
 overflowing sum cuts decline. Finite globals compose with arithmetic completion
 through their finite owner and pinned source coordinates, as described by
-[theory composition](theories.md#shared-composition-contract). This path does not
-provide a standalone open-integer distinctness encoder.
+[theory composition](theories.md#shared-composition-contract). Selected linear and
+polynomial encoders preserve mandatory, optional and excepted source relations.
+Their guarded comparisons use exact source values; open integer declarations stay open.
 
 ## Distinct-value counts
 
@@ -278,10 +279,13 @@ and rational reals. A checked ray preserves every affine separation; false
 reification requires a permanent affine collision. Distinctness supplies no
 unconditional numerical relaxation.
 
-Caller-selected linear and polynomial encoders expand the retained relation into
-exact pairwise comparisons. Whole-relation reification includes both truth
-directions. Encoding uses the source coordinate namespaces, carries factor
-attribution, and checks cancellation before publishing an enforcing fragment.
+Selected linear encoders expand the retained relation into exact pairwise comparisons.
+Polynomial encoders retain the operand list until query normalization constructs
+its comparisons under the native arithmetic allowance. Whole-relation reification
+includes both truth directions. Encoding uses the source coordinate namespaces,
+carries factor attribution, and checks cancellation before publishing an enforcing fragment.
+Already finite integer/Boolean sources with complete native finite support select
+their finite owner before arithmetic installation, avoiding unused pairwise encodings.
 
 ## Published assignments and objectives
 

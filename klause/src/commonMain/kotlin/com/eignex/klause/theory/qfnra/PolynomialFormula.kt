@@ -2,10 +2,12 @@ package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.ir.PolynomialDistinct
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.PolynomialSelection
+import com.eignex.klause.lowering.polynomialDistinctEncoding
 import com.eignex.klause.lowering.polynomialSelectionEncoding
 import com.eignex.klause.simplex.exact.BigFraction
 
@@ -177,7 +179,7 @@ internal class PolynomialFormula private constructor(
             val nodes = mutableListOf<FormulaNode>()
             val atoms = mutableListOf<PolynomialAtom>()
             val booleans = LinkedHashSet<Int>()
-            val selections = HashMap<PolynomialSelection, PolynomialRealFormula>()
+            val selections = HashMap<PolynomialRealFormula, PolynomialRealFormula>()
             val pending = ArrayDeque<Pair<PolynomialRealFormula, Boolean>>()
             pending.addLast(formula to false)
             while (pending.isNotEmpty()) {
@@ -188,6 +190,9 @@ internal class PolynomialFormula private constructor(
                     is PolynomialRealFormula.Not -> listOf(node.operand)
                     is PolynomialRealFormula.And -> node.operands
                     is PolynomialRealFormula.Or -> node.operands
+                    is PolynomialDistinct -> listOf(selections.getOrPut(node) {
+                        polynomialDistinctEncoding(node, arithmetic::step)
+                    })
                     is PolynomialSelection -> listOf(selections.getOrPut(node) {
                         polynomialSelectionEncoding(node, arithmetic::step)
                     })
@@ -212,7 +217,7 @@ internal class PolynomialFormula private constructor(
                         FormulaNode.Atom(atoms.lastIndex)
                     }
                     is PolynomialRealFormula.Not -> FormulaNode.Not(indices.getValue(node.operand))
-                    is PolynomialSelection -> FormulaNode.Junction(
+                    is PolynomialDistinct, is PolynomialSelection -> FormulaNode.Junction(
                         intArrayOf(indices.getValue(children.single())), true,
                     )
                     is PolynomialRealFormula.And -> FormulaNode.Junction(

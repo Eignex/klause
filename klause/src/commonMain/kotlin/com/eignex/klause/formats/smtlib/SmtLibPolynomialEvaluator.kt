@@ -1,13 +1,14 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.ir.TranscendentalFunction
+import com.eignex.klause.ir.PolynomialDistinct
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.lowering.PolynomialRealLowering
+import com.eignex.klause.ir.TranscendentalFunction
 import com.eignex.klause.lowering.FunctionSourceLowering
+import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.and
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.constant
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.equivalent
@@ -22,16 +23,16 @@ import com.eignex.klause.lowering.PolynomialRealLowering.Companion.sum
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BIG_TWO
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.shr
-import com.eignex.klause.util.rem as bigRemainder
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.signum
 import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.rem as bigRemainder
+import com.eignex.klause.util.shr
+import com.eignex.klause.util.signum
 import com.eignex.klause.util.toLong
 
 internal sealed interface PolynomialValue {
@@ -382,9 +383,18 @@ internal class SmtLibPolynomialEvaluator(
     }
 
     private fun comparison(head: String, args: List<PolynomialValue>): PolynomialRealFormula {
-        val pairs = if (head == "distinct") {
-            args.indices.flatMap { left -> (left + 1 until args.size).map { right -> left to right } }
-        } else (0 until args.size - 1).map { it to it + 1 }
+        if (head == "distinct" && args.any { it is PolynomialValue.Boolean } &&
+            args.any { it !is PolynomialValue.Boolean }
+        ) smtUnsupported("distinct requires operands of the same sort")
+        if (head == "distinct") return PolynomialDistinct(args.map { value ->
+            cancellation.polynomialSourceCheckpoint(1)
+            when (value) {
+                is PolynomialValue.Real -> value.expression
+                is PolynomialValue.Boolean -> lowering.conditional(value.formula,
+                    constant(BigFraction.ONE), constant(BigFraction.ZERO))
+            }
+        })
+        val pairs = (0 until args.size - 1).map { it to it + 1 }
         val op = when (head) {
             "=" -> PolynomialRelation.EQ
             "distinct" -> PolynomialRelation.NE

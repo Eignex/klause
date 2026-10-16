@@ -93,7 +93,10 @@ The containing theory invocation closes after portfolio handles and sessions.
 counts. Numeric source selections retain their result, guard and branch expressions
 in this formula. Polynomial normalization privately installs both guarded equality
 alternatives under the invocation's native work and cancellation controls; the
-source snapshot remains unchanged. Each `PolynomialTheoryInvocation` owns a cumulative native work allowance
+source snapshot remains unchanged. Distinctness retains its ordered numeric operands;
+query normalization constructs exact disequalities for every pair under that same
+arithmetic allowance, without publishing a partial normalized formula.
+Each `PolynomialTheoryInvocation` owns a cumulative native work allowance
 across fresh conditioned checks. Boolean pins and rational lower/upper bounds are
 conjoined within the counted arithmetic scope. Query construction, normalization,
 CAD, exact witness capture and the final verdict poll share cancellation and allocation

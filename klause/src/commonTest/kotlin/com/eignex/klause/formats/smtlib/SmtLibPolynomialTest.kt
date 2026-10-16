@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.ir.PolynomialDistinct
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
@@ -140,7 +141,6 @@ class SmtLibPolynomialTest {
     fun `real comparisons should preserve strictness and equality polarity`() {
         val cases = listOf(
             "=" to PolynomialRelation.EQ,
-            "distinct" to PolynomialRelation.NE,
             "<" to PolynomialRelation.LT,
             "<=" to PolynomialRelation.LE,
             ">" to PolynomialRelation.GT,
@@ -167,18 +167,15 @@ class SmtLibPolynomialTest {
     }
 
     @Test
-    fun `distinct should constrain every pair rather than adjacent operands`() {
+    fun `distinct should retain every original operand in order`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const y Real) (assert (distinct x y 0))",
         )
 
-        val terms = assertIs<PolynomialRealFormula.And>(parsed.formula).operands
-        assertEquals(3, terms.size)
-        assertTrue(terms.all { assertIs<PolynomialRealFormula.Atom>(it).relation == PolynomialRelation.NE })
-        val first = assertIs<PolynomialRealFormula.Atom>(terms[0])
-        val nonadjacent = assertIs<PolynomialRealFormula.Atom>(terms[1])
-        assertEquals(first.left, nonadjacent.left)
-        assertEquals(PolynomialExpression.Constant.of(bigIntOf(0)), nonadjacent.right)
+        val operands = assertIs<PolynomialDistinct>(parsed.formula).operands
+
+        assertEquals(listOf(PolynomialExpression.Variable(SourceRealId(0)),
+            PolynomialExpression.Variable(SourceRealId(1)), PolynomialExpression.Constant.of(bigIntOf(0))), operands)
     }
 
     @Test

@@ -4,14 +4,11 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lowering.ALL_DIFFERENT_WITNESS_MIN_ARITY
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.WideLinComb
-import com.eignex.klause.lowering.allDifferentWindowSize
 import com.eignex.klause.lowering.constProduct
 import com.eignex.klause.lowering.isConstant
-import com.eignex.klause.lowering.reifyAllDifferentWitness
 import com.eignex.klause.lowering.scaleByConst
 import com.eignex.klause.lowering.scaleIntComb
 import com.eignex.klause.lowering.sumIntCombs
@@ -364,18 +361,7 @@ private fun Compiler.Builder.combineBool(node: SExpr.SList, head: String, args: 
         Res.B(reifyRelArgs(node, head, args))
     }
 
-    "distinct" -> if (args.any { it is Res.R }) {
-        val terms = args.map { it.asReal() }
-        val neLits = ArrayList<Int>()
-        for (i in terms.indices) {
-            for (j in i + 1 until terms.size) {
-                neLits.add(Lit.negate(reifyRealRel("=", terms[i], terms[j])))
-            }
-        }
-        Res.B(reifyAnd(neLits))
-    } else {
-        Res.B(distinctFromArgs(args))
-    }
+    "distinct" -> Res.B(distinctFromArgs(args))
 
     "ite" -> Res.B(tseitinIte(args[0].asLit(), args[1].asLit(), args[2].asLit()))
 
@@ -565,45 +551,6 @@ private fun Compiler.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: L
  *  boolean structure stays a conjunction of reified pairs. */
 private inline fun Compiler.Builder.chainReified(n: Int, reifyPair: (Int) -> Int): Int =
     if (n == 2) reifyPair(0) else reifyAnd((0 until n - 1).map(reifyPair))
-
-/** Reified `distinct` over folded operands (bool operands channelled to a 0/1 int term): the linear-size
- *  witness encoding where every operand is a bare finite-domain variable, else pairwise strict-order choices. */
-private fun Compiler.Builder.distinctFromArgs(args: List<Res>): Int {
-    if (args.size < 2) return trueLit()
-    val terms = args.map {
-        if (it is Res.B) IntComb.Narrow(litToIntTerm(it.lit)) else it.asIntComb()
-    }
-    witnessDistinct(terms)?.let { return it }
-    val orderLits = ArrayList<Int>()
-    for (i in terms.indices) {
-        for (j in i + 1 until terms.size) {
-            val less = reifyRelation("<", terms[i], terms[j])
-            val greater = reifyRelation(">", terms[i], terms[j])
-            orderLits.add(reifyOr(listOf(less, greater)))
-        }
-    }
-    return reifyAnd(orderLits)
-}
-
-/** The witness reification of `distinct`, or null when an operand is not a bare variable, repeats another,
- *  or carries an open domain — the same gate the asserted form uses to reach the native global. */
-private fun Compiler.Builder.witnessDistinct(terms: List<IntComb>): Int? {
-    if (terms.size < ALL_DIFFERENT_WITNESS_MIN_ARITY) return null
-    val vars = IntArray(terms.size) { i ->
-        val narrow = terms[i] as? IntComb.Narrow ?: return null
-        narrow.lin.asSimpleVar() ?: return null
-    }
-    if (vars.toHashSet().size != vars.size) return null
-    var lo = Long.MAX_VALUE
-    var hi = Long.MIN_VALUE
-    for (v in vars) {
-        val d = intDomains[v] as? PresolveDomain.Finite ?: return null
-        if (d.domain.min < lo) lo = d.domain.min
-        if (d.domain.max > hi) hi = d.domain.max
-    }
-    val size = allDifferentWindowSize(lo, hi) ?: return null
-    return reifyAllDifferentWitness(vars, lo, size) { min, max -> newInt(min, max) }
-}
 
 /** Fold an atom to a boolean literal, integer term, or real term. */
 private fun Compiler.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (sort == Sort.REAL) {

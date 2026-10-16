@@ -108,6 +108,7 @@ internal fun PolynomialRealFormula.remap(remap: VarRemap): PolynomialRealFormula
             is PolynomialRealFormula.Atom -> values.addLast(
                 PolynomialRealFormula.Atom(node.left.remap(remap), node.relation, node.right.remap(remap)),
             )
+            is PolynomialDistinct -> values.addLast(PolynomialDistinct(node.operands.map { it.remap(remap) }))
             is PolynomialSelection -> if (combine) {
                 values.addLast(PolynomialSelection(
                     requireNotNull(remap.real(node.result)) { "removed polynomial selection result" },
@@ -142,7 +143,8 @@ internal fun PolynomialRealFormula.remap(remap: VarRemap): PolynomialRealFormula
             }
         }
         if (combine || node is PolynomialRealFormula.Constant ||
-            node is PolynomialRealFormula.BooleanVariable || node is PolynomialRealFormula.Atom
+            node is PolynomialRealFormula.BooleanVariable || node is PolynomialRealFormula.Atom ||
+            node is PolynomialDistinct
         ) {
             remapped[node] = values.last()
         }
@@ -174,6 +176,7 @@ internal fun PolynomialRealFormula.requireVariableCounts(
                 expressions.addLast(node.left)
                 expressions.addLast(node.right)
             }
+            is PolynomialDistinct -> expressions.addAll(node.operands)
             is PolynomialSelection -> {
                 require(node.result.index < realCount) { "polynomial selection result out of range" }
                 formulas.addLast(node.condition)
@@ -218,6 +221,9 @@ private fun polynomialFormulasEqual(left: PolynomialRealFormula, right: Polynomi
                     !polynomialExpressionsEqual(first.left, second.left) ||
                     !polynomialExpressionsEqual(first.right, second.right)
                 ) return false
+            }
+            is PolynomialDistinct -> {
+                if (second !is PolynomialDistinct || first.operands != second.operands) return false
             }
             is PolynomialSelection -> {
                 if (second !is PolynomialSelection || first.result != second.result ||

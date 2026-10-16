@@ -8,6 +8,7 @@ import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.TranscendentalDistinct
 import com.eignex.klause.ir.TranscendentalExpression
 import com.eignex.klause.ir.TranscendentalFormula
 import com.eignex.klause.ir.TranscendentalFunction
@@ -17,6 +18,7 @@ import com.eignex.klause.lowering.PolynomialRealLowering.Companion.constant
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.not
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.or
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.relation
+import com.eignex.klause.lowering.transcendentalDistinctEncoding
 import com.eignex.klause.simplex.exact.BigFraction
 
 internal class TranscendentalRelaxationModel(
@@ -51,6 +53,7 @@ internal class TranscendentalRelaxationModel(
             is TranscendentalFormula.Constant -> PolynomialRealFormula.Constant(source.value)
             is TranscendentalFormula.BooleanVariable -> PolynomialRealFormula.BooleanVariable(source.id)
             is TranscendentalFormula.Atom -> atom(source, guard)
+            is TranscendentalDistinct -> boolean(transcendentalDistinctEncoding(source, arithmetic::step), guard)
             is TranscendentalFormula.Not -> not(boolean(source.operand, guard))
             is TranscendentalFormula.And -> and(source.operands.map { boolean(it, guard) })
             is TranscendentalFormula.Or -> or(source.operands.map { boolean(it, guard) })
