@@ -17,15 +17,23 @@ import com.eignex.klause.util.bigIntOf
 
 private const val MAX_CONDITIONED_LINEAR_CASES = 4096
 
-internal fun PreparedFactorProjections.conditionedLinearSupported(index: Int): Boolean =
-    conditionedLinearDomains(index) != null
+internal fun PreparedFactorProjections.conditionedLinearSupported(
+    index: Int,
+    cancellation: Cancellation = Cancellation.Never,
+): Boolean = conditionedLinearDomains(index, cancellation) != null
 
-private fun PreparedFactorProjections.conditionedLinearDomains(index: Int): List<Pair<SourceIntId, IntSpan>>? {
+private fun PreparedFactorProjections.conditionedLinearDomains(
+    index: Int,
+    cancellation: Cancellation,
+): List<Pair<SourceIntId, IntSpan>>? {
     val selected = encoder(index, EncodingTarget.LINEAR)
     if (selected.support != EncoderSupport.CONDITIONED || selected.requiredBooleans.isNotEmpty()) return null
     val conditions = selected.requiredIntegers.distinct()
     var cases = 1L
     return conditions.map { id ->
+        if (cancellation()) return null
+        cancellation.charge(1)
+        if (cancellation()) return null
         if (id.index !in 0 until problem.numIntVars || !problem.intBounds.hasLower(id.index) ||
             !problem.intBounds.hasUpper(id.index)
         ) return null
@@ -45,8 +53,8 @@ internal fun PreparedFactorProjections.installConditionedLinearFactor(
     allocator: EncodingRealAllocator,
     onDecline: (EncoderDecline) -> Unit,
 ): List<EncodedTheoryFactor>? {
-    val domains = conditionedLinearDomains(index) ?: run {
-        onDecline(EncoderDecline.CONDITIONS)
+    val domains = conditionedLinearDomains(index, cancellation) ?: run {
+        onDecline(if (cancellation()) EncoderDecline.RESOURCE else EncoderDecline.CONDITIONS)
         return null
     }
     val source = problem.factors[index]

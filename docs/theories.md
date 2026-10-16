@@ -50,6 +50,22 @@ can declare a target and implement the same installation scope. Selection contai
 no mutable solving state. Prepared relations are combined within one arithmetic
 owner before its checks, rather than checked as independent factor witnesses.
 
+Selected linear and difference requests preflight their entire ordered source scope
+before allocating a receiver or invoking any selected installer. Unsupported and
+relaxation-only descriptors decline enforcement; missing source pins decline the
+condition scope. An ineligible whole source does not suppress a separately admitted
+connected subset. Candidate planning retains finite ownership and encoding
+participation independently. A complete LRA candidate needs no difference
+installation. Each admitted receiver still performs the installer's own condition,
+resource and formula validation; a descriptor cannot certify that work in advance.
+Source identities and captured pin maps survive through original factor attribution.
+
+Admission charges each visited pin, selected factor and declared condition to the
+containing work meter. The retained cancellation observes the same deadline and
+meter through installation; an observed stop is latched for that preparation and
+withholds its installed fragments. A new receiving scope cannot refresh an allowance
+or refund failed admission/installation work.
+
 A linear consumer can complete an integer-conditioned encoder by covering every
 value of its required finite declarations. It retains source integer guards on
 each installed relation, combines all factors in the same arithmetic owner, and

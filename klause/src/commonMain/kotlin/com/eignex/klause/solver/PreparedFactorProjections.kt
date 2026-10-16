@@ -8,6 +8,8 @@ import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceBoolId
+import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.ScoringProjection
@@ -21,7 +23,10 @@ import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.SelectedProjectionChecks
 import com.eignex.klause.theory.Encoder
+import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.Cancellation
 
 /**
  * Immutable source-associated mechanism selection. Factories are retained, never mutable workspaces;
@@ -44,6 +49,23 @@ class PreparedFactorProjections internal constructor(
 ) {
     /** Immutable whole-relation selection in this canonical source's factor namespace. */
     fun encoder(factorId: Int, target: EncodingTarget): Encoder = encoders.getValue(target)[factorId]
+
+    internal fun capturedEncoder(factorId: Int, target: EncodingTarget): Encoder? =
+        encoders[target]?.getOrNull(factorId)
+
+    internal fun requestEncoders(
+        target: EncodingTarget,
+        indices: List<Int>,
+        fixedIntegers: Map<SourceIntId, BigInt> = emptyMap(),
+        fixedBooleans: Map<SourceBoolId, Boolean> = emptyMap(),
+        cancellation: Cancellation = Cancellation.Never,
+        completeFiniteConditions: Boolean = false,
+        onDecline: (EncoderDecline) -> Unit = {},
+    ): SelectedEncoderRequest? {
+        require(target in encoders) { "consumer target was not captured for this source" }
+        return SelectedEncoderRequest.prepare(this, target, indices, fixedIntegers, fixedBooleans,
+            cancellation, completeFiniteConditions, onDecline)
+    }
 
     private val declarations = Array(problem.numFactors) { id ->
         FactorExecutionCapabilities(
