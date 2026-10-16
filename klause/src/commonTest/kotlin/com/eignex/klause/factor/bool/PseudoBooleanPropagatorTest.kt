@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
@@ -27,7 +28,7 @@ class PseudoBooleanPropagatorTest {
         state.currentFactor = 0
         assertTrue(state.pinBool(0, true))
 
-        assertTrue(problem.propagators[0].propagate(state, 0))
+        assertTrue(state.factorAt(0).propagate(state, 0))
 
         assertEquals(false, state.boolValues[1])
     }
@@ -40,7 +41,7 @@ class PseudoBooleanPropagatorTest {
         val state = PropagationState(problem, Assumptions.None)
         state.currentFactor = 0
 
-        assertTrue(problem.propagators[0].propagate(state, 0))
+        assertTrue(state.factorAt(0).propagate(state, 0))
 
         assertEquals(false, state.boolValues[0])
     }
@@ -53,7 +54,7 @@ class PseudoBooleanPropagatorTest {
         val state = PropagationState(problem, Assumptions.None)
         state.currentFactor = 0
 
-        assertFalse(problem.propagators[0].propagate(state, 0))
+        assertFalse(state.factorAt(0).propagate(state, 0))
     }
 
     @Test
@@ -67,7 +68,7 @@ class PseudoBooleanPropagatorTest {
             state.currentFactor = 0
             assertTrue(state.pinBool(0, indicator))
 
-            assertTrue(problem.propagators[0].propagate(state, 0))
+            assertTrue(state.factorAt(0).propagate(state, 0))
 
             assertEquals(if (op == PbOp.LE) !indicator else indicator, state.boolValues[1], "$op $indicator")
         }

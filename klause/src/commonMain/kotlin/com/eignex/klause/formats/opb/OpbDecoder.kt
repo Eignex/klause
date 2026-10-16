@@ -70,7 +70,8 @@ internal object OpbDecoder {
                 is OpbStatement.Constraint -> {
                     val relation = lowerRelation(builder, statement.relation)
                     if (statement.softCost == null) {
-                        builder.factors += PseudoBoolean(relation.weights, relation.literals, relation.op, relation.bound)
+                        builder.factors += PseudoBoolean(
+                            relation.weights, relation.literals, relation.op, relation.bound)
                     } else {
                         val sat = builder.newBool()
                         builder.factors += ReifiedPseudoBoolean(

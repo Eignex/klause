@@ -10,7 +10,7 @@ interface ReifiedFactor : Factor {
     /** The reifying Boolean variable, true iff the body predicate holds. */
     val auxBoolVar: Int
 
-    /** Whether the body predicate currently holds, read from the factor's payload at [factorId]. */
+    /** Whether the body predicate holds for the current assignment at [factorId]. */
     fun holdsNow(state: LocalSearchState, factorId: Int): Boolean
 
     /** Violation magnitude of the body predicate at [factorId], capped at [softCap]; 0 when it holds. */
