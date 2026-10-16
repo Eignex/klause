@@ -12,11 +12,14 @@ import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.constsOf
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
@@ -29,15 +32,200 @@ import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverConflictTest {
+    @Test
+    fun `source equalities should refute an incompatible row without a numeric check`() {
+        val source = Problem(
+            numBoolVars = 0,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.EQ, 1.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, -2.0), LinearOp.EQ, 1.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), maxChecks = 0)
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.initialize())
+
+            assertTrue(assertNotNull(conflict.explanation).literals.isEmpty())
+            assertEquals(0L, stats.snapshot().completeSearchLinearChecks)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_CONFLICT"))
+        }
+    }
+
+    @Test
+    fun `an equality conflict should cite its guard and retract before a sibling`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.EQ, 1.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, -2.0), LinearOp.EQ, 1.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(0)))
+
+            assertContentEquals(intArrayOf(1), assertNotNull(conflict.explanation).literals)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_CONFLICT"))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+        }
+    }
+
+    @Test
+    fun `equality projection should wait for and cite a signed Boolean coefficient`() {
+        val row = object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+            intArrayOf(1), doubleArrayOf(1.0), LinearOp.LE, 0.0) {
+            override val linearForm: LinearForm = LinearForm.Conjunction(listOf(TaggedLinearRow(
+                intArrayOf(Term.ofLit(Lit.make(1, false)), Term.ofRealVar(1)),
+                RealConstants(RealConsts(doubleArrayOf(1.0)), RealConsts(doubleArrayOf(1.0)), 0.0, false),
+                LinearOp.LE, activator = 0,
+            )))
+        }
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.EQ, 1.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, -2.0), LinearOp.EQ, 1.0),
+                row,
+            ),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(3)))
+
+            assertEquals(setOf(1, 2), assertNotNull(conflict.explanation).literals.toSet())
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_CONFLICT"))
+        }
+    }
+
+    @Test
+    fun `an unavailable equality guard should retain ordinary conflict handling`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.EQ, 1.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, -2.0), LinearOp.EQ, 1.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        val context = object : SearchContext by session {
+            override fun atomLiteral(decision: SearchDecision): Int? =
+                if (decision == SearchDecision.Bool(0)) null else session.atomLiteral(decision)
+        }
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val decision = SearchDecision.Bool(0)
+            assertIs<ComponentResult.Consistent>(session.push(decision))
+            assertIs<ComponentResult.Consistent>(component.assert(decision, context))
+
+            val conflict = assertIs<ComponentResult.Conflict>(component.propagate(context))
+
+            assertNull(conflict.explanation)
+            assertEquals(0L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_CONFLICT") ?: 0L)
+        }
+    }
+
+    @Test
+    fun `a stop during equality explanation should allow a live retry`() {
+        var stopped = false
+        var armed = false
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.EQ, 1.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, -2.0), LinearOp.EQ, 1.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        val context = object : SearchContext by session {
+            override fun atomLiteral(decision: SearchDecision): Int? {
+                val literal = session.atomLiteral(decision)
+                if (armed) stopped = true
+                return literal
+            }
+        }
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            component.useOperationAllowance { parent -> parent or Cancellation { stopped } }
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val decision = SearchDecision.Bool(0)
+            assertIs<ComponentResult.Consistent>(session.push(decision))
+            assertIs<ComponentResult.Consistent>(component.assert(decision, context))
+            armed = true
+            assertIs<ComponentResult.Indeterminate>(component.propagate(context))
+            assertIs<ComponentCheck.Indeterminate>(component.check(context))
+            assertEquals(0L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_CONFLICT") ?: 0L)
+            armed = false
+            stopped = false
+
+            val conflict = assertIs<ComponentResult.Conflict>(component.propagate(context))
+
+            assertContentEquals(intArrayOf(1), assertNotNull(conflict.explanation).literals)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_CONFLICT"))
+        }
+    }
+
     @Test
     fun `a false source clause should conflict despite feasible real bounds`() {
         val model = Problem(

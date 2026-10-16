@@ -207,6 +207,7 @@ class ExactLiraSearchComponent private constructor(
     private val exactForms = preparedSource.exactForms
     private val preparedRows = preparedSource.preparedRows
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
+    private var sourceEqualityConflict: SearchExplanation? = null
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
@@ -965,7 +966,67 @@ class ExactLiraSearchComponent private constructor(
         return system.install().also { sourceInstalled = it }
     }
 
+    private fun refuteSourceEqualities(context: SearchContext): SearchExplanation? {
+        if (graphFirst || hasPrivateReals || model.numIntVars != 0 ||
+            !admitsSourceEqualityColumns(model.numRealVars) || hasSourceDisjunctions ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
+            node.rowAssertions.isNotEmpty() || node.sourceBranches.isNotEmpty() ||
+            node.disequalityDirections.isNotEmpty() || node.directionPremises.isNotEmpty() ||
+            node.branches.isNotEmpty() || node.reducedBranches.isNotEmpty() ||
+            node.transformedBranches.isNotEmpty() || node.retainedReduction != null || lp.state?.conflict != null
+        ) return null
+        val rows = ArrayList<ExactRationalInequality>()
+        val variables = LinkedHashSet<Int>()
+        operationStop.charge(2L * model.numRealVars + 1L)
+        if (operationStop()) return null
+        for (real in 0 until model.numRealVars) {
+            model.realLower[real].takeIf(Double::isFinite)?.let { rows += exactColumnLower(real, it.asFraction()) }
+            model.realUpper[real].takeIf(Double::isFinite)?.let { rows += exactColumnUpper(real, it.asFraction()) }
+        }
+        var entries = rows.size * 2L
+        for (prepared in preparedRows) {
+            operationStop.charge(1L + prepared.booleans.size)
+            if (operationStop()) return null
+            if (prepared.booleans.any { bools[it] == UNASSIGNED }) continue
+            val row = prepared.row
+            operationStop.charge(row.size.toLong() + 1L)
+            if (operationStop()) return null
+            if ((0 until row.size).none { Term.isReal(row.ref(it)) }) continue
+            val truth = node.rowTruth(prepared.address, row, bools) ?: continue
+            val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
+            if (comparison.op == LinearOp.NE) continue
+            val copyEntries = (row.size.toLong() + 1L) * if (comparison.op == LinearOp.EQ) 2L else 1L
+            if (copyEntries > 65536L - entries) return null
+            operationStop.charge(copyEntries + prepared.booleans.size)
+            if (operationStop()) return null
+            entries += copyEntries
+            comparison.rowsInto(rows)
+            variables.addAll(prepared.booleans)
+            if (variables.size >= 4096) return null
+        }
+        val refuted = when (val prepared = prepareSourceEqualities(model.numRealVars, rows, operationStop)) {
+            is SourceEqualityPreparation.Ready -> {
+                observeCompleteStage("SOURCE_EQUALITY_PREPARED")
+                prepared.repair.checkedResidual(rows) === SourceEqualityResidual.Refuted
+            }
+            SourceEqualityPreparation.Refuted -> true
+            SourceEqualityPreparation.Declined -> {
+                observeCompleteStage("SOURCE_EQUALITY_DECLINED")
+                false
+            }
+        }
+        if (!refuted || operationStop()) return null
+        operationStop.charge(2L * variables.size + 1L)
+        if (operationStop()) return null
+        val premise = SearchAtomPremise.All(variables.map { variable ->
+            SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
+        })
+        val explanation = context.explainAtoms(premise)
+        return explanation.takeUnless { operationStop() }
+    }
+
     private fun assertSource(context: SearchContext): Boolean {
+        sourceEqualityConflict = null
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((index, prepared) in preparedRows.withIndex()) {
@@ -999,6 +1060,7 @@ class ExactLiraSearchComponent private constructor(
             is LpBoundBatchResult.Applied -> Unit
         }
         if (!assertDisequalities(disequalities)) return false
+        sourceEqualityConflict = refuteSourceEqualities(context)
         nodesByLevel.put(context.decisionLevel, node)
         return true
     }
@@ -1162,6 +1224,16 @@ class ExactLiraSearchComponent private constructor(
         val asserted = assertSource(context)
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
+        }
+        sourceEqualityConflict?.let { explanation ->
+            sourceEqualityConflict = null
+            dirty = false
+            candidate = null
+            assignment = null
+            smtStats?.observeConflict(explanation)
+            outcome = ComponentCheck.Infeasible(explanation)
+            observeCompleteStage("SOURCE_EQUALITY_CONFLICT")
+            return ComponentResult.Conflict(explanation)
         }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0

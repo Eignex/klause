@@ -27,6 +27,24 @@ those assertions through their decision scope, checks the residual system and
 contributes exact source coordinates at a complete check. Disequalities require
 an applicable direction and remain part of the source check.
 
+Resolved original pure-real rows can also conflict through exact equality
+elimination before numerical completion. Literal opposite non-strict rows establish
+equalities; Gaussian substitution can prove an inconsistent equality or reduce an
+active inequality to a false constant. The component retains every admitted row's
+actual Boolean and coefficient antecedents and requires a complete current
+explanation. Unresolved rows, disequalities, private coordinates, arithmetic
+alternatives, unavailable explanations and interrupted or oversized arithmetic
+withhold this deduction and retain ordinary numerical handling.
+
+Equality preparation distinguishes completed refutations from private declines.
+The point-completion adapter preserves its nullable interface, while the proof
+consumer uses only an explicit exact contradiction. It creates no point or LP
+invocation. Its ephemeral workspace retains the existing 65,536 source-entry and
+square-column admission, 4,096-bit arithmetic and containing operation token.
+At most 4,095 distinct active Boolean antecedents enter the flat explanation.
+Every assertion attempt rebuilds the rows from current source values; retraction
+and cancellation cannot retain a pending conflict for another frame.
+
 For a source containing integer or real coordinates, the exact-linear component can
 reuse the exact source-coordinate prefix of an existing completed LP witness, or
 the point from its existing feasible difference check,

@@ -4,17 +4,42 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
 
+internal sealed interface SourceEqualityPreparation {
+    class Ready(val repair: MixedEqualityRepair) : SourceEqualityPreparation
+    data object Refuted : SourceEqualityPreparation
+    data object Declined : SourceEqualityPreparation
+}
+
+internal sealed interface SourceEqualityResidual {
+    class Rows(val rows: List<ExactRationalInequality>) : SourceEqualityResidual
+    data object Refuted : SourceEqualityResidual
+    data object Declined : SourceEqualityResidual
+}
+
+internal fun admitsSourceEqualityColumns(columns: Int): Boolean =
+    columns > 0 && columns.toLong() * columns <= MAX_REPAIR_ENTRIES
+
 internal fun prepareMixedEqualityRepair(
     columns: Int,
     rows: List<ExactRationalInequality>,
     stop: Cancellation,
     onStage: ((String) -> Unit)? = null,
 ): MixedEqualityRepair? {
-    if (columns <= 0 || columns.toLong() * columns > MAX_REPAIR_ENTRIES) {
+    val prepared = prepareSourceEqualities(columns, rows, stop, onStage)
+    return (prepared as? SourceEqualityPreparation.Ready)?.repair
+}
+
+internal fun prepareSourceEqualities(
+    columns: Int,
+    rows: List<ExactRationalInequality>,
+    stop: Cancellation,
+    onStage: ((String) -> Unit)? = null,
+): SourceEqualityPreparation {
+    if (!admitsSourceEqualityColumns(columns)) {
         onStage?.invoke("RECOVERY_EQUALITY_LIMIT")
-        return null
+        return SourceEqualityPreparation.Declined
     }
-    if (stop()) return null
+    if (stop()) return SourceEqualityPreparation.Declined
     val work = MixedPointArithmetic(stop)
     val directions = HashMap<MixedEqualityKey, Int>()
     val equalities = ArrayList<MixedEqualityKey>()
@@ -24,11 +49,11 @@ internal fun prepareMixedEqualityRepair(
         entries += row.columns.size + 1L
         if (entries > MAX_REPAIR_ENTRIES) {
             onStage?.invoke("RECOVERY_EQUALITY_LIMIT")
-            return null
+            return SourceEqualityPreparation.Declined
         }
-        if (stop()) return null
-        if (row.columns.any { it !in 0 until columns }) return null
-        if (!row.coefficients.all(work::admitted) || !work.admitted(row.rhs)) return null
+        if (stop()) return SourceEqualityPreparation.Declined
+        if (row.columns.any { it !in 0 until columns }) return SourceEqualityPreparation.Declined
+        if (!row.coefficients.all(work::admitted) || !work.admitted(row.rhs)) return SourceEqualityPreparation.Declined
         if (row.strict) continue
         val first = row.coefficients.firstOrNull { !it.isZero } ?: continue
         val reversed = first < BigFraction.ZERO
@@ -43,26 +68,26 @@ internal fun prepareMixedEqualityRepair(
     }
     if (equalities.isEmpty()) {
         onStage?.invoke("RECOVERY_EQUALITY_NO_PAIRS")
-        return null
+        return SourceEqualityPreparation.Declined
     }
     onStage?.invoke("RECOVERY_EQUALITY_PAIRED")
     stop.charge(3L * columns)
-    if (stop()) return null
+    if (stop()) return SourceEqualityPreparation.Declined
     val pivots = arrayOfNulls<ExactRationalInequality>(columns)
     for (equality in equalities) {
         stop.charge(3L * equality.terms.size + 1L)
-        if (stop()) return null
+        if (stop()) return SourceEqualityPreparation.Declined
         val coefficients = equality.terms.toMap().toMutableMap()
         var bound = equality.bound
         while (coefficients.isNotEmpty()) {
             stop.charge(coefficients.size.toLong() + 1L)
-            if (stop()) return null
-            val pivot = coefficients.keys.minOrNull() ?: return null
-            if (pivot !in pivots.indices) return null
+            if (stop()) return SourceEqualityPreparation.Declined
+            val pivot = coefficients.keys.minOrNull() ?: return SourceEqualityPreparation.Declined
+            if (pivot !in pivots.indices) return SourceEqualityPreparation.Declined
             val previous = pivots[pivot]
             if (previous == null) {
                 stop.charge(coefficients.size.toLong() * coefficients.size + 1L)
-                if (stop()) return null
+                if (stop()) return SourceEqualityPreparation.Declined
                 val ordered = coefficients.keys.sorted()
                 pivots[pivot] = ExactRationalInequality(ordered.toIntArray(),
                     ordered.map(coefficients::getValue), bound)
@@ -70,20 +95,22 @@ internal fun prepareMixedEqualityRepair(
                 break
             }
             val scale = work.quotient(coefficients.getValue(pivot), previous.coefficients.first())
-                ?: return null
+                ?: return SourceEqualityPreparation.Declined
             coefficients.remove(pivot)
-            bound = work.subtractProduct(bound, scale, previous.rhs) ?: return null
+            bound = work.subtractProduct(bound, scale, previous.rhs) ?: return SourceEqualityPreparation.Declined
             for (index in 1 until previous.columns.size) {
                 val column = previous.columns[index]
                 val coefficient = previous.coefficients[index]
                 val value = work.subtractProduct(coefficients[column] ?: BigFraction.ZERO, scale, coefficient)
-                    ?: return null
+                    ?: return SourceEqualityPreparation.Declined
                 if (value.isZero) coefficients.remove(column) else coefficients[column] = value
             }
         }
-        if (coefficients.isEmpty() && !bound.isZero) return null
+        if (coefficients.isEmpty() && !bound.isZero) {
+            return if (stop()) SourceEqualityPreparation.Declined else SourceEqualityPreparation.Refuted
+        }
     }
-    return MixedEqualityRepair(pivots, stop, onStage)
+    return SourceEqualityPreparation.Ready(MixedEqualityRepair(pivots, stop, onStage))
 }
 
 internal class MixedEqualityRepair(
@@ -111,27 +138,38 @@ internal class MixedEqualityRepair(
         return point.takeUnless { stop() }?.also { onStage?.invoke("RECOVERY_EQUALITY_RECONSTRUCTED") }
     }
 
-    fun completePoint(
-        rows: List<ExactRationalInequality>,
-        realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> List<BigFraction>?)?,
-    ): List<BigFraction>? {
+    fun checkedResidual(rows: List<ExactRationalInequality>): SourceEqualityResidual {
+        var entries = 0L
+        for (row in rows) {
+            stop.charge(row.columns.size.toLong() + 1L)
+            entries += row.columns.size + 1L
+            if (entries > MAX_REPAIR_ENTRIES || stop()) return SourceEqualityResidual.Declined
+            if (row.columns.any { it !in pivots.indices } ||
+                !row.coefficients.all(work::admitted) || !work.admitted(row.rhs)
+            ) return SourceEqualityResidual.Declined
+        }
+        return reduceRows(rows)
+    }
+
+    private fun reduceRows(rows: List<ExactRationalInequality>): SourceEqualityResidual {
         val residual = ArrayList<ExactRationalInequality>()
         var entries = 0L
         for (row in rows) {
             stop.charge(3L * row.columns.size + pivots.size + 1L)
-            if (stop()) return null
+            if (stop()) return SourceEqualityResidual.Declined
             val coefficients = row.columns.indices.associate { row.columns[it] to row.coefficients[it] }.toMutableMap()
             var bound = row.rhs
             for (pivot in pivots.indices) {
                 val coefficient = coefficients[pivot] ?: continue
                 val equation = pivots[pivot] ?: continue
-                val scale = work.quotient(coefficient, equation.coefficients.first()) ?: return null
+                val scale = work.quotient(coefficient, equation.coefficients.first())
+                    ?: return SourceEqualityResidual.Declined
                 coefficients.remove(pivot)
-                bound = work.subtractProduct(bound, scale, equation.rhs) ?: return null
+                bound = work.subtractProduct(bound, scale, equation.rhs) ?: return SourceEqualityResidual.Declined
                 for (index in 1 until equation.columns.size) {
                     val column = equation.columns[index]
                     val value = work.subtractProduct(coefficients[column] ?: BigFraction.ZERO,
-                        scale, equation.coefficients[index]) ?: return null
+                        scale, equation.coefficients[index]) ?: return SourceEqualityResidual.Declined
                     if (value.isZero) coefficients.remove(column) else coefficients[column] = value
                 }
             }
@@ -139,21 +177,29 @@ internal class MixedEqualityRepair(
             if (coefficients.isEmpty()) {
                 if (if (row.strict) BigFraction.ZERO >= bound else BigFraction.ZERO > bound) {
                     onStage?.invoke("RECOVERY_EQUALITY_RESIDUAL_FALSE")
-                    return null
+                    return if (stop()) SourceEqualityResidual.Declined else SourceEqualityResidual.Refuted
                 }
                 continue
             }
             entries += coefficients.size + 1L
             if (entries > MAX_REPAIR_ENTRIES) {
                 onStage?.invoke("RECOVERY_EQUALITY_LIMIT")
-                return null
+                return SourceEqualityResidual.Declined
             }
             stop.charge(coefficients.size.toLong() * coefficients.size + 1L)
-            if (stop()) return null
+            if (stop()) return SourceEqualityResidual.Declined
             val ordered = coefficients.keys.sorted()
             residual += ExactRationalInequality(ordered.toIntArray(), ordered.map(coefficients::getValue), bound,
                 row.strict)
         }
+        return SourceEqualityResidual.Rows(residual)
+    }
+
+    fun completePoint(
+        rows: List<ExactRationalInequality>,
+        realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> List<BigFraction>?)?,
+    ): List<BigFraction>? {
+        val residual = (reduceRows(rows) as? SourceEqualityResidual.Rows)?.rows ?: return null
         val graph = RealDifferenceSystem.prepareRows(pivots.size, residual, stop)
         if (stop()) return null
         val free = if (graph == null) {
