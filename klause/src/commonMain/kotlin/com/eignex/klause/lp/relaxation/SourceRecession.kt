@@ -10,6 +10,8 @@ import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.complemented
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -195,9 +197,12 @@ private fun ExactLinear.keeps(point: Sample, direction: List<BigFraction>): Bool
         }
     }
     val bound = BigFraction.of(constants.exactBound, BIG_ONE)
-    return when (relation) {
-        LinearOp.LE -> activity <= bound && movement <= BigFraction.ZERO
-        LinearOp.GE -> activity >= bound && movement >= BigFraction.ZERO
+    val truth = activator == LinearRow.ALWAYS || point.boolValue(activator)
+    val comparison = if (truth) relation else relation.complemented()
+    val strictSide = if (truth) strict else !strict
+    return when (comparison) {
+        LinearOp.LE -> (if (strictSide) activity < bound else activity <= bound) && movement <= BigFraction.ZERO
+        LinearOp.GE -> (if (strictSide) activity > bound else activity >= bound) && movement >= BigFraction.ZERO
         LinearOp.EQ -> activity == bound && movement.isZero
         LinearOp.NE -> activity != bound && movement.isZero
     }
