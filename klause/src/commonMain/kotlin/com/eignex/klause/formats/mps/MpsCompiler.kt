@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
@@ -15,6 +16,9 @@ import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.lowering.RowScale
 import com.eignex.klause.lowering.RowScaleBuilder
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.toleranceQualification
+import com.eignex.klause.solver.validation.LinearSourceCheck
+import com.eignex.klause.solver.validation.checkLinearSourceWitness
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Bits
@@ -73,7 +77,7 @@ class MpsCompiled(
     val floatColumns: Int,
 ) : SourceSemanticsOwner {
     override val semantics: EffectiveSourceSemantics get() = model.semantics
-    private var sourceModel: MpsModel? = null
+    private var sourceModel: LinearSourceProblem? = null
     private var sourceMismatch: String? = null
     private var toleranceMismatch: String? = null
 
@@ -95,9 +99,12 @@ class MpsCompiled(
      * Whether nominal constraints and tolerance acceptance have provably identical feasible points.
      * Representation correspondence remains separate; an interrupted check establishes no equivalence.
      */
-    fun exactClaimsCoverTolerance(cancellation: Cancellation = Cancellation.Never): Boolean =
-        sourceModel?.exactClaimsCoverTolerance(checkNotNull(semantics.effective.feasibilityTolerance), cancellation)
-            ?: false
+    fun exactClaimsCoverTolerance(cancellation: Cancellation = Cancellation.Never): Boolean {
+        if (cancellation()) return false
+        val source = sourceModel ?: return false
+        return checkNotNull(semantics.effective.feasibilityTolerance).isExact ||
+            source.toleranceQualification(cancellation)?.verify() == true
+    }
 
     /**
      * An exact objective bound from tolerance-accepted declarations and enabled one-term rows, in source units.
@@ -105,7 +112,7 @@ class MpsCompiled(
      * An open required side or interruption yields null.
      */
     fun toleranceObjectiveBound(cancellation: Cancellation = Cancellation.Never): BigFraction? =
-        sourceModel?.toleranceObjectiveBound(checkNotNull(semantics.effective.feasibilityTolerance), cancellation)
+        sourceModel?.toleranceQualification(cancellation)?.objectiveBound()
 
     /** Check finite binary64 coordinates against original source numbers under the effective policy. */
     fun withinTolerance(
@@ -115,6 +122,8 @@ class MpsCompiled(
     ): Boolean {
         if (cancellation() || sourceModel == null) return false
         val values = columns.map { column ->
+            cancellation.charge(1L)
+            if (cancellation()) return false
             if (column.real) {
                 reals.getOrNull(column.id)?.let(BigFraction::ofDouble) ?: return false
             } else {
@@ -131,7 +140,7 @@ class MpsCompiled(
 
     internal fun withSourceModel(source: MpsModel, mismatch: String?, toleranceMismatch: String?): MpsCompiled = apply {
         check(sourceModel == null) { "MPS source model is already attached" }
-        sourceModel = source
+        sourceModel = checkNotNull(source.captureLinearSource(semantics, Cancellation.Never))
         sourceMismatch = mismatch
         this.toleranceMismatch = toleranceMismatch
     }
@@ -151,10 +160,10 @@ class MpsCompiled(
     ): MpsSourceWitness? {
         require(maxEntries >= 0)
         val source = sourceModel ?: return null
-        var remaining = maxEntries.toLong() - columns.size - source.objective.indices.size
+        var remaining = maxEntries.toLong() - columns.size - source.objective?.termValues.orEmpty().size
         if (remaining < 0L) return null
-        for (row in source.constraints) {
-            remaining -= row.indices.size.toLong() + 1L
+        for (row in source.rowValues) {
+            remaining -= row.termValues.size.toLong() + 1L
             if (remaining < 0L) return null
         }
         return try {
@@ -172,66 +181,14 @@ class MpsCompiled(
         values: List<BigFraction>,
         cancellation: Cancellation = Cancellation.Never,
     ): MpsSourceWitness {
-        fun checkCancellation() {
-            if (cancellation()) mpsLoweringError("source witness check cancelled")
-        }
-        checkCancellation()
-        if (values.size != columns.size) mpsLoweringError("source witness does not cover every column")
         val source = checkNotNull(sourceModel) { "MPS source model is unavailable" }
-        val numbers = source.sourceNumbers()
-        val tolerance = checkNotNull(semantics.effective.feasibilityTolerance)
-        val absolute = BigFraction.of(tolerance.absolute.numerator, tolerance.absolute.denominator)
-        val relative = BigFraction.of(tolerance.relative.numerator, tolerance.relative.denominator)
-        var exact = true
-        fun slack(vararg scales: BigFraction?): BigFraction {
-            val scale = scales.fold(BigFraction.ZERO) { widest, value ->
-                val magnitude = value?.absolute() ?: return@fold widest
-                if (magnitude > widest) magnitude else widest
+        return when (val checked = checkLinearSourceWitness(source, values, cancellation)) {
+            is LinearSourceCheck.Accepted -> checked.witness.let { witness ->
+                MpsSourceWitness(witness.values, witness.objective ?: BigFraction.ZERO, witness.exact)
             }
-            val scaled = relative * scale
-            return if (scaled > absolute) scaled else absolute
+            LinearSourceCheck.Rejected -> mpsLoweringError("source witness violates original declarations or rows")
+            LinearSourceCheck.Declined -> mpsLoweringError("source witness check cancelled")
         }
-        fun satisfies(value: BigFraction, lower: BigFraction?, upper: BigFraction?, magnitude: BigFraction): Boolean {
-            if ((lower != null && value < lower) || (upper != null && value > upper)) exact = false
-            return (lower == null || value >= lower - slack(lower, magnitude)) &&
-                (upper == null || value <= upper + slack(upper, magnitude))
-        }
-        source.variables.forEachIndexed { index, variable ->
-            checkCancellation()
-            val value = values[index]
-            if (variable.integer && value.den != BIG_ONE) {
-                mpsLoweringError("source witness violates integrality of '${variable.name}'")
-            }
-            val (lower, upper) = numbers.variableBounds[index]
-            if (!satisfies(value, lower.finiteMps()?.fraction, upper.finiteMps()?.fraction, BigFraction.ZERO)) {
-                throw MpsLoweringException("source witness violates bound on '${variable.name}'")
-            }
-        }
-        source.constraints.forEachIndexed { rowIndex, row ->
-            checkCancellation()
-            val indicator = row.indicator
-            val trigger = if (indicator?.whenOne == true) 1L else 0L
-            if (indicator != null && values[indicator.column] != BigFraction.ofLong(trigger)) {
-                return@forEachIndexed
-            }
-            var activity = BigFraction.ZERO
-            var magnitude = BigFraction.ZERO
-            for (entry in row.indices.indices) {
-                checkCancellation()
-                val term = numbers.constraintCoefficients[rowIndex][entry].fraction * values[row.indices[entry]]
-                activity += term
-                magnitude += term.absolute()
-            }
-            val (lower, upper) = numbers.constraintBounds[rowIndex]
-            if (!satisfies(activity, lower.finiteMps()?.fraction, upper.finiteMps()?.fraction, magnitude)) {
-                throw MpsLoweringException("source witness violates row '${row.name}'")
-            }
-        }
-        val objective = source.objective.indices.indices.fold(numbers.objectiveConstant.fraction) { sum, entry ->
-            checkCancellation()
-            sum + numbers.objectiveCoefficients[entry].fraction * values[source.objective.indices[entry]]
-        }
-        return MpsSourceWitness(values, objective, exact)
     }
 
     /**
@@ -241,15 +198,16 @@ class MpsCompiled(
      */
     fun sourceObjective(ints: LongArray, reals: DoubleArray): BigFraction? {
         val source = checkNotNull(sourceModel) { "MPS source model is unavailable" }
-        val numbers = source.sourceNumbers()
-        return source.objective.indices.indices.fold(numbers.objectiveConstant.fraction) { sum, entry ->
-            val column = columns[source.objective.indices[entry]]
+        val original = source.objective ?: return BigFraction.ZERO
+        return original.termValues.fold(BigFraction.of(original.constant.numerator, original.constant.denominator)) {
+                sum, term ->
+            val column = columns[term.column]
             val value = if (column.real) {
                 reals.getOrNull(column.id)?.let(BigFraction::ofDouble)
             } else {
                 ints.getOrNull(column.id)?.let(BigFraction::ofLong)
             }
-            sum + numbers.objectiveCoefficients[entry].fraction * (value ?: return null)
+            sum + BigFraction.of(term.coefficient.numerator, term.coefficient.denominator) * (value ?: return null)
         }
     }
 
@@ -304,8 +262,6 @@ private fun sourceColumnValue(column: MpsColumn, ints: LongArray, reals: List<Bi
         ints.getOrNull(column.id)?.let(BigFraction::ofLong)
             ?: throw MpsLoweringException("integer column '${column.name}' has no value")
     }
-
-private fun BigFraction.absolute(): BigFraction = if (signum() < 0) negated() else this
 
 /** A point checked against the original MPS decimal authority. */
 data class MpsSourceWitness(
