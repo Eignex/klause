@@ -22,6 +22,12 @@ admission decline does not itself reject a supported linear source.
 
 ## Solving and composition
 
+Complete exact-real openings use conflict-activity Boolean ordering when the
+request leaves ordering automatic. An explicit source-order or activity request
+retains that choice. Mixed arithmetic keeps its default point-owner qualification;
+heuristic consumers and separate linear authority invocations retain their own
+ordering policies.
+
 Shared decisions activate rows and comparisons. The arithmetic component retains
 those assertions through their decision scope, checks the residual system and
 contributes exact source coordinates at a complete check. Disequalities require

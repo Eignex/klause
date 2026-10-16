@@ -14,7 +14,7 @@ enum class OpenBranching(
     /** Conflict-activity order over the shared session. */
     Activity("activity"),
 
-    /** Activity for a complete mixed default point owner; source order for other openings. */
+    /** Activity for complete real openings and mixed default point owners; source order otherwise. */
     Automatic("auto"),
     ;
 

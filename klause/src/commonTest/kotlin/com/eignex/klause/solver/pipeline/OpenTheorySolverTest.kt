@@ -46,6 +46,37 @@ class OpenTheorySolverTest {
     private fun sourceRoute(model: Problem): ProblemPipeline = model.sourceRoute()
 
     @Test
+    fun `automatic exact real openings should follow conflict activity ordering`() {
+        val source = SmtLib.parse(
+            "(declare-const a Bool) (declare-const b Bool) (declare-const c Bool) " +
+                "(declare-const x Real) (assert (= x 0.0)) (assert (or a b c))",
+        )
+        val assignments = listOf(OpenBranching.Automatic, OpenBranching.Activity).map { ordering ->
+            val result = OpenTheoryPipeline.engineFor(OpenTheoryRequest(source.model))
+                .solve(TheoryParams(openBranching = ordering))
+            val point = assertIs<OpenTheoryResult.Sat>(result).assignment
+            listOf("a", "b", "c").map { point.boolValue(source.boolVarNames.getValue(it)) }
+        }
+
+        assertEquals(assignments[1], assignments[0])
+    }
+
+    @Test
+    fun `explicit exact real source order should retain false before true decisions`() {
+        val source = SmtLib.parse(
+            "(declare-const a Bool) (declare-const b Bool) (declare-const c Bool) " +
+                "(declare-const x Real) (assert (= x 0.0)) (assert (or a b c))",
+        )
+
+        val result = OpenTheoryPipeline.engineFor(OpenTheoryRequest(source.model))
+            .solve(TheoryParams(openBranching = OpenBranching.SourceOrder))
+
+        val point = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertEquals(listOf(false, false, true),
+            listOf("a", "b", "c").map { point.boolValue(source.boolVarNames.getValue(it)) })
+    }
+
+    @Test
     fun `difference openings should keep their component owned model payload`() {
         val open = Bits.full(2)
         val model = Problem(
