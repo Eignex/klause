@@ -130,20 +130,16 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `polynomial fallback should retain numeric selection guards and ordered branches`() {
+    fun `native polynomial selection should retain numeric guards and ordered branches`() {
         for (sort in listOf("Real", "Int")) {
-            val input = SmtLib.parse(
+            val input = SmtLibPolynomial.parse(
                 """
                 (declare-const x $sort) (declare-const b Bool)
                 (define-fun selected () $sort (ite b (* x x) 3))
                 (assert (= selected 4)) (check-sat)
-                """.trimIndent(),
+                """.trimIndent(), allowIntegers = true,
             )
-            val formula = if (sort == "Real") {
-                assertIs<PolynomialRealProblem>((input).source.originalSource).formula
-            } else {
-                assertIs<NonlinearIntegerProblem>((input).source.originalSource).formula
-            }
+            val formula = input.formula
 
             val selection = assertIs<PolynomialRealFormula.And>(formula).operands
                 .filterIsInstance<PolynomialSelection>().single()
@@ -726,12 +722,13 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `function names shadowed by polynomial helpers should keep polynomial source authority`() {
+    fun `function names shadowed by polynomial helpers should retain factor mathematics`() {
         val input = SmtLib.parse(
             "(define-fun exp ((t Real)) Real (* t t)) (declare-const x Real) (assert (= (exp x) 2)) (check-sat)",
         )
 
-        assertIs<PolynomialRealProblem>((input).source.originalSource)
+        assertIs<Problem>(input.source.originalSource)
+        assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(input.model).solve())
     }
 
     @Test

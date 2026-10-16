@@ -17,8 +17,7 @@ import com.eignex.klause.util.Bits
  * Single-scan integer bounds from conjunctive relations mentioning one variable.
  * Missing sides remain null (infinite) in [PresolveDomain]. The scan is linear in
  * row width; multi-variable fixpoint tightening belongs to budgeted presolve.
- * These bounds guide auxiliary ranges and the choice between AllDifferent and
- * pairwise disequality lowering.
+ * These bounds justify finite auxiliary ranges without imposing bounds on open declarations.
  */
 internal fun Compiler.Builder.inferBounds() {
     if (intNames.isEmpty()) return

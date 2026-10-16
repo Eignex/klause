@@ -187,8 +187,11 @@ internal class SmtLibScope(private val cancellation: Cancellation) {
         "=", "distinct" -> if (args.size >= 2 &&
             (args.all { it == Sort.BOOL } || args.all(::numeric))) Sort.BOOL else null
         "<", "<=", ">", ">=" -> if (args.size >= 2 && args.all(::numeric)) Sort.BOOL else null
-        "ite" -> if (args.size != 3 || args[0] != Sort.BOOL) null
+        "ite" -> {
+            if (args.size != 3) smtUnsupported("ite expects 3 arguments")
+            if (args[0] != Sort.BOOL) null
             else if (args[1] == Sort.BOOL && args[2] == Sort.BOOL) Sort.BOOL else numericResult(args.drop(1))
+        }
         "to_real" -> if (args == listOf(Sort.INT)) Sort.REAL else null
         "to_int" -> if (args.size == 1 && numeric(args[0])) Sort.INT else null
         "is_int" -> if (args.size == 1 && numeric(args[0])) Sort.BOOL else null

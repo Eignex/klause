@@ -765,14 +765,11 @@ class SmtLibConditionalEqualityTest {
             (assert (or (= (ite b (+ x 9223372036854775807) 0) (- 9223372036854775808)) false))
             """.trimIndent(),
         )
-        val session = SearchSession(
-            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
-            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
-        )
+        val result = BacktrackSolver.source(parsed.model).solve()
 
-        assertIs<ComponentResult.Consistent>(session.initialize())
-
-        assertEquals(true, session.boolValue(parsed.boolVarNames.getValue("b")))
+        val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertEquals(true, assignment.boolValue(parsed.boolVarNames.getValue("b")))
+        assertEquals("-18446744073709551615", assignment.intValue(parsed.intVarNames.getValue("x")))
     }
 
     @Test
