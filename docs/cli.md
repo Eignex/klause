@@ -136,6 +136,23 @@ retains `best-found` status.
 [Portfolio admission](solver/portfolio.md) owns acceptance;
 [source values](model.md#published-assignments-and-objectives) own exact payloads.
 
+The internal `linearSourceSolvable` adapter accepts an attached `LinearSourceProblem`
+and a renderer of checked `LinearSourceWitness` values. It captures one invocation;
+`SolveCore` supplies the existing finite request factory or selected arithmetic
+controls to `SourceSetup.execute`. Finite controls use the actual invocation's
+retained shape. The adapter publishes declaration-order coordinates and original
+rational objective values through `ArithmeticPublication`, and selects terminal
+markers from `SourceExecutionResult.linearSource.conclusion`. A native nominal
+optimum qualified only as source feasibility produces `BEST_FOUND` during optimization.
+A rendering veto cannot establish an optimum marker.
+
+`OutputProtocol.onLinearSourceResult` receives the full retained native result beside
+its immutable original-unit qualification. Renderers must use that qualification
+for source bounds and terminal claims; a native working objective can have a different
+scale or private column. This adapter is available for frontend integration; MPS
+format registration still uses its existing adapter. Numerical strategy interpretation
+and parallel execution retain their current library limitations.
+
 ## Flags
 
 Solver-control flags are common to **every** mode:

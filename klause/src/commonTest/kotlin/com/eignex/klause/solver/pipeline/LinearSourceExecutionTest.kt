@@ -23,6 +23,7 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.validation.LinearSourceWitness
+import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
@@ -37,6 +38,33 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LinearSourceExecutionTest {
+    @Test
+    fun `a rebuilt witness should retain typed exact reals and recovered source integers`() {
+        val source = LinearSourceProblem(
+            listOf(
+                LinearSourceVariable("n", true, SemanticRational.ofLong(3), SemanticRational.ofLong(3)),
+                LinearSourceVariable("x", false),
+            ),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(1, SemanticRational.ofLong(3))),
+                lower = SemanticRational.ONE, upper = SemanticRational.ONE)),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+        ))
+        val exact = BigFraction.ofLong(3).reciprocal()
+        val sample = Sample(booleanArrayOf(), longArrayOf(0), doubleArrayOf(1.0 / 3.0),
+            exactReals = listOf(exact))
+        val rebuilt = OpenTheoryAssignment.Rebuilt(OpenTheoryAssignment.Difference(sample),
+            booleanArrayOf(), arrayOf(bigIntOf(3)))
+
+        val checked = assertIs<LinearSourceCheck.Accepted>(
+            assertNotNull(invocation.linearSource).check(rebuilt, Cancellation.Never),
+        )
+
+        assertEquals(listOf(BigFraction.ofLong(3), exact), checked.witness.values)
+        assertTrue(checked.witness.exact)
+    }
+
     @Test
     fun `open numerical maximization should retain scaled native costs and original exact units`() {
         val source = LinearSourceProblem(
