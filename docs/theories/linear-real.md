@@ -52,10 +52,8 @@ direct primitive preferences from its existing completed point, including for
 integer-only sources. Integer columns retain their complete integrality and source
 checks; fractional partial values provide only comparison preferences. Registration
 precedes component initialization; capture and bounded exact comparison evaluation
-retain the existing numerical operation owner. No extra LP, graph check or Boolean
-draw is created. Pure integer and real openings keep this primitive path without
-an index; [complete mixed workers](linear-mixed.md#solving-and-composition) can
-lazily reuse the bounded source-clause adapter. A custom registered
+retain the existing numerical operation owner. No extra LP,
+graph check, Boolean draw or source-clause index is created. A custom registered
 provider retains precedence, even when it declines a selected Boolean.
 When initialization establishes complete pure-real difference-graph admission under
 the production certification policy, direct default preferences remain enabled beside
@@ -68,7 +66,7 @@ release optional hint state at the first live default primitive consultation and
 supply no preference. This applies
 to the admitted source even if a later private branch uses LP fallback; it does not
 classify individual point origins. Explicit allowances retain graph-point guidance.
-Pure-real compound source-clause preferences remain opt-in through the existing allowance.
+Compound source-clause preferences remain opt-in through the existing allowance.
 Their existing real-coordinate producer admission is unchanged.
 Explicit zero retains bounded construction observations without component steering;
 positive values permit indexed preferences. Arithmetic and index work keep their
