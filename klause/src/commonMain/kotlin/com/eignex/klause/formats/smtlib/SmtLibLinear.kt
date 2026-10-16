@@ -74,6 +74,10 @@ internal fun Compiler.Builder.assertLinearRow(coeffs: LongArray, vars: IntArray,
 /** Assert `a ⟨op⟩ b` (an SMT relation operator) as a hard linear row, lowering to a wide [Linear]
  *  when a coefficient or the bound exceeds the 64-bit range. */
 internal fun Compiler.Builder.assertRelation(op: String, a: IntComb, b: IntComb) {
+    constantConditionalComparison(op, a, b)?.let {
+        if (!it) forceTrue(Lit.negate(trueLit()))
+        return
+    }
     if (op == "=") conditionalEquality(a, b)?.let {
         forceTrue(it)
         return
@@ -93,6 +97,7 @@ internal fun Compiler.Builder.assertRelation(op: String, a: IntComb, b: IntComb)
 /** Reify `a ⟨op⟩ b` onto a fresh literal, using a wide [com.eignex.klause.factor.arithmetic.ReifiedLinear]
  *  when a coefficient or the bound exceeds the 64-bit range. */
 internal fun Compiler.Builder.reifyRelation(op: String, a: IntComb, b: IntComb): Int {
+    constantConditionalComparison(op, a, b)?.let { return if (it) trueLit() else Lit.negate(trueLit()) }
     if (op == "=") conditionalEquality(a, b)?.let { return it }
     val linOp = relLinearOp(op)
     return when (val rel = intCombDiff(a, b, strictDelta(op).toLong())) {
@@ -118,6 +123,19 @@ private fun Compiler.Builder.reifyIntegerRelation(rel: LinRelation.LongRel, op: 
     val literal = reifyDifferenceLinear(rel.coeffs, rel.vars, op, rel.bound)
     conditionalEqualities.definePredicate(Lit.variable(literal), factors.subList(start, factors.size))
     return literal
+}
+
+private fun Compiler.Builder.constantConditionalComparison(op: String, a: IntComb, b: IntComb): Boolean? {
+    if (a !is IntComb.Narrow || b !is IntComb.Narrow) return null
+    val left = a.lin.asSimpleVar()
+    val right = b.lin.asSimpleVar()
+    if ((left == null && a.lin.coeffs.isNotEmpty()) || (right == null && b.lin.coeffs.isNotEmpty())) return null
+    val leftDefined = left != null && (conditionalEqualities.isDefined(left) || iteChains.openAt(left) != null)
+    val rightDefined = right != null && (conditionalEqualities.isDefined(right) || iteChains.openAt(right) != null)
+    if (!leftDefined && !rightDefined) return null
+    left?.let { closeIteChain(it) }
+    right?.let { closeIteChain(it) }
+    return conditionalEqualities.constantComparison(op, a.lin, b.lin)
 }
 
 private fun Compiler.Builder.conditionalEquality(a: IntComb, b: IntComb): Int? {

@@ -76,6 +76,31 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
 
     fun isDefined(variable: Int): Boolean = variable in definitions
 
+    fun constantComparison(op: String, left: LinComb, right: LinComb): Boolean? {
+        val a = imageOf(left) ?: return null
+        val b = imageOf(right) ?: return null
+        if (a.isEmpty() || b.isEmpty()) return null
+        if (op == "=") {
+            if (a.size == 1 && b.size == 1) return a.single() == b.single()
+            return if (a.none { it in b }) false else null
+        }
+        val aMin = a.min()
+        val aMax = a.max()
+        val bMin = b.min()
+        val bMax = b.max()
+        return when (op) {
+            "<" -> if (aMax < bMin) true else if (aMin >= bMax) false else null
+            "<=" -> if (aMax <= bMin) true else if (aMin > bMax) false else null
+            ">" -> if (aMin > bMax) true else if (aMax <= bMin) false else null
+            ">=" -> if (aMin >= bMax) true else if (aMax < bMin) false else null
+            else -> null
+        }
+    }
+
+    private fun imageOf(term: LinComb): Set<Long>? =
+        if (term.coeffs.isEmpty()) setOf(term.constant)
+        else term.asSimpleVar()?.let { definitions[it]?.image }
+
     fun branchUnder(variable: Int, knownLiteral: Int): LinComb? {
         val definition = definitions[variable] ?: return null
         val guard = definition.guards.singleOrNull() ?: return null

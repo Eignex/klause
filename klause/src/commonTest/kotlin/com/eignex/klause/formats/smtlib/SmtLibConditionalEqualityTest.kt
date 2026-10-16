@@ -1,8 +1,12 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -23,6 +27,109 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
+    @Test
+    fun `uniformly true image comparisons omit their private selections`() {
+        for (comparison in listOf(
+            "(not (= (ite b 2 8) (ite c 5 7)))",
+            "(= (ite b 3 3) (ite c 3 3))",
+            "(< (ite b 2 3) (ite c 5 7))",
+            "(<= (ite b 2 5) (ite c 5 7))",
+            "(> (ite b 5 7) (ite c 2 3))",
+            "(>= (ite b 5 7) (ite c 2 5))",
+            "(< (- 9223372036854775807) (ite b 2 3))",
+        )) {
+            val parsed = SmtLib.parse("(declare-const b Bool) (declare-const c Bool) (assert $comparison)")
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            assertIs<ComponentResult.Consistent>(session.initialize(), comparison)
+            val result = session.solve(parsed.model.numBoolVars)
+
+            assertEquals(0, parsed.model.numIntVars, comparison)
+            assertTrue(parsed.model.factors.all { it is Clause }, comparison)
+            assertIs<SearchResult.Satisfied>(result, comparison)
+        }
+    }
+
+    @Test
+    fun `uniformly false image comparisons refute without arithmetic selections`() {
+        for (comparison in listOf(
+            "(= (ite b 2 8) (ite c 5 7))",
+            "(< (ite b 5 7) (ite c 2 5))",
+            "(<= (ite b 5 7) (ite c 2 3))",
+            "(> (ite b 2 5) (ite c 5 7))",
+            "(>= (ite b 2 3) (ite c 5 7))",
+            "(> (ite b 2 3) 9223372036854775807)",
+        )) {
+            val parsed = SmtLib.parse("(declare-const b Bool) (declare-const c Bool) (assert $comparison)")
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            val result = session.initialize()
+
+            assertEquals(0, parsed.model.numIntVars, comparison)
+            assertTrue(parsed.model.factors.all { it is Clause }, comparison)
+            assertIs<ComponentResult.Conflict>(result, comparison)
+        }
+    }
+
+    @Test
+    fun `an image comparison preserves an independently consumed derived guard`() {
+        for (branch in listOf(false, true)) {
+            val parsed = SmtLib.parse("""
+                (declare-const b Bool) (declare-const c Bool)
+                (declare-const x Int) (declare-const y Int)
+                (assert (and (<= (- 4) x 4) (<= (- 4) y 4)))
+                (assert (let ((g (and b c))) (and
+                    (= x y) (= (+ x y) (ite g (+ x 1) (- y 1)))
+                    (not (= (ite g 2 8) (ite (not g) 5 7)))
+                    ${if (branch) "g" else "(not g)"})))
+            """.trimIndent())
+
+            val result = BacktrackSolver.source(parsed.model)
+                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+            assertEquals(1, parsed.model.factors.filterIsInstance<Element>().size)
+            val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+            assertEquals(branch, sample.boolValue(parsed.boolVarNames.getValue("b")) &&
+                sample.boolValue(parsed.boolVarNames.getValue("c")))
+            assertEquals(if (branch) "1" else "-1", sample.intValue(parsed.intVarNames.getValue("x")))
+            assertEquals(sample.intValue(parsed.intVarNames.getValue("x")),
+                sample.intValue(parsed.intVarNames.getValue("y")))
+        }
+    }
+
+    @Test
+    fun `an open conditional branch retains its comparison`() {
+        val parsed = SmtLib.parse("""
+            (declare-const b Bool) (declare-const c Bool) (declare-const x Int)
+            (assert (and (not b) (not c) (= (ite b 2 x) (ite c 5 7))))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        assertEquals("7", assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+            .intValue(parsed.intVarNames.getValue("x")))
+    }
+
+    @Test
+    fun `equal nonsingleton images do not imply equal selected values`() {
+        val parsed = SmtLib.parse("""
+            (declare-const b Bool) (declare-const c Bool)
+            (assert (and b (not c) (= (ite b 2 8) (ite c 2 8))))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
     @Test
     fun `repeated conditional guards exclude unreachable values without equality expansion`() {
         val terms = listOf(
