@@ -14,6 +14,7 @@ import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.ir.UndeclaredRealBounds
+import com.eignex.klause.lowering.approximateGridValue
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.magnitudeBitLength
@@ -52,13 +53,6 @@ internal class FlatZincSemantics(
             ),
         )
         val effective = legacy.resolve(overrides).effective
-        val grid = effective.floats as? FloatSemantics.Grid
-        if (grid != null) {
-            val scale = grid.linearScale.toDouble()
-            require(scale < -Long.MIN_VALUE.toDouble() && scale.toLong() == grid.linearScale) {
-                "float linear scale cannot be represented exactly in binary64"
-            }
-        }
         return EffectiveSourceSemantics(flatZincSemantics, effective)
     }
 }
@@ -68,7 +62,7 @@ private fun semanticFloat(value: Double): SemanticRational {
     return SemanticRational.of(rational.num, rational.den)
 }
 
-internal fun SemanticRational.gridFloat(): Double = binary64("float grid window")
+internal fun SemanticRational.gridFloat(): Double = approximateGridValue(BigFraction.of(numerator, denominator))
 
 internal fun SemanticRational.sourceRealBound(): Double = binary64("undeclared real bound")
 

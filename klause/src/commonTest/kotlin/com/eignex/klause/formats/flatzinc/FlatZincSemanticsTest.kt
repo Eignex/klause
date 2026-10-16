@@ -21,6 +21,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FlatZincSemanticsTest {
@@ -170,16 +172,18 @@ class FlatZincSemanticsTest {
     }
 
     @Test
-    fun `a typed grid window should decline rather than round an unrepresentable endpoint`() {
+    fun `a typed rational window should remain exact private geometry`() {
         val lower = SemanticRational.of(bigIntOf(1), bigIntOf(10))
         val bounds = UndeclaredRealBounds(lower, SemanticRational.ONE)
         val overrides = SemanticOverrides(floats = FloatSemantics.Grid(8, 1_000_000, bounds))
 
-        val error = assertFailsWith<IllegalArgumentException> {
-            parseFlatZinc("var float: x; solve satisfy;", semanticOverrides = overrides)
-        }
+        val execution = parseFlatZincExecution("var float: x; solve minimize x;", semanticOverrides = overrides)
 
-        assertTrue("cannot be represented exactly" in error.message.orEmpty())
+        val projection = assertNotNull(assertNotNull(execution.sourceInvocation).floatProjection)
+        assertEquals(lower, projection.coordinates.single().origin)
+        assertEquals(SemanticRational.of(bigIntOf(9), bigIntOf(70)), projection.coordinates.single().step)
+        assertEquals(Double.NEGATIVE_INFINITY, execution.program.sourceProgram.problem.realLower[0])
+        assertEquals(Double.POSITIVE_INFINITY, execution.program.sourceProgram.problem.realUpper[0])
     }
 
     @Test
@@ -297,25 +301,27 @@ class FlatZincSemanticsTest {
     }
 
     @Test
-    fun `a grid window disjoint from an open real default should decline without a refutation`() {
-        val error = assertFailsWith<UnsupportedFlatZincException> {
-            parseFlatZinc("var float: x; solve minimize x;", semanticOverrides = SemanticOverrides(
-                floats = FloatSemantics.Grid(4, 1_000_000),
-                undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
-            ))
-        }
+    fun `a disjoint grid window should preserve the original real default and native route`() {
+        val program = parseFlatZinc("var float: x; solve minimize x;", semanticOverrides = SemanticOverrides(
+            floats = FloatSemantics.Grid(4, 1_000_000),
+            undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
+        ))
 
-        assertTrue("approximation window excludes its effective source bounds" in error.message.orEmpty())
+        assertEquals(2_000_000.0, program.sourceProgram.problem.realLower[0])
+        assertEquals(Double.POSITIVE_INFINITY, program.sourceProgram.problem.realUpper[0])
+        assertSame(program.sourceProgram.problem, program.problem)
+        assertTrue(program.floatVarsByName.getValue("x").lpOnly)
     }
 
     @Test
-    fun `a float linear scale outside binary64 integer precision should be rejected before lowering`() {
-        val error = assertFailsWith<IllegalArgumentException> {
-            parseFlatZinc("solve satisfy;", semanticOverrides = SemanticOverrides(
-                floats = FloatSemantics.Grid(4, 9_007_199_254_740_993L),
-            ))
-        }
+    fun `an unrepresentable private linear scale should preserve the original source`() {
+        val policy = FloatSemantics.Grid(4, 9_007_199_254_740_993L)
+        val program = parseFlatZinc("var float: x; solve minimize x;",
+            semanticOverrides = SemanticOverrides(floats = policy))
 
-        assertTrue("float linear scale cannot be represented exactly in binary64" in error.message.orEmpty())
+        assertEquals(policy, program.semantics.effective.floats)
+        assertSame(program.sourceProgram.problem, program.problem)
+        assertEquals(1, program.problem.numRealVars)
+        assertEquals(0, program.problem.numIntVars)
     }
 }
