@@ -51,7 +51,7 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
     return token
 }
 
-/** Required admission observes the containing stop while retaining the shared routing work ledger. */
+// Required admission observes the containing stop while retaining the shared routing work ledger.
 internal fun CommonOptions.routingPreparationCancellation(): Cancellation {
     val meter = routingCancellation().workMeter()
     return object : Cancellation {
