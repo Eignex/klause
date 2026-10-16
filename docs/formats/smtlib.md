@@ -74,7 +74,7 @@ can lower directly to Boolean tests of its branches. Completed conditional defin
 results are shared within one parse; nested definitions are traversed iteratively.
 Primitive equality literals are shared across source uses and branch expansion.
 Reified pairwise unit integer differences use lower/upper comparison gates with complete
-Boolean-definition ownership. A deferred conditional equality keeps one arithmetic
+Boolean-definition ownership. A deferred conditional comparison keeps its arithmetic
 placeholder, which is removed only after its branch expansion completes.
 Comparisons finish open decision lists before expanding their branch tests.
 Constant branch images of at most 1,024 distinct values can reject a comparison
@@ -85,6 +85,20 @@ publishes only complete nonempty sets and preserves existing known images. Its n
 dependency and completion visits share the ordinary expansion allowance. Direct
 one-level comparisons retain their existing path. Open, cyclic or capped metadata
 keeps the arithmetic fallback; completing an image never changes numeric bounds.
+Nested integer comparisons against a constant can share structural expression-choice
+bits for `=`, `<`, `<=`, `>` and `>=`. Their codebook is frozen after all assertion
+and objective chains close, using original integer identities, coefficients and
+constants. Codes identify selected expressions rather than numeric values. Each
+comparison combines the selected code with the exact arithmetic predicate on its
+leaf; different expressions can evaluate to the same number. Opaque affine leaves
+retain any private numeric operands they read. Bare conditional references share
+completed functional bits, with complete signed guards and default selection.
+Codebook preparation, structural copies, support walks, bit construction and leaf
+predicates use the same expansion allowance and cancellation token. A query admits
+at most 1,024 structural leaves without restricting their numeric values. Cyclic,
+oversized or unfinished work retains its arithmetic placeholder. Completed unused
+Boolean helpers remain independently owned and are pruned through ordinary
+consumer dependencies. Direct one-level comparisons retain their existing path.
 Immutable guard meanings exclude unreachable arms from those images. A default
 omits selector values covered by its guards, and a fully covered selector image
 excludes the default even when that default is open arithmetic.
