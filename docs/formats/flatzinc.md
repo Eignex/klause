@@ -45,8 +45,9 @@ from the defaults.
 Such a run withholds default-source refutation, unboundedness, optimum markers
 and unattained-bound metadata;
 its effective-scope result is separate from proof of the unchanged default source.
-CLI flag mapping to typed real defaults, other frontend migrations, global semantic
-configuration removal and remaining open result qualification remain unfinished.
+Typed real defaults are available through `SemanticOverrides`; existing CLI float
+endpoint arguments configure the approximation window. Legacy semantic
+configuration is adapted at parsing boundaries.
 
 ## Integer extrema and selection
 
