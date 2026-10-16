@@ -11,6 +11,7 @@ import tarfile
 import tempfile
 
 import jvm_compilation_mapping as mapping
+import jvm_method_costs as method_costs
 import jvm_recording_context as context
 import review_jvm_task_log_cohort as cohort
 
@@ -313,6 +314,7 @@ def inspect(selected, manifest, prefix, declaration=None):
         if declaration is not None else None
     rows, recordings, represented, mapped_rows, represented_xml = [], [], set(), [], set()
     represented_exports = set()
+    method_rows = []
     cohort_complete = index.get('completed') is True and index.get('allCaseCensusesComplete') is True and \
         not index.get('metadataOnlyCaseNames') and not index.get('archivedCasesMissingMetadata') and \
         set(metadata) == {row['caseDirectory'] for row in index['cases']}
@@ -344,6 +346,9 @@ def inspect(selected, manifest, prefix, declaration=None):
                 raise ValueError('Census report original recording identity differs')
             recordings.append({'case': name, 'reportIdentity': retained,
                 'arm': metadata[name].get('arm'), **{key: metadata[name].get(key) for key in CONTEXT_KEYS},
+                'originalSourceStatus': source_status(metadata[name], checks),
+                'sourceHashesMatch': metadata[name].get('sourceHashesMatch'), 'originalExit': metadata[name].get('exit'),
+                'originalCaseCompleted': case.get('completed'), 'originalCohortComplete': cohort_complete,
                 'completed': report.get('completed'), 'error': report.get('error'),
                 'savedJvmContext': context.inspect(report, selected, represented_exports),
                 'eventCounts': report.get('eventCounts'),
@@ -352,6 +357,9 @@ def inspect(selected, manifest, prefix, declaration=None):
                 'ambiguousCompileIds': report.get('ambiguousCompileIds'),
                 'unresolvedSuccessfulInliningEventIndices': report.get('unresolvedSuccessfulInliningEventIndices'),
                 'familyNames': list(report.get('families', {}))})
+            method_rows.extend(method_costs.observations(report, len(recordings) - 1))
+            if len(method_rows) > method_costs.MAX_OBSERVATIONS:
+                raise ValueError('Complete cohort method observations exceed bounds')
             rows.extend(observations(case, metadata[name], report, checks, retained, cohort_complete))
             if mapped_families is not None:
                 mapped = mapping.reform(report, mapped_families, metadata[name].get('arm'), xml)
@@ -378,6 +386,8 @@ def inspect(selected, manifest, prefix, declaration=None):
         'pairArmRepresentation': 'observationIndex references sibling familyCaseObservations; all arms and duplicates retained',
         'metadataOnlyCaseNames': sorted(set(metadata) - {row['caseDirectory'] for row in index['cases']}),
         'recordingObservations': recordings,
+        'methodRecordingObservations': method_rows,
+        'observedMethodSummaries': method_costs.summaries(method_rows, recordings),
         'unreferencedSavedExportPaths': [name for name in selected
             if re.fullmatch(r'events-[0-9]{6}\.json\.gz', name) and name not in represented_exports],
         'recordingsWithoutFamilyCensus': [row for row in recordings if not row['familyNames']],
@@ -437,9 +447,11 @@ def main():
             if mapped is not None else None
         summary['recordingObservationSummaries'] = [{key: row.get(key) for key in
             ('case', 'arm', *CONTEXT_KEYS, 'reportIdentity', 'completed', 'error', 'eventCounts',
+             'originalSourceStatus', 'sourceHashesMatch', 'originalExit', 'originalCaseCompleted', 'originalCohortComplete',
              'savedJvmContext', 'observedAllClassMetrics', 'observedTierMetrics')}
             for row in result.get('recordingObservations', [])]
         summary['unreferencedSavedExportPaths'] = result.get('unreferencedSavedExportPaths')
+        summary['observedMethodSummaries'] = result.get('observedMethodSummaries')
         summary['observationSummaryScope'] = 'Complete descriptive reported root quantities, including excluded contexts; '
         summary['observationSummaryScope'] += 'not paired eligibility, exhaustive source costs or current-source benefit.'
         raw = (json.dumps(summary, indent=2) + '\n').encode()

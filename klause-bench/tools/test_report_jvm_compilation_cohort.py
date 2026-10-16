@@ -220,7 +220,9 @@ class ReportJvmCompilationCohortTest(unittest.TestCase):
                           'unmeasuredAllTierXmlSnapshotReferences': [], 'conflictingXmlSnapshotReferences': [],
                           'observedAllTierMetrics': metrics, 'observedC2Metrics': {}}
                 report = {'completed': True, 'originalMember': member, 'originalIdentity': identity,
-                          'originalCaseDirectory': arm, 'compilations': [{'eventIndex': 0, 'errors': []}],
+                          'originalCaseDirectory': arm, 'compilations': [{'eventIndex': 0, 'id': 1,
+                              'method': 'p.C.work()V', 'level': 4, 'osr': False, 'succeeded': True,
+                              'reportedElapsedNanos': elapsed, 'reportedSuccessfulCodeBytes': 16, 'errors': []}],
                           'families': {'f': family}}
                 export = root / f'events-{ordinal:06d}.json.gz'
                 event_raw = json.dumps({'recording': {'events': [
@@ -253,6 +255,13 @@ class ReportJvmCompilationCohortTest(unittest.TestCase):
             self.assertEqual([], result['metadataOnlyCaseNames'])
             self.assertEqual(2, len(result['recordingObservations']))
             self.assertEqual([], result['unreferencedSavedExportPaths'])
+            self.assertEqual(2, len(result['methodRecordingObservations']))
+            self.assertEqual(2, len(result['observedMethodSummaries']))
+            for method in result['observedMethodSummaries']:
+                self.assertEqual('p.C.work()V', method['method'])
+                self.assertEqual(8 if method['arm'] == 'control' else 5,
+                                 method['observedInclusiveMetrics']['reportedElapsedNanos'])
+                self.assertEqual([], method['recordingIndicesWithoutMethodObservation'])
             for observation in result['recordingObservations']:
                 self.assertEqual(observation['case'], observation['arm'])
                 self.assertTrue(observation['savedJvmContext']['completeSavedExportRead'])

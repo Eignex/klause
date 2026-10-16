@@ -2363,6 +2363,27 @@ incomplete original censuses and mismatched event counts remain explicit.
 No context is selected from multiple events and no target process role is inferred.
 Unreferenced saved exports remain named in `unreferencedSavedExportPaths`.
 Context availability does not change original or mapped pair eligibility.
+`methodRecordingObservations` retains every direct root method, inline callee and caller,
+including unknown identities and methods seen only in failed inline attempts.
+Each row references its original recording, direct roots, successful outside
+inlining roots, all inline attempts, unresolved successful references and root
+errors. Inclusive costs deduplicate a shared root within a method, preserving all
+tiers, ordinary/OSR, failed and replacement events; C2 values remain separate.
+Successful-inlining roots are shared and nonadditive across methods.
+Caller references alone do not authorize an inclusive root association; methods
+seen only as callers retain those references with unavailable cost quantities.
+`observedMethodSummaries`, also retained in the plain summary, groups every
+observed exact method identity by arm, engine, mode and recipe across recorded
+input indexes and repetitions. It references every method observation and names
+recordings without that method observation. Those absent contexts are unavailable
+and do not become zero-cost samples. Each metric sums the observed recording
+values only when every such value is available; the method maximum is the largest
+reported root duration across those recordings. This differs from the sum of
+per-recording maxima in the family comparison summaries.
+Recording summaries preserve original source outcome, source-hash status,
+invocation exit, case and cohort completion alongside the original JVM context.
+These descriptive method summaries do not change family eligibility, select a
+process role, establish exhaustive source work or qualify a compiler saving.
 Missing, duplicate or unexpected arms, mismatched problem identities, invalid or
 unknown original source outcomes, incomplete cohorts, missing declared ordinary
 phases, unresolved roots, XML gaps, data-loss events and ambiguous IDs remain
@@ -2379,13 +2400,16 @@ Resource bounds are 2 GiB compressed archives, 16 GiB complete member expansion,
 512 MiB selected compressed metadata and saved exports, 512 MiB per expanded census JSON and
 512 MiB complete compressed output. Transport staging is removed after the child
 finishes. Optional mapping inputs are bounded to 16 MiB. The observer retains its
-installed build/JDK identity, exact twelve-file
+installed build/JDK identity, exact thirteen-file
 Python closure, original input identities and actual child streams/exit.
 Saved exports keep the census reader's 8 GiB expanded, 8 MiB per event and four
 million event bounds. Each recording allows at most 4096 JVMInformation events
 and 16 MiB of complete context JSON; exceeding a bound declines the complete
 context review and cannot authorize a parsed prefix. Existing 512 MiB report and
 64 MiB summary limits also apply to the retained contexts.
+The complete method observation table allows 250,000 rows across the cohort;
+exceeding the bound declines the review without selecting a method prefix or
+raising the existing report, summary or output limits.
 
 ### Polynomial witness work checkpoints
 
