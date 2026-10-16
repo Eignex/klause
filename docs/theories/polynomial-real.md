@@ -596,17 +596,20 @@ instrumented queries and does not establish coverage of its unobserved portions.
 These aggregate events identify
 execution stages, not the private cause of a failed proposal or an inner cost clock.
 
-Complete Collins projection followed by exact lifting partitions the real space
-into sign-invariant cells when probing supplies no witness. Refutation requires
+Complete projection followed by exact lifting covers the source's feasible real
+space when probing supplies no witness. Required equations with a nonzero rational
+coefficient on an isolated coordinate define total polynomial graph sections.
+These sections can restrict projection and lifting; other dimensions retain complete
+Collins projection. Refutation requires
 exhaustion of the relevant cells and Boolean alternatives; unsuccessful repairs
 supply no refutation authority. Both witness paths retain the final stop check.
 
 ### Projection families
 
 [PolynomialProjection](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialProjection.kt)
-constructs a complete Collins projection family for rational multivariate
-polynomials. It reads the [exact polynomial kernel](../arithmetic/polynomial.md)
-and owns selection of projection operations and declared variable order.
+constructs projection families for rational multivariate polynomials. It reads the
+[exact polynomial kernel](../arithmetic/polynomial.md) and owns selection of projection
+operations and coordinate order.
 The theory does not materialize finite CP domains or depend on the linear engines.
 
 The returned family owns its level buffers. Input list mutation and mutation of a
@@ -614,13 +617,34 @@ returned list do not change captured families. Immutable kernel polynomials may 
 shared. One caller-supplied arithmetic context spans construction; interruption and
 kernel resource stops propagate without publishing a partial family.
 
-Variable IDs define ascending lifting order. Construction eliminates variables in
-descending order and stores one polynomial family per declared ID, containing only
-polynomials whose main variable is that ID. Lower-variable polynomials carry through
-elimination. An absent dimension retains an empty family. The univariate family is
-the last projection level.
+Without required equations, variable IDs define ascending lifting order. Complete
+query preparation also collects positive equality atoms reached only through
+conjunctions. Alternatives and negated compounds supply no required equation; every
+original formula node remains in the sample checker. A coordinate occurring as one
+isolated linear monomial in a required equation has a nonzero rational coefficient.
+Solving that equation divides only by the coefficient and gives a total polynomial
+graph over the other coordinates, including zero and singular base points.
 
-For each eliminated top-variable family, the projection contains all coefficient
+Projection selects these coordinates before ordinary elimination. Estimated fill
+from row size and family occurrences, followed by coefficient size and source ID,
+determines their order. Each selected graph substitutes into every current boundary
+polynomial and required equation. A resulting nonzero constant required equation
+proves the source variety empty; no partial boundary family is exposed. A dependent
+leading coefficient or nonlinear coordinate equation retains ordinary projection.
+Required equations involving an ordinarily eliminated coordinate cannot be reused
+as lower-dimensional equations.
+
+The resulting permutation maps each lifting level to its original coordinate ID;
+source formulas, pins and returned assignments retain those IDs. Every level owns
+its boundary family and optional exact graph section. Other coordinates carry through
+elimination, and absent dimensions retain an empty family. With no eligible required
+equation, elimination follows descending original IDs. Exact rewriting, ordering,
+construction and lifting debit the same containing native owner after the unchanged
+optional probe; they create no additional probe or allowance. Dense, matrix and
+checked-degree kernel limits remain unchanged. Private query snapshots count completed
+equational sections separately from projected polynomials and lifted cells.
+
+For each ordinarily eliminated coordinate family, the projection contains all coefficient
 polynomials, every principal subresultant coefficient of each nonconstant reductum
 and its derivative, and every principal subresultant coefficient between reducta
 from distinct input polynomials. Equal-degree pairs use the same exact kernel
@@ -636,25 +660,29 @@ reducta rather than relying on a nonvanishing discriminant or leading coefficien
 
 ### Lifting and truth
 
-Traversal uses an iterative stack in ascending variable order. Each projection
-polynomial specializes at the exact earlier coordinates. Identically-zero
+Traversal uses an iterative stack in the prepared coordinate order. A total graph
+section contributes its single exact point. Fixed coordinates retain their captured
+values and all source obligations. For other levels, each projection polynomial
+specializes at the exact earlier coordinates. Identically-zero
 specializations add no roots; nonzero constants also add none. Kernel isolation
 supplies every distinct real root, and exact comparison sorts and deduplicates the
 union. Each root is a section sample; kernel rational samples lie strictly inside
 the intervening and unbounded sectors. Empty families still contribute a whole-line
 sector, so every declared dimension receives a coordinate.
 
-At a prefix, only original atoms whose variables are all assigned have definite
-truth. Higher atoms and every Boolean variable remain unknown. A three-valued false
+At a prefix, cached support levels identify original atoms whose coordinates are all
+assigned. These atoms have definite truth. Other atoms and every Boolean variable
+remain unknown. A three-valued false
 formula prunes that base cell because those lower signs are invariant throughout
 the cell. No prefix supplies a satisfying result. At a complete sample, exact
 algebraic evaluation decides every atom and iterative Boolean search preserves
 reference correlation. Unused Boolean IDs receive false. The complete assignment
 is checked against the normalized source formula before capture.
 
-Full Collins projection and exhaustive section/sector traversal provide a
-sign-invariant decomposition, including degree loss and nullification. A satisfying
-result requires a complete exact witness; an unsatisfiable result requires exhaustion
-of every unpruned cell and its Boolean alternatives. Root indices in returned
+Complete projection and exhaustive lifting cover the required graph sections and
+all remaining source cells. Ordinary Collins families retain degree-loss and
+nullification boundaries. A satisfying result requires a complete exact witness;
+an unsatisfiable result requires a completed necessary equality conflict or exhaustion
+of every unpruned relevant cell and its Boolean alternatives. Root indices in returned
 `AlgebraicReal` values identify their rational defining polynomial's distinct roots,
 not the position in a specialized lifting family.

@@ -37,6 +37,7 @@ internal data class QfNraStats(
     val dyadicBases: Long? = null,
     val coupledWorkDeclines: Long? = null,
     val dyadicPreExtractionDeclines: Long? = null,
+    val equationalSections: Int = 0,
 )
 
 internal enum class QfNraReason { Interrupted, WorkLimit, ResourceLimit }
@@ -122,13 +123,15 @@ internal class QfNraQuery(
                 arithmetic.step()
                 it.polynomial
             }
-            val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic)
+            val equations = normalized.requiredZeroPolynomials(arithmetic)
+            val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic, equations)
             var projection: PolynomialProjection? = null
             while (projection == null) {
                 projection = pending.next()
                 if (projection == null) yield(null)
             }
             work.projectedPolynomials = projection.polynomialCount
+            work.equationalSections = projection.equationalSections
             yield(null)
             val assignment = searchCells(normalized, projection, boolCount, arithmetic, algebraic, work, fixed)
             arithmetic.step()
@@ -149,6 +152,7 @@ internal class QfNraQuery(
 }
 
 internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMeter {
+    var equationalSections: Int = 0
     var projectedPolynomials: Long = 0
     var liftedCells: Long = 0
     var dyadicAttempts: Long = 0
@@ -211,7 +215,7 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
         }
     }
     fun snapshot(): QfNraStats = QfNraStats(projectedPolynomials, liftedCells, spent,
-        dyadicAttempts, dyadicBases, coupledWorkDeclines, dyadicPreExtractionDeclines)
+        dyadicAttempts, dyadicBases, coupledWorkDeclines, dyadicPreExtractionDeclines, equationalSections)
 }
 
 private const val MAX_WITNESS_WORK = 65_536L
@@ -1399,9 +1403,19 @@ private fun searchCells(
     work: QfNraWork,
     fixed: Map<Int, BigFraction>,
 ): QfNraAssignment? {
+    if (projection.inconsistentEquations) return null
     val coordinates = HashMap<Int, AlgebraicReal>()
     if (projection.variableCount == 0) {
         return checkSample(formula, coordinates, boolCount, arithmetic, algebraic)
+    }
+    val atomLevels = IntArray(formula.atoms.size) { index ->
+        arithmetic.step()
+        var level = -1
+        for (variable in formula.atoms[index].polynomial.variables) {
+            arithmetic.step()
+            level = maxOf(level, projection.level(variable))
+        }
+        level
     }
     val frames = ArrayDeque<CadFrame>()
     frames.addLast(liftFrame(projection, 0, coordinates, arithmetic, algebraic, fixed))
@@ -1415,14 +1429,14 @@ private fun searchCells(
         }
         val cell = frame.nextCell++
         val root = (cell / 2).toInt()
-        val coordinate = frame.fixed ?: if (cell and 1L != 0L) frame.roots[root] else {
+        val coordinate = frame.point ?: if (cell and 1L != 0L) frame.roots[root] else {
             algebraic.rational(algebraic.sampleBetween(frame.roots.getOrNull(root - 1), frame.roots.getOrNull(root)))
         }
         coordinates[frame.variable] = coordinate
         if (work.liftedCells < Long.MAX_VALUE) work.liftedCells++
-        if (frame.variable + 1 < projection.variableCount) {
-            if (prefixFeasible(formula, coordinates, boolCount, arithmetic, algebraic)) {
-                frames.addLast(liftFrame(projection, frame.variable + 1, coordinates, arithmetic, algebraic, fixed))
+        if (frame.level + 1 < projection.variableCount) {
+            if (prefixFeasible(formula, coordinates, atomLevels, boolCount, arithmetic, algebraic)) {
+                frames.addLast(liftFrame(projection, frame.level + 1, coordinates, arithmetic, algebraic, fixed))
             }
         } else {
             val assignment = checkSample(formula, coordinates, boolCount, arithmetic, algebraic)
@@ -1432,22 +1446,31 @@ private fun searchCells(
     return null
 }
 
-private class CadFrame(val variable: Int, val roots: List<AlgebraicReal>, val fixed: AlgebraicReal? = null) {
-    val cellCount: Long = if (fixed == null) 2L * roots.size + 1 else 1
+private class CadFrame(
+    val level: Int,
+    val variable: Int,
+    val roots: List<AlgebraicReal>,
+    val point: AlgebraicReal? = null,
+) {
+    val cellCount: Long = if (point == null) 2L * roots.size + 1 else 1
     var nextCell: Long = 0
 }
 
 private fun liftFrame(
     projection: PolynomialProjection,
-    variable: Int,
+    level: Int,
     coordinates: Map<Int, AlgebraicReal>,
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
     fixed: Map<Int, BigFraction>,
 ): CadFrame {
-    fixed[variable]?.let { return CadFrame(variable, emptyList(), algebraic.rational(it)) }
+    val variable = projection.variable(level)
+    fixed[variable]?.let { return CadFrame(level, variable, emptyList(), algebraic.rational(it)) }
+    projection.section(level)?.let {
+        return CadFrame(level, variable, emptyList(), algebraic.evaluate(it, coordinates))
+    }
     val roots = mutableListOf<AlgebraicReal>()
-    for (polynomial in projection.polynomials(variable)) {
+    for (polynomial in projection.polynomials(level)) {
         arithmetic.step()
         val specialized = algebraic.specialize(polynomial, variable, coordinates)
         if (!specialized.isZero) roots.addAll(algebraic.roots(specialized))
@@ -1458,12 +1481,13 @@ private fun liftFrame(
         arithmetic.step()
         if (distinct.isEmpty() || algebraic.compare(distinct.last(), root) != 0) distinct.add(root)
     }
-    return CadFrame(variable, distinct)
+    return CadFrame(level, variable, distinct)
 }
 
 private fun prefixFeasible(
     formula: PolynomialFormula,
     coordinates: Map<Int, AlgebraicReal>,
+    atomLevels: IntArray,
     boolCount: Int,
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
@@ -1471,8 +1495,7 @@ private fun prefixFeasible(
     val atoms = IntArray(formula.atoms.size) { index ->
         arithmetic.step()
         val atom = formula.atoms[index]
-        val variable = atom.polynomial.mainVariable
-        if (variable != null && variable >= coordinates.size) PolynomialFormula.UNASSIGNED
+        if (atomLevels[index] >= coordinates.size) PolynomialFormula.UNASSIGNED
         else if (atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates)))) PolynomialFormula.TRUE
         else PolynomialFormula.FALSE
     }

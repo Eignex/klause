@@ -26,6 +26,29 @@ internal class PolynomialFormula private constructor(
     val atoms: List<PolynomialAtom>,
     val booleanVariables: List<Int>,
 ) {
+    fun requiredZeroPolynomials(arithmetic: PolynomialArithmetic): List<Polynomial> {
+        val equations = ArrayList<Polynomial>()
+        val pending = ArrayDeque<Int>()
+        val visited = HashSet<Int>()
+        pending.addLast(root)
+        while (pending.isNotEmpty()) {
+            arithmetic.step()
+            val index = pending.removeLast()
+            if (!visited.add(index)) continue
+            when (val node = nodes[index]) {
+                is FormulaNode.Atom -> if (atoms[node.atom].relation == PolynomialRelation.EQ) {
+                    equations.add(atoms[node.atom].polynomial)
+                }
+                is FormulaNode.Junction -> if (node.conjunction) for (child in node.children) {
+                    arithmetic.step()
+                    pending.addLast(child)
+                }
+                else -> Unit
+            }
+        }
+        return equations
+    }
+
     fun refuteBooleans(
         arithmetic: PolynomialArithmetic,
         maximumAtoms: Int,
