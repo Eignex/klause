@@ -137,6 +137,24 @@ class PolynomialConsequenceRefutationTest {
     }
 
     @Test
+    fun `multiple square pairs preserve a strictly positive remainder`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const d Real) (declare-const t Real) (declare-const y Real) (declare-const c Real)
+            (assert (and (>= d 0) (>= t 0) (>= y 0) (> c 0)
+              (= (+ (* d d t y) (* t y) (* d t t y y) d (* d d) (* t t y y)
+                (* (- 6) d t y) c) 0)))
+            """.trimIndent(),
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        val refuted = refutePolynomialConsequences(formula, arithmetic, 128, 2048, 4096)
+
+        assertTrue(refuted)
+    }
+
+    @Test
     fun `a negative common factor cannot authorize nonnegative squares`() {
         val source = SmtLibPolynomial.parse(
             """
