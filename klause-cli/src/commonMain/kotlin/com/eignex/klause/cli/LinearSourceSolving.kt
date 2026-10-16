@@ -31,7 +31,9 @@ internal fun solveLinearSource(
     val invocation = pipeline.invocation
     if (invocation.operation == ExecutionOperation.ENUMERATE &&
         SourceSetup.executionKind(invocation) !in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.REFUTED)
-    ) usageError("all-solution enumeration requires an admitted finite source execution")
+    ) {
+        usageError("all-solution enumeration requires an admitted finite source execution")
+    }
     output.begin(solvable.optimize, solvable.maximize)
     var points = 0L
     var lastPoint: LinearSourceWitness? = null
@@ -57,15 +59,19 @@ internal fun solveLinearSource(
         when (val outcome = result.result.outcome) {
             FiniteSolveOutcome.PreparedOnly -> {
                 val prepared = result.result.preparation.problem
-                errPrintln("source preparation: factors ${prepared.numFactors}, ints ${prepared.numIntVars}, " +
-                    "reals ${prepared.numRealVars}")
+                errPrintln(
+                    "source preparation: factors ${prepared.numFactors}, ints ${prepared.numIntVars}, " +
+                        "reals ${prepared.numRealVars}",
+                )
                 return
             }
+
             is FiniteSolveOutcome.DryRun -> {
                 errPrintln(outcome.heading)
                 outcome.lines.forEach(::errPrintln)
                 return
             }
+
             is FiniteSolveOutcome.Completed -> Unit
         }
     }
@@ -83,32 +89,45 @@ internal fun solveLinearSource(
     val stats = result.linearSourceStats()
     val complete = invocation.admission?.arms?.contains(ExecutionStrategy.COMPLETE) == true &&
         SourceSetup.executionKind(invocation) != SourceExecutionKind.HEURISTIC
-    output.onVerdictContext(VerdictContext(
+    output.onVerdictContext(
+        VerdictContext(
         budgetExhausted = stats.run.timedOut,
         terminationReason = result.linearSourceReason(),
         completePool = complete,
-    ))
+    )
+    )
     val solutions = if (solvable.optimize) publication.solutions else points
     val hasPoint = solutions > 0L
-    output.onComplete(when (qualified.conclusion) {
-        LinearSourceConclusion.OPTIMAL -> if (incumbentAccepted) Verdict.OPTIMAL else if (hasPoint) {
-            Verdict.BEST_FOUND
-        } else Verdict.UNKNOWN
-        LinearSourceConclusion.UNSATISFIABLE -> Verdict.UNSATISFIABLE
-        LinearSourceConclusion.UNBOUNDED -> if (hasPoint) Verdict.UNBOUNDED else Verdict.UNKNOWN
-        LinearSourceConclusion.SATISFIABLE, LinearSourceConclusion.LIMIT, LinearSourceConclusion.UNKNOWN -> when {
-            !hasPoint -> Verdict.UNKNOWN
-            solvable.optimize -> Verdict.BEST_FOUND
-            else -> Verdict.SATISFIABLE
-        }
-    })
+    output.onComplete(
+        when (qualified.conclusion) {
+            LinearSourceConclusion.OPTIMAL -> if (incumbentAccepted) {
+                Verdict.OPTIMAL
+            } else if (hasPoint) {
+                Verdict.BEST_FOUND
+            } else {
+                Verdict.UNKNOWN
+            }
+
+            LinearSourceConclusion.UNSATISFIABLE -> Verdict.UNSATISFIABLE
+
+            LinearSourceConclusion.UNBOUNDED -> if (hasPoint) Verdict.UNBOUNDED else Verdict.UNKNOWN
+
+            LinearSourceConclusion.SATISFIABLE, LinearSourceConclusion.LIMIT, LinearSourceConclusion.UNKNOWN -> when {
+                !hasPoint -> Verdict.UNKNOWN
+                solvable.optimize -> Verdict.BEST_FOUND
+                else -> Verdict.SATISFIABLE
+            }
+        },
+    )
     if (!common.statistics) return
-    output.onAllowanceStatistics(listOf(
+    output.onAllowanceStatistics(
+        listOf(
         "sourceConclusion" to qualified.conclusion.name.lowercase(),
         "nativeConclusion" to qualified.nativeConclusion.name.lowercase(),
         "nativeClaimsUnrestricted" to qualified.nativeClaimsUnrestricted.toString(),
         "sourceObjectiveScale" to qualified.objectiveScale.toString(),
-    ))
+    )
+    )
     val sourceStats = stats.copy(
         ls = stats.ls.copy(incumbentObjective = qualified.incumbent?.objective?.toDouble() ?: Double.NaN),
         lp = stats.lp.mergedWith(solvable.routingLpStats),
@@ -118,31 +137,44 @@ internal fun solveLinearSource(
 
 private fun SourceExecutionResult.linearSourceStats(): SolveStats = when (this) {
     is SourceExecutionResult.Numerical -> result.stats
+
     is SourceExecutionResult.Finite -> (result.outcome as? FiniteSolveOutcome.Completed)?.stats ?: SolveStats.EMPTY
+
     is SourceExecutionResult.Linear -> when (val execution = result) {
         is OpenTheoryExecution.Satisfy -> execution.result.stats
         is OpenTheoryExecution.Optimize -> execution.result.stats
     }
+
     is SourceExecutionResult.Polynomial -> result.result.stats
+
     is SourceExecutionResult.Quadratic -> result.result.stats
+
     is SourceExecutionResult.Transcendental -> result.result.stats
+
     is SourceExecutionResult.Declined, is SourceExecutionResult.Refuted -> SolveStats.EMPTY
 }
 
 private fun SourceExecutionResult.linearSourceReason(): TerminationReason? = when (this) {
     is SourceExecutionResult.Numerical -> result.reason
+
     is SourceExecutionResult.Declined -> reason
+
     is SourceExecutionResult.Linear -> when (val execution = result) {
         is OpenTheoryExecution.Satisfy -> (execution.result as? OpenTheoryResult.Unknown)?.reason
         is OpenTheoryExecution.Optimize -> (execution.result as? OpenTheoryOptimum.Bounded)?.reason
     }
+
     is SourceExecutionResult.Polynomial -> (result.result as? OpenTheoryResult.Unknown)?.reason
+
     is SourceExecutionResult.Quadratic -> when (val optimum = result.result) {
         is QuadraticOptimizationResult.Unknown -> optimum.reason
         is QuadraticOptimizationResult.BestFound -> optimum.reason
         else -> null
     }
+
     is SourceExecutionResult.Transcendental -> (result.result as? OpenTheoryResult.Unknown)?.reason
+
     is SourceExecutionResult.Finite -> if (linearSourceStats().run.timedOut) TerminationReason.Timeout else null
+
     is SourceExecutionResult.Refuted -> null
 }
