@@ -121,6 +121,7 @@ internal data class LpSolveContext(
     val engineFactory: LpEngineFactory = ProductionLpEngineFactory,
     val certificationPolicy: LpCertificationPolicy = ProductionLpCertificationPolicy,
     val onRefinementBasisVerification: ((ExactBasisMetrics) -> Unit)? = null,
+    val sparsePointRecovery: Boolean = false,
 ) {
     companion object {
         val Production = LpSolveContext()
