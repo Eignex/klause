@@ -714,7 +714,7 @@ internal class FlatZincCompiler(
 }
 
 /** Parse and compile FlatZinc from an in-memory [String].
- *  @param forLocalSearch Compatibility hint; source constraints are retained for either value. */
+ *  The [forLocalSearch] compatibility hint retains source constraints for either value. */
 fun parseFlatZinc(
     source: String,
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
@@ -744,7 +744,7 @@ fun parseFlatZinc(
 /** Parse and compile FlatZinc from a streamed [source], pulling one token at a time so the whole file
  *  and its token list are never held. The compiler stays whole-model (its float classification and
  *  `int2float` forward references need every constraint at once); only lexing/parsing are streamed.
- *  @param forLocalSearch Compatibility hint; source constraints are retained for either value. */
+ *  The [forLocalSearch] compatibility hint retains source constraints for either value. */
 fun parseFlatZinc(
     source: CharSource,
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
