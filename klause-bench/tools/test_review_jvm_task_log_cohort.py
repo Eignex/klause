@@ -369,6 +369,61 @@ class ReviewJvmTaskLogCohortTest(unittest.TestCase):
             self.assertEqual(row['reviewUncompressedIdentity'],
                              review.gzip_identity(output / row['reviewCompressedFile'], review.MAX_REVIEW_BYTES))
 
+    def test_expanded_unselected_member_can_exceed_the_compressed_archive_allowance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / 'original.tar.gz'
+            contents = {'profile9/cases/a/hotspot.xml': b'<hotspot_log/>',
+                        'profile9/study-report.json': b'x' * (200 * 1024)}
+            with tarfile.open(archive, 'w:gz') as target:
+                for name, data in contents.items():
+                    entry = tarfile.TarInfo(name)
+                    entry.size = len(data)
+                    target.addfile(entry, io.BytesIO(data))
+            path = root / 'manifest.json'
+            path.write_text(json.dumps({'archive': {'name': archive.name, **review.file_identity(archive)},
+                                        'files': {name: {'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+                                                  for name, data in contents.items()}}))
+            report = {'completed': False, 'sourceSha256': 'a' * 64}
+
+            with patch.object(review, 'MAX_ARCHIVE_BYTES', 128 * 1024), \
+                    patch.object(review, 'MAX_EXPANDED_BYTES', 256 * 1024):
+                review.inspect(path, hashlib.sha256(path.read_bytes()).hexdigest(), archive, root / 'out', report)
+
+            self.assertTrue(report['completed'])
+            self.assertTrue(report['inventory']['allArchiveMemberBytesVerified'])
+            self.assertTrue(report['allCaseLogReviewsCompleted'])
+            self.assertFalse((root / 'out/study-report.json').exists())
+            self.assertFalse(report['compilerElapsedTimeProven'])
+
+    def test_unselected_member_expansion_still_prevents_accepting_a_valid_log_subset(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / 'original.tar.gz'
+            contents = {'profile9/cases/a/hotspot.xml': b'<hotspot_log/>',
+                        'profile9/study-report.json': b'x' * (200 * 1024)}
+            with tarfile.open(archive, 'w:gz') as target:
+                for name, data in contents.items():
+                    entry = tarfile.TarInfo(name)
+                    entry.size = len(data)
+                    target.addfile(entry, io.BytesIO(data))
+            path = root / 'manifest.json'
+            path.write_text(json.dumps({'archive': {'name': archive.name, **review.file_identity(archive)},
+                                        'files': {name: {'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+                                                  for name, data in contents.items()}}))
+            report = {'completed': False, 'sourceSha256': 'a' * 64}
+
+            with patch.object(review, 'MAX_ARCHIVE_BYTES', 128 * 1024), \
+                    patch.object(review, 'MAX_EXPANDED_BYTES', 128 * 1024), \
+                    patch.object(review.streaming, 'parse_stream') as inspect:
+                with self.assertRaisesRegex(ValueError, 'expansion exceeds'):
+                    review.inspect(path, hashlib.sha256(path.read_bytes()).hexdigest(), archive, root / 'out', report)
+
+            inspect.assert_not_called()
+            self.assertFalse(report['completed'])
+            self.assertFalse(report['inventory']['allArchiveMemberBytesVerified'])
+            self.assertEqual(['a'], [row['caseDirectory'] for row in report['inventory']['cases']])
+
     def test_retained_gzip_must_decode_completely_within_its_declared_byte_identity(self):
         for changed in ['truncated', 'expanded']:
             with self.subTest(changed=changed), tempfile.TemporaryDirectory() as directory:
