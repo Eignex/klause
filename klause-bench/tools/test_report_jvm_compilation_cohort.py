@@ -114,6 +114,33 @@ class ReportJvmCompilationCohortTest(unittest.TestCase):
             self.assertIsNone(metric['sumOfPairCandidateValues'])
             self.assertIsNone(metric['pairDifferenceRange'])
 
+    def test_bounded_summary_keeps_complete_file_and_stdout_payloads(self):
+        methods = [{'method': 'p.C.m', 'observedDirectMetrics': {'reportedElapsedNanos': None},
+                    'exclusions': ['unknown']} for _ in range(128)]
+        result = {'completed': True, 'sourceSha256': 'a' * 64,
+                  'observedMethodSummaries': methods, 'acceptedSavingsCredit': False}
+        limit = 16 * 1024
+        stdout = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'output'
+            with (
+                patch.object(review.sys, 'argv', ['report', 'manifest', 'expected', 'archive',
+                                                str(output), directory]),
+                patch.object(review, 'authenticate', return_value=({}, {}, 'profile')),
+                patch.object(review, 'inspect', return_value=result),
+                patch.object(review.cohort, 'MAX_INDEX_BYTES', limit),
+                patch.object(review.cohort, 'write_compressed_report'),
+                patch('sys.stdout', stdout),
+            ):
+                review.main()
+            raw = (output / 'compilation-cost-summary.json').read_bytes()
+
+        summary = json.loads(raw)
+        self.assertGreater(len(json.dumps(summary, indent=2).encode()), limit)
+        self.assertLessEqual(len(raw), limit)
+        self.assertEqual(methods, summary['observedMethodSummaries'])
+        self.assertEqual(raw.decode(), stdout.getvalue())
+
     def test_family_rows_keep_full_census_and_declared_eligibility_without_source_or_savings_proof(self):
         family = {'requiredOrdinaryPhases': ['p.C.work'], 'inclusiveRootEventIndices': [3],
                   'missingRequiredOrdinaryPhases': [], 'unresolvedSuccessfulInliningEventIndices': [],

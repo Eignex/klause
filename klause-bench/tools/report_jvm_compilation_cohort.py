@@ -454,7 +454,7 @@ def main():
         summary['observedMethodSummaries'] = result.get('observedMethodSummaries')
         summary['observationSummaryScope'] = 'Complete descriptive reported root quantities, including excluded contexts; '
         summary['observationSummaryScope'] += 'not paired eligibility, exhaustive source costs or current-source benefit.'
-        raw = (json.dumps(summary, indent=2) + '\n').encode()
+        raw = (json.dumps(summary, separators=(',', ':')) + '\n').encode()
         if len(raw) > cohort.MAX_INDEX_BYTES:
             raise ValueError('Complete observed comparison summary exceeds bounds')
         (output / 'compilation-cost-summary.json').write_bytes(raw)
