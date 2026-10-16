@@ -27,6 +27,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 
 class SourceExecutionTest {
     @Test
@@ -34,27 +35,30 @@ class SourceExecutionTest {
         val source = Problem(0, 1, arrayOf(IntDomain(2, 2)), emptyArray())
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.MIXED,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.MIXED,
+            ),
         )
         val samples = mutableListOf<Sample>()
 
         val result = assertIs<SourceExecutionResult.Finite>(
             SourceSetup.execute(
-            SourceExecutionRequest(invocation, finiteRequest = { shape ->
-                FiniteSolveRequest(
-                    shape, FiniteEngine.MIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
-                    presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
-                    randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.OFF,
-                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
-                    solveBudgetMillis = null, allSolutions = false, solutionCap = null, deadlineExceeded = { false },
-                    onEvent = null, onPortfolioEvent = null,
-                )
-            }),
-            SourceExecutionCallbacks(finite = FiniteSolveCallbacks(samples::add, { samples += it.sample })),
-        )
+                SourceExecutionRequest(invocation, finiteRequest = { shape ->
+                    FiniteSolveRequest(
+                        shape, FiniteEngine.MIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                        presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
+                        randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.OFF,
+                        zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                        solveBudgetMillis = null,
+                        allSolutions = false,
+                        solutionCap = null,
+                        deadlineExceeded = { false },
+                        onEvent = null, onPortfolioEvent = null,
+                    )
+                }),
+                SourceExecutionCallbacks(finite = FiniteSolveCallbacks(samples::add, { samples += it.sample })),
+            ),
         )
 
         val outcome = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
@@ -68,16 +72,18 @@ class SourceExecutionTest {
     @Test
     fun `linear dispatch should retain exact source values and accepted publications`() {
         val source = Problem(
-            0, 0, emptyArray(),
+            0,
+            0,
+            emptyArray(),
             arrayOf(
                 Linear(
-            intVars = intArrayOf(),
-            intCoeffs = doubleArrayOf(),
-            realVars = intArrayOf(0),
-            realCoeffs = doubleArrayOf(3.0),
-            op = LinearOp.EQ,
-            bound = 1.0,
-        )
+                    intVars = intArrayOf(),
+                    intCoeffs = doubleArrayOf(),
+                    realVars = intArrayOf(0),
+                    realCoeffs = doubleArrayOf(3.0),
+                    op = LinearOp.EQ,
+                    bound = 1.0,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),
@@ -86,19 +92,22 @@ class SourceExecutionTest {
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0), constant = 7)
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.BACKTRACK,
-            objective,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.BACKTRACK,
+                objective,
+            ),
         )
         val values = mutableListOf<SourceValue>()
 
         val result = assertIs<SourceExecutionResult.Linear>(
             SourceSetup.execute(
-            SourceExecutionRequest(invocation, finiteRequest = { error("an unused finite consumer was constructed") }),
-            SourceExecutionCallbacks(onLinearIncumbent = { values += it.value }),
-        )
+                SourceExecutionRequest(
+                    invocation,
+                    finiteRequest = { error("an unused finite consumer was constructed") },
+                ),
+                SourceExecutionCallbacks(onLinearIncumbent = { values += it.value }),
+            ),
         )
 
         val native = assertIs<OpenTheoryExecution.Optimize>(result.result)
@@ -123,10 +132,10 @@ class SourceExecutionTest {
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
 
         val result = assertIs<SourceExecutionResult.Polynomial>(SourceSetup.execute(SourceExecutionRequest(invocation)))
@@ -152,12 +161,12 @@ class SourceExecutionTest {
         val objective = LinearObjective(realCoefficients = doubleArrayOf(0.0, 1.0), constant = 7)
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.BACKTRACK,
-            objective,
-            maximize = true,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.BACKTRACK,
+                objective,
+                maximize = true,
+            ),
         )
 
         val result = assertIs<SourceExecutionResult.Quadratic>(SourceSetup.execute(SourceExecutionRequest(invocation)))
@@ -182,11 +191,11 @@ class SourceExecutionTest {
         var stopped = false
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-            cancellation = Cancellation { stopped },
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+                cancellation = Cancellation { stopped },
+            ),
         )
         stopped = true
 
@@ -214,18 +223,18 @@ class SourceExecutionTest {
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.ENUMERATE,
-            FiniteEngine.MIXED,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.ENUMERATE,
+                FiniteEngine.MIXED,
+            ),
         )
 
         assertFailsWith<PipelineConfigException> {
             SourceSetup.execute(
                 SourceExecutionRequest(
-                invocation,
-                finiteRequest = { error("an incompatible finite consumer was constructed") },
-            )
+                    invocation,
+                    finiteRequest = { error("an incompatible finite consumer was constructed") },
+                ),
             )
         }
     }
@@ -235,32 +244,32 @@ class SourceExecutionTest {
         val source = Problem(0, 1, arrayOf(IntDomain(2, 2)), emptyArray())
         val first = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.FIXED,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.FIXED,
+            ),
         )
         val second = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.FIXED,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.FIXED,
+            ),
         )
 
         assertFailsWith<IllegalArgumentException> {
             SourceSetup.execute(
                 SourceExecutionRequest(first, finiteRequest = {
-                FiniteSolveRequest(
-                    second.finiteShape(), FiniteEngine.FIXED, PresolveConfig.NONE,
-                    false, false, Cancellation.Never, presolveBudget = null, cores = 1,
-                    executionOptions = ExecutionOptions.parse(emptyList()), randomSeed = 17,
-                    defaultArms = 1, lpConfig = LpConfig.OFF,
-                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
-                    solveBudgetMillis = null, allSolutions = false, solutionCap = null,
-                    deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
-                )
-            })
+                    FiniteSolveRequest(
+                        second.finiteShape(), FiniteEngine.FIXED, PresolveConfig.NONE,
+                        false, false, Cancellation.Never, presolveBudget = null, cores = 1,
+                        executionOptions = ExecutionOptions.parse(emptyList()), randomSeed = 17,
+                        defaultArms = 1, lpConfig = LpConfig.OFF,
+                        zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                        solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                        deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
+                    )
+                }),
             )
         }
     }
@@ -276,20 +285,20 @@ class SourceExecutionTest {
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.LOCAL_SEARCH,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.LOCAL_SEARCH,
+            ),
         )
         assertEquals(SourceExecutionKind.HEURISTIC, SourceSetup.executionKind(invocation))
 
         val result = assertIs<SourceExecutionResult.Linear>(
             SourceSetup.execute(
                 SourceExecutionRequest(
-            invocation,
-            theory = TheoryParams(maxFlips = 32, randomSeed = 17),
-        )
-            )
+                    invocation,
+                    theory = TheoryParams(maxFlips = 32, randomSeed = 17),
+                ),
+            ),
         )
 
         val native = assertIs<OpenTheoryExecution.Satisfy>(result.result)
@@ -312,21 +321,43 @@ class SourceExecutionTest {
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.ENUMERATE,
-            FiniteEngine.MIXED,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.ENUMERATE,
+                FiniteEngine.MIXED,
+            ),
         )
 
         val result = SourceSetup.execute(
             SourceExecutionRequest(
-            invocation,
-            finiteRequest = { error("a refuted source constructed a worker") },
-        )
+                invocation,
+                finiteRequest = { error("a refuted source constructed a worker") },
+            ),
         )
 
         assertIs<SourceExecutionResult.Refuted>(result)
         assertSame(source, result.invocation.source.originalSource)
         assertEquals(ExecutionOperation.ENUMERATE, result.invocation.operation)
     }
+    @Test
+    fun `a captured source deadline should retain its native timeout reason`() {
+        val source = Problem(
+            0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+                SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+                cancellation = Cancellation.after(Duration.ZERO),
+            ),
+        )
+
+        val result = assertIs<SourceExecutionResult.Linear>(
+            SourceSetup.execute(SourceExecutionRequest(invocation)),
+        )
+
+        val native = assertIs<OpenTheoryExecution.Satisfy>(result.result)
+        assertEquals(TerminationReason.Timeout, assertIs<OpenTheoryResult.Unknown>(native.result).reason)
+        assertSame(source.semantics, result.semantics)
+    }
+
 }

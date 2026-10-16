@@ -108,7 +108,9 @@ empty enumeration without constructing a worker.
 `SourceExecutionResult` retains the complete native finite, linear, polynomial or
 quadratic execution rather than narrowing exact values, bounds, limits, rays, resource
 telemetry or publication receipts. Callback types retain their native source coordinates
-and objective units. `executionKind` inspects the installed family; library policy owns
+and objective units. Captured interpretation does not upgrade a native claim beyond
+its producing model and proof scope; source-specific transfer qualification still applies.
+`executionKind` inspects the installed family; library policy owns
 unsupported-linear optimization fallback to source-checked heuristic execution on the
 same prepared plan. The MiniZinc finite invocation path, SMT linear admission and
 source-strategy arithmetic satisfaction consume this dispatcher. Legacy source-specific
