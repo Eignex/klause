@@ -122,8 +122,18 @@ data class SourceSemantics(
             declared = this,
             effective = copy(
                 floats = overrides.floats ?: floats,
-                undeclaredIntegers = overrides.undeclaredIntegers ?: undeclaredIntegers,
-                undeclaredReals = overrides.undeclaredReals ?: undeclaredReals,
+                undeclaredIntegers = overrides.undeclaredIntegers?.let { bounds ->
+                    UndeclaredIntegerBounds(
+                        bounds.lower.resolveEndpoint(undeclaredIntegers?.lower),
+                        bounds.upper.resolveEndpoint(undeclaredIntegers?.upper),
+                    )
+                } ?: undeclaredIntegers,
+                undeclaredReals = overrides.undeclaredReals?.let { bounds ->
+                    UndeclaredRealBounds(
+                        bounds.lower.resolveEndpoint(undeclaredReals?.lower),
+                        bounds.upper.resolveEndpoint(undeclaredReals?.upper),
+                    )
+                } ?: undeclaredReals,
                 feasibilityTolerance = overrides.feasibilityTolerance ?: feasibilityTolerance,
                 pinAbsentOptionalValues = overrides.pinAbsentOptionalValues ?: pinAbsentOptionalValues,
             ),
@@ -131,14 +141,40 @@ data class SourceSemantics(
     }
 }
 
+/** Explicit endpoint replacement, including opening an endpoint that a format bounds by default. */
+sealed interface BoundOverride<out T> {
+    /** Leave the endpoint unbounded. */
+    data object Open : BoundOverride<Nothing>
+
+    /** Replace the endpoint with the supplied source value. */
+    data class Value<T>(
+        /** Inclusive source endpoint. */
+        val value: T,
+    ) : BoundOverride<T>
+}
+
+/** Independent range endpoint replacements; null preserves that endpoint's declared default. */
+data class BoundsOverride<T>(
+    /** Replacement lower endpoint. */
+    val lower: BoundOverride<T>? = null,
+    /** Replacement upper endpoint. */
+    val upper: BoundOverride<T>? = null,
+)
+
+private fun <T> BoundOverride<T>?.resolveEndpoint(default: T?): T? = when (this) {
+    null -> default
+    BoundOverride.Open -> null
+    is BoundOverride.Value -> value
+}
+
 /** Uniform caller replacements for applicable source policies; null leaves a policy unchanged. */
 data class SemanticOverrides(
     /** Replacement float interpretation. */
     val floats: FloatSemantics? = null,
-    /** Replacement default integer range, including explicit open endpoints. */
-    val undeclaredIntegers: UndeclaredIntegerBounds? = null,
-    /** Replacement default real range, including explicit open endpoints. */
-    val undeclaredReals: UndeclaredRealBounds? = null,
+    /** Replacement default integer endpoints, including explicit opening. */
+    val undeclaredIntegers: BoundsOverride<Long>? = null,
+    /** Replacement default real endpoints, including explicit opening. */
+    val undeclaredReals: BoundsOverride<BigFraction>? = null,
     /** Replacement absolute and relative source feasibility slack. */
     val feasibilityTolerance: SourceTolerance? = null,
     /** Replacement absent-value canonicalization. */

@@ -18,11 +18,27 @@ class SourceSemanticsTest {
         )
 
         val resolved = declared.resolve(
-            SemanticOverrides(undeclaredIntegers = UndeclaredIntegerBounds(-2_000_000, 3_000_000)),
+            SemanticOverrides(
+                undeclaredIntegers = BoundsOverride(BoundOverride.Value(-2_000_000), BoundOverride.Value(3_000_000)),
+            ),
         )
 
         assertEquals(UndeclaredIntegerBounds(-2_000_000, 3_000_000), resolved.effective.undeclaredIntegers)
         assertEquals(UndeclaredIntegerBounds(-1_000_000, 1_000_000), resolved.declared.undeclaredIntegers)
+    }
+
+    @Test
+    fun `single endpoint replacements should preserve the other declared endpoint`() {
+        val declared = SourceSemantics(
+            format = SourceFormat.FLATZINC,
+            undeclaredIntegers = UndeclaredIntegerBounds(-10, 10),
+        )
+
+        val resolved = declared.resolve(
+            SemanticOverrides(undeclaredIntegers = BoundsOverride(lower = BoundOverride.Value(-20))),
+        )
+
+        assertEquals(UndeclaredIntegerBounds(-20, 10), resolved.effective.undeclaredIntegers)
     }
 
     @Test
@@ -32,7 +48,9 @@ class SourceSemanticsTest {
             undeclaredIntegers = UndeclaredIntegerBounds(-1_000_000, 1_000_000),
         )
 
-        val resolved = declared.resolve(SemanticOverrides(undeclaredIntegers = UndeclaredIntegerBounds()))
+        val resolved = declared.resolve(
+            SemanticOverrides(undeclaredIntegers = BoundsOverride(BoundOverride.Open, BoundOverride.Open)),
+        )
 
         assertEquals(UndeclaredIntegerBounds(), resolved.effective.undeclaredIntegers)
         assertTrue(resolved.hasOverrides)
@@ -86,8 +104,8 @@ class SourceSemanticsTest {
         val declared = SourceSemantics(SourceFormat.DIMACS)
         val replacements = listOf(
             SemanticOverrides(floats = FloatSemantics.Continuous),
-            SemanticOverrides(undeclaredIntegers = UndeclaredIntegerBounds()),
-            SemanticOverrides(undeclaredReals = UndeclaredRealBounds()),
+            SemanticOverrides(undeclaredIntegers = BoundsOverride()),
+            SemanticOverrides(undeclaredReals = BoundsOverride()),
             SemanticOverrides(feasibilityTolerance = SourceTolerance()),
             SemanticOverrides(pinAbsentOptionalValues = false),
         )
@@ -122,7 +140,9 @@ class SourceSemanticsTest {
 
         for (format in listOf(SourceFormat.FLATZINC, SourceFormat.SMTLIB, SourceFormat.MPS)) {
             val declared = SourceSemantics(format, undeclaredIntegers = UndeclaredIntegerBounds())
-            val resolved = declared.resolve(SemanticOverrides(undeclaredIntegers = replacement))
+            val resolved = declared.resolve(
+                SemanticOverrides(undeclaredIntegers = BoundsOverride(BoundOverride.Value(-20), BoundOverride.Value(30))),
+            )
 
             assertEquals(replacement, resolved.effective.undeclaredIntegers)
         }
