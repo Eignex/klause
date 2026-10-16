@@ -102,6 +102,19 @@ final enum class com.eignex.klause.ir/LinearOp : kotlin/Enum<com.eignex.klause.i
     final fun values(): kotlin/Array<com.eignex.klause.ir/LinearOp> // com.eignex.klause.ir/LinearOp.values|values#static(){}[0]
 }
 
+final enum class com.eignex.klause.ir/NumericAuthority : kotlin/Enum<com.eignex.klause.ir/NumericAuthority> { // com.eignex.klause.ir/NumericAuthority|null[0]
+    enum entry BINARY64_LITERALS // com.eignex.klause.ir/NumericAuthority.BINARY64_LITERALS|null[0]
+    enum entry DECIMAL_LITERALS // com.eignex.klause.ir/NumericAuthority.DECIMAL_LITERALS|null[0]
+    enum entry EXACT_VALUES // com.eignex.klause.ir/NumericAuthority.EXACT_VALUES|null[0]
+    enum entry RATIONAL_LITERALS // com.eignex.klause.ir/NumericAuthority.RATIONAL_LITERALS|null[0]
+
+    final val entries // com.eignex.klause.ir/NumericAuthority.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.ir/NumericAuthority> // com.eignex.klause.ir/NumericAuthority.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.ir/NumericAuthority // com.eignex.klause.ir/NumericAuthority.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.ir/NumericAuthority> // com.eignex.klause.ir/NumericAuthority.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.ir/ObjectiveSense : kotlin/Enum<com.eignex.klause.ir/ObjectiveSense> { // com.eignex.klause.ir/ObjectiveSense|null[0]
     enum entry MAXIMIZE // com.eignex.klause.ir/ObjectiveSense.MAXIMIZE|null[0]
     enum entry MINIMIZE // com.eignex.klause.ir/ObjectiveSense.MINIMIZE|null[0]
@@ -126,6 +139,24 @@ final enum class com.eignex.klause.ir/PolynomialRelation : kotlin/Enum<com.eigne
 
     final fun valueOf(kotlin/String): com.eignex.klause.ir/PolynomialRelation // com.eignex.klause.ir/PolynomialRelation.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.eignex.klause.ir/PolynomialRelation> // com.eignex.klause.ir/PolynomialRelation.values|values#static(){}[0]
+}
+
+final enum class com.eignex.klause.ir/SourceFormat : kotlin/Enum<com.eignex.klause.ir/SourceFormat> { // com.eignex.klause.ir/SourceFormat|null[0]
+    enum entry DIMACS // com.eignex.klause.ir/SourceFormat.DIMACS|null[0]
+    enum entry FLATZINC // com.eignex.klause.ir/SourceFormat.FLATZINC|null[0]
+    enum entry IR // com.eignex.klause.ir/SourceFormat.IR|null[0]
+    enum entry MPS // com.eignex.klause.ir/SourceFormat.MPS|null[0]
+    enum entry OPB // com.eignex.klause.ir/SourceFormat.OPB|null[0]
+    enum entry SCHEMA // com.eignex.klause.ir/SourceFormat.SCHEMA|null[0]
+    enum entry SMTLIB // com.eignex.klause.ir/SourceFormat.SMTLIB|null[0]
+    enum entry WCNF // com.eignex.klause.ir/SourceFormat.WCNF|null[0]
+    enum entry XCSP3 // com.eignex.klause.ir/SourceFormat.XCSP3|null[0]
+
+    final val entries // com.eignex.klause.ir/SourceFormat.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.ir/SourceFormat> // com.eignex.klause.ir/SourceFormat.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.ir/SourceFormat // com.eignex.klause.ir/SourceFormat.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.ir/SourceFormat> // com.eignex.klause.ir/SourceFormat.values|values#static(){}[0]
 }
 
 final enum class com.eignex.klause.ir/ValueSelection : kotlin/Enum<com.eignex.klause.ir/ValueSelection> { // com.eignex.klause.ir/ValueSelection|null[0]
@@ -1843,6 +1874,27 @@ sealed interface <#A: out kotlin/Any?, #B: out kotlin/Any?> com.eignex.klause.so
     }
 }
 
+sealed interface <#A: out kotlin/Any?> com.eignex.klause.ir/BoundOverride { // com.eignex.klause.ir/BoundOverride|null[0]
+    final class <#A1: kotlin/Any?> Value : com.eignex.klause.ir/BoundOverride<#A1> { // com.eignex.klause.ir/BoundOverride.Value|null[0]
+        constructor <init>(#A1) // com.eignex.klause.ir/BoundOverride.Value.<init>|<init>(1:0){}[0]
+
+        final val value // com.eignex.klause.ir/BoundOverride.Value.value|{}value[0]
+            final fun <get-value>(): #A1 // com.eignex.klause.ir/BoundOverride.Value.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): #A1 // com.eignex.klause.ir/BoundOverride.Value.component1|component1(){}[0]
+        final fun copy(#A1 = ...): com.eignex.klause.ir/BoundOverride.Value<#A1> // com.eignex.klause.ir/BoundOverride.Value.copy|copy(1:0){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/BoundOverride.Value.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.ir/BoundOverride.Value.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.ir/BoundOverride.Value.toString|toString(){}[0]
+    }
+
+    final object Open : com.eignex.klause.ir/BoundOverride<kotlin/Nothing> { // com.eignex.klause.ir/BoundOverride.Open|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/BoundOverride.Open.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.ir/BoundOverride.Open.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.ir/BoundOverride.Open.toString|toString(){}[0]
+    }
+}
+
 sealed interface <#A: out kotlin/Any?> com.eignex.klause.theory/TheoryCheck { // com.eignex.klause.theory/TheoryCheck|null[0]
     final class <#A1: kotlin/Any?> Sat : com.eignex.klause.theory/TheoryCheck<#A1> { // com.eignex.klause.theory/TheoryCheck.Sat|null[0]
         constructor <init>(#A1) // com.eignex.klause.theory/TheoryCheck.Sat.<init>|<init>(1:0){}[0]
@@ -2404,6 +2456,33 @@ sealed interface com.eignex.klause.ir/FactorReduction { // com.eignex.klause.ir/
     }
 
     final object Unchanged : com.eignex.klause.ir/FactorReduction // com.eignex.klause.ir/FactorReduction.Unchanged|null[0]
+}
+
+sealed interface com.eignex.klause.ir/FloatSemantics { // com.eignex.klause.ir/FloatSemantics|null[0]
+    final class Grid : com.eignex.klause.ir/FloatSemantics { // com.eignex.klause.ir/FloatSemantics.Grid|null[0]
+        constructor <init>(kotlin/Int, kotlin/Long, com.eignex.klause.ir/UndeclaredRealBounds = ...) // com.eignex.klause.ir/FloatSemantics.Grid.<init>|<init>(kotlin.Int;kotlin.Long;com.eignex.klause.ir.UndeclaredRealBounds){}[0]
+
+        final val buckets // com.eignex.klause.ir/FloatSemantics.Grid.buckets|{}buckets[0]
+            final fun <get-buckets>(): kotlin/Int // com.eignex.klause.ir/FloatSemantics.Grid.buckets.<get-buckets>|<get-buckets>(){}[0]
+        final val linearScale // com.eignex.klause.ir/FloatSemantics.Grid.linearScale|{}linearScale[0]
+            final fun <get-linearScale>(): kotlin/Long // com.eignex.klause.ir/FloatSemantics.Grid.linearScale.<get-linearScale>|<get-linearScale>(){}[0]
+        final val unrangedBounds // com.eignex.klause.ir/FloatSemantics.Grid.unrangedBounds|{}unrangedBounds[0]
+            final fun <get-unrangedBounds>(): com.eignex.klause.ir/UndeclaredRealBounds // com.eignex.klause.ir/FloatSemantics.Grid.unrangedBounds.<get-unrangedBounds>|<get-unrangedBounds>(){}[0]
+
+        final fun component1(): kotlin/Int // com.eignex.klause.ir/FloatSemantics.Grid.component1|component1(){}[0]
+        final fun component2(): kotlin/Long // com.eignex.klause.ir/FloatSemantics.Grid.component2|component2(){}[0]
+        final fun component3(): com.eignex.klause.ir/UndeclaredRealBounds // com.eignex.klause.ir/FloatSemantics.Grid.component3|component3(){}[0]
+        final fun copy(kotlin/Int = ..., kotlin/Long = ..., com.eignex.klause.ir/UndeclaredRealBounds = ...): com.eignex.klause.ir/FloatSemantics.Grid // com.eignex.klause.ir/FloatSemantics.Grid.copy|copy(kotlin.Int;kotlin.Long;com.eignex.klause.ir.UndeclaredRealBounds){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/FloatSemantics.Grid.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.ir/FloatSemantics.Grid.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.ir/FloatSemantics.Grid.toString|toString(){}[0]
+    }
+
+    final object Continuous : com.eignex.klause.ir/FloatSemantics { // com.eignex.klause.ir/FloatSemantics.Continuous|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/FloatSemantics.Continuous.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.ir/FloatSemantics.Continuous.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.ir/FloatSemantics.Continuous.toString|toString(){}[0]
+    }
 }
 
 sealed interface com.eignex.klause.ir/IntegralConstants : com.eignex.klause.ir/LinearConstants { // com.eignex.klause.ir/IntegralConstants|null[0]
@@ -4955,6 +5034,22 @@ final class <#A: kotlin/Any?, #B: kotlin/Any?> com.eignex.klause.solver.incumben
     }
 }
 
+final class <#A: kotlin/Any?> com.eignex.klause.ir/BoundsOverride { // com.eignex.klause.ir/BoundsOverride|null[0]
+    constructor <init>(com.eignex.klause.ir/BoundOverride<#A>? = ..., com.eignex.klause.ir/BoundOverride<#A>? = ...) // com.eignex.klause.ir/BoundsOverride.<init>|<init>(com.eignex.klause.ir.BoundOverride<1:0>?;com.eignex.klause.ir.BoundOverride<1:0>?){}[0]
+
+    final val lower // com.eignex.klause.ir/BoundsOverride.lower|{}lower[0]
+        final fun <get-lower>(): com.eignex.klause.ir/BoundOverride<#A>? // com.eignex.klause.ir/BoundsOverride.lower.<get-lower>|<get-lower>(){}[0]
+    final val upper // com.eignex.klause.ir/BoundsOverride.upper|{}upper[0]
+        final fun <get-upper>(): com.eignex.klause.ir/BoundOverride<#A>? // com.eignex.klause.ir/BoundsOverride.upper.<get-upper>|<get-upper>(){}[0]
+
+    final fun component1(): com.eignex.klause.ir/BoundOverride<#A>? // com.eignex.klause.ir/BoundsOverride.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.ir/BoundOverride<#A>? // com.eignex.klause.ir/BoundsOverride.component2|component2(){}[0]
+    final fun copy(com.eignex.klause.ir/BoundOverride<#A>? = ..., com.eignex.klause.ir/BoundOverride<#A>? = ...): com.eignex.klause.ir/BoundsOverride<#A> // com.eignex.klause.ir/BoundsOverride.copy|copy(com.eignex.klause.ir.BoundOverride<1:0>?;com.eignex.klause.ir.BoundOverride<1:0>?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/BoundsOverride.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/BoundsOverride.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/BoundsOverride.toString|toString(){}[0]
+}
+
 final class <#A: kotlin/Any?> com.eignex.klause.solver.pipeline/ExecutionOption { // com.eignex.klause.solver.pipeline/ExecutionOption|null[0]
     final fun invoke(#A): com.eignex.klause.solver.pipeline/ExecutionSetting<#A> // com.eignex.klause.solver.pipeline/ExecutionOption.invoke|invoke(1:0){}[0]
 
@@ -5134,6 +5229,22 @@ final class <#A: out kotlin/Any?, #B: out kotlin/Any?> com.eignex.klause.solver.
         final fun <get-objective>(): #B // com.eignex.klause.solver.incumbent/VerifiedIncumbent.objective.<get-objective>|<get-objective>(){}[0]
     final val version // com.eignex.klause.solver.incumbent/VerifiedIncumbent.version|{}version[0]
         final fun <get-version>(): kotlin/Long // com.eignex.klause.solver.incumbent/VerifiedIncumbent.version.<get-version>|<get-version>(){}[0]
+}
+
+final class <#A: out kotlin/Any?> com.eignex.klause.ir/SemanticSource { // com.eignex.klause.ir/SemanticSource|null[0]
+    constructor <init>(#A, com.eignex.klause.ir/EffectiveSourceSemantics) // com.eignex.klause.ir/SemanticSource.<init>|<init>(1:0;com.eignex.klause.ir.EffectiveSourceSemantics){}[0]
+
+    final val model // com.eignex.klause.ir/SemanticSource.model|{}model[0]
+        final fun <get-model>(): #A // com.eignex.klause.ir/SemanticSource.model.<get-model>|<get-model>(){}[0]
+    final val semantics // com.eignex.klause.ir/SemanticSource.semantics|{}semantics[0]
+        final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/SemanticSource.semantics.<get-semantics>|<get-semantics>(){}[0]
+
+    final fun component1(): #A // com.eignex.klause.ir/SemanticSource.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/SemanticSource.component2|component2(){}[0]
+    final fun copy(#A = ..., com.eignex.klause.ir/EffectiveSourceSemantics = ...): com.eignex.klause.ir/SemanticSource<#A> // com.eignex.klause.ir/SemanticSource.copy|copy(1:0;com.eignex.klause.ir.EffectiveSourceSemantics){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/SemanticSource.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/SemanticSource.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/SemanticSource.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.arithmetic.polynomial/AlgebraicReal { // com.eignex.klause.arithmetic.polynomial/AlgebraicReal|null[0]
@@ -7530,6 +7641,17 @@ final class com.eignex.klause.ir/DomainStorageSettings { // com.eignex.klause.ir
     final fun toString(): kotlin/String // com.eignex.klause.ir/DomainStorageSettings.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.ir/EffectiveSourceSemantics { // com.eignex.klause.ir/EffectiveSourceSemantics|null[0]
+    final val declared // com.eignex.klause.ir/EffectiveSourceSemantics.declared|{}declared[0]
+        final fun <get-declared>(): com.eignex.klause.ir/SourceSemantics // com.eignex.klause.ir/EffectiveSourceSemantics.declared.<get-declared>|<get-declared>(){}[0]
+    final val effective // com.eignex.klause.ir/EffectiveSourceSemantics.effective|{}effective[0]
+        final fun <get-effective>(): com.eignex.klause.ir/SourceSemantics // com.eignex.klause.ir/EffectiveSourceSemantics.effective.<get-effective>|<get-effective>(){}[0]
+    final val hasOverrides // com.eignex.klause.ir/EffectiveSourceSemantics.hasOverrides|{}hasOverrides[0]
+        final fun <get-hasOverrides>(): kotlin/Boolean // com.eignex.klause.ir/EffectiveSourceSemantics.hasOverrides.<get-hasOverrides>|<get-hasOverrides>(){}[0]
+    final val isApproximate // com.eignex.klause.ir/EffectiveSourceSemantics.isApproximate|{}isApproximate[0]
+        final fun <get-isApproximate>(): kotlin/Boolean // com.eignex.klause.ir/EffectiveSourceSemantics.isApproximate.<get-isApproximate>|<get-isApproximate>(){}[0]
+}
+
 final class com.eignex.klause.ir/IntBounds { // com.eignex.klause.ir/IntBounds|null[0]
     final val size // com.eignex.klause.ir/IntBounds.size|{}size[0]
         final fun <get-size>(): kotlin/Int // com.eignex.klause.ir/IntBounds.size.<get-size>|<get-size>(){}[0]
@@ -7801,6 +7923,52 @@ final class com.eignex.klause.ir/SearchHints { // com.eignex.klause.ir/SearchHin
     final fun toString(): kotlin/String // com.eignex.klause.ir/SearchHints.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.ir/SemanticOverrides { // com.eignex.klause.ir/SemanticOverrides|null[0]
+    constructor <init>(com.eignex.klause.ir/FloatSemantics? = ..., com.eignex.klause.ir/BoundsOverride<kotlin/Long>? = ..., com.eignex.klause.ir/BoundsOverride<com.eignex.klause.ir/SemanticRational>? = ..., com.eignex.klause.ir/SourceTolerance? = ..., kotlin/Boolean? = ...) // com.eignex.klause.ir/SemanticOverrides.<init>|<init>(com.eignex.klause.ir.FloatSemantics?;com.eignex.klause.ir.BoundsOverride<kotlin.Long>?;com.eignex.klause.ir.BoundsOverride<com.eignex.klause.ir.SemanticRational>?;com.eignex.klause.ir.SourceTolerance?;kotlin.Boolean?){}[0]
+
+    final val feasibilityTolerance // com.eignex.klause.ir/SemanticOverrides.feasibilityTolerance|{}feasibilityTolerance[0]
+        final fun <get-feasibilityTolerance>(): com.eignex.klause.ir/SourceTolerance? // com.eignex.klause.ir/SemanticOverrides.feasibilityTolerance.<get-feasibilityTolerance>|<get-feasibilityTolerance>(){}[0]
+    final val floats // com.eignex.klause.ir/SemanticOverrides.floats|{}floats[0]
+        final fun <get-floats>(): com.eignex.klause.ir/FloatSemantics? // com.eignex.klause.ir/SemanticOverrides.floats.<get-floats>|<get-floats>(){}[0]
+    final val pinAbsentOptionalValues // com.eignex.klause.ir/SemanticOverrides.pinAbsentOptionalValues|{}pinAbsentOptionalValues[0]
+        final fun <get-pinAbsentOptionalValues>(): kotlin/Boolean? // com.eignex.klause.ir/SemanticOverrides.pinAbsentOptionalValues.<get-pinAbsentOptionalValues>|<get-pinAbsentOptionalValues>(){}[0]
+    final val undeclaredIntegers // com.eignex.klause.ir/SemanticOverrides.undeclaredIntegers|{}undeclaredIntegers[0]
+        final fun <get-undeclaredIntegers>(): com.eignex.klause.ir/BoundsOverride<kotlin/Long>? // com.eignex.klause.ir/SemanticOverrides.undeclaredIntegers.<get-undeclaredIntegers>|<get-undeclaredIntegers>(){}[0]
+    final val undeclaredReals // com.eignex.klause.ir/SemanticOverrides.undeclaredReals|{}undeclaredReals[0]
+        final fun <get-undeclaredReals>(): com.eignex.klause.ir/BoundsOverride<com.eignex.klause.ir/SemanticRational>? // com.eignex.klause.ir/SemanticOverrides.undeclaredReals.<get-undeclaredReals>|<get-undeclaredReals>(){}[0]
+
+    final fun component1(): com.eignex.klause.ir/FloatSemantics? // com.eignex.klause.ir/SemanticOverrides.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.ir/BoundsOverride<kotlin/Long>? // com.eignex.klause.ir/SemanticOverrides.component2|component2(){}[0]
+    final fun component3(): com.eignex.klause.ir/BoundsOverride<com.eignex.klause.ir/SemanticRational>? // com.eignex.klause.ir/SemanticOverrides.component3|component3(){}[0]
+    final fun component4(): com.eignex.klause.ir/SourceTolerance? // com.eignex.klause.ir/SemanticOverrides.component4|component4(){}[0]
+    final fun component5(): kotlin/Boolean? // com.eignex.klause.ir/SemanticOverrides.component5|component5(){}[0]
+    final fun copy(com.eignex.klause.ir/FloatSemantics? = ..., com.eignex.klause.ir/BoundsOverride<kotlin/Long>? = ..., com.eignex.klause.ir/BoundsOverride<com.eignex.klause.ir/SemanticRational>? = ..., com.eignex.klause.ir/SourceTolerance? = ..., kotlin/Boolean? = ...): com.eignex.klause.ir/SemanticOverrides // com.eignex.klause.ir/SemanticOverrides.copy|copy(com.eignex.klause.ir.FloatSemantics?;com.eignex.klause.ir.BoundsOverride<kotlin.Long>?;com.eignex.klause.ir.BoundsOverride<com.eignex.klause.ir.SemanticRational>?;com.eignex.klause.ir.SourceTolerance?;kotlin.Boolean?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/SemanticOverrides.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/SemanticOverrides.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/SemanticOverrides.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.ir/SemanticRational : kotlin/Comparable<com.eignex.klause.ir/SemanticRational> { // com.eignex.klause.ir/SemanticRational|null[0]
+    final val denominator // com.eignex.klause.ir/SemanticRational.denominator|{}denominator[0]
+        final fun <get-denominator>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.ir/SemanticRational.denominator.<get-denominator>|<get-denominator>(){}[0]
+    final val numerator // com.eignex.klause.ir/SemanticRational.numerator|{}numerator[0]
+        final fun <get-numerator>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.ir/SemanticRational.numerator.<get-numerator>|<get-numerator>(){}[0]
+
+    final fun compareTo(com.eignex.klause.ir/SemanticRational): kotlin/Int // com.eignex.klause.ir/SemanticRational.compareTo|compareTo(com.eignex.klause.ir.SemanticRational){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/SemanticRational.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/SemanticRational.hashCode|hashCode(){}[0]
+
+    final object Companion { // com.eignex.klause.ir/SemanticRational.Companion|null[0]
+        final val ONE // com.eignex.klause.ir/SemanticRational.Companion.ONE|{}ONE[0]
+            final fun <get-ONE>(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/SemanticRational.Companion.ONE.<get-ONE>|<get-ONE>(){}[0]
+        final val ZERO // com.eignex.klause.ir/SemanticRational.Companion.ZERO|{}ZERO[0]
+            final fun <get-ZERO>(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/SemanticRational.Companion.ZERO.<get-ZERO>|<get-ZERO>(){}[0]
+
+        final fun of(com.ionspin.kotlin.bignum.integer/BigInteger, com.ionspin.kotlin.bignum.integer/BigInteger = ...): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/SemanticRational.Companion.of|of(com.ionspin.kotlin.bignum.integer.BigInteger;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
+        final fun ofLong(kotlin/Long): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/SemanticRational.Companion.ofLong|ofLong(kotlin.Long){}[0]
+    }
+}
+
 final class com.eignex.klause.ir/SourceIntDomains { // com.eignex.klause.ir/SourceIntDomains|null[0]
     final val bounds // com.eignex.klause.ir/SourceIntDomains.bounds|{}bounds[0]
         final fun <get-bounds>(): com.eignex.klause.ir/IntBounds // com.eignex.klause.ir/SourceIntDomains.bounds.<get-bounds>|<get-bounds>(){}[0]
@@ -7815,6 +7983,56 @@ final class com.eignex.klause.ir/SourceIntDomains { // com.eignex.klause.ir/Sour
     final object Companion { // com.eignex.klause.ir/SourceIntDomains.Companion|null[0]
         final fun ofBounds(com.eignex.klause.ir/IntBounds): com.eignex.klause.ir/SourceIntDomains // com.eignex.klause.ir/SourceIntDomains.Companion.ofBounds|ofBounds(com.eignex.klause.ir.IntBounds){}[0]
     }
+}
+
+final class com.eignex.klause.ir/SourceSemantics { // com.eignex.klause.ir/SourceSemantics|null[0]
+    constructor <init>(com.eignex.klause.ir/SourceFormat, com.eignex.klause.ir/NumericAuthority = ..., com.eignex.klause.ir/FloatSemantics? = ..., com.eignex.klause.ir/UndeclaredIntegerBounds? = ..., com.eignex.klause.ir/UndeclaredRealBounds? = ..., com.eignex.klause.ir/SourceTolerance? = ..., kotlin/Boolean? = ...) // com.eignex.klause.ir/SourceSemantics.<init>|<init>(com.eignex.klause.ir.SourceFormat;com.eignex.klause.ir.NumericAuthority;com.eignex.klause.ir.FloatSemantics?;com.eignex.klause.ir.UndeclaredIntegerBounds?;com.eignex.klause.ir.UndeclaredRealBounds?;com.eignex.klause.ir.SourceTolerance?;kotlin.Boolean?){}[0]
+
+    final val feasibilityTolerance // com.eignex.klause.ir/SourceSemantics.feasibilityTolerance|{}feasibilityTolerance[0]
+        final fun <get-feasibilityTolerance>(): com.eignex.klause.ir/SourceTolerance? // com.eignex.klause.ir/SourceSemantics.feasibilityTolerance.<get-feasibilityTolerance>|<get-feasibilityTolerance>(){}[0]
+    final val floats // com.eignex.klause.ir/SourceSemantics.floats|{}floats[0]
+        final fun <get-floats>(): com.eignex.klause.ir/FloatSemantics? // com.eignex.klause.ir/SourceSemantics.floats.<get-floats>|<get-floats>(){}[0]
+    final val format // com.eignex.klause.ir/SourceSemantics.format|{}format[0]
+        final fun <get-format>(): com.eignex.klause.ir/SourceFormat // com.eignex.klause.ir/SourceSemantics.format.<get-format>|<get-format>(){}[0]
+    final val numericAuthority // com.eignex.klause.ir/SourceSemantics.numericAuthority|{}numericAuthority[0]
+        final fun <get-numericAuthority>(): com.eignex.klause.ir/NumericAuthority // com.eignex.klause.ir/SourceSemantics.numericAuthority.<get-numericAuthority>|<get-numericAuthority>(){}[0]
+    final val pinAbsentOptionalValues // com.eignex.klause.ir/SourceSemantics.pinAbsentOptionalValues|{}pinAbsentOptionalValues[0]
+        final fun <get-pinAbsentOptionalValues>(): kotlin/Boolean? // com.eignex.klause.ir/SourceSemantics.pinAbsentOptionalValues.<get-pinAbsentOptionalValues>|<get-pinAbsentOptionalValues>(){}[0]
+    final val undeclaredIntegers // com.eignex.klause.ir/SourceSemantics.undeclaredIntegers|{}undeclaredIntegers[0]
+        final fun <get-undeclaredIntegers>(): com.eignex.klause.ir/UndeclaredIntegerBounds? // com.eignex.klause.ir/SourceSemantics.undeclaredIntegers.<get-undeclaredIntegers>|<get-undeclaredIntegers>(){}[0]
+    final val undeclaredReals // com.eignex.klause.ir/SourceSemantics.undeclaredReals|{}undeclaredReals[0]
+        final fun <get-undeclaredReals>(): com.eignex.klause.ir/UndeclaredRealBounds? // com.eignex.klause.ir/SourceSemantics.undeclaredReals.<get-undeclaredReals>|<get-undeclaredReals>(){}[0]
+
+    final fun component1(): com.eignex.klause.ir/SourceFormat // com.eignex.klause.ir/SourceSemantics.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.ir/NumericAuthority // com.eignex.klause.ir/SourceSemantics.component2|component2(){}[0]
+    final fun component3(): com.eignex.klause.ir/FloatSemantics? // com.eignex.klause.ir/SourceSemantics.component3|component3(){}[0]
+    final fun component4(): com.eignex.klause.ir/UndeclaredIntegerBounds? // com.eignex.klause.ir/SourceSemantics.component4|component4(){}[0]
+    final fun component5(): com.eignex.klause.ir/UndeclaredRealBounds? // com.eignex.klause.ir/SourceSemantics.component5|component5(){}[0]
+    final fun component6(): com.eignex.klause.ir/SourceTolerance? // com.eignex.klause.ir/SourceSemantics.component6|component6(){}[0]
+    final fun component7(): kotlin/Boolean? // com.eignex.klause.ir/SourceSemantics.component7|component7(){}[0]
+    final fun copy(com.eignex.klause.ir/SourceFormat = ..., com.eignex.klause.ir/NumericAuthority = ..., com.eignex.klause.ir/FloatSemantics? = ..., com.eignex.klause.ir/UndeclaredIntegerBounds? = ..., com.eignex.klause.ir/UndeclaredRealBounds? = ..., com.eignex.klause.ir/SourceTolerance? = ..., kotlin/Boolean? = ...): com.eignex.klause.ir/SourceSemantics // com.eignex.klause.ir/SourceSemantics.copy|copy(com.eignex.klause.ir.SourceFormat;com.eignex.klause.ir.NumericAuthority;com.eignex.klause.ir.FloatSemantics?;com.eignex.klause.ir.UndeclaredIntegerBounds?;com.eignex.klause.ir.UndeclaredRealBounds?;com.eignex.klause.ir.SourceTolerance?;kotlin.Boolean?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/SourceSemantics.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/SourceSemantics.hashCode|hashCode(){}[0]
+    final fun resolve(com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/SourceSemantics.resolve|resolve(com.eignex.klause.ir.SemanticOverrides){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/SourceSemantics.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.ir/SourceTolerance { // com.eignex.klause.ir/SourceTolerance|null[0]
+    constructor <init>(com.eignex.klause.ir/SemanticRational = ..., com.eignex.klause.ir/SemanticRational = ...) // com.eignex.klause.ir/SourceTolerance.<init>|<init>(com.eignex.klause.ir.SemanticRational;com.eignex.klause.ir.SemanticRational){}[0]
+
+    final val absolute // com.eignex.klause.ir/SourceTolerance.absolute|{}absolute[0]
+        final fun <get-absolute>(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/SourceTolerance.absolute.<get-absolute>|<get-absolute>(){}[0]
+    final val isExact // com.eignex.klause.ir/SourceTolerance.isExact|{}isExact[0]
+        final fun <get-isExact>(): kotlin/Boolean // com.eignex.klause.ir/SourceTolerance.isExact.<get-isExact>|<get-isExact>(){}[0]
+    final val relative // com.eignex.klause.ir/SourceTolerance.relative|{}relative[0]
+        final fun <get-relative>(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/SourceTolerance.relative.<get-relative>|<get-relative>(){}[0]
+
+    final fun component1(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/SourceTolerance.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/SourceTolerance.component2|component2(){}[0]
+    final fun copy(com.eignex.klause.ir/SemanticRational = ..., com.eignex.klause.ir/SemanticRational = ...): com.eignex.klause.ir/SourceTolerance // com.eignex.klause.ir/SourceTolerance.copy|copy(com.eignex.klause.ir.SemanticRational;com.eignex.klause.ir.SemanticRational){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/SourceTolerance.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/SourceTolerance.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/SourceTolerance.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.ir/SpanIntVars : com.eignex.klause.ir/VarList { // com.eignex.klause.ir/SpanIntVars|null[0]
@@ -7859,6 +8077,38 @@ final class com.eignex.klause.ir/TranscendentalProblem { // com.eignex.klause.ir
         final fun <get-objectiveSense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.ir/TranscendentalProblem.objectiveSense.<get-objectiveSense>|<get-objectiveSense>(){}[0]
     final val realVarNames // com.eignex.klause.ir/TranscendentalProblem.realVarNames|{}realVarNames[0]
         final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
+}
+
+final class com.eignex.klause.ir/UndeclaredIntegerBounds { // com.eignex.klause.ir/UndeclaredIntegerBounds|null[0]
+    constructor <init>(kotlin/Long? = ..., kotlin/Long? = ...) // com.eignex.klause.ir/UndeclaredIntegerBounds.<init>|<init>(kotlin.Long?;kotlin.Long?){}[0]
+
+    final val lower // com.eignex.klause.ir/UndeclaredIntegerBounds.lower|{}lower[0]
+        final fun <get-lower>(): kotlin/Long? // com.eignex.klause.ir/UndeclaredIntegerBounds.lower.<get-lower>|<get-lower>(){}[0]
+    final val upper // com.eignex.klause.ir/UndeclaredIntegerBounds.upper|{}upper[0]
+        final fun <get-upper>(): kotlin/Long? // com.eignex.klause.ir/UndeclaredIntegerBounds.upper.<get-upper>|<get-upper>(){}[0]
+
+    final fun component1(): kotlin/Long? // com.eignex.klause.ir/UndeclaredIntegerBounds.component1|component1(){}[0]
+    final fun component2(): kotlin/Long? // com.eignex.klause.ir/UndeclaredIntegerBounds.component2|component2(){}[0]
+    final fun copy(kotlin/Long? = ..., kotlin/Long? = ...): com.eignex.klause.ir/UndeclaredIntegerBounds // com.eignex.klause.ir/UndeclaredIntegerBounds.copy|copy(kotlin.Long?;kotlin.Long?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/UndeclaredIntegerBounds.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/UndeclaredIntegerBounds.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/UndeclaredIntegerBounds.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.ir/UndeclaredRealBounds { // com.eignex.klause.ir/UndeclaredRealBounds|null[0]
+    constructor <init>(com.eignex.klause.ir/SemanticRational? = ..., com.eignex.klause.ir/SemanticRational? = ...) // com.eignex.klause.ir/UndeclaredRealBounds.<init>|<init>(com.eignex.klause.ir.SemanticRational?;com.eignex.klause.ir.SemanticRational?){}[0]
+
+    final val lower // com.eignex.klause.ir/UndeclaredRealBounds.lower|{}lower[0]
+        final fun <get-lower>(): com.eignex.klause.ir/SemanticRational? // com.eignex.klause.ir/UndeclaredRealBounds.lower.<get-lower>|<get-lower>(){}[0]
+    final val upper // com.eignex.klause.ir/UndeclaredRealBounds.upper|{}upper[0]
+        final fun <get-upper>(): com.eignex.klause.ir/SemanticRational? // com.eignex.klause.ir/UndeclaredRealBounds.upper.<get-upper>|<get-upper>(){}[0]
+
+    final fun component1(): com.eignex.klause.ir/SemanticRational? // com.eignex.klause.ir/UndeclaredRealBounds.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.ir/SemanticRational? // com.eignex.klause.ir/UndeclaredRealBounds.component2|component2(){}[0]
+    final fun copy(com.eignex.klause.ir/SemanticRational? = ..., com.eignex.klause.ir/SemanticRational? = ...): com.eignex.klause.ir/UndeclaredRealBounds // com.eignex.klause.ir/UndeclaredRealBounds.copy|copy(com.eignex.klause.ir.SemanticRational?;com.eignex.klause.ir.SemanticRational?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/UndeclaredRealBounds.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/UndeclaredRealBounds.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/UndeclaredRealBounds.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.ir/UnitConsts : com.eignex.klause.ir/LongConstList { // com.eignex.klause.ir/UnitConsts|null[0]
