@@ -1001,8 +1001,10 @@ class ExactLiraSearchComponent private constructor(
             if (operationStop()) return null
             entries += copyEntries
             comparison.rowsInto(rows)
-            variables.addAll(prepared.booleans)
-            if (variables.size >= 4096) return null
+            for (variable in prepared.booleans) {
+                variables.add(variable)
+                if (variables.size >= 4096) return null
+            }
         }
         val refuted = when (val prepared = prepareSourceEqualities(model.numRealVars, rows, operationStop)) {
             is SourceEqualityPreparation.Ready -> {
