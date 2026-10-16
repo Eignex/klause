@@ -2153,6 +2153,53 @@ code-size/root coverage, clocks or compiler savings, and never changes original
 argument-binding or capture-wide acceptance flags. The review performs no new
 field reads, observer attachment or captured JVM replay.
 
+### Saved JVM cohort task logs
+
+`com.eignex.klause.bench.profile.JvmTaskLogCohortReview` accepts
+`manifest=<https URL>`, `manifest-sha256=<hash>` and `archive=<https URL>`.
+Use public URLs without user information, query or fragment. The profile streams
+the manifest and archive with separate 16 MiB and 2 GiB download bounds. The
+manifest must match its supplied hash; the child independently rechecks the
+complete archive size and SHA-256 against that manifest. The archive occupies
+owned temporary transport staging, removed after the child finishes; its original
+public URL, full byte identity and raw manifest remain in the capture.
+
+The reader requires one original `profileN/cases/` prefix and enumerates every
+archived case directory from the complete file inventory. It retains cases with
+no log and reviews every literal `hotspot.xml` member, including nested and
+outside-case logs. Multiple logs keep separate identities and case references;
+outside-case ownership remains unknown. No compiler family, method, engine or
+outcome selects a subset. Every archive member is checked for safe regular-file
+membership, size and SHA-256 before any log is interpreted, including members
+that are not extracted. Linked, duplicate, unexpected and missing members decline
+the archive binding. Duplicate manifest JSON keys are rejected.
+
+Complete raw logs are retained losslessly as `raw-logs/log-NNNNNN.xml.gz` and
+per-log reports as `log-reviews/log-NNNNNN.json.gz`. `cohort-review.json` maps
+original members and case directories to those files, including their compressed
+identities and every missing, malformed, oversized or unresolved log. The existing
+single-log parser, decimal-stamp checks and proof denials remain unchanged. A
+successful inventory does not establish the expected study's full case universe,
+runtime source binding, full compiler roots, exact elapsed time or code size.
+
+Resource bounds are 100,000 original members, 4,096 archived case directories,
+8,192 logs, 16 GiB expanded member bytes, 128 MiB retained raw bytes per log and
+512 MiB stored compressed case evidence. Each log retains the unchanged 16 MiB
+interpretation and 64 MiB derived-report bounds; the cohort index is bounded to
+64 MiB. A raw log above its retention bound remains identified in its complete
+original archive, without a truncated replacement. Per-log failures keep negative
+reports and raw provenance; cohort authentication or storage failure prevents a
+complete review claim. No omitted or oversized input becomes zero work, and
+valid logs do not rescue missing cases or rejected logs.
+
+The profile retains its input origins, raw manifest, archive digest, five-file
+reader import closure, output/error/exit files and complete owned capture. It
+performs no captured target/JVM/solver replay, observer attachment or field read.
+Full ordinary/private phases, callers/helpers/synthetics, queued, failed,
+unfinished, OSR, replaced and source-excluded work, source outcomes and independent
+runtime/allocation/RNG/work controls require separate evidence. Nominal printed
+stamp differences remain distinct from compiler elapsed-time and code-size proof.
+
 ### Polynomial witness work checkpoints
 
 `com.eignex.klause.bench.profile.PolynomialWitnessProbeProfile` diagnoses the bounded
