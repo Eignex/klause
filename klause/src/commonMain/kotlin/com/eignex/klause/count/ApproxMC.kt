@@ -26,7 +26,10 @@ import kotlin.random.Random
  */
 internal object ApproxMC {
 
-    fun run(problem: BakedProblem, config: ApproxCountConfig): Count {
+    fun run(problem: BakedProblem, config: ApproxCountConfig): Count =
+        count(problem, config).copy(semantics = problem.semantics)
+
+    private fun count(problem: BakedProblem, config: ApproxCountConfig): Count {
         val ctx = CellContext.resolve(problem, config.samplingSet, config.intSamplingSet)
         val eps = config.epsilon
         val thresh = threshold(eps)

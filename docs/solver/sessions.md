@@ -73,6 +73,11 @@ Accurate sampling also conditions on both call parameters and session scopes. Co
 and accurate sampling use complete finite-model machinery independently of the session's
 sampling backend; local-search enumeration remains sampling with replacement.
 
+Count bounds retain the captured source interpretation through exact, approximate
+and scoped counting. The source policy is separate from the algorithm's confidence
+and exactness: an exact count of a bounded interpretation does not count an
+unrestricted source.
+
 Approximate counting and accurate sampling project only Boolean and finite integer
 values. Real columns remain existential feasibility constraints: neither a real
 interval nor multiple real completions multiply the projected count. Integer channels,

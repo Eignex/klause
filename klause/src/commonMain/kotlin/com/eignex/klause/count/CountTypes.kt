@@ -1,5 +1,7 @@
 package com.eignex.klause.count
 
+import com.eignex.klause.ir.EffectiveSourceSemantics
+
 /**
  * Configuration for approximate model counting ([com.eignex.klause.solver.Solver.approximateCount]).
  *
@@ -63,6 +65,8 @@ data class Count(
     val exact: Boolean,
     /** Probability the true count lies in `[lower, upper]`: `1.0` for exact, `1 - δ` for ApproxMC. */
     val confidence: Double,
+    /** Effective source interpretation, independent of the counting method's confidence. */
+    val semantics: EffectiveSourceSemantics? = null,
 ) {
     /** Multiplicative gap `upper / lower` (1.0 == exact, ∞ when nothing is proven yet). */
     val ratio: Double get() = if (lower <= 0L) Double.POSITIVE_INFINITY else upper.toDouble() / lower.toDouble()
