@@ -2485,6 +2485,8 @@ identities. Pair keys include engine, input index, repetition, mode and recipe.
 `compilation-cost-summary.json` and the child stdout retain every family/engine/
 mode/recipe summary and excluded pair context. Summary maxima are sums of paired
 per-recording maxima, with a retained difference range; they are not cohort maxima.
+The summary file and its stdout mirror use compact JSON under the complete-output
+byte bound.
 `familyObservationSummaries` and `mappedFamilyObservationSummaries` also retain
 the already computed all-tier and C2 scalar quantities for every family/recording,
 including excluded contexts. Their source/phase exclusions and missing quantities
