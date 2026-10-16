@@ -37,7 +37,7 @@ internal data class QfNraStats(
     val dyadicBases: Long? = null,
     val coupledWorkDeclines: Long? = null,
     val dyadicPreExtractionDeclines: Long? = null,
-    val equationalSections: Int = 0,
+    val equationalSections: Long = 0,
 )
 
 internal enum class QfNraReason { Interrupted, WorkLimit, ResourceLimit }
@@ -124,14 +124,16 @@ internal class QfNraQuery(
                 it.polynomial
             }
             val equations = normalized.requiredZeroPolynomials(arithmetic)
-            val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic, equations)
+            val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic, equations) {
+                work.equationalSections++
+            }
             var projection: PolynomialProjection? = null
             while (projection == null) {
                 projection = pending.next()
                 if (projection == null) yield(null)
             }
             work.projectedPolynomials = projection.polynomialCount
-            work.equationalSections = projection.equationalSections
+            check(work.equationalSections == projection.equationalSections.toLong())
             yield(null)
             val assignment = searchCells(normalized, projection, boolCount, arithmetic, algebraic, work, fixed)
             arithmetic.step()
@@ -152,7 +154,7 @@ internal class QfNraQuery(
 }
 
 internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMeter {
-    var equationalSections: Int = 0
+    var equationalSections: Long = 0
     var projectedPolynomials: Long = 0
     var liftedCells: Long = 0
     var dyadicAttempts: Long = 0

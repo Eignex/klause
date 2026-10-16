@@ -44,6 +44,7 @@ internal class PolynomialProjection private constructor(
             variableCount: Int,
             arithmetic: PolynomialArithmetic,
             requiredZeroes: List<Polynomial> = emptyList(),
+            onSection: () -> Unit = {},
         ): Iterator<PolynomialProjection?> = sequence {
             require(variableCount >= 0)
             arithmetic.step()
@@ -94,10 +95,9 @@ internal class PolynomialProjection private constructor(
                     arithmetic.step()
                     if (variable in polynomial.variables) top.add(polynomial) else lower.add(polynomial)
                 }
-                levels[level] = top.toList()
+                levels[level] = if (section == null) top.toList() else emptyList()
                 if (section != null) {
                     sections[level] = section.replacement
-                    sectionCount++
                     val rewritten = HashMap<Polynomial, Polynomial>()
                     val projected = ArrayList<Polynomial>()
                     for (polynomial in pending) {
@@ -114,6 +114,8 @@ internal class PolynomialProjection private constructor(
                         rewritten.getValue(it)
                     }
                     pending = projectionFamily(projected, arithmetic)
+                    sectionCount++
+                    onSection()
                 } else if (level > 0) {
                     equations = equations.filter {
                         arithmetic.step()

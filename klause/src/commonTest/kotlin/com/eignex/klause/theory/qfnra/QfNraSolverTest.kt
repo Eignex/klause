@@ -421,11 +421,13 @@ class QfNraSolverTest {
 
     @Test
     fun `matrix allowance stops should never supply a refutation`() {
+        val unused = (0 until 31).joinToString(" ") { "(declare-const unused$it Real)" }
         val source = SmtLibPolynomial.parse(
             """
             (declare-const x Real)
             (declare-const y Real)
-            (assert (and (= (* x y) 1) (= (+ x y) 0)))
+            $unused
+            (assert (and (= (* x y) 1) (= (+ (* x x) (* y y)) 1)))
             (check-sat)
             """.trimIndent(),
         )

@@ -5,13 +5,13 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
 import com.eignex.klause.util.magnitudeBitLength
 
-internal class PolynomialSection(val variable: Int, val replacement: Polynomial)
+internal class PolynomialEquationalProjection(val variable: Int, val replacement: Polynomial)
 
 internal fun equationalSection(
     equations: List<Polynomial>,
     family: List<Polynomial>,
     arithmetic: PolynomialArithmetic,
-): PolynomialSection? {
+): PolynomialEquationalProjection? {
     if (equations.isEmpty()) return null
     val occurrences = HashMap<Int, Int>()
     for (polynomial in family) for (variable in polynomial.variables) {
@@ -45,7 +45,7 @@ internal fun equationalSection(
     }
     // A nonzero rational coefficient makes the section total, including singular base points.
     val replacement = arithmetic.scale(Polynomial.of(remainder), pivot.term.coefficient.reciprocal().negated())
-    return PolynomialSection(pivot.variable, replacement)
+    return PolynomialEquationalProjection(pivot.variable, replacement)
 }
 
 private class SectionPivot(

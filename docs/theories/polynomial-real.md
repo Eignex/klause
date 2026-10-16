@@ -641,8 +641,12 @@ elimination, and absent dimensions retain an empty family. With no eligible requ
 equation, elimination follows descending original IDs. Exact rewriting, ordering,
 construction and lifting debit the same containing native owner after the unchanged
 optional probe; they create no additional probe or allowance. Dense, matrix and
-checked-degree kernel limits remain unchanged. Private query snapshots count completed
-equational sections separately from projected polynomials and lifted cells.
+checked-degree kernel limits remain unchanged. Graph levels retain only their required
+section rather than unused boundary families. Private query snapshots count each
+completed equational substitution separately from projected polynomials and lifted
+cells, including completed substitutions before a containing stop. Invocation
+snapshots retain and saturatingly aggregate those observations without extra work or
+cancellation polls. They expose no partial boundary family or result authority.
 
 For each ordinarily eliminated coordinate family, the projection contains all coefficient
 polynomials, every principal subresultant coefficient of each nonconstant reductum

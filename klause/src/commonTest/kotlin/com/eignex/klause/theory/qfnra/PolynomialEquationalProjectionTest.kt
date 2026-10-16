@@ -195,7 +195,7 @@ class PolynomialEquationalProjectionTest {
 
         val result = assertIs<QfNraResult.Unsatisfiable>(solveQfNra(source.formula, 0, 33))
 
-        assertEquals(1, result.stats.equationalSections)
+        assertEquals(1L, result.stats.equationalSections)
         assertTrue(result.stats.liftedCells > 0)
     }
 
@@ -210,7 +210,7 @@ class PolynomialEquationalProjectionTest {
 
         assertEquals(0, AlgebraicArithmetic(arithmetic).compare(result.assignment.realValue(0),
             AlgebraicArithmetic(arithmetic).rational(BigFraction.ONE)))
-        assertEquals(1, result.stats.equationalSections)
+        assertEquals(1L, result.stats.equationalSections)
     }
 
     @Test
@@ -224,7 +224,7 @@ class PolynomialEquationalProjectionTest {
 
         assertEquals(BigFraction.ZERO, result.assignment.realValue(0).rational)
         assertTrue(AlgebraicArithmetic(arithmetic).sign(result.assignment.realValue(1)) > 0)
-        assertEquals(0, result.stats.equationalSections)
+        assertEquals(0L, result.stats.equationalSections)
     }
 
     @Test
@@ -266,5 +266,18 @@ class PolynomialEquationalProjectionTest {
             QfNraParams(maximumWork = completed.stats.workSpent - 1))
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
+    }
+
+    @Test
+    fun `total equality sections can refute without matrix allocation`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= (* x0 x1) 1) (= (+ x0 x1) 0)))",
+        )
+        val params = QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0))
+
+        val result = assertIs<QfNraResult.Unsatisfiable>(solveQfNra(source.formula, 0, 33, params))
+
+        assertEquals(1L, result.stats.equationalSections)
     }
 }
