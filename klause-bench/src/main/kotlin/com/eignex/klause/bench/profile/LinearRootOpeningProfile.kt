@@ -139,7 +139,7 @@ internal object LinearRootOpeningProfile {
         } finally {
             (run as? AutoCloseable)?.close()
         }
-        if (inspection != null) LinearDisjunctionInspection.inspect(engine, stop, out)
+        if (inspection == "disjunction-names") LinearDisjunctionInspection.inspect(engine, stop, out)
     }
 
     private fun launch(args: Array<String>, out: File) {
