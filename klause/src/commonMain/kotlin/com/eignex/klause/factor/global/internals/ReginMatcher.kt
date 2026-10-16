@@ -56,8 +56,8 @@ internal fun reginFilter(
     if (n < 2) return null
 
     // A domain too large to walk would make the GAC value graph below enumerate its span. Fall back to
-    // the span-safe bounds-consistency filter for plain alldifferent; for the except variant (excepted
-    // values may repeat, which bounds consistency cannot model) skip filtering — sound, just no prune.
+    // the bounds-consistency filter for plain alldifferent. Excepted values may repeat, so that
+    // variant uses fixed non-excepted values rather than mandatory Hall intervals.
     if (filteredVars.any { state.intDomains[it].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null }) {
         return if (exceptSet.isEmpty()) boundsAllDifferentFilter(state, filteredVars, premises, tag)
         else filterFixedDistinctness(state, filteredVars, exceptSet, premises)
