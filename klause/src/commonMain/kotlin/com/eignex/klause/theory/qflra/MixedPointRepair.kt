@@ -21,6 +21,7 @@ internal fun repairMixedEqualities(
         stop.charge(4L * row.columns.size + 3L)
         entries += row.columns.size + 1L
         if (entries > MAX_REPAIR_ENTRIES || stop()) return null
+        if (row.columns.any { it !in 0 until columns }) return null
         if (!row.coefficients.all(work::admitted) || !work.admitted(row.rhs)) return null
         if (row.strict) continue
         val first = row.coefficients.firstOrNull { !it.isZero } ?: continue
