@@ -59,6 +59,16 @@ internal object LinearStopAttributionProfile {
         val jars = SolverInvocation.klauseCliBin().canonicalFile.parentFile.parentFile.resolve("lib")
             .listFiles().orEmpty().filter { it.extension == "jar" }.sortedBy { it.name }
         require(jars.isNotEmpty())
+        val loaded = File(Problem::class.java.protectionDomain.codeSource.location.toURI())
+        val installed = jars.single { it.name == loaded.name }
+        require(sha256(loaded.readBytes()) == sha256(installed.readBytes())) {
+            "harness and installed CLI load different solver bytes"
+        }
+        out.resolve("loaded-solver.json").writeText(buildJsonObject {
+            put("path", loaded.path)
+            put("sha256", sha256(loaded.readBytes()))
+            put("installedCliSolver", installed.path)
+        }.toString() + "\n")
         URLClassLoader(jars.map { it.toURI().toURL() }.toTypedArray(), javaClass.classLoader).use { loader ->
             val access = LinearCliAccess(loader)
             for ((index, source) in sources.withIndex()) {
@@ -110,6 +120,9 @@ private class LinearCliAccess(private val loader: ClassLoader) {
         val solvable = requireNotNull(load.invoke(session, input.path, common))
         val pipeline = get(solvable, "Pipeline")
         val frontendNs = System.nanoTime() - started
+        val budget = optionsType.getDeclaredField("presolveBudget").apply { isAccessible = true }.get(common)
+            as? PresolveBudget
+        val routingSpent = budget?.spent()
         val deadline = coreType.getDeclaredMethod("deadlineCancellation", optionsType).apply { isAccessible = true }
             .invoke(core, common) as Pair<*, *>
         val containing = LinearObservedStop(deadline.second as Cancellation, observed)
@@ -152,6 +165,7 @@ private class LinearCliAccess(private val loader: ClassLoader) {
             put("pipeline", pipeline.javaClass.simpleName)
             put("declaredRoute", request?.route?.name)
             put("frontendNs", frontendNs)
+            put("routingSpent", routingSpent)
             put("presolveSpent", (allowance.second as? PresolveBudget)?.spent())
             put("presolveAllowance", (allowance.second as? PresolveBudget)?.allowance)
             put("elapsedNs", System.nanoTime() - started)
