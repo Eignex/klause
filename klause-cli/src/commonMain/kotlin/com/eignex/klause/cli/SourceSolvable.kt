@@ -125,12 +125,14 @@ internal fun linearSourceSolvable(
         common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
         else -> ExecutionOperation.SATISFY
     }
-    val invocation = SourceSetup.prepare(SourceSetupRequest(
+    val request = SourceSetupRequest(
         source, operation, common.resolvedEngine(),
         maximize = source.embeddedObjectiveSense == ObjectiveSense.MAXIMIZE,
         cancellation = common.routingPreparationCancellation(),
         boundCancellation = common.routingCancellation(),
-    ))
+    )
+    var lpStats = LpStats()
+    val invocation = SourceSetup.prepare(request, onLpStats = { lpStats = it })
     val elapsed = start.elapsedNow().inWholeMilliseconds
     common.logRoute(invocation.route, elapsed)
     return Solvable(
@@ -138,6 +140,7 @@ internal fun linearSourceSolvable(
         render = { error("linear source publication requires its checked original coordinates") },
         objectiveValue = null,
         pipeline = SolvablePipeline.LinearSource(invocation, render),
+        routingLpStats = lpStats,
         routingElapsedMs = admissionElapsedMs + elapsed,
         sourceInvocation = invocation,
     )

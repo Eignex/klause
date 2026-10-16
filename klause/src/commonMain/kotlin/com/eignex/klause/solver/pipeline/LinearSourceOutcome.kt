@@ -135,7 +135,9 @@ private fun AlgebraicReal.linearRational(): BigFraction? {
     val coefficients = definingCoefficients
     return if (coefficients.size == 2 && !coefficients[1].isZero) {
         coefficients[0].negated() * coefficients[1].reciprocal()
-    } else null
+    } else {
+        null
+    }
 }
 
 internal fun executeLinearSource(
@@ -269,23 +271,23 @@ internal fun executeLinearSource(
                     linear(requireNotNull(optimum.linearResult))
                 } else {
                     when (optimum) {
-                    is OpenTheoryOptimum.Optimal -> {
-                        assignment(optimum.assignment)
-                        nativeOptimalValue = optimum.value
-                        native = LinearSourceConclusion.OPTIMAL
+                        is OpenTheoryOptimum.Optimal -> {
+                            assignment(optimum.assignment)
+                            nativeOptimalValue = optimum.value
+                            native = LinearSourceConclusion.OPTIMAL
+                        }
+
+                        is OpenTheoryOptimum.Infeasible -> native = LinearSourceConclusion.UNSATISFIABLE
+
+                        is OpenTheoryOptimum.Unbounded -> {
+                            assignment(optimum.witness)
+                            unboundedBaseExact = (prepared.check(optimum.witness, stop) as? LinearSourceCheck.Accepted)
+                                ?.witness?.exact == true
+                            native = LinearSourceConclusion.UNBOUNDED
+                        }
+
+                        is OpenTheoryOptimum.Bounded -> assignment(optimum.incumbent)
                     }
-
-                    is OpenTheoryOptimum.Infeasible -> native = LinearSourceConclusion.UNSATISFIABLE
-
-                    is OpenTheoryOptimum.Unbounded -> {
-                        assignment(optimum.witness)
-                        unboundedBaseExact = (prepared.check(optimum.witness, stop) as? LinearSourceCheck.Accepted)
-                            ?.witness?.exact == true
-                        native = LinearSourceConclusion.UNBOUNDED
-                    }
-
-                    is OpenTheoryOptimum.Bounded -> assignment(optimum.incumbent)
-                }
                 }
             }
         }
@@ -348,14 +350,21 @@ internal fun executeLinearSource(
     } == true
     val conclusion = when {
         acceptedOptimal -> LinearSourceConclusion.OPTIMAL
+
         native == LinearSourceConclusion.UNSATISFIABLE && prepared.view.constraintsExact &&
             prepared.claimsCoverTolerance && nativeClaimsUnrestricted -> native
+
         invocation.operation != ExecutionOperation.OPTIMIZE && incumbent != null -> LinearSourceConclusion.SATISFIABLE
+
         native == LinearSourceConclusion.OPTIMAL && equivalent && incumbent?.exact == true &&
             nativeOptimalAttained -> native
+
         native == LinearSourceConclusion.LIMIT && equivalent -> native
+
         native == LinearSourceConclusion.UNBOUNDED && prepared.view.exact && unboundedBaseExact -> native
+
         incumbent != null -> LinearSourceConclusion.SATISFIABLE
+
         else -> LinearSourceConclusion.UNKNOWN
     }
     val snapshot = LinearSourceOutcome(
