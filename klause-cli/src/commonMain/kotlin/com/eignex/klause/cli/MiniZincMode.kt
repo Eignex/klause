@@ -21,7 +21,6 @@ import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
-import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
@@ -82,50 +81,19 @@ internal object MiniZincMode : CliMode {
                 { s -> applier?.render(program, s) ?: writeFlatZincSolution(program, s, outputObjective) }
 
             if (exactFloats || program.problem.numRealVars > 0) {
-                val maximize = program.solve is SolveDirective.Maximize
-                val minimized = program.linearObjective()
-                val sourceObjective = if (maximize) minimized?.negated() else minimized
-                val integralObjective = sourceObjective == null ||
-                    (
-                        sourceObjective.realCoefficients.none { it != 0.0 } &&
-                            sourceObjective.boolWeights.all { it == 0L }
-                        )
-                val route = program.problem.pipelineRoute(
-                    objective = sourceObjective,
-                    maximize = maximize,
-                    boundCancellation = common.routingCancellation(),
-                    preparationCancellation = common.routingPreparationCancellation(),
-                    routeLinearToTheory = integralObjective,
-                )
-                return when (route) {
-                    is SourceProblemRoute.PolynomialTheory -> polynomialSolvable(route, { assignment ->
+                return sourceSolvable(
+                    program.problem,
+                    program.linearObjective(),
+                    program.solve is SolveDirective.Maximize,
+                    common,
+                    render,
+                    { assignment ->
                         applier?.render(program, assignment)
                             ?: writeFlatZincSolution(program, assignment, outputObjective)
-                    })
-
-                    is SourceProblemRoute.Finite -> linearSolvable(
-                        route.problem,
-                        minimized,
-                        maximize,
-                        render,
-                        searchHints = program.searchHints?.toSearchHints(),
-                    )
-
-                    is SourceProblemRoute.OpenTheory -> openTheorySolvable(route.request, { assignment ->
-                        applier?.render(
-                            program,
-                            assignment,
-                        ) ?: writeFlatZincSolution(program, assignment, outputObjective)
-                    })
-
-                    is SourceProblemRoute.UnsupportedOpen -> throw UnsupportedFlatZincException(
-                        "FlatZinc real columns require a supported arithmetic theory",
-                        0,
-                        0,
-                    )
-
-                    SourceProblemRoute.Refuted -> refutedSolvable()
-                }
+                    },
+                    definitionHints = program.definitionHints,
+                    searchHints = program.searchHints?.toSearchHints(),
+                )
             }
 
             val objective = program.linearObjective()

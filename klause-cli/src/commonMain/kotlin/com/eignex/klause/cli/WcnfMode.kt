@@ -4,6 +4,7 @@ import com.eignex.klause.formats.dimacs.wcnfSemantics
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.toLinearObjective
 
 /**
  * DIMACS **WCNF** (MaxSAT) front-end (`.wcnf`). Soft clauses are relaxed with a fresh indicator and
@@ -32,8 +33,10 @@ internal object WcnfMode : CliMode {
             }
             val render: (Sample) -> String = { s -> renderWcnfModel(parsed.numOriginalBoolVars, s) }
             // MaxSAT minimises the weight of falsified soft clauses.
-            return linearSolvable(
-                parsed.problem, parsed.objective, maximize = false, render, boolFolds = parsed.boolFolds,
+            return sourceSolvable(
+                parsed.problem, parsed.objective.toLinearObjective(), false, common, render,
+                { assignment -> renderWcnfModel(parsed.numOriginalBoolVars, assignment::boolValue) },
+                boolFolds = parsed.boolFolds,
             )
         }
 
@@ -42,9 +45,12 @@ internal object WcnfMode : CliMode {
 }
 
 /** Render a MaxSAT-Evaluation `v` line: `v` followed by one `0`/`1` bit per original variable (1-based). */
-internal fun renderWcnfModel(numOriginalVars: Int, s: Sample): String = buildString {
+internal fun renderWcnfModel(numOriginalVars: Int, s: Sample): String =
+    renderWcnfModel(numOriginalVars, s::boolValue)
+
+private fun renderWcnfModel(numOriginalVars: Int, boolValue: (Int) -> Boolean): String = buildString {
     append("v ")
-    for (v in 0 until numOriginalVars) append(if (s.boolValue(v)) '1' else '0')
+    for (v in 0 until numOriginalVars) append(if (boolValue(v)) '1' else '0')
 }
 
 /** MaxSAT-Evaluation output protocol. Incumbent `o` costs stream live; the final `s` status and `v`

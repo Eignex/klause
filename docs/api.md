@@ -90,8 +90,11 @@ For source orchestration, attach a canonical `Problem` with
 source direction and units; `maximize` records its sense. Setup prefers exact arithmetic
 for pure-real models and for admitted linear integer objectives whose declared range
 exceeds binary64's exact integral range. Other finite models retain finite execution.
-The same policy serves SMT-LIB linear admission and source-strategy satisfaction;
-the SMT finite adapter retains the selected plan and its existing definition hints.
+The same policy serves DIMACS, WCNF, OPB, XCSP3, exact or original-real FlatZinc,
+SMT-LIB linear admission and source-strategy satisfaction. Finite format adapters
+retain the selected route and their existing definition, Boolean-fold, functional
+objective and search hints. Arithmetic adapters render original exact coordinates;
+XCSP3 objective values beyond binary64's exact integral range retain their original units.
 `PreparedSourceInvocation` retains the actual selected route, source plan and operation admission. Its
 `finiteShape()` supplies the same captured plan to `FiniteSolveRequest` and
 `FinitePipeline.solve`; it does not select a second route. An explicit enumeration
@@ -112,7 +115,8 @@ and objective units. Captured interpretation does not upgrade a native claim bey
 its producing model and proof scope; source-specific transfer qualification still applies.
 `executionKind` inspects the installed family; library policy owns
 unsupported-linear optimization fallback to source-checked heuristic execution on the
-same prepared plan. The MiniZinc finite invocation path, SMT linear admission and
+same prepared plan. Exact and original-real FlatZinc use the same arithmetic fallback
+as SMT-LIB linear admission. Those paths, the MiniZinc finite invocation path and
 source-strategy arithmetic satisfaction consume this dispatcher. Legacy source-specific
 entries retain their existing execution surfaces; other input carriers and common
 parameter interpretation have separate adapters.

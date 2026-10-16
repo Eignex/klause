@@ -4,6 +4,7 @@ import com.eignex.klause.formats.opb.opbSemantics
 import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.formats.opb.toProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.toLinearObjective
 
 /**
  * OPB/WBO pseudo-Boolean front-end (`.opb`, `.wbo`). Satisfaction (`SAT`), optimisation (`min:`),
@@ -33,11 +34,9 @@ internal object OpbMode : CliMode {
             // `Problem.numBoolVars` also counts.
             val render: (Sample) -> String = { s -> renderPbModel(parsed.numDeclaredVars, s) }
             // OPB objectives are minimisations; there is no maximisation form.
-            return linearSolvable(
-                parsed.problem,
-                parsed.objective,
-                maximize = false,
-                render,
+            return sourceSolvable(
+                parsed.problem, parsed.objective?.toLinearObjective(), false, common, render,
+                { assignment -> renderPbModel(parsed.numDeclaredVars, assignment::boolValue) },
                 boolFolds = parsed.boolFolds,
             )
         }
@@ -48,9 +47,11 @@ internal object OpbMode : CliMode {
 
 /** Render a PB-competition `v <literals>` line: each variable `xi` (1-based) as `xi` when true,
  *  `-xi` when false. */
-internal fun renderPbModel(numVars: Int, s: Sample): String = buildString {
+internal fun renderPbModel(numVars: Int, s: Sample): String = renderPbModel(numVars, s::boolValue)
+
+private fun renderPbModel(numVars: Int, boolValue: (Int) -> Boolean): String = buildString {
     append("v")
-    for (v in 0 until numVars) append(if (s.boolValue(v)) " x${v + 1}" else " -x${v + 1}")
+    for (v in 0 until numVars) append(if (boolValue(v)) " x${v + 1}" else " -x${v + 1}")
 }
 
 /** PB-competition output protocol. Incumbent `o` costs stream live; the final `s` status and the
