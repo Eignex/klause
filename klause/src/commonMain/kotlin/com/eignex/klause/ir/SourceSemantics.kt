@@ -217,8 +217,9 @@ class EffectiveSourceSemantics internal constructor(
     val hasOverrides: Boolean get() = declared != effective
 
     /**
-     * Whether source checking requires a grid or a positive tolerance. False does not establish
-     * witness validity, completeness, refutation authority or an independently checked proof.
+     * Whether policy declares grid defaults or a positive tolerance. Individual components can
+     * retain exact representations. This flag establishes no witness validity, completeness,
+     * refutation authority or independently checked proof.
      */
     val isApproximate: Boolean
         get() = effective.floats is FloatSemantics.Grid || effective.feasibilityTolerance?.isExact == false
