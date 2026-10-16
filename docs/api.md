@@ -133,9 +133,18 @@ must match the operation and cannot be replaced. `sourceLinearObjective` exposes
 original exact descriptor; working scales and auxiliary cost columns remain private.
 
 `PreparedSourceInvocation` retains the actual selected route, source plan and operation admission. Its
-`finiteShape()` supplies the same captured plan to `FiniteSolveRequest` and
-`FinitePipeline.solve`; it does not select a second route. An explicit enumeration
+`finiteShape()` supplies the captured engine plan to `FiniteSolveRequest` and
+`FinitePipeline.solve`; it does not repeat routing. An explicit enumeration
 operation remains enumeration under a cap of one.
+
+An internally selected private float grid retains the canonical `route` and
+`preparedPlan`, with a separate engine plan for its private model. Its immutable
+`floatProjection` describes original-real and private bucket namespaces and exact
+objective units. `FiniteSolveResult.outcome` reports only source-qualified points and
+claims; `nativeGridOutcome` separately retains the unmodified private-grid outcome,
+including refutations and optima without an original-source transfer. Neither metadata
+nor one checked source point establishes global completeness. Ordinary
+`SourceSetup.prepare` does not implicitly select a grid for complete/exact consumers.
 
 `SourceSetup.execute(SourceExecutionRequest(invocation, ...))` dispatches that captured
 operation. Finite callers supply their existing full `FiniteSolveRequest` factory over

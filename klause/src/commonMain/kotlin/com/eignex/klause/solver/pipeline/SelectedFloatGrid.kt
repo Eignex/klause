@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.projection.FloatGridDecline
 import com.eignex.klause.solver.projection.FloatGridObjective
 import com.eignex.klause.solver.projection.FloatGridPreparation
@@ -25,7 +27,10 @@ internal class SelectedFloatGridBinding(
     val projection: FloatGridPreparation.Prepared,
     val route: SourceProblemRoute.Finite,
     val objective: FloatGridObjective?,
-)
+    val sourceChecker: BakedProblem,
+) {
+    val metadata = SourceFloatProjection(this)
+}
 
 internal enum class SelectedGridDecline { SOURCE_REFUTED, CONSUMER, PROJECTION, OBJECTIVE, ENGINE_PLAN, RESOURCE }
 
@@ -43,6 +48,9 @@ internal fun SourceSetup.prepareSelectedFloatGrid(
     invocation.requireUnselectedFloatGrid()
     val stop = invocation.cancellation
     if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
+    if (invocation.source.factorProblem == null || invocation.request.quadraticObjective != null) {
+        return SelectedFloatGridPreparation.Declined(SelectedGridDecline.CONSUMER)
+    }
     if (invocation.route == SourceProblemRoute.Refuted) {
         return SelectedFloatGridPreparation.Declined(SelectedGridDecline.SOURCE_REFUTED)
     }
@@ -82,7 +90,9 @@ internal fun SourceSetup.prepareSelectedFloatGrid(
     }
     if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
     val route = SourceProblemRoute.Finite(projection.problem, ownership, plan)
-    invocation.bindFloatGrid(SelectedFloatGridBinding(consumer, projection, route, objective), nativeObjective)
+    val checker = invocation.source.problem.bake(consumer.providers, stop)
+    if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
+    invocation.bindFloatGrid(SelectedFloatGridBinding(consumer, projection, route, objective, checker), nativeObjective)
     return SelectedFloatGridPreparation.Prepared(invocation)
 }
 

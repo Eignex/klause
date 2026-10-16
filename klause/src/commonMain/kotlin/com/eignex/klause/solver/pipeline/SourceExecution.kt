@@ -220,7 +220,7 @@ sealed class SourceExecutionResult protected constructor(
 
 /** Inspect the selected execution family without allocating a worker or changing the source plan. */
 fun SourceSetup.executionKind(invocation: PreparedSourceInvocation): SourceExecutionKind =
-    when (val route = invocation.route) {
+    when (val route = invocation.engineRoute) {
         is SourceProblemRoute.NativeFormula -> when (invocation.source.formula) {
             is AttachedSourceFormula.Linear -> SourceExecutionKind.NUMERICAL
             is AttachedSourceFormula.IntegerPolynomial -> SourceExecutionKind.NONLINEAR_INTEGER
@@ -261,6 +261,7 @@ private fun executeCapturedSource(
     bindScope: ((Cancellation, Boolean) -> Unit)? = null,
 ): SourceExecutionResult {
     val invocation = request.invocation
+    invocation.freezeExecution()
     val kind = SourceSetup.executionKind(invocation)
     if (invocation.operation !in setOf(
             ExecutionOperation.SATISFY,
@@ -281,7 +282,7 @@ private fun executeCapturedSource(
         "native function controls require their captured function source"
     }
     val engine = invocation.request.engine
-    return when (val route = invocation.route) {
+    return when (val route = invocation.engineRoute) {
         is SourceProblemRoute.NativeFormula -> executeNativeSource(request, route, callbacks)
 
         is SourceProblemRoute.Finite -> {

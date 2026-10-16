@@ -34,6 +34,17 @@ bounds and supported exact factor relations, including strict and reified rows.
 Missing rational coordinates or a factor without a complete checker remains
 indeterminate. Algebraic, symbolic and arbitrary-width source checks retain their
 existing specialized owners; a finite checker does not reinterpret those values.
+The cancellation-aware overload charges coordinate, factor, row and finite-choice
+visits to its caller. Rational powers use the same containing token and do not open
+another arithmetic allowance. Interruption withholds acceptance.
+
+`verifyProjectedSourceWitness` combines that exact real check, or the caller's full
+effective source acceptance policy, with original integer declarations and a private
+composed fixpoint from the captured source providers. Explicit enforcing peers cover
+only real relations already checked in the original frame. A private-grid relation
+cannot certify its own original real relation, and a rejected point supplies no
+source refutation. [Private float projections](../model.md#private-float-projections)
+own namespace reconstruction and native-result qualification.
 
 The same exact point check validates integer absolute-value and distinctness
 relations before returning from a source with no real coordinates. `AllDifferent`

@@ -62,6 +62,7 @@ class SourceAttachment private constructor(
         this(null, AttachedSourceFormula.Functions(problem), emptyList(), null, settings)
 
     internal val problem: Problem get() = requireNotNull(factorSource) { "source attachment contains a native formula" }
+    internal val factorProblem: Problem? get() = factorSource
     internal val providers: FactorProjectionProviders = (factorSource as? BakedProblem)?.projectionProviders
         ?: FactorProjectionProviders.Default
     private val definitions = definitionHints.toList()

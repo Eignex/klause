@@ -182,6 +182,12 @@ class Sample private constructor(
 
     internal var witnessCertificate: EvidenceCertificate? = null
     private var capturedSemantics: EffectiveSourceSemantics? = null
+    private var capturedFrame: Any? = null
+
+    /** Coordinate namespace identity, without feasibility or proof authority. */
+    val coordinateFrame: Any? get() = capturedFrame
+
+    internal fun withCoordinateFrame(frame: Any): Sample = copy().also { it.capturedFrame = frame }
 
     /**
      * Effective source policy retained by a source-bound result, or null for an unbound sample.
@@ -267,6 +273,7 @@ class Sample private constructor(
         ) {
             it.witnessCertificate = witnessCertificate
             it.capturedSemantics = capturedSemantics
+            it.capturedFrame = capturedFrame
         }
     }
 
