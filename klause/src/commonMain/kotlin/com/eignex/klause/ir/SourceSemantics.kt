@@ -1,15 +1,40 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.signum
 
 /** Syntax owner of a source model; this identity selects no execution mechanism. */
 enum class SourceFormat {
-    IR, SCHEMA, FLATZINC, SMTLIB, MPS, XCSP3, OPB, DIMACS, WCNF,
+    /** Programmatically constructed engine-neutral models. */
+    IR,
+    /** Typed schema declarations. */
+    SCHEMA,
+    /** FlatZinc source syntax. */
+    FLATZINC,
+    /** SMT-LIB source syntax. */
+    SMTLIB,
+    /** MPS decimal linear models. */
+    MPS,
+    /** XCSP3 integer constraint syntax. */
+    XCSP3,
+    /** OPB and WBO pseudo-Boolean syntax. */
+    OPB,
+    /** DIMACS conjunctive normal form. */
+    DIMACS,
+    /** Weighted conjunctive normal form. */
+    WCNF,
 }
 
 /** Interpretation of real literals before any numerical execution projection. */
 enum class NumericAuthority {
-    EXACT_VALUES, BINARY64_LITERALS, DECIMAL_LITERALS, RATIONAL_LITERALS,
+    /** Exact values explicitly supplied by the model producer. */
+    EXACT_VALUES,
+    /** Exact rational interpretation of parsed binary64 values. */
+    BINARY64_LITERALS,
+    /** Exact rational interpretation of decimal source tokens. */
+    DECIMAL_LITERALS,
+    /** Exact rational interpretation of rational source terms. */
+    RATIONAL_LITERALS,
 }
 
 /** Default range of an integer declaration with no source range; null endpoints remain open. */
@@ -27,9 +52,9 @@ data class UndeclaredIntegerBounds(
 /** Default range of a real declaration with no source range; null endpoints remain open. */
 data class UndeclaredRealBounds(
     /** Inclusive finite lower endpoint, or null for no lower bound. */
-    val lower: BigFraction? = null,
+    val lower: SemanticRational? = null,
     /** Inclusive finite upper endpoint, or null for no upper bound. */
-    val upper: BigFraction? = null,
+    val upper: SemanticRational? = null,
 ) {
     init {
         require(lower == null || upper == null || lower <= upper) { "real lower bound exceeds upper bound" }
@@ -49,7 +74,7 @@ sealed interface FloatSemantics {
         val linearScale: Long,
         /** Approximation window for a float without a declared finite range. */
         val unrangedBounds: UndeclaredRealBounds = UndeclaredRealBounds(
-            BigFraction.ofLong(-1_000_000), BigFraction.ofLong(1_000_000),
+            SemanticRational.ofLong(-1_000_000), SemanticRational.ofLong(1_000_000),
         ),
     ) : FloatSemantics {
         init {
@@ -69,17 +94,17 @@ sealed interface FloatSemantics {
  */
 data class SourceTolerance(
     /** Minimum permitted absolute slack in source units. */
-    val absolute: BigFraction = BigFraction.ZERO,
+    val absolute: SemanticRational = SemanticRational.ZERO,
     /** Permitted slack relative to the checked source scale. */
-    val relative: BigFraction = BigFraction.ZERO,
+    val relative: SemanticRational = SemanticRational.ZERO,
 ) {
     init {
-        require(absolute.signum() >= 0) { "absolute tolerance must be nonnegative" }
-        require(relative.signum() >= 0) { "relative tolerance must be nonnegative" }
+        require(absolute.numerator.signum() >= 0) { "absolute tolerance must be nonnegative" }
+        require(relative.numerator.signum() >= 0) { "relative tolerance must be nonnegative" }
     }
 
     /** Whether no source feasibility slack is permitted. */
-    val isExact: Boolean get() = absolute.isZero && relative.isZero
+    val isExact: Boolean get() = absolute.numerator.isZero() && relative.numerator.isZero()
 }
 
 /**
@@ -174,7 +199,7 @@ data class SemanticOverrides(
     /** Replacement default integer endpoints, including explicit opening. */
     val undeclaredIntegers: BoundsOverride<Long>? = null,
     /** Replacement default real endpoints, including explicit opening. */
-    val undeclaredReals: BoundsOverride<BigFraction>? = null,
+    val undeclaredReals: BoundsOverride<SemanticRational>? = null,
     /** Replacement absolute and relative source feasibility slack. */
     val feasibilityTolerance: SourceTolerance? = null,
     /** Replacement absent-value canonicalization. */
