@@ -105,8 +105,8 @@ internal class QfNraQuery(
                             MAX_WITNESS_DEGREE, MAX_WITNESS_BITS) ||
                         refutePolynomialConsequences(normalized, arithmetic, MAX_WITNESS_ATOMS, MAX_WITNESS_TERMS,
                             MAX_WITNESS_BITS) ||
-                        boolCount <= MAX_WITNESS_BOOLS && normalized.refuteBooleans(arithmetic, MAX_WITNESS_ATOMS,
-                            MAX_WITNESS_TERMS, MAX_WITNESS_BITS)
+                        (boolCount <= MAX_WITNESS_BOOLS && normalized.refuteBooleans(arithmetic, MAX_WITNESS_ATOMS,
+                            MAX_WITNESS_TERMS, MAX_WITNESS_BITS))
                     )
                 if (refuted) null else WitnessProbe(normalized, boolCount, arithmetic, algebraic, work)
                     .probeWitness(realCount, fixed, work::coupled)
