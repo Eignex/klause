@@ -248,6 +248,21 @@ class CpToLpRelaxationHullTest {
     }
 
     @Test
+    fun `nvalue hull should omit excepted values from the count while retaining their selectors`() {
+        for ((except, expected) in listOf(longArrayOf(0) to 1.0, longArrayOf(0, 2) to 0.0)) {
+            val problem = Problem(0, 3, arrayOf(IntDomain(0, 0), IntDomain(2, 2), IntDomain(0, 2)),
+                arrayOf(NValue(2, intArrayOf(0, 1), exceptSet = except)))
+            val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 1))
+
+            val hull = solveLp(CpToLpRelaxation(problem, objective, nValueHull = true)
+                .build(PropagationSession(problem)).model)
+
+            assertEquals(FloatLpStatus.OPTIMAL, hull.status)
+            assertEquals(expected, hull.objectiveValue, eps)
+        }
+    }
+
+    @Test
     fun `gcc count hull should capture the joint count sum the per-count propagator misses`() {
         val p = gccProblem()
         val session = PropagationSession(p)

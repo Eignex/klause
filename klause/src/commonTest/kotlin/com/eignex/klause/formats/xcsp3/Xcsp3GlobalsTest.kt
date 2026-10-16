@@ -3,6 +3,7 @@ package com.eignex.klause.formats.xcsp3
 import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
 import com.eignex.klause.factor.global.Increasing
+import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
@@ -54,6 +55,30 @@ class Xcsp3GlobalsTest {
     }
 
     private val threeVars = """<var id="x">1..3</var><var id="y">1..3</var><var id="z">1..3</var>"""
+
+    @Test
+    fun `nValues except should retain one relation across wide source domains`() {
+        val parsed = parse(
+            "<nValues><list>x y</list><except>0 2</except><condition>(eq,k)</condition></nValues>",
+            """<var id="x">-2147483648..2147483647</var><var id="y">0..2</var><var id="k">0..2</var>""",
+        )
+        val relation = factorsOf(parsed).filterIsInstance<NValue>().single()
+
+        assertContentEquals(longArrayOf(0, 2), relation.exceptSet)
+        assertContentEquals(intArrayOf(parsed.intVarNames.getValue("x"), parsed.intVarNames.getValue("y")), relation.xs)
+        assertEquals(0, parsed.problem.numBoolVars)
+    }
+
+    @Test
+    fun `nValues except should count each remaining source value once`() {
+        val parsed = parse(
+            "<nValues><list>x y</list><except>0</except><condition>(eq,1)</condition></nValues>",
+            """<var id="x">0..2</var><var id="y">0..2</var>""",
+        )
+
+        assertEquals(setOf(listOf(0L, 1L), listOf(1L, 0L), listOf(1L, 1L),
+            listOf(0L, 2L), listOf(2L, 0L), listOf(2L, 2L)), solutions(parsed, 2))
+    }
 
     @Test
     fun `matrix results should follow coordinate and selected cell moves`() {

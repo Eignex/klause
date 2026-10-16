@@ -18,9 +18,10 @@ internal class NValueInvariant(
     private val xs: IntArray,
     private val mode: NValue.Mode,
     private val presents: IntArray,
+    private val exceptValues: Set<Long>,
     private val presentNvInvFn: (LocalSearchState, Int) -> Boolean,
 ) : Invariant {
-    private val eliminationMoves = NValueEliminationMoves(n, xs, mode, presents, presentNvInvFn)
+    private val eliminationMoves = NValueEliminationMoves(n, xs, mode, presents, exceptValues, presentNvInvFn)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         val counts = MutableLongIntMap()
@@ -30,7 +31,7 @@ internal class NValueInvariant(
             val value = state.assignment.intValue(xs[i])
             val prev = counts.getOrDefault(value, 0)
             counts.put(value, prev + 1)
-            if (prev == 0) distinct++
+            if (prev == 0 && value !in exceptValues) distinct++
         }
         state.refPayload[factorId] = NValueState(counts, distinct)
     }
@@ -67,12 +68,12 @@ internal class NValueInvariant(
             val after = oldCount - occurrences
             if (after == 0) {
                 s.counts.remove(oldValue)
-                s.distinctCount--
+                if (oldValue !in exceptValues) s.distinctCount--
             } else {
                 s.counts.put(oldValue, after)
             }
             val newCount = s.counts.getOrDefault(cur, 0)
-            if (newCount == 0) s.distinctCount++
+            if (newCount == 0 && cur !in exceptValues) s.distinctCount++
             s.counts.put(cur, newCount + occurrences)
         }
         val afterDeg = nvDegree(s.distinctCount, state.assignment.intValue(n))
@@ -96,8 +97,8 @@ internal class NValueInvariant(
         touched.forEach { value, delta ->
             val cntBefore = s.counts.getOrDefault(value, 0)
             val cntAfter = cntBefore + delta
-            if (cntBefore == 0 && cntAfter > 0) distinct++
-            if (cntBefore > 0 && cntAfter == 0) distinct--
+            if (cntBefore == 0 && cntAfter > 0 && value !in exceptValues) distinct++
+            if (cntBefore > 0 && cntAfter == 0 && value !in exceptValues) distinct--
         }
         return compressViolation(nvDegree(distinct, nVal), state.violationSoftCap) -
             compressViolation(before, state.violationSoftCap)
@@ -114,14 +115,14 @@ internal class NValueInvariant(
             val value = state.assignment.intValue(xs[i])
             if (nowP) {
                 val before = s.counts.getOrDefault(value, 0)
-                if (before == 0) s.distinctCount++
+                if (before == 0 && value !in exceptValues) s.distinctCount++
                 s.counts.put(value, before + 1)
             } else {
                 if (!s.counts.containsKey(value)) error("nvalue: absent flip without prior count")
                 val after = s.counts.getOrDefault(value, 0) - 1
                 if (after == 0) {
                     s.counts.remove(value)
-                    s.distinctCount--
+                    if (value !in exceptValues) s.distinctCount--
                 } else {
                     s.counts.put(value, after)
                 }
@@ -155,11 +156,11 @@ internal class NValueInvariant(
             for (i in xs.indices) {
                 if (!presentNvInvFn(state, i)) continue
                 val cur = state.assignment.intValue(xs[i])
-                if (s.counts.getOrDefault(cur, 0) <= 1) continue
+                if (cur !in exceptValues && s.counts.getOrDefault(cur, 0) <= 1) continue
                 val d = state.rootDomains[xs[i]]
                 var pick: Long? = null
                 d.forEachCandidate(state.rng) {
-                    if (pick == null && it != cur && s.counts.getOrDefault(it, 0) == 0) pick = it
+                    if (pick == null && it != cur && it !in exceptValues && s.counts.getOrDefault(it, 0) == 0) pick = it
                 }
                 val p = pick
                 if (p != null) sink.addChannelingIntSet(state, xs[i], p)
@@ -169,11 +170,11 @@ internal class NValueInvariant(
             for (i in xs.indices) {
                 if (!presentNvInvFn(state, i)) continue
                 val cur = state.assignment.intValue(xs[i])
-                if (s.counts.getOrDefault(cur, 0) > 1) continue
+                if (cur in exceptValues || s.counts.getOrDefault(cur, 0) > 1) continue
                 val d = state.rootDomains[xs[i]]
                 var pick: Long? = null
                 d.forEachCandidate(state.rng) {
-                    if (pick == null && it != cur && s.counts.getOrDefault(it, 0) > 0) pick = it
+                    if (pick == null && it != cur && (it in exceptValues || s.counts.getOrDefault(it, 0) > 0)) pick = it
                 }
                 val p = pick
                 if (p != null) sink.addChannelingIntSet(state, xs[i], p)
@@ -196,13 +197,13 @@ internal class NValueInvariant(
             var occ = 0
             for (j in xs.indices) if (xs[j] == xs[i] && presentNvInvFn(state, j)) occ++
             val cv = s.counts.getOrDefault(v, 0)
-            val vDies = cv - occ == 0
+            val vDies = v !in exceptValues && cv - occ == 0
             val d = state.rootDomains[xs[i]]
             var pick: Long? = null
             var seen = 0
             d.forEachCandidate(state.rng) { w ->
                 if (w != v) {
-                    val wBorn = s.counts.getOrDefault(w, 0) == 0
+                    val wBorn = w !in exceptValues && s.counts.getOrDefault(w, 0) == 0
                     if (vDies == wBorn && (xs[i] != n || nvDegree(s.distinctCount, w) == 0L)) {
                         seen++
                         if (state.rng.nextInt(seen) == 0) pick = w
@@ -222,7 +223,10 @@ internal class NValueInvariant(
             state.assignment.setInt(xs[i], state.rootDomains[xs[i]].min)
         }
         val seen = LongHashSet()
-        for (i in xs.indices) if (presentNvInvFn(state, i)) seen.add(state.assignment.intValue(xs[i]))
+        for (i in xs.indices) {
+            val value = state.assignment.intValue(xs[i])
+            if (presentNvInvFn(state, i) && value !in exceptValues) seen.add(value)
+        }
         val distinct = seen.size
         val nDom = state.rootDomains[n]
         val target = when (mode) {
@@ -249,9 +253,9 @@ internal class NValueInvariant(
         if (old == newValue) return s.distinctCount
         var distinct = s.distinctCount
         val oldCount = s.counts.getOrDefault(old, 0)
-        if (oldCount - occurrences == 0) distinct--
+        if (oldCount - occurrences == 0 && old !in exceptValues) distinct--
         val newCount = s.counts.getOrDefault(newValue, 0)
-        if (newCount == 0) distinct++
+        if (newCount == 0 && newValue !in exceptValues) distinct++
         return distinct
     }
 

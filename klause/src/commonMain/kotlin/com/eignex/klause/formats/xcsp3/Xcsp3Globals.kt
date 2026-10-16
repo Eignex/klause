@@ -996,34 +996,16 @@ internal fun Compiler.Builder.knapsack(e: XmlElement) {
 internal fun Compiler.Builder.nValues(e: XmlElement) {
     val vars = listVars(e)
     val condText = requireNotNull(e.child("condition")).textContent.trim()
-    // Constant bounds without <except> use native NValue, avoiding O(range * arity) indicators.
-    // Variable bounds retain per-value indicators for a tight objective relaxation;
-    // <except> requires them because native NValue counts every distinct value.
-    val constBound = splitCondition(condText).second.toIntOrNull() != null
-    val cnt = if (constBound && e.child("except") == null) {
-        newAuxVar(0L, vars.size.toLong()).also { factors.add(NValue(n = it, xs = vars, mode = NValue.Mode.Eq)) }
-    } else {
-        distinctCountVar(vars, (parseInts(e.child("except")?.textContent)?.toSet()).orEmpty())
-    }
+    val except = parseInts(e.child("except")?.textContent)?.toSet().orEmpty()
+    val cnt = distinctCountVar(vars, except)
     postCondition(intArrayOf(1), intArrayOf(cnt), condText)
 }
 
-/** A fresh int var equal to the count of distinct values taken across [vars], decomposed as
- *  `Σ used(v)` where `used(v) = 1` iff some variable equals `v`. Values in [except] are not
- *  counted (XCSP3 `nValues` with `<except>`). */
 internal fun Compiler.Builder.distinctCountVar(vars: IntArray, except: Set<Int> = emptySet()): Int {
-    val loV = vars.minOf { domains[it].min }
-    val hiV = vars.maxOf { domains[it].max }
-    val used = ArrayList<Int>()
-    for (v in loV..hiV) {
-        val vi = v.toInt()
-        if (vi in except) continue
-        val eqLits = vars.map { reifyLinear(intArrayOf(1), intArrayOf(it), LinearOp.EQ, vi) }
-        used.add(litTo01(tseitinOr(eqLits)))
+    val cnt = newAuxVar(0L, vars.size.toLong())
+    if (vars.isNotEmpty()) {
+        factors.add(NValue(n = cnt, xs = vars, exceptSet = except.map { it.toLong() }.toLongArray()))
     }
-    val cnt = newAuxVar(0L, used.size.toLong())
-    val coeffs = IntArray(used.size + 1) { if (it < used.size) 1 else -1 }
-    factors.add(Linear(coeffs, (used + cnt).toIntArray(), LinearOp.EQ, 0))
     return cnt
 }
 

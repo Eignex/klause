@@ -26,6 +26,7 @@ internal fun NValue.emitLpRelaxation(builder: RelaxationBuilder) {
     var cells = 0L
     for (x in xs) cells += builder.rootDomain(x).values.size.toLong()
     if (cells == 0L || cells > MAX_NVALUE_CELLS) return
+    val exceptValues = exceptSet.toSet()
     val yCols = IntArrayList()
     val yByValue = MutableLongIntMap()
     fun yOf(v: Long): Int {
@@ -58,7 +59,9 @@ internal fun NValue.emitLpRelaxation(builder: RelaxationBuilder) {
             )
             sel.add(z)
             selVal.add(v)
-            builder.row(intArrayOf(z, yOf(v)), longArrayOf(1L, -1L), LinearOp.LE, 0L, Contribution.HULL) // y_v ≥ z
+            if (v !in exceptValues) {
+                builder.row(intArrayOf(z, yOf(v)), longArrayOf(1L, -1L), LinearOp.LE, 0L, Contribution.HULL)
+            }
         }
         val k = sel.size
         if (k == 0) return // a variable with no values in its root box — leave it to propagation
@@ -74,7 +77,6 @@ internal fun NValue.emitLpRelaxation(builder: RelaxationBuilder) {
         cVals[k] = -1L
         builder.row(cCols, cVals, LinearOp.EQ, 0L, Contribution.HULL)
     }
-    if (yCols.isEmpty()) return
     val op = when (mode) {
         NValue.Mode.Eq -> LinearOp.EQ
         NValue.Mode.AtMost -> LinearOp.LE

@@ -25,6 +25,12 @@ shared AND indicators and source conjunction semantics.
 
 ## XCSP3 lowering
 
+XCSP3 `nValues` retains `NValue`, including `<except>`, constant or variable
+conditions and distinct-count objectives. The frontend allocates one count coordinate
+and its source condition without enumerating the domain's value span. Excluded
+values remain factor data; propagation, local search and the selected LP hull consume
+the [distinct-value count relation](../model.md#distinct-value-counts).
+
 Integer intension `pow(base, exponent)` retains `Power` with a fixed nonnegative
 integer exponent. Compound operands receive source equalities; materialized output
 bounds must fit the signed-word representation. Variable, negative and fractional

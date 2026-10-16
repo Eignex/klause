@@ -114,7 +114,7 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
     is Mdd -> MddInvariant(seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost)
 
     is NValue -> NValueInvariant(
-        n, xs, mode, presents,
+        n, xs, mode, presents, exceptSet.toSet(),
         { state, idx -> OptionalPresence.isPresentInAssignment(presents, idx, state) },
     )
 
