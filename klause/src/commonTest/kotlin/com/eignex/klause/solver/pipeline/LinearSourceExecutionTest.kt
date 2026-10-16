@@ -64,7 +64,7 @@ class LinearSourceExecutionTest {
         assertEquals(BigFraction.ofLong(10), outcome.objectiveScale)
         assertEquals(BigFraction.ofLong(31), result.result.value)
         assertIs<SourceClaim.Optimal>(assertNotNull(result.result.terminal).claim)
-        assertEquals(BigFraction.ofLong(31) / BigFraction.ofLong(10), points.last().objective)
+        assertEquals(BigFraction.ofLong(31) * BigFraction.ofLong(10).reciprocal(), points.last().objective)
         assertEquals(points.last().objective, outcome.incumbent?.objective)
         assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
         assertTrue(outcome.claimsCoverTolerance)
@@ -162,7 +162,7 @@ class LinearSourceExecutionTest {
         val outcome = assertNotNull(result.linearSource)
         assertSame(source, outcome.source)
         assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
-        assertEquals(BigFraction.ofLong(11) / BigFraction.ofLong(10), outcome.incumbent?.objective)
+        assertEquals(BigFraction.ofLong(11) * BigFraction.ofLong(10).reciprocal(), outcome.incumbent?.objective)
         assertEquals(outcome.incumbent?.objective, values.last().objective)
         assertEquals(BigFraction.ofLong(30), outcome.objectiveScale)
         assertEquals(FiniteSolveVerdict.OPTIMAL,
@@ -213,5 +213,38 @@ class LinearSourceExecutionTest {
 
         assertSame(failure, thrown)
         assertEquals(LinearSourceConclusion.SATISFIABLE, assertNotNull(retry.linearSource).conclusion)
+    }
+
+    @Test
+    fun `finite real publication should exclude a private objective column from original coordinates`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false, BigFraction.ZERO, BigFraction.ONE)), emptyList(),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, BigFraction.ofLong(10).reciprocal())),
+                BigFraction.ofLong(3) * BigFraction.ofLong(10).reciprocal()),
+            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+                absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
+            )).resolve(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
+        ))
+
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+            FiniteSolveRequest(
+                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
+                randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
+            )
+        }))
+
+        val point = assertNotNull(assertNotNull(result.linearSource).incumbent)
+        assertEquals(1, point.values.size)
+        assertEquals(BigFraction.ZERO, point.values.single())
+        assertEquals(BigFraction.ofLong(3) * BigFraction.ofLong(10).reciprocal(), point.objective)
+        assertEquals(1, assertNotNull(invocation.preparedPlan).sourceRealCount)
+        assertEquals(2, assertNotNull(invocation.preparedPlan).model?.numRealVars)
     }
 }

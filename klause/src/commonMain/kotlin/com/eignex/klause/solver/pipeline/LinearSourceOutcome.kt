@@ -109,7 +109,7 @@ private fun AlgebraicReal.linearRational(): BigFraction? {
     rational?.let { return it }
     val coefficients = definingCoefficients
     return if (coefficients.size == 2 && !coefficients[1].isZero) {
-        coefficients[0].negated() / coefficients[1]
+        coefficients[0].negated() * coefficients[1].reciprocal()
     } else null
 }
 

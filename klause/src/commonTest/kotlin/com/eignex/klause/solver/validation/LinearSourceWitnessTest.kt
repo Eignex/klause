@@ -96,7 +96,7 @@ class LinearSourceWitnessTest {
 
         val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(3)), Cancellation.Never)
 
-        assertEquals(BigFraction.ofLong(11) / BigFraction.ofLong(10),
+        assertEquals(BigFraction.ofLong(11) * BigFraction.ofLong(10).reciprocal(),
             assertIs<LinearSourceCheck.Accepted>(result).witness.objective)
     }
 
