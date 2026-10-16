@@ -30,10 +30,10 @@ class SmtLibExprTest {
     }
 
     @Test
-    fun `directly asserted Boolean bindings should retain their enclosing values`() {
+    fun `directly asserted Boolean bindings should retain outer local values`() {
         val source = parse(
-            "(declare-const p Bool) (assert p) " +
-                "(assert (let ((bound p)) (let ((p false)) bound)))",
+            "(declare-const p Bool) (assert (not p)) " +
+                "(assert (let ((p true)) (let ((bound p)) (let ((p false)) bound))))",
         )
 
         val result = BacktrackSolver(source).solve()
