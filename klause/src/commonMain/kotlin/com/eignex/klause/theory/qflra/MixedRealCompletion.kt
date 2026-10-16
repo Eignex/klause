@@ -65,6 +65,7 @@ internal fun completeMixedRealComponents(
             if (stop()) return null
             (result as? RealDifferenceSystem.Result.Feasible)?.point
         } else {
+            onStage?.invoke("RECOVERY_REAL_COMPONENT_SHAPE_${component.size}_${localRows.size}")
             if (!budget.admitsDimensions(component.size, localRows.size.toLong())) {
                 onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_DIMENSION")
                 return null

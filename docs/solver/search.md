@@ -824,7 +824,9 @@ pivots, reconstructed guesses and failed full-row checks. Its residual observati
 separate unsupported rows, false constants, graph admission and graph points. A false
 residual belongs to guessed integers and establishes no source refutation. Real
 component observations identify graph checks, source-LP dimension declines and requests,
-and points returned across every component. A source-LP request can still decline
+and points returned across every component. `RECOVERY_REAL_COMPONENT_SHAPE_<columns>_<rows>`
+records the compact dimensions of a general component before LP admission.
+A source-LP request can still decline
 under its shared operation or work limits; it is not a numerical-call count. These are component stages, not full-source acceptance
 or explanations for UNKNOWN. A missing recovery attempt cannot identify which earlier
 stage stopped progress without the corresponding observations. Stage recording adds
