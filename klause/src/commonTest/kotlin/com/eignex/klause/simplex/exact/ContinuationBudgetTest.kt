@@ -19,12 +19,26 @@ class ContinuationBudgetTest {
 
         budget.step(units = 3L, bytes = 5L)
 
-        assertEquals(mapOf(ContinuationPhase.VERIFY to 3L, ContinuationPhase.INPUT to 7L,
-            ContinuationPhase.REPAIR to 0L), budget.workByPhase)
-        assertEquals(mapOf(ContinuationPhase.VERIFY to 5L, ContinuationPhase.INPUT to 11L,
-            ContinuationPhase.REPAIR to 0L), budget.allocationByPhase)
-        assertEquals(listOf(ContinuationPhase.VERIFY, ContinuationPhase.INPUT, ContinuationPhase.REPAIR),
-            budget.workByPhase.keys.toList())
+        assertEquals(
+            mapOf(
+                ContinuationPhase.VERIFY to 3L,
+                ContinuationPhase.INPUT to 7L,
+                ContinuationPhase.REPAIR to 0L,
+            ),
+            budget.workByPhase,
+        )
+        assertEquals(
+            mapOf(
+                ContinuationPhase.VERIFY to 5L,
+                ContinuationPhase.INPUT to 11L,
+                ContinuationPhase.REPAIR to 0L,
+            ),
+            budget.allocationByPhase,
+        )
+        assertEquals(
+            listOf(ContinuationPhase.VERIFY, ContinuationPhase.INPUT, ContinuationPhase.REPAIR),
+            budget.workByPhase.keys.toList(),
+        )
         assertEquals(10L, budget.work)
         assertEquals(16L, budget.allocation)
     }
@@ -48,7 +62,12 @@ class ContinuationBudgetTest {
 
     @Test
     fun `a declined charge retains all accounting at its accepted prefix`() {
-        for (reason in listOf(ContinuationDecline.CANCELLED, ContinuationDecline.WORK, ContinuationDecline.ALLOCATION)) {
+        val reasons = listOf(
+            ContinuationDecline.CANCELLED,
+            ContinuationDecline.WORK,
+            ContinuationDecline.ALLOCATION,
+        )
+        for (reason in reasons) {
             var cancelled = false
             val limits = ExactContinuationLimits(
                 maxWork = if (reason == ContinuationDecline.WORK) 2L else 100L,
