@@ -2,7 +2,6 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.lp.admittedSourcePoint
 import com.eignex.klause.lp.engine.reconstructRational
-import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
@@ -45,6 +44,7 @@ internal fun completeMixedPoint(
             !row.coefficients.admittedSourcePoint() || !listOf(row.rhs).admittedSourcePoint()
         ) return declined("RECOVERY_SOURCE_INPUT")
     }
+    val arithmetic = MixedPointArithmetic(stop)
     var realGuess: List<BigFraction>? = null
     for (reconstruct in listOf(false, true)) {
         val reals = ArrayList<BigFraction>(realColumns)
@@ -66,7 +66,7 @@ internal fun completeMixedPoint(
         val point = reals + integers
         stop.charge(rowWork)
         if (stop()) return declined("RECOVERY_STOPPED")
-        if (point.satisfiesSourceRows(rows, stop) && !stop()) {
+        if (arithmetic.satisfies(point, rows) && !stop()) {
             onStage?.invoke(if (reconstruct) "RECOVERY_RECONSTRUCTED_POINT" else "RECOVERY_IEEE_POINT")
             return point
         }
@@ -84,8 +84,8 @@ internal fun completeMixedPoint(
                 real += column
                 coefficients += row.coefficients[index]
             } else {
-                bound -= row.coefficients[index] * integers[column - realColumns]
-                if (!listOf(bound).admittedSourcePoint()) return declined("RECOVERY_RATIONAL_RANGE")
+                bound = arithmetic.subtractProduct(bound, row.coefficients[index], integers[column - realColumns])
+                    ?: return declined(if (stop()) "RECOVERY_STOPPED" else "RECOVERY_RATIONAL_RANGE")
             }
         }
         if (real.isEmpty()) {
@@ -107,7 +107,7 @@ internal fun completeMixedPoint(
             if (reals == null) continue
             val point = reals + integers
             stop.charge(rowWork)
-            if (!stop() && point.satisfiesSourceRows(rows, stop) && !stop()) {
+            if (!stop() && arithmetic.satisfies(point, rows) && !stop()) {
                 onStage?.invoke(if (difference) "RECOVERY_EQUALITY_RESIDUAL_POINT" else "RECOVERY_EQUALITY_POINT")
                 return point
             }
@@ -127,7 +127,7 @@ internal fun completeMixedPoint(
     }
     val point = reals + integers
     stop.charge(rowWork)
-    val valid = !stop() && point.satisfiesSourceRows(rows, stop) && !stop()
+    val valid = !stop() && arithmetic.satisfies(point, rows) && !stop()
     onStage?.invoke(if (valid) "RECOVERY_GRAPH_POINT" else "RECOVERY_GRAPH_NO_POINT")
     return point.takeIf { valid }
 }
