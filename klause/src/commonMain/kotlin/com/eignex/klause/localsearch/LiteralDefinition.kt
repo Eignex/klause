@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.Assignment
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 
 internal class LiteralIntDefinition(override val out: Int, val literal: Int) : SweepNode {
@@ -48,14 +49,27 @@ internal class EqualityPredicateDefinition(out: Int, input: Int, value: Long) :
 internal class ComparisonPredicateDefinition(out: Int, input: Int, value: Long, op: LinearOp) :
     UnaryPredicateDefinition(out, input, value, op)
 
-internal fun literalDefinitions(problem: Problem, hints: IntArray, nodes: List<SweepNode>): List<SweepNode> {
+internal fun literalDefinitions(
+    problem: Problem,
+    hints: IntArray,
+    nodes: List<SweepNode>,
+    cancellation: Cancellation = Cancellation.Never,
+): List<SweepNode> {
+    if (cancellation()) return emptyList()
     val hinted = BooleanArray(problem.numIntVars)
-    for (v in hints) if (v in hinted.indices) hinted[v] = true
+    for (v in hints) {
+        if (cancellation.definitionStopped()) return emptyList()
+        if (v in hinted.indices) hinted[v] = true
+    }
     val elementResults = BooleanArray(problem.numIntVars)
-    for (node in nodes) if (node is ElementResultDefinition) elementResults[node.out] = true
+    for (node in nodes) {
+        if (cancellation.definitionStopped()) return emptyList()
+        if (node is ElementResultDefinition) elementResults[node.out] = true
+    }
     val channelRows = BooleanArray(problem.numFactors)
     val channels = ArrayList<LiteralIntDefinition>()
     for (i in problem.factors.indices) {
+        if (cancellation.definitionStopped()) return emptyList()
         val row = problem.factors[i] as? ReifiedLinear ?: continue
         if (row.op != LinearOp.EQ || row.vars.size != 1 || !hinted[row.vars[0]]) continue
         if (elementResults[row.vars[0]]) continue
@@ -70,13 +84,17 @@ internal fun literalDefinitions(problem: Problem, hints: IntArray, nodes: List<S
         channels.add(LiteralIntDefinition(row.vars[0], literal))
         channelRows[i] = true
     }
-    if (channels.isEmpty()) return orderedDefinitions(problem, nodes)
+    if (channels.isEmpty()) return orderedDefinitions(problem, nodes, cancellation)
     val counts = IntArray(problem.numBoolVars)
     val sources = arrayOfNulls<ReifiedLinear>(problem.numBoolVars)
     for (i in problem.factors.indices) {
+        if (cancellation.definitionStopped()) return emptyList()
         if (channelRows[i]) continue
         val factor = problem.factors[i]
-        for (b in factor.boolVars) counts[b]++
+        for (b in factor.boolVars) {
+            if (cancellation.definitionStopped()) return emptyList()
+            counts[b]++
+        }
         val row = factor as? ReifiedLinear ?: continue
         if (row.vars.size != 1) continue
         val constants = row.integerConstants ?: continue
@@ -89,6 +107,7 @@ internal fun literalDefinitions(problem: Problem, hints: IntArray, nodes: List<S
     val predicates = ArrayList<UnaryPredicateDefinition>()
     val claimed = BooleanArray(problem.numBoolVars)
     for (channel in channels) {
+        if (cancellation.definitionStopped()) return emptyList()
         val b = Lit.variable(channel.literal)
         val row = sources[b] ?: continue
         if (counts[b] != 1 || claimed[b]) continue
@@ -104,6 +123,6 @@ internal fun literalDefinitions(problem: Problem, hints: IntArray, nodes: List<S
         else ComparisonPredicateDefinition(b, row.vars[0], value, op))
         claimed[b] = true
     }
-    return orderedDefinitions(problem, nodes + predicates + channels)
+    return orderedDefinitions(problem, nodes + predicates + channels, cancellation)
 }
 
