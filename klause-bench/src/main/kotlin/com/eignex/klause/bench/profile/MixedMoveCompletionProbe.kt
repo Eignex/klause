@@ -163,14 +163,18 @@ internal object MixedMoveCompletionProbe {
             val attempts = mutableListOf<JsonObject>()
             var lpVerdict: String? = null
             var lpStats: LpStats? = null
+            var floatPoint: Sample? = null
             val observe: (Any, LpStats) -> Unit = { verdict, stats ->
                 lpVerdict = verdict.toString()
                 lpStats = stats
             }
             adapter.methods.singleOrNull { it.name.startsWith("setObserveLp") }?.invoke(completion, observe)
+            val observeFloat: (Sample) -> Unit = { floatPoint = it }
+            adapter.methods.singleOrNull { it.name.startsWith("setObserveFloat") }?.invoke(completion, observeFloat)
             val observed = CandidateCompletion { candidate, cancellation ->
                 lpVerdict = null
                 lpStats = null
+                floatPoint = null
                 val started = System.nanoTime()
                 val result = (completion as CandidateCompletion).complete(candidate, cancellation)
                 val elapsed = System.nanoTime() - started
@@ -184,12 +188,27 @@ internal object MixedMoveCompletionProbe {
                     if (attempts.size < 16) put("finite", finite)
                     put("lpVerdict", lpVerdict)
                     put("lpStats", lpStats?.toString())
+                    floatPoint?.let { point ->
+                        val sourceValues = compiled.columns.map { column ->
+                            if (column.real) requireNotNull(BigFraction.ofDouble(point.approximateRealValue(column.id)))
+                            else BigFraction.ofLong(point.intValue(column.id))
+                        }
+                        val checked = runCatching { original.sourceWitness(sourceValues) }.getOrNull()
+                        put("floatExactlySourceFeasible", checked != null)
+                        if (attempts.size < 16) {
+                            put("floatWitness", "v " + compiled.columns.zip(sourceValues).joinToString(" ") {
+                                (column, value) -> "${column.name}=$value"
+                            })
+                            put("floatSourceObjective", checked?.objective?.toString())
+                        }
+                    }
                     put("verdict", result::class.simpleName)
                     put("work", result.work)
                 }
                 result
             }
-            val solver = LocalSearchSolver(compiled.model.bake(), completion = observed, greedyRepairOnRestart = false)
+            val solver = LocalSearchSolver(compiled.model.bake(), completion = observed,
+                greedyRepairOnRestart = initial == null)
             val begun = System.nanoTime()
             val results = solver.improvements(objective, LocalSearchParams(
                 maxInstructions = instructions, randomSeed = seed, initialAssignment = initial,

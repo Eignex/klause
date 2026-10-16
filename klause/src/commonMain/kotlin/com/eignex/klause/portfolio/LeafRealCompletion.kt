@@ -40,6 +40,7 @@ internal class LeafRealCompletion(
     private val encoders = problem.selectedFactorProjections()
     private val absCompletion = if (problem.factors.any { it is RealAbs }) AbsRealCompletion(problem) else null
     var observeLp: ((LpVerdict, LpStats) -> Unit)? = null
+    var observeFloat: ((Sample) -> Unit)? = null
 
     override fun complete(candidate: Sample, cancellation: Cancellation): Completion {
         if (objective == null || objective.realCoefficientValues.all { it == 0.0 }) {
@@ -65,8 +66,12 @@ internal class LeafRealCompletion(
             }
         }
         val sink = LpStatsSink(LpRoute.STANDALONE)
+        val check = if (observeFloat == null) toleranceCheck else { sample: Sample ->
+            observeFloat?.invoke(sample)
+            toleranceCheck?.invoke(sample) == true
+        }
         val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink,
-            context = context, toleranceCheck = toleranceCheck, encoders = encoders)
+            context = context, toleranceCheck = check, encoders = encoders)
         val work = movesFor(sink.snapshot().standaloneWorkOps.sum)
         observeLp?.invoke(real.verdict, sink.snapshot())
         if (cancellation()) return Completion.Undecided(work)
