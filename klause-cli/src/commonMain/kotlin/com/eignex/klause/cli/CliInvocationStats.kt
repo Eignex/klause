@@ -39,32 +39,53 @@ internal fun cliInvocationStats(common: CommonOptions, pipeline: SolvablePipelin
         common.frontendRouting,
         when (pipeline) {
             is SolvablePipeline.NativeSource -> pipeline.nativePipelineName()
+
             SolvablePipeline.FiniteCp -> "finite-cp"
+
             is SolvablePipeline.NumericalLinear -> "numerical-mip"
+
             is SolvablePipeline.OpenTheory -> "open-theory"
+
             is SolvablePipeline.PolynomialTheory -> "polynomial-theory"
+
             is SolvablePipeline.NonlinearIntegerTheory -> "nonlinear-integer-theory"
+
             is SolvablePipeline.QuadraticTheory -> when (pipeline.request) {
                 is QuadraticRequest.Polynomial -> "quadratic-polynomial"
                 is QuadraticRequest.Integer -> "quadratic-integer"
             }
+
             is SolvablePipeline.ExactTheorySatisfaction -> pipeline.pipelineName
+
             is SolvablePipeline.Interrupted -> "interrupted"
+
             is SolvablePipeline.OpenLocalSearch -> "open-local-search"
+
             SolvablePipeline.Refuted -> "refuted"
         },
         when (pipeline) {
             is SolvablePipeline.NativeSource -> when {
                 SourceSetup.executionKind(pipeline.invocation) == SourceExecutionKind.FUNCTIONS -> "transcendental"
+
                 pipeline.invocation.operation == ExecutionOperation.OPTIMIZE -> "quadratic_optimization"
-                SourceSetup.executionKind(pipeline.invocation) == SourceExecutionKind.NONLINEAR_INTEGER -> "incomplete_nia"
+
+                SourceSetup.executionKind(
+                    pipeline.invocation,
+                ) == SourceExecutionKind.NONLINEAR_INTEGER -> "incomplete_nia"
+
                 else -> "exact_nra"
             }
+
             is SolvablePipeline.OpenTheory -> pipeline.request.route.name.lowercase()
+
             is SolvablePipeline.PolynomialTheory -> "exact_nra"
+
             is SolvablePipeline.NonlinearIntegerTheory -> "incomplete_nia"
+
             is SolvablePipeline.QuadraticTheory -> "quadratic_optimization"
+
             is SolvablePipeline.ExactTheorySatisfaction -> pipeline.declaredTheoryRoute
+
             else -> null
         },
     )

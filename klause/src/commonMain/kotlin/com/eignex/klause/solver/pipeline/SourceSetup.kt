@@ -51,8 +51,10 @@ class SourceSetupRequest private constructor(
         providers: FactorProjectionProviders = source.providers,
         cancellation: Cancellation = Cancellation.Never,
         boundCancellation: Cancellation = cancellation,
-    ) : this(source, ExecutionOperation.OPTIMIZE, engine, null, sense == ObjectiveSense.MAXIMIZE,
-        providers, cancellation, boundCancellation, quadraticObjective)
+    ) : this(
+        source, ExecutionOperation.OPTIMIZE, engine, null, sense == ObjectiveSense.MAXIMIZE,
+        providers, cancellation, boundCancellation, quadraticObjective,
+    )
 
     init {
         val embedded = source.embeddedObjectiveSense
@@ -62,11 +64,15 @@ class SourceSetupRequest private constructor(
         require(embedded == null || maximize == (embedded == ObjectiveSense.MAXIMIZE)) {
             "embedded source objective direction differs from its operation binding"
         }
-        require((operation == ExecutionOperation.OPTIMIZE) ==
-            (objective != null || quadraticObjective != null || embedded != null)) {
+        require(
+            (operation == ExecutionOperation.OPTIMIZE) ==
+                (objective != null || quadraticObjective != null || embedded != null),
+        ) {
             "optimization and its source objective must be bound together"
         }
-        require(objective != null || quadraticObjective != null || embedded != null || !maximize) { "maximization requires a source objective" }
+        require(
+            objective != null || quadraticObjective != null || embedded != null || !maximize,
+        ) { "maximization requires a source objective" }
     }
 
     internal fun finiteObjective(): LinearObjective? {
@@ -109,8 +115,11 @@ object SourceSetup {
         val projections = (problem as? BakedProblem)?.factorProjections
             ?.takeIf { it.providers === request.providers } ?: request.providers.prepare(problem)
         if (request.quadraticObjective != null) {
-            return PreparedSourceInvocation(request,
-                prepareFactorQuadratic(request, projections, polynomialCancellation or stop, stop), stop)
+            return PreparedSourceInvocation(
+                request,
+                prepareFactorQuadratic(request, projections, polynomialCancellation or stop, stop),
+                stop,
+            )
         }
         val route = problem.pipelineRoute(
             projections = projections,

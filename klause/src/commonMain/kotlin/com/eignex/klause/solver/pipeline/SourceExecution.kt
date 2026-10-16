@@ -2,12 +2,12 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.ir.QuadraticObjectiveSpec
-import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 
 /** Installed execution family, after source routing and operation admission. */
@@ -21,17 +21,17 @@ enum class SourceExecutionKind {
     /** Finite composition with exact polynomial completion. */
     POLYNOMIAL,
 
-    /** Exact integer polynomial search with original open coordinates. */
-    NONLINEAR_INTEGER,
-
-    /** Exact real functions with their native source and resource diagnostics. */
-    FUNCTIONS,
-
     /** Source-checked witness search without an available complete arithmetic route. */
     HEURISTIC,
 
     /** Source deductions already established infeasibility. */
     REFUTED,
+
+    /** Exact integer polynomial search with original open coordinates. */
+    NONLINEAR_INTEGER,
+
+    /** Exact real functions with their native source and resource diagnostics. */
+    FUNCTIONS,
 }
 
 /** Original objective captured by this source operation. */
@@ -76,24 +76,30 @@ class SourceExecutionRequest private constructor(
         presolveConfig: PresolveConfig? = null,
         presolveCancellation: Cancellation = Cancellation.Never,
         presolveBudget: PresolveBudget? = null,
-    ) : this(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
-        presolveCancellation, presolveBudget, null, null)
+    ) : this(
+        invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+        presolveCancellation, presolveBudget, null, null,
+    )
 
     /** Bind full native integer controls without replacing their polynomial or node ledger. */
     constructor(
         invocation: PreparedSourceInvocation,
         nonlinearInteger: NonlinearIntegerTheoryParams,
         cores: Int = 1,
-    ) : this(invocation, null, TheoryParams(), nonlinearInteger.polynomial, cores, null,
-        Cancellation.Never, null, nonlinearInteger, null)
+    ) : this(
+        invocation, null, TheoryParams(), nonlinearInteger.polynomial, cores, null,
+        Cancellation.Never, null, nonlinearInteger, null,
+    )
 
     /** Bind full exact function controls without renewing the containing invocation. */
     constructor(
         invocation: PreparedSourceInvocation,
         transcendental: TranscendentalTheoryParams,
         cores: Int = 1,
-    ) : this(invocation, null, TheoryParams(), PolynomialTheoryParams(), cores, null,
-        Cancellation.Never, null, null, transcendental)
+    ) : this(
+        invocation, null, TheoryParams(), PolynomialTheoryParams(), cores, null,
+        Cancellation.Never, null, null, transcendental,
+    )
 
     init {
         require(cores > 0)
@@ -204,8 +210,8 @@ fun SourceSetup.execute(
         ) ||
         (
             invocation.operation == ExecutionOperation.ENUMERATE &&
-            kind !in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.REFUTED)
-        )
+                kind !in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.REFUTED)
+            )
     ) {
         throw PipelineConfigException("source execution does not support ${invocation.operation} on $kind")
     }

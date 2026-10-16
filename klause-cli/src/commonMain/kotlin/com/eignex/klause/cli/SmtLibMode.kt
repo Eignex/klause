@@ -52,12 +52,14 @@ internal object SmtLibMode : CliMode {
             )
             val parsed = when (admitted) {
                 is SmtLibInput.Linear -> admitted.problem
+
                 is SmtLibInput.Polynomial -> {
                     val source = admitted.problem
                     val bools = source.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
                     val reals = source.realVarNames.mapKeys { smtSourceSymbol(it.key) }
                     return attachedSourceSolvable(
-                        SourceAttachment(source, config.problemSettings()), common,
+                        SourceAttachment(source, config.problemSettings()),
+                        common,
                         { assignment -> renderOpenTheoryModel(emptyMap(), bools, reals, assignment) },
                         admissionStart.elapsedNow().inWholeMilliseconds,
                     )
@@ -69,7 +71,8 @@ internal object SmtLibMode : CliMode {
                     val bools = source.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
                     val reals = source.realVarNames.mapKeys { smtSourceSymbol(it.key) }
                     return attachedSourceSolvable(
-                        SourceAttachment(source, config.problemSettings()), common,
+                        SourceAttachment(source, config.problemSettings()),
+                        common,
                         { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
                         admissionStart.elapsedNow().inWholeMilliseconds,
                     )
@@ -80,9 +83,12 @@ internal object SmtLibMode : CliMode {
                     val ints = source.intVarNames.mapKeys { smtSourceSymbol(it.key) }
                     val bools = source.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
                     val reals = source.realVarNames.mapKeys { smtSourceSymbol(it.key) }
-                    return attachedSourceSolvable(SourceAttachment(source, config.problemSettings()), common,
+                    return attachedSourceSolvable(
+                        SourceAttachment(source, config.problemSettings()),
+                        common,
                         { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
-                        admissionStart.elapsedNow().inWholeMilliseconds)
+                        admissionStart.elapsedNow().inWholeMilliseconds,
+                    )
                 }
 
                 is SmtLibInput.Quadratic -> {
@@ -138,17 +144,24 @@ private fun quadraticSmtSolvable(
             bools = source.problem.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
             reals = source.problem.realVarNames.mapKeys { smtSourceSymbol(it.key) }
         }
+
         is SmtLibInput.NonlinearInteger -> {
             attachment = SourceAttachment(source.problem, common.config.problemSettings())
             ints = source.problem.intVarNames.mapKeys { smtSourceSymbol(it.key) }
             bools = source.problem.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
             reals = source.problem.realVarNames.mapKeys { smtSourceSymbol(it.key) }
         }
+
         else -> error("quadratic SMT source snapshot is invalid")
     }
-    return attachedSourceSolvable(attachment, common,
+    return attachedSourceSolvable(
+        attachment,
+        common,
         { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
-        admissionElapsedMs, input.objective, input.sense)
+        admissionElapsedMs,
+        input.objective,
+        input.sense,
+    )
 }
 
 /** Render an SMT-LIB `(get-model)`-style model: one `(define-fun name () Sort value)` per

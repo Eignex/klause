@@ -2,8 +2,8 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.DefinitionHint
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.solver.Sample
@@ -56,7 +56,14 @@ internal fun sourceSolvable(
     val elapsed = start.elapsedNow().inWholeMilliseconds
     common.logRoute(invocation.route, elapsed)
     return preparedSourceSolvable(
-        invocation, render, renderOpen, lpStats, elapsed, definedVars, boolFolds, searchHints,
+        invocation,
+        render,
+        renderOpen,
+        lpStats,
+        elapsed,
+        definedVars,
+        boolFolds,
+        searchHints,
     )
 }
 
@@ -71,24 +78,38 @@ internal fun attachedSourceSolvable(
     val start = TimeSource.Monotonic.markNow()
     val stop = common.routingPreparationCancellation()
     val request = if (quadraticObjective != null) {
-        SourceSetupRequest(source, common.resolvedEngine(), quadraticObjective, sense,
-            cancellation = stop, boundCancellation = common.routingCancellation())
+        SourceSetupRequest(
+            source,
+            common.resolvedEngine(),
+            quadraticObjective,
+            sense,
+            cancellation = stop,
+            boundCancellation = common.routingCancellation(),
+        )
     } else {
         val operation = when {
             source.embeddedObjectiveSense != null -> ExecutionOperation.OPTIMIZE
             common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
             else -> ExecutionOperation.SATISFY
         }
-        SourceSetupRequest(source, operation, common.resolvedEngine(),
+        SourceSetupRequest(
+            source,
+            operation,
+            common.resolvedEngine(),
             maximize = source.embeddedObjectiveSense == ObjectiveSense.MAXIMIZE,
-            cancellation = stop, boundCancellation = common.routingCancellation())
+            cancellation = stop,
+            boundCancellation = common.routingCancellation(),
+        )
     }
     val invocation = SourceSetup.prepare(request)
     val elapsed = start.elapsedNow().inWholeMilliseconds
     common.logRoute(invocation.route, elapsed)
-    return preparedSourceSolvable(invocation,
-        { error("native source formulas retain their exact original coordinate renderer") }, render,
-        routingElapsedMs = admissionElapsedMs + elapsed)
+    return preparedSourceSolvable(
+        invocation,
+        { error("native source formulas retain their exact original coordinate renderer") },
+        render,
+        routingElapsedMs = admissionElapsedMs + elapsed,
+    )
 }
 
 internal fun preparedSourceSolvable(
@@ -102,13 +123,15 @@ internal fun preparedSourceSolvable(
     searchHints: SearchHints? = null,
 ): Solvable {
     if (invocation.route is SourceProblemRoute.NativeFormula) {
-        return Solvable(finite = null,
+        return Solvable(
+            finite = null,
             render = { error("native source formulas retain their exact original coordinate renderer") },
             objectiveValue = null,
             pipeline = SolvablePipeline.NativeSource(invocation, renderOpen),
             routingLpStats = routingLpStats,
             routingElapsedMs = routingElapsedMs,
-            sourceInvocation = invocation)
+            sourceInvocation = invocation,
+        )
     }
     val objective = invocation.sourceObjective
     val maximize = invocation.maximizeSourceObjective

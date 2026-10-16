@@ -39,32 +39,58 @@ internal fun solveNativeSource(
     }
     val complete = common.resolvedEngine() !in setOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
     output.begin(solvable.optimize, solvable.maximize)
-    val result = SourceSetup.execute(controls, SourceExecutionCallbacks(onQuadraticIncumbent = { accepted ->
-        publication.publish(pipeline.render(polynomialAssignment(accepted.incumbent.sample)),
-            SourceValue.Algebraic(accepted.incumbent.value), accepted.version)
-    }))
+    val result = SourceSetup.execute(
+        controls,
+        SourceExecutionCallbacks(onQuadraticIncumbent = { accepted ->
+        publication.publish(
+            pipeline.render(polynomialAssignment(accepted.incumbent.sample)),
+            SourceValue.Algebraic(accepted.incumbent.value),
+            accepted.version,
+        )
+    })
+    )
     when (result) {
         is SourceExecutionResult.Quadratic -> reportQuadraticOptimization(
-            result.result, { pipeline.render(polynomialAssignment(it)) }, output, common.statistics,
-            solvable.routingElapsedMs, complete, publication,
+            result.result,
+            { pipeline.render(polynomialAssignment(it)) },
+            output,
+            common.statistics,
+            solvable.routingElapsedMs,
+            complete,
+            publication,
         )
+
         is SourceExecutionResult.Polynomial -> reportNativeSatisfaction(
-            result.result, pipeline, output, common.statistics, solvable.routingElapsedMs, complete,
+            result.result,
+            pipeline,
+            output,
+            common.statistics,
+            solvable.routingElapsedMs,
+            complete,
             retainHeuristicRefutation = kind == SourceExecutionKind.NONLINEAR_INTEGER,
         )
+
         is SourceExecutionResult.Transcendental -> reportNativeSatisfaction(
-            PolynomialTheoryExecution(result.result.result,
+            PolynomialTheoryExecution(
+                result.result.result,
                 PolynomialTheoryStats(workSpent = result.result.workSpent),
                 nativeWorkScope = "transcendental",
-                nativeResource = if (result.result.representationDeclined) "RepresentationLimit" else null),
-            pipeline, output, common.statistics, solvable.routingElapsedMs, complete,
+                nativeResource = if (result.result.representationDeclined) "RepresentationLimit" else null,
+            ),
+            pipeline,
+            output,
+            common.statistics,
+            solvable.routingElapsedMs,
+            complete,
             retainHeuristicRefutation = false,
         )
+
         is SourceExecutionResult.Declined -> {
             output.onVerdictContext(VerdictContext(terminationReason = result.reason, completePool = complete))
             output.onComplete(Verdict.UNKNOWN)
             if (common.statistics) output.onStatistics(SolveStats.EMPTY, solvable.routingElapsedMs, 0L)
         }
+
         is SourceExecutionResult.Finite, is SourceExecutionResult.Linear, is SourceExecutionResult.Refuted ->
             error("native source execution returned an unrelated execution family")
     }
@@ -81,30 +107,41 @@ private fun reportNativeSatisfaction(
 ) {
     val result = if (!complete && !retainHeuristicRefutation && execution.result is OpenTheoryResult.Unsat) {
         OpenTheoryResult.Unknown(TerminationReason.BudgetExhausted, execution.result.stats)
-    } else execution.result
-    output.onVerdictContext(VerdictContext(
+    } else {
+        execution.result
+    }
+    output.onVerdictContext(
+        VerdictContext(
         terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
         completePool = complete,
-    ))
+    )
+    )
     when (result) {
         is OpenTheoryResult.Sat -> {
             output.onSolution(pipeline.render(result.assignment), null)
             output.onComplete(Verdict.SATISFIABLE)
         }
+
         is OpenTheoryResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
+
         is OpenTheoryResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
     }
     if (!statistics) return
-    output.onStatistics(result.stats, result.stats.run.wallMs + routingElapsedMs,
-        if (result is OpenTheoryResult.Sat) 1L else 0L)
+    output.onStatistics(
+        result.stats,
+        result.stats.run.wallMs + routingElapsedMs,
+        if (result is OpenTheoryResult.Sat) 1L else 0L,
+    )
     val native = execution.stats
     val pairs = if (execution.nativeWorkScope == "transcendental") {
         listOf("transcendentalWork" to native.workSpent.toString()) +
             execution.nativeResource?.let { listOf("transcendentalResource" to it) }.orEmpty()
     } else {
-        listOf("nraWork" to native.workSpent.toString(),
+        listOf(
+            "nraWork" to native.workSpent.toString(),
             "nraProjectedPolynomials" to native.projectedPolynomials.toString(),
-            "nraLiftedCells" to native.liftedCells.toString()) + listOfNotNull(
+            "nraLiftedCells" to native.liftedCells.toString(),
+        ) + listOfNotNull(
             native.dyadicAttempts?.let { "nraDyadicAttempts" to it.toString() },
             native.dyadicBases?.let { "nraDyadicBases" to it.toString() },
             native.coupledWorkDeclines?.let { "nraCoupledWorkDeclines" to it.toString() },

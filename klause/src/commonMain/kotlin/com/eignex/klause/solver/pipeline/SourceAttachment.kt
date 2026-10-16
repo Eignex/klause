@@ -2,14 +2,14 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.EffectiveSourceSemantics
+import com.eignex.klause.ir.NonlinearIntegerProblem
+import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
-import com.eignex.klause.ir.PolynomialRealProblem
-import com.eignex.klause.ir.NonlinearIntegerProblem
-import com.eignex.klause.ir.TranscendentalProblem
-import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.SourceSemanticsOwner
+import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
 

@@ -116,8 +116,8 @@ class SourceStrategy internal constructor(
                 if (!scope.supportsPolynomial(engine)) return scope.unsupported()
                 (
                     SourceSetup.execute(SourceExecutionRequest(invocation, polynomial = scope.polynomial))
-                    as SourceExecutionResult.Polynomial
-                ).result.result
+                        as SourceExecutionResult.Polynomial
+                    ).result.result
             }
 
             is SourceProblemRoute.Finite -> finiteSolve(route, scope)

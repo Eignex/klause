@@ -409,39 +409,86 @@ internal fun Problem.preparePolynomialExecutionPlan(
     }
     val boundedIntegers = (0 until numIntVars).filter { intBounds.hasLower(it) && intBounds.hasUpper(it) }
     val bounded = boundedIntegers.toSet()
-    val finiteFactors = polynomial?.finiteFactorIndices ?: if (cause == PreparedPlanDecline.RESOURCE) emptyList() else
+    val finiteFactors = polynomial?.finiteFactorIndices ?: if (cause == PreparedPlanDecline.RESOURCE) {
+        emptyList()
+    } else {
         factors.indices.filter { index ->
             factors[index].variables.reals.isEmpty() && factors[index].intVars.all { it in bounded } &&
                 projections.capabilities(index).propagation != PropagationCapability.UNSUPPORTED
         }
+    }
     val finiteIndices = finiteFactors.toSet()
-    val ownership = if (polynomial != null || cause == PreparedPlanDecline.RESOURCE) null else ComponentPlan(
-        this, Array(numIntVars) { if (it in bounded) IntVariableOwner.CP else IntVariableOwner.THEORY },
+    val ownership = if (polynomial != null || cause == PreparedPlanDecline.RESOURCE) {
+        null
+    } else {
+        ComponentPlan(
+        this,
+        Array(numIntVars) { if (it in bounded) IntVariableOwner.CP else IntVariableOwner.THEORY },
         Array(numFactors) { if (it in finiteIndices) FactorOwner.CP else FactorOwner.THEORY },
-        ProblemPipeline.UNSUPPORTED_OPEN, factorProjections = projections,
+        ProblemPipeline.UNSUPPORTED_OPEN,
+        factorProjections = projections,
     )
+    }
     val descriptors = listOf(
-        ExecutionComponentDescriptor("finite", ComponentResponsibility.FINITE, finiteFactors,
-            boundedIntegers, emptyList(), (0 until numBoolVars).toList(),
-            finiteComponentContract(finiteFactors, boundedIntegers, ownership, polynomial != null,
-                exactNeighborhood = false, projections = projections,
-                enforcingFactors = polynomial?.encodingAttributions?.map { it.sourceFactorIndex }?.toSet().orEmpty())),
-        ExecutionComponentDescriptor("polynomial-real", ComponentResponsibility.COMPLETION,
-            factors.indices.filter { it !in finiteIndices }, emptyList(), (0 until numRealVars).toList(),
-            execution = if (polynomial != null) checkedCompletionContract(ProcedureCompleteness.DECISION)
-            else unavailableContract(ExecutionDeclineCause.PREPARATION, "polynomial-real", cause),
-            participatingFactorIndices = polynomial?.encodingAttributions?.map { it.sourceFactorIndex }.orEmpty()),
-    ) + if (openInteger) listOf(ExecutionComponentDescriptor("unplaced-polynomial-integer",
-        ComponentResponsibility.UNPLACED, emptyList(),
-        (0 until numIntVars).filter { it !in boundedIntegers }, emptyList()))
-    else emptyList()
+        ExecutionComponentDescriptor(
+            "finite",
+            ComponentResponsibility.FINITE,
+            finiteFactors,
+            boundedIntegers,
+            emptyList(),
+            (0 until numBoolVars).toList(),
+            finiteComponentContract(
+                finiteFactors,
+                boundedIntegers,
+                ownership,
+                polynomial != null,
+                exactNeighborhood = false,
+                projections = projections,
+                enforcingFactors = polynomial?.encodingAttributions?.map { it.sourceFactorIndex }?.toSet().orEmpty(),
+            ),
+        ),
+        ExecutionComponentDescriptor(
+            "polynomial-real",
+            ComponentResponsibility.COMPLETION,
+            factors.indices.filter { it !in finiteIndices },
+            emptyList(),
+            (0 until numRealVars).toList(),
+            execution = if (polynomial != null) {
+                checkedCompletionContract(ProcedureCompleteness.DECISION)
+            } else {
+                unavailableContract(ExecutionDeclineCause.PREPARATION, "polynomial-real", cause)
+            },
+            participatingFactorIndices = polynomial?.encodingAttributions?.map { it.sourceFactorIndex }.orEmpty(),
+        ),
+    ) + if (openInteger) {
+        listOf(
+            ExecutionComponentDescriptor(
+        "unplaced-polynomial-integer",
+        ComponentResponsibility.UNPLACED,
+        emptyList(),
+        (0 until numIntVars).filter { it !in boundedIntegers },
+        emptyList(),
+    )
+        )
+    } else {
+        emptyList()
+    }
     val sourceBools = (original as? PolynomialRealProblem)?.sourceBoolCount ?: numBoolVars
     val sourceReals = (original as? PolynomialRealProblem)?.sourceRealCount ?: numRealVars
-    val execution = if (cause == null) PreparedExecution.Polynomial(requireNotNull(polynomial))
-        else PreparedExecution.Declined(this, cause, polynomial?.let { PreparedExecution.Polynomial(it) }
-            ?: ownership?.let { PreparedExecution.FiniteLinear(this, it) })
-    return PreparedSourcePlan(original, execution, descriptors, sourceBools, numIntVars, sourceReals,
-        objective, maximize, factorProjections = projections)
+    val execution = if (cause == null) {
+        PreparedExecution.Polynomial(requireNotNull(polynomial))
+    } else {
+        PreparedExecution.Declined(
+        this,
+        cause,
+        polynomial?.let { PreparedExecution.Polynomial(it) }
+            ?: ownership?.let { PreparedExecution.FiniteLinear(this, it) },
+    )
+    }
+    return PreparedSourcePlan(
+        original, execution, descriptors, sourceBools, numIntVars, sourceReals,
+        objective, maximize, factorProjections = projections,
+    )
 }
 
 /** Preserve the original polynomial snapshot while preparing its finite and completion projections. */
@@ -461,17 +508,38 @@ internal fun PolynomialRealProblem.prepareExecutionPlan(
 
 /** Preserve nonlinear integer source syntax and its exact declaration-to-numeric projection. */
 fun NonlinearIntegerProblem.prepareExecutionPlan(): PreparedSourcePlan = PreparedSourcePlan(
-    this, PreparedExecution.NonlinearInteger(this),
-    listOf(ExecutionComponentDescriptor("polynomial-integer", ComponentResponsibility.COMPLETION,
-        emptyList(), integerCoordinates, (0 until numericCount).filter { it !in integerCoordinates },
-        (0 until boolCount).toList(), ComponentExecutionContract(
-            ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH,
-                setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION)),
+    this,
+    PreparedExecution.NonlinearInteger(this),
+    listOf(
+        ExecutionComponentDescriptor(
+        "polynomial-integer",
+        ComponentResponsibility.COMPLETION,
+        emptyList(),
+        integerCoordinates,
+        (0 until numericCount).filter { it !in integerCoordinates },
+        (0 until boolCount).toList(),
+        ComponentExecutionContract(
+            ComponentStrategySupport(
+                ProcedureCompleteness.WITNESS_SEARCH,
+                setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION),
+            ),
             ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH, witnessAuthority),
-            optimization = ComponentStrategySupport(ProcedureCompleteness.EXHAUSTIVE,
-                setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION,
-                    ExecutionClaimAuthority.OBJECTIVE_BOUND, ExecutionClaimAuthority.OPTIMALITY,
-                    ExecutionClaimAuthority.UNBOUNDEDNESS))))),
-    boolCount, integerCoordinates.size, realCoordinates.size,
-    integerCoordinates = integerCoordinates, realCoordinates = realCoordinates,
+            optimization = ComponentStrategySupport(
+                ProcedureCompleteness.EXHAUSTIVE,
+                setOf(
+                    ExecutionClaimAuthority.WITNESS,
+                    ExecutionClaimAuthority.REFUTATION,
+                    ExecutionClaimAuthority.OBJECTIVE_BOUND,
+                    ExecutionClaimAuthority.OPTIMALITY,
+                    ExecutionClaimAuthority.UNBOUNDEDNESS,
+                ),
+            ),
+        ),
+    )
+    ),
+    boolCount,
+    integerCoordinates.size,
+    realCoordinates.size,
+    integerCoordinates = integerCoordinates,
+    realCoordinates = realCoordinates,
 )

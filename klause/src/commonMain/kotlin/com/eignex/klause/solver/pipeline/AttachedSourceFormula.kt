@@ -54,11 +54,19 @@ internal fun prepareNativeSource(
     if (stop()) return SourceProblemRoute.NativeFormula(null)
     val execution = when (formula) {
         is AttachedSourceFormula.Polynomial -> NativeSourceExecution.Polynomial(
-            PolynomialTheoryRequest(formula.problem, formula.problem.prepareExecutionPlan(request.source.settings, stop).bindObjective(request)),
+            PolynomialTheoryRequest(
+                formula.problem,
+                formula.problem.prepareExecutionPlan(request.source.settings, stop).bindObjective(request),
+            ),
         )
+
         is AttachedSourceFormula.IntegerPolynomial -> NativeSourceExecution.IntegerPolynomial(
-            NonlinearIntegerTheoryRequest(formula.problem, formula.problem.prepareExecutionPlan().bindObjective(request)),
+            NonlinearIntegerTheoryRequest(
+                formula.problem,
+                formula.problem.prepareExecutionPlan().bindObjective(request),
+            ),
         )
+
         is AttachedSourceFormula.Functions -> NativeSourceExecution.Functions(
             TranscendentalTheoryRequest(formula.problem),
         )
@@ -67,8 +75,12 @@ internal fun prepareNativeSource(
 }
 
 private fun PreparedSourcePlan.bindObjective(request: SourceSetupRequest): PreparedSourcePlan = when {
-    request.quadraticObjective != null -> withObjective(request.quadraticObjective,
-        if (request.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE)
+    request.quadraticObjective != null -> withObjective(
+        request.quadraticObjective,
+        if (request.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
+    )
+
     request.objective != null -> withObjective(request.objective, request.maximize)
+
     else -> this
 }

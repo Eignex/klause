@@ -187,15 +187,11 @@ private fun sourceRouteName(route: SourceProblemRoute): String = when (route) {
 
 /** A concrete solve pipeline, selected before [SolveCore] starts its finite CP loop. */
 internal sealed interface SolvablePipeline {
-    data class NativeSource(
-        val invocation: PreparedSourceInvocation,
-        val render: (OpenTheoryAssignment) -> String,
-    ) : SolvablePipeline
+    data class NativeSource(val invocation: PreparedSourceInvocation, val render: (OpenTheoryAssignment) -> String) :
+        SolvablePipeline
 
-    data class NumericalLinear(
-        val request: NumericalLinearRequest,
-        val render: (OpenTheoryAssignment) -> String,
-    ) : SolvablePipeline
+    data class NumericalLinear(val request: NumericalLinearRequest, val render: (OpenTheoryAssignment) -> String) :
+        SolvablePipeline
 
     data class ExactTheorySatisfaction(
         val request: ExactTheorySatisfactionRequest,
