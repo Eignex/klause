@@ -4,7 +4,6 @@ import com.eignex.klause.formats.dimacs.dimacsSemantics
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.objective.LinearObjective
 
 /**
  * DIMACS **CNF** front-end (`.cnf`) for Boolean satisfiability. Emits the SAT-competition
@@ -30,7 +29,10 @@ internal object DimacsMode : CliMode {
                 "parsed ${fileName(path)}: bool=${problem.numBoolVars} factors=${problem.numFactors}"
             }
             val render: (Sample) -> String = { s -> renderDimacsModel(problem.numBoolVars, s) }
-            return linearSolvable(problem, null as LinearObjective?, false, render)
+            return sourceSolvable(
+                problem, null, false, common, render,
+                { assignment -> renderDimacsModel(problem.numBoolVars, assignment::boolValue) },
+            )
         }
 
         override fun output(common: CommonOptions): OutputProtocol = DimacsOutput()
@@ -39,9 +41,11 @@ internal object DimacsMode : CliMode {
 
 /** Render a DIMACS SAT model line: each variable `i` (1-based) as `i` when true, `-i` when
  *  false, terminated by `0`. */
-internal fun renderDimacsModel(numVars: Int, s: Sample): String = buildString {
+internal fun renderDimacsModel(numVars: Int, s: Sample): String = renderDimacsModel(numVars, s::boolValue)
+
+private fun renderDimacsModel(numVars: Int, boolValue: (Int) -> Boolean): String = buildString {
     append("v")
-    for (v in 0 until numVars) append(" ${if (s.boolValue(v)) v + 1 else -(v + 1)}")
+    for (v in 0 until numVars) append(" ${if (boolValue(v)) v + 1 else -(v + 1)}")
     append(" 0")
 }
 

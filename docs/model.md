@@ -59,7 +59,10 @@ shape retains that exact source plan; constructing it does not repeat routing.
 Baked sources retain their selected providers unless the request explicitly replaces them.
 Automatic pure-real and wide integral-objective preferences belong to setup; the
 objective interval scan observes and charges the containing preparation allowance.
-SMT-LIB linear admission retains that selected plan through finite adaptation.
+DIMACS, WCNF, OPB, XCSP3, exact or original-real FlatZinc and SMT-LIB linear admission
+use the same selection policy and retain the selected route through finite adaptation.
+Finite format adapters preserve their existing private definition and objective hints;
+these compatibility shapes retain their existing finite execution controls.
 `SourceSetup.execute` dispatches captured finite, open-linear and polynomial operations.
 Its result retains the entire producing native execution alongside the original source
 interpretation. Exact linear and polynomial publication callbacks keep their own

@@ -4,6 +4,7 @@ import com.eignex.klause.formats.xcsp3.xcsp3Semantics
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.toLinearObjective
 
 /**
  * XCSP3 front-end (`.xml` / `.xcsp` / `.xcsp3`). Emits the XCSP3 competition output protocol:
@@ -32,12 +33,14 @@ internal object Xcsp3Mode : CliMode {
             }
             val names = parsed.intVarNames
             val render: (Sample) -> String = { s -> renderInstantiation(names, s) }
-            return linearSolvable(
+            return sourceSolvable(
                 parsed.problem,
-                parsed.objective,
+                parsed.objective?.toLinearObjective(),
                 parsed.sense == ObjectiveSense.MAXIMIZE,
+                common,
                 render,
-                parsed.definedVars,
+                { assignment -> renderInstantiation(names, assignment::intValue) },
+                definedVars = parsed.definedVars,
             )
         }
 
@@ -47,9 +50,12 @@ internal object Xcsp3Mode : CliMode {
 
 /** Render an XCSP3 competition `v <instantiation>` line: the declared variables (array cells
  *  as `id[i]`) in declaration order paired with their solution values. */
-internal fun renderInstantiation(names: Map<String, Int>, s: Sample): String {
+internal fun renderInstantiation(names: Map<String, Int>, s: Sample): String =
+    renderInstantiation(names) { s.intValue(it).toString() }
+
+private fun renderInstantiation(names: Map<String, Int>, intValue: (Int) -> String): String {
     val list = names.keys.joinToString(" ")
-    val values = names.values.joinToString(" ") { s.intValue(it).toString() }
+    val values = names.values.joinToString(" ") { intValue(it) }
     return "v <instantiation> <list> $list </list> <values> $values </values> </instantiation>"
 }
 

@@ -9,16 +9,11 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.toLinearObjective
-import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
-import com.eignex.klause.solver.pipeline.SourceAttachment
-import com.eignex.klause.solver.pipeline.SourceSetup
-import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.pipeline.symbolicRealValue
 import com.eignex.klause.solver.result.LinearOptimizationResult
-import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
@@ -119,34 +114,13 @@ internal object SmtLibMode : CliMode {
                 latestSourceObjective = objective?.evaluateExact(sample)
                 renderModel(ints, bools, reals, sample)
             }
-            var routingLpStats = LpStats()
-            val routingStart = TimeSource.Monotonic.markNow()
-            val operation = when {
-                objective != null -> ExecutionOperation.OPTIMIZE
-                common.allSolutions || (common.solutionCap ?: 1L) > 1L -> ExecutionOperation.ENUMERATE
-                else -> ExecutionOperation.SATISFY
-            }
-            val invocation = SourceSetup.prepare(
-                SourceSetupRequest(
-                    SourceAttachment(parsed.model),
-                    operation,
-                    common.resolvedEngine(),
-                    objective = objective,
-                    maximize = maximize,
-                    boundCancellation = common.routingCancellation(),
-                    cancellation = common.routingPreparationCancellation(),
-                ),
-                onLpStats = { routingLpStats = it },
-            )
-            val route = invocation.route
-            val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
-            common.logRoute(route, routingElapsedMs)
-            return preparedSourceSolvable(
-                invocation,
+            return sourceSolvable(
+                parsed.model,
+                minimizedObjective,
+                maximize,
+                common,
                 render,
                 { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
-                routingLpStats,
-                routingElapsedMs,
             )
         }
 
