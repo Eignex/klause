@@ -27,6 +27,8 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 
 internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification<Sample, Unit> =
@@ -101,9 +103,11 @@ internal fun verifyRealCoordinates(
             continue
         }
         if (factor is Power && factor.base is Power.Coordinate.Real) {
-            val expected = rationalPower(reals[factor.base.id.index], factor.exponent, cancellation)
-                ?: return Verification.Indeterminate("source power check cancelled")
-            if (expected != reals[(factor.result as Power.Coordinate.Real).id.index]) {
+            val matches = rationalPowerEquals(reals[factor.base.id.index], factor.exponent,
+                reals[(factor.result as Power.Coordinate.Real).id.index], cancellation)
+                ?: return Verification.Indeterminate("source power check unavailable or cancelled")
+            if (cancellation()) return Verification.Indeterminate("source power check cancelled")
+            if (!matches) {
                 return Verification.Rejected("real factor $id refutes the assignment")
             }
             continue
@@ -190,18 +194,62 @@ internal fun verifyRealCoordinates(
     else Verification.Accepted(Candidate(sample, Unit))
 }
 
-private fun rationalPower(value: BigFraction, exponent: Int, cancellation: Cancellation): BigFraction? {
+private fun rationalPowerEquals(
+    value: BigFraction,
+    exponent: Int,
+    expected: BigFraction,
+    cancellation: Cancellation,
+): Boolean? {
+    cancellation.charge(1)
+    if (cancellation()) return null
+    val direct = when {
+        exponent == 0 || value == BigFraction.ONE -> expected == BigFraction.ONE
+        value.isZero -> expected.isZero
+        value == BigFraction.MINUS_ONE -> expected ==
+            if (exponent and 1 == 0) BigFraction.ONE else BigFraction.MINUS_ONE
+        expected.isZero || (expected.signum() < 0) != (value.signum() < 0 && exponent and 1 != 0) -> false
+        else -> null
+    }
+    if (direct != null) return direct.takeUnless { cancellation() }
+    val numerator = positivePowerEquals(value.num.abs(), exponent, expected.num.abs(), cancellation)
+        ?: return null
+    if (!numerator) return false.takeUnless { cancellation() }
+    val denominator = positivePowerEquals(value.den, exponent, expected.den, cancellation)
+    return denominator?.takeUnless { cancellation() }
+}
+
+private fun positivePowerEquals(
+    value: BigInt,
+    exponent: Int,
+    expected: BigInt,
+    cancellation: Cancellation,
+): Boolean? {
+    if (value == BIG_ONE) return (expected == BIG_ONE).takeUnless { cancellation() }
+    val width = expected.magnitudeBitLength().toLong()
+    if ((value.magnitudeBitLength() - 1L) * exponent + 1L > width) return false
     var remaining = exponent
     var base = value
-    var result = BigFraction.ONE
+    var result = BIG_ONE
     while (remaining > 0) {
         cancellation.charge(1)
         if (cancellation()) return null
-        if (remaining and 1 != 0) result *= base
+        if (remaining and 1 != 0) {
+            val bits = result.magnitudeBitLength().toLong() + base.magnitudeBitLength()
+            if (bits - 1L > width) return false
+            if (bits > Int.MAX_VALUE) return null
+            result *= base
+            if (cancellation()) return null
+        }
         remaining = remaining ushr 1
-        if (remaining > 0) base *= base
+        if (remaining > 0) {
+            val bits = 2L * base.magnitudeBitLength()
+            if (bits - 1L > width) return false
+            if (bits > Int.MAX_VALUE) return null
+            base *= base
+            if (cancellation()) return null
+        }
     }
-    return if (cancellation()) null else result
+    return if (cancellation()) null else result == expected
 }
 
 private fun AllDifferent.isSatisfied(sample: Sample): Boolean {
