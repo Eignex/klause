@@ -399,6 +399,7 @@ object Mps {
                 .map(::bounds),
             objectiveRow?.coeffs?.values?.toList() ?: emptyList(),
             objectiveRow?.rhs?.negated() ?: MpsSourceNumber.parsed(BigFraction.ZERO),
+            unrangedVariables = vars.indices.filter { !vars[it].explicitLower && !vars[it].explicitUpper }.toSet(),
         )
         return MpsModel(name, sense, objective, variables, constraints, mpsSemantics).withSourceNumbers(source)
     }

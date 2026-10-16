@@ -14,8 +14,21 @@ the claims each route may publish.
 `DECIMAL_LITERALS`; programmatic models interpret supplied doubles as exact binary64
 literals. `toProblem(settings, semanticOverrides)` resolves caller policy before
 constructing a model. `MpsCompiled.semantics` and its `Problem` retain the same effective
-contract. Float grids, default undeclared ranges and optional-value policies are
-inapplicable to MPS and reject overrides.
+contract. Float grids and optional-value policies are inapplicable to MPS and
+reject overrides.
+
+A wholly unranged marker integer defaults to `[0,1]`; an unranged real column
+defaults to `[0,+infinity)`. Caller integer and real declaration defaults replace
+those intervals before lowering. Any explicit BOUNDS record, including a one-sided
+or explicitly open range, preserves its complete source range. A programmatically
+supplied variable range is explicit. Copies retaining a parsed declaration retain
+its bound origin; replacing that declaration with a programmatic range makes it explicit.
+
+Effective declarations and source-number checking share one captured snapshot.
+Caller rational endpoints remain exact bound rows, and finite integer extrema
+remain finite. The MPS text infinity convention does not apply to finite caller
+endpoints. Numerical projection limits decline execution rather than erase a
+bound. The declared policy remains available separately from the effective policy.
 
 MPS defaults to `SourceTolerance(absolute=1/10000000, relative=1/10000000)`.
 Each component can be replaced independently, including zero. Zero tolerance requires
@@ -40,7 +53,11 @@ when the resulting rows and objective retain their source numbers. The proof use
 exact source coefficients and bounds; fractional definitions and inexact integer
 lowerings remain continuous. Source column names, witness values and objective
 units are preserved.
-`sourceExact` records exact source correspondence; `toleranceDifference` identifies
+`sourceExact` records exact correspondence to the effective source snapshot;
+it does not establish an original-file claim after declaration defaults change.
+Output qualifies such witnesses and terminal results with the effective declaration
+bounds. Checking the original file requires its original declaration policy.
+`toleranceDifference` identifies
 a lowering difference relevant to tolerance publication. Rounded or oversized
 pure-integer rows are rebuilt from source decimals; oversized objectives can use
 an auxiliary defining row. Integer values and lower-bound shifts keep exact

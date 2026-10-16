@@ -35,7 +35,7 @@ internal fun MpsModel.lowerExactSource(
     settings: ProblemSettings,
     effectiveSemantics: EffectiveSourceSemantics,
 ): MpsCompiled {
-    val source = exactAdapterSnapshot()
+    val source = withDeclarationDefaults(effectiveSemantics).exactAdapterSnapshot()
     val numbers = source.sourceNumbers()
     var intCount = 0
     var realCount = 0

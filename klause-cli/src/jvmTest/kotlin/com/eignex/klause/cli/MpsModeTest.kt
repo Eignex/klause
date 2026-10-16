@@ -3,6 +3,8 @@ package com.eignex.klause.cli
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.ir.BoundOverride
+import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SemanticOverrides
@@ -47,6 +49,42 @@ class MpsModeTest {
 
         assertTrue(check(exact))
         assertFalse(check(approximate))
+    }
+
+    @Test
+    fun `replaced MPS declaration defaults should qualify the effective source witness`() {
+        val file = File.createTempFile("mps-declaration-defaults", ".mps").apply {
+            writeText("ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1\nENDATA\n")
+            deleteOnExit()
+        }
+        val common = CommonOptions().apply {
+            semanticOverrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(
+                BoundOverride.Value(2L), BoundOverride.Value(5L)))
+        }
+        val session = MpsMode.newSession()
+        val loaded = session.load(file.absolutePath, common)
+        val output = session.output(common)
+
+        val text = capture {
+            output.onSolution(loaded.render(Sample(BooleanArray(0), longArrayOf(3))), objective = 3)
+            output.onComplete(Verdict.BEST_FOUND)
+        }
+
+        assertTrue("v I=3" in text.lines(), text)
+        assertTrue("exact effective MPS source witness" in text, text)
+        assertTrue("effective MPS declaration bounds" in text, text)
+        assertFalse("original MPS source witness" in text, text)
+    }
+
+    @Test
+    fun `MPS refutations without a witness should retain effective declaration scope`() {
+        val output = MpsOutput(effectiveDeclarationBounds = true)
+
+        val text = capture { output.onComplete(Verdict.UNSATISFIABLE) }
+
+        assertTrue("s UNSATISFIABLE" in text.lines(), text)
+        assertTrue("effective MPS declaration bounds" in text, text)
+        assertFalse("original MPS source" in text, text)
     }
 
     @Test

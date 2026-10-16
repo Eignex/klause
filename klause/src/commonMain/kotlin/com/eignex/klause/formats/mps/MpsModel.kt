@@ -11,6 +11,7 @@ internal class MpsSourceNumber private constructor(
     private val rational: BigFraction?,
     private val ieeeBits: Long?,
     private val projectionBits: Long,
+    val literalBound: Boolean = false,
 ) {
     val fraction: BigFraction
         get() = rational ?: requireNotNull(BigFraction.ofDouble(Double.fromBits(checkNotNull(ieeeBits))))
@@ -38,6 +39,9 @@ internal class MpsSourceNumber private constructor(
         fun parsed(value: BigFraction, projection: Double = value.toDouble()): MpsSourceNumber =
             MpsSourceNumber(value, null, projection.toRawBits())
 
+        fun bound(value: BigFraction): MpsSourceNumber =
+            MpsSourceNumber(value, null, value.toDouble().toRawBits(), literalBound = true)
+
         fun ieee(value: Double): MpsSourceNumber {
             require(value.isFinite()) { "MPS source number must be finite" }
             return MpsSourceNumber(null, value.toRawBits(), value.toRawBits())
@@ -52,7 +56,9 @@ internal class MpsSourceNumbers(
     objectiveCoefficients: List<MpsSourceNumber>,
     val objectiveConstant: MpsSourceNumber,
     private val snapshot: MpsSourceSnapshot? = null,
+    unrangedVariables: Set<Int> = emptySet(),
 ) {
+    val unrangedVariables = unrangedVariables.toSet()
     val variableBounds = variableBounds.toList()
     val constraintCoefficients = constraintCoefficients.map { it.toList() }
     val constraintBounds = constraintBounds.toList()
@@ -69,6 +75,7 @@ internal class MpsSourceNumbers(
         objectiveCoefficients,
         objectiveConstant,
         MpsSourceSnapshot.capture(objective, variables, constraints),
+        unrangedVariables,
     )
 
     fun reconciled(
@@ -120,7 +127,12 @@ internal class MpsSourceNumbers(
                 row.lower.toRowBoundSource() to row.upper.toRowBoundSource()
             }
         }
-        return MpsSourceNumbers(nextVariables, nextCoefficients, nextBounds, nextObjective, nextConstant)
+        val nextUnranged = variables.indices.filter { index ->
+            val previous = before?.variables?.indexOfFirst { it === variables[index] } ?: -1
+            previous in unrangedVariables
+        }.toSet()
+        return MpsSourceNumbers(nextVariables, nextCoefficients, nextBounds, nextObjective, nextConstant,
+            unrangedVariables = nextUnranged)
             .attachedTo(objective, variables, constraints)
     }
 
@@ -272,9 +284,12 @@ class MpsModel(
             semantics.numericAuthority == NumericAuthority.BINARY64_LITERALS
         ) { "MPS requires decimal or binary64 literal authority" }
         require(semantics.feasibilityTolerance != null) { "MPS requires an explicit feasibility tolerance" }
-        require(semantics.floats == null && semantics.undeclaredIntegers == null &&
-            semantics.undeclaredReals == null && semantics.pinAbsentOptionalValues == null
-        ) { "MPS does not support grid, undeclared range or optional-value policies" }
+        require(semantics.undeclaredIntegers != null && semantics.undeclaredReals != null) {
+            "MPS requires explicit undeclared integer and real bounds"
+        }
+        require(semantics.floats == null && semantics.pinAbsentOptionalValues == null) {
+            "MPS does not support grid or optional-value policies"
+        }
     }
 
     private var parsedSourceNumbers: MpsSourceNumbers? = null

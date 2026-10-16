@@ -357,6 +357,8 @@ fun MpsModel.toProblem(
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ): MpsCompiled {
     val effectiveSemantics = semantics.resolve(semanticOverrides)
+    val effectiveSource = withDeclarationDefaults(effectiveSemantics)
+    if (effectiveSource !== this) return effectiveSource.lowerExactSource(settings, effectiveSemantics)
     val exactInput = exactAdapterSnapshot()
     val sourceNumbers = exactInput.sourceNumbers()
     if (constraints.any { it.indicator != null }) return exactInput.lowerExactSource(settings, effectiveSemantics)
@@ -633,7 +635,7 @@ private val MPS_INFINITY_EXACT = BigFraction.of(
 )
 
 internal fun MpsSourceNumber?.finiteMps(): MpsSourceNumber? = this?.takeIf {
-    it.fraction > MPS_INFINITY_EXACT.negated() && it.fraction < MPS_INFINITY_EXACT
+    it.literalBound || (it.fraction > MPS_INFINITY_EXACT.negated() && it.fraction < MPS_INFINITY_EXACT)
 }
 
 private fun MpsSourceNumber.shiftedBy(origin: ExactLpNumber): ExactLpNumber =

@@ -6,8 +6,6 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceTolerance
-import com.eignex.klause.ir.UndeclaredIntegerBounds
-import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
@@ -50,8 +48,8 @@ class MpsSemanticsTest {
             mpsSemantics.copy(numericAuthority = NumericAuthority.RATIONAL_LITERALS),
             mpsSemantics.copy(feasibilityTolerance = null),
             mpsSemantics.copy(floats = FloatSemantics.Continuous),
-            mpsSemantics.copy(undeclaredIntegers = UndeclaredIntegerBounds()),
-            mpsSemantics.copy(undeclaredReals = UndeclaredRealBounds()),
+            mpsSemantics.copy(undeclaredIntegers = null),
+            mpsSemantics.copy(undeclaredReals = null),
             mpsSemantics.copy(pinAbsentOptionalValues = true),
         )
 
