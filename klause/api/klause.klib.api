@@ -3736,16 +3736,22 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com
 }
 
 sealed interface com.eignex.klause.solver.pipeline/OpenTheoryExecution { // com.eignex.klause.solver.pipeline/OpenTheoryExecution|null[0]
+    abstract val semantics // com.eignex.klause.solver.pipeline/OpenTheoryExecution.semantics|{}semantics[0]
+        abstract fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryExecution.semantics.<get-semantics>|<get-semantics>(){}[0]
+
     final class Optimize : com.eignex.klause.solver.pipeline/OpenTheoryExecution { // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryOptimum) // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryOptimum){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryOptimum, com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryOptimum;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val acceptedIncumbent // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.acceptedIncumbent|{}acceptedIncumbent[0]
             final fun <get-acceptedIncumbent>(): com.eignex.klause.solver.pipeline/SourceIncumbentPublication? // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.acceptedIncumbent.<get-acceptedIncumbent>|<get-acceptedIncumbent>(){}[0]
         final val result // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.result|{}result[0]
             final fun <get-result>(): com.eignex.klause.solver.pipeline/OpenTheoryOptimum // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.result.<get-result>|<get-result>(){}[0]
+        final val semantics // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.semantics.<get-semantics>|<get-semantics>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryOptimum // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryOptimum = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryOptimum){}[0]
+        final fun component2(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryOptimum = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryOptimum;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Optimize.toString|toString(){}[0]
@@ -3756,6 +3762,8 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryExecution { // com.
 
         final val result // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Satisfy.result|{}result[0]
             final fun <get-result>(): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Satisfy.result.<get-result>|<get-result>(){}[0]
+        final val semantics // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Satisfy.semantics|{}semantics[0]
+            final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Satisfy.semantics.<get-semantics>|<get-semantics>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Satisfy.component1|component1(){}[0]
         final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryResult = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution.Satisfy // com.eignex.klause.solver.pipeline/OpenTheoryExecution.Satisfy.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryResult){}[0]
@@ -13774,7 +13782,7 @@ final class com.eignex.klause.solver.pipeline/QuadraticIncumbentPublication { //
 }
 
 final class com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution { // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution|null[0]
-    constructor <init>(com.eignex.klause.solver.result/QuadraticOptimizationResult, com.eignex.klause.solver.pipeline/PolynomialTheoryStats, kotlin/Long, kotlin/Long, com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ...) // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.<init>|<init>(com.eignex.klause.solver.result.QuadraticOptimizationResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;kotlin.Long;kotlin.Long;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?){}[0]
+    constructor <init>(com.eignex.klause.solver.result/QuadraticOptimizationResult, com.eignex.klause.solver.pipeline/PolynomialTheoryStats, kotlin/Long, kotlin/Long, com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.<init>|<init>(com.eignex.klause.solver.result.QuadraticOptimizationResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;kotlin.Long;kotlin.Long;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
     final val acceptedIncumbent // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.acceptedIncumbent|{}acceptedIncumbent[0]
         final fun <get-acceptedIncumbent>(): com.eignex.klause.solver.pipeline/QuadraticIncumbentPublication? // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.acceptedIncumbent.<get-acceptedIncumbent>|<get-acceptedIncumbent>(){}[0]
@@ -13788,13 +13796,16 @@ final class com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution { /
         final fun <get-resource>(): com.eignex.klause.solver.pipeline/PolynomialTheoryResource? // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.resource.<get-resource>|<get-resource>(){}[0]
     final val result // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.result|{}result[0]
         final fun <get-result>(): com.eignex.klause.solver.result/QuadraticOptimizationResult // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.result.<get-result>|<get-result>(){}[0]
+    final val semantics // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.semantics|{}semantics[0]
+        final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.semantics.<get-semantics>|<get-semantics>(){}[0]
 
     final fun component1(): com.eignex.klause.solver.result/QuadraticOptimizationResult // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.component1|component1(){}[0]
     final fun component2(): com.eignex.klause.solver.pipeline/PolynomialTheoryStats // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.component2|component2(){}[0]
     final fun component3(): kotlin/Long // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.component3|component3(){}[0]
     final fun component4(): kotlin/Long // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.component4|component4(){}[0]
     final fun component5(): com.eignex.klause.solver.pipeline/PolynomialTheoryResource? // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.component5|component5(){}[0]
-    final fun copy(com.eignex.klause.solver.result/QuadraticOptimizationResult = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryStats = ..., kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.copy|copy(com.eignex.klause.solver.result.QuadraticOptimizationResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;kotlin.Long;kotlin.Long;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?){}[0]
+    final fun component6(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.component6|component6(){}[0]
+    final fun copy(com.eignex.klause.solver.result/QuadraticOptimizationResult = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryStats = ..., kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.copy|copy(com.eignex.klause.solver.result.QuadraticOptimizationResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;kotlin.Long;kotlin.Long;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.toString|toString(){}[0]
