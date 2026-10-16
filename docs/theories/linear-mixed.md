@@ -80,11 +80,16 @@ paired opposite, non-strict source equations. Bounded sparse elimination retains
 free-coordinate guesses and reconstructs pivot values. If that guess fails full-row
 validation, the same retained pivots reduce the remaining inequalities. A supported
 difference residual can complete the free real coordinates before pivot reconstruction.
-Without equation repair, an entirely supported real difference graph can also complete
-the integer guesses. The full rows,
+A general residual is partitioned by connected real coordinates. Each component
+uses the difference checker when supported; other components can request exact points
+through the existing [source LP owner](../lp/architecture.md), sharing the reduction
+owner's operation allowance and unchanged small-model admission. Without equation
+repair, an entirely supported real difference graph can also complete the integer
+guesses. The full rows,
 strictness, integrality and source reconstruction still gate acceptance. Failed or
-unsupported guesses supply no conflict, bound or exhaustion claim. This path adds
-no LP solve and uses the current operation allowance; private neighborhood openings
+unsupported guesses supply no conflict, bound or exhaustion claim. Graph and prefix
+checks add no LP solve; general components request one only after those checks fail.
+Every stage uses the current operation allowance; private neighborhood openings
 retain their own completion path.
 
 Complete workers and open local search can share checked incumbents under the

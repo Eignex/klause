@@ -132,6 +132,9 @@ internal class SourceLpBudget(
         block: (Cancellation) -> T?,
     ): T? = runAdmitted(rows, variables, cancellation, emptyList(), emptyList(), true, block)
 
+    fun admitsDimensions(variables: Int, rows: Long): Boolean =
+        variables >= 0 && rows >= 0L && variables.toLong() + rows <= 128L
+
     private fun <T> runAdmitted(
         rows: List<ExactRationalInequality>,
         variables: Int,
@@ -158,7 +161,7 @@ internal class SourceLpBudget(
         try {
             val groups = listOf(rows) + additional
             val rowCount = groups.sumOf { it.size.toLong() }
-            if (variables < 0 || variables.toLong() + rowCount > 128L || rhs.size > 128) return null
+            if (!admitsDimensions(variables, rowCount) || rhs.size > 128) return null
             var entries = 0L
             var bits = 0L
             fun admit(number: BigFraction): Boolean {

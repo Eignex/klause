@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.satisfiesSourceRows
@@ -79,6 +80,29 @@ class MixedPointCompletionTest {
             rows, Cancellation.Never))
 
         assertTrue(point[0] > BigFraction.ZERO && point[0] < BigFraction.ONE)
+        assertTrue(point.satisfiesSourceRows(rows))
+    }
+
+    @Test
+    fun `small general residuals complete under the retained source allowance`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1, 2),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE, BigFraction.ONE), BigFraction.ZERO),
+            exactColumnLower(1, BigFraction.ZERO), exactColumnUpper(1, BigFraction.ZERO),
+            exactColumnLower(2, BigFraction.ZERO), exactColumnUpper(2, BigFraction.ONE),
+            exactColumnLower(3, BigFraction.ZERO), exactColumnUpper(3, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(2, 3),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE), BigFraction.MINUS_ONE, strict = true),
+        )
+        val budget = SourceLpBudget()
+
+        val point = assertNotNull(completeMixedPoint(4, 1, doubleArrayOf(0.0, 0.0, 0.0, 0.0, 1.0),
+            rows, Cancellation.Never, realCompletion = { columns, residual, stop ->
+                completeMixedRealComponents(columns, residual, budget, stop)
+            }))
+
         assertTrue(point.satisfiesSourceRows(rows))
     }
 

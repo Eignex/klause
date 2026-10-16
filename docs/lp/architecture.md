@@ -162,6 +162,13 @@ completion solves the selected relation directly. An unfixed index contributes
 only the range relaxation; complete arithmetic consumers install its equivalent
 guarded formula. The original real coordinates remain the witness authority.
 
+Complete mixed witness recovery can submit a connected real residual to `SourceLp`
+after fixing private integer guesses and reducing source equations. These requests
+share the exact-linear reduction owner's existing `SourceLpBudget` and small-model
+admission; each transient component closes within that invocation. Only exact primal
+coordinates are consumed. Source reconstruction and every original row still gate
+publication, and a failed guessed assignment supplies no source conflict or bound.
+
 Finite satisfaction and optimization searches share root hull pruning and global
 cut harvesting. Satisfaction uses a zero objective and admits variable shaving;
 objective shaving and incumbent-relative fixings remain optimization work. Root

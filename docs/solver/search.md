@@ -809,7 +809,7 @@ only input declarations. The pair is absent until observed and survives retracti
 and aggregation as a historical minimum. `smtCompleteSearchLinearChecks` counts LP
 attempts with all those Booleans assigned; `smtCompleteSearchLinearPoints` counts
 their returned LP continuous points before source-disjunction selection, integrality
-and full-source acceptance; independent mixed point recovery is excluded. Unobserved counts remain absent rather than zero.
+and full-source acceptance; independent mixed point recovery and its residual LP requests are excluded. Unobserved counts remain absent rather than zero.
 `smtCompleteSearchLinearOutcome_*` counts returned verdicts, float completion,
 raw exact-point presence and existing stage declines before the caller stop check.
 An absent stage differs from a present stage without a decline; neither establishes
@@ -822,7 +822,10 @@ and source branchers offering no further choice. `RECOVERY_*` records an actual 
 and its existing return path. Equality repair distinguishes paired equations,
 pivots, reconstructed guesses and failed full-row checks. Its residual observations
 separate unsupported rows, false constants, graph admission and graph points. A false
-residual belongs to guessed integers and establishes no source refutation. These are component stages, not full-source acceptance
+residual belongs to guessed integers and establishes no source refutation. Real
+component observations identify graph checks, source-LP dimension declines and requests,
+and points returned across every component. A source-LP request can still decline
+under its shared operation or work limits; it is not a numerical-call count. These are component stages, not full-source acceptance
 or explanations for UNKNOWN. A missing recovery attempt cannot identify which earlier
 stage stopped progress without the corresponding observations. Stage recording adds
 no scan, owner poll, numerical query or work allowance. Stages overlap and their
