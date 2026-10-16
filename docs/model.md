@@ -57,6 +57,9 @@ execution. `SourceSetup.prepare` binds the operation, original objective and dir
 finite engine choice, providers and containing preparation token. The selected finite
 shape retains that exact source plan; constructing it does not repeat routing.
 Baked sources retain their selected providers unless the request explicitly replaces them.
+Automatic pure-real and wide integral-objective preferences belong to setup; the
+objective interval scan observes and charges the containing preparation allowance.
+SMT-LIB linear admission retains that selected plan through finite adaptation.
 
 The source plan keeps the original objective while finite engines receive its
 minimize-oriented projection. Enumeration retains its operation identity even when

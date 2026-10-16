@@ -10,8 +10,8 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.presolve.OpenPresolveResult
-import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
@@ -27,10 +27,13 @@ import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
 import com.eignex.klause.solver.pipeline.PreparedExecution
-import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.PreparedPlanDecline
+import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
+import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.admission
 import com.eignex.klause.solver.pipeline.execute
@@ -91,11 +94,13 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, theory)
         if (scope.stop()) return scope.unknown()
         if (!scope.supportsSource()) return scope.unsupported()
-        val projections = projectionProviders.prepare(source)
-        val route = source.pipelineRoute(
-            projections, routePureRealToTheory = true,
-            boundCancellation = scope.stop, polynomialCancellation = scope.polynomialPreparation(),
-        )
+        val route = SourceSetup.prepare(
+            SourceSetupRequest(
+                SourceAttachment(source), ExecutionOperation.SATISFY, engine,
+                providers = projectionProviders, cancellation = scope.stop, boundCancellation = scope.stop,
+            ),
+            polynomialCancellation = scope.polynomialPreparation(),
+        ).route
         if (scope.stop()) return scope.unknown()
         val result = when (route) {
             is SourceProblemRoute.PolynomialTheory -> {
