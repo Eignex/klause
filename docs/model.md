@@ -60,6 +60,11 @@ Baked sources retain their selected providers unless the request explicitly repl
 Automatic pure-real and wide integral-objective preferences belong to setup; the
 objective interval scan observes and charges the containing preparation allowance.
 SMT-LIB linear admission retains that selected plan through finite adaptation.
+`SourceSetup.execute` dispatches captured finite, open-linear and polynomial operations.
+Its result retains the entire producing native execution alongside the original source
+interpretation. Exact linear and polynomial publication callbacks keep their own
+accepted samples, values and receipts. Heuristic fallback retains the captured plan,
+providers, requested lanes and containing stop rather than preparing an unrelated model.
 
 The source plan keeps the original objective while finite engines receive its
 minimize-oriented projection. Enumeration retains its operation identity even when

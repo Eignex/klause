@@ -31,6 +31,8 @@ import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
 import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceExecutionRequest
+import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
@@ -94,7 +96,7 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, theory)
         if (scope.stop()) return scope.unknown()
         if (!scope.supportsSource()) return scope.unsupported()
-        val route = SourceSetup.prepare(
+        val invocation = SourceSetup.prepare(
             SourceSetupRequest(
                 SourceAttachment(source),
                 ExecutionOperation.SATISFY,
@@ -104,19 +106,23 @@ class SourceStrategy internal constructor(
                 boundCancellation = scope.stop,
             ),
             polynomialCancellation = scope.polynomialPreparation(),
-        ).route
+        )
+        val route = invocation.route
         if (scope.stop()) return scope.unknown()
         val result = when (route) {
             is SourceProblemRoute.PolynomialTheory -> {
                 if (!scope.supportsPolynomial(engine)) return scope.unsupported()
-                OpenTheoryPipeline.execute(route.request, scope.polynomial, engine).result
+                (SourceSetup.execute(SourceExecutionRequest(invocation, polynomial = scope.polynomial))
+                    as SourceExecutionResult.Polynomial).result.result
             }
             is SourceProblemRoute.Finite -> finiteSolve(route, scope)
             is SourceProblemRoute.OpenTheory -> {
                 if (!scope.supportsOpen(engine)) {
                     return scope.unsupported()
                 }
-                (OpenTheoryPipeline.execute(route.request, scope.theory, engine) as OpenTheoryExecution.Satisfy).result
+                val execution = (SourceSetup.execute(SourceExecutionRequest(invocation, theory = scope.theory))
+                    as SourceExecutionResult.Linear).result
+                (execution as OpenTheoryExecution.Satisfy).result
             }
             is SourceProblemRoute.UnsupportedOpen -> {
                 if (route.preparedPlan.decline == PreparedPlanDecline.RESOURCE) {
@@ -125,9 +131,9 @@ class SourceStrategy internal constructor(
                 if (!scope.supportsOpen(engine)) {
                     return scope.unsupported()
                 }
-                (OpenTheoryPipeline.searchWithoutTheory(
-                    route.preparedPlan, scope.theory, null, engine,
-                ) as OpenTheoryExecution.Satisfy).result
+                val execution = (SourceSetup.execute(SourceExecutionRequest(invocation, theory = scope.theory))
+                    as SourceExecutionResult.Linear).result
+                (execution as OpenTheoryExecution.Satisfy).result
             }
             SourceProblemRoute.Refuted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
         }

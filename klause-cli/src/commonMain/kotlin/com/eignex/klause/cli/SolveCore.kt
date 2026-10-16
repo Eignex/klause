@@ -29,6 +29,11 @@ import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.QuadraticIncumbentPublication
+import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
+import com.eignex.klause.solver.pipeline.SourceExecutionRequest
+import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceIncumbentPublication
+import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.autoArms
 import com.eignex.klause.solver.pipeline.execute
@@ -199,20 +204,19 @@ internal object SolveCore {
                 pipeline.objective?.let { sourceObjective ->
                     output.begin(optimize = true, maximize = pipeline.maximize)
                     val sense = if (pipeline.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
-                    val execution = OpenTheoryPipeline.optimize(
-                        pipeline.request,
-                        sourceObjective,
-                        polynomialParams,
-                        engine,
-                        sense,
-                        openCores,
-                    ) { accepted ->
+                    val accepted: (QuadraticIncumbentPublication) -> Unit = { value ->
                         publication.publish(
-                            pipeline.render(polynomialAssignment(accepted.incumbent.sample)),
-                            SourceValue.Algebraic(accepted.incumbent.value),
-                            accepted.version,
+                            pipeline.render(polynomialAssignment(value.incumbent.sample)),
+                            SourceValue.Algebraic(value.incumbent.value), value.version,
                         )
                     }
+                    val execution = rawSolvable.sourceInvocation?.let { invocation ->
+                        (SourceSetup.execute(SourceExecutionRequest(invocation, polynomial = polynomialParams,
+                            cores = openCores), SourceExecutionCallbacks(onQuadraticIncumbent = accepted))
+                            as SourceExecutionResult.Quadratic).result
+                    } ?: OpenTheoryPipeline.optimize(
+                        pipeline.request, sourceObjective, polynomialParams, engine, sense, openCores, accepted,
+                    )
                     reportQuadraticOptimization(
                         execution,
                         { pipeline.render(polynomialAssignment(it)) },
@@ -231,7 +235,10 @@ internal object SolveCore {
                 if (solutionSetSensitive) usageError("all-solution enumeration is unavailable for this exact source")
                 val polynomialParams = polynomialParams(common, deadlineCancel)
                 output.begin(optimize = false, maximize = false)
-                val execution = pipeline.request.execute(polynomialParams, engine, openCores)
+                val execution = rawSolvable.sourceInvocation?.let { invocation ->
+                    (SourceSetup.execute(SourceExecutionRequest(invocation, polynomial = polynomialParams,
+                        cores = openCores)) as SourceExecutionResult.Polynomial).result
+                } ?: pipeline.request.execute(polynomialParams, engine, openCores)
                 val result = if ((engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) &&
                     execution.result is OpenTheoryResult.Unsat
                 ) {
@@ -355,17 +362,16 @@ internal object SolveCore {
                     maxInstructions = takeOpenLongParam(common, "max-instructions", nonNegative = true),
                     alnsIterations = takeOpenIntParam(common, "alns-iterations", nonNegative = true) ?: 50,
                 )
+                fun executeHeuristic(onAccepted: ((SourceIncumbentPublication) -> Unit)? = null): OpenTheoryExecution =
+                    rawSolvable.sourceInvocation?.let { invocation ->
+                        (SourceSetup.execute(SourceExecutionRequest(invocation, theory = params, cores = openCores),
+                            SourceExecutionCallbacks(onLinearIncumbent = onAccepted)) as SourceExecutionResult.Linear).result
+                    } ?: OpenTheoryPipeline.searchWithoutTheory(pipeline.model, params, pipeline.objective,
+                        engine, openCores, pipeline.maximize, onAccepted)
                 val objective = pipeline.objective
                 if (objective != null) {
                     output.begin(optimize = true, maximize = pipeline.maximize)
-                    val execution = OpenTheoryPipeline.searchWithoutTheory(
-                        pipeline.model,
-                        params,
-                        objective,
-                        engine,
-                        openCores,
-                        pipeline.maximize,
-                    ) { accepted ->
+                    val execution = executeHeuristic { accepted ->
                         val rendered = pipeline.render(OpenTheoryAssignment.Sampled(accepted.sample))
                         publication.publish(rendered, accepted.value, accepted.version)
                     }
@@ -385,7 +391,7 @@ internal object SolveCore {
                     return
                 }
                 output.begin(optimize = false, maximize = false)
-                val execution = OpenTheoryPipeline.searchWithoutTheory(pipeline.model, params, null, engine, openCores)
+                val execution = executeHeuristic()
                 val result = (execution as OpenTheoryExecution.Satisfy).result
                 output.onVerdictContext(
                     VerdictContext(
@@ -459,10 +465,17 @@ internal object SolveCore {
                     if (prepared.infeasible) errPrintln("  preparation refuted the model")
                     return
                 }
+                fun executeOpen(onAccepted: ((SourceIncumbentPublication) -> Unit)? = null): OpenTheoryExecution =
+                    rawSolvable.sourceInvocation?.let { invocation ->
+                        (SourceSetup.execute(SourceExecutionRequest(invocation, theory = theoryParams, cores = openCores,
+                            presolveConfig = config, presolveCancellation = presolveCancel,
+                            presolveBudget = presolveBudget), SourceExecutionCallbacks(onLinearIncumbent = onAccepted))
+                            as SourceExecutionResult.Linear).result
+                    } ?: OpenTheoryPipeline.execute(request, theoryParams, engine, openCores, onAccepted)
                 val objective = request.objective
                 if (objective != null) {
                     output.begin(optimize = true, maximize = request.maximize)
-                    val execution = OpenTheoryPipeline.execute(request, theoryParams, engine, openCores) { accepted ->
+                    val execution = executeOpen { accepted ->
                         val rendered = pipeline.render(OpenTheoryAssignment.Sampled(accepted.sample))
                         publication.publish(rendered, accepted.value, accepted.version)
                     }
@@ -483,7 +496,7 @@ internal object SolveCore {
                     return
                 }
                 output.begin(optimize = false, maximize = false)
-                val execution = OpenTheoryPipeline.execute(request, theoryParams, engine, openCores)
+                val execution = executeOpen()
                 val result = (execution as OpenTheoryExecution.Satisfy).result
                 val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(rawSolvable.routingLpStats))
                 output.onVerdictContext(
@@ -516,7 +529,8 @@ internal object SolveCore {
             // Routing already decided the model over its genuinely open ranges, so no engine runs and
             // there is nothing for a budget to have cut short.
             SolvablePipeline.Refuted -> {
-                output.begin(optimize = false, maximize = false)
+                rawSolvable.sourceInvocation?.let { SourceSetup.execute(SourceExecutionRequest(it)) }
+                output.begin(optimize = rawSolvable.optimize, maximize = rawSolvable.maximize)
                 output.onComplete(Verdict.UNSATISFIABLE)
                 if (common.statistics) {
                     output.onStatistics(
@@ -991,9 +1005,7 @@ internal object SolveCore {
         output: OutputProtocol,
     ) {
         val workBefore = request.presolveBudget?.spent() ?: 0L
-        val result = FinitePipeline.solve(
-            request,
-            FiniteSolveCallbacks(
+        val callbacks = FiniteSolveCallbacks(
                 onSample = { sample -> emit(output, solvable, sample) },
                 onImprovement = { improvement ->
                     val (objective, continuousObjective) = emit(output, solvable, improvement.sample)
@@ -1006,8 +1018,16 @@ internal object SolveCore {
                         )
                     }
                 },
-            ),
         )
+        val invocation = request.shape.sourceInvocation
+        val result = if (invocation == null) {
+            FinitePipeline.solve(request, callbacks)
+        } else {
+            (SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+                require(shape === request.shape) { "finite CLI request belongs to another source invocation" }
+                request
+            }), SourceExecutionCallbacks(finite = callbacks)) as SourceExecutionResult.Finite).result
+        }
         val preparation = result.preparation
         cliLogger(common.verbose).v {
             val p0 = solvable.finiteProblem

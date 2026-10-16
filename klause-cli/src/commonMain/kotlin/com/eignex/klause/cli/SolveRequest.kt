@@ -9,13 +9,16 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExactTheorySatisfactionRequest
+import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteSolveShape
 import com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryRequest
 import com.eignex.klause.solver.pipeline.NumericalLinearRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.PolynomialTheoryRequest
+import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.maximizeSourceObjective
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -42,7 +45,13 @@ internal class Solvable(
     /** Tolerance semantics for continuous leaves: a check of a source-space sample; `null` keeps exact semantics. */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
     val numericalCompletion: Boolean = false,
+    val sourceInvocation: PreparedSourceInvocation? = finite?.sourceInvocation,
 ) {
+    fun withSourceInvocation(invocation: PreparedSourceInvocation): Solvable = Solvable(
+        finite, render, objectiveValue, continuousObjectiveValue, pipeline, routingLpStats, routingElapsedMs,
+        toleranceCheck, numericalCompletion, invocation,
+    )
+
     /** This instance solved under tolerance semantics with [check]. */
     fun withToleranceCheck(check: (Sample) -> Boolean): Solvable = Solvable(
         finite,
@@ -54,10 +63,11 @@ internal class Solvable(
         routingElapsedMs,
         check,
         numericalCompletion,
+        sourceInvocation,
     )
 
     fun withNumericalCompletion(): Solvable = Solvable(finite, render, objectiveValue,
-        continuousObjectiveValue, pipeline, routingLpStats, routingElapsedMs, toleranceCheck, true)
+        continuousObjectiveValue, pipeline, routingLpStats, routingElapsedMs, toleranceCheck, true, sourceInvocation)
 
     constructor(
         /** Finite CP problem. */
@@ -115,11 +125,12 @@ internal class Solvable(
 
     /** Finite CP problem. */
     val problem: Problem? get() = finite?.problem
-    val optimize: Boolean get() = finite?.optimize ?: (
+    val optimize: Boolean get() = finite?.optimize ?:
+        sourceInvocation?.let { it.operation == ExecutionOperation.OPTIMIZE } ?: (
         openRequest?.objective != null || polynomial?.objective != null || quadratic != null ||
             numerical?.request?.objective != null
     )
-    val maximize: Boolean get() = finite?.maximize ?: (
+    val maximize: Boolean get() = finite?.maximize ?: sourceInvocation?.maximizeSourceObjective ?: (
         openRequest?.maximize ?: polynomial?.maximize ?: numerical?.request?.maximize ?:
             (quadratic?.sense == ObjectiveSense.MAXIMIZE)
     )

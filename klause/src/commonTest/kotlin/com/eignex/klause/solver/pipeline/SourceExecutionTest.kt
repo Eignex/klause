@@ -1,0 +1,211 @@
+package com.eignex.klause.solver.pipeline
+
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.Bits
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+
+class SourceExecutionTest {
+    @Test
+    fun `finite dispatch should retain source publication and native outcome`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(2, 2)), emptyArray())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.MIXED,
+        ))
+        val samples = mutableListOf<Sample>()
+
+        val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(
+            SourceExecutionRequest(invocation, finiteRequest = { shape ->
+                FiniteSolveRequest(shape, FiniteEngine.MIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                    presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
+                    randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.OFF,
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                    solveBudgetMillis = null, allSolutions = false, solutionCap = null, deadlineExceeded = { false },
+                    onEvent = null, onPortfolioEvent = null)
+            }),
+            SourceExecutionCallbacks(finite = FiniteSolveCallbacks(samples::add, { samples += it.sample })),
+        ))
+
+        val outcome = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
+        assertEquals(FiniteSolveVerdict.SAT, outcome.verdict)
+        assertEquals(2L, assertNotNull(outcome.bestSample).intValue(0))
+        assertEquals(2L, samples.last().intValue(0))
+        assertSame(source.semantics, result.semantics)
+        assertSame(invocation, result.invocation)
+    }
+
+    @Test
+    fun `linear dispatch should retain exact source values and accepted publications`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intVars = intArrayOf(),
+            intCoeffs = doubleArrayOf(), realVars = intArrayOf(0), realCoeffs = doubleArrayOf(3.0),
+            op = LinearOp.EQ, bound = 1.0)), numRealVars = 1)
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0), constant = 7)
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK, objective,
+        ))
+        val values = mutableListOf<SourceValue>()
+
+        val result = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(
+            SourceExecutionRequest(invocation, finiteRequest = { error("an unused finite consumer was constructed") }),
+            SourceExecutionCallbacks(onLinearIncumbent = { values += it.value }),
+        ))
+
+        val native = assertIs<OpenTheoryExecution.Optimize>(result.result)
+        val optimum = assertIs<OpenTheoryOptimum.Optimal>(native.result)
+        val expected = BigFraction.ofLong(22) * BigFraction.ofLong(3).reciprocal()
+        assertEquals(expected, optimum.value)
+        assertEquals(expected, assertIs<SourceValue.Rational>(values.last()).value)
+        assertNotNull(native.acceptedIncumbent)
+        assertSame(source.semantics, result.semantics)
+    }
+
+    @Test
+    fun `polynomial dispatch should retain its native completion and resource telemetry`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+
+        val result = assertIs<SourceExecutionResult.Polynomial>(SourceSetup.execute(SourceExecutionRequest(invocation)))
+
+        val point = assertIs<OpenTheoryResult.Sat>(result.result.result).assignment
+        assertEquals(BigFraction.ONE, assertNotNull(point.algebraicRealValue(0)).rational)
+        assertEquals(BigFraction.ONE, assertNotNull(point.algebraicRealValue(1)).rational)
+        assertTrue(result.result.stats.workSpent > 0)
+        assertSame(source.semantics, result.result.result.semantics)
+    }
+
+    @Test
+    fun `polynomial maximization should retain original objective direction and native optimum`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(0.0, 1.0), constant = 7)
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK, objective, maximize = true,
+        ))
+
+        val result = assertIs<SourceExecutionResult.Quadratic>(SourceSetup.execute(SourceExecutionRequest(invocation)))
+
+        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result.result.result)
+        assertEquals(ObjectiveSense.MAXIMIZE, optimum.sense)
+        assertEquals(BigFraction.ofLong(8), optimum.incumbent.value.rational)
+        assertSame(objective, result.invocation.sourceObjective)
+    }
+
+    @Test
+    fun `a stopped source invocation should not resume through fresh execution controls`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
+        var stopped = false
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK, cancellation = Cancellation { stopped }))
+        stopped = true
+
+        val first = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(SourceExecutionRequest(invocation)))
+        stopped = false
+        val second = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(SourceExecutionRequest(invocation)))
+
+        for (result in listOf(first, second)) {
+            val native = assertIs<OpenTheoryExecution.Satisfy>(result.result)
+            assertEquals(TerminationReason.Cancelled, assertIs<OpenTheoryResult.Unknown>(native.result).reason)
+            assertSame(source.semantics, result.semantics)
+        }
+    }
+
+    @Test
+    fun `nonfinite enumeration should reject before constructing an execution consumer`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source), ExecutionOperation.ENUMERATE, FiniteEngine.MIXED,
+        ))
+
+        assertFailsWith<PipelineConfigException> {
+            SourceSetup.execute(SourceExecutionRequest(invocation,
+                finiteRequest = { error("an incompatible finite consumer was constructed") }))
+        }
+    }
+
+    @Test
+    fun `finite dispatch should reject a request bound to another source`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(2, 2)), emptyArray())
+        val first = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
+        val second = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
+
+        assertFailsWith<IllegalArgumentException> {
+            SourceSetup.execute(SourceExecutionRequest(first, finiteRequest = {
+                FiniteSolveRequest(second.finiteShape(), FiniteEngine.FIXED, PresolveConfig.NONE,
+                    false, false, Cancellation.Never, presolveBudget = null, cores = 1,
+                    executionOptions = ExecutionOptions.parse(emptyList()), randomSeed = 17,
+                    defaultArms = 1, lpConfig = LpConfig.OFF,
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                    solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                    deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null)
+            }))
+        }
+    }
+    @Test
+    fun `a refused complete route should retain its source checked heuristic witness`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 0), IntDomain(0, 2)),
+            arrayOf(AllDifferent(intArrayOf(0, 1), 0, 3)), openIntHi = booleanArrayOf(false, true))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH,
+        ))
+        assertEquals(SourceExecutionKind.HEURISTIC, SourceSetup.executionKind(invocation))
+
+        val result = assertIs<SourceExecutionResult.Linear>(SourceSetup.execute(SourceExecutionRequest(
+            invocation, theory = TheoryParams(maxFlips = 32, randomSeed = 17),
+        )))
+
+        val native = assertIs<OpenTheoryExecution.Satisfy>(result.result)
+        val point = assertIs<OpenTheoryResult.Sat>(native.result).assignment
+        assertEquals("0", point.intValue(0))
+        assertTrue(point.intValue(1).toLong() > 0)
+        assertSame(source, assertNotNull(invocation.preparedPlan).originalSource)
+    }
+
+    @Test
+    fun `source refutation should finish empty enumeration without constructing a worker`() {
+        val open = Bits(1).also { it.set(0) }
+        val source = Problem(0, IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+                Linear(intArrayOf(-1), intArrayOf(0), LinearOp.LE, -5)))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source), ExecutionOperation.ENUMERATE, FiniteEngine.MIXED,
+        ))
+
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
+            finiteRequest = { error("a refuted source constructed a worker") }))
+
+        assertIs<SourceExecutionResult.Refuted>(result)
+        assertSame(source, result.invocation.source.originalSource)
+        assertEquals(ExecutionOperation.ENUMERATE, result.invocation.operation)
+    }
+
+}
