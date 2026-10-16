@@ -29,8 +29,15 @@ internal fun OpenTheoryRequest.linearAuthorityContext(cancellation: Cancellation
     linearContext?.let { return it }
     val objective = objective ?: return null
     val original = preparedPlan.sourceModel ?: return null
-    return original.linearAuthorityContext(objective, if (maximize) ObjectiveSense.MAXIMIZE
-        else ObjectiveSense.MINIMIZE, cancellation)
+    return original.linearAuthorityContext(
+        objective,
+        if (maximize) {
+            ObjectiveSense.MAXIMIZE
+        } else {
+            ObjectiveSense.MINIMIZE
+        },
+        cancellation,
+    )
 }
 
 internal fun Problem.linearAuthorityContext(
@@ -46,7 +53,9 @@ internal fun Problem.linearAuthorityContext(
         for (row in form.rows) {
             if (row.relation == LinearOp.NE ||
                 (row.relation == LinearOp.EQ && row.activator != LinearRow.ALWAYS)
-            ) return null
+            ) {
+                return null
+            }
             val booleans = linkedSetOf<Int>()
             if (row.activator != LinearRow.ALWAYS) booleans += row.activator
             for (id in 0 until row.size) {
@@ -56,11 +65,17 @@ internal fun Problem.linearAuthorityContext(
         }
     }
     val identity = Uuid.random().toString()
-    val scope = SourceScope(SourceRevision(identity, "klause-ir-exact-v1"),
-        objective = SourceObjective("$identity/objective", sense))
+    val scope = SourceScope(
+        SourceRevision(identity, "klause-ir-exact-v1"),
+        objective = SourceObjective("$identity/objective", sense),
+    )
     val captured = sourceProofContext(scope, objective, cancellation) ?: return null
-    val affine = LinearSourceSemanticsChecker(captured.coordinates, captured.premises.values.toList(),
-        captured.objective, captured.objectiveConstant)
+    val affine = LinearSourceSemanticsChecker(
+        captured.coordinates,
+        captured.premises.values.toList(),
+        captured.objective,
+        captured.objectiveConstant,
+    )
     val source = this
     val checker = object : SourceSemanticsChecker {
         override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
@@ -78,7 +93,10 @@ internal fun Problem.linearAuthorityContext(
         }
 
         override fun objectiveEquals(
-            sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
+            sample: Sample,
+            value: SourceValue,
+            scope: SourceScope,
+            cancellation: Cancellation,
         ): SourceEvidenceCheck = affine.objectiveEquals(sample, value, scope, cancellation)
 
         override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
@@ -86,6 +104,13 @@ internal fun Problem.linearAuthorityContext(
             return if (checked == SourceEvidenceCheck.Checked) affine.ray(claim, scope, cancellation) else checked
         }
     }
-    return SourceProofContext(scope, captured.coordinates, captured.premises, captured.objective,
-        captured.objectiveConstant, checker, captured.semantics)
+    return SourceProofContext(
+        scope,
+        captured.coordinates,
+        captured.premises,
+        captured.objective,
+        captured.objectiveConstant,
+        checker,
+        captured.semantics,
+    )
 }

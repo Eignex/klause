@@ -28,10 +28,16 @@ class LinearSourceWitnessTest {
         val third = BigFraction.ofLong(3).reciprocal()
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, BigFraction.ONE)), lower = third)),
-            semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+            listOf(LinearSourceRow(
+                listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                lower = SemanticRational.of(BIG_ONE, bigIntOf(3)),
+            )),
+            semantics = SourceSemantics(
+                SourceFormat.MPS,
+                feasibilityTolerance = SourceTolerance(
                 absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
-            )).resolve(),
+            )
+            ).resolve(),
         )
         val value = third - BigFraction.ofLong(2_000_000).reciprocal()
 
@@ -47,11 +53,21 @@ class LinearSourceWitnessTest {
     fun `relative tolerance should retain canceling original term magnitudes`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, BigFraction.ONE),
-                LinearSourceTerm(0, BigFraction.MINUS_ONE)), lower = BigFraction.ONE)),
-            semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+            listOf(
+                LinearSourceRow(
+                    listOf(
+                LinearSourceTerm(0, SemanticRational.ONE),
+                LinearSourceTerm(0, SemanticRational.ofLong(-1)),
+            ),
+                lower = SemanticRational.ONE
+                )
+            ),
+            semantics = SourceSemantics(
+                SourceFormat.MPS,
+                feasibilityTolerance = SourceTolerance(
                 relative = SemanticRational.of(BIG_ONE, bigIntOf(10)),
-            )).resolve(),
+            )
+            ).resolve(),
         )
 
         val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(10)), Cancellation.Never)
@@ -62,10 +78,14 @@ class LinearSourceWitnessTest {
     @Test
     fun `tolerance should not relax integer integrality`() {
         val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("n", true)), emptyList(),
-            semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+            listOf(LinearSourceVariable("n", true)),
+            emptyList(),
+            semantics = SourceSemantics(
+                SourceFormat.MPS,
+                feasibilityTolerance = SourceTolerance(
                 absolute = SemanticRational.ONE,
-            )).resolve(),
+            )
+            ).resolve(),
         )
 
         val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(2).reciprocal()), Cancellation.Never)
@@ -77,8 +97,13 @@ class LinearSourceWitnessTest {
     fun `inactive integer indicators should leave their row unconstrained`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("guard", true), LinearSourceVariable("x", false)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(1, BigFraction.ONE)), lower = BigFraction.ONE,
-                indicator = LinearSourceIndicator(0, true))),
+            listOf(
+                LinearSourceRow(
+                listOf(LinearSourceTerm(1, SemanticRational.ONE)),
+                lower = SemanticRational.ONE,
+                indicator = LinearSourceIndicator(0, true),
+            )
+            ),
         )
 
         val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO, BigFraction.ZERO), Cancellation.Never)
@@ -89,9 +114,13 @@ class LinearSourceWitnessTest {
     @Test
     fun `maximization should retain exact source coefficient and constant units`() {
         val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("n", true)), emptyList(),
-            LinearSourceObjective(listOf(LinearSourceTerm(0, BigFraction.ofLong(3).reciprocal())),
-                BigFraction.ofLong(10).reciprocal(), ObjectiveSense.MAXIMIZE),
+            listOf(LinearSourceVariable("n", true)),
+            emptyList(),
+            LinearSourceObjective(
+                listOf(LinearSourceTerm(0, SemanticRational.of(BIG_ONE, bigIntOf(3)))),
+                SemanticRational.of(BIG_ONE, bigIntOf(10)),
+                ObjectiveSense.MAXIMIZE,
+            ),
         )
 
         val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(3)), Cancellation.Never)

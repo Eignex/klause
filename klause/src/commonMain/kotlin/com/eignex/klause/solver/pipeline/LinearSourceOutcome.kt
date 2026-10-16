@@ -1,17 +1,17 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.LinearSourceWitness
 import com.eignex.klause.solver.validation.checkLinearSourceWitness
-import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
@@ -20,14 +20,19 @@ import com.eignex.klause.util.parseBigInt
 enum class LinearSourceConclusion {
     /** No accepted source conclusion is available. */
     UNKNOWN,
+
     /** An original-source point is accepted. */
     SATISFIABLE,
+
     /** An accepted source point attains a checked global original-unit bound. */
     OPTIMAL,
+
     /** The accepted source has no feasible assignment. */
     UNSATISFIABLE,
+
     /** A checked source trajectory improves the original objective without limit. */
     UNBOUNDED,
+
     /** A checked original-source objective limit is unattained. */
     LIMIT,
 }
@@ -44,6 +49,8 @@ class LinearSourceOutcome internal constructor(
     val conclusion: LinearSourceConclusion,
     /** Whether the native view retains the nominal rational source exactly. */
     val nominalSourceExact: Boolean,
+    /** Whether nominal constraints retain source feasibility independently of objective projection. */
+    val nominalConstraintsExact: Boolean,
     /** Whether nominal constraints and tolerance acceptance have the same feasible points. */
     val claimsCoverTolerance: Boolean,
     /** Independently checked global accepted-set objective bound in original units. */
@@ -153,14 +160,17 @@ internal fun executeLinearSource(
         },
         onQuadraticIncumbent = { publication ->
             accept(prepared.check(publication.incumbent.sample, stop))?.objective?.let { value ->
-                callbacks.onQuadraticIncumbent?.invoke(publication.copy(
+                callbacks.onQuadraticIncumbent?.invoke(
+                    publication.copy(
                     incumbent = publication.incumbent.copy(value = AlgebraicArithmetic().rational(value)),
-                ))
+                )
+                )
             }
         },
     )
     val result = execute(request, observed)
     var native = LinearSourceConclusion.UNKNOWN
+    var nativeOptimalValue: BigFraction? = null
     var unboundedBaseExact = false
     fun sample(sample: Sample?) {
         if (sample != null) accept(prepared.check(sample, stop))
@@ -171,14 +181,25 @@ internal fun executeLinearSource(
     fun linear(result: com.eignex.klause.solver.result.LinearOptimizationResult) {
         sample(result.incumbent)
         native = when (val claim = result.terminal?.claim) {
-            is SourceClaim.Optimal -> LinearSourceConclusion.OPTIMAL
+            is SourceClaim.Optimal -> {
+                nativeOptimalValue = when (val value = claim.value) {
+                    is SourceValue.Rational -> value.value
+                    is SourceValue.Algebraic -> value.value.linearRational()
+                    is SourceValue.Extension -> null
+                }
+                LinearSourceConclusion.OPTIMAL
+            }
+
             SourceClaim.Refutation -> LinearSourceConclusion.UNSATISFIABLE
+
             is SourceClaim.Limit -> LinearSourceConclusion.LIMIT
+
             is SourceClaim.Unbounded -> {
                 val point = (prepared.check(claim.sample, stop) as? LinearSourceCheck.Accepted)?.witness
                 unboundedBaseExact = point?.exact == true
                 LinearSourceConclusion.UNBOUNDED
             }
+
             else -> if (result.incumbent != null) LinearSourceConclusion.SATISFIABLE else LinearSourceConclusion.UNKNOWN
         }
     }
@@ -186,72 +207,107 @@ internal fun executeLinearSource(
         is SourceExecutionResult.Finite -> (result.result.outcome as? FiniteSolveOutcome.Completed)?.let { completed ->
             sample(completed.bestSample)
             native = when (completed.verdict) {
-                FiniteSolveVerdict.OPTIMAL -> LinearSourceConclusion.OPTIMAL
+                FiniteSolveVerdict.OPTIMAL -> {
+                    nativeOptimalValue = completed.bestSample?.let { prepared.objective?.evaluateExact(it) }
+                    LinearSourceConclusion.OPTIMAL
+                }
+
                 FiniteSolveVerdict.UNSAT -> LinearSourceConclusion.UNSATISFIABLE
+
                 FiniteSolveVerdict.UNBOUNDED -> {
                     unboundedBaseExact = completed.bestSample?.let {
                         (prepared.check(it, stop) as? LinearSourceCheck.Accepted)?.witness?.exact
                     } == true
                     LinearSourceConclusion.UNBOUNDED
                 }
+
                 FiniteSolveVerdict.SAT, FiniteSolveVerdict.BEST_FOUND -> LinearSourceConclusion.SATISFIABLE
+
                 FiniteSolveVerdict.UNKNOWN -> LinearSourceConclusion.UNKNOWN
             }
         }
+
         is SourceExecutionResult.Numerical -> linear(result.result)
+
         is SourceExecutionResult.Linear -> when (val execution = result.result) {
             is OpenTheoryExecution.Satisfy -> when (val solved = execution.result) {
                 is OpenTheoryResult.Sat -> {
                     assignment(solved.assignment)
                     native = LinearSourceConclusion.SATISFIABLE
                 }
+
                 is OpenTheoryResult.Unsat -> native = LinearSourceConclusion.UNSATISFIABLE
+
                 is OpenTheoryResult.Unknown -> Unit
             }
+
             is OpenTheoryExecution.Optimize -> {
                 val optimum = execution.result
-                if (optimum.linearResult != null) linear(requireNotNull(optimum.linearResult)) else when (optimum) {
+                if (optimum.linearResult != null) {
+                    linear(requireNotNull(optimum.linearResult))
+                } else {
+                    when (optimum) {
                     is OpenTheoryOptimum.Optimal -> {
                         assignment(optimum.assignment)
+                        nativeOptimalValue = optimum.value
                         native = LinearSourceConclusion.OPTIMAL
                     }
+
                     is OpenTheoryOptimum.Infeasible -> native = LinearSourceConclusion.UNSATISFIABLE
+
                     is OpenTheoryOptimum.Unbounded -> {
                         assignment(optimum.witness)
                         unboundedBaseExact = (prepared.check(optimum.witness, stop) as? LinearSourceCheck.Accepted)
                             ?.witness?.exact == true
                         native = LinearSourceConclusion.UNBOUNDED
                     }
+
                     is OpenTheoryOptimum.Bounded -> assignment(optimum.incumbent)
+                }
                 }
             }
         }
+
         is SourceExecutionResult.Refuted -> native = LinearSourceConclusion.UNSATISFIABLE
+
         is SourceExecutionResult.Declined -> Unit
+
         is SourceExecutionResult.Polynomial -> when (val solved = result.result.result) {
             is OpenTheoryResult.Sat -> {
                 assignment(solved.assignment)
                 native = LinearSourceConclusion.SATISFIABLE
             }
+
             is OpenTheoryResult.Unsat -> native = LinearSourceConclusion.UNSATISFIABLE
+
             is OpenTheoryResult.Unknown -> Unit
         }
+
         is SourceExecutionResult.Quadratic -> {
             val optimum = result.result.result
             (optimum as? QuadraticOptimizationResult.WithIncumbent)?.let { sample(it.incumbent.sample) }
             native = when (optimum) {
-                is QuadraticOptimizationResult.Optimal -> LinearSourceConclusion.OPTIMAL
+                is QuadraticOptimizationResult.Optimal -> {
+                    nativeOptimalValue = optimum.bound.value.linearRational()
+                    LinearSourceConclusion.OPTIMAL
+                }
+
                 is QuadraticOptimizationResult.UnattainedLimit -> LinearSourceConclusion.LIMIT
+
                 is QuadraticOptimizationResult.Unbounded -> {
                     unboundedBaseExact = (prepared.check(optimum.incumbent.sample, stop) as? LinearSourceCheck.Accepted)
                         ?.witness?.exact == true
                     LinearSourceConclusion.UNBOUNDED
                 }
+
                 is QuadraticOptimizationResult.BestFound -> LinearSourceConclusion.SATISFIABLE
+
                 is QuadraticOptimizationResult.Infeasible -> LinearSourceConclusion.UNSATISFIABLE
+
                 is QuadraticOptimizationResult.Unknown -> LinearSourceConclusion.UNKNOWN
             }
         }
+
         is SourceExecutionResult.Transcendental -> error("linear source selected function execution")
     }
     val strategy = request.polynomial.strategy
@@ -260,22 +316,32 @@ internal fun executeLinearSource(
     ) {
         listOf(strategy.assumptions, strategy.backtrack.assumptions, strategy.localSearch.assumptions)
             .all { it.isEmpty && it.deductions.isEmpty }
-    } else true
+    } else {
+        true
+    }
     val equivalent = prepared.view.exact && prepared.claimsCoverTolerance && nativeClaimsUnrestricted
     val acceptedOptimal = incumbent?.objective?.let { value -> value == prepared.acceptedObjectiveBound } == true
+    val nativeOptimalAttained = incumbent?.objective?.let { value ->
+        value * prepared.view.objectiveScale == nativeOptimalValue
+    } == true
     val conclusion = when {
         acceptedOptimal -> LinearSourceConclusion.OPTIMAL
-        native == LinearSourceConclusion.UNSATISFIABLE && equivalent -> native
+        native == LinearSourceConclusion.UNSATISFIABLE && prepared.view.constraintsExact &&
+            prepared.claimsCoverTolerance && nativeClaimsUnrestricted -> native
         invocation.operation != ExecutionOperation.OPTIMIZE && incumbent != null -> LinearSourceConclusion.SATISFIABLE
-        native == LinearSourceConclusion.OPTIMAL && equivalent && incumbent?.exact == true -> native
+        native == LinearSourceConclusion.OPTIMAL && equivalent && incumbent?.exact == true &&
+            nativeOptimalAttained -> native
         native == LinearSourceConclusion.LIMIT && equivalent -> native
         native == LinearSourceConclusion.UNBOUNDED && prepared.view.exact && unboundedBaseExact -> native
         incumbent != null -> LinearSourceConclusion.SATISFIABLE
         else -> LinearSourceConclusion.UNKNOWN
     }
-    val snapshot = LinearSourceOutcome(prepared.view.source, incumbent, native, conclusion,
-        prepared.view.exact, prepared.claimsCoverTolerance, prepared.acceptedObjectiveBound,
-        nativeClaimsUnrestricted, prepared.view.objectiveScale)
+    val snapshot = LinearSourceOutcome(
+        prepared.view.source, incumbent, native, conclusion,
+        prepared.view.exact, prepared.view.constraintsExact, prepared.claimsCoverTolerance,
+        prepared.acceptedObjectiveBound,
+        nativeClaimsUnrestricted, prepared.view.objectiveScale,
+    )
     return when (result) {
         is SourceExecutionResult.Finite -> SourceExecutionResult.Finite(invocation, result.result, snapshot)
         is SourceExecutionResult.Linear -> SourceExecutionResult.Linear(invocation, result.result, snapshot)

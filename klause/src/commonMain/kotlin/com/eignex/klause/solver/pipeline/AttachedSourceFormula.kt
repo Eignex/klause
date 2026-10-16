@@ -31,10 +31,8 @@ internal sealed interface AttachedSourceFormula {
 internal sealed interface NativeSourceExecution {
     val preparedPlan: PreparedSourcePlan
 
-    class Numerical(
-        val request: NumericalLinearRequest,
-        override val preparedPlan: PreparedSourcePlan,
-    ) : NativeSourceExecution
+    class Numerical(val request: NumericalLinearRequest, override val preparedPlan: PreparedSourcePlan) :
+        NativeSourceExecution
 
     class Polynomial(val request: PolynomialTheoryRequest) : NativeSourceExecution {
         override val preparedPlan: PreparedSourcePlan get() = request.preparedPlan
@@ -65,6 +63,7 @@ internal fun prepareNativeSource(
     if (stop()) return SourceProblemRoute.NativeFormula(null)
     val execution = when (formula) {
         is AttachedSourceFormula.Linear -> error("linear sources prepare their source-unit execution view")
+
         is AttachedSourceFormula.Polynomial -> NativeSourceExecution.Polynomial(
             PolynomialTheoryRequest(
                 formula.problem,

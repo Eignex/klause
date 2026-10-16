@@ -1,15 +1,15 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.EffectiveSourceSemantics
-import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.LinearSourceObjective
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.LinearOptimizationResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 
 /** Installed execution family, after source routing and operation admission. */

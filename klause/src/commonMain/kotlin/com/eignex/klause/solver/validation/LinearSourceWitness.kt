@@ -2,6 +2,7 @@ package com.eignex.klause.solver.validation
 
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
@@ -54,7 +55,9 @@ internal fun checkLinearSourceWitness(
         if (stop()) return LinearSourceCheck.Declined
         val value = values[index]
         if (variable.integer && value.den != BIG_ONE) return LinearSourceCheck.Rejected
-        if (!satisfies(value, variable.lower, variable.upper, BigFraction.ZERO)) return LinearSourceCheck.Rejected
+        if (!satisfies(value, variable.lower?.fraction(), variable.upper?.fraction(), BigFraction.ZERO)) {
+            return LinearSourceCheck.Rejected
+        }
     }
     for (row in source.rowValues) {
         stop.charge(1L)
@@ -67,24 +70,30 @@ internal fun checkLinearSourceWitness(
         for (term in row.termValues) {
             stop.charge(1L)
             if (stop()) return LinearSourceCheck.Declined
-            val value = term.coefficient * values[term.column]
+            val value = term.coefficient.fraction() * values[term.column]
             activity += value
             magnitude += value.magnitude()
         }
-        if (!satisfies(activity, row.lower, row.upper, magnitude)) return LinearSourceCheck.Rejected
+        if (!satisfies(activity, row.lower?.fraction(), row.upper?.fraction(), magnitude)) {
+            return LinearSourceCheck.Rejected
+        }
     }
     val objective = source.objective?.let { objective ->
-        var value = objective.constant
+        var value = objective.constant.fraction()
         for (term in objective.termValues) {
             stop.charge(1L)
             if (stop()) return LinearSourceCheck.Declined
-            value += term.coefficient * values[term.column]
+            value += term.coefficient.fraction() * values[term.column]
         }
         value
     }
-    return if (stop()) LinearSourceCheck.Declined else {
+    return if (stop()) {
+        LinearSourceCheck.Declined
+    } else {
         LinearSourceCheck.Accepted(LinearSourceWitness(source, values, objective, exact))
     }
 }
 
 private fun BigFraction.magnitude(): BigFraction = if (this < BigFraction.ZERO) negated() else this
+
+private fun SemanticRational.fraction(): BigFraction = BigFraction.of(numerator, denominator)

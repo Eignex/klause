@@ -1,7 +1,5 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.simplex.exact.BigFraction
-
 /** A numerical declaration with its original rational bounds and coordinate identity. */
 data class LinearSourceVariable(
     /** Original declaration name. */
@@ -9,9 +7,9 @@ data class LinearSourceVariable(
     /** Whether every accepted coordinate must be integral. */
     val integer: Boolean,
     /** Original finite lower side, or null for an absent side. */
-    val lower: BigFraction? = null,
+    val lower: SemanticRational? = null,
     /** Original finite upper side, or null for an absent side. */
-    val upper: BigFraction? = null,
+    val upper: SemanticRational? = null,
 )
 
 /** One original-unit term, indexed in declaration order. */
@@ -19,7 +17,7 @@ data class LinearSourceTerm(
     /** Declaration-order column identity. */
     val column: Int,
     /** Exact source coefficient before normalization. */
-    val coefficient: BigFraction,
+    val coefficient: SemanticRational,
 )
 
 /** An implication enabled when an integer source coordinate equals zero or one. */
@@ -34,9 +32,9 @@ data class LinearSourceIndicator(
 class LinearSourceRow(
     terms: List<LinearSourceTerm>,
     /** Original finite lower side, or null for an absent side. */
-    val lower: BigFraction? = null,
+    val lower: SemanticRational? = null,
     /** Original finite upper side, or null for an absent side. */
-    val upper: BigFraction? = null,
+    val upper: SemanticRational? = null,
     /** Optional integer implication guard. */
     val indicator: LinearSourceIndicator? = null,
 ) {
@@ -50,7 +48,7 @@ class LinearSourceRow(
 class LinearSourceObjective(
     terms: List<LinearSourceTerm>,
     /** Original constant term. */
-    val constant: BigFraction = BigFraction.ZERO,
+    val constant: SemanticRational = SemanticRational.ZERO,
     /** Original source direction. */
     val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
 ) {
