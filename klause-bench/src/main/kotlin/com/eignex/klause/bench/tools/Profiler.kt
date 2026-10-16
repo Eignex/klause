@@ -110,8 +110,11 @@ internal object Profiler {
             allocationModelCallers, 60, output)
         printTable("whole CLI: CPU samples by captured context markers and model-facing callers",
             cpuContexts, Int.MAX_VALUE, output)
-        printTable("whole CLI: sampled allocation weight by captured context markers and model-facing callers (estimated bytes)",
-            allocationContexts, Int.MAX_VALUE, output)
+        printTable(
+            "whole CLI: sampled allocation weight by captured context markers and " +
+                "model-facing callers (estimated bytes)",
+            allocationContexts, Int.MAX_VALUE, output,
+        )
     }
 
     private fun cliContextCallers(event: RecordedEvent): String {
