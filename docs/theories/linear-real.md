@@ -30,9 +30,12 @@ an applicable direction and remain part of the source check.
 Resolved original pure-real rows can also conflict through exact equality
 elimination before numerical completion. Literal opposite non-strict rows establish
 equalities; Gaussian substitution can prove an inconsistent equality or reduce an
-active inequality to a false constant. The component retains every admitted row's
-actual Boolean and coefficient antecedents and requires a complete current
-explanation. Unresolved rows, disequalities, private coordinates, arithmetic
+active inequality to a false constant. A completed derivation can retain the actual
+input rows used by its equality pairs and nonzero pivot eliminations. Both opposite
+inequalities justify an equality; a refuted residual also requires its own row.
+These supports can omit unrelated source guards, but need not be minimum cores.
+The component maps supported rows to their captured Boolean and coefficient
+antecedents and requires a complete current explanation. Unresolved rows, disequalities, private coordinates, arithmetic
 alternatives, unavailable explanations and interrupted or oversized arithmetic
 withhold this deduction and retain ordinary numerical handling.
 
@@ -47,6 +50,37 @@ substitution intermediate require the same bounded scalar checks and token.
 At most 4,095 distinct active Boolean antecedents enter the flat explanation.
 Every assertion attempt rebuilds the rows from current source values; retraction
 and cancellation cannot retain a pending conflict for another frame.
+
+Optional row support uses a private fixed catalogue with owned column-array and
+coefficient-list copies. Only that catalogue enters its preparation and residual
+reduction; no traced repair or mutable support escapes. A source origin per emitted
+inequality preserves equality expansion and unconditional declared bounds. Copied
+Boolean dependencies and values bind those origins to their actual capture; used
+values must still match before and after explanation. Missing unused names do not
+enter a completed derivation, while a missing used premise withholds the conflict.
+Numeric-only point-completion callers retain support tracing disabled.
+
+Support admission reserves all simultaneously live pivot masks, working mask and
+immutable output copy, pair metadata, source origins, Boolean snapshots, numeric
+row copies and temporary wrappers. It uses conservative eight-byte cells for every
+integer, reference and bitset word, with explicit array and object header reserves.
+The complete new storage must fit both the unused 65,536 capture-entry capacity
+and the unused 65,536 pivot-workspace capacity. Origin arrays require a charged
+conservative source-size pass before allocation; numeric copies and masks require
+a second admission using the completed capture size. Shape decline retains the
+conservative all-row explanation under the remaining same operation token. A
+containing stop or incomplete support cannot retry that path or publish a proof.
+Copies, zeroing, unions, output scans and premise mapping charge that token; work
+charges do not represent a byte-allocation meter. For `n` columns, `R` captured
+inequalities, `T` copied terms and `w = ceil(R/64)`, the numeric addition reserves
+`33*R + 2*T + 16` snapshot cells, `(n+2)*w` mask cells, `5*R` pair and direction-box
+cells, 128 fixed wrapper cells and the complete origin metadata. The origin reserve
+contains two possible outputs per prepared row and declared column, copied Boolean
+values and dependencies, row offsets and 48 wrapper cells. Each object or array
+header allowance is conservatively 64 bytes; the source-capture wrapper reserves
+128 bytes. These are accounting assumptions rather than measured heap usage.
+The source-only residual pass retains no projected-row collection when only
+refutation is required.
 
 For a source containing integer or real coordinates, the exact-linear component can
 reuse the exact source-coordinate prefix of an existing completed LP witness, or

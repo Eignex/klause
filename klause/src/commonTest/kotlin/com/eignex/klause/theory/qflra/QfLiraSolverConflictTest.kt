@@ -50,6 +50,54 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverConflictTest {
     @Test
+    fun `an unrelated equality guard should not enter a source equality conflict`() {
+        for (missingUnusedName in listOf(false, true)) {
+            val source = Problem(
+                numBoolVars = 2,
+                intBounds = openBounds(0),
+                numRealVars = 3,
+                realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+                factors = arrayOf(
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.EQ, 1.0),
+                    ExactLinear.of(
+                        intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                        listOf(BigFraction.ONE, BigFraction.ofLong(-2)),
+                        LinearOp.EQ, BigFraction.ONE, activator = 0,
+                    ),
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+                    ExactLinear.of(intArrayOf(Term.ofRealVar(2)), listOf(BigFraction.ONE),
+                        LinearOp.EQ, BigFraction.ofLong(5), activator = 1),
+                ),
+            )
+            val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+            val context = object : SearchContext by session {
+                override fun atomLiteral(decision: SearchDecision): Int? =
+                    if (missingUnusedName && decision == SearchDecision.Bool(2)) null else session.atomLiteral(decision)
+            }
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(source).use { component ->
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(component.initialize(context))
+                val unrelated = SearchDecision.Bool(2)
+                assertIs<ComponentResult.Consistent>(session.push(unrelated))
+                assertIs<ComponentResult.Consistent>(component.assert(unrelated, context))
+                assertIs<ComponentResult.Consistent>(component.propagate(context))
+                val used = SearchDecision.Bool(0)
+                assertIs<ComponentResult.Consistent>(session.push(used))
+                assertIs<ComponentResult.Consistent>(component.assert(used, context))
+
+                val conflict = assertIs<ComponentResult.Conflict>(component.propagate(context))
+
+                assertContentEquals(intArrayOf(1), assertNotNull(conflict.explanation).literals)
+                assertEquals(1L, stats.snapshot().completeSearchStages?.get("SOURCE_EQUALITY_SUPPORT_USED"))
+            }
+        }
+    }
+
+    @Test
     fun `source capture should reject oversized Boolean arithmetic before cancellation`() {
         val wide = BIG_ONE shl 4096
         val admitted = BIG_ONE shl 4095

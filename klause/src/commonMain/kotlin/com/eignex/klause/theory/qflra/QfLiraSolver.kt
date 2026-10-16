@@ -977,15 +977,18 @@ class ExactLiraSearchComponent private constructor(
         ) return null
         val rows = ArrayList<ExactRationalInequality>()
         val variables = LinkedHashSet<Int>()
+        val origins = SourceEqualityOrigins.prepare(model.numRealVars, preparedRows, bools, operationStop)
+        if (operationStop()) return null
         operationStop.charge(2L * model.numRealVars + 1L)
         if (operationStop()) return null
         for (real in 0 until model.numRealVars) {
             model.realLower[real].takeIf(Double::isFinite)?.let { rows += exactColumnLower(real, it.asFraction()) }
             model.realUpper[real].takeIf(Double::isFinite)?.let { rows += exactColumnUpper(real, it.asFraction()) }
         }
+        if (origins != null && !origins.append(-1, 0, rows.size)) return null
         var entries = rows.size * 2L
         val arithmetic = MixedPointArithmetic(operationStop)
-        for (prepared in preparedRows) {
+        for ((sourceIndex, prepared) in preparedRows.withIndex()) {
             operationStop.charge(1L)
             if (operationStop()) return null
             val row = prepared.row
@@ -995,11 +998,13 @@ class ExactLiraSearchComponent private constructor(
             }
             operationStop.charge(prepared.booleans.size.toLong())
             if (operationStop()) return null
-            if (prepared.booleans.any { bools[it] == UNASSIGNED }) continue
+            if (prepared.booleans.any { (origins?.value(it) ?: bools[it]) == UNASSIGNED }) continue
             operationStop.charge(row.size.toLong() + 1L)
             if (operationStop()) return null
             if ((0 until row.size).none { Term.isReal(row.ref(it)) }) continue
-            val truth = node.rowTruth(prepared.address, row, bools) ?: continue
+            val truth = if (origins == null) node.rowTruth(prepared.address, row, bools)
+                else origins.truth(node, prepared)
+            if (truth == null) continue
             val relation = if (truth) row.relation else row.relation.complemented()
             if (relation == LinearOp.NE) continue
             val copyEntries = (row.size.toLong() + 1L) * if (relation == LinearOp.EQ) 2L else 1L
@@ -1011,7 +1016,8 @@ class ExactLiraSearchComponent private constructor(
             if (operationStop()) return null
             val comparison = prepared.form.checkedComparison(
                 truth,
-                { variable -> bools[variable].takeIf { it != UNASSIGNED }?.let { it == TRUE } },
+                { variable -> (origins?.value(variable) ?: bools[variable])
+                    .takeIf { it != UNASSIGNED }?.let { it == TRUE } },
                 arithmetic::admitted,
                 arithmetic::preflight,
             )
@@ -1021,30 +1027,52 @@ class ExactLiraSearchComponent private constructor(
                 return null
             }
             entries += copyEntries
+            val firstRow = rows.size
             comparison.rowsInto(rows)
+            if (origins != null && !origins.append(sourceIndex, firstRow, rows.size)) return null
             for (variable in prepared.booleans) {
                 variables.add(variable)
                 if (variables.size >= 4096) return null
             }
         }
-        val refuted = when (val prepared = prepareSourceEqualities(model.numRealVars, rows, operationStop)) {
-            is SourceEqualityPreparation.Ready -> {
-                observeCompleteStage("SOURCE_EQUALITY_PREPARED")
-                prepared.repair.checkedResidual(rows) === SourceEqualityResidual.Refuted
+        val supported = origins?.let { capture ->
+            refuteCapturedSourceEqualities(model.numRealVars, rows, operationStop, capture.cells, entries) { stage ->
+                if (stage == "RECOVERY_SOURCE_EQUALITY_PREPARED") observeCompleteStage("SOURCE_EQUALITY_PREPARED")
             }
-            SourceEqualityPreparation.Refuted -> true
-            SourceEqualityPreparation.Declined -> {
-                observeCompleteStage("SOURCE_EQUALITY_DECLINED")
-                false
+        } ?: SourceEqualityProof.Unavailable
+        val refuted = when (supported) {
+            is SourceEqualityProof.Refuted -> {
+                if (origins == null || !origins.retain(supported.support, variables, bools)) return null
+                observeCompleteStage("SOURCE_EQUALITY_SUPPORT_USED")
+                true
             }
+            SourceEqualityProof.Unavailable -> {
+                if (operationStop()) return null
+                observeCompleteStage("SOURCE_EQUALITY_SUPPORT_LIMIT")
+                when (val prepared = prepareSourceEqualities(model.numRealVars, rows, operationStop)) {
+                    is SourceEqualityPreparation.Ready -> {
+                        observeCompleteStage("SOURCE_EQUALITY_PREPARED")
+                        prepared.repair.checkedResidual(rows) === SourceEqualityResidual.Refuted
+                    }
+                    SourceEqualityPreparation.Refuted -> true
+                    SourceEqualityPreparation.Declined -> {
+                        observeCompleteStage("SOURCE_EQUALITY_DECLINED")
+                        false
+                    }
+                }
+            }
+            SourceEqualityProof.Declined -> false
         }
         if (!refuted || operationStop()) return null
+        if (origins != null && !origins.current(variables, bools)) return null
         operationStop.charge(2L * variables.size + 1L)
         if (operationStop()) return null
         val premise = SearchAtomPremise.All(variables.map { variable ->
-            SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
+            val value = origins?.value(variable) ?: bools[variable]
+            SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, value == TRUE)))
         })
         val explanation = context.explainAtoms(premise)
+        if (origins != null && !origins.current(variables, bools)) return null
         return explanation.takeUnless { operationStop() }
     }
 
@@ -2244,6 +2272,100 @@ private class PreparedSourceRow(
     val booleans: IntArray,
     val disjunction: Boolean,
 )
+
+private class SourceEqualityOrigins private constructor(
+    private val origins: IntArray,
+    private val offsets: IntArray,
+    private val dependencies: IntArray,
+    private val values: IntArray,
+    val cells: Long,
+    private val stop: Cancellation,
+) {
+    private var captured = 0
+
+    fun value(variable: Int): Int = values[variable].let { if (it < 0) it else it and 1 }
+
+    fun truth(node: SearchNode, prepared: PreparedSourceRow): Boolean? =
+        node.rowTruth(prepared.address, prepared.row, values)
+
+    fun append(origin: Int, first: Int, end: Int): Boolean {
+        stop.charge(2L * (end - first) + 1L)
+        if (stop() || first != captured || end > origins.size || end < first) return false
+        origins.fill(origin, first, end)
+        captured = end
+        return !stop()
+    }
+
+    fun retain(support: SourceEqualityRowSupport, variables: MutableSet<Int>, current: IntArray): Boolean {
+        val complete = support.visit(stop) { row ->
+            if (row !in 0 until captured) return@visit false
+            val origin = origins[row]
+            if (origin == -1) return@visit true
+            if (origin !in 0 until offsets.size - 1) return@visit false
+            for (index in offsets[origin] until offsets[origin + 1]) {
+                stop.charge(2L)
+                if (stop()) return@visit false
+                val variable = dependencies[index]
+                if (!variables.contains(variable) || value(variable) < 0 || current[variable] != value(variable)) {
+                    return@visit false
+                }
+                values[variable] = values[variable] or 2
+            }
+            true
+        }
+        if (!complete || stop()) return false
+        stop.charge(2L * variables.size + 1L)
+        if (stop()) return false
+        val iterator = variables.iterator()
+        while (iterator.hasNext()) {
+            val variable = iterator.next()
+            if (values[variable] and 2 == 0) iterator.remove()
+        }
+        return !stop()
+    }
+
+    fun current(variables: Set<Int>, current: IntArray): Boolean {
+        stop.charge(variables.size.toLong() + 1L)
+        return !stop() && variables.all { value(it) >= 0 && current[it] == value(it) } && !stop()
+    }
+
+    companion object {
+        fun prepare(
+            columns: Int,
+            rows: List<PreparedSourceRow>,
+            bools: IntArray,
+            stop: Cancellation,
+        ): SourceEqualityOrigins? {
+            var capture = 4L * columns
+            var dependencyCount = 0L
+            for (prepared in rows) {
+                stop.charge(1L)
+                if (stop() || prepared.booleans.size >= 4096) return null
+                capture += 2L * (prepared.row.size.toLong() + 1L)
+                dependencyCount += prepared.booleans.size
+                if (capture > 65536L || dependencyCount > 65536L) return null
+            }
+            val originCount = 2L * columns + 2L * rows.size
+            val cells = originCount + rows.size + 1L + dependencyCount + bools.size + 48L
+            if (capture + cells > 65536L || columns.toLong() * columns + cells > 65536L) return null
+            stop.charge(3L * cells)
+            if (stop()) return null
+            val origins = IntArray(originCount.toInt()) { -1 }
+            val offsets = IntArray(rows.size + 1)
+            val dependencies = IntArray(dependencyCount.toInt())
+            val values = bools.copyOf()
+            var offset = 0
+            for ((index, prepared) in rows.withIndex()) {
+                if (stop()) return null
+                offsets[index] = offset
+                prepared.booleans.copyInto(dependencies, offset)
+                offset += prepared.booleans.size
+            }
+            offsets[rows.size] = offset
+            return if (stop()) null else SourceEqualityOrigins(origins, offsets, dependencies, values, cells, stop)
+        }
+    }
+}
 
 private data class SearchNode(
     val branches: List<IntegerBranch> = emptyList(),

@@ -14,6 +14,133 @@ import kotlin.test.assertTrue
 
 class MixedEqualityRepairTest {
     @Test
+    fun `equality support should preserve the first actual opposite pair`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.ONE), BigFraction.ofLong(5)),
+        )
+
+        val result = assertIs<SourceEqualityProof.Refuted>(refuteCapturedSourceEqualities(2, rows, Cancellation.Never))
+
+        val used = mutableSetOf<Int>()
+        assertTrue(result.support.visit(Cancellation.Never) { used.add(it); true })
+        assertEquals(setOf(0, 2, 4, 5), used)
+    }
+
+    @Test
+    fun `residual support should include used pivots and exclude zero coefficient pivots`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(2), listOf(BigFraction.ONE), BigFraction.ofLong(5)),
+            ExactRationalInequality(intArrayOf(2), listOf(BigFraction.MINUS_ONE), BigFraction.ofLong(-5)),
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.ofLong(2)), BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.MINUS_ONE, BigFraction.ofLong(-2)),
+                BigFraction.MINUS_ONE),
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.ofLong(-2)), BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.MINUS_ONE, BigFraction.ofLong(2)),
+                BigFraction.MINUS_ONE),
+            ExactRationalInequality(intArrayOf(1, 2), listOf(BigFraction.MINUS_ONE, BigFraction.ZERO),
+                BigFraction.MINUS_ONE),
+        )
+
+        val result = assertIs<SourceEqualityProof.Refuted>(refuteCapturedSourceEqualities(3, rows, Cancellation.Never))
+
+        val used = mutableSetOf<Int>()
+        assertTrue(result.support.visit(Cancellation.Never) { used.add(it); true })
+        assertEquals(setOf(2, 3, 4, 5, 6), used)
+    }
+
+    @Test
+    fun `a strict endpoint refutation should include its own captured row`() {
+        for (strict in listOf(false, true)) {
+            val rows = listOf(
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO, strict),
+            )
+
+            val result = refuteCapturedSourceEqualities(1, rows, Cancellation.Never)
+
+            if (strict) {
+                val used = mutableSetOf<Int>()
+                assertTrue(assertIs<SourceEqualityProof.Refuted>(result).support.visit(Cancellation.Never) {
+                    used.add(it)
+                    true
+                })
+                assertEquals(setOf(0, 1, 2), used)
+            } else {
+                assertIs<SourceEqualityProof.Declined>(result)
+            }
+        }
+    }
+
+    @Test
+    fun `caller mutations should not replace the captured equality catalogue`() {
+        val columns = intArrayOf(0)
+        val coefficients = mutableListOf(BigFraction.ONE)
+        val rows = mutableListOf(
+            ExactRationalInequality(columns, coefficients, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO, strict = true),
+        )
+
+        val result = refuteCapturedSourceEqualities(1, rows, Cancellation.Never) { stage ->
+            if (stage == "RECOVERY_SUPPORT_CAPTURED") {
+                columns[0] = 4
+                coefficients.clear()
+                rows.clear()
+            }
+        }
+
+        val used = mutableSetOf<Int>()
+        assertTrue(assertIs<SourceEqualityProof.Refuted>(result).support.visit(Cancellation.Never) {
+            used.add(it)
+            true
+        })
+        assertEquals(setOf(0, 1, 2), used)
+    }
+
+    @Test
+    fun `the live output support should fit the same capture boundary`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO, strict = true),
+        )
+
+        val admitted = refuteCapturedSourceEqualities(1, rows, Cancellation.Never, captureEntries = 65269L)
+        val declined = refuteCapturedSourceEqualities(1, rows, Cancellation.Never, captureEntries = 65270L)
+
+        assertIs<SourceEqualityProof.Refuted>(admitted)
+        assertIs<SourceEqualityProof.Unavailable>(declined)
+    }
+
+    @Test
+    fun `an interrupted support operation should withhold its proof and permit a live retry`() {
+        for (interrupted in listOf("RECOVERY_SUPPORT_CAPTURED", "RECOVERY_SUPPORT_UNION", "RECOVERY_SUPPORT_OUTPUT")) {
+            val rows = listOf(
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE),
+                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+            )
+            var stopped = false
+
+            val result = refuteCapturedSourceEqualities(1, rows, Cancellation { stopped }) { stage ->
+                if (stage == interrupted) stopped = true
+            }
+
+            assertTrue(stopped)
+            assertIs<SourceEqualityProof.Declined>(result)
+            assertIs<SourceEqualityProof.Refuted>(refuteCapturedSourceEqualities(1, rows, Cancellation.Never))
+        }
+    }
+
+    @Test
     fun `incompatible equalities should have an explicit refutation result`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ONE }, BigFraction.ZERO),
