@@ -92,8 +92,10 @@ class LpExactContinuationTest {
             listOf(ExactLpRow()),
             ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero, zero, zero)),
         )
-        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val state = LpExactState(source)
+        val model = assertNotNull(state.toWorkingModel())
         val solver = object : LpSolver {
+            override val solvedExactState = state
             override val infeasibleRay: DoubleArray? = null
             override val recessionDirection = doubleArrayOf(1.0, 0.0, 0.0)
             override fun solve(warm: Basis?): FloatLpResult? = null
