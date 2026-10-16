@@ -99,12 +99,47 @@ class DefinitionalSweep internal constructor(
             problem: Problem,
             definedHints: IntArray = IntArray(0),
             boolFolds: List<BoolFoldDefinition> = emptyList(),
+        ): DefinitionalSweep? = infer(problem, definedHints, boolFolds, Cancellation.Never)
+
+        internal fun infer(
+            problem: Problem,
+            definedHints: IntArray,
+            boolFolds: List<BoolFoldDefinition>,
+            cancellation: Cancellation,
         ): DefinitionalSweep? {
-            val base = infer(problem.factors, problem.numIntVars, definedHints, boolFolds)
-            val nodes = base?.nodes.orEmpty() + elementResultDefinitions(problem, definedHints) +
-                divModDefinitions(problem) + wideDivModDefinitions(problem)
-            val ordered = literalDefinitions(problem, definedHints, nodes)
-            return if (ordered.isEmpty()) null else DefinitionalSweep(ordered)
+            if (cancellation()) return null
+            val base = infer(problem.factors, problem.numIntVars, definedHints, boolFolds, cancellation)
+            if (cancellation()) return null
+            val nodes = base?.nodes.orEmpty() + elementResultDefinitions(problem, definedHints, cancellation) +
+                divModDefinitions(problem, cancellation) + wideDivModDefinitions(problem, cancellation)
+            if (cancellation()) return null
+            val ordered = literalDefinitions(problem, definedHints, nodes, cancellation)
+            return if (cancellation() || ordered.isEmpty()) null else DefinitionalSweep(ordered)
+        }
+
+        internal fun withSource(
+            problem: Problem,
+            inferred: DefinitionalSweep?,
+            hints: List<DefinitionHint>,
+            cancellation: Cancellation,
+        ): DefinitionalSweep? {
+            if (hints.isEmpty()) return inferred
+            val source = fromSource(problem, hints, cancellation)
+            if (cancellation()) return null
+            val integerOutputs = IntHashSet()
+            val booleanOutputs = IntHashSet()
+            for (hint in hints) {
+                if (cancellation.definitionStopped()) return null
+                (if (hint is DefinitionHint.Boolean) booleanOutputs else integerOutputs).add(hint.output)
+            }
+            val nodes = ArrayList<SweepNode>()
+            for (node in inferred?.nodes.orEmpty()) {
+                if (cancellation.definitionStopped()) return null
+                if (node.out !in (if (node.outIsBool) booleanOutputs else integerOutputs)) nodes += node
+            }
+            nodes.addAll(source?.nodes.orEmpty())
+            val ordered = orderedDefinitions(problem, nodes, cancellation)
+            return if (cancellation() || ordered.isEmpty()) null else DefinitionalSweep(ordered)
         }
 
         /** Infer a sweep from the factor IR, so local search derives functionally-defined vars from the
@@ -125,7 +160,16 @@ class DefinitionalSweep internal constructor(
             numIntVars: Int,
             definedHints: IntArray = IntArray(0),
             boolFolds: List<BoolFoldDefinition> = emptyList(),
+        ): DefinitionalSweep? = infer(factors, numIntVars, definedHints, boolFolds, Cancellation.Never)
+
+        internal fun infer(
+            factors: Array<Factor>,
+            numIntVars: Int,
+            definedHints: IntArray,
+            boolFolds: List<BoolFoldDefinition>,
+            cancellation: Cancellation,
         ): DefinitionalSweep? {
+            if (cancellation()) return null
             val def = arrayOfNulls<Factor>(numIntVars)
             val defOut = IntArray(numIntVars) { -1 } // for a Linear definer, the output var's index
             val overDefined = BooleanArray(numIntVars)
@@ -139,15 +183,20 @@ class DefinitionalSweep internal constructor(
                     defOut[v] = outIdx
                 }
             }
-            for (factor in factors) if (factor is Abs) claim(factor.result, factor, -1)
+            for (factor in factors) {
+                if (cancellation.definitionStopped()) return null
+                if (factor is Abs) claim(factor.result, factor, -1)
+            }
             val isProductResult = BooleanArray(numIntVars)
             for (f in factors) {
+                if (cancellation.definitionStopped()) return null
                 if (f is Product) {
                     claim(f.result, f, -1)
                     if (f.result in 0 until numIntVars) isProductResult[f.result] = true
                 }
             }
             for (f in factors) {
+                if (cancellation.definitionStopped()) return null
                 if (f is Power && f.base is Power.Coordinate.Integer) {
                     val output = (f.result as Power.Coordinate.Integer).id.index
                     claim(output, f, -1)
@@ -156,7 +205,10 @@ class DefinitionalSweep internal constructor(
             }
             if (definedHints.isNotEmpty()) {
                 val hinted = BooleanArray(numIntVars)
-                for (v in definedHints) if (v in 0 until numIntVars) hinted[v] = true
+                for (v in definedHints) {
+                    if (cancellation.definitionStopped()) return null
+                    if (v in 0 until numIntVars) hinted[v] = true
+                }
                 // Deriving a hinted sum var is always sound but only pays off when it sits atop a functional
                 // cone that bottoms out at lightly-constrained decision vars — the objective-decomposition
                 // shape (e.g. `c = Σ x_i·x_j`, then `c²` in the objective). Two guards keep it there:
@@ -166,39 +218,49 @@ class DefinitionalSweep internal constructor(
                 //    feasibility-critical decision variables whose exclusion from search stalls repair).
                 val nonProductOcc = IntArray(numIntVars)
                 for (f in factors) {
+                    if (cancellation.definitionStopped()) return null
                     for (v in f.intVars) {
+                        if (cancellation.definitionStopped()) return null
                         if (v in 0 until numIntVars) {
                             if (f !is Product && f !is Power) nonProductOcc[v]++
                         }
                     }
                 }
                 for (f in factors) {
+                    if (cancellation.definitionStopped()) return null
                     if (f !is Linear || f.op != LinearOp.EQ) continue
                     val row = f.integerConstants ?: continue
                     val j = f.vars.indices.firstOrNull {
+                        if (cancellation.definitionStopped()) return null
                         hinted[f.vars[it]] && (row.coeff(it) == 1L || row.coeff(it) == -1L) &&
                             nonProductOcc[f.vars[it]] == 1 &&
-                            f.vars.indices.all { k -> k == it || isProductResult[f.vars[k]] }
+                            f.vars.indices.all { k ->
+                                if (cancellation.definitionStopped()) return null
+                                k == it || isProductResult[f.vars[k]]
+                            }
                     }
                     if (j != null) claim(f.vars[j], f, j)
                 }
-                for (definition in affineIndexDefinitions(factors, numIntVars, definedHints)) {
+                for (definition in affineIndexDefinitions(factors, numIntVars, definedHints, cancellation)) {
                     claim(definition.variable, definition.factor, definition.outputIndex)
                 }
             }
-            val extrema = extremumDefinitions(factors, numIntVars, definedHints)
+            val extrema = extremumDefinitions(factors, numIntVars, definedHints, cancellation)
             val priorDefinitions = def.copyOf()
             val extremumOutputs = BooleanArray(numIntVars)
             for (definition in extrema) {
+                if (cancellation.definitionStopped()) return null
                 extremumOutputs[definition.variable] = true
                 if (priorDefinitions[definition.variable] !== definition.factor) {
                     claim(definition.variable, definition.factor, definition.outputIndex)
                 }
             }
+            if (cancellation()) return null
             val nodes = ArrayList<SweepNode>()
             val state = ByteArray(numIntVars) // 0 unseen, 1 on-stack, 2 done
             val cyclic = BooleanArray(numIntVars)
             fun visit(v: Int) {
+                if (cancellation.definitionStopped()) return
                 if (v < 0 || v >= numIntVars || state[v].toInt() == 2) return
                 if (state[v].toInt() == 1) {
                     cyclic[v] = true
@@ -227,7 +289,10 @@ class DefinitionalSweep internal constructor(
                     node = FunctionalObjective.Power(v, FunctionalObjective.Operand.v(input), f.exponent)
                     inputs = intArrayOf(input)
                 } else if (f is ArrayMinMax) {
-                    for (input in f.xs) visit(input)
+                    for (input in f.xs) {
+                        if (cancellation.definitionStopped()) return
+                        visit(input)
+                    }
                     node = FunctionalObjective.Extreme(
                         v,
                         Array(f.xs.size) { FunctionalObjective.Operand.v(f.xs[it]) },
@@ -241,6 +306,7 @@ class DefinitionalSweep internal constructor(
                     val ins = ArrayList<FunctionalObjective.Operand>(lin.vars.size - 1)
                     val inc = ArrayList<Long>(lin.vars.size - 1)
                     for (k in lin.vars.indices) {
+                        if (cancellation.definitionStopped()) return
                         if (k != j) {
                             visit(lin.vars[k])
                             ins.add(FunctionalObjective.Operand.v(lin.vars[k]))
@@ -256,16 +322,24 @@ class DefinitionalSweep internal constructor(
                     )
                     inputs = IntArray(ins.size) { lin.vars[if (it < j) it else it + 1] }
                 }
+                if (cancellation()) return
                 if (inputs.any { it in cyclic.indices && cyclic[it] }) cyclic[v] = true
                 if (!cyclic[v]) nodes.add(SweepNode.IntDef(node, inputs, extremumOutputs[v]))
                 state[v] = 2
             }
-            for (v in 0 until numIntVars) visit(v)
+            for (v in 0 until numIntVars) {
+                if (cancellation.definitionStopped()) return null
+                visit(v)
+            }
             // Bool AND/OR definitions supplied by the front-end (e.g. OPB Tseitin product indicators),
             // which the factor IR alone can't recover from the reified clauses. Appended after the int
             // cone; callers list them so an input fold precedes any fold that reads it.
-            for (bf in boolFolds) nodes.add(SweepNode.BoolFold(bf.out, bf.lits, bf.isAnd))
-            return if (nodes.isEmpty()) null else DefinitionalSweep(nodes)
+            for (bf in boolFolds) {
+                if (cancellation.definitionStopped()) return null
+                for (i in bf.lits.indices) if (cancellation.definitionStopped()) return null
+                nodes.add(SweepNode.BoolFold(bf.out, bf.lits, bf.isAnd))
+            }
+            return if (cancellation() || nodes.isEmpty()) null else DefinitionalSweep(nodes)
         }
     }
 

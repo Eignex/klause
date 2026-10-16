@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.LinearSourceProblem
@@ -22,6 +23,7 @@ class SourceAttachment private constructor(
     searchHints: SearchHints?,
     /** Immutable source storage and preparation policy captured by the caller. */
     val settings: ProblemSettings,
+    internal val definitionReferences: SourceDefinitionReferences? = null,
 ) : SourceSemanticsOwner {
     /** Attach the canonical factor model and its neutral construction hints. */
     constructor(
@@ -29,6 +31,18 @@ class SourceAttachment private constructor(
         definitionHints: List<DefinitionHint> = emptyList(),
         searchHints: SearchHints? = null,
     ) : this(problem, null, definitionHints, searchHints, problem.settings)
+
+    /** Attach factor-backed integer orientations and Boolean folds for lazy heuristic construction. */
+    constructor(
+        problem: Problem,
+        definedVars: IntArray,
+        boolFolds: List<BoolFoldDefinition>,
+        definitionHints: List<DefinitionHint> = emptyList(),
+        searchHints: SearchHints? = null,
+    ) : this(
+        problem, null, definitionHints, searchHints, problem.settings,
+        SourceDefinitionReferences(definedVars, boolFolds),
+    )
 
     /** Attach original rational linear rows and their captured source-unit interpretation. */
     constructor(problem: LinearSourceProblem, settings: ProblemSettings) :
