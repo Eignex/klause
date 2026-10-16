@@ -64,7 +64,8 @@ class CliModeMpsTest {
         }
 
         assertTrue("s SATISFIABLE" in out.lines(), out)
-        assertTrue("v X=0.3333333333333333" in out.lines(), out)
+        assertTrue("o 0.333333333333333314829616256247390992939472198486328125" in out.lines(), out)
+        assertTrue("v X=0.333333333333333314829616256247390992939472198486328125" in out.lines(), out)
         assertTrue("c workingModelOptimizationStatus=tolerance-optimum" in out.lines(), out)
         assertTrue("tolerance-accepted optimality unproved" in out, out)
     }
