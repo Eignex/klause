@@ -42,11 +42,14 @@ private val zeroCount = Count(0L, 0L, 0L, exact = true, confidence = 1.0)
 internal fun combineCounts(proven: Count, approximate: () -> Count): Count {
     if (proven.exact) return proven
     val approx = approximate()
-    val semantics = proven.semantics?.takeIf { captured ->
-        approx.semantics?.let {
-            captured.declared == it.declared && captured.effective == it.effective
-        } == true
+    val provenPolicy = proven.semantics
+    val approximatePolicy = approx.semantics
+    if (provenPolicy != null && approximatePolicy != null) {
+        require(provenPolicy.declared == approximatePolicy.declared &&
+            provenPolicy.effective == approximatePolicy.effective
+        ) { "count bounds belong to different source interpretations" }
     }
+    val semantics = provenPolicy?.takeIf { approximatePolicy != null }
     val lower = maxOf(proven.lower, approx.lower)
     val upper = maxOf(lower, minOf(proven.upper, approx.upper))
     return Count(
