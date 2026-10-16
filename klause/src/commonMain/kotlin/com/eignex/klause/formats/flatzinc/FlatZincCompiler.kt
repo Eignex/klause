@@ -43,6 +43,7 @@ internal class FlatZincCompiler(
     private val settings: ProblemSettings = ProblemSettings(),
     internal val floatChoiceLimit: Int = DEFAULT_FLOAT_CHOICE_LIMIT,
     internal val booleanZeroSumClauseLimit: Int = 32_768,
+    private val forFloatPlanning: Boolean = false,
 ) : CnfLowering {
     init {
         require(floatBuckets > 0) { "floatBuckets must be positive" }
@@ -75,6 +76,7 @@ internal class FlatZincCompiler(
     internal val realLo = ArrayList<Double>()
     internal val realHi = ArrayList<Double>()
     internal val finiteFloatChoices = HashMap<Int, DoubleArray>()
+    internal val floatSearchWindowIds = HashSet<Int>()
     internal val floatValueLiterals = HashMap<Pair<Int, Double>, Int>()
     internal val integerFloatSources = HashMap<Int, Int>()
 
@@ -103,6 +105,24 @@ internal class FlatZincCompiler(
         }
         return compileConstraints(onLowered)
     }
+
+    // Real and integer ids overlap after lowering; planning keeps all declarations in one
+    // placeholder namespace while retaining caller policy and source bounds.
+    internal fun floatPlanningDeclarations(): FlatZincCompiler = FlatZincCompiler(
+        model = model,
+        floatBuckets = floatBuckets,
+        floatScale = floatScale,
+        forLocalSearch = forLocalSearch,
+        unboundedIntLo = unboundedIntLo,
+        unboundedIntHi = unboundedIntHi,
+        unboundedFloatLo = unboundedFloatLo,
+        unboundedFloatHi = unboundedFloatHi,
+        exactFloats = exactFloats,
+        settings = settings,
+        floatChoiceLimit = floatChoiceLimit,
+        booleanZeroSumClauseLimit = booleanZeroSumClauseLimit,
+        forFloatPlanning = true,
+    ).also { it.processDeclarations() }
 
     internal fun processDeclarations() {
         for (decl in model.varDecls) {
@@ -473,10 +493,12 @@ internal class FlatZincCompiler(
         else -> failHere("set `$ownerName`: universe must be an int range or int set, got ${elem::class.simpleName}")
     }
 
-    internal fun allocOpenFloat(name: String): Int = if (name in lpOnlyFloats) {
+    internal fun allocOpenFloat(name: String): Int = if (name in lpOnlyFloats || (forFloatPlanning && exactFloats)) {
         allocFloat(name, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)
     } else {
-        allocFloat(name, unboundedFloatLo, unboundedFloatHi)
+        allocFloat(name, unboundedFloatLo, unboundedFloatHi).also {
+            if (forFloatPlanning) floatSearchWindowIds.add(it)
+        }
     }
 
     internal fun allocFloat(name: String, lo: Double, hi: Double, lpOnly: Boolean = name in lpOnlyFloats): Int {
@@ -489,15 +511,15 @@ internal class FlatZincCompiler(
             floatVars[name] = FloatBucketing(rid, lo, hi, floatBuckets, lpOnly = true)
             return rid
         }
-        if (exactFloats) {
+        if (exactFloats && !forFloatPlanning) {
             unsupportedHere("float variable `$name`: its constraints are unsupported by exact float lowering")
         }
-        if (!lo.isFinite() || !hi.isFinite()) {
+        if (!forFloatPlanning && (!lo.isFinite() || !hi.isFinite())) {
             unsupportedHere("float variable `$name`: a bucketed constraint or objective requires a finite range")
         }
         val buckets = if (lo == hi) 1 else floatBuckets
         val id = intDomains.size
-        intDomains.add(IntDomain(0L, (buckets - 1).toLong()))
+        intDomains.add(IntDomain(0L, (buckets - 1).toLong(), settings.storage))
         intVars[name] = id
         floatVars[name] = FloatBucketing(id, lo, hi, buckets)
         return id
