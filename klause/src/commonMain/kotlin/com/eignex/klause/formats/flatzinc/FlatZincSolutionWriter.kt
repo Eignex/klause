@@ -9,7 +9,7 @@ import com.eignex.klause.util.parseBigInt
 
 /** Render one solved sample in FlatZinc output format. */
 fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObjective: Boolean = false): String =
-    writeFlatZincSolution(program, FlatZincValues(sample), outputObjective)
+    writeFlatZincSolution(program.forSample(sample), FlatZincValues(sample), outputObjective)
 
 /** Render an open-theory witness in the FlatZinc solution protocol. */
 fun writeFlatZincSolution(

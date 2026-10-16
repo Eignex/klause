@@ -12,6 +12,11 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.minimizeBool
 import com.eignex.klause.solver.objective.minimizeInt
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 
@@ -23,7 +28,17 @@ data class FlatZincExecutionProgram(
     val localSearchObjective: IncrementalObjective?,
     /** Definitions to maintain while evaluating local-search moves. */
     val definitionalSweep: DefinitionalSweep?,
-)
+) {
+    private var invocation: PreparedSourceInvocation? = null
+
+    /** Original source and actual selected private engine view for this compatibility request. */
+    val sourceInvocation: PreparedSourceInvocation? get() = invocation
+
+    internal fun bindSourceInvocation(value: PreparedSourceInvocation) {
+        check(invocation == null) { "FlatZinc compatibility request already has its source binding" }
+        invocation = value
+    }
+}
 
 /** Build the minimize-oriented objective for a FlatZinc solve directive. */
 fun FlatZincProgram.linearObjective(): LinearObjective? {
@@ -93,7 +108,16 @@ fun parseFlatZincExecution(
         settings,
         semanticOverrides,
     )
-    val sweep = DefinitionalSweep.fromSource(program.problem, program.definitionHints)
-    val objective = program.linearObjective()?.let { sweep?.functionalObjective(it) }
-    return FlatZincExecutionProgram(program, objective, sweep)
+    val original = program.sourceProgram
+    val normalized = original.linearObjective()
+    val maximize = original.solve is SolveDirective.Maximize
+    val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
+        if (normalized == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
+        FiniteEngine.LOCAL_SEARCH, if (maximize) normalized?.negated() else normalized, maximize))
+    val selected = program.retainedSource?.executionProgram(invocation) ?: original
+    val finite = invocation.engineRoute as? SourceProblemRoute.Finite
+    val shape = finite?.let { invocation.finiteShape() }
+    val sweep = shape?.let { DefinitionalSweep.fromSource(it.problem, original.definitionHints, invocation.cancellation) }
+    val objective = shape?.linearObjective?.let { sweep?.functionalObjective(it, invocation.cancellation) }
+    return FlatZincExecutionProgram(selected, objective, sweep).also { it.bindSourceInvocation(invocation) }
 }

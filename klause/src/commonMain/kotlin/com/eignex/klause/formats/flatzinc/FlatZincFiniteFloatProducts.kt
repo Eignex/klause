@@ -54,10 +54,11 @@ internal fun FlatZincCompiler.emitFiniteFloatProduct(a: FloatRef, b: FloatRef, r
     val aValues = finiteChoices(first)
     val bValues = finiteChoices(second)
     val selectA = aValues != null && (bValues == null || aValues.size <= bValues.size)
-    val values = (if (selectA) aValues else bValues)
-        ?: unsupportedHere(
-            "`float_times` is unsupported by exact float lowering without finite constant choices",
-        )
+    val values = if (selectA) aValues else bValues
+    if (values == null) {
+        factors.add(ContinuousProduct(first.bk.varId, second.bk.varId, output))
+        return
+    }
     if (values.isEmpty()) {
         postFalseFactor()
         return

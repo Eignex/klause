@@ -12,7 +12,7 @@ class OznApplier(oznSource: String) {
 
     /** Render one solution block ending with `----------\n`. */
     fun render(program: FlatZincProgram, sample: Sample): String {
-        return renderValues(program, FlatZincValues(sample))
+        return renderValues(program.forSample(sample), FlatZincValues(sample))
     }
 
     /** Render an open-theory witness through the output model. */

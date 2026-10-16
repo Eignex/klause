@@ -136,6 +136,30 @@ as multiplication. Negative/fractional exponents and variable real exponents dec
 
 ## FlatZinc floats
 
+Canonical compilation retains original real declarations and strong real relations.
+`FlatZincProgram.sourceProgram` and `sourceAttachment()` expose that frame without
+requesting a grid. Unrestricted products remain `ContinuousProduct` relations for
+selected polynomial completion; finite-choice metadata preserves the existing
+guarded linear consumers. A Grid policy grants permission to a selected private
+view and does not replace original real bounds or namespaces.
+
+The historical `problem`, name/array decoders and component metadata request a lazy
+finite compatibility view. `prepareFiniteCompatibility` binds that view to the same
+source invocation with the caller's actual operation, providers and containing stop.
+`parseFlatZincExecution` uses this binding and exposes its `sourceInvocation`.
+Cached geometry retains only immutable source/model definitions; another operation
+binds its own consumer, checks and stop. Structured view declines preserve the
+canonical original route. Source-frame samples use the original decoder; unbound
+samples retain the documented legacy convention, and a bound foreign frame is rejected.
+
+`FlatZincProgram` preserves its thirteen constructor, copy, component and property
+signatures as an ordinary class. Positional access, logical equality, hashing and
+string rendering use the public fields. A copy over the same model retains source
+correspondence and legacy problem identity; an explicit foreign model drops it.
+Kotlin data-class metadata and reflection `isData` change. Copying, equality, hashing
+and string rendering may request the historical compatibility fields; source-only
+metadata access uses `sourceProgram`.
+
 A source-fixed float-array index also pins its finite value literal, preserving
 Boolean propagation across the shared finite choices.
 Continuous `float_min` and `float_max` retain `RealArrayMinMax`, including constant
@@ -154,7 +178,7 @@ one-based source index and repeated entries. Grid entries use the result's exist
 bucket conversion and representability checks. Lowering visits array positions
 inside the index domain, including domains wider than a signed integer.
 
-Representation planning resolves aliases in a private declaration pass with one
+The requested legacy compatibility view resolves aliases in a private declaration pass with one
 shared integer placeholder namespace for integer and float columns. It captures the
 caller's bounds, exact-float mode and `ProblemSettings`, including integer domain
 storage. Exact-mode open floats stay open in this pass. Grid search bounds on
@@ -180,10 +204,10 @@ Finite integer float images retain affine maps to source integer values. Fixed
 integer selections and products can be eliminated while preserving source values
 and output reconstruction. These maps must survive preparation and source checks.
 
-A component requiring approximation, or more than 4096 finite alternatives, uses
+A requested compatibility component requiring approximation, or more than 4096 finite alternatives, uses
 integer buckets at a configurable resolution. Repeated array entries count toward
 the alternative limit. Continuous components without finite choices also use the
-grid under default lowering. Unconstrained floats outside the objective can remain
+grid in that compatibility view. Unconstrained floats outside the objective can remain
 continuous. Unrestricted continuous-by-continuous products are outside linear
 arithmetic.
 
@@ -201,8 +225,8 @@ grid witness does not turn a grid optimum or refutation into a source proof.
 
 `--exact` preserves continuous variables and open bounds, routes supported linear
 satisfaction through the shared real/mixed theory, and requires exact certification
-for continuous objectives. It declines unsupported float operations and expansion
-above the alternative limit. Arithmetic overflow during lowering also declines
+for continuous objectives. Other retained real relations use their selected complete
+or incomplete consumers without requesting a grid. Arithmetic overflow during lowering declines
 with a diagnostic. Integer constants used in float arithmetic also decline when
 their exact source value cannot be represented in binary64.
 

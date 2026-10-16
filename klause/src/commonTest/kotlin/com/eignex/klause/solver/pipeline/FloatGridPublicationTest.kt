@@ -29,6 +29,60 @@ import kotlin.time.Duration
 
 class FloatGridPublicationTest {
     @Test
+    fun `retained grid results should not change when later publications update the incumbent`() {
+        val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
+            LinearObjective(realCoefficients = doubleArrayOf(1.0)), maximize = true))
+        assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(invocation,
+            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+        val binding = assertNotNull(invocation.floatGrid)
+        val publications = FloatGridPublication(binding, Cancellation.Never, null, FiniteSolveCallbacks({}, {}))
+        val preparation = FinitePipelinePreparation(binding.projection.problem, null, { it }, null)
+        val firstNative = FiniteSolveOutcome.Completed(FiniteSolveVerdict.BEST_FOUND, SolveStats.EMPTY, 1,
+            Sample(booleanArrayOf(), longArrayOf(0)), 0)
+
+        val first = publications.result(preparation, Duration.ZERO, firstNative)
+        val second = publications.result(preparation, Duration.ZERO,
+            FiniteSolveOutcome.Completed(FiniteSolveVerdict.OPTIMAL, SolveStats.EMPTY, 2,
+                Sample(booleanArrayOf(), longArrayOf(2)), 0))
+
+        assertEquals(BigFraction.ZERO, assertNotNull(assertIs<FiniteSolveOutcome.Completed>(first.outcome).bestSample)
+            .exactReals?.single())
+        assertEquals(BigFraction.ONE, assertNotNull(assertIs<FiniteSolveOutcome.Completed>(second.outcome).bestSample)
+            .exactReals?.single())
+        assertSame(firstNative, assertNotNull(first.nativeGridOutcome).outcome)
+        assertEquals(FiniteSolveVerdict.BEST_FOUND, assertIs<FiniteSolveOutcome.Completed>(second.outcome).verdict)
+    }
+
+    @Test
+    fun `interruption during original acceptance should withhold a private grid publication`() {
+        val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
+        assertIs<SelectedFloatGridPreparation.Prepared>(SourceSetup.prepareSelectedFloatGrid(invocation,
+            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+        val binding = assertNotNull(invocation.floatGrid)
+        var stopped = false
+        val points = ArrayList<Sample>()
+        val publications = FloatGridPublication(binding, Cancellation { stopped }, { stopped = true; true },
+            FiniteSolveCallbacks(points::add, {}))
+        val native = FiniteSolveOutcome.Completed(FiniteSolveVerdict.SAT, SolveStats.EMPTY, 1,
+            Sample(booleanArrayOf(), longArrayOf(1)), 0)
+
+        val result = publications.result(FinitePipelinePreparation(binding.projection.problem, null, { it }, null),
+            Duration.ZERO, native)
+
+        assertTrue(points.isEmpty())
+        assertEquals(FiniteSolveVerdict.UNKNOWN, assertIs<FiniteSolveOutcome.Completed>(result.outcome).verdict)
+        assertSame(native, assertNotNull(result.nativeGridOutcome).outcome)
+    }
+
+    @Test
     fun `private grid exhaustion should retain its refutation without refuting the original real source`() {
         val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
             intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.25)), numRealVars = 1,

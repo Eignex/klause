@@ -98,6 +98,7 @@ internal class FlatZincCompiler(
     override var trueLitCache: Int = -1
 
     internal var lpOnlyFloats: Set<String> = emptySet()
+    private var declaredRealCount: Int = 0
     internal val realLo = ArrayList<Double>()
     internal val realHi = ArrayList<Double>()
     internal val finiteFloatChoices = HashMap<Int, DoubleArray>()
@@ -117,9 +118,10 @@ internal class FlatZincCompiler(
     internal val setVarsByName = LinkedHashMap<String, SetVarLayout>()
 
     internal fun compile(): FlatZincProgram {
-        floatRepresentations = selectFloatRepresentations()
-        lpOnlyFloats = floatRepresentations.filterValues { !it.approximate }.keys
         processDeclarations()
+        declaredRealCount = realLo.size
+        lpOnlyFloats = floatVars.keys.toSet()
+        floatRepresentations = floatVars.mapValues { FloatRepresentation(it.value.varId, null) }
         integerFloatImages.putAll(collectIntegerFloatImages(onlyRealColumns = true))
         collectAffineFloatImages()
         if (lpOnlyFloats.isNotEmpty()) {
@@ -222,7 +224,11 @@ internal class FlatZincCompiler(
             floatRepresentations = floatRepresentations,
             semantics = sourceSemantics,
             definitionHints = definitionHints,
-        )
+        ).also { program ->
+            program.retainSource(FlatZincSourceState(program.suppliedCopy(), declaredRealCount) {
+                selectFloatRepresentations()
+            })
+        }
     }
 
     internal fun processDecl(d: FznVarDecl) {
@@ -537,6 +543,7 @@ internal class FlatZincCompiler(
     }
 
     internal fun allocOpenFloat(name: String): Int {
+        if (!forFloatPlanning) return allocFloat(name, sourceRealLower, sourceRealUpper)
         if (name in lpOnlyFloats || (forFloatPlanning && (exactFloats || hasDefaultRealBounds))) {
             return allocFloat(name, sourceRealLower, sourceRealUpper)
         }
@@ -550,7 +557,12 @@ internal class FlatZincCompiler(
         }
     }
 
-    internal fun allocFloat(name: String, lo: Double, hi: Double, lpOnly: Boolean = name in lpOnlyFloats): Int {
+    internal fun allocFloat(
+        name: String,
+        lo: Double,
+        hi: Double,
+        lpOnly: Boolean = !forFloatPlanning || name in lpOnlyFloats,
+    ): Int {
         if (lpOnly) {
             // LP-only continuous column: a real variable, absent from CP search. The linear
             // float handlers emit real rows over it; the returned id is a real var id (not an int var).

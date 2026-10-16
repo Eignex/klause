@@ -159,7 +159,7 @@ class LinearObjective(
             val c = realCoefficientValues[r]
             if (c == 0.0) continue
             val symbolic = sample.symbolicReals?.get(r)
-            val x = sample.exactReals?.get(r) ?: if (symbolic != null) {
+            val x = sample.exactReals?.get(r) ?: sample.algebraicReals?.get(r)?.rational ?: if (symbolic != null) {
                 requireNotNull(symbolic.rational) { "a symbolic objective coordinate requires exact real arithmetic" }
             } else checkNotNull(BigFraction.ofDouble(sample.approximateRealValue(r)))
             value += checkNotNull(BigFraction.ofDouble(c)) * x
