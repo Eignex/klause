@@ -16,6 +16,41 @@ import review_jvm_task_log_cohort as cohort
 MAX_JSON_BYTES = 512 * 1024 * 1024
 CONTEXT_KEYS = ('engine', 'index', 'repetition', 'mode', 'recipe')
 METRICS = ('reportedElapsedNanos', 'maxReportedElapsedNanos', 'reportedSuccessfulCodeBytes')
+XML_REFERENCE_FIELDS = ('unmeasuredAllTierXmlSnapshotReferences', 'conflictingXmlSnapshotReferences')
+XML_COLLECTIONS = ('queued', 'tasks', 'nmethods')
+
+
+def compact_family_census(value):
+    result = dict(value)
+    for field in XML_REFERENCE_FIELDS:
+        grouped, previous = {}, -1
+        for reference in result.pop(field):
+            collection, index = reference['collection'], reference['index']
+            if collection not in XML_COLLECTIONS or type(index) is not int or index < 0 or \
+                    set(reference) != {'collection', 'index'}:
+                raise ValueError('Malformed XML snapshot reference')
+            position = XML_COLLECTIONS.index(collection)
+            if position < previous:
+                raise ValueError('XML snapshot reference collections are out of source order')
+            previous = position
+            grouped.setdefault(collection, []).append(index)
+        result[field.replace('References', 'IndicesByCollection')] = grouped
+    return result
+
+
+def referenced_pairs(pairs, rows):
+    positions = {id(row): ordinal for ordinal, row in enumerate(rows)}
+    if len(positions) != len(rows):
+        raise ValueError('Repeated family observation object')
+    result = []
+    for pair in pairs:
+        try:
+            arms = {arm: [{'observationIndex': positions[id(row)]} for row in values]
+                    for arm, values in pair['arms'].items()}
+        except KeyError as error:
+            raise ValueError('Paired arm has no retained family observation') from error
+        result.append(dict(pair, arms=arms))
+    return result
 
 
 def source_status(metadata, checks):
@@ -326,15 +361,21 @@ def inspect(selected, manifest, prefix, declaration=None):
     return {'completed': True, 'sourceSha256': cohort.file_identity(Path(__file__))['sha256'],
         'completeArchiveMemberBytesVerified': True, 'inputArchive': manifest['archive'],
         'inputCensusPrefix': prefix, 'producerCohortProtocolCopiedVerbatim': index,
+        'reportFormatVersion': 2,
+        'pairArmRepresentation': 'observationIndex references sibling familyCaseObservations; all arms and duplicates retained',
         'metadataOnlyCaseNames': sorted(set(metadata) - {row['caseDirectory'] for row in index['cases']}),
         'recordingObservations': recordings,
         'recordingsWithoutFamilyCensus': [row for row in recordings if not row['familyNames']],
-        'familyCaseObservations': rows, 'allOriginalContextPairs': pairs,
+        'familyCaseObservations': rows, 'allOriginalContextPairs': referenced_pairs(pairs, rows),
         'observedComparisonSummaries': summaries(pairs),
         'phaseMapping': {'declarationCopiedVerbatim': declaration,
             'sourceClosure': {path.name: cohort.file_identity(path) for path in
                               (Path(mapping.__file__), Path(mapping.events.__file__))},
-            'familyCaseObservations': mapped_rows, 'allOriginalContextPairs': mapped_pairs,
+            'familyCaseObservations': [dict(row, mappedFamilyCensus=compact_family_census(row['mappedFamilyCensus']))
+                                       for row in mapped_rows],
+            'allOriginalContextPairs': referenced_pairs(mapped_pairs, mapped_rows),
+            'xmlSnapshotReferenceEncoding': {field: field.replace('References', 'IndicesByCollection')
+                                             for field in XML_REFERENCE_FIELDS},
             'observedComparisonSummaries': summaries(mapped_pairs),
             'runtimeSourceBindingProven': False, 'fullSourcePhaseCoverageProven': False,
             'acceptedSavingsCredit': False,

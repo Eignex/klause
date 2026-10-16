@@ -252,6 +252,54 @@ class ReportJvmCompilationCohortTest(unittest.TestCase):
             self.assertEqual([-3, -3], summary['metrics']['reportedElapsedNanos']['pairDifferenceRange'])
             self.assertFalse(result['acceptedSavingsCredit'])
 
+    def test_compact_xml_indices_restore_every_reference_without_changing_roots_metrics_or_exclusions(self):
+        for references in [[], [{'collection': collection, 'index': index}
+                               for collection in review.XML_COLLECTIONS for index in (0, 3, 3, 99)]]:
+            with self.subTest(references=references):
+                value = {'inclusiveRootEventIndices': [1, 4, 9], 'requiredOrdinaryPhases': ['p.C.work'],
+                         'observedAllTierMetrics': {'reportedElapsedNanos': None}, 'acceptedSavingsCredit': False,
+                         **dict.fromkeys(review.XML_REFERENCE_FIELDS, references)}
+                before = copy.deepcopy(value)
+
+                result = review.compact_family_census(value)
+
+                self.assertEqual(before, value)
+                for field in review.XML_REFERENCE_FIELDS:
+                    grouped = result.pop(field.replace('References', 'IndicesByCollection'))
+                    restored = [{'collection': collection, 'index': index}
+                                for collection, indices in grouped.items() for index in indices]
+                    self.assertEqual(references, restored)
+                self.assertEqual({k: v for k, v in value.items() if k not in review.XML_REFERENCE_FIELDS}, result)
+
+    def test_compact_xml_indices_reject_unknown_malformed_or_reordered_reference_collections(self):
+        invalid = [[{'collection': 'unknown', 'index': 0}], [{'collection': 'tasks', 'index': True}],
+                   [{'collection': 'tasks', 'index': -1}], [{'collection': 'tasks', 'index': 0, 'extra': 1}],
+                   [{'collection': 'tasks', 'index': 0}, {'collection': 'queued', 'index': 1}]]
+        for references in invalid:
+            with self.subTest(references=references), self.assertRaises(ValueError):
+                review.compact_family_census(dict.fromkeys(review.XML_REFERENCE_FIELDS, references))
+
+    def test_pair_references_recover_every_original_arm_and_duplicate_from_the_complete_observation_table(self):
+        rows = [{'case': 'control', 'family': 'f', 'negative': ['source unknown']},
+                {'case': 'candidate', 'family': 'f', 'negative': ['unmeasured queued root']},
+                {'case': 'other', 'family': 'f', 'negative': ['failed root']}]
+        pairs = [{'family': 'f', 'arms': {'control': [rows[0], rows[0]], 'candidate': [rows[1]], 'unknown': [rows[2]]},
+                  'exclusions': ['Missing, duplicate or unexpected original pair arms'], 'acceptedSavingsCredit': False}]
+        before = copy.deepcopy(pairs)
+
+        result = review.referenced_pairs(pairs, rows)
+
+        self.assertEqual(before, pairs)
+        restored = {arm: [rows[value['observationIndex']] for value in values]
+                    for arm, values in result[0]['arms'].items()}
+        self.assertEqual(pairs[0]['arms'], restored)
+        self.assertEqual(pairs[0]['exclusions'], result[0]['exclusions'])
+        self.assertFalse(result[0]['acceptedSavingsCredit'])
+        with self.assertRaisesRegex(ValueError, 'no retained family observation'):
+            review.referenced_pairs(pairs, rows[:2])
+        with self.assertRaisesRegex(ValueError, 'Repeated family observation'):
+            review.referenced_pairs(pairs, rows + [rows[0]])
+
     def test_separate_mapping_compares_complete_saved_roots_without_replacing_original_excluded_results(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

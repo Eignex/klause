@@ -2300,6 +2300,18 @@ the original summaries. The mapping input and its hash remain captured. Recorded
 head equality establishes metadata scope only; it does not prove loaded classes,
 descriptors, synthetic ownership or exhaustive source-phase coverage.
 
+Report format version 2 stores each original or mapped family observation once.
+Every pair arm contains `observationIndex` references into its sibling
+`familyCaseObservations` array, preserving duplicate and unexpected arms. Original
+family censuses retain their producer representation. Mapped XML references use
+`unmeasuredAllTierXmlSnapshotIndicesByCollection` and
+`conflictingXmlSnapshotIndicesByCollection`: each maps `queued`, `tasks` or
+`nmethods` to every corresponding source index in order. Empty maps mean no
+references; repeated indices remain repeated. Expanding each collection/index
+pair recovers the complete reference list. Roots, phases, metrics and exclusions
+are unchanged. These representations avoid duplicate root lists and repeated XML
+collection labels without increasing the output bounds or selecting away records.
+
 `compilation-cost-comparison.json.gz` retains every original family/case row and
 pair, original source-check status, whole recording/tier costs and report recovery
 identities. Pair keys include engine, input index, repetition, mode and recipe.
