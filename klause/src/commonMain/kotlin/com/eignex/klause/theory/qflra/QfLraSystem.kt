@@ -247,7 +247,7 @@ internal class LiveQfLraSystem(
         if (lowerBound != null && upperBound != null) {
             if (!work.admitted(lowerBound.number.value) || !work.admitted(upperBound.number.value)) return null
             val relation = lowerBound.number.value.compareTo(upperBound.number.value)
-            if (relation > 0 || relation == 0 && (lowerBound.strict || upperBound.strict)) return null
+            if (relation > 0 || (relation == 0 && (lowerBound.strict || upperBound.strict))) return null
         }
         for (boundIndex in 0..1) {
             val upper = boundIndex == 0
