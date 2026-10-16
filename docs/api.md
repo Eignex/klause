@@ -51,6 +51,14 @@ locations. `solve` returns `OpenTheoryResult` and exact source-coordinate assign
 including algebraic reals and arbitrary-width open integers. Finite globals remain
 part of the same source rather than becoming an unconstrained finite projection.
 
+Finite `SourceStrategy.solve` dispatches its captured invocation through
+`SourceSetup.execute` and `FinitePipeline.solve`. Its internal single-consumer adapter
+retains the full typed CP or LS parameters, including assumptions, hooks, starting
+points and the same node ledger. Finite preparation uses the retained shape without
+additional presolve reductions. Each completed envelope keeps its native result
+privately beside the reconstructed source outcome, preserving the original stop
+reason without a live worker or a later mutable result getter.
+
 Typed `BacktrackParams` and `LocalSearchParams` overloads retain their finite and
 polynomial controls. `PolynomialTheoryParams` supplies native polynomial limits and
 common pins; `TheoryParams` supplies open-linear limits. These are distinct work
