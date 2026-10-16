@@ -122,7 +122,9 @@ constructor retains its neutral-hint behavior. See [source definition materializ
 for move and objective-gradient policies.
 Native `PolynomialRealProblem`, `NonlinearIntegerProblem` and `TranscendentalProblem`
 snapshots use the same attachment through `SourceAttachment(source, settings)`, with
-explicit immutable `ProblemSettings`. Their actual source identity, exact formula,
+explicit immutable `ProblemSettings`. Attaching metadata does not initialize the
+default mechanism providers; setup binding resolves the immutable default bundle
+or the bundle retained by a baked source. Their actual source identity, exact formula,
 integer/real namespaces and effective semantics remain retained. Pure polynomial
 preparation applies those settings to its private factor view. No finite source model
 is substituted for the native input. `SourceSetupRequest(source, engine,
