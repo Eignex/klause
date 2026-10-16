@@ -502,5 +502,8 @@ Original-unit linear lowering, row/coordinate capture, tolerance qualification a
 point checks poll and charge the containing source invocation token. Stopped
 preparation exports no partial source binding. Every execution owns a fresh checked
 incumbent and immutable result qualification; retained outcomes do not read later
-publication state. Native numerical execution retains its existing theory-work
+publication state. The selected finite request contributes its actual cancellation
+and deadline to original-unit publication checking before workers begin; supplying
+those controls through a deferred factory does not leave checking outside its scope.
+Native numerical execution retains its existing theory-work
 currency and cleanup owner, including when an original-unit callback fails.

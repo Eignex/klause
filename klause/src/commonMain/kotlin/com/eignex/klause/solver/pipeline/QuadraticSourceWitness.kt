@@ -6,7 +6,6 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
-import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
@@ -29,46 +28,28 @@ internal fun checkQuadraticSourceWitness(
 ): SourceEvidenceCheck = try {
     val arithmetic = PolynomialArithmetic(cancellation, limits)
     arithmetic.step()
-    val linear = plan.originalSource is LinearSourceProblem
-    val model = plan.sourceModel.takeIf { linear }
-    if (point.numBoolVars != (model?.numBoolVars ?: plan.sourceBoolCount) ||
-        point.numIntVars != (model?.numIntVars ?: plan.sourceIntCount) ||
-        point.numRealVars != (model?.numRealVars ?: plan.sourceRealCount)
-    ) {
-        SourceEvidenceCheck.Rejected("quadratic witness has different source coordinates")
-    } else {
-        when (val source = plan.originalSource) {
+    if (point.numBoolVars != plan.sourceBoolCount || point.numIntVars != plan.sourceIntCount ||
+        point.numRealVars != plan.sourceRealCount
+    ) SourceEvidenceCheck.Rejected("quadratic witness has different source coordinates")
+    else when (val source = plan.originalSource) {
         is PolynomialRealProblem -> checkProjectedPolynomialWitness(source, point, cancellation, limits)
-
         is NonlinearIntegerProblem -> {
             val algebraic = AlgebraicArithmetic(arithmetic)
             val reals = exactQuadraticReals(point, algebraic)
-            if (reals == null) {
-                SourceEvidenceCheck.Unavailable("quadratic witness has no exact real coordinates")
-            } else {
+            if (reals == null) SourceEvidenceCheck.Unavailable("quadratic witness has no exact real coordinates")
+            else {
                 val values = source.realCoordinates.withIndex().associate { it.value to reals[it.index] }
                     .toMutableMap()
                 for ((id, column) in source.integerCoordinates.withIndex()) {
                     arithmetic.step()
                     values[column] = algebraic.rational(BigFraction.of(point.exactIntValue(id), BIG_ONE))
                 }
-                checkProjectedPolynomialFormula(
-                    source.formula,
-                    source.boolCount,
-                    source.numericCount,
-                    point.bools,
-                    values,
-                    cancellation,
-                    arithmetic,
-                    limits,
-                )
+                checkProjectedPolynomialFormula(source.formula, source.boolCount, source.numericCount,
+                    point.bools, values, cancellation, arithmetic, limits)
             }
         }
-        is LinearSourceProblem -> checkQuadraticIrWitness(plan, point, cancellation, arithmetic, limits)
         is Problem -> checkQuadraticIrWitness(plan, point, cancellation, arithmetic, limits)
-
         else -> SourceEvidenceCheck.Unavailable("quadratic source has no installed witness checker")
-    }
     }
 } catch (_: PolynomialInterrupted) {
     SourceEvidenceCheck.Unavailable("quadratic source witness checking interrupted")
@@ -91,14 +72,8 @@ private fun checkQuadraticIrWitness(
     val discrete = Sample(point.bools, point.ints)
     val finite = plan.finiteFactorProjections?.let { model.finite.bake(it, cancellation) }
         ?: model.finite.bake(cancellation)
-    when (
-        val checked = composedFixpoint(
-        finite,
-        Candidate(discrete, Unit),
-        cancellation,
-        enforcingPeers = model.finiteEnforcingFactors,
-    )
-    ) {
+    when (val checked = composedFixpoint(finite, Candidate(discrete, Unit), cancellation,
+        enforcingPeers = model.finiteEnforcingFactors)) {
         is Verification.Rejected -> return SourceEvidenceCheck.Rejected(checked.reason)
         is Verification.Indeterminate -> return SourceEvidenceCheck.Unavailable(checked.reason)
         is Verification.Accepted -> Unit
@@ -111,16 +86,8 @@ private fun checkQuadraticIrWitness(
         arithmetic.step()
         values[column] = algebraic.rational(BigFraction.of(point.exactIntValue(id), BIG_ONE))
     }
-    return checkProjectedPolynomialFormula(
-        model.service.formula,
-        model.service.boolCount,
-        model.service.realCount,
-        point.bools,
-        values,
-        cancellation,
-        arithmetic,
-        limits,
-    )
+    return checkProjectedPolynomialFormula(model.service.formula, model.service.boolCount, model.service.realCount,
+        point.bools, values, cancellation, arithmetic, limits)
 }
 
 private fun exactQuadraticReals(point: Sample, arithmetic: AlgebraicArithmetic): List<AlgebraicReal>? =

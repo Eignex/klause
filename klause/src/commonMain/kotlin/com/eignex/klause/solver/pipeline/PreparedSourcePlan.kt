@@ -189,6 +189,7 @@ class PreparedSourcePlan private constructor(
 
     internal val execution: PreparedExecution get() = preparation.execution
     internal val sourceModel: Problem? get() = preparation.sourceModel
+    internal val operationKinds: Set<ExecutionOperation> get() = preparation.operations
 
     /** Original neutral source object, including its declaration identities and representation. */
     val originalSource: Any get() = preparation.originalSource
@@ -689,4 +690,14 @@ fun NonlinearIntegerProblem.prepareExecutionPlan(): PreparedSourcePlan = Prepare
 internal fun PreparedSourcePlan.retainingLinearSource(binding: PreparedSourcePlan): PreparedSourcePlan {
     val source = binding.originalSource as? LinearSourceProblem ?: return this
     return withLinearSource(source, binding.sourceIntCount, binding.sourceRealCount, binding.workingLinearObjective)
+}
+
+internal fun PreparedSourcePlan.linearWorkingPlan(): PreparedSourcePlan {
+    if (originalSource !is LinearSourceProblem) return this
+    val source = requireNotNull(sourceModel)
+    return PreparedSourcePlan(
+        source, execution, components, source.numBoolVars, source.numIntVars, source.numRealVars,
+        workingLinearObjective, maximize, operations = operationKinds,
+        factorProjections = factorProjections,
+    )
 }

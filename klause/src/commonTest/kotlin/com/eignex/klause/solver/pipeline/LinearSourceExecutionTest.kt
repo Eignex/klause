@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.LinearSourceIndicator
 import com.eignex.klause.ir.LinearSourceObjective
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.LinearSourceRow
@@ -16,6 +17,7 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.objective.LinearObjective
@@ -378,7 +380,7 @@ class LinearSourceExecutionTest {
             OpenTheoryAssignment.Sampled(point), BigFraction.ZERO, SolveStats.EMPTY,
         ))
 
-        val result = executeLinearSource(SourceExecutionRequest(invocation), SourceExecutionCallbacks()) { _, _ ->
+        val result = executeLinearSource(SourceExecutionRequest(invocation), SourceExecutionCallbacks()) { _, _, _ ->
             SourceExecutionResult.Linear(invocation, native)
         }
 
@@ -387,5 +389,63 @@ class LinearSourceExecutionTest {
         assertEquals(LinearSourceConclusion.SATISFIABLE, outcome.conclusion)
         assertEquals(BigFraction.ONE, outcome.incumbent?.objective)
         assertSame(native, assertIs<SourceExecutionResult.Linear>(result).result)
+    }
+
+    @Test
+    fun `exact integer indicators should retain their admitted numerical source execution`() {
+        val source = LinearSourceProblem(
+            listOf(
+                LinearSourceVariable("guard", true, SemanticRational.ZERO, SemanticRational.ONE),
+                LinearSourceVariable("x", false, SemanticRational.ZERO, SemanticRational.ofLong(2)),
+            ),
+            listOf(LinearSourceRow(
+                listOf(LinearSourceTerm(1, SemanticRational.ONE)), lower = SemanticRational.ONE,
+                indicator = LinearSourceIndicator(0, true),
+            )),
+            LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
+        ))
+
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+            FiniteSolveRequest(
+                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
+                randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
+            )
+        }))
+
+        val outcome = assertNotNull(result.linearSource)
+        assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
+        assertEquals(BigFraction.ZERO, outcome.incumbent?.objective)
+        assertEquals(2, assertNotNull(outcome.incumbent).values.size)
+        assertSame(source, invocation.source.originalSource)
+    }
+
+    @Test
+    fun `a finite execution stop should cover original source publication checks`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("n", true, SemanticRational.ofLong(2), SemanticRational.ofLong(2))),
+            emptyList(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+        ))
+        val points = mutableListOf<LinearSourceWitness>()
+
+        val result = executeLinearSource(SourceExecutionRequest(invocation),
+            SourceExecutionCallbacks(onLinearSourceIncumbent = points::add)) { _, callbacks, bind ->
+            assertNotNull(bind).invoke(Cancellation { true })
+            callbacks.finite.onSample(Sample(booleanArrayOf(), longArrayOf(2)))
+            SourceExecutionResult.Declined(invocation, TerminationReason.Cancelled)
+        }
+
+        assertTrue(points.isEmpty())
+        assertEquals(LinearSourceConclusion.UNKNOWN, assertNotNull(result.linearSource).conclusion)
+        assertEquals(TerminationReason.Cancelled, assertIs<SourceExecutionResult.Declined>(result).reason)
     }
 }

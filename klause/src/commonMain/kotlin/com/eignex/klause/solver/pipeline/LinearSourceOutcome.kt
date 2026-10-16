@@ -123,11 +123,11 @@ private fun AlgebraicReal.linearRational(): BigFraction? {
 internal fun executeLinearSource(
     request: SourceExecutionRequest,
     callbacks: SourceExecutionCallbacks,
-    execute: (SourceExecutionRequest, SourceExecutionCallbacks) -> SourceExecutionResult,
+    execute: (SourceExecutionRequest, SourceExecutionCallbacks, ((Cancellation) -> Unit)?) -> SourceExecutionResult,
 ): SourceExecutionResult {
     val invocation = request.invocation
     val prepared = requireNotNull(invocation.linearSource)
-    val stop = invocation.cancellation or request.theory.cancellation or request.theory.timeout or
+    var stop = invocation.cancellation or request.theory.cancellation or request.theory.timeout or
         request.polynomial.cancellation or request.polynomial.timeout
     var incumbent: LinearSourceWitness? = null
     fun accept(check: LinearSourceCheck): LinearSourceWitness? {
@@ -168,7 +168,7 @@ internal fun executeLinearSource(
             }
         },
     )
-    val result = execute(request, observed)
+    val result = execute(request, observed) { scope -> stop = stop or scope }
     var native = LinearSourceConclusion.UNKNOWN
     var nativeOptimalValue: BigFraction? = null
     var unboundedBaseExact = false
