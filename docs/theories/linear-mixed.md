@@ -55,13 +55,14 @@ all finite coordinates to be fixed, and retraction discards the point with its L
 
 With the default null hint allowance and one registered linear completion owner,
 a complete mixed worker can prefer an unresolved row of its current source
-disjunction using an existing exact point or an optimal float point's copied model
+disjunction or a disequality side using an existing exact point or an optimal float point's copied model
 prefix. Frontend lowering coordinates remain present; only LP normalization
 columns are omitted. Boolean and finite choices retain their order and must already
 be complete.
 Bounded exact comparison evaluation substitutes known Boolean inputs, preserves
 strictness and skips guarded rows. Named predicates use their registered threshold
-and strictness, including integer lattice rounding. These point values only order exhaustive choices;
+and strictness, including integer lattice rounding. Disequality ties and unavailable
+coordinates retain their original side order. These point values only order exhaustive choices;
 a float optimum supplies no witness, implication, bound or refutation. Custom
 providers, explicit allowances, multiple completion owners, private queries and
 pure integer or real models retain their selected ordering. The comparison work
