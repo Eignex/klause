@@ -109,6 +109,18 @@ internal fun attachedSourceSolvable(
     val invocation = SourceSetup.prepare(request) { lpStats = it }
     val elapsed = start.elapsedNow().inWholeMilliseconds
     common.logRoute(invocation.route, elapsed)
+    if (invocation.route is SourceProblemRoute.Finite) {
+        return Solvable(
+            finite = invocation.finiteShape(),
+            render = renderFinite,
+            objectiveValue = objective?.let { linear -> { sample -> linear.evaluateLong(sample) } },
+            continuousObjectiveValue = objective?.takeIf { linear ->
+                linear.realCoefficients.any { it != 0.0 }
+            }?.let { linear -> { sample -> linear.evaluate(sample) } },
+            routingLpStats = lpStats,
+            routingElapsedMs = admissionElapsedMs + elapsed,
+        )
+    }
     return preparedSourceSolvable(
         invocation,
         renderFinite,

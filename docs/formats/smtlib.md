@@ -337,7 +337,9 @@ same attachment to `SourceSetupRequest`; callers bind the retained affine or exa
 quadratic objective and sense before `SourceSetup.prepare` and `SourceSetup.execute`.
 The CLI and preparation/execution probes use this common contract instead of
 frontend source classifications. Source ownership and captured resource defaults
-survive every fresh invocation; traversal state belongs to execution.
+survive every fresh invocation; traversal state belongs to execution. Finite CLI
+execution retains the invocation's selected shape and minimized consumer objective,
+while rendering costs in original source units.
 
 A genuine open linear integer beside a bounded mixed product does not by itself
 replace the factor model with a nonlinear source snapshot. Admission reads the
