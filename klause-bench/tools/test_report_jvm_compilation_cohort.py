@@ -95,6 +95,25 @@ class ReportJvmCompilationCohortTest(unittest.TestCase):
                 self.assertEqual(2, len(result))
                 self.assertTrue(all(row['exclusions'] for row in result))
 
+    def test_summary_keeps_excluded_contexts_without_zero_cost_totals(self):
+        base = {'family': 'f', 'engine': 'cp', 'index': 4, 'repetition': 2, 'mode': 'profile',
+                'recipe': None, 'originalProblemCopiedVerbatim': {'sha256': 'same'},
+                'observedDeclaredPhaseAndSourceEligible': False,
+                'observedMetrics': dict.fromkeys(review.METRICS, 12)}
+        pairs = review.paired([dict(base, arm='control'), dict(base, arm='candidate')])
+
+        result = review.summaries(pairs)[0]
+
+        self.assertEqual(1, result['totalOriginalPairs'])
+        self.assertEqual(0, result['observedDeclaredPhaseAndSourceEligiblePairs'])
+        self.assertEqual(4, result['excludedPairContexts'][0]['index'])
+        self.assertEqual(2, result['excludedPairContexts'][0]['repetition'])
+        for metric in result['metrics'].values():
+            self.assertEqual(0, metric['observedEligiblePairs'])
+            self.assertIsNone(metric['sumOfPairControlValues'])
+            self.assertIsNone(metric['sumOfPairCandidateValues'])
+            self.assertIsNone(metric['pairDifferenceRange'])
+
     def test_family_rows_keep_full_census_and_declared_eligibility_without_source_or_savings_proof(self):
         family = {'requiredOrdinaryPhases': ['p.C.work'], 'inclusiveRootEventIndices': [3],
                   'missingRequiredOrdinaryPhases': [], 'unresolvedSuccessfulInliningEventIndices': [],
@@ -226,6 +245,11 @@ class ReportJvmCompilationCohortTest(unittest.TestCase):
             pair = result['allOriginalContextPairs'][0]
             self.assertTrue(pair['observedDeclaredPhaseAndSourceEligible'])
             self.assertEqual(-3, pair['observedAllTierDifferences']['reportedElapsedNanos']['candidateMinusControl'])
+            summary = result['observedComparisonSummaries'][0]
+            self.assertEqual(1, summary['totalOriginalPairs'])
+            self.assertEqual(8, summary['metrics']['reportedElapsedNanos']['sumOfPairControlValues'])
+            self.assertEqual(5, summary['metrics']['reportedElapsedNanos']['sumOfPairCandidateValues'])
+            self.assertEqual([-3, -3], summary['metrics']['reportedElapsedNanos']['pairDifferenceRange'])
             self.assertFalse(result['acceptedSavingsCredit'])
 
 

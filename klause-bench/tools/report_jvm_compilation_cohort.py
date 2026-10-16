@@ -128,6 +128,36 @@ def paired(rows):
     return pairs
 
 
+def summaries(pairs):
+    groups = defaultdict(list)
+    for pair in pairs:
+        key = (pair['family'], pair['engine'], pair['mode'], pair['recipe'])
+        groups[key].append(pair)
+    result = []
+    for key, rows in groups.items():
+        metrics = {}
+        for name in METRICS:
+            available = [row['observedAllTierDifferences'][name] for row in rows
+                         if row['observedAllTierDifferences'][name]['available']]
+            controls = [row['originalArmValues']['control'] for row in available]
+            candidates = [row['originalArmValues']['candidate'] for row in available]
+            differences = [row['candidateMinusControl'] for row in available]
+            metrics[name] = {'observedEligiblePairs': len(available),
+                'sumOfPairControlValues': sum(controls) if controls else None,
+                'sumOfPairCandidateValues': sum(candidates) if candidates else None,
+                'sumOfPairCandidateMinusControl': sum(differences) if differences else None,
+                'pairDifferenceRange': [min(differences), max(differences)] if differences else None,
+                'aggregation': 'Sum of per-recording maxima, not a cohort maximum' if
+                    name == 'maxReportedElapsedNanos' else 'Sum of paired inclusive-root reported quantities'}
+        result.append({'family': key[0], 'engine': key[1], 'mode': key[2], 'recipe': key[3],
+            'totalOriginalPairs': len(rows),
+            'observedDeclaredPhaseAndSourceEligiblePairs': sum(row['observedDeclaredPhaseAndSourceEligible'] for row in rows),
+            'excludedPairContexts': [{name: row[name] for name in ('index', 'repetition', 'exclusions')}
+                                     for row in rows if row['exclusions']],
+            'metrics': metrics, 'acceptedSavingsCredit': False})
+    return result
+
+
 def load_json(path, compressed=False):
     with (gzip.open(path, 'rb') if compressed else path.open('rb')) as source:
         raw = source.read(MAX_JSON_BYTES + 1)
@@ -264,13 +294,15 @@ def inspect(selected, manifest, prefix):
     census_files = {name for name in selected if re.fullmatch(r'compilation-[0-9]{6}\.json\.gz', name)}
     if census_files != represented:
         raise ValueError('Unrepresented census report files')
+    pairs = paired(rows)
     return {'completed': True, 'sourceSha256': cohort.file_identity(Path(__file__))['sha256'],
         'completeArchiveMemberBytesVerified': True, 'inputArchive': manifest['archive'],
         'inputCensusPrefix': prefix, 'producerCohortProtocolCopiedVerbatim': index,
         'metadataOnlyCaseNames': sorted(set(metadata) - {row['caseDirectory'] for row in index['cases']}),
         'recordingObservations': recordings,
         'recordingsWithoutFamilyCensus': [row for row in recordings if not row['familyNames']],
-        'familyCaseObservations': rows, 'allOriginalContextPairs': paired(rows),
+        'familyCaseObservations': rows, 'allOriginalContextPairs': pairs,
+        'observedComparisonSummaries': summaries(pairs),
         'compilerElapsedTimeProven': False, 'rootCensusProven': False, 'codeSizeProven': False,
         'runtimeSourceBindingProven': False, 'acceptedSavingsCredit': False,
         'scope': 'Historical observed all-tier standard-JFR duration/codeSize comparisons under original declared phases and source outcomes only. Full successful inlining roots are nonadditive across families; every ordinary/OSR/failed/replaced/unresolved/queued root and excluded pair remains in the authenticated census. Declared-phase eligibility does not prove exhaustive source phases, global loss-free lifetime, current runtime/allocation/RNG/work controls, independent confirmation or compiler benefit.'}
@@ -289,8 +321,15 @@ def main():
         result['error'] = {'type': type(error).__name__, 'message': str(error)}
         raise
     finally:
+        summary = {key: result.get(key) for key in ('completed', 'sourceSha256',
+                   'observedComparisonSummaries', 'error', 'scope', 'acceptedSavingsCredit')}
+        raw = (json.dumps(summary, indent=2) + '\n').encode()
+        if len(raw) > cohort.MAX_INDEX_BYTES:
+            raise ValueError('Complete observed comparison summary exceeds bounds')
+        (output / 'compilation-cost-summary.json').write_bytes(raw)
         cohort.write_compressed_report(output / 'compilation-cost-comparison.json.gz', result,
                                        cohort.StorageBudget(output), MAX_JSON_BYTES)
+        print(raw.decode(), end='')
 
 
 if __name__ == '__main__':

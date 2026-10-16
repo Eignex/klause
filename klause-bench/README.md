@@ -2281,6 +2281,9 @@ It performs no original JVM or solver replay and does not run `jfr print`.
 `compilation-cost-comparison.json.gz` retains every original family/case row and
 pair, original source-check status, whole recording/tier costs and report recovery
 identities. Pair keys include engine, input index, repetition, mode and recipe.
+`compilation-cost-summary.json` and the child stdout retain every family/engine/
+mode/recipe summary and excluded pair context. Summary maxima are sums of paired
+per-recording maxima, with a retained difference range; they are not cohort maxima.
 Missing, duplicate or unexpected arms, mismatched problem identities, invalid or
 unknown original source outcomes, incomplete cohorts, missing declared ordinary
 phases, unresolved roots, XML gaps, data-loss events and ambiguous IDs remain
