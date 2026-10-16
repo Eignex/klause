@@ -445,10 +445,5 @@ private const val MAX_EXACT_WHOLE = 9.007199254740992E15
 /** Format an MPS retained-objective value whose solver coefficients were scaled by [scale]. */
 private fun scaledDecimal(value: Long, scale: Long): String {
     require(scale > 0L)
-    if (scale == 1L || value % scale == 0L) return (value / scale).toString()
-    val digits = scale.toString().length - 1
-    val negative = value < 0L
-    val whole = (value / scale).toString().removePrefix("-")
-    val fraction = (value % scale).toString().removePrefix("-").padStart(digits, '0').trimEnd('0')
-    return "${if (negative) "-" else ""}$whole.$fraction"
+    return exactMpsNumber(BigFraction.ofLong(value) * BigFraction.ofLong(scale).reciprocal())
 }

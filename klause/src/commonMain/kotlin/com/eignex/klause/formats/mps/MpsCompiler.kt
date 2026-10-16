@@ -70,8 +70,7 @@ class MpsCompiled(
     val maximize: Boolean,
     /** Columns in declaration order, each mapping a name to its integer- or real-variable id. */
     val columns: List<MpsColumn>,
-    /** Power of ten multiplying the retained objective, set by integer terms when present and by real
-     *  terms for a pure-real objective. */
+    /** Positive multiplier from source objective units to retained working objective units. */
     val objectiveScale: Long,
     /** Count of the source's continuous columns (zero for a pure-integer instance). */
     val floatColumns: Int,
@@ -138,9 +137,18 @@ class MpsCompiled(
         }
     }
 
-    internal fun withSourceModel(source: MpsModel, mismatch: String?, toleranceMismatch: String?): MpsCompiled = apply {
+    internal fun withSourceModel(source: MpsModel, mismatch: String?, toleranceMismatch: String?): MpsCompiled =
+        withLinearSource(checkNotNull(source.captureLinearSource(semantics, Cancellation.Never)),
+            mismatch, toleranceMismatch)
+
+    internal fun withLinearSource(
+        source: LinearSourceProblem,
+        mismatch: String?,
+        toleranceMismatch: String?,
+    ): MpsCompiled = apply {
         check(sourceModel == null) { "MPS source model is already attached" }
-        sourceModel = checkNotNull(source.captureLinearSource(semantics, Cancellation.Never))
+        require(source.semantics == semantics) { "MPS source interpretation differs from the compiled model" }
+        sourceModel = source
         sourceMismatch = mismatch
         this.toleranceMismatch = toleranceMismatch
     }
