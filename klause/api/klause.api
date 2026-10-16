@@ -12514,6 +12514,8 @@ public final class com/eignex/klause/solver/pipeline/SourceAttachment : com/eign
 	public fun <init> (Lcom/eignex/klause/ir/PolynomialRealProblem;Lcom/eignex/klause/ir/ProblemSettings;)V
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Ljava/util/List;Lcom/eignex/klause/ir/SearchHints;)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Ljava/util/List;Lcom/eignex/klause/ir/SearchHints;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;[ILjava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/SearchHints;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;[ILjava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/SearchHints;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/ir/TranscendentalProblem;Lcom/eignex/klause/ir/ProblemSettings;)V
 	public final fun getDefinitionHints ()Ljava/util/List;
 	public final fun getEmbeddedObjectiveSense ()Lcom/eignex/klause/ir/ObjectiveSense;
