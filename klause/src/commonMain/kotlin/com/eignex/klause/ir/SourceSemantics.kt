@@ -1,5 +1,7 @@
 package com.eignex.klause.ir
 
+import com.eignex.klause.simplex.exact.BigFraction
+
 /** Syntax owner of a source model; this identity selects no execution mechanism. */
 enum class SourceFormat {
     IR, SCHEMA, FLATZINC, SMTLIB, MPS, XCSP3, OPB, DIMACS, WCNF,
@@ -25,13 +27,11 @@ data class UndeclaredIntegerBounds(
 /** Default range of a real declaration with no source range; null endpoints remain open. */
 data class UndeclaredRealBounds(
     /** Inclusive finite lower endpoint, or null for no lower bound. */
-    val lower: Double? = null,
+    val lower: BigFraction? = null,
     /** Inclusive finite upper endpoint, or null for no upper bound. */
-    val upper: Double? = null,
+    val upper: BigFraction? = null,
 ) {
     init {
-        require(lower == null || lower.isFinite()) { "real lower bound must be finite or null" }
-        require(upper == null || upper.isFinite()) { "real upper bound must be finite or null" }
         require(lower == null || upper == null || lower <= upper) { "real lower bound exceeds upper bound" }
     }
 }
@@ -48,7 +48,9 @@ sealed interface FloatSemantics {
         /** Fixed-point scale of float-linear source lowering. */
         val linearScale: Long,
         /** Approximation window for a float without a declared finite range. */
-        val unrangedBounds: UndeclaredRealBounds = UndeclaredRealBounds(-1_000_000.0, 1_000_000.0),
+        val unrangedBounds: UndeclaredRealBounds = UndeclaredRealBounds(
+            BigFraction.ofLong(-1_000_000), BigFraction.ofLong(1_000_000),
+        ),
     ) : FloatSemantics {
         init {
             require(buckets > 0) { "float buckets must be positive" }
@@ -67,17 +69,17 @@ sealed interface FloatSemantics {
  */
 data class SourceTolerance(
     /** Minimum permitted absolute slack in source units. */
-    val absolute: Double = 0.0,
+    val absolute: BigFraction = BigFraction.ZERO,
     /** Permitted slack relative to the checked source scale. */
-    val relative: Double = 0.0,
+    val relative: BigFraction = BigFraction.ZERO,
 ) {
     init {
-        require(absolute.isFinite() && absolute >= 0.0) { "absolute tolerance must be finite and nonnegative" }
-        require(relative.isFinite() && relative >= 0.0) { "relative tolerance must be finite and nonnegative" }
+        require(absolute.signum() >= 0) { "absolute tolerance must be nonnegative" }
+        require(relative.signum() >= 0) { "relative tolerance must be nonnegative" }
     }
 
     /** Whether no source feasibility slack is permitted. */
-    val isExact: Boolean get() = absolute == 0.0 && relative == 0.0
+    val isExact: Boolean get() = absolute.isZero && relative.isZero
 }
 
 /**

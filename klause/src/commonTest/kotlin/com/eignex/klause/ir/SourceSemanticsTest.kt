@@ -1,5 +1,8 @@
 package com.eignex.klause.ir
 
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.bigIntOf
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -40,7 +43,10 @@ class SourceSemanticsTest {
         val declared = SourceSemantics(
             format = SourceFormat.MPS,
             numericAuthority = NumericAuthority.DECIMAL_LITERALS,
-            feasibilityTolerance = SourceTolerance(1e-7, 1e-7),
+            feasibilityTolerance = SourceTolerance(
+                BigFraction.of(bigIntOf(1), bigIntOf(10_000_000)),
+                BigFraction.of(bigIntOf(1), bigIntOf(10_000_000)),
+            ),
         )
 
         val resolved = declared.resolve(SemanticOverrides(feasibilityTolerance = SourceTolerance()))
@@ -55,12 +61,12 @@ class SourceSemanticsTest {
         val declared = SourceSemantics(
             format = SourceFormat.FLATZINC,
             floats = FloatSemantics.Grid(1024, 1_000_000),
-            undeclaredReals = UndeclaredRealBounds(-10.0, 10.0),
+            undeclaredReals = UndeclaredRealBounds(BigFraction.ofLong(-10), BigFraction.ofLong(10)),
         )
 
         val resolved = declared.resolve(SemanticOverrides(floats = FloatSemantics.Continuous))
 
-        assertEquals(UndeclaredRealBounds(-10.0, 10.0), resolved.effective.undeclaredReals)
+        assertEquals(UndeclaredRealBounds(BigFraction.ofLong(-10), BigFraction.ofLong(10)), resolved.effective.undeclaredReals)
         assertFalse(resolved.isApproximate)
         assertTrue(declared.resolve().isApproximate)
     }
@@ -92,8 +98,8 @@ class SourceSemanticsTest {
     }
 
     @Test
-    fun `tolerance components should reject negative or nonfinite slack`() {
-        for (tolerance in listOf(-1.0, Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)) {
+    fun `tolerance components should reject negative slack`() {
+        for (tolerance in listOf(BigFraction.ofLong(-1), BigFraction.ofLong(-2))) {
             assertFailsWith<IllegalArgumentException> { SourceTolerance(absolute = tolerance) }
             assertFailsWith<IllegalArgumentException> { SourceTolerance(relative = tolerance) }
         }
@@ -101,7 +107,9 @@ class SourceSemanticsTest {
 
     @Test
     fun `either tolerance component should qualify the source as approximate`() {
-        for (tolerance in listOf(SourceTolerance(absolute = 1e-7), SourceTolerance(relative = 1e-7))) {
+        val slack = BigFraction.of(bigIntOf(1), bigIntOf(10_000_000))
+
+        for (tolerance in listOf(SourceTolerance(absolute = slack), SourceTolerance(relative = slack))) {
             val declared = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance)
 
             assertTrue(declared.resolve().isApproximate)
@@ -122,7 +130,7 @@ class SourceSemanticsTest {
 
     @Test
     fun `grid approximation windows should require finite endpoints`() {
-        for (bounds in listOf(UndeclaredRealBounds(), UndeclaredRealBounds(lower = 0.0))) {
+        for (bounds in listOf(UndeclaredRealBounds(), UndeclaredRealBounds(lower = BigFraction.ZERO))) {
             assertFailsWith<IllegalArgumentException> { FloatSemantics.Grid(8, 1000, bounds) }
         }
     }
