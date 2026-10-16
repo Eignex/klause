@@ -111,6 +111,12 @@ optional hint work. Integer-only registration is limited to the default-null
 primitive path; explicit allowances retain their existing producer admission.
 Optional hint storage admits at most 65,536 source
 row/term/coordinate/index entries.
+When the complete comparison table exceeds that entry bound, admission can retain
+a subset of complete activators in source order. An activator is withheld if any
+of its rows cannot fit, including rows already retained for it. Consumed entries
+are not reclaimed. A bounded transient rejection bitmap and final filtering use
+the same containing token; interrupted admission publishes no subset. Uncovered
+activators supply no preference, and every source row remains enforced by search.
 The scalar policy admits 4,096-bit normalized rationals and bounds intermediate
 products before evaluation. Copying, term visits and bit/word arithmetic costs
 charge the current operation token's native meter and poll its unchanged deadline.

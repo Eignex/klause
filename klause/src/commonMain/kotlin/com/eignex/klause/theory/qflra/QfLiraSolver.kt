@@ -326,6 +326,10 @@ class ExactLiraSearchComponent private constructor(
         }
         if (stop()) return null
         var entries = model.numRealVars.toLong() + model.numIntVars + model.numBoolVars
+        stop.charge(model.numBoolVars.toLong() + 1L)
+        if (stop()) return null
+        val declined = BooleanArray(model.numBoolVars)
+        var partial = false
         val rows = ArrayList<PreparedSourceRow>()
         val variables = LinkedHashSet<Int>()
         for (prepared in preparedRows) {
@@ -333,20 +337,31 @@ class ExactLiraSearchComponent private constructor(
             if (stop()) return null
             if (prepared.row.activator == LinearRow.ALWAYS) continue
             if (prepared.row.activator !in bools.indices) return null
-            entries += prepared.row.size.toLong() + 1L
-            if (entries > MAX_POINT_HINT_ENTRIES) {
-                observePointHintAdmission("POINT_HINT_ENTRIES_DECLINED")
-                return null
+            val variable = prepared.row.activator
+            if (declined[variable]) continue
+            val weight = prepared.row.size.toLong() + 1L
+            if (entries + weight > MAX_POINT_HINT_ENTRIES) {
+                declined[variable] = true
+                partial = true
+                continue
             }
+            entries += weight
             rows += prepared
-            variables += prepared.row.activator
+            variables += variable
         }
-        stop.charge(rows.size.toLong() + variables.size + 1L)
-        if (stop() || rows.isEmpty()) return null
-        pointHintRows = rows.toList()
+        stop.charge(2L * rows.size + 2L * variables.size + 1L)
+        if (stop()) return null
+        val retainedRows = rows.filterNot { declined[it.row.activator] }
+        val retainedVariables = variables.filterNot { declined[it] }.toIntArray()
+        if (stop()) return null
+        if (retainedRows.isEmpty()) {
+            if (partial) observePointHintAdmission("POINT_HINT_ENTRIES_DECLINED")
+            return null
+        }
+        pointHintRows = retainedRows
         pointHintStop = stop
-        observePointHintAdmission("POINT_HINT_REGISTERED")
-        return variables.toIntArray() to SearchCandidateHints { variable ->
+        observePointHintAdmission(if (partial) "POINT_HINT_PARTIAL_REGISTERED" else "POINT_HINT_REGISTERED")
+        return retainedVariables to SearchCandidateHints { variable ->
             observeCompleteStage("POINT_HINT_CONSULTED")
             if (!partialPointHintAvailable()) {
                 observeCompleteStage("POINT_HINT_UNAVAILABLE")

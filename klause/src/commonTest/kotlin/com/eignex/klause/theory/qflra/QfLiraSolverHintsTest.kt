@@ -47,6 +47,38 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
     @Test
+    fun `bounded point hints should withhold every row of a declined activator`() {
+        val model = Problem(
+            numBoolVars = 65_531,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, -1.0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val (variables, hints) = assertNotNull(component.partialPointHints(Cancellation.Never))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertContentEquals(intArrayOf(1), variables)
+            assertNull(hints.preferredBool(0))
+            assertEquals(false, hints.preferredBool(1))
+            assertNull(hints.preferredBool(2))
+        }
+    }
+
+    @Test
     fun `point hint admission observations should identify storage declines`() {
         val variants = listOf(
             65_535 to "POINT_HINT_ENTRIES_DECLINED",
