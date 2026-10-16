@@ -55,7 +55,9 @@ class ExactLinear private constructor(
             else Term.ofRealVar(mapping.real(Term.realVar(reference)))
         },
         coefficients.map { BigFraction.of(it, BIG_ONE) }, relation, BigFraction.of(rhs, BIG_ONE), strict,
-        if (activator == LinearRow.ALWAYS) activator else mapping.bool(activator),
+        if (activator == LinearRow.ALWAYS) activator else mapping.bool(activator).also {
+            require(it >= 0) { "removed exact row activator" }
+        },
     )
 
     override fun structuralKey(): StructuralKey = key()
