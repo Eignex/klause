@@ -109,7 +109,8 @@ internal object LinearCachedPointInspection {
             put("status", "CAPTURED")
             put("coordinateMapping", if (mapping) "VERIFIED_UNCHANGED_PREPARATION_AND_PINNED_LAYOUT" else "UNVERIFIED")
             put("mappingIsFeasibilityOrWitnessAuthority", false)
-            put("layoutContract", "LiveQfLraSystem.install: real then integer source prefix, followed by expression columns")
+            put("layoutContract",
+                "LiveQfLraSystem.install: real then integer source prefix, followed by expression columns")
             put("preparedSourceIsCompiled", preparedSource === compiled.model)
             put("preparedProblemIsCompiled", preparedProblem === compiled.model)
             put("sourceMappingMetadata", sourceMappingMetadata)
@@ -143,7 +144,8 @@ internal object LinearCachedPointInspection {
                 compiled.boolVarNames.toSortedMap().forEach { (name, id) ->
                     put(name, buildJsonObject {
                         put("id", id)
-                        put("value", if (mapping) sessionBools.getOrNull(id)?.toString() ?: "UNASSIGNED" else "UNMAPPED")
+                        put("value", if (mapping) sessionBools.getOrNull(id)?.toString() ?: "UNASSIGNED"
+                            else "UNMAPPED")
                     })
                 }
             })
@@ -166,10 +168,11 @@ internal object LinearCachedPointInspection {
         check(field(owner, "lastResult") === result && field(result, "float") === float)
         check(field(result, "witness") === witness)
         check(witness == null || field(witness, "primal") === exactPrimal)
-        check(exactValues == null || exactValues.indices.all { exactPrimal?.get(it) === exactValues[it] })
+        check(exactValues == null || exactValues.indices.all { exactPrimal[it] === exactValues[it] })
         check(exactPrimal?.size == exactLength)
         check(field(float, "primal") === primal && rawBits.indices.all { rawBits[it] == primal[it].toRawBits() })
-        check(field(owner, "trail") === trail && field(trail, "state") === state && field(state, "model") === stateModel)
+        check(field(owner, "trail") === trail && field(trail, "state") === state &&
+            field(state, "model") === stateModel)
         check(revisions(state) == stateRevisions && field(lp, "closed") == lpClosed)
         check(field(lp, "invalidated") == lpInvalidated && field(owner, "closed") == ownerClosed)
         check(field(owner, "workingActive") == ownerWorking)

@@ -37,10 +37,12 @@ internal object SmtLibCompilationInspection {
             parsed.realVarNames == canonical.realVarNames) { "source names or mappings differ" }
         requireSameModel(parsed.model, canonical.model)
         val definitions = field(state, "definitions") as Map<*, *>
-        val comparisonField = if (stateType.declaredFields.any { it.name == "comparisons" }) "comparisons" else "equalities"
+        val comparisonField = if (stateType.declaredFields.any { it.name == "comparisons" }) "comparisons"
+            else "equalities"
         val comparisons = field(state, comparisonField) as Map<*, *>
         val byOperator = comparisons.keys.groupingBy { key ->
-            if (key!!.javaClass.declaredFields.any { it.name == "op" }) field(key, "op") as String else "="
+            val comparison = requireNotNull(key)
+            if (comparison.javaClass.declaredFields.any { it.name == "op" }) field(comparison, "op") as String else "="
         }.eachCount()
         val guards = definitions.values.map { (field(requireNotNull(it), "guards") as List<*>).size }
         val images = definitions.values.map { field(requireNotNull(it), "image") as? Set<*> }

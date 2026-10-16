@@ -64,7 +64,8 @@ internal object LinearRootOpeningProfile {
         val parsingNs = System.nanoTime() - parsingStarted
         require(compiled.objective == null) { "only satisfaction openings are supported" }
         if (inspection == "compiler-expansion" || inspection == "compiler-ownership") {
-            SmtLibCompilationInspection.inspect(bytes.decodeToString(), compiled, out, inspection == "compiler-ownership")
+            SmtLibCompilationInspection.inspect(bytes.decodeToString(), compiled, out,
+                inspection == "compiler-ownership")
         }
         val deadlineStarted = System.nanoTime()
         val stop = Cancellation.after(OPENING_BUDGET_MS.milliseconds)

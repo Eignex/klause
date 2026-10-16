@@ -71,7 +71,7 @@ internal class SmtLibConditionalLeafInspection(
                     when {
                         definition == null -> results.add(setOf(frame.term))
                         source in supports -> results.add(supports[source])
-                        !active.add(source!!) -> results.add(null)
+                        !active.add(source) -> results.add(null)
                         else -> {
                             val terms = (field(definition, "arms") as List<Any>) +
                                 requireNotNull(field(definition, "default"))
@@ -114,7 +114,8 @@ internal class SmtLibConditionalLeafInspection(
 
     private fun shape(variable: Int): String {
         val support = supports[variable] ?: return "unknown"
-        return listOf("constant", "source-arithmetic", "arithmetic-reading-definition", "arithmetic-reading-other-auxiliary")
+        return listOf("constant", "source-arithmetic", "arithmetic-reading-definition",
+            "arithmetic-reading-other-auxiliary")
             .joinToString("/") { label -> "$label=${support.count { kind(it) == label }}" }
     }
 

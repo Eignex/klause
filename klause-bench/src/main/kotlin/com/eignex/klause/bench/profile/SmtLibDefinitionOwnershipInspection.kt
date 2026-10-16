@@ -45,12 +45,15 @@ internal object SmtLibDefinitionOwnershipInspection {
         val originalSources = intNames.values.toSet()
         val originalFactors = factors.toList()
         val snapshot = snapshot(state, factors, intNames.values, boolNames.values, beforeExpansion)
-        val removed = requireNotNull(method(state, "retainNeededDefinitions", factors, intNames.values, boolNames.values, null))
+        val removed = requireNotNull(method(state, "retainNeededDefinitions", factors,
+            intNames.values, boolNames.values, null))
         val removedInts = field(removed, "ints") as Set<Int>
         val removedBools = field(removed, "bools") as Set<Int>
         require(removedInts == snapshot.integerOwners.filterValues { it !in snapshot.retained }.keys)
         require(removedBools == snapshot.booleanOwners.filterValues { it !in snapshot.retained }.keys)
-        require(factors == originalFactors.filter { snapshot.owners[it]?.let { owner -> owner !in snapshot.retained } != true })
+        require(factors == originalFactors.filter {
+            snapshot.owners[it]?.let { owner -> owner !in snapshot.retained } != true
+        })
         require(method(builder, "compactConditionalColumns", removed, null) == null)
         val count = field(builder, "nextBool") as Int
         require(field(builder, "nextReal") == 0)
@@ -92,9 +95,9 @@ internal object SmtLibDefinitionOwnershipInspection {
         val integerOwners = definitions.keys.associateWith { Owner(it, integer = true) }
         val booleanOwners = HashMap<Int, Owner>()
         val parts = HashMap<Owner, List<Factor>>()
-        fun own(owner: Owner, factors: List<Factor>, inputs: Set<Int> = emptySet()) {
-            parts[owner] = factors
-            for (factor in factors) {
+        fun own(owner: Owner, ownerFactors: List<Factor>, inputs: Set<Int> = emptySet()) {
+            parts[owner] = ownerFactors
+            for (factor in ownerFactors) {
                 owners[factor] = owner
                 if (factor is ReifiedFactor && factor.auxBoolVar !in inputs) booleanOwners[factor.auxBoolVar] = owner
             }
@@ -104,10 +107,10 @@ internal object SmtLibDefinitionOwnershipInspection {
             own(integerOwners.getValue(variable), field(definition, "factors") as List<Factor>,
                 guards.mapTo(HashSet()) { Lit.variable(it) })
         }
-        for ((variable, factors) in predicates) {
+        for ((variable, predicateFactors) in predicates) {
             val owner = Owner(variable, integer = false)
             booleanOwners[variable] = owner
-            own(owner, factors)
+            own(owner, predicateFactors)
         }
         for (factor in factors) {
             if (factor is ReifiedFactor && factor !in owners && factor.auxBoolVar !in booleanOwners) {
@@ -174,7 +177,8 @@ internal object SmtLibDefinitionOwnershipInspection {
             put("lateKnownImagesFromCurrentCompletedChildren", snapshot.lateImages.size)
             put("retainedLateKnownImages", retainedDefinitions.count { it in snapshot.lateImages })
             put("lateImageSizes", histogram(snapshot.lateImages.values.map(Int::toString)))
-            put("lateImageScope", "one read-only call to existing constantImage per unknown definition; no fixpoint or mutation")
+            put("lateImageScope",
+                "one read-only call to existing constantImage per unknown definition; no fixpoint or mutation")
             put("retainedFactorKinds", histogram(surviving.map { it.javaClass.simpleName }))
             put("externalDefinitionReadFactorKinds", histogram(externalReads.map { it.javaClass.simpleName }))
             put("externalReifiedRows", histogram(rows.map { row ->
@@ -185,7 +189,8 @@ internal object SmtLibDefinitionOwnershipInspection {
                 val images = row.vars.filter { it in snapshot.definitions }.map {
                     field(snapshot.definitions.getValue(it), "image") as? Set<*>
                 }
-                "${row.op}/arity${row.vars.size}/known${images.count { it != null }}/unknown${images.count { it == null }}"
+                "${row.op}/arity${row.vars.size}/known${images.count { it != null }}" +
+                    "/unknown${images.count { it == null }}"
             }))
             put("predicateSharing", snapshot.predicateSharing)
             put("predicateSharingSolverCounterChanged", false)
@@ -215,7 +220,8 @@ internal object SmtLibDefinitionOwnershipInspection {
                     })
                 })
             })
-            put("classificationScope", "precompaction owner identities; external reads exclude integer defining factors")
+            put("classificationScope",
+                "precompaction owner identities; external reads exclude integer defining factors")
         }
     }
 
