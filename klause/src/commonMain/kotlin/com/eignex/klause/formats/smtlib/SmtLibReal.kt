@@ -62,7 +62,10 @@ internal fun Compiler.Builder.isRealExpr(t: SExpr): Boolean {
                 val binding = lookup(node.text)
                 if (binding != null) {
                     if (binding.isReal) return true
-                } else if (node.text in realNames || isRealLiteral(node.text) || macros[node.text]?.isReal == true) {
+                } else if (node.text in realNames || macros[node.text]?.isReal == true ||
+                    (node.text !in intNames && node.text !in boolNames && node.text !in macros &&
+                        isRealLiteral(node.text))
+                ) {
                     return true
                 }
             }

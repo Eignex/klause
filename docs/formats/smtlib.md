@@ -261,8 +261,8 @@ is published.
 
 Factor-representable real products remain retained factors for library-selected
 polynomial completion. Lexical helpers and objectives can retain exact formula
-snapshots; helper declarations still receive lexical body and result-sort
-validation. Unused declarations stay visible in original output namespaces.
+snapshots. Every helper declaration receives lexical body, argument and result-sort
+validation, including unused definitions and integer helpers. Unused declarations stay visible in original output namespaces.
 Native integer snapshots preserve separate declaration-ordered Int/Real/Bool maps,
 with shared numeric formula slots kept private to the prepared source plan.
 Quadratic snapshots retain exact rational coefficients, original Boolean numeric
@@ -308,6 +308,16 @@ A syntactic nonlinear marker distinguishes products of multiple nonconstant oper
 and nonconstant powers above one, without requiring polynomial expansion.
 
 ### Lexical scope and refusals
+
+Admission checks declaration signatures and expression sorts with an iterative
+lexical type walk. Helper bodies are checked once against their definition scope;
+calls validate declared parameter sorts without expanding bodies for validation.
+Integer-to-real promotion is allowed; Boolean/numeric and real-to-integer coercions
+are rejected. Logic declaration syntax does not choose a source representation.
+Quoted and bare spellings of one symbol share its declaration identity, while
+quoted numeral symbols stay separate from numeral literals. Output metadata keeps
+the declaration's original spelling. Source lowering charges and polls the containing
+admission allowance while expanding actual helper applications.
 
 Parallel `let` values read the enclosing scope. Typed nonrecursive `define-fun` macros
 capture their definition scope, and assertions retain the declarations visible at

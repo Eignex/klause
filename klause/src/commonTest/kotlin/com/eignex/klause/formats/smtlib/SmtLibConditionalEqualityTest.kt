@@ -563,8 +563,8 @@ class SmtLibConditionalEqualityTest {
         val parsed = SmtLib.parse(
             """
             (declare-const x Int)
-            (assert (= x -9223372036854775808))
-            (assert (= (ite (not (= (- x) -9223372036854775808)) x 0) -9223372036854775808))
+            (assert (= x (- 9223372036854775808)))
+            (assert (= (ite (not (= (- x) (- 9223372036854775808))) x 0) (- 9223372036854775808)))
             """.trimIndent(),
         )
         ExactLiraSearchComponent(parsed.model).use { component ->
@@ -762,7 +762,7 @@ class SmtLibConditionalEqualityTest {
         val parsed = SmtLib.parse(
             """
             (declare-const b Bool) (declare-const x Int)
-            (assert (or (= (ite b (+ x 9223372036854775807) 0) -9223372036854775808) false))
+            (assert (or (= (ite b (+ x 9223372036854775807) 0) (- 9223372036854775808)) false))
             """.trimIndent(),
         )
         val session = SearchSession(
