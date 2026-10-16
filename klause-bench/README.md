@@ -2369,6 +2369,20 @@ source refutation, independent witness acceptance or optimization claim.
 
 ### Saved JVM compilation census
 
+`bench.profile.JvmInstalledMethodMetadata` accepts `head=`, `manifest=` and
+`manifest-sha256=`. The HTTPS manifest is an original installed CLI provenance
+manifest. Two detached builds of the pinned source must reproduce its complete
+distribution digest map before any class is inspected. The reader inventories
+every jar class entry without loading or initializing target classes. Descriptors,
+flags, source-file attributes and complete per-method line tables retain their
+original order; alternate multi-release entries are not selected away. Missing
+attributes and parse failures remain explicit. Original jar bytes are retained
+privately, including source-debug attributes not interpreted by this reader.
+The complete output uses the capture archive and owned worktrees are cleaned.
+This is source/binary metadata, not loaded-class, executed-phase, inlining,
+compilation-cost, runtime or allocation evidence. Run it on a lab worker; it does
+not invoke a solver, source checker or recording exporter.
+
 `com.eignex.klause.bench.profile.JvmCompilationCohortReview` accepts `manifest=`,
 `manifest-sha256=` and `archive=` HTTPS inputs. It authenticates the complete
 original archive and every member before decoding any recording. It extracts
