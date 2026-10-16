@@ -28,10 +28,10 @@ class VariablePartitionTest {
     private fun row(vararg vars: Int) = Linear(LongArray(vars.size) { 1L }, vars.toList().toIntArray(), LinearOp.LE, 5L)
 
     @Test
-    fun `global should drag only the columns it mentions into the search set`() {
+    fun `an encoded global should admit all its columns to arithmetic representation`() {
         val alldiff = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 11)
         val partition = problemOf(3, alldiff, row(2)).variablePartition()
-        assertEquals(1, partition.theoryEligibleCount)
+        assertEquals(3, partition.theoryEligibleCount)
         assertTrue(partition.isTheoryEligible(2))
     }
 

@@ -128,17 +128,40 @@ class Distinct(
         },
     )
 
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.DISTINCT) {
-        int(activator)
+    override fun structuralKey(): StructuralKey = key()
+
+    override fun remapStructuralHash(mapping: VarRemap): Int = key(mapping).hashCode()
+
+    private fun key(mapping: VarRemap? = null): StructuralKey = StructuralKey.of(FactorKind.DISTINCT) {
+        // Symmetry refinement uses colors, including a negative focal marker, rather than source ids.
+        bool(activator != LinearRow.ALWAYS)
+        if (activator != LinearRow.ALWAYS) int(mapping?.bool(activator) ?: activator)
         int(captured.size)
         for (operand in captured) {
-            ints(operand.references)
-            for (value in operand.coefficients + operand.constant) {
-                ints(value.num.toString().map { it.code }.toIntArray())
-                ints(value.den.toString().map { it.code }.toIntArray())
+            val terms = HashMap<Pair<Int, Int>, BigFraction>()
+            for ((reference, coefficient) in operand.references.zip(operand.coefficients)) {
+                val coordinate = when {
+                    Term.isInt(reference) -> 0 to (mapping?.int(Term.intVar(reference)) ?: Term.intVar(reference))
+                    Term.isBool(reference) -> {
+                        val id = Lit.variable(Term.lit(reference))
+                        1 to (mapping?.bool(id) ?: id)
+                    }
+                    else -> 2 to (mapping?.real(Term.realVar(reference)) ?: Term.realVar(reference))
+                }
+                terms[coordinate] = (terms[coordinate] ?: BigFraction.ZERO) + coefficient
             }
+            val kept = terms.filterValues { !it.isZero }.entries.sortedWith(
+                compareBy({ it.key.first }, { it.key.second }),
+            )
+            int(kept.size)
+            for ((coordinate, coefficient) in kept) {
+                int(coordinate.first)
+                int(coordinate.second)
+                ints(coefficient.num.toString().map { it.code }.toIntArray())
+                ints(coefficient.den.toString().map { it.code }.toIntArray())
+            }
+            ints(operand.constant.num.toString().map { it.code }.toIntArray())
+            ints(operand.constant.den.toString().map { it.code }.toIntArray())
         }
     }
-
-    override fun remapStructuralHash(mapping: VarRemap): Int = remap(mapping).structuralKey().hashCode()
 }

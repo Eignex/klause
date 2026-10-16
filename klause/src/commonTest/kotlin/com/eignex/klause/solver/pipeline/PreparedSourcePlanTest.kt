@@ -320,7 +320,7 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `finite ownership selection should decline when the containing stop follows arithmetic reuse`() {
+    fun `finite ownership selection should decline when the containing stop follows bound publication`() {
         val source = Problem(
             0,
             1,
@@ -335,22 +335,12 @@ class PreparedSourcePlanTest {
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1), constant = 7)
         var boundsComplete = false
-        var reuseAllowed = false
         var stopObserved = false
         val stop = Cancellation {
-            when {
-                !boundsComplete -> false
-
-                !reuseAllowed -> {
-                    reuseAllowed = true
-                    false
-                }
-
-                else -> {
-                    stopObserved = true
-                    true
-                }
-            }
+            if (boundsComplete) {
+                stopObserved = true
+                true
+            } else false
         }
 
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(
@@ -909,7 +899,7 @@ class PreparedSourcePlanTest {
                 it.responsibility == ComponentResponsibility.COMPLETION
             }.factorIndices,
         )
-        assertEquals(3, plan.polynomialIntegerCoordinate(1))
+        assertEquals(4, plan.polynomialIntegerCoordinate(1))
         assertEquals(
             listOf(0, 1),
             plan.components.single {

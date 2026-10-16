@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
@@ -69,7 +70,10 @@ class AllDifferentEncoderTest {
                 realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
             val shared = assertNotNull(source.preparePolynomialExecutionPlan().polynomialModel)
 
-            val result = shared.service.invocation().use { it.check(PolynomialCondition()) }
+            val pins = (0..1).associate { shared.integerColumns.getValue(it) to BigFraction.ofLong(value) }
+            val result = shared.service.invocation().use {
+                it.check(PolynomialCondition(lower = pins, upper = pins))
+            }
 
             if (expectedSat) assertIs<QfNraResult.Satisfiable>(result) else assertIs<QfNraResult.Unsatisfiable>(result)
             assertEquals(0, shared.encodingAttributions.first().sourceFactorIndex)

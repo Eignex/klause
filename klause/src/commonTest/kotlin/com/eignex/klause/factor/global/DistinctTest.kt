@@ -21,8 +21,36 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 
 class DistinctTest {
+    @Test
+    fun `distinct structural colors should preserve namespaces and affine roles`() {
+        val first = Distinct(listOf(Distinct.Operand(intArrayOf(Term.ofIntVar(0),
+            Term.ofLit(Lit.make(0, true)), Term.ofRealVar(0)),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.ONE))), activator = 1)
+        val second = Distinct(listOf(Distinct.Operand(intArrayOf(Term.ofIntVar(1),
+            Term.ofLit(Lit.make(1, true)), Term.ofRealVar(1)),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.ONE))), activator = 0)
+
+        val firstHash = first.remapStructuralHash(VarRemap(intArrayOf(-1, 2), intArrayOf(-1, 3), intArrayOf(-1, 3)))
+        val secondHash = second.remapStructuralHash(VarRemap(intArrayOf(2, -1), intArrayOf(3, -1), intArrayOf(3, -1)))
+
+        assertEquals(firstHash, secondHash)
+        assertNotEquals(first.structuralKey(), second.structuralKey())
+    }
+
+    @Test
+    fun `distinct mapped keys should coalesce affine aliases before hashing`() {
+        val source = Distinct(listOf(Distinct.Operand(intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+            listOf(BigFraction.ONE, BigFraction.MINUS_ONE))))
+        val mapping = VarRemap(intArrayOf(), intArrayOf(0, 0))
+
+        val hash = source.remapStructuralHash(mapping)
+
+        assertEquals(source.remap(mapping).structuralKey().hashCode(), hash)
+    }
+
     @Test
     fun `finite distinct should compare arbitrary width rational affine values exactly`() {
         val coefficient = BigFraction.of(parseBigInt("100000000000000000000000000000000000000000000000001"), BIG_ONE)
