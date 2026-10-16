@@ -142,7 +142,7 @@ internal object SolverInvocation {
      */
     fun klauseCliDefect(bin: File = klauseCliBin()): String? {
         if (!bin.isFile) return "$bin is missing — run `./gradlew :klause-cli:installJvmDist`"
-        val proc = runCatching { ProcessBuilder(bin.absolutePath, "--version").redirectErrorStream(true).start() }
+        val proc = runCatching { cliVersionCommand(bin).start() }
             .getOrElse { return "$bin will not start: ${it.message}" }
         // Same watchdog shape as [invoke]: kill a child that never answers so the read below returns.
         Thread {
@@ -155,6 +155,15 @@ internal object SolverInvocation {
         val exit = proc.waitFor()
         return "`$bin --version` exited $exit: ${output.take(STDERR_CAP)}".takeIf { exit != 0 }
     }
+
+    internal fun cliVersionCommand(bin: File, environment: Map<String, String> = System.getenv()): ProcessBuilder =
+        ProcessBuilder(bin.absolutePath, "--version").redirectErrorStream(true).apply {
+            environment().apply {
+                clear()
+                putAll(environment)
+                environment["KLAUSE_CLI_PREFLIGHT_OPTS"]?.let { put("KLAUSE_CLI_OPTS", it) }
+            }
+        }
 
     /** klause-cli on the model file (compiled `.fzn` for MiniZinc, else the original source). */
     private fun klauseCommand(entry: ResolvedProblem, s: Settings, budget: Budget, optimize: Boolean): List<String> {

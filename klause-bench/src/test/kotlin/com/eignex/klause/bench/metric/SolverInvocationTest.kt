@@ -2,6 +2,8 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.report.Reports
 import java.io.File
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -92,6 +94,30 @@ class SolverInvocationTest {
     @Test
     fun `a klause dist that answers version should not be a defect`() {
         assertNull(SolverInvocation.klauseCliDefect(File("/usr/bin/true")))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["", "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"])
+    fun `version preflight should leave solve recording options private to the solve`(preflight: String) {
+        val solve = "-Xmx3g -XX:StartFlightRecording=filename=solve.jfr -XX:LogFile=solve.xml"
+        val environment = mapOf("KLAUSE_CLI_OPTS" to solve, "KLAUSE_CLI_PREFLIGHT_OPTS" to preflight,
+            "JAVA_HOME" to "/runtime")
+
+        val command = SolverInvocation.cliVersionCommand(File("/installed/klause-cli"), environment)
+
+        assertEquals(listOf("/installed/klause-cli", "--version"), command.command())
+        assertEquals(preflight, command.environment()["KLAUSE_CLI_OPTS"])
+        assertEquals("/runtime", command.environment()["JAVA_HOME"])
+        assertEquals(solve, environment["KLAUSE_CLI_OPTS"])
+    }
+
+    @Test
+    fun `version preflight should retain ordinary options without an explicit override`() {
+        val environment = mapOf("KLAUSE_CLI_OPTS" to "-Xmx64m", "JAVA_HOME" to "/runtime")
+
+        val command = SolverInvocation.cliVersionCommand(File("/installed/klause-cli"), environment)
+
+        assertEquals(environment, command.environment())
     }
 
     @Test

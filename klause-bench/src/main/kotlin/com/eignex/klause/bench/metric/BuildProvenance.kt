@@ -193,6 +193,7 @@ private val OPTION_WORD = Regex("""(?:[^\s"'\\]|\\.|"(?:[^"\\]|\\.)*"|'[^']*')+"
 private val RUNTIME_OPTIONS = listOf(
     "JAVA_OPTS",
     "KLAUSE_CLI_OPTS",
+    "KLAUSE_CLI_PREFLIGHT_OPTS",
     "JAVA_TOOL_OPTIONS",
     "JDK_JAVA_OPTIONS",
     "_JAVA_OPTIONS",
