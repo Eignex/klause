@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.ExactLinear
@@ -67,7 +68,8 @@ class PreparedFactorProjections internal constructor(
 
     internal val requiresRealSourceCheck: Boolean = problem.factors.indices.any { id ->
         problem.factors[id].variables.reals.isNotEmpty() &&
-            (problem.factors[id] is RealAbs || problem.factors[id] is ContinuousProduct ||
+            (problem.factors[id] is Distinct || problem.factors[id] is RealAbs ||
+                problem.factors[id] is ContinuousProduct ||
                 problem.factors[id] is ExactLinear || problem.factors[id] is LinearIndicator ||
                 propagation[id]?.builtIn != true || !usesBuiltInRelaxation(id))
     }
