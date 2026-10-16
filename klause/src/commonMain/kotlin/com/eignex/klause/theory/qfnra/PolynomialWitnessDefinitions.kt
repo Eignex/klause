@@ -3,6 +3,7 @@ package com.eignex.klause.theory.qfnra
 import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.magnitudeBitLength
@@ -17,7 +18,13 @@ internal class PolynomialWitnessDefinitions(
         atoms: List<PolynomialAtom>,
         realCount: Int,
         fixed: Map<Int, BigFraction>,
-    ): Map<Int, BigFraction>? {
+    ): Map<Int, BigFraction>? = prepare(atoms, realCount, fixed)?.point()
+
+    fun prepare(
+        atoms: List<PolynomialAtom>,
+        realCount: Int,
+        fixed: Map<Int, BigFraction>,
+    ): Plan? {
         repeat(atoms.size + 1) { arithmetic.step() }
         var residual = atoms.toList()
         val definitions = ArrayList<Pair<Int, Polynomial>>()
@@ -65,11 +72,54 @@ internal class PolynomialWitnessDefinitions(
             point[id] = value
         }
         if (!hint(residual, point, fixed)) return null
-        for ((variable, polynomial) in definitions.asReversed()) {
-            arithmetic.step()
-            point[variable] = evaluate(polynomial, point) ?: return null
+        val protectedVariables = HashSet<Int>()
+        for (id in fixed.keys) { arithmetic.step(); protectedVariables.add(id) }
+        for ((id, _) in definitions) { arithmetic.step(); protectedVariables.add(id) }
+        arithmetic.step()
+        return Plan(point, residual, definitions, protectedVariables)
+    }
+
+    inner class Plan internal constructor(
+        private val seed: Map<Int, BigFraction>,
+        private val residual: List<PolynomialAtom>,
+        private val definitions: List<Pair<Int, Polynomial>>,
+        private val protectedVariables: Set<Int>,
+    ) {
+        val residualAtoms: List<PolynomialAtom> get() {
+            repeat(residual.size + 1) { arithmetic.step() }
+            return residual.toList()
         }
-        return point
+
+        fun point(): Map<Int, BigFraction>? = reconstruct(null, null)
+
+        fun point(variable: Int, value: BigFraction): Map<Int, BigFraction>? {
+            arithmetic.step()
+            if (variable !in seed || variable in protectedVariables || !admitted(value)) return null
+            return reconstruct(variable, value)
+        }
+
+        fun axis(polynomial: Polynomial, variable: Int): RationalPolynomial? {
+            arithmetic.step()
+            if (variable !in seed || variable in protectedVariables) return null
+            val coefficients = ArrayList<BigFraction>()
+            for (coefficient in arithmetic.coefficients(polynomial, variable)) {
+                arithmetic.step()
+                coefficients.add(evaluate(coefficient, seed) ?: return null)
+            }
+            repeat(coefficients.size + 1) { arithmetic.step() }
+            return RationalPolynomial(coefficients)
+        }
+
+        private fun reconstruct(variable: Int?, value: BigFraction?): Map<Int, BigFraction>? {
+            repeat(seed.size + 1) { arithmetic.step() }
+            val point = LinkedHashMap(seed)
+            if (variable != null) point[variable] = requireNotNull(value)
+            for ((id, polynomial) in definitions.asReversed()) {
+                arithmetic.step()
+                point[id] = evaluate(polynomial, point) ?: return null
+            }
+            return point
+        }
     }
 
     private fun hint(

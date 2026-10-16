@@ -17,6 +17,114 @@ import kotlin.test.assertTrue
 
 class PolynomialWitnessDefinitionsTest {
     @Test
+    fun `prepared definitions reconstruct each proposal independently`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const y Real) (declare-const z Real) (declare-const unused Real)
+            (assert (and (= y (* x x)) (= z (+ y 1))))
+            """.trimIndent(),
+        )
+        val arithmetic = PolynomialArithmetic()
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
+        val plan = assertNotNull(PolynomialWitnessDefinitions(arithmetic, 2048, 8, 4096)
+            .prepare(atoms, source.realCount, emptyMap()))
+
+        val first = assertNotNull(plan.point(0, BigFraction.ofLong(2)))
+        val second = assertNotNull(plan.point(0, BigFraction.ofLong(3)))
+        val seed = assertNotNull(plan.point())
+
+        assertEquals(BigFraction.ofLong(4), first.getValue(1))
+        assertEquals(BigFraction.ofLong(5), first.getValue(2))
+        assertEquals(BigFraction.ofLong(10), second.getValue(2))
+        assertEquals(BigFraction.ONE, seed.getValue(0))
+        assertEquals(BigFraction.ZERO, first.getValue(3))
+    }
+
+    @Test
+    fun `prepared proposals preserve fixed and dependent coordinates`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (declare-const fixed Real) (assert (= y (* x x)))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
+        val plan = assertNotNull(PolynomialWitnessDefinitions(arithmetic, 2048, 8, 4096)
+            .prepare(atoms, source.realCount, mapOf(2 to BigFraction.ofLong(3))))
+
+        for (variable in listOf(1, 2)) assertNull(plan.point(variable, BigFraction.ofLong(2)))
+    }
+
+    @Test
+    fun `prepared axes decline coefficient growth before root isolation`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const y Real) (declare-const z Real)
+            (assert (and (= y (* x x)) (<= (* 2 x z) 1)))
+            """.trimIndent(),
+        )
+        val arithmetic = PolynomialArithmetic()
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
+        val plan = assertNotNull(PolynomialWitnessDefinitions(arithmetic, 2048, 8, 2)
+            .prepare(atoms, source.realCount, mapOf(2 to BigFraction.ofLong(3))))
+
+        val axis = plan.axis(plan.residualAtoms.single().polynomial, 0)
+
+        assertNull(axis)
+    }
+
+    @Test
+    fun `boundary proposals retain complete Boolean and strict source obligations`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const y Real) (declare-const unused Real)
+            (assert (and (= y (* x x)) (< (* x x) 2) (or (= y (- 1)) (> x 1))))
+            """.trimIndent(),
+        )
+        val algebraic = AlgebraicArithmetic()
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val point = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val square = algebraic.power(point.realValue(0), 2)
+        assertTrue(algebraic.compare(point.realValue(0), algebraic.rational(BigFraction.ONE)) > 0)
+        assertTrue(algebraic.compare(square, algebraic.rational(BigFraction.ofLong(2))) < 0)
+        assertEquals(0, algebraic.compare(square, point.realValue(1)))
+        assertEquals(BigFraction.ZERO, point.realValue(2).rational)
+    }
+
+    @Test
+    fun `a source boundary cannot satisfy a strict guarded alternative`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const y Real)
+            (assert (and (= y (* x x)) (<= (* x x) 2) (or (> y 2) (< y 0))))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
+    fun `containing work exhaustion withholds a reconstructed boundary witness`() {
+        val source = SmtLibPolynomial.parse(
+            """
+            (declare-const x Real) (declare-const y Real)
+            (assert (and (= y (* x x)) (< (* x x) 2) (or (= y (- 1)) (> x 1))))
+            """.trimIndent(),
+        )
+        val completed = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, 0, 2))
+
+        val result = solveQfNra(source.formula, 0, 2,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1))
+
+        assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
+    }
+
+    @Test
     fun `completion reconstructs chained definitions and unused declarations`() {
         val source = SmtLibPolynomial.parse(
             """
