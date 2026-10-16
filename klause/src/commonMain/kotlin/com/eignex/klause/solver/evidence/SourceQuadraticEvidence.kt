@@ -121,7 +121,8 @@ fun Problem.quadraticSourceProofContext(
             }
         }
     }
-    return SourceProofContext(scope, base.coordinates, base.premises, semanticsChecker = checker)
+    return SourceProofContext(scope, base.coordinates, base.premises, semanticsChecker = checker,
+        semantics = base.semantics)
 }
 
 private fun quadraticValue(value: SourceValue, arithmetic: AlgebraicArithmetic) = when (value) {

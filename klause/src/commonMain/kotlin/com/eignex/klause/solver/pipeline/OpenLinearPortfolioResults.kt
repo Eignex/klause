@@ -77,7 +77,7 @@ internal class OpenLinearPortfolioResults(
             else -> TerminationReason.BudgetExhausted
         }
         val authority = LinearOptimizationResult(original.scope, terminal?.result?.terminal, bound,
-            pooled?.assignment, pooled?.objective?.source, reason, result.stats)
+            pooled?.assignment, pooled?.objective?.source, reason, result.stats, original.semantics)
         val point = pooled?.assignment?.let { OpenTheoryAssignment.Sampled(it) }
         val score = pooled?.objective?.source?.let(::minimized)
         return when (val claim = authority.terminal?.claim) {

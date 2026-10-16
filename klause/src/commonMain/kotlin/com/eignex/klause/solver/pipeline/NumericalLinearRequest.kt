@@ -97,14 +97,15 @@ class NumericalLinearRequest(
                 stop() -> TerminationReason.Cancelled
                 else -> TerminationReason.Unsupported
             }
-            return LinearOptimizationResult(scope, null, null, null, null, reason, SolveStats.EMPTY)
+            return LinearOptimizationResult(scope, null, null, null, null, reason, SolveStats.EMPTY, model.semantics)
         }
         return LinearAuthorityInvocation(context, params.copy(cancellation = stop)).use { invocation ->
             val result = requireNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1, onIncumbent))
             LinearOptimizationResult(context.scope, result.terminal.takeIf { complete },
                 result.bound.takeIf { complete },
                 result.incumbent,
-                result.value, result.reason, result.stats.copy(run = result.stats.run.copy(backend = "numerical-mip")))
+                result.value, result.reason, result.stats.copy(run = result.stats.run.copy(backend = "numerical-mip")),
+                context.semantics)
         }
     }
 }

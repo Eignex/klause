@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.result
 
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -24,6 +25,8 @@ class LinearOptimizationResult internal constructor(
     val reason: TerminationReason,
     /** Cumulative traversal and numerical diagnostics. */
     val stats: SolveStats,
+    /** Interpretation of the producing source context, independent of claim authority. */
+    val semantics: EffectiveSourceSemantics? = null,
 ) {
     /** Inspectable original-source derivations, including retained partial witness and bound data. */
     val evidence: SourceResultEvidence = SourceResultEvidence(scope, buildList {

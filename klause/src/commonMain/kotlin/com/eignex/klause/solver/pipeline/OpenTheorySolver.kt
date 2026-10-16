@@ -258,6 +258,7 @@ class OpenTheoryEngine internal constructor(
     private val prepareSource: (Cancellation) -> OpenSourcePreparation,
     private val preparationCancellation: Cancellation,
     private val reuseOpeningBoundAttempt: Boolean,
+    private val sourceSemantics: EffectiveSourceSemantics,
 ) {
     private var preparation: OpenSourcePreparation? = null
 
@@ -298,6 +299,7 @@ class OpenTheoryEngine internal constructor(
         },
         presolveCancellation,
         false,
+        model.semantics,
     )
 
     /** Decide an already-prepared model under the plan selected from it. */
@@ -306,7 +308,8 @@ class OpenTheoryEngine internal constructor(
         preparationCancellation: Cancellation,
         reuseOpeningBoundAttempt: Boolean,
         declaredRoute: ProblemPipeline = planned.route,
-    ) : this(declaredRoute, { planned }, preparationCancellation, reuseOpeningBoundAttempt)
+    ) : this(declaredRoute, { planned }, preparationCancellation, reuseOpeningBoundAttempt,
+        planned.prepared.source.semantics)
 
     init {
         require(declaredRoute != ProblemPipeline.FINITE_CP && declaredRoute != ProblemPipeline.UNSUPPORTED_OPEN) {
@@ -328,7 +331,7 @@ class OpenTheoryEngine internal constructor(
             is OpenTheoryResult.Sat -> result.copy(stats = stats)
             is OpenTheoryResult.Unsat -> result.copy(stats = stats)
             is OpenTheoryResult.Unknown -> result.copy(stats = stats)
-        }
+        }.withSourceSemantics(sourceSemantics)
     }
 
     private fun solvePrepared(params: TheoryParams, state: OpenTheorySolveState): OpenTheoryResult =

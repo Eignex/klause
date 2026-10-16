@@ -23,7 +23,7 @@ fun OpenTheoryPipeline.optimizeLinear(
     return LinearAuthorityInvocation(context, params).use { invocation ->
         val result = requireNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1, onIncumbent))
         LinearOptimizationResult(context.scope, result.terminal, result.bound, result.incumbent,
-            result.value, result.reason, result.stats)
+            result.value, result.reason, result.stats, context.semantics)
     }
 }
 

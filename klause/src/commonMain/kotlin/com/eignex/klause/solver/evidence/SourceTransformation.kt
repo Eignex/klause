@@ -103,7 +103,7 @@ class SourceTransformationVerifier(
             val scope = source.scope.copy(condition = condition)
             val context = SourceProofContext(scope, source.coordinates, source.premises,
                 source.objective.takeIf { source.affineObjectiveAvailable },
-                source.objectiveConstant, source.semanticsChecker)
+                source.objectiveConstant, source.semanticsChecker, source.semantics)
             val obligation = substitute(premise.inequality, transformation)
             val proof = transformation.premiseDerivations[id]
                 ?: return SourceEvidenceCheck.Unavailable("missing original-source transformation premise $id")

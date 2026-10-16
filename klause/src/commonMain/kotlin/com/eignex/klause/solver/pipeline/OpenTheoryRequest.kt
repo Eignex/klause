@@ -132,7 +132,7 @@ sealed interface OpenTheoryExecution {
     data class Optimize(
         /** The optimization verdict. */
         val result: OpenTheoryOptimum,
-        override val semantics: EffectiveSourceSemantics? = null,
+        override val semantics: EffectiveSourceSemantics? = result.semantics,
     ) : OpenTheoryExecution {
         private var retainedPublication: SourceIncumbentPublication? = null
 

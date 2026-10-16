@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
+import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -64,6 +65,8 @@ class SourceProofContext(
     /** Exact original-source objective constant. */
     val objectiveConstant: BigFraction = BigFraction.ZERO,
     internal val semanticsChecker: SourceSemanticsChecker? = null,
+    /** Captured source interpretation, absent when the context has no bound source owner. */
+    val semantics: EffectiveSourceSemantics? = null,
 ) {
     private val capturedCoordinates = coordinates.toSet()
     private val capturedPremises = premises.toMap()

@@ -18,13 +18,31 @@ private fun requireMatchingSemantics(previous: EffectiveSourceSemantics?, semant
 internal fun OpenTheoryExecution.withSourceSemantics(semantics: EffectiveSourceSemantics?): OpenTheoryExecution {
     if (semantics == null) return this
     requireMatchingSemantics(this.semantics, semantics)
-    if (this.semantics === semantics) return this
     return when (this) {
-        is OpenTheoryExecution.Satisfy -> copy(result = result.withSourceSemantics(semantics))
+        is OpenTheoryExecution.Satisfy -> {
+            val qualified = result.withSourceSemantics(semantics)
+            if (qualified === result) this else copy(result = qualified)
+        }
         is OpenTheoryExecution.Optimize -> {
             requireMatchingSemantics(acceptedIncumbent?.sample?.semantics, semantics)
-            copy(semantics = semantics).also { it.retainPublication(acceptedIncumbent) }
+            val qualified = result.withSourceSemantics(semantics)
+            if (this.semantics === semantics && qualified === result) this else {
+                copy(result = qualified, semantics = semantics)
+                    .also { it.retainPublication(acceptedIncumbent) }
+            }
         }
+    }
+}
+
+internal fun OpenTheoryOptimum.withSourceSemantics(semantics: EffectiveSourceSemantics): OpenTheoryOptimum {
+    requireMatchingSemantics(this.semantics, semantics)
+    requireMatchingSemantics(linearResult?.semantics, semantics)
+    if (this.semantics === semantics) return this
+    return when (this) {
+        is OpenTheoryOptimum.Optimal -> copy(semantics = semantics)
+        is OpenTheoryOptimum.Infeasible -> copy(semantics = semantics)
+        is OpenTheoryOptimum.Unbounded -> copy(semantics = semantics)
+        is OpenTheoryOptimum.Bounded -> copy(semantics = semantics)
     }
 }
 
