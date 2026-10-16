@@ -27,11 +27,8 @@ internal sealed interface PreparedExecution {
     class NonlinearInteger(val source: NonlinearIntegerProblem) : PreparedExecution
     class Transcendental(val source: TranscendentalProblem) : PreparedExecution
     class Numerical(val source: LinearSourceProblem, override val model: Problem) : Factor
-    class Declined(
-        val model: Problem,
-        val reason: PreparedPlanDecline,
-        val retained: Factor? = null,
-    ) : PreparedExecution {
+    class Declined(val model: Problem, val reason: PreparedPlanDecline, val retained: Factor? = null) :
+        PreparedExecution {
         init {
             require(retained == null || retained.model === model)
         }
@@ -57,9 +54,13 @@ internal val PreparedExecution.finiteLinear: PreparedExecution.FiniteLinear? get
 
 internal val PreparedExecution.polynomial: PreparedExecution.Polynomial? get() = when (this) {
     is PreparedExecution.Polynomial -> this
+
     is PreparedExecution.Declined -> retained as? PreparedExecution.Polynomial
+
     is PreparedExecution.FiniteLinear, is PreparedExecution.NonlinearInteger,
-    is PreparedExecution.Transcendental -> null
+    is PreparedExecution.Transcendental,
+    -> null
+
     is PreparedExecution.Numerical -> null
 }
 
@@ -76,8 +77,11 @@ internal val PreparedExecution.decline: PreparedPlanDecline? get() = when (this)
     is PreparedExecution.FiniteLinear -> PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT.takeIf {
         ownership.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN
     }
+
     is PreparedExecution.Declined -> reason
+
     is PreparedExecution.Polynomial, is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
+
     is PreparedExecution.Numerical -> null
 }
 
@@ -99,8 +103,10 @@ internal class PreparedSourceStructure(
     val realCoordinates = realCoordinates.toList()
     val operations = operations.toSet()
     val finiteFactorProjections: PreparedFactorProjections? = execution.polynomial?.let { polynomial ->
-        factorProjections?.projected(polynomial.completion.finite,
-            polynomial.completion.finiteFactorIndices.toIntArray())
+        factorProjections?.projected(
+            polynomial.completion.finite,
+            polynomial.completion.finiteFactorIndices.toIntArray(),
+        )
     } ?: factorProjections
 
     init {
@@ -135,20 +141,24 @@ internal class PreparedOperationBinding(
         }
         if (quadraticObjective != null) {
             return (execution.polynomial != null || execution is PreparedExecution.NonlinearInteger) &&
-                quadraticObjective.terms.all { term -> listOfNotNull(term.first, term.second).all { variable ->
-                    when (variable) {
-                        is QuadraticVariable.Bool -> variable.id.index in 0 until source.sourceBoolCount
-                        is QuadraticVariable.Int -> variable.id.index in 0 until source.sourceIntCount
-                        is QuadraticVariable.Real -> variable.id.index in 0 until source.sourceRealCount
+                quadraticObjective.terms.all { term ->
+                    listOfNotNull(term.first, term.second).all { variable ->
+                        when (variable) {
+                            is QuadraticVariable.Bool -> variable.id.index in 0 until source.sourceBoolCount
+                            is QuadraticVariable.Int -> variable.id.index in 0 until source.sourceIntCount
+                            is QuadraticVariable.Real -> variable.id.index in 0 until source.sourceRealCount
+                        }
                     }
-                } }
+                }
         }
         val linear = objective ?: return false
         if (linear.realCoefficientValues.any { !it.isFinite() } ||
             linear.realCoefficientValues.size > source.sourceRealCount ||
             linear.intCoefficientValues.size > source.sourceIntCount ||
             linear.boolWeightValues.size > source.sourceBoolCount
-        ) return false
+        ) {
+            return false
+        }
         return execution !is PreparedExecution.NonlinearInteger && execution !is PreparedExecution.Transcendental
     }
 }
@@ -162,21 +172,30 @@ internal fun legacyPreparedExecution(
     decline: PreparedPlanDecline?,
 ): PreparedExecution = when (kind) {
     PreparedExecutionKind.FINITE_LINEAR -> PreparedExecution.FiniteLinear(
-        requireNotNull(model), requireNotNull(componentPlan),
+        requireNotNull(model),
+        requireNotNull(componentPlan),
     )
+
     PreparedExecutionKind.POLYNOMIAL -> PreparedExecution.Polynomial(requireNotNull(polynomialModel))
+
     PreparedExecutionKind.NONLINEAR_INTEGER -> PreparedExecution.NonlinearInteger(
         originalSource as NonlinearIntegerProblem,
     )
+
     PreparedExecutionKind.TRANSCENDENTAL -> PreparedExecution.Transcendental(originalSource as TranscendentalProblem)
     PreparedExecutionKind.NUMERICAL -> PreparedExecution.Numerical(
         originalSource as LinearSourceProblem, requireNotNull(model),
     )
     PreparedExecutionKind.DECLINED -> if (decline == PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE &&
         polynomialModel != null
-    ) PreparedExecution.Polynomial(polynomialModel) else PreparedExecution.Declined(
-        requireNotNull(model), requireNotNull(decline),
+    ) {
+        PreparedExecution.Polynomial(polynomialModel)
+    } else {
+        PreparedExecution.Declined(
+        requireNotNull(model),
+        requireNotNull(decline),
         polynomialModel?.let { PreparedExecution.Polynomial(it) }
             ?: componentPlan?.let { PreparedExecution.FiniteLinear(requireNotNull(model), it) },
     )
+    }
 }

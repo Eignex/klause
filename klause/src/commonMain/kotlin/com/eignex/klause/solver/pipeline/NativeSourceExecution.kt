@@ -84,7 +84,9 @@ internal fun executeNativeSource(
                 cancellation = request.theory.cancellation or invocation.cancellation,
                 timeout = request.theory.timeout or invocation.nativeDeadline(),
             )
-            SourceExecutionResult.Numerical(invocation, publication.execute {
+            SourceExecutionResult.Numerical(
+                invocation,
+                publication.execute {
                 native.request.solve(
                     controls,
                     complete = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
@@ -92,8 +94,10 @@ internal fun executeNativeSource(
                         publication.accepted(sample, com.eignex.klause.solver.evidence.SourceValue.Rational(value))
                     },
                 )
-            })
+            }
+            )
         }
+
         is NativeSourceExecution.Polynomial -> {
             val params = request.polynomial.nativeBoundTo(invocation)
             when {

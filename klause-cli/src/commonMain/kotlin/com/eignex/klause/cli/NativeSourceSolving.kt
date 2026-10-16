@@ -92,7 +92,8 @@ internal fun solveNativeSource(
         }
 
         is SourceExecutionResult.Finite, is SourceExecutionResult.Linear, is SourceExecutionResult.Refuted,
-        is SourceExecutionResult.Numerical ->
+        is SourceExecutionResult.Numerical,
+        ->
             error("native source execution returned an unrelated execution family")
     }
 }

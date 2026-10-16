@@ -168,13 +168,13 @@ class PreparedSourcePlan private constructor(
         PreparedSourceStructure(
             originalSource,
             legacyPreparedExecution(
-            originalSource,
-            model,
-            kind,
-            componentPlan,
-            polynomialModel,
-            decline,
-        ),
+                originalSource,
+                model,
+                kind,
+                componentPlan,
+                polynomialModel,
+                decline,
+            ),
             components, sourceBoolCount, sourceIntCount, sourceRealCount,
             integerCoordinates, realCoordinates, operations, factorProjections,
         ),
@@ -277,8 +277,10 @@ class PreparedSourcePlan private constructor(
         sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
     ): PreparedSourcePlan {
         require(originalSource !is LinearSourceProblem) { "a linear source retains its embedded original objective" }
-        return PreparedSourcePlan(preparation,
-            PreparedOperationBinding(quadraticObjective = objective, quadraticSense = sense))
+        return PreparedSourcePlan(
+            preparation,
+            PreparedOperationBinding(quadraticObjective = objective, quadraticSense = sense),
+        )
     }
 
     /** Independent component list whose values own their coordinate and factor lists. */
@@ -323,6 +325,7 @@ class PreparedSourcePlan private constructor(
             }
 
             is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
+
             is PreparedExecution.Numerical -> null
         }
     }
@@ -408,24 +411,24 @@ internal fun Problem.prepareExecutionPlan(
     val ownership = componentPlan(projections, preferFinite, cancellation)
     if (cancellation() || ownership.encodingDecline == EncoderDecline.RESOURCE) {
         return PreparedSourcePlan(
-        original, PreparedExecution.Declined(this, PreparedPlanDecline.RESOURCE),
-        listOf(
-            ExecutionComponentDescriptor(
-            "interrupted-preparation",
-            ComponentResponsibility.UNPLACED,
-            factors.indices.toList(),
-            (0 until numIntVars).toList(),
-            (0 until numRealVars).toList(),
-            (0 until numBoolVars).toList(),
-            unavailableContract(
-                ExecutionDeclineCause.PREPARATION,
-                "interrupted-preparation",
-                PreparedPlanDecline.RESOURCE,
+            original, PreparedExecution.Declined(this, PreparedPlanDecline.RESOURCE),
+            listOf(
+                ExecutionComponentDescriptor(
+                    "interrupted-preparation",
+                    ComponentResponsibility.UNPLACED,
+                    factors.indices.toList(),
+                    (0 until numIntVars).toList(),
+                    (0 until numRealVars).toList(),
+                    (0 until numBoolVars).toList(),
+                    unavailableContract(
+                        ExecutionDeclineCause.PREPARATION,
+                        "interrupted-preparation",
+                        PreparedPlanDecline.RESOURCE,
+                    ),
+                ),
             ),
-        )
-        ),
-        original.numBoolVars, original.numIntVars, original.numRealVars, objective, maximize,
-        factorProjections = projections,
+            original.numBoolVars, original.numIntVars, original.numRealVars, objective, maximize,
+            factorProjections = projections,
         )
     }
     return preparedWithComponents(ownership, original, objective, maximize)
@@ -442,8 +445,8 @@ internal fun Problem.requiresPolynomialCompletion(
             projections.encoder(index, EncodingTarget.POLYNOMIAL).enforcesSource &&
             (
                 factors[index].variables.reals.isNotEmpty() ||
-                projections.capabilities(index).propagation == PropagationCapability.UNSUPPORTED
-            ) &&
+                    projections.capabilities(index).propagation == PropagationCapability.UNSUPPORTED
+                ) &&
             (!preferFinite || !finiteRealFactorSupported(index, projections))
     }
 }

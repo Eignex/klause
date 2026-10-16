@@ -104,7 +104,8 @@ is substituted for the native input. `SourceSetupRequest(source, engine,
 quadraticObjective, sense)` captures an exact quadratic objective and its original
 direction. Affine requests retain their existing constructor. An embedded function
 objective must agree with the requested operation and direction and cannot be replaced.
-`LinearSourceProblem` attaches original rational linear declarations, row sides,
+`LinearSourceProblem` uses engine-neutral `SemanticRational` coefficients and bounds.
+It attaches original rational linear declarations, row sides,
 indicator pins and an embedded affine objective through the same `(source, settings)`
 constructor. Its row terms precede normalization so absolute and relative feasibility
 tolerances retain original units. Declare effective bounds before attachment; setup
@@ -141,8 +142,12 @@ exact original objective values. Native finite improvement costs remain working 
 their own evidence scope, bounds, terminal and reason. Original accepted-set claims
 require nominal correspondence, tolerance coverage and an unrestricted native scope,
 or an independently established accepted-set bound attained by a checked point.
+Feasibility correspondence is tracked separately from objective projection, so a
+private approximate cost definition does not erase a checked constraint refutation.
 A checked nominal recession base and ray retain their existing unboundedness authority.
 Source acceptance alone cannot promote a nominal optimum to a tolerance optimum.
+An accepted original objective must also attain the native bound after applying its
+working scale; a private cost coordinate cannot substitute for that comparison.
 The numerical route uses `TheoryParams` and its existing serial LP/MIP traversal;
 LS/ALNS requests retain witness-only native results. Common strategy controls and
 format-specific CLI registration remain separate from this library surface.

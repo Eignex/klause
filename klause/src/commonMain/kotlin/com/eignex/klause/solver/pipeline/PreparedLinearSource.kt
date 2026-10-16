@@ -40,7 +40,10 @@ internal fun prepareLinearSource(
     val maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE
     val native = NumericalLinearRequest(view.model, objective, maximize, stop)
     val route = if (numerical && native.numericalRowsSupported(stop)) {
-        native.finiteRoute(onLpStats ?: {}) ?: SourceProblemRoute.NativeFormula(
+        val finite = native.finiteRoute(onLpStats ?: {})
+        if (finite is SourceProblemRoute.Finite && finite.problem.requiresExactObjectiveRoute(objective, stop)) {
+            SourceProblemRoute.NativeFormula(NativeSourceExecution.Numerical(native, view.numericalPlan(objective)))
+        } else finite ?: SourceProblemRoute.NativeFormula(
             NativeSourceExecution.Numerical(native, view.numericalPlan(objective)),
         )
     } else {
@@ -63,38 +66,62 @@ private fun PreparedLinearSource.bind(route: SourceProblemRoute): SourceProblemR
         plan.withLinearSource(view.source, view.sourceIntCount, view.sourceRealCount, objective)
     return when (route) {
         is SourceProblemRoute.Finite -> route.copy(preparedPlan = bound(route.preparedPlan))
+
         is SourceProblemRoute.OpenTheory -> {
             val original = route.request
-            SourceProblemRoute.OpenTheory(OpenTheoryRequest(
+            SourceProblemRoute.OpenTheory(
+                OpenTheoryRequest(
                 original.model, original.objective, original.maximize, original.componentPlan,
                 original.presolveConfig, original.solutionSetSensitive, original.presolveCancellation,
                 original.presolveBudget, bound(original.preparedPlan), original.linearContext,
-            ))
+            )
+            )
         }
-        is SourceProblemRoute.PolynomialTheory -> route.copy(request = PolynomialTheoryRequest(
-            route.request.problem, bound(route.preparedPlan),
-        ))
+
+        is SourceProblemRoute.PolynomialTheory -> route.copy(
+            request = PolynomialTheoryRequest(
+            route.request.problem,
+            bound(route.preparedPlan),
+        )
+        )
+
         is SourceProblemRoute.UnsupportedOpen -> route.copy(preparedPlan = bound(route.preparedPlan))
+
         is SourceProblemRoute.NativeFormula, SourceProblemRoute.Refuted -> route
     }
 }
 
 private fun LinearSourceView.numericalPlan(objective: LinearObjective?): PreparedSourcePlan {
-    val complete = ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH,
-        setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION,
-            ExecutionClaimAuthority.OBJECTIVE_BOUND, ExecutionClaimAuthority.OPTIMALITY,
-            ExecutionClaimAuthority.UNBOUNDEDNESS))
-    val heuristic = ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH,
-        setOf(ExecutionClaimAuthority.WITNESS))
+    val complete = ComponentStrategySupport(
+        ProcedureCompleteness.WITNESS_SEARCH,
+        setOf(
+            ExecutionClaimAuthority.WITNESS,
+            ExecutionClaimAuthority.REFUTATION,
+            ExecutionClaimAuthority.OBJECTIVE_BOUND,
+            ExecutionClaimAuthority.OPTIMALITY,
+            ExecutionClaimAuthority.UNBOUNDEDNESS,
+        ),
+    )
+    val heuristic = ComponentStrategySupport(
+        ProcedureCompleteness.WITNESS_SEARCH,
+        setOf(ExecutionClaimAuthority.WITNESS),
+    )
     return PreparedSourcePlan(
         source,
         PreparedExecution.Numerical(source, model),
-        listOf(ExecutionComponentDescriptor(
-            "linear-numerical", ComponentResponsibility.COMPLETION, model.factors.indices.toList(),
-            (0 until sourceIntCount).toList(), (0 until model.numRealVars).toList(),
+        listOf(
+            ExecutionComponentDescriptor(
+            "linear-numerical",
+            ComponentResponsibility.COMPLETION,
+            model.factors.indices.toList(),
+            (0 until sourceIntCount).toList(),
+            (0 until model.numRealVars).toList(),
             execution = ComponentExecutionContract(complete, heuristic),
-        )),
-        0, sourceIntCount, sourceRealCount,
+        )
+        ),
+        0,
+        sourceIntCount,
+        sourceRealCount,
         operations = setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE),
     ).withLinearSource(source, sourceIntCount, sourceRealCount, objective)
 }

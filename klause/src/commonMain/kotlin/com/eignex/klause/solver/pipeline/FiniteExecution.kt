@@ -466,7 +466,9 @@ internal fun FinitePipeline.solve(
         )
     }
     val linearSource = request.shape.sourceInvocation?.linearSource
-    val sourceCheck: ((Sample) -> Boolean)? = if (linearSource == null) request.toleranceCheck else {
+    val sourceCheck: ((Sample) -> Boolean)? = if (linearSource == null) {
+        request.toleranceCheck
+    } else {
         { sample ->
             linearSource.check(sample, stop) is com.eignex.klause.solver.validation.LinearSourceCheck.Accepted &&
                 request.toleranceCheck?.invoke(sample) != false
