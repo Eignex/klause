@@ -13,9 +13,11 @@ import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.StringCharSource
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -149,6 +151,19 @@ class FlatZincSemanticsTest {
             assertEquals(1_000_000L, program.problem.intBounds.upper(0))
             assertEquals(programs.first().semantics.effective, program.semantics.effective)
         }
+    }
+
+    @Test
+    fun `a typed grid window should decline rather than round an unrepresentable endpoint`() {
+        val lower = SemanticRational.of(bigIntOf(1), bigIntOf(10))
+        val bounds = UndeclaredRealBounds(lower, SemanticRational.ONE)
+        val overrides = SemanticOverrides(floats = FloatSemantics.Grid(8, 1_000_000, bounds))
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            parseFlatZinc("var float: x; solve satisfy;", semanticOverrides = overrides)
+        }
+
+        assertTrue("cannot be represented exactly" in error.message.orEmpty())
     }
 
     @Test

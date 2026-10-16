@@ -55,8 +55,13 @@ private fun semanticFloat(value: Double): SemanticRational {
     return SemanticRational.of(rational.num, rational.den)
 }
 
-internal fun SemanticRational.gridFloat(): Double = BigFraction.of(numerator, denominator).toDouble().also {
-    require(it.isFinite()) { "float grid window cannot be represented in binary64" }
+internal fun SemanticRational.gridFloat(): Double {
+    val exact = BigFraction.of(numerator, denominator)
+    val value = exact.toDouble()
+    require(value.isFinite() && BigFraction.ofDouble(value) == exact) {
+        "float grid window cannot be represented exactly in binary64"
+    }
+    return value
 }
 
 internal fun EffectiveSourceSemantics.gridDefaults(): FloatSemantics.Grid =
