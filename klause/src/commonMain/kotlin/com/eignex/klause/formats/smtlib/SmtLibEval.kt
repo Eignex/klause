@@ -648,7 +648,7 @@ private fun Compiler.Builder.evalRealAtom(node: SExpr.Atom): Res {
 
             else -> when (val ic = intBinding(node.text, binding)) {
                 is IntComb.Narrow -> Res.R(ic.lin.toRealComb())
-                is IntComb.Wide -> smtUnsupported("'${node.text}' beyond the 64-bit range used as Real")
+                is IntComb.Wide -> Res.R(ic.lin.toRealComb())
             }
         }
     }

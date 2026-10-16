@@ -29,6 +29,22 @@ class SmtLibRealTest {
     }
 
     @Test
+    fun `wide integer bindings should retain exact coefficients in real comparisons`() {
+        val coefficient = "100000000000000000000000000000000000000000000000001"
+        val source = SmtLib.parse(
+            "(declare-const n Int) (declare-const x Real) (assert (= n 1)) " +
+                "(assert (let ((wide (* $coefficient n))) (= wide x)))",
+        )
+
+        val result = BacktrackSolver.source(source.model).solve()
+
+        val point = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertEquals(BigFraction.of(parseBigInt(coefficient), BIG_ONE),
+            TheoryCompletion.parseRational(point.realValue(source.realVarNames.getValue("x"))))
+        assertEquals(1, source.model.numRealVars)
+    }
+
+    @Test
     fun `wide reified strict comparisons should preserve an excluded boundary`() {
         val coefficient = "100000000000000000000000000000000000000000000000001"
         val source = SmtLib.parse(
