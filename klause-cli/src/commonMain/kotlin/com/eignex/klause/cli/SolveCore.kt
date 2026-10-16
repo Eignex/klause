@@ -21,8 +21,6 @@ import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveShape
-import com.eignex.klause.solver.pipeline.SourceExecutionKind
-import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.NODE_LIMIT_KEY
 import com.eignex.klause.solver.pipeline.OpenBranching
@@ -33,6 +31,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.QuadraticIncumbentPublication
 import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
+import com.eignex.klause.solver.pipeline.SourceExecutionKind
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceIncumbentPublication
@@ -40,6 +39,7 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.autoArms
 import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.solver.pipeline.minimize
 import com.eignex.klause.solver.pipeline.optimize
 import com.eignex.klause.solver.pipeline.solve
@@ -105,21 +105,31 @@ internal object SolveCore {
                         val budget = (common.nodeBudget ?: takeNodeBudget(common)).also { common.nodeBudget = it }
                         val cancel = budget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
                         SourceExecutionRequest(pipeline.invocation, finiteRequest = { shape ->
-                            finiteRequest(shape, common, engine, openCores, config, solutionSetSensitive,
-                                presolveCancel, presolveBudget, cancel, deadline, budget)
+                            finiteRequest(
+                                shape, common, engine, openCores, config, solutionSetSensitive,
+                                presolveCancel, presolveBudget, cancel, deadline, budget,
+                            )
                         })
                     }
+
                     SourceExecutionKind.POLYNOMIAL -> SourceExecutionRequest(
-                        pipeline.invocation, polynomial = polynomialParams(common, deadlineCancel), cores = openCores,
+                        pipeline.invocation,
+                        polynomial = polynomialParams(common, deadlineCancel),
+                        cores = openCores,
                     )
+
                     else -> {
                         val params = theoryParams(common, deadlineCancel)
                         if (common.engineParams.isNotEmpty()) {
                             usageError("unsupported linear source parameter `${common.engineParams.first()}`")
                         }
                         SourceExecutionRequest(
-                            pipeline.invocation, theory = params, cores = openCores,
-                            presolveConfig = config, presolveCancellation = presolveCancel, presolveBudget = presolveBudget,
+                            pipeline.invocation,
+                            theory = params,
+                            cores = openCores,
+                            presolveConfig = config,
+                            presolveCancellation = presolveCancel,
+                            presolveBudget = presolveBudget,
                         )
                     }
                 }
@@ -796,10 +806,14 @@ internal object SolveCore {
         nodeBudget: NodeBudget?,
     ) {
         executeFinite(
-            finiteRequest(solvable.finiteShape, common, FiniteEngine.FIXED, 1, presolveConfig,
+            finiteRequest(
+                solvable.finiteShape, common, FiniteEngine.FIXED, 1, presolveConfig,
                 solutionSetSensitive, presolveCancellation, presolveBudget, cancel, deadline, nodeBudget,
-                solvable.numericalCompletion, solvable.toleranceCheck),
-            solvable, common, output,
+                solvable.numericalCompletion, solvable.toleranceCheck,
+            ),
+            solvable,
+            common,
+            output,
         )
     }
 
@@ -992,10 +1006,14 @@ internal object SolveCore {
         nodeBudget: NodeBudget?,
     ) {
         executeFinite(
-            finiteRequest(solvable.finiteShape, common, engine, cores, presolveConfig,
+            finiteRequest(
+                solvable.finiteShape, common, engine, cores, presolveConfig,
                 solutionSetSensitive, presolveCancellation, presolveBudget, cancel, null, nodeBudget,
-                solvable.numericalCompletion, solvable.toleranceCheck),
-            solvable, common, output,
+                solvable.numericalCompletion, solvable.toleranceCheck,
+            ),
+            solvable,
+            common,
+            output,
         )
     }
 
@@ -1025,7 +1043,11 @@ internal object SolveCore {
         val configuredArms = if (fixed) null else cliProp(CliKnobs.portfolioArms)?.toIntOrNull()
         val engineParams = if (configuredArms != null &&
             common.engineParams.none { it.substringBefore('=') in listOf("arms", "ls", "bt") }
-        ) common.engineParams + "arms=$configuredArms" else common.engineParams
+        ) {
+            common.engineParams + "arms=$configuredArms"
+        } else {
+            common.engineParams
+        }
         return FiniteSolveRequest(
             shape = shape,
             engine = engine,
