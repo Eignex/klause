@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
@@ -35,9 +35,11 @@ class SourceSetupRequest(
     internal fun finiteObjective(): LinearObjective? {
         val selected = objective ?: return null
         if (!maximize) return selected
-        require(selected.constant != Long.MIN_VALUE &&
-            selected.intCoefficientValues.none { it == Long.MIN_VALUE } &&
-            selected.boolWeightValues.none { it == Long.MIN_VALUE }) {
+        require(
+            selected.constant != Long.MIN_VALUE &&
+                selected.intCoefficientValues.none { it == Long.MIN_VALUE } &&
+                selected.boolWeightValues.none { it == Long.MIN_VALUE },
+        ) {
             "finite maximization objective cannot be normalized within signed-word coefficients"
         }
         return selected.negated()

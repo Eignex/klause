@@ -15,6 +15,7 @@ import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.VariableSelection
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ProblemProfile
@@ -26,7 +27,6 @@ import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.PortfolioPlan
 import com.eignex.klause.solver.pipeline.PortfolioPlanRequest
 import com.eignex.klause.solver.pipeline.planPortfolio
-import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,16 +42,27 @@ class PortfolioBuilderTest {
     @Test
     fun `complete only selected pools should not request native heuristic views`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray()).bake()
-        for ((engine, params) in listOf(FiniteEngine.BACKTRACK to emptyList(),
-            FiniteEngine.MIXED to listOf("ls=0", "bt=1"))) {
-            val plan = assertIs<PortfolioPlan.Execute>(FinitePipeline.planPortfolio(PortfolioPlanRequest(
+        for ((engine, params) in listOf(
+            FiniteEngine.BACKTRACK to emptyList(),
+            FiniteEngine.MIXED to listOf("ls=0", "bt=1"),
+        )) {
+            val plan = assertIs<PortfolioPlan.Execute>(
+                FinitePipeline.planPortfolio(
+                    PortfolioPlanRequest(
                 engine, false, 1, params, 3, 1, LpConfig.OFF,
                 LpZeroObjectivePricing.MIN_BOUND_SUPPORT, null, null,
-            )))
+            )
+                )
+            )
             var views = 0
 
-            val factories = PortfolioBuilder.factories(problem, plan.scenario, null, null, null, null,
-                ProblemProfile.of(problem, false), false, sourceHints = { views++; null })
+            val factories = PortfolioBuilder.factories(
+                problem, plan.scenario, null, null, null, null,
+                ProblemProfile.of(problem, false), false, sourceHints = {
+                    views++;
+                    null
+                },
+            )
 
             assertTrue(factories.isNotEmpty())
             assertTrue(factories.all { it.family == ArmFamily.Backtrack })
@@ -62,18 +73,22 @@ class PortfolioBuilderTest {
     @Test
     fun `selected heuristic pools should request their native view once`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray()).bake()
-        for ((engine, expected) in listOf(EngineMix.LOCAL_SEARCH to ExecutionStrategy.LOCAL_SEARCH,
-            EngineMix.ALNS to ExecutionStrategy.ALNS)) {
+        for ((engine, expected) in listOf(
+            EngineMix.LOCAL_SEARCH to ExecutionStrategy.LOCAL_SEARCH,
+            EngineMix.ALNS to ExecutionStrategy.ALNS,
+        )) {
             var views = 0
             var selected = emptySet<ExecutionStrategy>()
             val scenario = PortfolioScenario(1, 2, Kind.CSP, engine)
 
-            val factories = PortfolioBuilder.factories(problem, scenario, null, null, null, null,
+            val factories = PortfolioBuilder.factories(
+                problem, scenario, null, null, null, null,
                 ProblemProfile.of(problem, false), false, sourceHints = { strategies ->
                     views++
                     selected = strategies
                     null
-                })
+                },
+            )
 
             assertTrue(factories.isNotEmpty())
             assertEquals(setOf(expected), selected)

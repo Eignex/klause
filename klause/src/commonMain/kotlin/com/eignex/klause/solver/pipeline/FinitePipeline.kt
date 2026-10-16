@@ -135,7 +135,8 @@ object FinitePipeline {
         } else {
             request.preparedPlan
         }
-        if (sourcePlan.decline == PreparedPlanDecline.RESOURCE) return FinitePipelinePreparation(
+        if (sourcePlan.decline == PreparedPlanDecline.RESOURCE) {
+            return FinitePipelinePreparation(
             prepared.problem,
             prepared.objective ?: request.objective,
             { prepared.mapping.reconstructFrom(prepared.problem, it) },
@@ -143,6 +144,7 @@ object FinitePipeline {
         ).also {
             it.sourceMapping = prepared.mapping
             it.executionPlan = sourcePlan
+        }
         }
         val plan = requireNotNull(sourcePlan.componentPlan)
         plan.requireFullFiniteProjection(prepared.problem)
@@ -162,24 +164,28 @@ object FinitePipeline {
         } else {
             val model = if (outcome.changed) outcome.problem else request.problem
             val projections = (model as? BakedProblem)?.factorProjections
-                ?: request.preparedPlan.factorProjections?.forEngineView(model)
-            if (projections == null) model.bake(request.solveCancellation)
-            else model.bake(projections, request.solveCancellation)
+                ?.takeIf { it.providers === plan.factorProjections.providers }
+                ?: plan.factorProjections.forEngineView(model)
+            model.bake(projections, request.solveCancellation)
         }
         val sameCoordinatesAndFactors = finiteModel.numBoolVars == request.problem.numBoolVars &&
             finiteModel.numIntVars == request.problem.numIntVars &&
             finiteModel.numRealVars == request.problem.numRealVars &&
             finiteModel.numFactors == request.problem.numFactors &&
             finiteModel.factors.indices.all { finiteModel.factors[it] === request.problem.factors[it] }
-        val executionPlan = if (outcome.stats.infeasible || sameCoordinatesAndFactors) request.preparedPlan else {
+        val executionPlan = if (outcome.stats.infeasible || sameCoordinatesAndFactors) {
+            request.preparedPlan
+        } else {
             val model = requireNotNull(finiteModel as? BakedProblem)
+            val providers = request.preparedPlan.factorProjections?.providers ?: FactorProjectionProviders.Default
+            val projections = model.factorProjections?.takeIf { it.providers === providers } ?: providers.prepare(model)
             model.prepareExecutionPlan(
                 original = requireNotNull(request.preparedPlan.originalSource as? Problem),
                 objective = request.preparedPlan.objective,
                 maximize = request.preparedPlan.maximize,
                 preferFinite = true,
-                providers = model.factorProjections.providers,
-                projections = model.factorProjections,
+                providers = providers,
+                projections = projections,
                 cancellation = request.solveCancellation,
             )
         }

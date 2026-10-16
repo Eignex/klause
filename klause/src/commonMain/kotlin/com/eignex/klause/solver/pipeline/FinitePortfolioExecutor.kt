@@ -53,8 +53,10 @@ internal fun FinitePipeline.portfolioExecutor(
     onFault: ((ArmFault) -> Unit)?,
     preparedPlan: PreparedSourcePlan,
     cancellation: Cancellation,
-): PortfolioExecutor = portfolioExecutor(problem, scenario, objective, lsObjective, definitionalSweep,
-    onEvent, onFault, preparedPlan, cancellation, false)
+): PortfolioExecutor = portfolioExecutor(
+    problem, scenario, objective, lsObjective, definitionalSweep,
+    onEvent, onFault, preparedPlan, cancellation, false,
+)
 
 internal fun FinitePipeline.portfolioExecutor(
     problem: BakedProblem,
@@ -72,16 +74,26 @@ internal fun FinitePipeline.portfolioExecutor(
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
-    val factories = PortfolioBuilder.factories(problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
-        profile, numericalCompletion, sourceHints).map { factory ->
+    val factories = PortfolioBuilder.factories(
+        problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
+        profile, numericalCompletion, sourceHints,
+    ).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
-            SourceWorkerBinding(EngineInvocation(preparedPlan, identity, objective,
-                executionAssumptions = worker.executionAssumptions ?: Assumptions.None),
-                sharingInvocation = binding, provesResults = worker.permitsSourceProofs)
+            SourceWorkerBinding(
+                EngineInvocation(
+                    preparedPlan,
+                    identity,
+                    objective,
+                    executionAssumptions = worker.executionAssumptions ?: Assumptions.None,
+                ),
+                sharingInvocation = binding,
+                provesResults = worker.permitsSourceProofs,
+            )
         }) { slot -> factory.materialize(slot.index, slot.baseSeed, slot.nodeBudget) }
     }
     return PortfolioInvocation(
-        preparedPlan, factories,
+        preparedPlan,
+        factories,
         PortfolioInvocationControls(
             parallelism = scenario.cores, workerSeed = scenario.seed, cancellation = cancellation,
             nodeBudget = scenario.nodeBudget,
@@ -89,21 +101,35 @@ internal fun FinitePipeline.portfolioExecutor(
             sliceGrowth = scenario.sliceGrowth, phaseRetention = scenario.phaseRetention,
             reseedStaleThreshold = scenario.reseedStaleThreshold,
         ),
-        PortfolioEvidence(identity,
-            finiteWitnessVerifier(problem, objective, toleranceCheck = scenario.toleranceCheck))
+        PortfolioEvidence(
+            identity,
+            finiteWitnessVerifier(problem, objective, toleranceCheck = scenario.toleranceCheck),
+        )
             .bindInvocation(binding, cancellation),
-        objective, onFault,
+        objective,
+        onFault,
     ) { workers ->
         val proofShares = clausalProofShares(scenario, profile, workers.map { it.label })
         val shares = if (proofShares.isEmpty()) {
-            continuousLpShares(scenario, profile, workers.map { it.label }, objective,
-                problem.continuousMajority, problem.binaryIntegers)
-        } else proofShares
+            continuousLpShares(
+                scenario,
+                profile,
+                workers.map { it.label },
+                objective,
+                problem.continuousMajority,
+                problem.binaryIntegers,
+            )
+        } else {
+            proofShares
+        }
         val reserved = if (shares.isEmpty()) booleanIncumbentShares(workers) else shares
         val probes = if (scenario.cores == 1 && scenario.engine == EngineMix.MIXED && scenario.kind == Kind.COP &&
             scenario.btPool == null && scenario.lsPool == null
-        ) workers.indices.filter { arm -> arm >= scenario.arms && workers[arm].label == "bt/lp-default" }.toSet()
-        else emptySet()
+        ) {
+            workers.indices.filter { arm -> arm >= scenario.arms && workers[arm].label == "bt/lp-default" }.toSet()
+        } else {
+            emptySet()
+        }
         PortfolioInvocationPolicy(profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes)
     }
 }
@@ -130,7 +156,9 @@ internal fun clausalProofShares(
     if (scenario.cores != 1 || scenario.kind != Kind.CSP || scenario.engine != EngineMix.MIXED ||
         profile.problemClass != ProblemClass.Sat || scenario.btPool != null || scenario.lsPool != null ||
         scenario.btEdit != null || scenario.annotationArm != null
-    ) return DoubleArray(0)
+    ) {
+        return DoubleArray(0)
+    }
     val proof = labels.indexOf("bt/clausal-balanced")
     if (proof < 0) return DoubleArray(0)
     // A refutation supplies no incumbent progress, so family rewards cannot identify its approaching proof.
@@ -150,7 +178,9 @@ internal fun continuousLpShares(
     if (!LpConfig.AUTO.cappedUnder(scenario.lpCeiling).resolved(LpTechnique.BOUNDING)) return DoubleArray(0)
     if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.engine != EngineMix.MIXED ||
         !profile.realColumns || scenario.btPool != null || scenario.lsPool != null
-    ) return DoubleArray(0)
+    ) {
+        return DoubleArray(0)
+    }
     val lp = labels.indexOf("bt/lp-default")
     if (lp < 0) return DoubleArray(0)
     // LP is the complete arm that optimizes continuous objective columns. Its expensive first solves can

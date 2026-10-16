@@ -33,6 +33,8 @@ class SourceAttachment(
     val searchHints: SearchHints? get() = search?.captured()
 }
 
-private fun SearchHints.captured(): SearchHints = copy(tiers = tiers.map { group ->
+private fun SearchHints.captured(): SearchHints = copy(
+    tiers = tiers.map { group ->
     group.copy(boolVars = group.boolVars.copyOf(), intVars = group.intVars.copyOf())
-})
+}
+)

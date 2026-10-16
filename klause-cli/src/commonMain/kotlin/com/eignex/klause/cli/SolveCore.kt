@@ -92,32 +92,55 @@ internal object SolveCore {
             is SolvablePipeline.NumericalLinear -> {
                 if (solutionSetSensitive) usageError("all-solution enumeration is unavailable for numerical MIP")
                 val work = takeOpenNodeLimit(common) ?: Long.MAX_VALUE
-                val params = TheoryParams(openWorkLimit = work,
+                val params = TheoryParams(
+                    openWorkLimit = work,
                     maxDecisions = takeOpenLongParam(common, "max-decisions", nonNegative = true) ?: Long.MAX_VALUE,
-                    timeout = deadlineCancel, cancellation = deadlineCancel)
+                    timeout = deadlineCancel,
+                    cancellation = deadlineCancel,
+                )
                 dropOpenOnlyParams(common)
                 output.begin(optimize = rawSolvable.optimize, maximize = rawSolvable.maximize)
                 val complete = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS
                 val result = pipeline.request.solve(params, complete) { sample, value ->
-                    if (rawSolvable.optimize) publication.publish(
-                        pipeline.render(OpenTheoryAssignment.Sampled(sample)), SourceValue.Rational(value))
+                    if (rawSolvable.optimize) {
+                        publication.publish(
+                        pipeline.render(OpenTheoryAssignment.Sampled(sample)),
+                        SourceValue.Rational(value),
+                    )
+                    }
                 }
                 if (rawSolvable.optimize) {
-                    reportLinearOptimization(result, { pipeline.render(OpenTheoryAssignment.Sampled(it)) },
-                        output, publication, common.statistics, rawSolvable.routingElapsedMs,
-                        completePool = complete, routingLpStats = rawSolvable.routingLpStats)
+                    reportLinearOptimization(
+                        result,
+                        { pipeline.render(OpenTheoryAssignment.Sampled(it)) },
+                        output,
+                        publication,
+                        common.statistics,
+                        rawSolvable.routingElapsedMs,
+                        completePool = complete,
+                        routingLpStats = rawSolvable.routingLpStats,
+                    )
                 } else {
                     output.onVerdictContext(VerdictContext(terminationReason = result.reason))
                     val point = result.incumbent
                     if (point != null) output.onSolution(pipeline.render(OpenTheoryAssignment.Sampled(point)), null)
-                    output.onComplete(when {
-                        point != null -> Verdict.SATISFIABLE
-                        result.terminal?.claim == com.eignex.klause.solver.evidence.SourceClaim.Refutation ->
-                            Verdict.UNSATISFIABLE
-                        else -> Verdict.UNKNOWN
-                    })
-                    if (common.statistics) output.onStatistics(result.stats,
-                        result.stats.run.wallMs + rawSolvable.routingElapsedMs, if (point == null) 0 else 1)
+                    output.onComplete(
+                        when {
+                            point != null -> Verdict.SATISFIABLE
+
+                            result.terminal?.claim == com.eignex.klause.solver.evidence.SourceClaim.Refutation ->
+                                Verdict.UNSATISFIABLE
+
+                            else -> Verdict.UNKNOWN
+                        },
+                    )
+                    if (common.statistics) {
+                        output.onStatistics(
+                        result.stats,
+                        result.stats.run.wallMs + rawSolvable.routingElapsedMs,
+                        if (point == null) 0 else 1,
+                    )
+                    }
                 }
                 return
             }
@@ -128,24 +151,40 @@ internal object SolveCore {
                 val onAccepted: (QuadraticIncumbentPublication) -> Unit = { accepted ->
                     publication.publish(
                         pipeline.render(accepted.incumbent.sample),
-                        SourceValue.Algebraic(accepted.incumbent.value), accepted.version,
+                        SourceValue.Algebraic(accepted.incumbent.value),
+                        accepted.version,
                     )
                 }
                 val execution = when (val request = pipeline.request) {
                     is QuadraticRequest.Polynomial -> OpenTheoryPipeline.minimize(
-                        request.request, pipeline.objective, polynomialParams(common, deadlineCancel),
-                        engine, pipeline.sense, openCores, onAccepted,
+                        request.request,
+                        pipeline.objective,
+                        polynomialParams(common, deadlineCancel),
+                        engine,
+                        pipeline.sense,
+                        openCores,
+                        onAccepted,
                     )
+
                     is QuadraticRequest.Integer -> {
                         val budget = takeNodeBudget(common).also { common.nodeBudget = it }
                         OpenTheoryPipeline.minimize(
-                            request.request, pipeline.objective, nonlinearIntegerParams(common, deadlineCancel, budget),
-                            engine, pipeline.sense, openCores, onAccepted,
+                            request.request,
+                            pipeline.objective,
+                            nonlinearIntegerParams(common, deadlineCancel, budget),
+                            engine,
+                            pipeline.sense,
+                            openCores,
+                            onAccepted,
                         )
                     }
                 }
                 reportQuadraticOptimization(
-                    execution, pipeline, output, common.statistics, rawSolvable.routingElapsedMs,
+                    execution,
+                    pipeline,
+                    output,
+                    common.statistics,
+                    rawSolvable.routingElapsedMs,
                     completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
                     publication = publication,
                 )
@@ -161,15 +200,24 @@ internal object SolveCore {
                     output.begin(optimize = true, maximize = pipeline.maximize)
                     val sense = if (pipeline.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
                     val execution = OpenTheoryPipeline.optimize(
-                        pipeline.request, sourceObjective, polynomialParams, engine, sense, openCores,
+                        pipeline.request,
+                        sourceObjective,
+                        polynomialParams,
+                        engine,
+                        sense,
+                        openCores,
                     ) { accepted ->
                         publication.publish(
                             pipeline.render(polynomialAssignment(accepted.incumbent.sample)),
-                            SourceValue.Algebraic(accepted.incumbent.value), accepted.version,
+                            SourceValue.Algebraic(accepted.incumbent.value),
+                            accepted.version,
                         )
                     }
                     reportQuadraticOptimization(
-                        execution, { pipeline.render(polynomialAssignment(it)) }, output, common.statistics,
+                        execution,
+                        { pipeline.render(polynomialAssignment(it)) },
+                        output,
+                        common.statistics,
                         rawSolvable.routingElapsedMs,
                         completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
                         publication = publication,
@@ -186,8 +234,11 @@ internal object SolveCore {
                 val execution = pipeline.request.execute(polynomialParams, engine, openCores)
                 val result = if ((engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) &&
                     execution.result is OpenTheoryResult.Unsat
-                ) OpenTheoryResult.Unknown(TerminationReason.BudgetExhausted, execution.result.stats)
-                else execution.result
+                ) {
+                    OpenTheoryResult.Unknown(TerminationReason.BudgetExhausted, execution.result.stats)
+                } else {
+                    execution.result
+                }
                 output.onVerdictContext(
                     VerdictContext(
                         terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
@@ -201,6 +252,7 @@ internal object SolveCore {
                     }
 
                     is OpenTheoryResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
+
                     is OpenTheoryResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
                 }
                 if (common.statistics) {
@@ -213,7 +265,8 @@ internal object SolveCore {
                     val pairs = if (execution.nativeWorkScope == "transcendental") {
                         listOf("transcendentalWork" to native.workSpent.toString()) +
                             execution.nativeResource?.let { listOf("transcendentalResource" to it) }.orEmpty()
-                    } else listOf(
+                    } else {
+                        listOf(
                         "nraWork" to native.workSpent.toString(),
                         "nraProjectedPolynomials" to native.projectedPolynomials.toString(),
                         "nraLiftedCells" to native.liftedCells.toString(),
@@ -223,6 +276,7 @@ internal object SolveCore {
                         native.coupledWorkDeclines?.let { "nraCoupledWorkDeclines" to it.toString() },
                         native.dyadicPreExtractionDeclines?.let { "nraDyadicPreExtractionDeclines" to it.toString() },
                     ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty()
+                    }
                     output.onAllowanceStatistics(pairs)
                 }
                 return
@@ -237,24 +291,30 @@ internal object SolveCore {
                 output.begin(optimize = false, maximize = false)
                 val execution = OpenTheoryPipeline.execute(pipeline.request, nonlinearParams, engine, openCores)
                 val result = execution.result
-                output.onVerdictContext(VerdictContext(
+                output.onVerdictContext(
+                    VerdictContext(
                     terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
                     completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
-                ))
+                )
+                )
                 when (result) {
                     is OpenTheoryResult.Sat -> {
                         output.onSolution(pipeline.render(result.assignment), null)
                         output.onComplete(Verdict.SATISFIABLE)
                     }
+
                     is OpenTheoryResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
+
                     is OpenTheoryResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
                 }
                 if (common.statistics) {
                     output.onStatistics(
-                        result.stats, result.stats.run.wallMs + rawSolvable.routingElapsedMs,
+                        result.stats,
+                        result.stats.run.wallMs + rawSolvable.routingElapsedMs,
                         if (result is OpenTheoryResult.Sat) 1L else 0L,
                     )
-                    output.onAllowanceStatistics(listOf(
+                    output.onAllowanceStatistics(
+                        listOf(
                         "nraWork" to execution.stats.workSpent.toString(),
                         "nraProjectedPolynomials" to execution.stats.projectedPolynomials.toString(),
                         "nraLiftedCells" to execution.stats.liftedCells.toString(),
@@ -265,7 +325,8 @@ internal object SolveCore {
                         execution.stats.dyadicPreExtractionDeclines?.let {
                             "nraDyadicPreExtractionDeclines" to it.toString()
                         },
-                    ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty())
+                    ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty()
+                    )
                 }
                 return
             }
@@ -296,7 +357,12 @@ internal object SolveCore {
                 if (objective != null) {
                     output.begin(optimize = true, maximize = pipeline.maximize)
                     val execution = OpenTheoryPipeline.searchWithoutTheory(
-                        pipeline.model, params, objective, engine, openCores, pipeline.maximize,
+                        pipeline.model,
+                        params,
+                        objective,
+                        engine,
+                        openCores,
+                        pipeline.maximize,
                     ) { accepted ->
                         val rendered = pipeline.render(OpenTheoryAssignment.Sampled(accepted.sample))
                         publication.publish(rendered, accepted.value, accepted.version)
@@ -529,7 +595,10 @@ internal object SolveCore {
         }
 
     private fun takeOpenLongParam(
-        common: CommonOptions, key: String, nonNegative: Boolean, signed: Boolean = false,
+        common: CommonOptions,
+        key: String,
+        nonNegative: Boolean,
+        signed: Boolean = false,
     ): Long? {
         val entry = common.engineParams.firstOrNull { it.startsWith("$key=") } ?: return null
         common.engineParams.remove(entry)
@@ -977,13 +1046,15 @@ internal object SolveCore {
                     common,
                     output,
                     withModelObjective(
-                        outcome.stats.copy(presolve = (outcome.stats.presolve ?: PresolveStats()).copy(
+                        outcome.stats.copy(
+                            presolve = (outcome.stats.presolve ?: PresolveStats()).copy(
                             effort = presolveEffortStats(
                                 request.presolveConfig,
                                 request.presolveBudget,
                                 result.preparationElapsed,
                             ),
-                        )),
+                        )
+                        ),
                         solvable,
                         outcome.bestSample,
                     ),
@@ -1087,8 +1158,10 @@ private fun reportOpenTheoryOptimum(
     val result = execution.result
     val receipt = execution.acceptedIncumbent
     result.linearResult?.let { linear ->
-        reportLinearOptimization(linear, { render(OpenTheoryAssignment.Sampled(it)) }, output, publication,
-            statistics, routingElapsedMs, completePool, routingLpStats, budgetExhausted, receipt)
+        reportLinearOptimization(
+            linear, { render(OpenTheoryAssignment.Sampled(it)) }, output, publication,
+            statistics, routingElapsedMs, completePool, routingLpStats, budgetExhausted, receipt,
+        )
         return
     }
     val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
@@ -1100,13 +1173,21 @@ private fun reportOpenTheoryOptimum(
         val signed = if (maximize) value?.negated() else value
         return if (assignment != null && signed != null) {
             publication.publish(render(assignment), SourceValue.Rational(signed))
-        } else false
+        } else {
+            false
+        }
     }
 
     fun complete(verdict: Verdict, accepted: Boolean) {
-        output.onComplete(if (accepted) verdict else if (publication.solutions > 0L) {
+        output.onComplete(
+            if (accepted) {
+            verdict
+        } else if (publication.solutions > 0L) {
             Verdict.BEST_FOUND
-        } else Verdict.UNKNOWN)
+        } else {
+            Verdict.UNKNOWN
+        }
+        )
     }
     output.onVerdictContext(
         VerdictContext(
@@ -1131,8 +1212,11 @@ private fun reportOpenTheoryOptimum(
         is OpenTheoryOptimum.Bounded -> {
             val incumbent = result.incumbent
             if (incumbent == null) {
-                if (receipt == null) output.onComplete(Verdict.UNKNOWN)
-                else complete(Verdict.BEST_FOUND, solution(null, null))
+                if (receipt == null) {
+                    output.onComplete(Verdict.UNKNOWN)
+                } else {
+                    complete(Verdict.BEST_FOUND, solution(null, null))
+                }
             } else {
                 complete(Verdict.BEST_FOUND, solution(incumbent, result.value))
             }

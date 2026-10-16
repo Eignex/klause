@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.SearchGroup
+import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.util.Cancellation
 
@@ -55,12 +55,7 @@ internal fun VarRemap.followedBy(next: VarRemap, cancellation: Cancellation): Va
     return VarRemap(bools, ints)
 }
 
-private fun mappedRoles(
-    ids: IntArray,
-    count: Int,
-    rename: (Int) -> Int,
-    cancellation: Cancellation,
-): IntArray? {
+private fun mappedRoles(ids: IntArray, count: Int, rename: (Int) -> Int, cancellation: Cancellation): IntArray? {
     val result = ArrayList<Int>(ids.size)
     for (id in ids) {
         cancellation.charge(1)

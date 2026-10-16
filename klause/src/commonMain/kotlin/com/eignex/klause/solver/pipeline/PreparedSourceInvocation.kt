@@ -52,8 +52,13 @@ class PreparedSourceInvocation internal constructor(
     internal fun requireFiniteExecution(shape: FiniteSolveShape, engine: FiniteEngine, operation: ExecutionOperation) {
         require(shape === finite) { "finite shape belongs to a different source invocation" }
         require(engine == request.engine) { "finite engine differs from its source operation binding" }
-        require(this.operation in setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE,
-            ExecutionOperation.ENUMERATE)) {
+        require(
+            this.operation in setOf(
+            ExecutionOperation.SATISFY,
+            ExecutionOperation.OPTIMIZE,
+            ExecutionOperation.ENUMERATE,
+        )
+        ) {
             "operation has no finite solve execution surface"
         }
         require(operation == this.operation) {
