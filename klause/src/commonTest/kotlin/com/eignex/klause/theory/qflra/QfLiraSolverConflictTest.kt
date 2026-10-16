@@ -19,10 +19,13 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.constsOf
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExplanation
+import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
@@ -476,6 +479,60 @@ class QfLiraSolverConflictTest {
             assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, true))))
 
             assertNull(session.boolValue(1))
+        }
+    }
+
+    @Test
+    fun `an interrupted published threshold should complete only after its local source check`() {
+        var stopped = false
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 1.0), LinearOp.LE, 1.0),
+            ),
+        )
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        val context = object : SearchContext by session {
+            override fun imply(literal: Int, explanation: SearchExplanation): ComponentResult {
+                val result = session.imply(literal, explanation)
+                stopped = true
+                return result
+            }
+        }
+        ExactLiraSearchComponent(source).use { component ->
+            component.useOperationAllowance { parent -> parent or Cancellation { stopped } }
+            var contribution: Any? = null
+            val assembly = object : SearchModel {
+                override fun put(key: Any, value: Any) {
+                    if (key === component) contribution = value
+                }
+            }
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val decision = SearchDecision.Bool(Lit.make(0, true))
+            assertIs<ComponentResult.Consistent>(session.push(decision))
+            assertIs<ComponentResult.Consistent>(component.assert(decision, context))
+            assertIs<ComponentResult.Indeterminate>(component.propagate(context))
+            assertEquals(true, session.boolValue(1))
+            assertIs<ComponentCheck.Indeterminate>(component.check(context))
+            component.contributeModel(assembly, context)
+            assertNull(contribution)
+            stopped = false
+
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+
+            assertIs<ComponentCheck.Feasible>(component.check(context))
+            component.contributeModel(assembly, context)
+            val point = assertIs<ExactLraAssignment>(contribution)
+            assertContentEquals(booleanArrayOf(true, true), point.bools)
+            assertTrue(point.reals[0] * BigFraction.ofLong(2) + point.reals[1] <= BigFraction.ZERO)
         }
     }
 

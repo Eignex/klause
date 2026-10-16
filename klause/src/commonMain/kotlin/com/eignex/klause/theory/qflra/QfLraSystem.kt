@@ -231,20 +231,13 @@ internal class LiveQfLraSystem(
         val state = lp.state ?: return null
         if (state.conflict != null || stop()) return null
         val key = preparedTerms[comparison.ordered]?.positive ?: return null
-        val term = normalized[key]?.term ?: return null
+        val slot = normalized[key] ?: return null
+        val term = slot.term
+        if (term.coefficients.isEmpty()) return null
         val work = MixedPointArithmetic(stop)
         val shifted = work.subtractProduct(comparison.bound, BigFraction.ONE, term.offset) ?: return null
         val threshold = work.quotient(shifted, term.scale) ?: return null
         val holdsBelow = (comparison.op == LinearOp.LE) == (term.scale > BigFraction.ZERO)
-        if (term.coefficients.isEmpty()) {
-            val relation = BigFraction.ZERO.compareTo(threshold)
-            val holds = if (holdsBelow) {
-                relation < 0 || relation == 0 && !comparison.strict
-            } else relation > 0 || relation == 0 && !comparison.strict
-            return DerivedComparisonTruth(holds, term.premise(SearchAtomPremise.All(emptyList())))
-                .takeUnless { stop() }
-        }
-        val slot = normalized[key] ?: return null
         if (slot.column >= 0 && slot.column !in 0 until state.model.numVars) return null
         val column = slot.column.takeIf { it in 0 until state.model.numVars }
             ?: term.coefficients.keys.singleOrNull() ?: definitions[term.coefficients] ?: return null
@@ -256,7 +249,8 @@ internal class LiveQfLraSystem(
             val relation = lowerBound.number.value.compareTo(upperBound.number.value)
             if (relation > 0 || relation == 0 && (lowerBound.strict || upperBound.strict)) return null
         }
-        for (upper in listOf(true, false)) {
+        for (boundIndex in 0..1) {
+            val upper = boundIndex == 0
             stop.charge(1L)
             if (stop()) return null
             val side = state.activeSide(column, upper)?.side ?: continue

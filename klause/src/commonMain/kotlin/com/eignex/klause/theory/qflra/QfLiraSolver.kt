@@ -969,7 +969,7 @@ class ExactLiraSearchComponent private constructor(
     private fun implySourceBound(prepared: PreparedSourceRow, context: SearchContext): ComponentResult? {
         val variable = prepared.row.activator
         if (variable !in bools.indices || context.boolValue(variable) != null || graphFirst || hasPrivateReals ||
-            model.numIntVars != 0 || hasSourceDisjunctions || prepared.disjunction ||
+            model.numIntVars != 0 || model.numRealVars == 0 || hasSourceDisjunctions || prepared.disjunction ||
             solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
             node.rowAssertions.isNotEmpty() || node.sourceBranches.isNotEmpty() ||
             node.disequalityDirections.isNotEmpty() || node.directionPremises.isNotEmpty() ||
@@ -1007,7 +1007,7 @@ class ExactLiraSearchComponent private constructor(
             if (truth == null) {
                 implySourceBound(prepared, context)?.let {
                     sourceBoundPublication = it
-                    return true
+                    if (it != ComponentResult.Consistent) return true
                 }
                 continue
             }
