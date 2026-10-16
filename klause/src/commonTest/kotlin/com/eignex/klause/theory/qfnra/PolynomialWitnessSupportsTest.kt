@@ -15,6 +15,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PolynomialWitnessSupportsTest {
     @Test
@@ -45,8 +46,10 @@ class PolynomialWitnessSupportsTest {
                 takeAxis = { ++axes <= 32 }, takeProposal = { ++proposals <= 63 },
             ))
 
-            assertNotNull(checkSample(formula, point.mapValues { algebraic.rational(it.value) },
-                source.boolCount, arithmetic, algebraic))
+            val coordinates = point.mapValues { algebraic.rational(it.value) }
+            for (atom in atoms) {
+                assertTrue(atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))))
+            }
         }
     }
 
@@ -68,8 +71,10 @@ class PolynomialWitnessSupportsTest {
             atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
         ))
 
-        assertNotNull(checkSample(formula, point.mapValues { algebraic.rational(it.value) },
-            source.boolCount, arithmetic, algebraic))
+        val coordinates = point.mapValues { algebraic.rational(it.value) }
+        for (atom in atoms) {
+            assertTrue(atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))))
+        }
     }
 
     @Test
@@ -129,8 +134,10 @@ class PolynomialWitnessSupportsTest {
             atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
         ))
 
-        assertNotNull(checkSample(formula, point.mapValues { algebraic.rational(it.value) },
-            source.boolCount, arithmetic, algebraic))
+        val coordinates = point.mapValues { algebraic.rational(it.value) }
+        for (atom in atoms) {
+            assertTrue(atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))))
+        }
     }
 
     @Test
@@ -206,8 +213,13 @@ class PolynomialWitnessSupportsTest {
         val point = assertNotNull(WitnessProbe(formula, source.boolCount, arithmetic, algebraic)
             .probeWitness(source.realCount, emptyMap()) { null })
 
-        assertNotNull(checkSample(formula, (0 until source.realCount).associateWith { point.realValue(it) },
-            source.boolCount, arithmetic, algebraic))
+        val coordinates = (0 until source.realCount).associateWith { point.realValue(it) }
+        val values = IntArray(formula.atoms.size) { index ->
+            val atom = formula.atoms[index]
+            if (atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))))
+                PolynomialFormula.TRUE else PolynomialFormula.FALSE
+        }
+        assertEquals(PolynomialFormula.TRUE, formula.truth(IntArray(source.boolCount), values, arithmetic))
     }
 
     @Test
