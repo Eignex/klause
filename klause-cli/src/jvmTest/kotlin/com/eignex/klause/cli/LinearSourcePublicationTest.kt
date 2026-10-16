@@ -22,7 +22,7 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
+import kotlin.test.assertFails
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -186,6 +186,8 @@ class LinearSourcePublicationTest {
             error("an invalid invocation published a point")
         })
 
-        assertFailsWith<CliUsageException> { SolveCore.solve(solvable, common, SmtLibOutput()) }
+        val failure = assertFails { SolveCore.solve(solvable, common, SmtLibOutput()) }
+
+        assertTrue("unknown-source-knob" in failure.message.orEmpty())
     }
 }
