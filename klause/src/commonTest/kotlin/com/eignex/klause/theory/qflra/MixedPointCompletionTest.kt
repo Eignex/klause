@@ -6,8 +6,10 @@ import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -139,6 +141,18 @@ class MixedPointCompletionTest {
 
         assertEquals(BigFraction.ONE, point[2])
         assertTrue(point.satisfiesSourceRows(rows))
+    }
+
+    @Test
+    fun `oversized intermediate products withhold an otherwise cancelling guess`() {
+        val coefficient = BigFraction.of(BIG_ONE shl 4095, BIG_ONE)
+        val rows = listOf(ExactRationalInequality(intArrayOf(1, 2),
+            listOf(coefficient, coefficient.negated()), BigFraction.ZERO))
+
+        val point = completeMixedPoint(1, 2, doubleArrayOf(0.0, Double.MAX_VALUE, Double.MAX_VALUE),
+            rows, Cancellation.Never)
+
+        assertNull(point)
     }
 
     @Test

@@ -1010,7 +1010,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `both open branchings reach the same verdict and an unknown one is refused`() {
+    fun `open branching policies reach the same verdict and an unknown one is refused`() {
         val smt = File.createTempFile("clibranching", ".smt2").apply {
             writeText(
                 """
