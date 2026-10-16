@@ -131,7 +131,6 @@ internal fun MpsModel.lowerExactSource(
     )
     return MpsCompiled(model, objective, source.sense == ObjectiveSense.MAXIMIZE, columns, 1,
         source.variables.count { !it.integer }).withSourceModel(source, null, null)
-        .withExactLpModel { source.toExactLpModel() }
 }
 
 private fun MpsModel.integralSourceObjective(

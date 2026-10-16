@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.perCharSource
@@ -165,9 +166,11 @@ class MpsTest {
     fun `unchanged copies should retain exact sums with overflowing projections`() {
         val parsed = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1e308\n X COST 1e308\nENDATA")
 
-        val exact = parsed.copy(name = "copy").toExactLpModel()
+        val compiled = parsed.copy(name = "copy").toExactSourceProblem()
 
-        assertEquals("2" + "0".repeat(308), exact.objective.cost(0).value.toString())
+        val witness = compiled.sourceWitness(listOf(BigFraction.ONE))
+
+        assertEquals("2" + "0".repeat(308), witness.objective.toString())
     }
 
     @Test

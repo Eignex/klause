@@ -1,15 +1,20 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
+import com.eignex.klause.ir.IntegralConstants
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MpsCompilerLoweringTest {
@@ -115,63 +120,52 @@ class MpsCompilerLoweringTest {
     }
 
     @Test
-    fun `a parsed exact LP should retain wide values and distinct double projections`() {
-        val text = """
-            ROWS
-             N COST
-             E C1
-            COLUMNS
-                MARK0 'MARKER' 'INTORG'
-                X COST 1 C1 9007199254740992
-                Y COST 2 C1 9007199254740993
-                MARK1 'MARKER' 'INTEND'
-            RHS
-                RHS C1 9999999999999999999
-            BOUNDS
-             LO BND X 1
-             UP BND X 1.000000000000000055511151231257827021181583404541015625
-             UP BND Y 9999999999999999999
-            ENDATA
-        """.trimIndent()
+    fun `source rows should retain wide values with indistinguishable double projections`() {
+        val text = "ROWS\n N COST\n E C1\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+            " X COST 1 C1 9007199254740992\n Y COST 2 C1 9007199254740993\n M1 'MARKER' 'INTEND'\n" +
+            "RHS\n RHS C1 9999999999999999999\nBOUNDS\n LO B X 1\n" +
+            " UP B X 1.000000000000000055511151231257827021181583404541015625\n" +
+            " UP B Y 9999999999999999999\nENDATA"
+        val source = Mps.parse(text)
 
-        val exact = assertNotNull(Mps.parse(text).toProblem().exactLpModel)
+        val compiled = source.toExactSourceProblem()
 
-        val x = exact.entries(0).single().number.value
-        val y = exact.entries(1).single().number.value
-        assertEquals("9007199254740992", x.toString())
-        assertEquals("9007199254740993", y.toString())
-        assertEquals(x.toDouble(), y.toDouble())
-        assertFalse(exact.column(0).bounds.fixed)
-        assertEquals("1/18014398509481984", exact.column(0).bounds.upper?.number?.value.toString())
-        assertEquals("9999999999999999999", exact.column(1).bounds.upper?.number?.value.toString())
-        assertNull(exact.toLegacy())
+        val row = compiled.model.factors.flatMap { it.linearRows }.single { it.size == 2 }
+        val constants = row.constants as IntegralConstants
+        val coefficients = (0 until row.size).map {
+            BigFraction.of(constants.exactCoeff(it), BIG_ONE)
+        }
+        assertEquals(listOf("9007199254740992", "9007199254740993"), coefficients.map { it.toString() })
+        assertEquals(coefficients[0].toDouble(), coefficients[1].toDouble())
+        assertEquals("9999999999999999999", constants.exactBound.toString())
+        val bounds = source.sourceNumbers().variableBounds
+        assertEquals(BigFraction.of(BIG_ONE, parseBigInt("18014398509481984")),
+            checkNotNull(bounds[0].second).fraction - checkNotNull(bounds[0].first).fraction)
+        assertEquals("9999999999999999999", bounds[1].second?.fraction.toString())
+        assertTrue(compiled.model.intBounds.isOpenUpper(1))
     }
 
     @Test
     fun `exact MPS infinity classification should use source values`() {
-        val text = """
-            ROWS
-             L C1
-            COLUMNS
-                X C1 1
-                Y C1 0
-            RHS
-                RHS C1 99999999999999999999
-            BOUNDS
-             UP BND X 99999999999999999999
-             UP BND Y 100000000000000000000
-            ENDATA
-        """.trimIndent()
+        val source = Mps.parse(
+            "ROWS\n L C1\nCOLUMNS\n X C1 1\n Y C1 0\nRHS\n RHS C1 99999999999999999999\n" +
+                "BOUNDS\n UP B X 99999999999999999999\n UP B Y 100000000000000000000\nENDATA",
+        )
+        val edge = BigFraction.of(parseBigInt("99999999999999999999"), BIG_ONE)
+        val compiled = source.toExactSourceProblem()
 
-        val exact = assertNotNull(Mps.parse(text).toProblem().exactLpModel)
+        compiled.sourceWitness(listOf(edge, edge + BigFraction.ofLong(2)))
 
-        assertEquals("99999999999999999999", exact.column(0).bounds.upper?.number?.value.toString())
-        assertEquals("99999999999999999999", exact.rhs(0).value.toString())
-        assertNull(exact.column(1).bounds.upper)
+        val upperRows = compiled.model.factors.flatMap { it.linearRows }
+            .filter { it.relation == LinearOp.LE && (it.constants as IntegralConstants).exactBound == edge.num }
+        assertEquals(2, upperRows.size)
+        assertFailsWith<MpsLoweringException> {
+            compiled.sourceWitness(listOf(edge + BigFraction.ONE, BigFraction.ZERO))
+        }
     }
 
     @Test
-    fun `a double only exact LP should retain signed zero and decline projection`() {
+    fun `programmatic signed zero should retain its bound and objective literals`() {
         val source = MpsModel(
             "binary",
             ObjectiveSense.MINIMIZE,
@@ -180,51 +174,51 @@ class MpsCompilerLoweringTest {
             emptyList(),
         )
 
-        val exact = assertNotNull(source.toProblem().exactLpModel)
+        val compiled = source.toProblem()
 
-        assertEquals((-0.0).toRawBits(), exact.column(0).bounds.upper?.number?.ieeeBits)
-        assertEquals((-0.0).toRawBits(), exact.objective.constant.ieeeBits)
-        assertNull(exact.toLegacy())
+        assertEquals((-0.0).toRawBits(),
+            source.sourceNumbers().variableBounds.single().second?.double?.toRawBits())
+        assertEquals((-0.0).toRawBits(), source.sourceNumbers().objectiveConstant.double.toRawBits())
+        assertEquals((-0.0).toRawBits(), compiled.model.realUpper.single().toRawBits())
+        assertEquals(BigFraction.ZERO, compiled.sourceWitness(listOf(BigFraction.ZERO)).objective)
+        assertFalse(compiled.withinTolerance(LongArray(0), doubleArrayOf(1.0)))
     }
 
     @Test
-    fun `a maximized exact LP should keep shifted source objective units`() {
-        val text = """
-            OBJSENSE
-             MAX
-            ROWS
-             N COST
-            COLUMNS
-                MARK0 'MARKER' 'INTORG'
-                X COST 3
-                MARK1 'MARKER' 'INTEND'
-            RHS
-                RHS COST 7
-            BOUNDS
-             LO BND X 2
-             UP BND X 8
-            ENDATA
-        """.trimIndent()
+    fun `maximization should retain original coordinates and objective units`() {
+        val source = Mps.parse(
+            "OBJSENSE\n MAX\nROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X COST 3\n" +
+                " M1 'MARKER' 'INTEND'\nRHS\n RHS COST 7\nBOUNDS\n LO B X 2\n UP B X 8\nENDATA",
+        )
 
-        val exact = assertNotNull(Mps.parse(text).toProblem().exactLpModel)
+        val compiled = source.toProblem()
+        val witness = compiled.sourceWitness(listOf(BigFraction.ofLong(4)))
 
-        assertEquals(Sense.MAXIMIZE, exact.objective.sense)
-        assertEquals(BigFraction.ofLong(-3L), exact.objective.cost(0).value)
-        assertEquals(BigFraction.ONE, exact.objective.constant.value)
-        assertEquals(BigFraction.ofLong(5L), exact.objective.sourceValue(listOf(BigFraction.ofLong(2L))))
+        assertTrue(compiled.maximize)
+        assertEquals(2L, compiled.model.intBounds.lower(0))
+        assertEquals(8L, compiled.model.intBounds.upper(0))
+        val objective = assertNotNull(compiled.objective)
+        assertEquals(3L, objective.intCoefficients.single())
+        assertEquals(-7L, objective.constant)
+        assertEquals(BigFraction.ofLong(5), witness.objective)
     }
 
     @Test
-    fun `an integral parsed exact LP should keep the compatible legacy route`() {
-        val text = "ROWS\n N COST\n L C1\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X COST 2 C1 1\n" +
-            " M1 'MARKER' 'INTEND'\nRHS\n RHS C1 4\nBOUNDS\n UP BND X 3\nENDATA"
+    fun `integral source rows bounds and objectives should remain in neutral IR`() {
+        val source = Mps.parse(
+            "ROWS\n N COST\n L C1\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X COST 2 C1 1\n" +
+                " M1 'MARKER' 'INTEND'\nRHS\n RHS C1 4\nBOUNDS\n UP B X 3\nENDATA",
+        )
 
-        val legacy = assertNotNull(assertNotNull(Mps.parse(text).toProblem().exactLpModel).toLegacy())
+        val compiled = source.toProblem()
 
-        assertEquals(1L, legacy.csc.colVal.single())
-        assertEquals(4L, legacy.rhs.single())
-        assertEquals(3L, legacy.upper[0])
-        assertEquals(2L, legacy.cost[0])
+        val row = compiled.model.factors.single().linearRows.single()
+        val constants = row.constants as IntegralConstants
+        assertEquals("1", constants.exactCoeff(0).toString())
+        assertEquals("4", constants.exactBound.toString())
+        assertEquals(3L, compiled.model.intBounds.upper(0))
+        assertEquals(2L, assertNotNull(compiled.objective).intCoefficients.single())
+        assertTrue(compiled.sourceExact)
     }
 
     @Test
@@ -236,13 +230,15 @@ class MpsCompilerLoweringTest {
         parsed.constraints[0].coeffs[0] = 9.0
 
         val compiled = parsed.copy(name = "edited").toProblem()
-        val exact = assertNotNull(compiled.exactLpModel)
 
-        assertEquals(7.0.toRawBits(), exact.objective.cost(0).ieeeBits)
-        assertEquals(9.0.toRawBits(), exact.entries(0).single().number.ieeeBits)
         assertEquals(7.0, assertNotNull(compiled.objective).realCoefficients.single())
-        val legacyRow = compiled.model.factors.single() as Linear
-        assertEquals(9.0, assertNotNull(legacyRow.realConstants).realCoefficients.at(0))
+        val row = compiled.model.factors.single() as Linear
+        assertEquals(9.0, assertNotNull(row.realConstants).realCoefficients.at(0))
+        assertEquals(BigFraction.ofLong(7) * BigFraction.ofLong(2).reciprocal(),
+            compiled.sourceWitness(listOf(BigFraction.ofLong(2).reciprocal())).objective)
+        assertFailsWith<MpsLoweringException> {
+            compiled.sourceWitness(listOf(BigFraction.ofLong(3).reciprocal() * BigFraction.ofLong(2)))
+        }
     }
 
     @Test
@@ -251,19 +247,21 @@ class MpsCompilerLoweringTest {
             "ROWS\n N COST\n L C1\n L C2\nCOLUMNS\n" +
                 " X COST 9007199254740993 C1 1\n Y C2 1\n" +
                 "RHS\n RHS C1 9007199254740993 C2 3\n" +
-                "BOUNDS\n UP BND X 9007199254740993\nENDATA",
+                "BOUNDS\n UP B X 9007199254740993\nENDATA",
         )
         parsed.objective.indices[0] = 1
+        val source = parsed.copy(
+            variables = parsed.variables.reversed(), constraints = parsed.constraints.reversed(),
+        )
 
-        val exact = parsed.copy(
-            variables = parsed.variables.reversed(),
-            constraints = parsed.constraints.reversed(),
-        ).toExactLpModel()
+        val compiled = source.toExactSourceProblem()
 
-        assertEquals("9007199254740993", exact.objective.cost(1).value.toString())
-        assertEquals("9007199254740993", assertNotNull(exact.column(1).bounds.upper).number.value.toString())
-        assertEquals(BigFraction.ofLong(3L), exact.rhs(0).value)
-        assertEquals("9007199254740993", exact.rhs(1).value.toString())
+        val numbers = source.sourceNumbers()
+        assertEquals("9007199254740993", numbers.variableBounds[1].second?.fraction.toString())
+        assertEquals(BigFraction.ofLong(3), numbers.constraintBounds[0].second?.fraction)
+        assertEquals("9007199254740993", numbers.constraintBounds[1].second?.fraction.toString())
+        assertEquals("9007199254740993",
+            compiled.sourceWitness(listOf(BigFraction.ZERO, BigFraction.ONE)).objective.toString())
     }
 
     @Test
@@ -277,29 +275,23 @@ class MpsCompilerLoweringTest {
                 MpsVar("y", integer = false, lower = 2.0, upper = Double.POSITIVE_INFINITY),
             ),
             listOf(
-                MpsConstraint(
-                    "open-row",
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
-                    Double.NEGATIVE_INFINITY,
-                    Double.POSITIVE_INFINITY,
-                ),
+                MpsConstraint("open-row", intArrayOf(0), doubleArrayOf(1.0),
+                    Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY),
                 MpsConstraint("upper-row", intArrayOf(1), doubleArrayOf(1.0), Double.NEGATIVE_INFINITY, 7.0),
             ),
         )
 
         val compiled = source.toProblem()
-        val exact = assertNotNull(compiled.exactLpModel)
 
         assertEquals(Double.NEGATIVE_INFINITY, compiled.model.realLower[0])
         assertEquals(Double.POSITIVE_INFINITY, compiled.model.realUpper[0])
         assertEquals(2.0, compiled.model.realLower[1])
         assertEquals(Double.POSITIVE_INFINITY, compiled.model.realUpper[1])
-        assertNull(exact.column(0).bounds.lower)
-        assertNull(exact.column(0).bounds.upper)
-        assertEquals(BigFraction.ofLong(2L), assertNotNull(exact.column(1).bounds.lower).number.value)
-        assertNull(exact.column(1).bounds.upper)
-        assertEquals(1, exact.m)
+        assertEquals(1, compiled.model.factors.size)
+        compiled.sourceWitness(listOf(BigFraction.ofLong(-100), BigFraction.ofLong(2)))
+        assertFailsWith<MpsLoweringException> {
+            compiled.sourceWitness(listOf(BigFraction.ZERO, BigFraction.ofLong(8)))
+        }
     }
 
     @Test
@@ -326,37 +318,29 @@ class MpsCompilerLoweringTest {
     }
 
     @Test
-    fun `conditional exact rows should retain equality bound provenance`() {
-        val source = """
-            ROWS
-             L C0
-             L C1
-            COLUMNS
-                M0 'MARKER' 'INTORG'
-                B C0 0 C1 0
-                X C0 1 C1 1
-                M1 'MARKER' 'INTEND'
-            RHS
-                RHS C0 3 C1 3
-            BOUNDS
-             UP BND B 2
-             UP BND X 5
-            INDICATORS
-             IF C0 B 0
-             IF C1 B 1
-            ENDATA
-        """.trimIndent()
+    fun `conditional source rows should retain exact integer triggers`() {
+        val source = Mps.parse(
+            "ROWS\n L C0\n L C1\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " B C0 0 C1 0\n X C0 1 C1 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS C0 3 C1 3\n" +
+                "BOUNDS\n UP B B 2\n UP B X 5\nINDICATORS\n IF C0 B 0\n IF C1 B 1\nENDATA",
+        )
 
-        val exact = assertNotNull(Mps.parse(source).toProblem().exactLpModel)
-        val legacy = assertNotNull(exact.toLegacy())
+        val compiled = source.toProblem()
 
-        assertTrue((0 until exact.m).all { !exact.row(it).global && exact.row(it).premises != null })
-        assertTrue(legacy.rowGlobal.none { it })
-        for ((row, trigger) in listOf(0L, 1L).withIndex()) {
-            val premise = assertNotNull(legacy.rowPremises[row])
-            assertEquals(listOf(0, 0), premise.vars.toList())
-            assertEquals(listOf(false, true), premise.isUpper.toList())
-            assertEquals(listOf(trigger, trigger), premise.thresholds.toList())
+        val guarded = compiled.model.factors.filterIsInstance<LinearIndicator>()
+        assertEquals(listOf(false, true), guarded.map { it.whenOne })
+        for (factor in guarded) {
+            assertEquals(0, factor.indicator)
+            assertEquals(Term.ofIntVar(1), factor.row.ref(0))
+            assertEquals("1", factor.row.constants.exactCoeff(0).toString())
+            assertEquals("3", factor.row.constants.exactBound.toString())
+            assertEquals(LinearOp.LE, factor.row.relation)
+        }
+        compiled.sourceWitness(listOf(BigFraction.ofLong(2), BigFraction.ofLong(5)))
+        for (trigger in listOf(0L, 1L)) {
+            assertFailsWith<MpsLoweringException> {
+                compiled.sourceWitness(listOf(BigFraction.ofLong(trigger), BigFraction.ofLong(4)))
+            }
         }
     }
 }
