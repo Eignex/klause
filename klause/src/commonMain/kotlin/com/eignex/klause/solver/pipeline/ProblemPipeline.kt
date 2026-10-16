@@ -164,7 +164,7 @@ fun Problem.pipelineRoute(
     onLpStats: ((LpStats) -> Unit)? = null,
 ): SourceProblemRoute = pipelineRouteObserved(objective, maximize, routePureRealToTheory,
     boundCancellation, onLpStats, routeLinearToTheory, providers,
-    preparationCancellation = preparationCancellation)
+    polynomialCancellation = preparationCancellation, preparationCancellation = preparationCancellation)
 
 internal fun Problem.pipelineRoute(
     projections: PreparedFactorProjections,
@@ -194,7 +194,7 @@ private fun Problem.pipelineRouteObserved(
         return SourceProblemRoute.UnsupportedOpen(null, this, initial)
     }
     val lpStats = onLpStats?.let { LpStatsSink(LpRoute.STANDALONE) }
-    val bounded = proveBounded(boundCancellation, lpStats)
+    val bounded = proveBounded(boundCancellation or preparationCancellation, lpStats)
     if (lpStats != null) onLpStats(lpStats.snapshot())
     val routed = when (bounded) {
         BoundedRouting.Refuted -> return SourceProblemRoute.Refuted
