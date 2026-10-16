@@ -312,6 +312,18 @@ its separate transport limit does not extend the opening deadline. A running roo
 is explicitly closed. This diagnostic claims neither CLI routing equivalence nor a
 source verdict, and cannot establish a default-route recovery.
 
+With `inspect=cached-root-point`, the tool copies an already cached floating LP
+point from the actual initialized root component before it closes. It invokes no
+additional preparation, solve, traversal or reconstruction. Raw IEEE bits, Boolean
+tri-state assignments, declared-name IDs and state provenance remain separate from
+feasibility or witness authority. Source-coordinate mapping requires unchanged
+preparation, matching installed model identities and a cached float result belonging
+to the current exact state. Missing state or uncertain mapping remains explicit;
+values are never rounded or filled. Snapshot invariants check that observation
+leaves the state, point, assignments and work counters unchanged. Diagnostic
+overhead occurs after the opening measurement; this mode makes no CLI timing,
+source-verdict or published-candidate claim.
+
 With `inspect=disjunction-names`, the tool additionally replays predicate registration
 from the cached preparation fragment in a fresh registry, using only the original
 deadline's remaining time. It records the first refused row and any existing

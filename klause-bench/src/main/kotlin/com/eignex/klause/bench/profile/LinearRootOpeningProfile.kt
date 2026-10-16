@@ -42,7 +42,9 @@ internal object LinearRootOpeningProfile {
         val required = setOf("suite", "problem", "sha256")
         require(options.keys == required || options.keys == required + "inspect")
         val inspection = options["inspect"]
-        require(inspection == null || inspection in setOf("disjunction-names", "compiler-expansion", "compiler-ownership"))
+        require(inspection == null || inspection in setOf(
+            "disjunction-names", "compiler-expansion", "compiler-ownership", "cached-root-point",
+        ))
         val expected = options.getValue("sha256")
         require(expected.matches(Regex("[0-9a-f]{64}")))
         val reference = Catalog.uncapped(options.getValue("suite")).problems
@@ -135,6 +137,9 @@ internal object LinearRootOpeningProfile {
             }
             out.resolve("root-opening.json").writeText(result.toString() + "\n")
             decided?.let { out.resolve("decided-stats.txt").writeText(it.stats.toString() + "\n") }
+            if (inspection == "cached-root-point") {
+                LinearCachedPointInspection.inspect(compiled, run, planned, work, actual, out)
+            }
             println(result)
         } finally {
             (run as? AutoCloseable)?.close()
