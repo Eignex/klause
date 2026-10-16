@@ -348,13 +348,23 @@ val checkNativeVmReturnSizes = tasks.register<Exec>("checkNativeVmReturnSizes") 
         "tools/native_vm_event_loss.py")
 }
 
+val checkJvmTaskLog = tasks.register<Exec>("checkJvmTaskLog") {
+    group = "verification"
+    description = "Test complete saved task-log inventories and nominal stamp differences without compiler-cost authority."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_jvm_task_log.py")
+    inputs.files("tools/review_jvm_task_log.py", "tools/test_review_jvm_task_log.py",
+        "tools/review_native_vm_log_identities.py", "tools/review_native_vm_live_arguments.py",
+        "tools/native_vm_event_loss.py")
+}
+
 tasks.named("check") {
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,
         checkNativeVmLiveArgumentReview, checkNativeVmEventLoss, checkNativeVmEventLossReview,
         checkNativeVmBoundaryEntries, checkNativeVmBoundaryLifecycle, checkNativeVmBoundaryLifecycleReview,
-        checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkNativeVmEntryTransfers,
+        checkNativeVmLogIdentities, checkNativeVmReturnSizes, checkJvmTaskLog, checkNativeVmEntryTransfers,
         checkNativeVmDebugImage, checkNativeVmDwarfProvider, checkNativeVmDwarfRecords,
         checkNativeVmDwarfRecordReview, checkNativeVmDwarfContext, checkNativeVmDwarfLayoutReview,
         checkNativeVmEntryAbi, checkNativeVmTaskCalls, checkNativeVmTaskCallFlow,

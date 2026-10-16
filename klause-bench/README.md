@@ -2093,6 +2093,45 @@ loss-counter results are preserved unchanged. Complementary log metadata does
 not establish argument binding, calling convention, root completeness, clock
 alignment, total code size or compiler savings.
 
+With `review=task-log`, the same profile retains and reviews the complete saved
+`live/hotspot.xml` without invoking the argument, native-memory or JFR reviewers.
+The pinned manifest and archive authenticate the unchanged XML. The original
+hierarchical identity parser retains every task, queue, global publication,
+fragment, orphan and unknown tag count. Failure reasons and publication-state
+records retain their original document positions. Shared compile-ID candidate
+tables preserve duplicates and unmatched identities without choosing a task,
+publication, compiler level or OSR interpretation. This mode replays no target
+and attaches no observer.
+
+Each task retains its raw start and completion stamp tokens. A nominal decimal
+stamp difference requires one direct completion, well-formed identity, consistent
+thread/process/start ownership and nondecreasing stamps. Missing, malformed,
+duplicated and unfinished pairs remain unresolved. The three fractional decimal
+places printed by the pinned JVM are not nanosecond endpoint accuracy. Equal
+printed stamps do not establish zero elapsed work. Quantization, floating-point
+formatting, clock-origin/provider assumptions and independent event alignment
+remain outside this nominal difference.
+
+The source boundary is inside `CompileTaskWrapper`: assignment precedes the
+start stamp, while task/env clearing, completion notification and recycling follow
+the done stamp. Stale-task cleanup, disabled compilation and breakpoint rejection
+can also produce task pairs without invoking a compiler. A logged pair therefore
+does not establish compiler-body or whole-invocation elapsed time. Raw `nmsize`
+remains content-size metadata, global `nmethod` size remains `CodeBlob::size()`,
+and JFR task code size remains the separate `nmethod::total_size()` section sum.
+No XML file length, failed/default zero or missing publication supplies code size
+or zero compilation cost.
+
+The input log is bounded to 16 MiB, the inherited parser to one million elements
+and the derived report to 64 MiB. Oversized derived output yields a negative
+report with input hashes while retaining the original archive and extracted XML.
+Raw output is `live-argument-review.json`; the profile retains its common output,
+error and exit files and the complete four-file reader import closure. Successful
+parsing and valid logged pairs supply no full-root census, global loss, native
+lifetime, compiler elapsed-time, code-size or savings proof. Full ordinary/private
+phases, callers/helpers/synthetics, queued/failed/unfinished/OSR/replaced work and
+source exclusions require their own complete measurement and control evidence.
+
 With `review=return-sizes`, the same saved-archive review also pairs recorded
 `total-size` entries and returns by thread and observed call nesting. The complete
 original and complementary log reviews remain in the output. A size comparison
