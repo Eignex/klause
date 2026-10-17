@@ -3,6 +3,7 @@ package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
@@ -11,6 +12,7 @@ import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -38,7 +40,8 @@ class FlatZincFiniteFloatProductsTest {
             assertEquals(program.floatVarsByName.getValue(names[0]).varId, product.a)
             assertEquals(program.floatVarsByName.getValue(names[1]).varId, product.b)
             assertEquals(2, product.finiteChoices?.size)
-            assertTrue(product.finiteChoices?.hasGuards == true)
+            assertFalse(requireNotNull(product.finiteChoices).hasGuards)
+            assertEquals(1, program.problem.factors.filterIsInstance<RealFiniteDomain>().size)
         }
     }
 

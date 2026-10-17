@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.ir.IntDomain
@@ -92,6 +93,7 @@ class PreparedFactorProjections internal constructor(
         problem.factors[id].variables.reals.isNotEmpty() &&
             (problem.factors[id] is Distinct || problem.factors[id] is RealAbs ||
                 problem.factors[id] is ContinuousProduct ||
+                problem.factors[id] is RealFiniteDomain ||
                 problem.factors[id] is ExactLinear || problem.factors[id] is LinearIndicator ||
                 propagation[id]?.builtIn != true || !usesBuiltInRelaxation(id))
     }

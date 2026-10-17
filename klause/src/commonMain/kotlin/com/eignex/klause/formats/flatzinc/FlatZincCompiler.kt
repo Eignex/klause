@@ -121,10 +121,8 @@ internal class FlatZincCompiler(
         integerFloatImages.putAll(collectIntegerFloatImages(onlyRealColumns = true))
         collectAffineFloatImages()
         if (lpOnlyFloats.isNotEmpty()) {
-            val finiteIds = floatVars.filterKeys { finiteRepresentations[it]?.approximate != true }
-                .values.mapTo(HashSet()) { it.varId }
             for (domain in collectFiniteFloatDomains()) {
-                if (domain.variable.varId in finiteIds) recordFiniteFloatChoices(domain)
+                recordFiniteFloatChoices(domain)
             }
             emitFiniteFloatDomains()
         }

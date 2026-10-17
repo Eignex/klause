@@ -35,6 +35,15 @@ the source relation.
 Generic `Problem` polynomial composition keeps its [finite integer boundary](theories/polynomial-real.md#scope-and-boundaries);
 admitted open/wide SMT powers retain their exact nonlinear source snapshots.
 
+`RealFiniteDomain` retains one original real coordinate and an immutable finite set
+of exact binary64-authoritative values. Empty sets contradict the source; duplicate
+mathematical values and signed zeros share membership. The selected linear or
+polynomial encoder installs an equality cover in its private scope. Original witness
+checks compare exact values, including algebraic roots whose storage is not a rational
+point. Every declared membership remains in source scope, including disconnected
+coordinates. A selected finite grid filters its private integer values by exact
+membership; it cannot round a declared value onto the grid or certify source exhaustion.
+
 ## Source definition hints
 
 `ir.DefinitionHint` records an integer or Boolean output orientation and its source
