@@ -671,7 +671,8 @@ The theory does not materialize finite CP domains or depend on the linear engine
 
 Each complete Boolean region first substitutes its total required-equation graph
 sections using the same graph-selection primitive as projection, preserving every
-remaining predicate's relation. Completed graphs use the existing section counter,
+remaining predicate's relation. Satisfied zero predicates are discharged; false zero
+predicates remain contradictions. Completed graphs use the existing section counter,
 including graphs completed before a later interruption or representation decline.
 The region then applies exact affine inequality elimination to the exposed constraints.
 A coordinate qualifies only when every occurrence is a pure linear monomial with a

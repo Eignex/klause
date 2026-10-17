@@ -74,6 +74,7 @@ internal class PolynomialAffineReduction private constructor(
                     val polynomial = if (graph.variable in atom.polynomial.variables) {
                         arithmetic.substitute(atom.polynomial, graph.variable, graph.replacement)
                     } else atom.polynomial
+                    if (polynomial.isZero && atom.holds(0)) continue
                     rewritten.add(PolynomialAtom(polynomial, atom.relation))
                     yield(null)
                 }

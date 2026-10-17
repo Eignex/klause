@@ -19,6 +19,19 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `graph reduction retains a false zero disequality`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= x0 0) (not (= (* x0 x1) 0))))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+        assertEquals(0L, result.stats.liftedCells)
+    }
+
+    @Test
     fun `graph reductions and affine fibers reconstruct every original coordinate in reverse order`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(
