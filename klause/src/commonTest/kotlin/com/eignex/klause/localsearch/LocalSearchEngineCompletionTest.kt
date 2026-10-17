@@ -37,10 +37,73 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LocalSearchEngineCompletionTest {
+    @Test
+    fun `continuous satisfaction should complete before requiring zero heuristic violation`() {
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ofLong(3)),
+                LinearOp.EQ, BigFraction.ONE)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val search = LocalSearchEngine(LocalSearchModel.of(problem.bake()),
+            greedyRepairOnRestart = false, completion = LeafRealCompletion(problem, null))
+        val initial = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.0))
+
+        val result = search.solve(LocalSearchParams(maxFlips = 1, initialAssignment = initial), null)
+
+        val point = assertIs<SolveResult.Sat>(result).assignment
+        assertEquals(listOf(BigFraction.ofLong(3).reciprocal()), point.exactReals)
+        assertTrue(result.stats.ls.completions.sum > 0)
+    }
+
+    @Test
+    fun `continuous optimization should publish a charged completion beyond its move slice`() {
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ofLong(3)),
+                LinearOp.GE, BigFraction.ONE)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val search = LocalSearchEngine(LocalSearchModel.of(problem.bake()),
+            greedyRepairOnRestart = false, completion = LeafRealCompletion(problem, objective))
+        val initial = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.0))
+        val budget = NodeBudget(100)
+
+        val result = search.improvements(objective,
+            LocalSearchParams(maxFlips = 1, initialAssignment = initial, nodeBudget = budget), null).last()
+
+        val best = assertIs<MinimizeResult.BestFound>(result)
+        assertEquals(listOf(BigFraction.ofLong(3).reciprocal()), best.sample.exactReals)
+        assertEquals(TerminationReason.BudgetExhausted, best.reason)
+        assertTrue(budget.spent > 0)
+    }
+
+    @Test
+    fun `an exhausted allowance should not begin continuous completion`() {
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ofLong(3)),
+                LinearOp.EQ, BigFraction.ONE)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val search = LocalSearchEngine(LocalSearchModel.of(problem.bake()),
+            completion = { _, _ -> error("an exhausted allowance cannot begin completion") })
+        val params = LocalSearchParams(nodeBudget = NodeBudget(0))
+
+        val solve = search.solve(params, null)
+        val optimize = search.improvements(LinearObjective(realCoefficients = doubleArrayOf(1.0)), params, null).last()
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<SolveResult.Unknown>(solve).reason)
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(optimize).reason)
+        assertEquals(0L, assertNotNull(params.nodeBudget).spent)
+    }
+
     // x + k = 2.5 and x ≤ 1 over a continuous x in [0, 10] and an integer k in [0, 5]: k ≥ 2 and x = 2.5 - k.
     private fun mixedProblem(): Problem = Problem(
         numBoolVars = 0,

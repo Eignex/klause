@@ -47,14 +47,8 @@ internal fun prepareLinearSource(
             NativeSourceExecution.Numerical(native, view.numericalPlan(objective)),
         )
     } else {
-        view.model.pipelineRoute(
-            projections = request.providers.prepare(view.model),
-            objective = objective,
-            maximize = maximize,
-            boundCancellation = request.boundCancellation or stop,
-            preparationCancellation = stop,
-            polynomialCancellation = stop,
-            onLpStats = onLpStats,
+        SourceProblemRoute.NativeFormula(
+            NativeSourceExecution.Numerical(native, view.numericalPlan(objective)),
         )
     }
     if (stop()) return interrupted()

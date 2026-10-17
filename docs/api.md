@@ -154,6 +154,10 @@ cannot refute or optimize the whole original source.
 The numerical route uses `TheoryParams` and its existing serial LP/MIP traversal;
 LS/ALNS requests retain witness-only native results. Common strategy controls and
 format-specific CLI registration remain separate from this library surface.
+Raw affine sources retain numerical execution when their working coefficients
+decline numerical admission. Nonzero underflow or nonfinite projection returns an
+unsupported native numerical result with no witness, bound or terminal claim; exact
+source storage does not select an arithmetic-theory fallback.
 
 `PreparedSourcePlan.workingCoordinate` maps a typed original coordinate into its
 canonical working namespace, including real declarations with proved integer

@@ -106,6 +106,9 @@ internal class LocalSearchEngine(
 
     // A finite projection may require theory-owned completion before publication.
     private val completion: CandidateCompletion? = completion
+    // An exact rational completion need not have a zero-violation floating representation.
+    private val continuousCompletion = completion != null && problem.numRealVars > 0 &&
+        problem.numBoolVars == 0 && problem.numIntVars == 0
     private val unscoredCandidateCheck = UnscoredCandidateCheck(problem, model.selection,
         (completion as? FiniteFactorEnforcer)?.enforcingFiniteFactors(problem).orEmpty()).takeIf { it.required }
 
@@ -561,6 +564,7 @@ internal class LocalSearchEngine(
             var moves = 0L
             var restartCount = 0L
             var everFeasible = false
+            var checkContinuousStart = continuousCompletion
             // Use the unwrapped restart policy so an adaptive one is detected past a sweep wrapper.
             val roundFeedback = RoundFeedback.of(strategy, configuredRestart)
 
@@ -575,6 +579,7 @@ internal class LocalSearchEngine(
                 flipsSinceYield++
                 restartCount++
                 flipsSinceRestart = 0
+                checkContinuousStart = continuousCompletion
             }
 
             try {
@@ -588,12 +593,16 @@ internal class LocalSearchEngine(
                         }
                         cancelCountdown = CANCEL_CHECK_INTERVAL
                     }
-                    if (state.cost == 0L && state.intValuesInDomain()) {
-                        if (completion != null) state.refreshRealRows()
-                        if (state.cost != 0L) continue
+                    val continuousCandidate = if (checkContinuousStart) {
+                        checkContinuousStart = false
+                        state.completionCandidate()
+                    } else null
+                    if ((state.cost == 0L || continuousCandidate != null) && state.intValuesInDomain()) {
+                        if (completion != null && continuousCandidate == null) state.refreshRealRows()
+                        if (state.cost != 0L && continuousCandidate == null) continue
                         val decided = decide(
                             state,
-                            state.assignment.snapshot(),
+                            continuousCandidate ?: state.assignment.snapshot(),
                             params.cancellation,
                             sink?.ls,
                         ) { work ->
@@ -602,6 +611,7 @@ internal class LocalSearchEngine(
                         }
                         if (decided !is Completion.Witness) {
                             if (checkpoint != null && decided is Completion.Undecided && params.cancellation()) {
+                                checkContinuousStart = continuousCompletion
                                 checkpoint.shouldPause(moves)
                                 reportProgress()
                                 yield(null)
@@ -790,9 +800,9 @@ internal class LocalSearchEngine(
             },
             current = { (liveCompletion as? Completion.Witness)?.sample ?: state.assignment.snapshot() },
         ) else null
-        var checkSuppliedStart = completedMoves != null && params.initialAssignment?.let {
+        var checkInitialCompletion = continuousCompletion || (completedMoves != null && params.initialAssignment?.let {
             it.numBoolVars == problem.numBoolVars && it.numIntVars == problem.numIntVars
-        } == true
+        } == true)
 
         fun reportProgress() = progress.optimization(
             totalFlips, restartCount, stallCount, bestObj, bestSample != null,
@@ -837,8 +847,8 @@ internal class LocalSearchEngine(
                     cancelCountdown = 0
                 }
             }
-            if (checkSuppliedStart) {
-                checkSuppliedStart = false
+            if (checkInitialCompletion) {
+                checkInitialCompletion = false
                 val candidate = if (state.cost != 0L && state.intValuesInDomain()) {
                     state.completionCandidate()
                 } else null
@@ -849,7 +859,7 @@ internal class LocalSearchEngine(
                     }
                     if (decided is Completion.Witness) liveCompletion = decided
                     if (params.cancellation()) {
-                        checkSuppliedStart = checkpoint != null && liveCompletion == null
+                        checkInitialCompletion = checkpoint != null && liveCompletion == null
                         cancelCountdown = 0
                         continue
                     }
