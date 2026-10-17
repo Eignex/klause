@@ -2402,6 +2402,13 @@ Limits are eight archives totalling 2 GiB compressed, 16 GiB expanded per archiv
 10,000 source member queries and a 64 MiB complete report. A limit decline is
 negative, and never permits a smaller successful subset or a raised bound.
 
+The installed-JAR and runtime-image class readers retain every source-debug
+extension as opaque `sourceDebugExtensionContentsBase64`, in the same attribute
+order as `sourceDebugExtensionIdentities`. Empty payloads remain distinct from
+absent attributes, and arbitrary modified UTF-8 bytes are preserved without
+decoding or normalizing them. These bytes permit a separate saved-source mapping
+review; retention alone supplies no source-phase, inline-location or loader proof.
+
 `bench.profile.JvmRuntimeMethodMetadata` accepts `manifest=`, `manifest-sha256=`,
 `archive=` and `archive-sha256=`. These identify an original CLI provenance manifest
 and its original JDK archive. Every archive file, including file-link aliases,
@@ -2428,7 +2435,7 @@ every jar class entry without loading or initializing target classes. Descriptor
 flags, source-file attributes and complete per-method line tables retain their
 original order; alternate multi-release entries are not selected away. Missing
 attributes and parse failures remain explicit. Original jar bytes are retained
-privately, including source-debug attributes not interpreted by this reader.
+privately; retained source-debug payloads are not interpreted by this reader.
 The complete output uses the capture archive and owned worktrees are cleaned.
 This is source/binary metadata, not loaded-class, executed-phase, inlining,
 compilation-cost, runtime or allocation evidence. Run it on a lab worker; it does

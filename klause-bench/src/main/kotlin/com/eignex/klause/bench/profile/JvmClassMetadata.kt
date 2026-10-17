@@ -4,19 +4,19 @@ import com.eignex.klause.bench.metric.sha256
 import kotlinx.serialization.Serializable
 import java.lang.classfile.Attributes
 import java.lang.classfile.ClassFile
+import java.util.Base64
 
 internal fun jvmClassMetadata(bytes: ByteArray): JvmClassMetadata {
     val model = ClassFile.of().parse(bytes)
+    val sourceDebugExtensions = model.findAttributes(Attributes.sourceDebugExtension()).map { it.contents() }
     return JvmClassMetadata(
         model.thisClass().asInternalName(),
         CaptureFile(bytes.size.toLong(), sha256(bytes)),
         JvmClassVersion(model.majorVersion(), model.minorVersion()),
         model.flags().flagsMask(),
         model.findAttributes(Attributes.sourceFile()).map { it.sourceFile().stringValue() },
-        model.findAttributes(Attributes.sourceDebugExtension()).map {
-            val contents = it.contents()
-            CaptureFile(contents.size.toLong(), sha256(contents))
-        },
+        sourceDebugExtensions.map { CaptureFile(it.size.toLong(), sha256(it)) },
+        sourceDebugExtensions.map { Base64.getEncoder().encodeToString(it) },
         model.attributes().map { it.attributeName().stringValue() },
         model.methods().map { method ->
             JvmMethodMetadata(
@@ -45,6 +45,7 @@ internal data class JvmClassMetadata(
     val accessFlags: Int,
     val sourceFiles: List<String>,
     val sourceDebugExtensionIdentities: List<CaptureFile>,
+    val sourceDebugExtensionContentsBase64: List<String>,
     val attributes: List<String>,
     val methods: List<JvmMethodMetadata>,
 )
