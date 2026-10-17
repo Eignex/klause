@@ -44,12 +44,22 @@ class NumericalWorkingPlanTest {
 
     @Test
     fun `a numerical working plan should reject a different captured objective`() {
-        val source = LinearSourceProblem(emptyList(), emptyList(),
-            LinearSourceObjective(emptyList(), constant = SemanticRational.ofLong(3)))
+        val source = LinearSourceProblem(
+            emptyList(),
+            emptyList(),
+            LinearSourceObjective(emptyList(), constant = SemanticRational.ofLong(3)),
+        )
         val model = Problem(0, 0, emptyArray(), emptyArray())
         val objective = LinearObjective(constant = 3)
-        val plan = PreparedSourcePlan(source, PreparedExecution.Numerical(source, model), emptyList(),
-            0, 0, 0, objective)
+        val plan = PreparedSourcePlan(
+            source,
+            PreparedExecution.Numerical(source, model),
+            emptyList(),
+            0,
+            0,
+            0,
+            objective,
+        )
 
         assertFailsWith<IllegalArgumentException> {
             plan.numericalWorkingPlan(model, LinearObjective(constant = 4), false)
@@ -58,12 +68,23 @@ class NumericalWorkingPlanTest {
 
     @Test
     fun `a numerical working plan should reject a different captured direction`() {
-        val source = LinearSourceProblem(emptyList(), emptyList(),
-            LinearSourceObjective(emptyList(), sense = ObjectiveSense.MAXIMIZE))
+        val source = LinearSourceProblem(
+            emptyList(),
+            emptyList(),
+            LinearSourceObjective(emptyList(), sense = ObjectiveSense.MAXIMIZE),
+        )
         val model = Problem(0, 0, emptyArray(), emptyArray())
         val objective = LinearObjective()
-        val plan = PreparedSourcePlan(source, PreparedExecution.Numerical(source, model), emptyList(),
-            0, 0, 0, objective, maximize = true)
+        val plan = PreparedSourcePlan(
+            source,
+            PreparedExecution.Numerical(source, model),
+            emptyList(),
+            0,
+            0,
+            0,
+            objective,
+            maximize = true,
+        )
 
         assertFailsWith<IllegalArgumentException> {
             plan.numericalWorkingPlan(model, objective, false)

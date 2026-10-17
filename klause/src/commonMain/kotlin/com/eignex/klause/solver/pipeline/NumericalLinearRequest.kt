@@ -55,10 +55,7 @@ class NumericalLinearRequest(
      */
     fun finiteRoute(onLpStats: (LpStats) -> Unit = {}): SourceProblemRoute? = finiteRoute(cancellation, onLpStats)
 
-    internal fun finiteRoute(
-        boundCancellation: Cancellation,
-        onLpStats: (LpStats) -> Unit,
-    ): SourceProblemRoute? {
+    internal fun finiteRoute(boundCancellation: Cancellation, onLpStats: (LpStats) -> Unit): SourceProblemRoute? {
         if (!numericalRowsSupported()) return null
         var routed = model
         if (!routed.hasFiniteIntegerRanges()) {
@@ -71,12 +68,20 @@ class NumericalLinearRequest(
             routed = routed.withIntDomains(routed.finiteIntDomains())
         }
         if (!routed.finiteRealCompletionSupported()) return null
-        val prepared = routed.prepareExecutionPlan(model, objective, maximize, preferFinite = true,
-            cancellation = cancellation)
+        val prepared = routed.prepareExecutionPlan(
+            model,
+            objective,
+            maximize,
+            preferFinite = true,
+            cancellation = cancellation,
+        )
         val finite = prepared.execution as? PreparedExecution.FiniteLinear ?: return null
         val ownership = finite.ownership
-        return if (ownership.theoryPipeline == ProblemPipeline.FINITE_CP)
-            SourceProblemRoute.Finite(finite.model, ownership, prepared) else null
+        return if (ownership.theoryPipeline == ProblemPipeline.FINITE_CP) {
+            SourceProblemRoute.Finite(finite.model, ownership, prepared)
+        } else {
+            null
+        }
     }
 
     /**
@@ -93,11 +98,16 @@ class NumericalLinearRequest(
         val context = authorityContext(objective ?: LinearObjective(), stop) ?: return unavailable(params, stop)
         return LinearAuthorityInvocation(context, params.copy(cancellation = stop)).use { invocation ->
             val result = requireNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1, onIncumbent))
-            LinearOptimizationResult(context.scope, result.terminal.takeIf { complete },
+            LinearOptimizationResult(
+                context.scope,
+                result.terminal.takeIf { complete },
                 result.bound.takeIf { complete },
                 result.incumbent,
-                result.value, result.reason, result.stats.copy(run = result.stats.run.copy(backend = "numerical-mip")),
-                context.semantics)
+                result.value,
+                result.reason,
+                result.stats.copy(run = result.stats.run.copy(backend = "numerical-mip")),
+                context.semantics,
+            )
         }
     }
 
@@ -128,20 +138,39 @@ class NumericalLinearRequest(
             publication = publication, preparedSource = workingPlan, completeOnly = true, numericalOnly = true,
         )
         val result = portfolio.minimize(executionObjective, null, stop).linearResult ?: return unavailable(params, stop)
-        return LinearOptimizationResult(result.scope, result.terminal, result.bound, result.incumbent, result.value,
-            result.reason, result.stats.copy(run = result.stats.run.copy(backend = "numerical-mip")), result.semantics)
+        return LinearOptimizationResult(
+            result.scope,
+            result.terminal,
+            result.bound,
+            result.incumbent,
+            result.value,
+            result.reason,
+            result.stats.copy(run = result.stats.run.copy(backend = "numerical-mip")),
+            result.semantics,
+        )
     }
 
     private fun authorityContext(objective: LinearObjective, stop: Cancellation) =
-        if (numericalRowsSupported(stop)) model.linearAuthorityContext(objective,
-            if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE, stop,
-            numericalIndicators = true) else null
+        if (numericalRowsSupported(stop)) {
+            model.linearAuthorityContext(
+            objective,
+            if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
+            stop,
+            numericalIndicators = true,
+        )
+        } else {
+            null
+        }
 
     private fun unavailable(params: TheoryParams, stop: Cancellation): LinearOptimizationResult {
         val identity = Uuid.random().toString()
-        val scope = SourceScope(SourceRevision(identity, "klause-ir-exact-v1"),
-            objective = SourceObjective("$identity/objective",
-                if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE))
+        val scope = SourceScope(
+            SourceRevision(identity, "klause-ir-exact-v1"),
+            objective = SourceObjective(
+                "$identity/objective",
+                if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
+            ),
+        )
         val reason = when {
             params.timeout() -> TerminationReason.Timeout
             stop() -> TerminationReason.Cancelled
