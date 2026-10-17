@@ -67,7 +67,9 @@ internal class MirUseObservation(private val owner: MirUseOwner) {
         if (!owner.snapshotActive || factor !is ExactLinear || factor.constants !is IntegerConstants ||
             factor.activator != LinearRow.ALWAYS || factor.strict || factor.variables.reals.isNotEmpty() ||
             factor.relation == LinearOp.NE
-        ) return
+        ) {
+            return
+        }
         owner.count(14)
         if (admitted) return
         val size = 10L + 12L * factor.size

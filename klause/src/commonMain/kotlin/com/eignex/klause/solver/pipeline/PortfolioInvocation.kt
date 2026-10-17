@@ -97,6 +97,7 @@ internal class PortfolioInvocation(
         }
         runCatching { resources.close() }.exceptionOrNull()
                     ?.takeUnless { it === failure }?.let(failure::addSuppressed)
+        mirUseBudget?.discard()
         throw failure
     }
     private var closed = false
@@ -149,14 +150,17 @@ internal class PortfolioInvocation(
     override fun close() {
         if (closed) return
         closed = true
-        mirUseBudget?.finish()
         try {
-            portfolio.close()
-        } catch (failure: Throwable) {
-            runCatching { resources.close() }.exceptionOrNull()
-                    ?.takeUnless { it === failure }?.let(failure::addSuppressed)
-            throw failure
+            try {
+                portfolio.close()
+            } catch (failure: Throwable) {
+                runCatching { resources.close() }.exceptionOrNull()
+                        ?.takeUnless { it === failure }?.let(failure::addSuppressed)
+                throw failure
+            }
+            resources.close()
+        } finally {
+            mirUseBudget?.discard()
         }
-        resources.close()
     }
 }

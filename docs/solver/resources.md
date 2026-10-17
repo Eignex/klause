@@ -284,7 +284,8 @@ Counters use fixed labels and saturating arithmetic. Returned observations own i
 primitive text, retain no solver objects and are attached once after worker statistics
 folding. Duplicate snapshots reuse that payload. Merging foreign invocations keeps the
 first payload, refuses the foreign data and marks the result incomplete rather than
-renewing its caps. Closing releases the mutable arena; unsupported modes are uncollected.
+renewing its caps. Closing discards the mutable arena without encoding a report, including
+when worker cleanup fails; unsupported modes are uncollected.
 The CLI statistics request changes collection only. Decisions, row order and admission,
 seeds, numerical work and solver meters do not consult these observations. Instrumented
 objectives and wall times cannot establish ordinary performance. See

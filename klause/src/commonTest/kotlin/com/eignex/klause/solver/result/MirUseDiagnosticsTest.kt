@@ -2,6 +2,7 @@ package com.eignex.klause.solver.result
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -127,6 +128,33 @@ class MirUseDiagnosticsTest {
 
         assertSame(first, second)
         assertNull(owner)
+    }
+
+    @Test
+    fun `discarding an aborted collector should refuse retention and report encoding`() {
+        val budget = assertNotNull(MirUseBudget.create())
+        val owner = assertNotNull(budget.owner(3L, 3, 0, 2, 0, 1))
+        owner.begin(root = true, sourceMap = true)
+        assertNotNull(owner.reserve(10L))
+
+        budget.discard()
+
+        assertNull(owner.reserve(10L))
+        assertNull(budget.owner(4L, 3, 0, 2, 0, 1))
+        assertFailsWith<IllegalStateException> { budget.finish() }
+    }
+
+    @Test
+    fun `returned immutable observations should survive collector disposal`() {
+        val budget = assertNotNull(MirUseBudget.create())
+        assertNotNull(budget.owner(3L, 3, 0, 2, 0, 1))
+        val snapshot = budget.finish()
+        val encoded = snapshot.encoded
+
+        budget.discard()
+
+        assertSame(snapshot, budget.finish())
+        assertEquals(encoded, snapshot.encoded)
     }
 
     @Test

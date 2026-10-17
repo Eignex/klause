@@ -75,7 +75,11 @@ internal fun FinitePipeline.portfolioExecutor(
 ): PortfolioInvocation {
     val mirUseBudget = if (collectMirUse && scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&
         scenario.kind == Kind.COP
-    ) MirUseBudget.create() else null
+    ) {
+        MirUseBudget.create()
+    } else {
+        null
+    }
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
