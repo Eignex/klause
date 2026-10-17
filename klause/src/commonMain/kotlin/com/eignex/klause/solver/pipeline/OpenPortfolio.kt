@@ -246,7 +246,7 @@ internal class OpenPortfolio(
                                 workerParams(slot),
                                 context,
                                 publicationInvocation = binding,
-                                allowTheoryFallback = !numericalOnly,
+                                numericalOnly = numericalOnly,
                             ) {
                                 incumbents.exchange.current()?.let { it.assignment to it.objective.execution }
                             }

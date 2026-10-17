@@ -173,7 +173,7 @@ class NumericalLinearRequestPortfolioTest(private val engine: FiniteEngine, priv
     }
 
     @Test
-    fun `numerical pools should retain integral source rays`() {
+    fun `numerical pools should retain native integral rays beside source qualification`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("i", true)),
             emptyList(),
@@ -195,7 +195,7 @@ class NumericalLinearRequestPortfolioTest(private val engine: FiniteEngine, priv
 
         val ray = assertIs<SourceClaim.Ray>(assertNotNull(result.result.terminal).claim)
         assertEquals(0L, ray.sample.intValue(0))
-        assertEquals(LinearSourceConclusion.UNBOUNDED, result.linearSource?.conclusion)
+        assertEquals(LinearSourceConclusion.SATISFIABLE, result.linearSource?.conclusion)
         assertSame(source, result.invocation.preparedPlan?.originalSource)
     }
 
