@@ -169,6 +169,116 @@ class QfLiraSolverHintsTest {
     }
 
     @Test
+    fun `selected query cursors should preserve complete groups in either query direction`() {
+        val unconditional = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+            doubleArrayOf(1.0), LinearOp.EQ, 0.0)
+        val model = Problem(
+            numBoolVars = 65530,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3),
+            factors = arrayOf(
+                unconditional,
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(2),
+                    doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(1),
+                    doubleArrayOf(1.0), LinearOp.GE, 0.0),
+                ReifiedRealLinear(63, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 1.0),
+                ReifiedRealLinear(65529, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            for (variable in listOf(65529, 0, 63, 0, 65529, 63, 65529)) {
+                assertEquals(variable != 63, hints.preferredBool(variable))
+            }
+
+            val stages = stats.snapshot().completeSearchStages
+            assertTrue((stages?.get("POINT_HINT_SELECTED_SORTED") ?: 0L) > 0L, stages.toString())
+            assertTrue((stages?.get("POINT_HINT_SELECTED_CURSOR_REUSED") ?: 0L) > 0L, stages.toString())
+        }
+    }
+
+    @Test
+    fun `selected query cursors should recheck Boolean dependencies after backward queries`() {
+        val declaration = object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+            intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0) {
+            override val linearForm: LinearForm = LinearForm.Conjunction(listOf(
+                LinearRow.ofColumns(intArrayOf(), intArrayOf(0),
+                    RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0)), 0.0, false),
+                    LinearOp.LE, activator = 0),
+                TaggedLinearRow(intArrayOf(Term.ofLit(Lit.make(2, true)), Term.ofRealVar(0)),
+                    RealConstants(RealConsts(doubleArrayOf(1.0)), RealConsts(doubleArrayOf(1.0)), 0.0, false),
+                    LinearOp.LE, activator = 0),
+            ))
+        }
+        val model = Problem(
+            numBoolVars = 65530,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                declaration,
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(true, hints.preferredBool(1))
+            assertNull(hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+            assertEquals(true, hints.preferredBool(1))
+            assertEquals(true, hints.preferredBool(0))
+
+            session.popTo(0)
+
+            assertNull(hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+            assertEquals(true, hints.preferredBool(1))
+            assertNull(hints.preferredBool(0))
+        }
+    }
+
+    @Test
+    fun `selected query cursors should retain the complete registration storage boundary`() {
+        for (groups in listOf(64, 65)) {
+            val model = Problem(
+                numBoolVars = 65530,
+                intBounds = openBounds(0),
+                numRealVars = 549,
+                realLower = DoubleArray(549),
+                realUpper = DoubleArray(549),
+                factors = Array(groups) { variable ->
+                    ReifiedRealLinear(variable, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0)
+                },
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val prepared = component.partialPointHints(Cancellation.Never, defaultOpening = true)
+
+                if (groups == 64) assertEquals(groups, assertNotNull(prepared).first.size) else assertNull(prepared)
+            }
+        }
+    }
+
+    @Test
     fun `selected primitive queries should require agreement from every member`() {
         for ((bound, expected) in listOf(0.0 to true, -1.0 to null)) {
             val first = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
@@ -180,6 +290,7 @@ class QfLiraSolverHintsTest {
             val unconditional = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
                 doubleArrayOf(1.0), LinearOp.EQ, 0.0)
             for (factors in listOf(arrayOf<Factor>(unconditional, first, second, other),
+                arrayOf<Factor>(first, unconditional, second, other),
                 arrayOf<Factor>(unconditional, first, other, second),
                 arrayOf<Factor>(unconditional, other, second, first),
                 arrayOf<Factor>(first, unconditional, other, second))) {

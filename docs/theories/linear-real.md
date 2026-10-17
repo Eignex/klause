@@ -138,18 +138,23 @@ real coordinates, source disjunctions, private assertions, branches or retained
 reductions. Every selected activator's members must be evaluable and agree before a
 preference is returned. Unregistered variables, incomplete groups and interruptions
 return no preference. No row is asserted and no numerical invocation is added.
-Construction checks whether activators are ordered in the immutable row catalogue.
-Ordered catalogues use a lower-bound lookup for the selected complete group; other
-catalogues scan all prepared rows. Neither path builds another row index.
+Construction checks whether activated groups are ordered in the immutable row
+catalogue, ignoring unconditional rows. An ordered catalogue retains a cursor to the
+first row of the last successfully queried group. Forward and repeated queries can
+start there; backward queries start at the beginning. Each scan skips unconditional
+and earlier groups and stops only at a later activated group. Other catalogues scan
+all prepared rows. The cursor locates immutable rows and never caches their truth;
+every member is evaluated against the current point and Boolean context. Neither
+path builds another row index. Registration and release reset the cursor.
 
 Selected registration and capture retain a 65,536-cell bound of
-`ceil(B/64) + K + 98C + 4W + 8192 + 256`, where `B` is the Boolean span, `K` the
+`ceil(B/64) + K + 98C + 4W + 8192 + 258`, where `B` is the Boolean span, `K` the
 complete activator count, `C` the real coordinate count and `W` the sum of numerator
 and denominator limb counts in 64-bit units. The reservation covers the bitset,
 returned ids, coordinate references, conservative scalar headers and backing storage,
-and bounded arithmetic scratch. It reserves full scalar ownership despite sharing
-immutable values; it is not a measured heap figure. Construction reserves at least
-one denominator limb per coordinate before publishing membership. A query admits
+two cursor cells and bounded arithmetic scratch. It reserves full scalar ownership
+despite sharing immutable values; it is not a measured heap figure. Construction
+reserves at least one denominator limb per coordinate before publishing membership. A query admits
 at most 65,536 prepared-row visits plus selected row/term entries, retains the existing
 4,096-bit arithmetic checks, and debits existing operation, registration and containing
 solve/context cancellation tokens without creating an allowance. Complete scope and

@@ -227,6 +227,8 @@ class ExactLiraSearchComponent private constructor(
     private var selectedPointVariables: LongArray? = null
     private var selectedPointVariableCount = 0
     private var selectedPointSorted = false
+    private var selectedPointCursorVariable = -1
+    private var selectedPointCursorRow = 0
     private var selectedPoint: List<BigFraction>? = null
     private var pointHintLevel = -1
     private var pointHintStop = Cancellation.Never
@@ -387,7 +389,7 @@ class ExactLiraSearchComponent private constructor(
 
     // Borrowed coordinates reserve their full scalar storage for the hint lifetime.
     private fun selectedPointCells(variables: Int): Long =
-        (model.numBoolVars.toLong() + 63L) / 64L + variables + 98L * model.numRealVars + 8192L + 256L
+        (model.numBoolVars.toLong() + 63L) / 64L + variables + 98L * model.numRealVars + 8192L + 258L
 
     private fun selectedPointHints(
         stop: Cancellation,
@@ -409,9 +411,9 @@ class ExactLiraSearchComponent private constructor(
             stop.charge(1L)
             if (stop()) return null
             val variable = prepared.row.activator
+            if (variable == LinearRow.ALWAYS) continue
             if (variable < previous) sorted = false
             previous = variable
-            if (variable == LinearRow.ALWAYS) continue
             if (variable !in bools.indices) return null
             val word = variable ushr 6
             val bit = 1L shl (variable and 63)
@@ -433,6 +435,8 @@ class ExactLiraSearchComponent private constructor(
         selectedPointVariables = members
         selectedPointVariableCount = count
         selectedPointSorted = sorted
+        selectedPointCursorVariable = -1
+        selectedPointCursorRow = 0
         pointHintStop = stop
         if (completeTraversalObserved) {
             observeCompleteStage("POINT_HINT_SELECTED_REGISTERED")
@@ -464,15 +468,18 @@ class ExactLiraSearchComponent private constructor(
         var entries = preparedRows.size.toLong()
         var preference: Boolean? = null
         val sorted = selectedPointSorted
-        var index = if (sorted) firstSelectedPointRow(variable, token) ?: return null else 0
+        var index = if (sorted && variable >= selectedPointCursorVariable) selectedPointCursorRow else 0
+        if (index > 0) observeCompleteStage("POINT_HINT_SELECTED_CURSOR_REUSED")
+        var firstMember = -1
         while (index < preparedRows.size) {
             token.charge(1L)
             if (token() || selectedPoint !== point) return null
             val prepared = preparedRows[index++]
             if (prepared.row.activator != variable) {
-                if (sorted) break
+                if (sorted && prepared.row.activator > variable) break
                 continue
             }
+            if (firstMember < 0) firstMember = index - 1
             entries += prepared.row.size + 1L
             if (entries > MAX_POINT_HINT_ENTRIES || prepared.disjunction) return null
             val comparison = prepared.form.hintComparison(
@@ -484,21 +491,14 @@ class ExactLiraSearchComponent private constructor(
             if (preference != null && preference != current) return null
             preference = current
         }
-        return preference.takeIf {
-            selectedPoint === point && context === currentContext && partialPointHintAvailable() && !token()
+        if (selectedPoint !== point || context !== currentContext || !partialPointHintAvailable() || token()) {
+            return null
         }
-    }
-
-    private fun firstSelectedPointRow(variable: Int, token: Cancellation): Int? {
-        var first = 0
-        var end = preparedRows.size
-        while (first < end) {
-            token.charge(1L)
-            if (token()) return null
-            val middle = first + (end - first) / 2
-            if (preparedRows[middle].row.activator < variable) first = middle + 1 else end = middle
+        if (sorted && firstMember >= 0 && preference != null) {
+            selectedPointCursorVariable = variable
+            selectedPointCursorRow = firstMember
         }
-        return first.takeUnless { token() }
+        return preference
     }
 
     internal fun partialPointHintAvailable(): Boolean {
@@ -519,6 +519,8 @@ class ExactLiraSearchComponent private constructor(
         selectedPointVariables = null
         selectedPointVariableCount = 0
         selectedPointSorted = false
+        selectedPointCursorVariable = -1
+        selectedPointCursorRow = 0
         pointHintEntryDeclined = false
         pointHintLevel = -1
         pointHintStop = Cancellation.Never
