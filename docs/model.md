@@ -68,6 +68,13 @@ result rather than becoming satisfaction. Required preparation interruption publ
 no runnable partial plan.
 Automatic pure-real and wide integral-objective preferences belong to setup; the
 objective interval scan observes and charges the containing preparation allowance.
+A bounded integer/Boolean source with supported native propagation and no exact-objective
+preference selects finite ownership before arithmetic installation. Declaration and
+factor inspection charge the containing preparation allowance. Captured descriptors,
+original checks and engine admission still govern the resulting finite plan. LP-work
+observation also runs for an empty deduction phase, and a stop raised by that observer
+withholds the plan. Real coordinates and exact-objective preferences retain arithmetic
+preparation.
 DIMACS, WCNF, OPB, XCSP3, exact or original-real FlatZinc and SMT-LIB linear admission
 use the same selection policy and retain the selected route through finite adaptation.
 Finite format adapters preserve their existing private definition and objective hints;
