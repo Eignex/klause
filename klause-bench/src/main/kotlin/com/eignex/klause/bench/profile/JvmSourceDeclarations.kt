@@ -3,12 +3,6 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
-import java.io.File
-import java.net.URI
-import java.security.MessageDigest
-import java.util.HexFormat
-import java.util.zip.GZIPInputStream
-import java.util.zip.GZIPOutputStream
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -22,6 +16,12 @@ import kotlinx.serialization.json.put
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.config.KotlinCompilerVersion
 import org.jetbrains.kotlin.psi.KtPsiFactory
+import java.io.File
+import java.net.URI
+import java.security.MessageDigest
+import java.util.HexFormat
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 
 internal object JvmSourceDeclarations {
     private const val MAX_INPUT_BYTES = 128L * 1024 * 1024
@@ -141,6 +141,7 @@ internal object JvmSourceDeclarations {
         return value.content
     }
 
+    @Suppress("LongMethod")
     private fun inspect(sources: List<SourceSyntaxInput>, out: File): JsonObject {
         val report = File(out, "source-declarations.jsonl.gz")
         check(!report.exists())
