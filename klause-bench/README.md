@@ -1662,6 +1662,16 @@ do not establish full tree-search or whole-CLI gains. Keep raw measurements exte
 
 ## Profiling
 
+`com.eignex.klause.bench.profile.CliLpScopeCapture` observes LP solve and scope
+boundaries in the installed CLI child on JDK 25. Supply `suite=`, `problem=`, the
+original decoded `sha256=`, `timeout=` and `seed=` through the maintained lab client.
+The startup agent transforms only the scoped solver and model-facing LP adapter;
+records include original/transformed class hashes, descriptors, source and runtime
+identities, bounded weak-reference metadata and unmatched method entries. Missing
+coverage, interrupted methods or observation failures make the capture inconclusive.
+The tool performs no certificate reuse, extra solve or source checking. Instrumented
+counts and elapsed attribution supply no ordinary timing or verdict credit.
+
 `profile=cpu|wall|alloc` writes `build/bench-prof.jfr` and prints a flat method table.
 `profile-scope=solve` starts after selection resolution; `all` covers the harness.
 Profiling uses an in-process single `cp`/`fixed` or `ls` engine, cannot profile
