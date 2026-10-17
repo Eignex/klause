@@ -130,8 +130,8 @@ class FiniteSolveRequest(
         onPortfolioEvent = null,
     ) {
         require(shape.sourceInvocation?.source?.originalSource is Problem &&
-            operation == ExecutionOperation.SATISFY
-        ) { "native finite controls require their captured factor-source satisfaction operation" }
+            operation in setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE)
+        ) { "native finite controls require their captured factor-source operation" }
         capturedSourceControls = controls
     }
 
@@ -218,6 +218,8 @@ class FiniteSolveResult(
 ) {
     private var retainedSourceResult: SolveResult? = null
     internal val nativeSourceResult: SolveResult? get() = retainedSourceResult
+    private var retainedSourceMinimum: MinimizeResult? = null
+    internal val nativeSourceMinimum: MinimizeResult? get() = retainedSourceMinimum
 
     internal constructor(
         preparation: FinitePipelinePreparation,
@@ -226,6 +228,16 @@ class FiniteSolveResult(
         nativeSourceResult: SolveResult?,
     ) : this(preparation, preparationElapsed, outcome) {
         retainedSourceResult = nativeSourceResult
+    }
+
+    internal constructor(
+        preparation: FinitePipelinePreparation,
+        preparationElapsed: Duration,
+        outcome: FiniteSolveOutcome,
+        nativeSourceResult: SolveResult?,
+        nativeSourceMinimum: MinimizeResult?,
+    ) : this(preparation, preparationElapsed, outcome, nativeSourceResult) {
+        retainedSourceMinimum = nativeSourceMinimum
     }
 }
 
@@ -396,6 +408,7 @@ private sealed class FiniteExecutionResult {
         /** On [FiniteExecutionVerdict.UNBOUNDED], the recession ray of the reals through [bestSample]. */
         val unboundedDirection: List<BigFraction>? = null,
         val nativeSourceResult: SolveResult? = null,
+        val nativeSourceMinimum: MinimizeResult? = null,
     ) : FiniteExecutionResult()
 
     /** The route was inspected instead of executed. */
@@ -592,6 +605,7 @@ internal fun FinitePipeline.solve(
         execution.reconstructed(preparation.reconstruct, request.shape.finiteProblem, request.shape.linearObjective)
             .toSolveOutcome().withPresolve(preparation.presolve),
         (execution as? FiniteExecutionResult.Completed)?.nativeSourceResult,
+        (execution as? FiniteExecutionResult.Completed)?.nativeSourceMinimum,
     )
 }
 
@@ -683,7 +697,8 @@ private fun executeSourceFinite(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
-    require(!request.optimize && request.sourceInvocation != null && request.toleranceCheck == null)
+    require(request.sourceInvocation != null && request.toleranceCheck == null)
+    if (request.optimize) return executeSourceMinimum(request, callbacks)
     val start = TimeSource.Monotonic.markNow()
     val solved = when (val controls = requireNotNull(request.sourceControls)) {
         is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).solve(
@@ -707,6 +722,40 @@ private fun executeSourceFinite(
         sample,
         start.elapsedNow().inWholeMilliseconds,
         nativeSourceResult = solved,
+    )
+}
+
+private fun executeSourceMinimum(
+    request: FiniteExecutionRequest,
+    callbacks: FiniteExecutionCallbacks,
+): FiniteExecutionResult {
+    val objective = requireNotNull(request.objective)
+    val start = TimeSource.Monotonic.markNow()
+    val result = when (val controls = requireNotNull(request.sourceControls)) {
+        is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).minimize(
+            objective, controls.params.copy(cancellation = controls.cancellation or request.cancellation),
+        )
+        is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
+            request.problem,
+            completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, null) else null,
+        ).minimize(objective, controls.params.copy(cancellation = controls.cancellation or request.cancellation))
+    }
+    val sample = result.assignment
+    if (sample != null) callbacks.onSample(sample)
+    return FiniteExecutionResult.Completed(
+        when (result) {
+            is MinimizeResult.Optimal -> FiniteExecutionVerdict.OPTIMAL
+            is MinimizeResult.BestFound -> FiniteExecutionVerdict.BEST_FOUND
+            is MinimizeResult.Unbounded -> FiniteExecutionVerdict.UNBOUNDED
+            is MinimizeResult.Infeasible -> FiniteExecutionVerdict.UNSAT
+            is MinimizeResult.Unknown -> FiniteExecutionVerdict.UNKNOWN
+        },
+        result.stats,
+        if (sample == null) 0L else 1L,
+        sample,
+        start.elapsedNow().inWholeMilliseconds,
+        (result as? MinimizeResult.Unbounded)?.direction,
+        nativeSourceMinimum = result,
     )
 }
 

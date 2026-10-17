@@ -1,12 +1,15 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
@@ -16,6 +19,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Bits
@@ -30,6 +34,41 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class SourceExecutionTest {
+    @Test
+    fun `finite optimization should retain native interruption after another invocation completes`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(Clause(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+        )))
+        val attachment = SourceAttachment(source)
+        val objective = LinearObjective(boolWeights = longArrayOf(1, 2), constant = 7)
+        val stopped = SourceSetup.prepare(SourceSetupRequest(
+            attachment, ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK, objective,
+        ))
+        val completed = SourceSetup.prepare(SourceSetupRequest(
+            attachment, ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK, objective,
+        ))
+
+        val first = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
+            stopped, finiteRequest = { shape -> FiniteSolveRequest(shape, SourceFiniteControls.Backtrack(
+                BacktrackParams(maxDecisions = 0L, nativeSat = false),
+            )) },
+        )))
+        val second = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
+            completed, finiteRequest = { shape -> FiniteSolveRequest(shape, SourceFiniteControls.Backtrack(
+                BacktrackParams(),
+            )) },
+        )))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(
+            first.result.nativeSourceMinimum,
+        ).reason)
+        assertEquals(FiniteSolveVerdict.UNKNOWN, assertIs<FiniteSolveOutcome.Completed>(first.result.outcome).verdict)
+        assertIs<MinimizeResult.Optimal>(second.result.nativeSourceMinimum)
+        assertEquals(FiniteSolveVerdict.OPTIMAL, assertIs<FiniteSolveOutcome.Completed>(second.result.outcome).verdict)
+        assertSame(stopped, first.invocation)
+        assertSame(completed, second.invocation)
+    }
+
     @Test
     fun `finite dispatch should retain source publication and native outcome`() {
         val source = Problem(0, 1, arrayOf(IntDomain(2, 2)), emptyArray())

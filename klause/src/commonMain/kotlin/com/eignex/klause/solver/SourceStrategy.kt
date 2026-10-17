@@ -12,14 +12,14 @@ import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
+import com.eignex.klause.solver.pipeline.FiniteSolveResult
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
-import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
-import com.eignex.klause.solver.pipeline.SourceFiniteControls
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
@@ -29,11 +29,14 @@ import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
 import com.eignex.klause.solver.pipeline.PreparedExecution
 import com.eignex.klause.solver.pipeline.PreparedPlanDecline
+import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
 import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceFiniteControls
+import com.eignex.klause.solver.pipeline.SourceIncumbentPublication
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
@@ -42,10 +45,10 @@ import com.eignex.klause.solver.pipeline.admission
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.minimize
 import com.eignex.klause.solver.pipeline.optimize
-import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.polynomialRequest
 import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
 import com.eignex.klause.solver.pipeline.withSourceSemantics
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -263,7 +266,7 @@ class SourceStrategy internal constructor(
     }
 
     /**
-     * Optimize a supported open-integer linear source through the native linear execution.
+     * Optimize an affine source through its captured finite or native linear execution.
      * Native costs and bounds retain minimization sense; [sense] selects the source objective direction.
      * Unsupported fragment or invocation controls return the native incomplete result, without finite boxing.
      */
@@ -286,33 +289,42 @@ class SourceStrategy internal constructor(
             OpenTheoryOptimum.Bounded(null, null, reason, SolveStats.EMPTY),
         )
         if (scope.stop()) return incomplete(scope.unknown().reason)
-        if (!scope.supportsOpen(engine)) return incomplete(TerminationReason.Unsupported)
-        val route = source.pipelineRoute(
-            projectionProviders,
-            objective,
-            maximize = sense == ObjectiveSense.MAXIMIZE,
-            routePureRealToTheory = true,
-            routeLinearToTheory = true,
-            boundCancellation = scope.stop,
+        if (!scope.supportsSource()) return incomplete(TerminationReason.Unsupported)
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+                SourceAttachment(source),
+                ExecutionOperation.OPTIMIZE,
+                engine,
+                objective,
+                maximize = sense == ObjectiveSense.MAXIMIZE,
+                providers = projectionProviders,
+                cancellation = scope.stop,
+                boundCancellation = scope.stop,
+            ),
+            polynomialCancellation = scope.polynomialPreparation(),
         )
         if (scope.stop()) return incomplete(scope.unknown().reason)
+        val route = invocation.route
         if (route is SourceProblemRoute.UnsupportedOpen &&
             route.preparedPlan.decline == PreparedPlanDecline.RESOURCE
         ) {
             return incomplete(TerminationReason.BudgetExhausted)
         }
         return when (route) {
-            is SourceProblemRoute.OpenTheory -> OpenTheoryPipeline.execute(route.request, scope.theory, engine)
+            is SourceProblemRoute.Finite -> {
+                if (invocation.admission?.runnable != true) return incomplete(TerminationReason.Unsupported)
+                finiteOptimize(invocation, scope, objective)
+            }
 
-            is SourceProblemRoute.UnsupportedOpen -> OpenTheoryPipeline.searchWithoutTheory(
-                route.preparedPlan,
-                scope.theory,
-                if (sense == ObjectiveSense.MAXIMIZE) objective.negated() else objective,
-                engine,
-                maximize = sense == ObjectiveSense.MAXIMIZE,
-            )
+            is SourceProblemRoute.OpenTheory, is SourceProblemRoute.UnsupportedOpen -> {
+                if (!scope.supportsOpen(engine)) return incomplete(TerminationReason.Unsupported)
+                (SourceSetup.execute(SourceExecutionRequest(invocation, theory = scope.theory))
+                    as SourceExecutionResult.Linear).result
+            }
 
-            SourceProblemRoute.Refuted -> OpenTheoryExecution.Optimize(OpenTheoryOptimum.Infeasible(SolveStats.EMPTY))
+            SourceProblemRoute.Refuted -> {
+                OpenTheoryExecution.Optimize(OpenTheoryOptimum.Infeasible(SolveStats.EMPTY))
+            }
 
             else -> incomplete(TerminationReason.Unsupported)
         }
@@ -353,16 +365,7 @@ class SourceStrategy internal constructor(
 
     private fun finiteSolve(invocation: PreparedSourceInvocation, scope: SourceInvocation): OpenTheoryResult {
         if (invocation.admission?.runnable != true) return scope.unsupported()
-        val result = (
-            SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
-                val controls = when (engine) {
-                    FiniteEngine.BACKTRACK -> SourceFiniteControls.Backtrack(scope.backtrack)
-                    FiniteEngine.LOCAL_SEARCH -> SourceFiniteControls.LocalSearch(scope.localSearch)
-                    else -> error("unsupported source strategy $engine")
-                }
-                FiniteSolveRequest(shape, controls)
-            })) as SourceExecutionResult.Finite
-        ).result
+        val result = executeFinite(invocation, scope)
         val outcome = result.outcome as FiniteSolveOutcome.Completed
         return when (outcome.verdict) {
             FiniteSolveVerdict.SAT -> OpenTheoryResult.Sat(
@@ -375,6 +378,59 @@ class SourceStrategy internal constructor(
                 outcome.stats,
             )
             else -> error("source satisfaction returned an optimization verdict")
+        }
+    }
+
+    private fun executeFinite(invocation: PreparedSourceInvocation, scope: SourceInvocation): FiniteSolveResult {
+        val execution = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+            val controls = when (engine) {
+                FiniteEngine.BACKTRACK -> SourceFiniteControls.Backtrack(scope.backtrack)
+                FiniteEngine.LOCAL_SEARCH -> SourceFiniteControls.LocalSearch(scope.localSearch)
+                else -> error("unsupported source strategy $engine")
+            }
+            FiniteSolveRequest(shape, controls)
+        }))
+        return (execution as SourceExecutionResult.Finite).result
+    }
+
+    private fun finiteOptimize(
+        invocation: PreparedSourceInvocation,
+        scope: SourceInvocation,
+        objective: LinearObjective,
+    ): OpenTheoryExecution {
+        val result = executeFinite(invocation, scope)
+        val outcome = result.outcome as FiniteSolveOutcome.Completed
+        val point = outcome.bestSample?.let { OpenTheoryAssignment.Sampled(it) }
+        val sourceValue = outcome.bestSample?.let(objective::evaluateExact)
+        val value = sourceValue?.let {
+            if (invocation.maximizeSourceObjective) it.negated() else it
+        }
+        val reason = when (val native = result.nativeSourceMinimum) {
+            is MinimizeResult.Unknown -> native.reason
+            is MinimizeResult.BestFound -> native.reason
+            is MinimizeResult.Unbounded -> TerminationReason.Unsupported
+            else -> if (scope.stop()) scope.unknown().reason else TerminationReason.BudgetExhausted
+        }
+        val optimum = when (outcome.verdict) {
+            FiniteSolveVerdict.OPTIMAL -> OpenTheoryOptimum.Optimal(
+                requireNotNull(point), requireNotNull(value), outcome.stats,
+            )
+            FiniteSolveVerdict.UNBOUNDED -> OpenTheoryOptimum.Unbounded(
+                requireNotNull(point), requireNotNull(value), outcome.stats,
+            )
+            FiniteSolveVerdict.UNSAT -> OpenTheoryOptimum.Infeasible(outcome.stats)
+            FiniteSolveVerdict.BEST_FOUND, FiniteSolveVerdict.UNKNOWN -> OpenTheoryOptimum.Bounded(
+                point, value, reason,
+                outcome.stats,
+            )
+            FiniteSolveVerdict.SAT -> error("source optimization returned a satisfaction verdict")
+        }
+        return OpenTheoryExecution.Optimize(optimum).also { execution ->
+            outcome.bestSample?.let { sample ->
+                execution.retainPublication(SourceIncumbentPublication(
+                    1L, sample, SourceValue.Rational(requireNotNull(sourceValue)),
+                ))
+            }
         }
     }
 
