@@ -436,7 +436,10 @@ class QfLiraSolverHintsTest {
             assertEquals(1, session.learnedClauseCount)
             assertContentEquals(expected, assertNotNull(session.reasonFor(1)).literals.sortedArray())
             assertTrue(component.partialPointHintAvailable())
-            assertEquals(2L, assertNotNull(stats.snapshot().completeSearchStages?.get("POINT_HINT_LP_CAPTURE")) - captures)
+            assertEquals(
+                2L,
+                assertNotNull(stats.snapshot().completeSearchStages?.get("POINT_HINT_LP_CAPTURE")) - captures,
+            )
             session.popTo(0)
             for (variable in 0..2) assertNull(session.boolValue(variable))
             assertNull(session.reasonFor(1))
