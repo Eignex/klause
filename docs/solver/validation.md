@@ -42,6 +42,15 @@ impossible equalities before allocation; each remaining product can allocate at 
 one bit beyond the corresponding witness component. Zero, units and sign parity are
 handled directly. Unproved representation declines and interruption remain indeterminate.
 
+Finite real domains compare their captured binary64 literals as exact rationals.
+An isolated algebraic root can match a rational member without point storage: the
+literal must lie inside its isolating interval and exactly zero its captured rational
+polynomial. Symbolic algebraic leaves retain the same authority. This check uses
+rational payload arithmetic and charges literal/coefficient visits to the caller;
+it creates no polynomial solver or arithmetic allowance. A matched member can supply
+the rational coordinate to the existing row checks. Other nonrational coordinates
+and symbolic expressions retain their specialized checking owners.
+
 `verifyProjectedSourceWitness` combines library-owned original relation checking with
 original integer declarations and a private composed fixpoint using captured source
 descriptors. A caller callback adds a restriction and cannot replace relation coverage.
