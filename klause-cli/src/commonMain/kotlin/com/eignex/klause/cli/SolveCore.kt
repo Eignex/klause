@@ -33,7 +33,6 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.autoArms
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.executionKind
-import com.eignex.klause.solver.pipeline.optimize
 import com.eignex.klause.solver.pipeline.solve
 import com.eignex.klause.solver.pipeline.variablePartition
 import com.eignex.klause.solver.result.LpStats
