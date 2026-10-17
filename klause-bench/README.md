@@ -1680,6 +1680,30 @@ do not establish full tree-search or whole-CLI gains. Keep raw measurements exte
 
 ## Profiling
 
+`com.eignex.klause.bench.profile.CliLpScopeCapture` observes LP solve and scope
+and private model replacement boundaries in the installed CLI child on JDK 25. Supply `suite=`, `problem=`, the
+original decoded `sha256=`, `timeout=` and `seed=` through the maintained lab client.
+The startup agent transforms only the scoped solver and model-facing LP adapter;
+records include original/transformed class hashes, descriptors, source and runtime
+identities, bounded weak-reference metadata and unmatched method entries. Missing
+coverage, interrupted methods or observation failures make the capture inconclusive.
+The tool performs no certificate reuse, extra solve or source checking. Instrumented
+counts and elapsed attribution supply no ordinary timing or verdict credit.
+
+Replacement aggregates retain joint old/candidate structural, row and total widths
+in fixed logarithmic buckets, including calls beyond the trace prefix. Native owner
+presence and the first observed scoped `solve`/`solveFloat` entry are separate phase
+labels; preparation can perform numerical work before either observed entry. Normal
+returns distinguish accepted publication from rejected candidates. Field descriptors
+and their digest are checked against the actual child alongside transformed methods.
+Stored-nonempty structural column samples inspect inner-list emptiness only; they
+ignore row and bound activity. Deterministic samples are limited to 65,536 columns
+each, 262,144 total column visits and 128 snapshots, with explicit refusal counts.
+Sampling limits preserve the scalar ledger; unknown schemas, publication mismatches,
+unmatched entries or the existing report cap make the capture inconclusive. Run
+through the maintained lab profile route with `host=lab`, retaining source, installed
+runtime and agent provenance. Raw parent JFR remains separate from this child report.
+
 `profile=cpu|wall|alloc` writes `build/bench-prof.jfr` and prints a flat method table.
 `profile-scope=solve` starts after selection resolution; `all` covers the harness.
 Profiling uses an in-process single `cp`/`fixed` or `ls` engine, cannot profile
