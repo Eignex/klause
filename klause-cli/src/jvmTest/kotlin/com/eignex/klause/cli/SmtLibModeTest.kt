@@ -32,7 +32,7 @@ class SmtLibModeTest(private val route: String, private val engine: String) {
             this.engine = this@SmtLibModeTest.engine
             parallel = 1
             randomSeed = 17
-            presolve = "off"
+            if (route == "ordinary") presolve = "off"
             engineParams += "max-flips=12"
         }
         val session = SmtLibMode.newSession()
