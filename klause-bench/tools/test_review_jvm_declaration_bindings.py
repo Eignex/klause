@@ -11,6 +11,28 @@ import review_jvm_declaration_bindings as bindings
 
 
 class ReviewJvmDeclarationBindingsTest(unittest.TestCase):
+    def test_empty_package_annotations_require_an_explicit_reader_policy(self):
+        specification = {'schema': 1, 'sources': [{'id': 'source', 'path': 'src/Example.kt',
+            'sha256': 'a' * 64, 'sourceFile': 'Example.kt', 'packages': [], 'members': []}]}
+
+        with self.assertRaises(ValueError):
+            bindings.source_specification(specification)
+        sources = bindings.source_specification(specification, allow_empty_packages=True)
+
+        self.assertEqual(specification['sources'], sources)
+        self.assertEqual([], sources[0]['packages'])
+
+    def test_file_identity_is_available_without_the_newer_hashlib_file_digest_api(self):
+        raw = b'complete original metadata'
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'metadata'
+            path.write_bytes(raw)
+
+            with patch.object(hashlib, 'file_digest', None, create=True):
+                identity = bindings.file_identity(path)
+
+            self.assertEqual({'size': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}, identity)
+
     def test_whole_source_file_retains_private_and_generated_members(self):
         specification = {'schema': 1, 'sources': [{'id': 'source', 'path': 'src/Example.kt',
             'sha256': 'a' * 64, 'sourceFile': 'Example.kt', 'packages': ['p'],

@@ -3243,3 +3243,72 @@ or target-program launch. Source ranges do not establish resolved calls,
 generated JVM members, semantic phases, actual loaded selection or compiler costs.
 Run and inspect actual source/metadata inventories on the supported profiling
 worker and retain complete positive, unavailable and negative results.
+
+
+### Saved syntax and class line joins
+
+`bench.profile.JvmSourceSyntaxBindings` accepts `catalog=` and `catalog-sha256=`
+for one pinned HTTPS catalog with `schema: 1`. Its `syntax` entry identifies a
+complete `JvmSourceDeclarations` archive, with `reportMember`, `sourcesMember`,
+`completionMember` and `compilerMember`. Its `previousLines` entry identifies the
+earlier complete source-line archive, with `reportMember`, `sourcesMember`,
+`completionMember` and `catalogMember`. Both entries supply unique `id`, `manifest`,
+`manifestSha256` and `archive` identities. The `metadata` object is the complete
+original `schema: 1` declaration catalog, with its entire `inputs` array of
+installed-JAR and runtime-image metadata archives and their row/completion/inventory
+roles. Every archive member, including unselected members and the opaque earlier
+line report, is authenticated before syntax or class interpretation.
+
+The original source array and key order must remain an unchanged prefix of the
+complete expanded syntax source specification. The earlier metadata catalog must
+match exactly. Earlier line-report and unavailable-payload counts stay explicit;
+the earlier report is retained by its original byte identity and source universe.
+The reader interprets saved metadata only. It launches no original JVM, SDK, solver,
+recording exporter or target source, and records its Python version. File hashing
+uses the baseline streaming API, including on Python 3.9.
+
+Every syntax record, dictionary reference, source boundary, lexical parent and
+source-end census is checked. All original UTF-16 offsets, UTF-8 byte offsets and
+hashes, and CR/LF line positions are independently checked against complete source
+text. This validates ranges and stream integrity without independently reparsing
+the source language or resolving symbols. Queries retain every overlapping syntax
+node, including private/default/accessor/lambda/expression/reference nodes and empty
+boundary nodes. Package disagreements and alternative source files remain explicit;
+matching names or a unique result never establish source selection. Empty package
+annotations in expanded inputs remain empty; the separately recorded PSI package
+agreement does not rewrite those original annotations.
+
+`syntax-line-bindings.jsonl.gz` retains every declared class and method, original
+line table, alternate entry, SMAP stratum, overlap and unavailable/outside candidate.
+Each source-line candidate adds its original per-file `syntaxNodeCandidates` and
+`syntaxParsedPackageAgrees`. Each generated line adds `declaredMethodLineEntries`:
+complete `[methodIndex, tableIndex, entryIndex]` references into the retained method
+line tables, including duplicate and unordered positions. This supplies point
+references, without inferring bytecode intervals or executed/inlined paths.
+The report uses the reversible `key-and-string-tables-v1` record encoding.
+`syntax-node-line-coverage.jsonl.gz` represents every syntax node in original
+source/node order, including nodes without a line candidate; its first record
+declares `syntax-node-line-coverage-v1` and columns `sourceIndex`, `nodeIndex` and
+`debugLineCandidatePresent`. A false value means no retained debug-line candidate,
+without an execution or work claim. The complete original syntax report stays
+byte-identical and recoverable, including all node values, ranges and lexical parents.
+Both new reports are fully gzip round-trip checked before completion.
+
+Limits are eight archives totalling 2 GiB compressed, 2 GiB selected input staging,
+512 MiB per selected member and 16 MiB per ordinary JSON document/row. Source JSON
+is bounded to 128 MiB and source text to 64 MiB/4,096 files; syntax input is bounded
+to 4 GiB logical bytes, 10 million nodes, depth 4,096 and 4,096 compiler class names.
+One query admits at most 100,000 overlapping nodes, and a complete class admits at
+most one million line/source/node candidates. The weighted query cache retains
+at most one million node references and 4,096 query keys, including empty matches.
+The combined new reports are bounded to 4 GiB logical and 512 MiB compressed bytes
+while streaming; the complete summary is bounded to 128 MiB. Bounds decline the
+whole review, without accepting a smaller inventory or prefix. Processing failures
+retain partial reports and cleanup errors; downloads that differ from their pinned
+archive identity stay private. Authenticated input staging is removed after processing.
+
+Run and inspect these actual metadata/syntax joins only on the supported profiling
+worker. Complete source/class line candidates do not prove source/JVM overload
+selection, generated bodies, class-loader selection, semantic phases, physical roots,
+compiler elapsed time, solver outcomes or compilation savings. Those proof flags
+remain false independently of complete byte and range checks.

@@ -452,8 +452,56 @@ val checkJvmDeclarationBindings = tasks.register<Exec>("checkJvmDeclarationBindi
     inputs.files("tools/review_jvm_declaration_bindings.py", "tools/test_review_jvm_declaration_bindings.py")
 }
 
+val checkJvmSourceDebug = tasks.register<Exec>("checkJvmSourceDebug") {
+    group = "verification"
+    description = "Test complete source-debug strata and unavailable payload retention."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_jvm_source_debug.py")
+    inputs.files("tools/jvm_source_debug.py", "tools/test_jvm_source_debug.py")
+}
+
+val checkJvmSourceLineBindings = tasks.register<Exec>("checkJvmSourceLineBindings") {
+    group = "verification"
+    description = "Test original line tables and overlapping source candidates."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_jvm_source_line_bindings.py")
+    inputs.files("tools/jvm_source_line_bindings.py", "tools/jvm_source_debug.py",
+        "tools/review_jvm_declaration_bindings.py", "tools/test_jvm_source_line_bindings.py")
+}
+
+val checkJvmSourceLineReports = tasks.register<Exec>("checkJvmSourceLineReports") {
+    group = "verification"
+    description = "Test source-line archive admission and reversible report encoding."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_jvm_source_lines.py")
+    inputs.files("tools/review_jvm_source_lines.py", "tools/jvm_source_line_bindings.py", "tools/jvm_source_debug.py",
+        "tools/review_jvm_declaration_bindings.py", "tools/test_review_jvm_source_lines.py")
+}
+
+val checkJvmSourceSyntax = tasks.register<Exec>("checkJvmSourceSyntax") {
+    group = "verification"
+    description = "Test complete compiler syntax ranges and lexical line candidates."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_jvm_source_syntax.py")
+    inputs.files("tools/jvm_source_syntax.py", "tools/review_jvm_declaration_bindings.py",
+        "tools/test_jvm_source_syntax.py",
+        "src/main/kotlin/com/eignex/klause/bench/profile/JvmSourceSyntaxEncoding.kt")
+}
+
+val checkJvmSourceSyntaxReview = tasks.register<Exec>("checkJvmSourceSyntaxReview") {
+    group = "verification"
+    description = "Test complete saved syntax/class joins and failed report preservation."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_jvm_source_syntax.py")
+    inputs.files("tools/review_jvm_source_syntax.py", "tools/jvm_source_syntax.py",
+        "tools/review_jvm_source_lines.py", "tools/jvm_source_line_bindings.py", "tools/jvm_source_debug.py",
+        "tools/review_jvm_declaration_bindings.py", "tools/test_review_jvm_source_syntax.py")
+}
+
 tasks.named("check") {
     dependsOn(checkJvmRecordingContext, checkJvmMethodCosts, checkJvmDeclarationBindings)
+    dependsOn(checkJvmSourceDebug, checkJvmSourceLineBindings, checkJvmSourceLineReports,
+        checkJvmSourceSyntax, checkJvmSourceSyntaxReview)
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,
