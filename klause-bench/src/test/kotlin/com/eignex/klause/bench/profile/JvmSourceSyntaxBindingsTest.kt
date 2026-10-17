@@ -13,7 +13,9 @@ class JvmSourceSyntaxBindingsTest {
 
         val options = JvmSourceSyntaxBindings.parse(args)
 
-        assertEquals(mapOf("catalog" to "https://example.test/catalog.json", "catalog-sha256" to "a".repeat(64)), options)
+        assertEquals(
+            mapOf("catalog" to "https://example.test/catalog.json", "catalog-sha256" to "a".repeat(64)), options
+        )
     }
 
     @ParameterizedTest
