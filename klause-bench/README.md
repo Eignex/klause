@@ -2491,6 +2491,7 @@ This binds metadata to retained distribution bytes; it does not establish loaded
 class selection, generated classes, exhaustive source phases, compiler costs,
 runtime equivalence or performance acceptance.
 
+
 ### Mac container measurement capabilities
 
 `bench.profile.CompilationStudyContainerProbe` inspects an existing Docker daemon
@@ -2666,12 +2667,30 @@ an original JDK executable. It visits all class files under `/modules`, includin
 module descriptors and generated image classes; `/packages` aliases are excluded.
 Original method descriptors, attributes and line tables use the same class-file
 reader as the jar inventory. Parse failures remain explicit and fail completion.
-The archive, staged image and partial output remain private in the capture archive.
+The archive and staged image remain private. Complete and partial metadata outputs
+remain retained for source-filtered evidence publication.
 Limits are 256 MiB compressed input, 1 GiB expanded runtime data, 20,000 archive
 members, 200,000 image resources, 100,000 classes, 16 MiB per class and 512 MiB
 of compact metadata. This is declared image metadata, not loaded/private/generated
 runtime selection, intrinsic lowering, physical compiler lifetimes or cost proof.
 Use a lab worker; no solver, checker or recording exporter runs.
+
+For a previously retained private SDK, `bench.profile.JvmRuntimeMethodMetadata`
+accepts `archive-mode=saved-local` alongside its original `manifest`,
+`manifest-sha256`, `archive` and `archive-sha256` arguments. The manifest remains
+an HTTPS input; `archive` is an explicit absolute local path. Unknown modes,
+duplicate options, incomplete identities and remote archive URLs in local mode
+fail before file access. Without the mode, both original HTTPS inputs remain
+required. A bounded private copy preserves the complete original archive, with
+its SHA-256 checked before copying and around inspection. All existing archive,
+member, runtime-file, provider, module and release identity checks still apply.
+The original SDK's launchers are not invoked: its retained `jrt-fs` provider reads
+the image inside the observer JVM. Every image class/resource remains covered by
+the existing bounded inventory; errors and partial outputs remain retained.
+Input and observer identities are checked after successful or failed inspection,
+and helper interruption or timeout reaps the owned process. SDK bytes and image
+inputs remain private. Loaded runtime selection, source-phase completeness and
+compiler/runtime benefit retain separate proof requirements.
 
 `bench.profile.JvmInstalledMethodMetadata` accepts `head=`, `manifest=` and
 `manifest-sha256=`. The HTTPS manifest is an original installed CLI provenance

@@ -29,21 +29,7 @@ internal object JvmRuntimeMethodMetadata {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        val options = args.associate {
-            require('=' in it)
-            it.substringBefore('=') to it.substringAfter('=')
-        }
-        require(
-            args.size == options.size && options.keys == setOf(
-            "manifest",
-            "manifest-sha256",
-            "archive",
-            "archive-sha256",
-        )
-        )
-        for (name in listOf("manifest-sha256", "archive-sha256")) {
-            require(options.getValue(name).matches(Regex("[0-9a-f]{64}")))
-        }
+        val options = parse(args)
         ProfileCaptureArchive.run {
             val out = File(requireNotNull(System.getenv("OUT"))).canonicalFile.apply { mkdirs() }
             val execution = runCatching { inspect(options, out) }
@@ -54,6 +40,8 @@ internal object JvmRuntimeMethodMetadata {
                     put("completed", execution.isSuccess)
                     put("error", execution.exceptionOrNull()?.let { "${it.javaClass.name}: ${it.message}" })
                     put("runtimeArchiveSha256", options.getValue("archive-sha256"))
+                    put("inputMode", options["archive-mode"] ?: "https-archive")
+                    put("originalSdkLauncherInvoked", false)
                     put("loadedClassSelectionProven", false)
                     put("runtimeGeneratedClassesBound", false)
                     put("fullSourcePhaseCoverageProven", false)
@@ -69,6 +57,33 @@ internal object JvmRuntimeMethodMetadata {
         }
     }
 
+    internal fun parse(args: Array<String>): Map<String, String> {
+        val options = args.associate {
+            require('=' in it)
+            it.substringBefore('=') to it.substringAfter('=')
+        }
+        val required = setOf("manifest", "manifest-sha256", "archive", "archive-sha256")
+        require(args.size == options.size && options.keys in listOf(required, required + "archive-mode"))
+        for (name in listOf("manifest-sha256", "archive-sha256")) {
+            require(options.getValue(name).matches(Regex("[0-9a-f]{64}")))
+        }
+        val local = options["archive-mode"] != null
+        require(!local || options["archive-mode"] == "saved-local")
+        for (name in if (local) listOf("manifest") else listOf("manifest", "archive")) {
+            val address = options.getValue(name)
+            require(address.length <= 4096)
+            val uri = URI(address)
+            require(uri.scheme == "https" && uri.host != null && uri.rawUserInfo == null &&
+                uri.rawQuery == null && uri.rawFragment == null)
+        }
+        if (local) {
+            val path = options.getValue("archive")
+            require(path.length <= 4096 && path.none { it.isISOControl() } && File(path).isAbsolute)
+        }
+        return options
+    }
+
+    @Suppress("LongMethod")
     private fun inspect(options: Map<String, String>, out: File) {
         val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
         for (name in listOf("JvmRuntimeMethodMetadata.kt", "JvmRuntimeImage.kt", "JvmClassMetadata.kt")) {
@@ -77,11 +92,10 @@ internal object JvmRuntimeMethodMetadata {
         val helper = File(root, "klause-bench/tools/jvm_runtime_archive.py")
         helper.copyTo(File(out, helper.name))
         val runtime = File(System.getProperty("java.home"))
-        InstalledBuild.writeManifest(
-            File(out, "observer-build-provenance.json"),
-            File(requireNotNull(System.getenv("KLAUSE_BENCH"))),
-            runtime,
-        )
+        val observer = File(requireNotNull(System.getenv("KLAUSE_BENCH")))
+        val provenance = File(out, "observer-build-provenance.json")
+        InstalledBuild.writeManifest(provenance, observer, runtime)
+        Reports.writeJson(File(out, "input-origins.json").path, options)
         val manifest = File(out, "captured-original-manifest.json")
         download(options.getValue("manifest"), manifest, MAX_MANIFEST_BYTES, options.getValue("manifest-sha256"))
         val original = Reports.json.parseToJsonElement(manifest.readText()).jsonObject
@@ -89,7 +103,12 @@ internal object JvmRuntimeMethodMetadata {
             .mapValues { it.value.jsonPrimitive.content }
         val privateInputs = File(out, "private-runtime-inputs").apply { check(mkdirs()) }
         val archive = File(privateInputs, "runtime.tar.gz")
-        download(options.getValue("archive"), archive, MAX_ARCHIVE_BYTES, options.getValue("archive-sha256"))
+        val saved = if (options["archive-mode"] == "saved-local") File(options.getValue("archive")) else null
+        if (saved == null) {
+            download(options.getValue("archive"), archive, MAX_ARCHIVE_BYTES, options.getValue("archive-sha256"))
+        } else {
+            copySavedArchive(saved, archive, options.getValue("archive-sha256"))
+        }
         val home = File(privateInputs, "runtime")
         val command = listOf(
             "python3",
@@ -100,19 +119,53 @@ internal object JvmRuntimeMethodMetadata {
             home.path,
             File(out, "runtime-preparation.json").path,
         )
-        val process = ProcessBuilder(command).directory(root)
-            .redirectOutput(File(out, "runtime-preparation.stdout"))
-            .redirectError(File(out, "runtime-preparation.stderr")).start()
-        val finished = process.waitFor(30, TimeUnit.MINUTES)
-        if (!finished) CompilationStudyBuilds.kill(process)
-        File(out, "runtime-preparation.exit").writeText("${process.exitValue()}\n")
-        check(finished && process.exitValue() == 0) { "Original runtime preparation failed" }
-        val prepared = Reports.json.parseToJsonElement(File(out, "runtime-preparation.json").readText()).jsonObject
-        check(prepared.getValue("completed").jsonPrimitive.content == "true")
-        check(prepared.getValue("allRuntimeArchiveFilesMatchOriginalManifest").jsonPrimitive.content == "true")
-        verifyImageInputs(home, original)
-        inventory(home, out)
-        verifyImageInputs(home, original)
+        Reports.writeJson(File(out, "runtime-preparation.command.json").path, command)
+        val execution = runCatching {
+            val process = ProcessBuilder(command).directory(root)
+                .redirectOutput(File(out, "runtime-preparation.stdout"))
+                .redirectError(File(out, "runtime-preparation.stderr")).start()
+            val finished = try {
+                process.waitFor(30, TimeUnit.MINUTES)
+            } finally {
+                if (process.isAlive) CompilationStudyBuilds.kill(process)
+            }
+            File(out, "runtime-preparation.exit").writeText("${process.exitValue()}\n")
+            check(finished && process.exitValue() == 0) { "Original runtime preparation failed" }
+            val prepared = Reports.json.parseToJsonElement(File(out, "runtime-preparation.json").readText()).jsonObject
+            check(prepared.getValue("completed").jsonPrimitive.content == "true")
+            check(prepared.getValue("allRuntimeArchiveFilesMatchOriginalManifest").jsonPrimitive.content == "true")
+            verifyImageInputs(home, original)
+            inventory(home, out)
+            verifyImageInputs(home, original)
+        }
+        val preservation = runCatching {
+            require(digest(archive) == options.getValue("archive-sha256"))
+            saved?.let { require(digest(it) == options.getValue("archive-sha256")) }
+            require(digest(manifest) == options.getValue("manifest-sha256"))
+            InstalledBuild.readManifest(provenance, observer, runtime, emptyMap())
+        }
+        execution.exceptionOrNull()?.let { failure -> preservation.exceptionOrNull()?.let(failure::addSuppressed) }
+        execution.getOrThrow()
+        preservation.getOrThrow()
+    }
+
+    private fun copySavedArchive(input: File, archive: File, expected: String) {
+        require(input.isAbsolute && !Files.isSymbolicLink(input.toPath()) && input.isFile)
+        require(input.length() <= MAX_ARCHIVE_BYTES && digest(input) == expected)
+        input.inputStream().use { source ->
+            archive.outputStream().use { target ->
+                val buffer = ByteArray(64 * 1024)
+                var size = 0L
+                while (true) {
+                    val count = source.read(buffer)
+                    if (count < 0) break
+                    size += count
+                    require(size <= MAX_ARCHIVE_BYTES)
+                    target.write(buffer, 0, count)
+                }
+            }
+        }
+        require(digest(archive) == expected && digest(input) == expected)
     }
 
     private fun verifyImageInputs(home: File, original: Map<String, String>) {
