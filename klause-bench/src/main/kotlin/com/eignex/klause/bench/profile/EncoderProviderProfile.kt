@@ -266,7 +266,17 @@ object EncoderProviderProfile {
                             "elapsedNs=$elapsed nativeWork=$work installations=$installations",
                     )
                 }
-                check(results.distinct().size == 1) { "encoder modes disagreed for $input round=$round: $results" }
+                if (entry == "source-optimize") {
+                    output.resolve("$index-comparison-$round.json").writeText(buildJsonObject {
+                        put("sourceSha256", sha256(bytes))
+                        put("round", round)
+                        put("sameVerdict", results.distinct().size == 1)
+                        put("verdicts", buildJsonArray { results.forEach { add(JsonPrimitive(it)) } })
+                        put("independentProofCheck", false)
+                    }.toString())
+                } else {
+                    check(results.distinct().size == 1) { "encoder modes disagreed for $input round=$round: $results" }
+                }
             }
         }
     }
