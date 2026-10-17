@@ -23,7 +23,9 @@ import kotlin.test.assertEquals
 class SourceExecutionOutputTest {
     @Test
     fun `native source refutations should retain their verdict without a complete pool`() {
-        val source = SmtLib.parse("(declare-const x Real) (assert (= (* x x) -1))").source
+        val source = SmtLib.parse(
+            "(set-logic QF_NRA) (declare-const x Real) (assert (< (* x x) 0))",
+        ).source
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             source, ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH,
         ))
@@ -45,7 +47,9 @@ class SourceExecutionOutputTest {
 
     @Test
     fun `native incomplete satisfaction should retain its stop reason`() {
-        val source = SmtLib.parse("(declare-const x Real) (assert (= (* x x) -1))").source
+        val source = SmtLib.parse(
+            "(set-logic QF_NRA) (declare-const x Real) (assert (< (* x x) 0))",
+        ).source
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             source, ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH,
         ))
