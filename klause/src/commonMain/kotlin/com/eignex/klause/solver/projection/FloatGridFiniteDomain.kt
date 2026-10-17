@@ -1,9 +1,10 @@
 package com.eignex.klause.solver.projection
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
@@ -38,6 +39,6 @@ internal fun lowerGridFiniteValues(
         }
     }
     if (cancellation()) return null
-    return if (admitted.isEmpty()) listOf(Clause(intArrayOf()))
+    return if (admitted.isEmpty()) listOf(Linear(longArrayOf(), intArrayOf(), LinearOp.EQ, 1L))
     else listOf(Table(intArrayOf(column.coordinate.variable), admitted.distinct().toLongArray()))
 }

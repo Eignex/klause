@@ -147,7 +147,7 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is RealAbs -> NoPropagator
 
-    is RealFiniteDomain -> if (size == 0) ClausePropagator(intArrayOf(), intArrayOf(), intArrayOf()) else NoPropagator
+    is RealFiniteDomain -> if (size == 0) EmptyRealDomainPropagator else NoPropagator
 
     is RealProduct, is ContinuousProduct -> NoPropagator
     is RealElement -> RealElementPropagator(this)
