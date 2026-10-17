@@ -159,7 +159,8 @@ format-specific CLI registration remain separate from this library surface.
 canonical working namespace, including real declarations with proved integer
 backings. Original declaration counts retain their source meaning. `realCoordinate`
 requires real storage; a cross-kind backing uses the typed mapping. Integer-only
-hint remaps use original integer identities and cannot invent real coordinates.
+hint remaps use original integer identities. A cross-kind plan withholds the
+same-kind remap and retains its typed working coordinates.
 
 `executionKind` inspects the installed family; library policy owns
 unsupported-linear optimization fallback to source-checked heuristic execution on the
