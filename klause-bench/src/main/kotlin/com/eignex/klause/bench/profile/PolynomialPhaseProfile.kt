@@ -318,11 +318,23 @@ private class ArithmeticObservation(arithmetic: Any, query: Any) {
         var constantLeaders = 0
         var commonFactors = 0
         val degrees = LinkedHashMap<Int, Int>()
+        val totalDegrees = LinkedHashMap<Long, Int>()
+        val allCoordinates = HashSet<Int>()
+        val nonlinearCoordinates = HashSet<Int>()
         for (input in inputs) {
             val inputDegree = degree.invoke(input, projectionVariable) as Int
             degrees[inputDegree] = (degrees[inputDegree] ?: 0) + 1
             val payload = (terms.invoke(input) as List<*>).map { monomial.invoke(it) }
             termCount += payload.size
+            var totalDegree = 0L
+            for (term in payload) {
+                val ids = (coordinates.invoke(term) as List<*>).map { it as Int }
+                allCoordinates.addAll(ids)
+                val powers = ids.map { exponent.invoke(term, it) as Int }
+                totalDegree = maxOf(totalDegree, powers.sumOf { it.toLong() })
+                if (ids.size != 1 || powers.single() != 1) nonlinearCoordinates.addAll(ids)
+            }
+            totalDegrees[totalDegree] = (totalDegrees[totalDegree] ?: 0) + 1
             val leaders = payload.filter { exponent.invoke(it, projectionVariable) == inputDegree }
             if (leaders.size == 1 && coordinates.invoke(leaders.single()) == listOf(projectionVariable)) {
                 constantLeaders++
@@ -334,7 +346,8 @@ private class ArithmeticObservation(arithmetic: Any, query: Any) {
             }
         }
         return PhaseProjection(projectionVariable, inputs.size, termCount, degrees,
-            constantLeaders, commonFactors, inputs.size.toLong() * (inputs.size - 1) / 2, requiredEquation)
+            constantLeaders, commonFactors, inputs.size.toLong() * (inputs.size - 1) / 2, requiredEquation,
+            totalDegrees, allCoordinates.count { it !in nonlinearCoordinates })
     }
 
     private fun termCount(value: Any): Int = (terms.invoke(value) as List<*>).size
@@ -381,6 +394,8 @@ internal data class PhaseProjection(
     val commonMonomialFactors: Int,
     val allInputPairs: Long,
     val requiredEquation: Boolean,
+    val totalDegrees: Map<Long, Int>,
+    val constantAffineCoordinates: Int,
 )
 
 @Serializable

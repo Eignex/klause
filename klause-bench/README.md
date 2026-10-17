@@ -2594,7 +2594,7 @@ performance gain. Field/method incompatibility fails the diagnostic explicitly.
 query through its containing stop. Its `request64=<base64>` argument encodes up to
 18 `{suite, problem, sha256}` catalog identities, with at most 48 KiB of encoded
 request and 1 MiB per original source. It requires the frozen original hash before
-parsing and retains those bytes. Run the committed profile through the lab with `host=auto`.
+parsing and retains those bytes. Run the committed profile through the lab with `host=lab`.
 The measured child uses one active processor, Serial GC and a 3 GiB heap, retaining
 its command, streams, actual exit, installed CLI/harness/runtime hashes and options.
 
@@ -2610,8 +2610,12 @@ index and requested matrix side length, plus the last exact-division operand ter
 counts and whether its divisor is constant or one monomial. Operand metadata is
 read after the measured query; callbacks retain references without arithmetic work.
 The last elimination family records its coordinate, polynomial and term counts,
-degree histogram, rational leading-coefficient count and common-monomial-factor
-count. Its `allInputPairs` is the theoretical number of unordered input pairs before
+degree histogram in the eliminated coordinate, total-degree histogram, rational
+leading-coefficient count and common-monomial-factor count. `constantAffineCoordinates`
+counts coordinates whose occurrences throughout that boundary family are pure
+linear monomials with rational constant coefficients. It does not inspect source
+predicate relations or establish eligibility for inequality elimination.
+Its `allInputPairs` is the theoretical number of unordered input pairs before
 required-equation selection and reducta expansion, not a count of requested or
 completed subresultants. The required-equation flag identifies that selection.
 Family metadata is also read after the query stops; pipeline mode disables these observers.

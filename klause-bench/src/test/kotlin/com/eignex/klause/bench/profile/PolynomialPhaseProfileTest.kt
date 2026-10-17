@@ -49,10 +49,28 @@ class PolynomialPhaseProfileTest {
         assertEquals(2, observed.polynomials)
         assertEquals(3L, observed.terms)
         assertEquals(mapOf(1 to 2), observed.degrees)
+        assertEquals(mapOf(2L to 2), observed.totalDegrees)
+        assertEquals(0, observed.constantAffineCoordinates)
         assertEquals(0, observed.constantLeadingCoefficients)
         assertEquals(2, observed.commonMonomialFactors)
         assertEquals(1L, observed.allInputPairs)
         assertEquals(false, observed.requiredEquation)
+    }
+
+    @Test
+    fun `phase family metadata distinguishes total degree from rational affine coordinates`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = "$declarations (assert (not (= x0 0))) " +
+            "(assert (> (+ x0 (* x1 x1)) 0)) (assert (> (- (* x1 x1) x0) 0))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, timeoutMs = 10_000)
+
+        val observed = assertNotNull(trace.lastProjection)
+        assertEquals("Satisfiable", trace.result)
+        assertEquals(trace.nativeWork, trace.chargeSum)
+        assertEquals(mapOf(2 to 2), observed.degrees)
+        assertEquals(mapOf(2L to 2), observed.totalDegrees)
+        assertEquals(1, observed.constantAffineCoordinates)
     }
 
     @Test
