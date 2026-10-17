@@ -18,6 +18,7 @@ import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveResult
@@ -32,6 +33,7 @@ import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
 import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
 import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceFiniteControls
@@ -97,10 +99,14 @@ class SourceStrategy internal constructor(
             providers = projectionProviders, cancellation = stop,
         ))
         compiledSchema?.sourceBinding?.selectView(invocation)
-        val execution = SourceSetup.execute(SourceExecutionRequest(
-            invocation, executionOptions, cores = cores, timeout = timeout, cancellation = cancellation,
-            nodeBudget = nodeBudget,
-        ))
+        var finiteWitness: Sample? = null
+        val execution = SourceSetup.execute(
+            SourceExecutionRequest(
+                invocation, executionOptions, cores = cores, timeout = timeout, cancellation = cancellation,
+                nodeBudget = nodeBudget,
+            ),
+            SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ finiteWitness = it }, {})),
+        )
         val result = when (execution) {
             is SourceExecutionResult.Polynomial -> execution.result.result
             is SourceExecutionResult.Transcendental -> execution.result.result
@@ -112,7 +118,7 @@ class SourceStrategy internal constructor(
                         .withSourceSemantics(source.semantics)
                 when (outcome.verdict) {
                     FiniteSolveVerdict.SAT -> OpenTheoryResult.Sat(
-                        OpenTheoryAssignment.Sampled(requireNotNull(outcome.bestSample)), outcome.stats,
+                        OpenTheoryAssignment.Sampled(requireNotNull(outcome.bestSample ?: finiteWitness)), outcome.stats,
                     )
                     FiniteSolveVerdict.UNSAT -> OpenTheoryResult.Unsat(outcome.stats)
                     else -> OpenTheoryResult.Unknown(

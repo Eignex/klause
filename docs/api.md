@@ -58,6 +58,8 @@ through `SourceExecutionRequest`. Compiled source names, objective ownership and
 published coordinate frames retain the same binding. The factory-selected `engine`
 remains the default for typed compatibility overloads. FIXED rejects multiple lanes;
 inapplicable options and conflicting node limits reject through the common entry.
+Satisfaction retains the reconstructed callback witness when a finite terminal
+envelope carries no point.
 
 Finite `SourceStrategy.solve` and affine `optimizeOpen` dispatch their captured invocations through
 `SourceSetup.execute` and `FinitePipeline.solve`. Its internal single-consumer adapter
