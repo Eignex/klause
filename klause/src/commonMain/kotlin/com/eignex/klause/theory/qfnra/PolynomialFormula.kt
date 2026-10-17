@@ -28,6 +28,9 @@ internal class PolynomialFormula private constructor(
     val atoms: List<PolynomialAtom>,
     val booleanVariables: List<Int>,
 ) {
+    fun booleanRegions(arithmetic: PolynomialArithmetic): Iterator<PolynomialBooleanRegion?> =
+        PolynomialBooleanRegions(nodes, root, atoms, arithmetic).prepare()
+
     fun refuteBooleans(
         arithmetic: PolynomialArithmetic,
         maximumAtoms: Int,
@@ -168,6 +171,18 @@ internal class PolynomialFormula private constructor(
         const val UNASSIGNED: Int = -1
         const val FALSE: Int = 0
         const val TRUE: Int = 1
+
+        fun conjunction(atoms: List<PolynomialAtom>, arithmetic: PolynomialArithmetic): PolynomialFormula {
+            val nodes = ArrayList<FormulaNode>()
+            val children = IntArray(atoms.size) { index ->
+                arithmetic.step()
+                nodes.add(FormulaNode.Atom(index))
+                index
+            }
+            arithmetic.step()
+            nodes.add(FormulaNode.Junction(children, true))
+            return PolynomialFormula(nodes, nodes.lastIndex, atoms.toList(), emptyList())
+        }
 
         fun normalize(
             formula: PolynomialRealFormula,
