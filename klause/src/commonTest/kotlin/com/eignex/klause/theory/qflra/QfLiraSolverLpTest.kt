@@ -18,6 +18,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -401,7 +402,7 @@ class QfLiraSolverLpTest {
     }
 
     @Test
-    fun `a reused prefix should reach typed source refutation when leaf point recovery declines`() {
+    fun `a reused prefix should reject a contradictory complete source leaf`() {
         val equations = (1..129).map { coefficient ->
             ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(2)),
                 listOf(BigFraction.ofLong(coefficient.toLong()), BigFraction.ONE, BigFraction.ONE),
@@ -422,19 +423,10 @@ class QfLiraSolverLpTest {
                     LinearOp.GE, BigFraction.ZERO, strict = true, activator = 1),
             )).toTypedArray(),
         )
-        var unchecked = false
-        var last: FloatLpResult? = null
         var queries = 0
         val factory = TrackingLpFactory { solver, allowance ->
             queries++
-            val current = solver.resolveBounds(allowance)
-            if (unchecked) {
-                val prior = current ?: assertNotNull(last)
-                FloatLpResult(prior.basis, 0.0, DoubleArray(prior.duals.size), DoubleArray(prior.primal.size),
-                    exactState = solver.solvedExactState)
-            } else {
-                current.also { last = it }
-            }
+            solver.resolveBounds(allowance)
         }
         val stats = SmtStatsSink()
         ExactLiraSearchComponent(source).use { component ->
@@ -444,21 +436,72 @@ class QfLiraSolverLpTest {
             component.useMixedPointCompletion()
             assertNotNull(component.partialPointHints(Cancellation.Never))
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
-            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.initialize(), "initial numerical point")
             val before = queries
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))),
+                "compatible extension stages=${stats.snapshot().completeSearchStages}")
             assertEquals(before, queries)
             assertEquals(1L, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
-            unchecked = true
+            val leaf = session.push(SearchDecision.Bool(Lit.make(1, true)))
+            if (leaf !is ComponentResult.Conflict) {
+                assertIs<ComponentResult.Consistent>(leaf,
+                    "contradictory leaf stages=${stats.snapshot().completeSearchStages}")
+                assertTrue(queries > before)
+                assertNull(component.nextBranch(session))
+                assertEquals(1L, stats.snapshot().completeSearchStages?.get("RECOVERY_SOURCE_REFUTED"),
+                    "queries=$queries stages=${stats.snapshot().completeSearchStages} " +
+                        "outcomes=${stats.snapshot().completeSearchLinearOutcomes}")
+                assertIs<ComponentCheck.Infeasible>(session.check())
+            }
+            assertEquals(0, stats.snapshot().completeSearchMinUnassignedBooleans)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+            assertNull(session.model().valueOf<Any>(component))
+        }
+    }
 
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+    @Test
+    fun `a synthetic numerical proposal should still require exact source refutation`() {
+        val inequalities = (1..129).map { coefficient ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(2)),
+                listOf(BigFraction.ofLong(coefficient.toLong()), BigFraction.ONE, BigFraction.ONE),
+                LinearOp.GE, BigFraction.ZERO)
+        }
+        val source = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 3,
+            realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+            factors = (inequalities + listOf(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(2)),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.EQ, BigFraction.ZERO),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(2)),
+                    List(3) { BigFraction.ONE }, LinearOp.LE, BigFraction.ZERO),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.LE, BigFraction.ZERO, strict = true),
+            )).toTypedArray(),
+        )
+        // The synthetic backend claims a solved state; only source verification supplies the refutation.
+        val factory = TrackingLpFactory(syntheticResult = { solver, _, state ->
+            val current = assertNotNull(state)
+            FloatLpResult(assertNotNull(solver.prepareLogicals()), 0.0,
+                DoubleArray(current.model.m), DoubleArray(current.model.n), exactState = current)
+        })
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            component.useMixedPointCompletion()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize(), "synthetic numerical proposal")
+
             assertNull(component.nextBranch(session))
 
-            assertTrue(queries > before)
-            assertEquals(0, stats.snapshot().completeSearchMinUnassignedBooleans)
             assertEquals(1L, stats.snapshot().completeSearchStages?.get("RECOVERY_SOURCE_REFUTED"),
-                "queries=$queries stages=${stats.snapshot().completeSearchStages} " +
+                "stages=${stats.snapshot().completeSearchStages} " +
                     "outcomes=${stats.snapshot().completeSearchLinearOutcomes}")
+            assertNull(stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
             assertIs<ComponentCheck.Infeasible>(session.check())
             assertNull(session.model().valueOf<Any>(component))
         }
@@ -1054,6 +1097,7 @@ class QfLiraSolverLpTest {
     )
 
     private class TrackingLpFactory(
+        private val syntheticResult: ((PersistentLpSolver, LpFloatAllowance?, LpExactState?) -> FloatLpResult?)? = null,
         private val resolve: (PersistentLpSolver, LpFloatAllowance?) -> FloatLpResult? = { solver, allowance ->
             solver.resolveBounds(allowance)
         },
@@ -1073,6 +1117,7 @@ class QfLiraSolverLpTest {
         ): PersistentLpSolver {
             created++
             lastCancellation = cancellation
+            var currentState = model.exactState
             val delegate = ProductionLpEngineFactory.newPersistentSolver(
                 model,
                 cancellation,
@@ -1083,7 +1128,21 @@ class QfLiraSolverLpTest {
                 pricing,
             )
             return object : PersistentLpSolver by delegate {
-                override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = resolve(delegate, allowance)
+                private var reportedState: LpExactState? = null
+
+                override val solvedExactState: LpExactState?
+                    get() = if (syntheticResult == null) delegate.solvedExactState
+                    else reportedState ?: delegate.solvedExactState
+
+                override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+                    reportedState = null
+                    return delegate.adopt(state, token).also { if (it) currentState = state }
+                }
+
+                override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                    val synthetic = syntheticResult ?: return resolve(delegate, allowance)
+                    return synthetic(delegate, allowance, currentState).also { reportedState = it?.exactState }
+                }
 
                 override fun close() {
                     closed++
