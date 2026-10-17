@@ -51,7 +51,7 @@ class PolynomialProjectionTest {
 
         assertEquals(plainCharges, observedCharges)
         assertEquals(listOf(1 to inputs), events)
-        assertEquals(listOf(equation), equations)
+        assertEquals(listOf<Polynomial?>(equation), equations)
         for (level in 0..1) {
             assertEquals(expected.variable(level), actual.variable(level))
             assertEquals(expected.polynomials(level), actual.polynomials(level))
