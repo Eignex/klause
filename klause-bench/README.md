@@ -2653,6 +2653,15 @@ all-tier queues, started/installed roots, failures, replacements and parse error
 Every archived case directory is retained. The original `cases.json`, individual
 measurement and recording/XML identities must agree for case decoding completion.
 Missing, extra, nested or ambiguous recordings and malformed XML remain negative.
+`plannedRecordingCoverage` separately checks recording requests against the
+archived study plan and selection, each bound to the original request's SHA-256.
+It expands every planned case and arm, checks all case coordinates and source
+input descriptions, and distinguishes deliberately unprofiled controls from
+missing requested recordings. Missing or extra cases, mismatched measurements,
+unexpected instrumentation and incomplete requested recordings prevent this
+check from completing. The literal `allCaseCensusesComplete` flag still requires
+a complete JFR/XML pair for every case; plan coverage does not promote that flag,
+comparison eligibility, source outcomes or expected external study coverage.
 Observer bench/JDK files are hash-bound before review and checked for changes
 afterwards, separately from the original CLI/runtime/source/worker context.
 Family declarations and observed ordinary-phase roots are reported;

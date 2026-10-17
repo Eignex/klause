@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import resource
 import subprocess
 import sys
@@ -233,6 +234,81 @@ def supplement_class_origins(inputs, manifest, original, selected, scratch, repo
     return additions
 
 
+def planned_recording_coverage(selected, prefix, measurements, cases):
+    result = {'complete': False, 'error': None, 'requestedRecordingCaseNames': [],
+              'deliberatelyUnprofiledCaseNames': [], 'missingCaseNames': [], 'unexpectedCaseNames': [],
+              'mismatchedCaseNames': [], 'incompleteRecordingCaseNames': [],
+              'unexpectedRecordingCaseNames': [], 'expectedStudyCaseUniverseProven': False,
+              'scope': 'Recording requests in the authenticated archived plan only; no external study, '
+                       'runtime, source outcome, phase or savings acceptance.'}
+    try:
+        names = ('requested-options.json', 'selection.json', 'study-plan.json')
+        if any(prefix + name not in selected for name in names):
+            raise ValueError('Original request, selection or plan is absent')
+        request, inputs, plans = (load_json(selected[prefix + name]) for name in names)
+        if not isinstance(request, dict):
+            raise ValueError('Original request is malformed')
+        for name, key in [('selection.json', 'sha256'), ('study-plan.json', 'plan-sha256')]:
+            if cohort.file_identity(selected[prefix + name])['sha256'] != request.get(key):
+                raise ValueError('Archived plan or selection differs from original request')
+        if not isinstance(inputs, list) or not 1 <= len(inputs) <= 128 or \
+                not isinstance(plans, list) or not plans:
+            raise ValueError('Original plan or selection has no bounded input inventory')
+        expected = {}
+        for plan in plans:
+            if not isinstance(plan, dict):
+                raise ValueError('Original plan entry is malformed')
+            indices, engines = plan['inputs'], plan['engines']
+            repeats, profile, mode = plan['repeats'], plan['profile'], plan['mode']
+            suffix, recipe = plan.get('caseSuffix'), plan.get('recipe')
+            if type(repeats) is not int or not 1 <= repeats <= 100 or type(profile) is not bool or \
+                    not isinstance(mode, str) or not re.fullmatch('[a-z][a-z0-9-]*', mode) or \
+                    not isinstance(indices, list) or not indices or \
+                    any(type(index) is not int or not 0 <= index < len(inputs) for index in indices) or \
+                    len(set(indices)) != len(indices) or not isinstance(engines, list) or not engines or \
+                    any(engine not in ('fixed', 'cp', 'mixed', 'ls') for engine in engines) or \
+                    len(set(engines)) != len(engines) or \
+                    (suffix is not None and (not isinstance(suffix, str) or
+                                            not re.fullmatch('[a-z0-9-]+', suffix))):
+                raise ValueError('Original plan has malformed case coordinates')
+            for index in indices:
+                for repetition in range(repeats):
+                    for engine in engines:
+                        for arm in ('control', 'candidate'):
+                            name = f'{mode}-{index:02d}-{repetition}-{suffix if suffix is not None else engine}-{arm}'
+                            if name in expected or len(expected) >= cohort.MAX_CASES:
+                                raise ValueError('Original plan duplicates or exceeds the case inventory')
+                            expected[name] = dict(index=index, repetition=repetition, engine=engine,
+                                                  arm=arm, mode=mode, recipe=recipe, profile=profile,
+                                                  problem=inputs[index])
+        observed = {row['case']: row for row in measurements}
+        archived = {row['caseDirectory']: row for row in cases}
+        if len(observed) != len(measurements) or len(archived) != len(cases):
+            raise ValueError('Original case inventory has duplicate identities')
+        result['requestedRecordingCaseNames'] = sorted(name for name, row in expected.items() if row['profile'])
+        result['deliberatelyUnprofiledCaseNames'] = sorted(name for name, row in expected.items() if not row['profile'])
+        result['missingCaseNames'] = sorted(set(expected) - (set(observed) & set(archived)))
+        result['unexpectedCaseNames'] = sorted((set(observed) | set(archived)) - set(expected))
+        for name in sorted(set(expected) & set(observed) & set(archived)):
+            row, case, wanted = observed[name], archived[name], expected[name]
+            if any(type(row.get(key)) is not type(value) or row.get(key) != value
+                   for key, value in wanted.items()) or case.get('measurementMatchesCasesJson') is not True:
+                result['mismatchedCaseNames'].append(name)
+            if wanted['profile']:
+                if case.get('completed') is not True or row.get('recordingPresent') is not True or \
+                        row.get('compilationLogPresent') is not True:
+                    result['incompleteRecordingCaseNames'].append(name)
+            elif case['recordings'] or case['xmlInputs'] or case['classOriginInputs'] or \
+                    row.get('recordingPresent') is not False or row.get('compilationLogPresent') is not False:
+                result['unexpectedRecordingCaseNames'].append(name)
+        result['complete'] = not any(result[key] for key in (
+            'missingCaseNames', 'unexpectedCaseNames', 'mismatchedCaseNames',
+            'incompleteRecordingCaseNames', 'unexpectedRecordingCaseNames'))
+    except (KeyError, TypeError, ValueError) as error:
+        result['error'] = {'type': type(error).__name__, 'message': str(error)}
+    return result
+
+
 def inspect(manifest_path, expected, archive_path, output, jfr, scratch, report, class_origin_supplement=None):
     manifest, original = cohort.catalog(manifest_path, expected)
     report['originalInventory'] = original
@@ -363,6 +439,7 @@ def inspect(manifest_path, expected, archive_path, output, jfr, scratch, report,
         print('Reviewed saved recording case', name, 'completed', case_report['completed'], flush=True)
     report.update(completed=True, allCaseCensusesComplete=bool(report['cases']) and all_decoded and
                   not report['metadataOnlyCaseNames'] and not report['archivedCasesMissingMetadata'])
+    report['plannedRecordingCoverage'] = planned_recording_coverage(selected, prefix, measurements, report['cases'])
 
 
 def main():

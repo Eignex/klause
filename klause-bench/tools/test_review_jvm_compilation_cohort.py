@@ -12,6 +12,69 @@ import review_jvm_compilation_cohort as review
 
 
 class ReviewJvmCompilationCohortTest(unittest.TestCase):
+    def test_archived_plan_distinguishes_requested_recordings_from_unprofiled_controls(self):
+        variants = ('complete', 'missing recording', 'unexpected recording', 'missing control',
+                    'extra case', 'metadata mismatch', 'profile mismatch', 'request hash mismatch',
+                    'missing plan', 'duplicate plan case', 'nonboolean profile')
+        for variant in variants:
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                inputs = [dict(suite='suite', problem='problem', format='DIMACS', sourceHashes={'model': 'a' * 64})]
+                plans = [dict(mode=mode, inputs=[0], repeats=1, engines=['cp'], profile=profile)
+                         for mode, profile in [('profile', True), ('cold-complete', False)]]
+                measurements, cases = [], []
+                for plan in plans:
+                    for arm in ('control', 'candidate'):
+                        name = plan['mode'] + '-00-0-cp-' + arm
+                        measurements.append(dict(case=name, index=0, repetition=0, engine='cp', arm=arm,
+                                                 mode=plan['mode'], recipe=None, profile=plan['profile'],
+                                                 problem=inputs[0], recordingPresent=plan['profile'],
+                                                 compilationLogPresent=plan['profile']))
+                        cases.append(dict(caseDirectory=name, completed=plan['profile'],
+                                          measurementMatchesCasesJson=True, classOriginInputs=[],
+                                          recordings=[{}] if plan['profile'] else [],
+                                          xmlInputs=[{}] if plan['profile'] else []))
+                if variant == 'missing recording':
+                    cases[0].update(recordings=[], completed=False)
+                elif variant == 'unexpected recording':
+                    cases[2]['recordings'] = [{}]
+                elif variant == 'missing control':
+                    del cases[2]
+                elif variant == 'extra case':
+                    cases.append(dict(cases[-1], caseDirectory='unexpected'))
+                elif variant == 'metadata mismatch':
+                    cases[2]['measurementMatchesCasesJson'] = False
+                elif variant == 'profile mismatch':
+                    measurements[0]['profile'] = False
+                elif variant == 'duplicate plan case':
+                    plans.append(plans[0])
+                elif variant == 'nonboolean profile':
+                    plans[0]['profile'] = 1
+                selected = {}
+                for name, value in [('selection.json', inputs), ('study-plan.json', plans)]:
+                    path = root / name
+                    path.write_text(json.dumps(value))
+                    selected['profile9/' + name] = path
+                request = {'sha256': review.cohort.file_identity(root / 'selection.json')['sha256'],
+                           'plan-sha256': review.cohort.file_identity(root / 'study-plan.json')['sha256']}
+                if variant == 'request hash mismatch':
+                    request['plan-sha256'] = '0' * 64
+                path = root / 'requested-options.json'
+                path.write_text(json.dumps(request))
+                selected['profile9/requested-options.json'] = path
+                if variant == 'missing plan':
+                    del selected['profile9/study-plan.json']
+
+                result = review.planned_recording_coverage(selected, 'profile9/', measurements, cases)
+
+                self.assertEqual(variant == 'complete', result['complete'])
+                self.assertFalse(result['expectedStudyCaseUniverseProven'])
+                if variant == 'complete':
+                    self.assertEqual(['profile-00-0-cp-candidate', 'profile-00-0-cp-control'],
+                                     result['requestedRecordingCaseNames'])
+                    self.assertEqual(['cold-complete-00-0-cp-candidate', 'cold-complete-00-0-cp-control'],
+                                     result['deliberatelyUnprofiledCaseNames'])
+
     def test_complete_archive_hashes_large_unselected_reports_without_extracting_them(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
