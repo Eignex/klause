@@ -11,6 +11,30 @@ import kotlin.test.assertTrue
 class CliModeOpenTheoryTest {
 
     @Test
+    fun `fixed parallel selection should be rejected across source families`() {
+        val sources = listOf(
+            "(declare-const b Bool) (assert b)",
+            "(declare-const x Real) (assert (> x 0))",
+            "(declare-const x Real) (assert (= (* x x) 2))",
+            "(declare-const x Int) (assert (= (* x x) 2))",
+            "(declare-const x Real) (assert (= (sin x) 0))",
+        ).map { ".smt2" to it } + (".mps" to
+            "NAME T\nROWS\n N COST\n G LOWER\nCOLUMNS\n X COST 1 LOWER 1\nRHS\n RHS1 LOWER 1\nENDATA\n")
+        for ((extension, source) in sources) {
+            val smt = File.createTempFile("clifixedcores", extension).apply {
+                writeText(source)
+                deleteOnExit()
+            }
+            var code = -1
+
+            val err = captureErr { code = runCli(arrayOf("-e", "fixed", "-p", "2", smt.absolutePath)) }
+
+            assertEquals(2, code, err)
+            assertTrue("single-core" in err, err)
+        }
+    }
+
+    @Test
     fun `an open theory wall timeout should name the cause`() {
         val smt = File.createTempFile("clibudget", ".smt2").apply {
             writeText(

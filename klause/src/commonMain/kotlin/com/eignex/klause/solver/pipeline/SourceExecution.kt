@@ -115,6 +115,9 @@ class SourceExecutionRequest private constructor(
 
     init {
         require(cores > 0)
+        if (invocation.request.engine == FiniteEngine.FIXED && cores > 1) {
+            throw PipelineConfigException("engine 'fixed' is single-core; use 'backtrack' for a parallel pool")
+        }
     }
 }
 

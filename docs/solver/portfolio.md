@@ -20,6 +20,9 @@ replicas. Native reservations divide the complete family's allowance across its
 materialized slots. Complete-only invocations divide the whole native allowance
 among their admitted slots.
 Heuristic-only factories carry witness authority.
+Shared source execution rejects multiple cores for `FIXED` when binding execution
+controls, before constructing a native worker. The finite request boundary enforces
+the same single-core rule for its deferred consumer.
 
 The [solver vision](../vision.md#shared-model-breadth) requires an available
 complete-search/local-search pair for every supported model. Current admission gaps
