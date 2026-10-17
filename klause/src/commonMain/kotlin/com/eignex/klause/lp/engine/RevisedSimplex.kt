@@ -159,11 +159,9 @@ internal class RevisedSimplex(
     private var continuationAvailable = false
     private var stoppedContinuationBasis: Basis? = null
 
-    private val pricingState = SimplexPricingState(m, numVars)
+    private val pricingState = SimplexPricingState(m)
     private val gamma = pricingState.gamma
-    private val pricingOrder = pricingState.order
-    private val pricingScratch = pricingState.scratch
-    private val workspace = SimplexWorkspace(m, numVars)
+    private val workspace = SimplexWorkspace(m)
     private val dualRhs = workspace.dualRhs
     private val dualValues = workspace.dualValues
     private val qualityRhs = workspace.qualityRhs
@@ -175,13 +173,7 @@ internal class RevisedSimplex(
     private val phaseOneGradient = workspace.phaseOneGradient
     private val phaseOneDuals = workspace.phaseOneDuals
     private val alphaValues = workspace.alphaValues
-    private val pivotRowEntries = workspace.pivotRowEntries
-    private val enteringRatios = workspace.enteringRatios
-    private val eligibleColumns = workspace.eligibleColumns
-    private val eligibleOrdered = workspace.eligibleOrdered
-    private val theoryColumns = workspace.theoryColumns
-    private val touchedColumns = workspace.touchedColumns
-    private val columnEpochs = workspace.columnEpochs
+    private var ratioScratch: SimplexRatioWorkspace? = null
     private val reconcileQueue = workspace.reconcileQueue
 
     /**
@@ -1360,12 +1352,7 @@ internal class RevisedSimplex(
         val beta = dualBeta
         // Cached basic values were seated on the real bounds, which an artificial seat does not match.
         var useCached = kept && model.exactState != null && artificialLower == null && restoreBasicValues(beta)
-        val pivotRowEntry = pivotRowEntries // ρ·A_j per nonbasic, reused by the bound-flip ratio test
-        val ratioBuf = enteringRatios // |d_j / a_j| per eligible nonbasic
-        val elig = eligibleColumns
-        val eligOrdered = eligibleOrdered // scratch for the ratio-ordered permutation of [elig]
-        val theoryCandidates = theoryColumns
-        workspace.beginDualPass()
+        ratioScratch?.beginDualPass()
         var epoch = 0
         // Whether an iterate's basic values are in [beta], so a solve that stops short can still hand
         // back its bound. The buffer is reused, and holds the last iterate the loop completed.
@@ -1471,18 +1458,16 @@ internal class RevisedSimplex(
 
                 RefactorResult.FAILED -> return null
             }
+            val scratch = ratioWorkspace()
+            val elig = scratch.eligibleColumns
             epoch++
-            val touchedCount = formPivotRow(epoch)
-            collectEligibleEntering(touchedCount, y, belowLower, enforced)
+            val touchedCount = formPivotRow(epoch, scratch)
+            collectEligibleEntering(touchedCount, y, belowLower, enforced, scratch)
             val entering = if (elig.isEmpty()) {
                 EnteringChoice.Selected(null)
             } else {
                 chooseEntering(
-                    elig,
-                    eligOrdered,
-                    theoryCandidates,
-                    ratioBuf,
-                    pivotRowEntry,
+                    scratch,
                     worst,
                     r,
                     enforced,
@@ -1618,14 +1603,20 @@ internal class RevisedSimplex(
         return r
     }
 
-    /**
-     * ρ·A_j for every column ρ reaches, accumulated over the rows ρ stores, into [pivotRowEntries]; returns how
-     * many columns it reached, listed in [touchedColumns]. Costs those rows' entries instead of nnz(A), which is
+    private fun ratioWorkspace(): SimplexRatioWorkspace = ratioScratch
+        ?: SimplexRatioWorkspace(numVars).also { ratioScratch = it }
+
+    /*
+     * ρ·A_j for every column ρ reaches, accumulated over the rows ρ stores, into pivotRowEntries; returns how
+     * many columns it reached, listed in touchedColumns. Costs those rows' entries instead of nnz(A), which is
      * the whole point of ρ staying sparse. A column ρ misses has ρ·A_j = 0 exactly, so the eligibility pass loses
-     * no candidate by skipping it. Reached columns are stamped with [epoch] rather than cleared: zeroing
-     * [pivotRowEntries] between iterations would reintroduce the pass over every column this removes.
+     * no candidate by skipping it. Reached columns are stamped with epoch rather than cleared: zeroing
+     * pivotRowEntries between iterations would reintroduce the pass over every column this removes.
      */
-    private fun formPivotRow(epoch: Int): Int {
+    private fun formPivotRow(epoch: Int, scratch: SimplexRatioWorkspace): Int {
+        val pivotRowEntries = scratch.pivotRowEntries
+        val columnEpochs = scratch.columnEpochs
+        val touchedColumns = scratch.touchedColumns
         var touchedCount = 0
         var pivotRowOps = 0L
         pivotEtaVec.forEachStored { i, rhoI ->
@@ -1641,8 +1632,8 @@ internal class RevisedSimplex(
         return touchedCount
     }
 
-    /**
-     * Collect the dual-feasible entering candidates into [eligibleColumns] and their ratios into [enteringRatios];
+    /*
+     * Collect the dual-feasible entering candidates into eligibleColumns and their ratios into enteringRatios;
      * eligibility is the sign rule that keeps reduced costs feasible as the leaving variable moves to its bound.
      */
     private fun collectEligibleEntering(
@@ -1650,7 +1641,12 @@ internal class RevisedSimplex(
         y: DoubleArray,
         belowLower: Boolean,
         enforced: BooleanArray?,
+        scratch: SimplexRatioWorkspace,
     ) {
+        val eligibleColumns = scratch.eligibleColumns
+        val touchedColumns = scratch.touchedColumns
+        val pivotRowEntries = scratch.pivotRowEntries
+        val enteringRatios = scratch.enteringRatios
         eligibleColumns.clear()
         for (t in 0 until touchedCount) {
             val j = touchedColumns[t]
@@ -2087,27 +2083,27 @@ internal class RevisedSimplex(
         }
     }
 
-    /**
-     * Pick the dual entering variable from the eligible set [elig] (ratios in [ratioBuf], pivot-row
-     * coefficients in [pivotRowEntry]). The bound-flipping long step walks the eligible breakpoints in
+    /*
+     * Pick the dual entering variable from the eligible set elig (ratios in ratioBuf, pivot-row
+     * coefficients in pivotRowEntry). The bound-flipping long step walks the eligible breakpoints in
      * ratio order, flipping each bounded nonbasic whose breakpoint is passed — accumulating `|a_j|·u_j`
-     * toward the leaving variable's violation [delta] — until that capacity covers the violation or an
+     * toward the leaving variable's violation delta — until that capacity covers the violation or an
      * unbounded column is reached; that column enters. Harris admits finishing columns below the running
      * scaled bound `max(minimumDelta / |α|, ratio + harrisTolerance / |α|)` and takes the largest pivot.
      * A boxed column whose remaining range cannot finish the step stays flip-only and cannot enter.
-     * Mutates [status] for the flips; sound regardless, since the basis is certified downstream.
+     * Mutates status for the flips; sound regardless, since the basis is certified downstream.
      */
     private fun chooseEntering(
-        elig: IntArrayList,
-        ordered: IntArray,
-        theoryCandidates: IntArrayList,
-        ratioBuf: DoubleArray,
-        pivotRowEntry: DoubleArray,
+        scratch: SimplexRatioWorkspace,
         delta: Double,
         leavingRow: Int,
         enforced: BooleanArray?,
     ): EnteringChoice {
-        sortByRatio(elig, ordered, ratioBuf)
+        val elig = scratch.eligibleColumns
+        val theoryCandidates = scratch.theoryColumns
+        val ratioBuf = scratch.enteringRatios
+        val pivotRowEntry = scratch.pivotRowEntries
+        sortByRatio(scratch)
         var acc = 0.0
         var flipCount = 0
         for (idx in 0 until elig.size) {
@@ -2125,7 +2121,7 @@ internal class RevisedSimplex(
                     val minimizeBoundSupport =
                         pricing.zeroObjective == LpZeroObjectivePricing.MIN_BOUND_SUPPORT && originalZeroCost
                     val selected = if (minimizeBoundSupport) {
-                        when (val theory = chooseTheoryEntering(theoryCandidates, leavingRow, enforced)) {
+                        when (val theory = chooseTheoryEntering(theoryCandidates, leavingRow, enforced, scratch)) {
                             EnteringChoice.ResourceStopped -> return theory
                             is EnteringChoice.Selected -> theory.column ?: best
                         }
@@ -2143,8 +2139,11 @@ internal class RevisedSimplex(
     }
 
     // Stable ascending order by ratio.
-    private fun sortByRatio(elig: IntArrayList, ordered: IntArray, ratioBuf: DoubleArray) {
-        val order = argsortBy(elig.size, pricingOrder, pricingScratch) { a, b ->
+    private fun sortByRatio(scratch: SimplexRatioWorkspace) {
+        val elig = scratch.eligibleColumns
+        val ordered = scratch.eligibleOrdered
+        val ratioBuf = scratch.enteringRatios
+        val order = argsortBy(elig.size, scratch.pricingOrder, scratch.pricingScratch) { a, b ->
             ratioBuf[elig[a]].compareTo(ratioBuf[elig[b]])
         }
         for (position in 0 until elig.size) ordered[position] = elig[order[position]]
@@ -2197,6 +2196,7 @@ internal class RevisedSimplex(
         candidates: IntArrayList,
         leavingRow: Int,
         enforced: BooleanArray?,
+        scratch: SimplexRatioWorkspace,
     ): EnteringChoice {
         observations.lastTheoryPricingAttempts++
         if (candidates.isEmpty()) {
@@ -2205,7 +2205,7 @@ internal class RevisedSimplex(
         }
         addTheoryPricingWork(candidateOrderingWork(candidates.size))
         if (pricingResourceStopped()) return EnteringChoice.ResourceStopped
-        val order = argsortBy(candidates.size, pricingOrder, pricingScratch) { a, b ->
+        val order = argsortBy(candidates.size, scratch.pricingOrder, scratch.pricingScratch) { a, b ->
             val left = candidates[a]
             val right = candidates[b]
             val sparsity = columnNnz(left).compareTo(columnNnz(right))

@@ -173,6 +173,11 @@ cap and its containing effort allowance. Required leaf completion and preparatio
 keep their own allowances. Retained numerical owner construction uses the containing
 effort allowance; the slice cap applies to its floating queries. Atomic kernel work
 can still overspend; the slice carries that debt through the existing accounting.
+Full-coordinate simplex ratio scratch allocates on its first ratio test and stays
+with that engine object across queries and close-and-reopen recovery. Its complete
+allocation precedes publication of the scratch owner, and allocation exceptions
+propagate at that use. Projection, scaling, basis preparation, native work charges
+and source edit admission remain eager and retain their containing allowances.
 Search before a finite external cutoff retains its containing native effort allowance.
 
 `Cancellation` and `WorkMeter` live in the neutral `util` package within `klause`. Their units come

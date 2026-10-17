@@ -15,6 +15,79 @@ import kotlin.test.assertTrue
 
 class RevisedSimplexScratchTest {
     @Test
+    fun `preparing logical and warm bases should preserve the first dual optimum`() {
+        for (cost in listOf(0L, 1L)) {
+            val model = LpBuilder().apply {
+                addVar(0L, 4L, cost = cost)
+                addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+            }.build(Sense.MINIMIZE)
+            val state = LpExactState(assertNotNull(model.authoritativeModel()))
+            RevisedSimplex(assertNotNull(state.toWorkingModel())).use { solver ->
+                val logical = assertNotNull(solver.prepareLogicals(Cancellation.Never))
+                assertNotNull(solver.prepareBasis(logical, Cancellation.Never))
+
+                val result = assertNotNull(solver.resolveBounds())
+
+                assertEquals(2.0 * cost, result.objective)
+                assertContentEquals(doubleArrayOf(2.0), result.primal)
+            }
+        }
+    }
+
+    @Test
+    fun `a cancelled first dual query should permit a later complete query`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 4L, cost = 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        }.build(Sense.MINIMIZE)
+        val state = LpExactState(assertNotNull(model.authoritativeModel()))
+        var cancelled = false
+        val token = Cancellation { cancelled }
+        RevisedSimplex(assertNotNull(state.toWorkingModel()), cancellation = token).use { solver ->
+            assertNotNull(solver.prepareLogicals(token))
+            cancelled = true
+            assertNull(solver.resolveBounds())
+            assertEquals(LpFloatTermination.CANCELLED, solver.lastTermination)
+
+            cancelled = false
+            val result = assertNotNull(solver.resolveBounds())
+
+            assertEquals(2.0, result.objective)
+            assertContentEquals(doubleArrayOf(2.0), result.primal)
+        }
+    }
+
+    @Test
+    fun `bound adoption across dual and primal queries should preserve each optimum`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 3L, cost = 1L)
+            addVar(0L, 3L, cost = 2L)
+            addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.GE, 3L)
+        }.build(Sense.MINIMIZE)
+        val state = LpExactState(assertNotNull(model.authoritativeModel()))
+        RevisedSimplex(assertNotNull(state.toWorkingModel())).use { solver ->
+            assertNotNull(solver.prepareLogicals(Cancellation.Never))
+            val first = assertNotNull(solver.resolveBounds())
+            assertEquals(3.0, first.objective)
+            val tightened = LpExactState(
+                assertNotNull(model.rebind(longArrayOf(0L, 0L), longArrayOf(1L, 3L)).authoritativeModel()),
+                boundRevision = 1L,
+            )
+            assertTrue(solver.adopt(tightened, Cancellation.Never))
+            assertEquals(5.0, assertNotNull(solver.resolveBounds()).objective)
+            val restored = LpExactState(assertNotNull(model.authoritativeModel()), boundRevision = 2L)
+            assertTrue(solver.adopt(restored, Cancellation.Never))
+
+            val primal = assertNotNull(solver.solvePrimal())
+            val repeated = assertNotNull(solver.resolveBounds())
+
+            assertEquals(3.0, primal.objective)
+            assertContentEquals(doubleArrayOf(3.0, 0.0), repeated.primal)
+            assertContentEquals(doubleArrayOf(3.0, 0.0), first.primal)
+        }
+    }
+
+    @Test
     fun `exact adoption should retire an old ray before the next solve`() {
         val model = LpBuilder().apply {
             addVar(0L, 1L, cost = 1L)

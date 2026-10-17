@@ -268,11 +268,19 @@ the search's incomplete flag. A projection decline does not retire a search work
 ## Floating simplex and basis factors
 
 [SimplexWorkspace](../../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/SimplexWorkspace.kt)
-owns fixed-dimension scratch for one floating engine. Concrete borrowed aliases keep
-the numerical loops on the same reusable arrays. Entering spikes, sampled pricing
-spikes, pivotal rows, RHS and dual solves have distinct indexed carriers: a basis backend
-can reuse the form it produced when the same carrier reaches its update operation.
-Scratch cannot escape as a published result or exact cache.
+owns row-dimension scratch for one floating engine. Its full-coordinate ratio and
+pricing buffers belong to a separate private owner, created together on the first
+dual ratio test and retained for that engine object, including close-and-reopen
+recovery. Preparation still projects the complete model, adopts its state and
+factorizes or repairs the requested basis eagerly. Every original coordinate keeps
+its slot. The scratch owner publishes only after all its allocations complete;
+an allocation failure propagates from first use. This changes scratch allocation
+timing without deferring numerical preparation or changing work allowances.
+Concrete borrowed arrays keep numerical loops on reusable storage. Entering spikes,
+sampled pricing spikes, pivotal rows, RHS and dual solves have distinct indexed
+carriers: a basis backend can reuse the form it produced when the same carrier
+reaches its update operation. Scratch cannot escape as a published result or exact
+cache.
 
 [SimplexBasisLifecycle](../../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/SimplexBasisLifecycle.kt)
 owns discrete headings/statuses, their factorization identity and the lazy floating
@@ -284,7 +292,7 @@ columns. Compatible bound edits retain the owner; structural size changes constr
 fresh fixed-dimension engine.
 
 [SimplexPricingState](../../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/SimplexPricingState.kt)
-owns Devex reference weights and reusable ordering buffers.
+owns Devex reference weights; ratio ordering buffers share the private ratio workspace.
 [SimplexObservations](../../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/SimplexObservations.kt)
 owns per-solve counters, numerical observations and detached metric snapshots.
 Observation reset is independent of retained factors and exact caches. Allowance

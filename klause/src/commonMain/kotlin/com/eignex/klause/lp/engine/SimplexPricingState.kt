@@ -2,10 +2,8 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.IndexedVector
 
-internal class SimplexPricingState(m: Int, numVars: Int) {
+internal class SimplexPricingState(m: Int) {
     val gamma = DoubleArray(m) { 1.0 }
-    val order = IntArray(numVars)
-    val scratch = IntArray(numVars)
 
     fun resetReference() {
         gamma.fill(1.0)
