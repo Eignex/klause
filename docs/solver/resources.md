@@ -55,6 +55,11 @@ calls only the selected finite request factory and retains the typed native cont
 arithmetic execution. Their cooperative stop composes with the captured source token;
 the original deadline also bounds native timeout reporting. Heuristic fallback reuses
 the captured source plan and ledger without another routing allowance.
+Numerical finite-route discovery applies the optional bound-closure token only to
+that deduction. Declining closure retains required source admission and numerical
+execution under the containing token. Raw linear finite consumers select numerical
+continuous completion before heuristic workers are built; fixed discrete coordinates
+do not replace their requested heuristic execution with an exact neighborhood worker.
 
 ## Units and boundaries
 

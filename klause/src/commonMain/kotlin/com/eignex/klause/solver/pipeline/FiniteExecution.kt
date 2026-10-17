@@ -39,6 +39,8 @@ import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.withPresolve
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
+import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
 import kotlin.time.TimeMark
@@ -465,14 +467,25 @@ internal fun FinitePipeline.solve(
             FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
         )
     }
-    val linearSource = request.shape.sourceInvocation?.linearSource
+    val invocation = request.shape.sourceInvocation
+    val linearSource = invocation?.linearSource
+    val permitsToleranceOptimum = invocation?.let {
+        it.source.semantics.effective.feasibilityTolerance?.isExact == false
+    } ?: true
     val sourceCheck: ((Sample) -> Boolean)? = if (linearSource == null) {
-        request.toleranceCheck
-    } else {
-        { sample ->
-            linearSource.check(sample, stop) is com.eignex.klause.solver.validation.LinearSourceCheck.Accepted &&
-                request.toleranceCheck?.invoke(sample) != false
+        request.toleranceCheck?.let { check ->
+            FiniteSourceAcceptance(check, permitsToleranceOptimum && check.permitsToleranceOptimum())
         }
+    } else {
+        FiniteSourceAcceptance(
+            { sample ->
+                linearSource.check(sample, stop) is com.eignex.klause.solver.validation.LinearSourceCheck.Accepted &&
+                    request.toleranceCheck?.invoke(sample) != false
+            },
+            permitsToleranceOptimum =
+                permitsToleranceOptimum &&
+                    (request.toleranceCheck == null || request.toleranceCheck.permitsToleranceOptimum()),
+        )
     }
     val execution = execute(
         FiniteExecutionRequest(
@@ -485,7 +498,8 @@ internal fun FinitePipeline.solve(
             definitionalSweep = request.shape.definitionalSweep,
             searchHints = searchHints,
             cores = request.cores,
-            executionOptions = request.executionOptions,
+            executionOptions = if (linearSource == null) request.executionOptions else
+                request.executionOptions.withNumericalCompletion(),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpConfig = request.lpConfig,
@@ -501,7 +515,9 @@ internal fun FinitePipeline.solve(
             onPortfolioEvent = request.onPortfolioEvent,
             onPortfolioFault = request.onPortfolioFault,
             lpSolveContext = lpSolveContext,
-            toleranceCheck = sourceCheck?.let { check -> { check(preparation.reconstruct(it)) } },
+            toleranceCheck = sourceCheck?.let { check ->
+                FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum())
+            },
             sourceInvocation = request.shape.sourceInvocation,
             sourceMapping = preparation.sourceMapping,
         ),

@@ -16,6 +16,8 @@ import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
+import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.util.Cancellation
@@ -33,7 +35,7 @@ internal class LeafRealCompletion(
     private val problem: Problem,
     private val objective: LinearObjective?,
     private val toleranceCheck: ((Sample) -> Boolean)?,
-    private val context: LpSolveContext = if (toleranceCheck == null) {
+    private val context: LpSolveContext = if (!toleranceCheck.permitsToleranceOptimum()) {
         LpSolveContext.Production.copy(sparsePointRecovery = true)
     } else LpSolveContext.Production,
 ) : CandidateCompletion {
@@ -70,10 +72,13 @@ internal class LeafRealCompletion(
         }
         val encoded = encoding.modelFor(candidate, cancellation) ?: return Completion.Undecided(movesFor(0.0))
         val sink = LpStatsSink(LpRoute.STANDALONE)
-        val check = if (observeFloat == null) toleranceCheck else { sample: Sample ->
-            observeFloat?.invoke(sample)
-            toleranceCheck?.invoke(sample) == true
-        }
+        val check = if (observeFloat == null) toleranceCheck else FiniteSourceAcceptance(
+            { sample ->
+                observeFloat?.invoke(sample)
+                toleranceCheck?.invoke(sample) == true
+            },
+            toleranceCheck.permitsToleranceOptimum(),
+        )
         val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink,
             context = context, toleranceCheck = check, encoders = encoders, sourceEncoding = encoded)
         val stats = sink.snapshot()
