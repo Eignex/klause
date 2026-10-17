@@ -183,8 +183,8 @@ private fun preflightFloatFactor(
     return when (factor) {
         is Linear, is ReifiedRealLinear, is RealAbs, is RealArrayMinMax, is RealElement, is RealFiniteDomain -> true
         is ContinuousProduct -> factor.finiteChoices?.let { choices ->
-            choices.size == 1 && source.realLower[choices.operand] == choices.valueAt(0) &&
-                source.realUpper[choices.operand] == choices.valueAt(0)
+            !choices.hasGuards || (choices.size == 1 && source.realLower[choices.operand] == choices.valueAt(0) &&
+                source.realUpper[choices.operand] == choices.valueAt(0))
         } ?: true
         is Power -> factor.base is Power.Coordinate.Real
         else -> false
@@ -252,8 +252,13 @@ private fun lowerFloatGridFactor(
             listOf(GridAbs(input.variable, output.variable, input.lower, input.upper, input.buckets,
                 output.lower, output.upper, output.buckets, image))
         }
-        is ContinuousProduct -> listOf(GridProduct(coordinate(factor.a), coordinate(factor.b),
-            coordinate(factor.result)))
+        is ContinuousProduct -> {
+            val product = GridProduct(coordinate(factor.a), coordinate(factor.b), coordinate(factor.result))
+            val choices = factor.finiteChoices?.takeUnless { it.hasGuards }
+            val membership = if (choices == null) emptyList() else lowerGridFiniteValues(choices.size,
+                choices::valueAt, columns.getValue(choices.operand), cancellation) ?: return null
+            listOf(product) + membership
+        }
         is Power -> listOf(GridPower(coordinate((factor.base as Power.Coordinate.Real).id.index), factor.exponent,
             coordinate((factor.result as Power.Coordinate.Real).id.index)))
         is RealArrayMinMax -> listOf(lowerGridMinMax(factor, columns, policy.linearScale, cancellation) ?: return null)

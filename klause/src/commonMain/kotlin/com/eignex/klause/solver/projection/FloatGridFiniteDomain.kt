@@ -14,12 +14,19 @@ internal fun lowerGridFiniteDomain(
     factor: RealFiniteDomain,
     column: FloatGridColumn,
     cancellation: Cancellation,
+): List<Factor>? = lowerGridFiniteValues(factor.size, factor::valueAt, column, cancellation)
+
+internal fun lowerGridFiniteValues(
+    size: Int,
+    valueAt: (Int) -> Double,
+    column: FloatGridColumn,
+    cancellation: Cancellation,
 ): List<Factor>? {
     val admitted = ArrayList<Long>()
-    for (index in 0 until factor.size) {
+    for (index in 0 until size) {
         cancellation.charge(1)
         if (cancellation()) return null
-        val value = requireNotNull(BigFraction.ofDouble(factor.valueAt(index)))
+        val value = requireNotNull(BigFraction.ofDouble(valueAt(index)))
         if (column.step.isZero) {
             if (value == column.origin) return emptyList()
         } else {

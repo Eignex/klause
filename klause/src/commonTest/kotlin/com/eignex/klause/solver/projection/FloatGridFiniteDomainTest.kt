@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.projection
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.Problem
@@ -20,6 +21,24 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 
 class FloatGridFiniteDomainTest {
+    @Test
+    fun `a private product view should retain its unguarded operand membership`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(
+            ContinuousProduct(0, 0, 1, 0, doubleArrayOf(-1.0, 0.125, 0.5)),
+        ), numRealVars = 2, realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(5, 1000)).resolve())
+        val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
+            listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1)))), Cancellation.Never))
+
+        val points = BacktrackSolver(prepared.problem.bake()).enumerate().map { point ->
+            assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, Cancellation.Never))
+        }.toList()
+
+        assertEquals(setOf(BigFraction.ofLong(-1), BigFraction.ONE / BigFraction.ofLong(2)),
+            points.map { assertNotNull(it.exactReals)[0] }.toSet())
+        for (point in points) assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, point))
+    }
+
     @Test
     fun `a selected grid should exclude nonmembers without rounding declared values`() {
         val source = Problem(0, 0, emptyArray(),
