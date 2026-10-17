@@ -21,10 +21,13 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
+import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
@@ -41,6 +44,7 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -547,6 +551,385 @@ class QfLiraSolverTest {
             assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, false))))
 
             assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+        }
+    }
+
+    @Test
+    fun `an integer side should imply its weaker source Boolean before completion`() {
+        val source = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(2),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 1),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3, maxAtoms = 0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertEquals(true, session.boolValue(1))
+            assertNull(session.boolValue(2))
+            assertEquals(setOf(Lit.make(0, false), Lit.make(1, true)),
+                assertNotNull(session.reasonFor(1)).literals.toSet())
+            val witness = assertNotNull(assertIs<SearchResult.Satisfied>(session.solve(source.numBoolVars)).model
+                .valueOf<ExactLiraAssignment>(component))
+            assertContentEquals(booleanArrayOf(true, true), witness.bools.copyOf(2))
+            assertTrue(witness.intValue(0) * bigIntOf(2) + witness.intValue(1) <= BIG_ZERO)
+        }
+    }
+
+    @Test
+    fun `integer feedback should preserve strict side polarity at equal endpoints`() {
+        val cases = listOf(
+            Triple(true, LinearOp.LE, true),
+            Triple(false, LinearOp.LE, false),
+            Triple(false, LinearOp.GE, true),
+            Triple(true, LinearOp.GE, null),
+        )
+        for ((antecedent, operator, expected) in cases) {
+            val source = Problem(
+                numBoolVars = 3,
+                intBounds = openBounds(),
+                factors = arrayOf(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                    ReifiedLinear(1, intArrayOf(1), intArrayOf(0), operator, 0),
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, antecedent))))
+
+                assertEquals(expected, session.boolValue(1))
+                assertNull(session.boolValue(2))
+                if (expected != null) {
+                    assertEquals(setOf(Lit.make(0, !antecedent), Lit.make(1, expected)),
+                        assertNotNull(session.reasonFor(1)).literals.toSet())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `integer feedback should preserve signed normalized expression scales`() {
+        for (operator in listOf(LinearOp.LE, LinearOp.GE)) {
+            val source = Problem(
+                numBoolVars = 1,
+                intBounds = openBounds(2),
+                factors = arrayOf(
+                    Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 4),
+                    ReifiedLinear(0, intArrayOf(-4, -2), intArrayOf(0, 1), operator, -10),
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component))
+
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                val expected = operator == LinearOp.GE
+                assertEquals(expected, session.boolValue(0))
+                assertContentEquals(intArrayOf(Lit.make(0, expected)), assertNotNull(session.reasonFor(0)).literals)
+                assertIs<SearchResult.Satisfied>(session.solve(source.numBoolVars))
+            }
+        }
+    }
+
+    @Test
+    fun `integer feedback should retract with its source antecedent`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertEquals(true, session.boolValue(1))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertNull(session.boolValue(1))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            assertNull(session.boolValue(1))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            val witness = assertNotNull(assertIs<SearchResult.Satisfied>(session.solve(source.numBoolVars)).model
+                .valueOf<ExactLiraAssignment>(component))
+            assertTrue(witness.intValue(0) > BIG_ONE)
+        }
+    }
+
+    @Test
+    fun `integer feedback should admit dormant disjunctions and exclude asserted rows`() {
+        for (active in listOf(false, true)) {
+            val source = Problem(
+                numBoolVars = 3,
+                intBounds = openBounds(2),
+                factors = arrayOf(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                    ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                    ComparisonClause(intArrayOf(1, 1), arrayOf(LinearOp.LE, LinearOp.GE), longArrayOf(0, 1)),
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val atoms = SearchAtomRegistry(3)
+                val session = SearchSession(listOf(component), atoms = atoms)
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                if (active) {
+                    assertIs<SearchResult.Satisfied>(session.solve(source.numBoolVars))
+                    val row = assertNotNull(atoms.assertion(Lit.make(3, true)))
+                    session.popTo(0)
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(row)))
+                }
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+                assertEquals(if (active) null else true, session.boolValue(1))
+                assertNull(session.boolValue(2))
+            }
+        }
+    }
+
+    @Test
+    fun `a source integer branch should exclude comparison feedback`() {
+        val source = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(2),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val split = assertNotNull(SourceBoundAtom.integerSplit(session,
+                listOf(SourceBoundTerm(SearchIntValue(1), BigFraction.ONE)), BigFraction.ZERO))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.positive)))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertNull(session.boolValue(1))
+        }
+    }
+
+    @Test
+    fun `unavailable source names should withhold integer feedback`() {
+        for (hidden in listOf(0, 1)) {
+            val source = Problem(
+                numBoolVars = 2,
+                intBounds = openBounds(),
+                factors = arrayOf(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                    ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                ),
+            )
+            val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+            val context = object : SearchContext by session {
+                override fun atomLiteral(decision: SearchDecision): Int? =
+                    if (decision == SearchDecision.Bool(Lit.make(hidden, true))) null else session.atomLiteral(decision)
+            }
+            ExactLiraSearchComponent(source).use { component ->
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(component.initialize(context))
+                val decision = SearchDecision.Bool(Lit.make(0, true))
+                assertIs<ComponentResult.Consistent>(session.push(decision))
+                assertIs<ComponentResult.Consistent>(component.assert(decision, context))
+
+                assertIs<ComponentResult.Consistent>(component.propagate(context))
+
+                assertNull(session.boolValue(1))
+            }
+        }
+    }
+
+    @Test
+    fun `unavailable or oversized integer bound reasons should withhold feedback`() {
+        for (oversized in listOf(false, true)) {
+            val source = Problem(numBoolVars = 1, intBounds = openBounds(),
+                factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)))
+            val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val bound = SearchDecision.IntAtMost(0, 0)
+            assertIs<ComponentResult.Consistent>(session.push(bound))
+            val premise = if (oversized) SearchAtomPremise.All(List(4096) { session.intUpperBoundPremise(0) })
+                else SearchAtomPremise.Unavailable
+            val context = object : SearchContext by session {
+                override fun intUpperBoundPremise(variable: Int): SearchAtomPremise = premise
+            }
+            ExactLiraSearchComponent(source).use { component ->
+                assertIs<ComponentResult.Consistent>(component.initialize(context))
+                assertIs<ComponentResult.Consistent>(component.assert(bound, context))
+
+                assertIs<ComponentResult.Consistent>(component.propagate(context))
+
+                assertNull(session.boolValue(0))
+            }
+        }
+    }
+
+    @Test
+    fun `nonprimitive integer targets should retain unresolved Booleans`() {
+        val booleanRow = object : Factor by ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0) {
+            override val linearForm = LinearForm.Conjunction(listOf(TaggedLinearRow(
+                intArrayOf(Term.ofLit(Lit.make(1, true)), Term.ofIntVar(0)), IntegerConstants(UnitConsts(2), 0L),
+                LinearOp.LE, activator = 0,
+            )))
+        }
+        val targets = listOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.NE, 0),
+            ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(0.5), intArrayOf(), doubleArrayOf(), LinearOp.LE, 0.0),
+            booleanRow,
+        )
+        for (target in targets) {
+            val source = Problem(numBoolVars = 2, intBounds = openBounds(),
+                factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0), target))
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component))
+
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertNull(session.boolValue(0))
+                assertNull(session.boolValue(1))
+            }
+        }
+    }
+
+    @Test
+    fun `mixed source models should withhold integer comparison feedback`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `a stop during integer reason validation should withhold publication`() {
+        var stopped = false
+        val source = Problem(numBoolVars = 2, intBounds = openBounds(), factors = arrayOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+        ))
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        val context = object : SearchContext by session {
+            override fun atomLiteral(decision: SearchDecision): Int? {
+                if (decision == SearchDecision.Bool(Lit.make(1, true))) stopped = true
+                return session.atomLiteral(decision)
+            }
+        }
+        ExactLiraSearchComponent(source).use { component ->
+            component.useOperationAllowance { parent -> parent or Cancellation { stopped } }
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val decision = SearchDecision.Bool(Lit.make(0, true))
+            assertIs<ComponentResult.Consistent>(session.push(decision))
+            assertIs<ComponentResult.Consistent>(component.assert(decision, context))
+
+            assertIs<ComponentResult.Indeterminate>(component.propagate(context))
+
+            assertNull(session.boolValue(1))
+            assertIs<ComponentCheck.Indeterminate>(component.check(context))
+        }
+    }
+
+    @Test
+    fun `an interrupted integer publication should finish only after its local source check`() {
+        var stopped = false
+        val source = Problem(numBoolVars = 2, intBounds = openBounds(), factors = arrayOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+        ))
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        val context = object : SearchContext by session {
+            override fun imply(literal: Int, explanation: SearchExplanation): ComponentResult {
+                val result = session.imply(literal, explanation)
+                stopped = true
+                return result
+            }
+        }
+        ExactLiraSearchComponent(source).use { component ->
+            component.useOperationAllowance { parent -> parent or Cancellation { stopped } }
+            var contribution: Any? = null
+            val assembly = object : SearchModel {
+                override fun put(key: Any, value: Any) {
+                    if (key === component) contribution = value
+                }
+            }
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val decision = SearchDecision.Bool(Lit.make(0, true))
+            assertIs<ComponentResult.Consistent>(session.push(decision))
+            assertIs<ComponentResult.Consistent>(component.assert(decision, context))
+            assertIs<ComponentResult.Indeterminate>(component.propagate(context))
+            assertEquals(true, session.boolValue(1))
+            assertIs<ComponentCheck.Indeterminate>(component.check(context))
+            component.contributeModel(assembly, context)
+            assertNull(contribution)
+            stopped = false
+
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+
+            assertIs<ComponentCheck.Feasible>(component.check(context))
+            component.contributeModel(assembly, context)
+            val witness = assertIs<ExactLiraAssignment>(contribution)
+            assertContentEquals(booleanArrayOf(true, true), witness.bools)
+            assertTrue(witness.intValue(0) <= BIG_ZERO)
+        }
+    }
+
+    @Test
+    fun `integer consequences should share one source pass before the numerical check`() {
+        val source = Problem(numBoolVars = 4, intBounds = openBounds(), factors = arrayOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ReifiedLinear(2, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+        ))
+        var checks = 0
+        val session = SearchSession(emptyList())
+        val context = object : SearchContext by session {
+            override fun consumeCheck(): Boolean {
+                checks++
+                return true
+            }
+        }
+        ExactLiraSearchComponent(source).use { component ->
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val decision = SearchDecision.Bool(Lit.make(0, true))
+            assertIs<ComponentResult.Consistent>(session.push(decision))
+            assertIs<ComponentResult.Consistent>(component.assert(decision, context))
+
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+
+            assertEquals(true, session.boolValue(1))
+            assertEquals(true, session.boolValue(2))
+            assertEquals(0, checks)
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+            assertEquals(1, checks)
         }
     }
 

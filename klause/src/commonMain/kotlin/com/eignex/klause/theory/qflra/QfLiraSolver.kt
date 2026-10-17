@@ -209,6 +209,7 @@ class ExactLiraSearchComponent private constructor(
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
+    private var sourceBoundPublication: ComponentResult? = null
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
     }
@@ -965,7 +966,72 @@ class ExactLiraSearchComponent private constructor(
         return system.install().also { sourceInstalled = it }
     }
 
+    private fun implySourceBound(prepared: PreparedSourceRow, context: SearchContext): ComponentResult? {
+        operationStop.charge(1L)
+        if (operationStop()) return ComponentResult.Indeterminate
+        val variable = prepared.row.activator
+        if (variable !in bools.indices || context.boolValue(variable) != null || graphFirst || hasPrivateReals ||
+            model.numIntVars == 0 || model.numRealVars != 0 || prepared.disjunction ||
+            prepared.row.constants !is IntegralConstants || prepared.row.size == 0 ||
+            (prepared.row.relation != LinearOp.LE && prepared.row.relation != LinearOp.GE) ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
+            node.rowAssertions.isNotEmpty() || node.sourceBranches.isNotEmpty() ||
+            node.disequalityDirections.isNotEmpty() || node.directionPremises.isNotEmpty() ||
+            node.branches.isNotEmpty() || node.reducedBranches.isNotEmpty() ||
+            node.transformedBranches.isNotEmpty() || node.retainedReduction != null
+        ) return null
+        for (index in 0 until prepared.row.size) {
+            operationStop.charge(1L)
+            if (operationStop()) return ComponentResult.Indeterminate
+            if (!Term.isInt(prepared.row.ref(index))) return null
+        }
+        operationStop.charge(3L * prepared.row.size + 8L)
+        if (operationStop()) return ComponentResult.Indeterminate
+        val comparison = prepared.form.comparison(true) { false }
+        val implied = system.impliedComparison(comparison, operationStop) ?: return null
+        val decision = SearchDecision.Bool(Lit.make(variable, implied.holds))
+        val explanation = sourceBoundReason(implied.premise, decision, context) ?: return null
+        if (operationStop()) return ComponentResult.Indeterminate
+        val published = context.imply(decision.literal, explanation)
+        if (published != ComponentResult.Consistent) return published
+        // Shared implication omits delivery to its producer, whose LP scope is already current.
+        val applied = lp.assertWithin(decision, context, operationStop)
+        if (applied == ComponentResult.Consistent) observeCompleteStage("SOURCE_BOUND_IMPLIED")
+        return applied
+    }
+
+    private fun sourceBoundReason(
+        premise: SearchAtomPremise,
+        decision: SearchDecision,
+        context: SearchContext,
+    ): SearchExplanation? {
+        val pending = ArrayDeque<SearchAtomPremise>()
+        val expanded = HashSet<SearchAtomPremise.All>()
+        pending.add(premise)
+        var remaining = 4096
+        var visited = 0L
+        while (pending.isNotEmpty()) {
+            operationStop.charge(2L)
+            if (operationStop() || remaining-- <= 0) return null
+            visited++
+            when (val current = pending.removeLast()) {
+                is SearchAtomPremise.Asserted -> Unit
+                is SearchAtomPremise.All -> {
+                    if (!expanded.add(current)) continue
+                    if (current.premises.size > remaining - pending.size) return null
+                    pending.addAll(current.premises)
+                }
+                SearchAtomPremise.Unavailable -> return null
+            }
+        }
+        // The shared validator repeats this bounded traversal and owns the resulting clause buffer.
+        operationStop.charge(visited + 2L)
+        if (operationStop()) return null
+        return context.explainAtoms(premise, decision).takeUnless { operationStop() }
+    }
+
     private fun assertSource(context: SearchContext): Boolean {
+        sourceBoundPublication = null
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((index, prepared) in preparedRows.withIndex()) {
@@ -975,7 +1041,14 @@ class ExactLiraSearchComponent private constructor(
             val address = prepared.address
             val asserted = node.rowAssertions[address]
             if (prepared.disjunction && asserted == null) continue
-            val truth = node.rowTruth(address, prepared.row, bools) ?: continue
+            val truth = node.rowTruth(address, prepared.row, bools)
+            if (truth == null) {
+                implySourceBound(prepared, context)?.let {
+                    sourceBoundPublication = it
+                    if (it != ComponentResult.Consistent) return true
+                }
+                continue
+            }
             val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
             val leaves = prepared.booleans.map { variable ->
                 SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
@@ -1163,6 +1236,7 @@ class ExactLiraSearchComponent private constructor(
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
         }
+        sourceBoundPublication?.let { return it }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()

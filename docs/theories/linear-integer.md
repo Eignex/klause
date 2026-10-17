@@ -28,6 +28,15 @@ before publishing a completed point. SMT admission remains defined by
 
 The linear component asserts active source rows under shared Boolean choices.
 Exact integer reductions and bound reasoning can simplify the remaining system.
+An existing exact side can imply an unresolved ordinary integral comparison
+Boolean with its current source premises. This feedback uses an already installed
+term and column, preserves strictness and normalization, and performs no numerical
+solve. Dormant source disjunctions may coexist; active row assertions, arithmetic
+branches and retained reductions exclude this feedback. The producer applies its
+own Boolean consequence in the current frame and yields the batch to the shared
+fixpoint before solving. Scalar checks and complete bounded premise expansion
+consume the current operation allowance. Missing names or premises, oversized
+reasons and interruption withhold the implication.
 A fractional open-integer candidate causes complementary branches at exact floor
 and ceiling thresholds. Finite variables receive scoped fixings from their finite
 owner, preserving bounds and holes. Shared search owns decision levels, retraction and conflict
