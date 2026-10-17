@@ -31,8 +31,8 @@ def source_objective(source):
         marker_name += '_'
     marker = z3.Real(marker_name)
     equality = z3.parse_smt2_string(
-        '\n'.join(sexpr(command) for command in declarations)
-        + '\n(assert (= ' + marker_name + ' ' + sexpr(objective[1]) + '))',
+        '\n'.join(sexpr(command, source_symbols=True) for command in declarations)
+        + '\n(assert (= ' + marker_name + ' ' + sexpr(objective[1], source_symbols=True) + '))',
         decls={marker_name: marker},
     )[0]
     return semantic_source, variables, equality.arg(1), objective[0]

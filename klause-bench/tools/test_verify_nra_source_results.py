@@ -95,6 +95,39 @@ class NraSourceCheckTest(unittest.TestCase):
                   '(define-fun p () Bool true))'
         self.assertEqual(check.check_witness(source, witness)['coordinates'], 2)
 
+    def test_signed_and_quoted_numeric_source_symbols_retain_declared_identity(self):
+        cases = (
+            ('(declare-const -1 Int) (assert (= -1 2)) (assert (= (to_real -1) 2.0))',
+             '((define-fun -1 () Int 2))'),
+            ('(declare-const |-1| Int) (assert (= -1 2)) (assert (= |-1| 2))',
+             '((define-fun |-1| () Int 2))'),
+            ('(declare-const -1.5 Int) (define-fun accepts ((n Int)) Bool (= n 3)) '
+             '(assert (accepts -1.5))', '((define-fun -1.5 () Int 3))'),
+            ('(declare-const |0| Int) (assert (= |0| 2)) (assert (= 0 0))',
+             '((define-fun |0| () Int 2))'),
+        )
+        for source, witness in cases:
+            with self.subTest(source=source), \
+                    mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')):
+                result = check.check_witness(source, witness)
+
+                self.assertEqual(1, result['coordinates'])
+                self.assertEqual(hashlib.sha256(source.encode()).hexdigest(), result['sourceSha256'])
+
+    def test_numeric_looking_source_symbols_reject_a_wrong_coordinate(self):
+        for name in ('-1', '|0|'):
+            source = '(declare-const ' + name + ' Int) (assert (= ' + name + ' 2))'
+            witness = '((define-fun ' + name + ' () Int 3))'
+            with self.subTest(name=name), \
+                    self.assertRaisesRegex(AssertionError, 'original source assertion 0 is false'):
+                check.check_witness(source, witness)
+
+    def test_an_undeclared_signed_source_symbol_is_not_a_negative_numeral(self):
+        source = '(declare-const x Int) (assert (= x -1))'
+
+        with self.assertRaises(z3.Z3Exception):
+            check.check_witness(source, '((define-fun x () Int (- 1)))')
+
     def test_source_assumptions_are_checked(self):
         source = '(declare-const p Bool) (assert (or p (not p))) (check-sat-assuming ((not p)))'
         with self.assertRaisesRegex(AssertionError, 'original source assertion 1 is false'):
