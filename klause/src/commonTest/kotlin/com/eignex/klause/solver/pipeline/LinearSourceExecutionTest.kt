@@ -38,6 +38,38 @@ import kotlin.test.assertTrue
 
 class LinearSourceExecutionTest {
     @Test
+    fun `a complete finite portfolio should certify an embedded original objective`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("n", true, SemanticRational.ZERO, SemanticRational.ofLong(2))),
+            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                sense = ObjectiveSense.MAXIMIZE),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
+            maximize = true,
+        ))
+
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+            FiniteSolveRequest(
+                shape, FiniteEngine.BACKTRACK, PresolveConfig.NONE, false, false, Cancellation.Never,
+                presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
+                randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+                nodeBudget = com.eignex.klause.backtrack.NodeBudget(100),
+                solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
+            )
+        }))
+
+        val finite = assertIs<SourceExecutionResult.Finite>(result)
+        val outcome = assertIs<FiniteSolveOutcome.Completed>(finite.result.outcome)
+        assertEquals(FiniteSolveVerdict.OPTIMAL, outcome.verdict)
+        assertTrue(outcome.stats.portfolio.arms.any { it.segments > 0L })
+        assertEquals(LinearSourceConclusion.OPTIMAL, finite.linearSource?.conclusion)
+        assertEquals(BigFraction.ofLong(2), finite.linearSource?.incumbent?.objective)
+    }
+
+    @Test
     fun `declining optional bound closure should retain required numerical source execution`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("n", true)),

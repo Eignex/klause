@@ -49,6 +49,10 @@ class LinearSourceExecutionModeTest(private val engine: FiniteEngine) {
         }))
 
         val outcome = assertIs<FiniteSolveOutcome.Completed>(assertIs<SourceExecutionResult.Finite>(result).result.outcome)
-        assertTrue(outcome.verdict == FiniteSolveVerdict.BEST_FOUND || outcome.verdict == FiniteSolveVerdict.UNKNOWN)
+        val arms = outcome.stats.portfolio.arms
+        val prefix = if (engine == FiniteEngine.ALNS) "alns/" else "ls/"
+        assertTrue(arms.isNotEmpty())
+        assertTrue(arms.any { it.segments > 0L })
+        assertTrue(arms.all { it.label.startsWith(prefix) && !it.label.contains("exact-neighborhood") })
     }
 }

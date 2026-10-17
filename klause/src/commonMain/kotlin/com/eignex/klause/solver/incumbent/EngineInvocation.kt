@@ -33,6 +33,7 @@ internal class EngineInvocation(
     private val sourceWitnessCondition: SourceCondition = executionCondition(sourcePins)
     val executionCondition: SourceCondition = executionCondition(executionPins)
     val sourceObjective: LinearObjective? get() = preparedPlan.objective
+    val hasSourceObjective: Boolean get() = sourceObjective != null || preparedPlan.sourceLinearObjective != null
     val sense: ObjectiveSense get() = if (preparedPlan.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
     val sourceModel: ModelIdentity = ModelIdentity.of(preparedPlan.originalSource, sourceObjective)
     val hasUncapturedSourceRestrictions: Boolean get() = !sourcePins.deductions.isEmpty
@@ -53,7 +54,7 @@ internal class EngineInvocation(
             }) { "source condition references an undeclared coordinate" }
         require(model.matches(model.forObjective(executionObjective))) { "execution objective differs from its model" }
         require(scope == null || scope.condition == sourceCondition) { "capture has a different source condition" }
-        require(scope == null || (scope.objective == null) == (sourceObjective == null)) {
+        require(scope == null || (scope.objective != null) == hasSourceObjective) {
             "capture has a different source objective"
         }
         require(scope?.objective == null || scope.objective.sense == sense) {
