@@ -106,14 +106,20 @@ class QfLiraSolverLpTest {
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
 
                 assertEquals(initialQueries, queries)
-                assertEquals(if (tracked) 1L else null, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+                assertEquals(
+                    if (tracked) 1L else null,
+                    stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"),
+                )
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
                 assertEquals(initialQueries, queries)
 
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
 
                 assertTrue(queries > initialQueries)
-                assertEquals(if (tracked) 1L else null, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+                assertEquals(
+                    if (tracked) 1L else null,
+                    stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"),
+                )
                 assertNull(component.nextBranch(session))
                 assertIs<ComponentCheck.Feasible>(session.check())
                 val witness = assertNotNull(session.model().valueOf<ExactLraAssignment>(component))
