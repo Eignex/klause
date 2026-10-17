@@ -11,9 +11,15 @@ import z3
 from verify_source_results import expressions, number, rational, smt_variables, symbol
 
 
-def sexpr(expression):
+def sexpr(expression, *, source_symbols=False):
+    def atom(text):
+        if source_symbols and len(text) > 1 and text[0] == '-' and text[1] in '0123456789':
+            assert re.fullmatch(r'-[0-9][a-zA-Z0-9~!@$%^&*_+=<>.?/-]*', text), 'invalid source symbol'
+            return '|' + text + '|'
+        return text
+
     if isinstance(expression, str):
-        return expression
+        return atom(expression)
     parts = ['(']
     pending = [(iter(expression), True)]
     while pending:
@@ -28,7 +34,7 @@ def sexpr(expression):
             parts.append(' ')
         pending[-1] = (iterator, False)
         if isinstance(item, str):
-            parts.append(item)
+            parts.append(atom(item))
         else:
             parts.append('(')
             pending.append((iter(item), True))
@@ -99,7 +105,8 @@ def source_formula(text):
         else:
             assert operator in ('set-logic', 'set-info', 'set-option', 'get-model', 'get-value', 'exit'), \
                 'unsupported source command ' + operator
-    constraints = list(z3.parse_smt2_string('\n'.join(map(sexpr, semantic))))
+    constraints = list(z3.parse_smt2_string('\n'.join(
+        sexpr(command, source_symbols=True) for command in semantic)))
     known = {value.get_id() for value in variables.values()}
     pending = list(constraints)
     seen = set()

@@ -1568,6 +1568,10 @@ including native numeric absolute-value terms.
 It reconstructs rational coordinates and `root-obj` algebraic coordinates using the
 pinned Z3 dependency, pins every source variable, and requires every
 original assertion and Boolean query assumption to evaluate exactly to true.
+Source serialization quotes identifiers beginning with a minus sign and digit,
+preserving their symbol identity for dependency parsing. Quoted numeral symbols
+remain distinct from numeral literals. Original source bytes retain their recorded
+hash; model-coordinate numeral decoding uses its separate scalar grammar.
 Algebraic coordinates use integer defining polynomials and one-based distinct
 ordered real-root indices. Approximate decimal coordinates do not establish exact
 irrational equalities. Missing, duplicate, unknown or sort-mismatched coordinates
