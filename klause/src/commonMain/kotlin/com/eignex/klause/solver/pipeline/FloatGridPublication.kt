@@ -2,7 +2,9 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.validation.verifyProjectedSourceWitness
 import com.eignex.klause.util.Cancellation
 
@@ -55,6 +57,8 @@ internal class FloatGridPublication(
         preparation: FinitePipelinePreparation,
         elapsed: kotlin.time.Duration,
         native: FiniteSolveOutcome,
+        nativeSourceResult: SolveResult? = null,
+        nativeSourceMinimum: MinimizeResult? = null,
     ): FiniteSolveResult {
         if (native is FiniteSolveOutcome.Completed) native.bestSample?.let(::onSample)
         val qualified = if (native is FiniteSolveOutcome.Completed) {
@@ -67,7 +71,7 @@ internal class FloatGridPublication(
                 native.stats, accepted, best, native.elapsedMs,
             )
         } else native
-        return FiniteSolveResult(preparation, elapsed, qualified).also {
+        return FiniteSolveResult(preparation, elapsed, qualified, nativeSourceResult, nativeSourceMinimum).also {
             it.bindNativeGridOutcome(NativeGridOutcome(binding.metadata, native))
         }
     }

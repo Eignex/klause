@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.validation
 
-import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Power
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp

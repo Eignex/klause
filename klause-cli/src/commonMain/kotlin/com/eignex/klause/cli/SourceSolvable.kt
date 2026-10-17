@@ -65,9 +65,6 @@ internal fun sourceSolvable(
         renderOpen,
         lpStats,
         elapsed,
-        definedVars,
-        boolFolds,
-        searchHints,
     )
 }
 
@@ -156,9 +153,6 @@ internal fun preparedSourceSolvable(
     renderOpen: (OpenTheoryAssignment) -> String,
     routingLpStats: LpStats = LpStats(),
     routingElapsedMs: Long = 0,
-    definedVars: IntArray = IntArray(0),
-    boolFolds: List<BoolFoldDefinition> = emptyList(),
-    searchHints: SearchHints? = null,
 ): Solvable {
     if (invocation.route is SourceProblemRoute.NativeFormula) {
         return Solvable(

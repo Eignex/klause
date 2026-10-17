@@ -488,8 +488,11 @@ internal fun FinitePipeline.solve(
         preparation: FinitePipelinePreparation,
         elapsed: Duration,
         outcome: FiniteSolveOutcome,
+        nativeSourceResult: SolveResult? = null,
+        nativeSourceMinimum: MinimizeResult? = null,
     ): FiniteSolveResult =
-        gridPublication?.result(preparation, elapsed, outcome) ?: FiniteSolveResult(preparation, elapsed, outcome)
+        gridPublication?.result(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
+            ?: FiniteSolveResult(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
     if (request.shape.sourceInvocation != null && stop()) {
         return result(
             FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
