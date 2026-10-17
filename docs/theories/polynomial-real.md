@@ -756,6 +756,9 @@ query's existing arithmetic and cancellation owner; predicates from separate
 Boolean regions cannot supply a pair. The equality stays whole, including product
 zero fibres, and can expose total graphs for ordinary reduction. The source
 formula and its final assignment check retain the original inequalities.
+Predicate rewrites select the private regional conjunction even when they produce
+no reconstruction fibre. Its required equalities then reach root projection, and
+publication still checks the original formula.
 
 Without a multi-coordinate triangular wave, reduction selects constant-coefficient
 graph candidates by fill, coefficient size and coordinate preference. Each equation
@@ -800,6 +803,13 @@ have been removed. Lower-level polynomials carry through elimination. An absent
 dimension retains an empty family. The univariate family occupies the first
 lifting level. Equality sections can override the preference while retaining all
 their coordinate dependencies at earlier lifting levels.
+
+After ordinary planning selects an empty fallback level without a graph or root
+section, consecutive fallback coordinates absent from the unchanged family receive
+empty levels directly. This private coordinate summary is discarded before a
+nonempty level. Every original slot and the same graph/root priority remain in
+the permutation; cancellation and native work polling continue between empty
+levels. Empty dimensions do not repeat graph planning or boundary normalization.
 
 #### Required root sections
 

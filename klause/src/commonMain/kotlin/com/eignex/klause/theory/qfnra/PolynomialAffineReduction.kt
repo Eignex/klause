@@ -10,9 +10,8 @@ import com.eignex.klause.ir.PolynomialRelation
 internal class PolynomialAffineReduction private constructor(
     val atoms: List<PolynomialAtom>,
     private val fibres: List<AffineFibre>,
+    val changed: Boolean,
 ) {
-    val eliminatedCount: Int get() = fibres.size
-
     fun reconstruct(
         assignment: QfNraAssignment,
         arithmetic: PolynomialArithmetic,
@@ -59,14 +58,16 @@ internal class PolynomialAffineReduction private constructor(
             }
             val fibres = ArrayList<AffineFibre>()
             var inconsistent = false
+            var rewrittenPredicates = false
             while (true) {
                 val closure = prepareWeakEqualities(current, arithmetic)
-                var closed: List<PolynomialAtom>? = null
+                var closed: WeakEqualityClosure? = null
                 while (closed == null) {
                     closed = closure.next()
                     if (closed == null) yield(null)
                 }
-                current = closed
+                current = closed.atoms
+                rewrittenPredicates = rewrittenPredicates || closed.changed
                 val equations = current.mapNotNull { atom ->
                     arithmetic.step()
                     if (atom.relation == PolynomialRelation.EQ) atom.polynomial else null
@@ -160,7 +161,8 @@ internal class PolynomialAffineReduction private constructor(
                 yield(null)
             }
             arithmetic.step()
-            yield(PolynomialAffineReduction(current.toList(), fibres.toList()))
+            yield(PolynomialAffineReduction(current.toList(), fibres.toList(),
+                rewrittenPredicates || fibres.isNotEmpty()))
         }.iterator()
     }
 }
@@ -168,7 +170,7 @@ internal class PolynomialAffineReduction private constructor(
 private fun prepareWeakEqualities(
     atoms: List<PolynomialAtom>,
     arithmetic: PolynomialArithmetic,
-): Iterator<List<PolynomialAtom>?> = sequence {
+): Iterator<WeakEqualityClosure?> = sequence {
     val boundaries = HashMap<Int, Polynomial>()
     val directions = HashMap<Polynomial, Int>()
     for ((index, atom) in atoms.withIndex()) {
@@ -187,16 +189,22 @@ private fun prepareWeakEqualities(
     }
     val emitted = HashSet<Polynomial>()
     val result = ArrayList<PolynomialAtom>()
+    var changed = false
     for ((index, atom) in atoms.withIndex()) {
         arithmetic.step()
         val boundary = boundaries[index]
         if (boundary == null || directions[boundary] != 3) result.add(atom)
-        else if (emitted.add(boundary)) result.add(PolynomialAtom(boundary, PolynomialRelation.EQ))
+        else {
+            changed = true
+            if (emitted.add(boundary)) result.add(PolynomialAtom(boundary, PolynomialRelation.EQ))
+        }
         yield(null)
     }
     arithmetic.step()
-    yield(result)
+    yield(WeakEqualityClosure(result, changed))
 }.iterator()
+
+private class WeakEqualityClosure(val atoms: List<PolynomialAtom>, val changed: Boolean)
 
 private class AffineBound(val polynomial: Polynomial, val strict: Boolean)
 private class AffineFibre(

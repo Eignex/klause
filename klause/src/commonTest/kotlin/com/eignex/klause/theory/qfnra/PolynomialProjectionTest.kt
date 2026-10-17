@@ -6,6 +6,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
+import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -19,6 +20,50 @@ class PolynomialProjectionTest {
     private val arithmetic = PolynomialArithmetic()
     private val x = Polynomial.variable(0)
     private val y = Polynomial.variable(1)
+
+    @Test
+    fun `empty coordinate levels retain their slots within the native allowance`() {
+        val polynomial = Polynomial.of((0..63).map { degree ->
+            PolynomialTerm(Monomial.of(mapOf(0 to degree)), BigFraction.ONE)
+        })
+        var charges = 0L
+        val meter = WorkMeter { charges += it }
+        val limited = PolynomialArithmetic(object : Cancellation {
+            override fun isCancelled(): Boolean = charges >= 50_000
+            override fun workMeter(): WorkMeter = meter
+        })
+
+        val projection = PolynomialProjection.compute(listOf(polynomial), 2048, limited)
+
+        assertEquals((0 until 2048).toSet(), (0 until projection.variableCount).map { projection.variable(it) }.toSet())
+        assertEquals(listOf(polynomial), projection.polynomials(projection.level(0)))
+        assertTrue((1 until 2048).all { projection.polynomials(projection.level(it)).isEmpty() })
+    }
+
+    @Test
+    fun `required roots retain priority over empty coordinate levels`() {
+        val equation = arithmetic.subtract(arithmetic.power(x, 2), Polynomial.constant(BigFraction.ofLong(2)))
+
+        val projection = PolynomialProjection.compute(listOf(equation), 8, arithmetic, listOf(equation))
+
+        assertEquals(7, projection.level(0))
+        assertEquals(equation, projection.rootSection(projection.level(0))?.polynomial)
+        assertEquals((0 until 8).toSet(), (0 until 8).map { projection.variable(it) }.toSet())
+    }
+
+    @Test
+    fun `cancellation during consecutive empty levels withholds the projection`() {
+        var stopped = false
+        val interrupted = PolynomialArithmetic(Cancellation { stopped })
+        val polynomial = arithmetic.add(arithmetic.power(x, 2), Polynomial.ONE)
+        val pending = PolynomialProjection.prepare(listOf(polynomial), 8, interrupted)
+        pending.next()
+        pending.next()
+
+        stopped = true
+
+        assertFailsWith<PolynomialInterrupted> { pending.next() }
+    }
 
     @Test
     fun `common monomial boundaries avoid higher degree matrices while retaining zero fibers`() {

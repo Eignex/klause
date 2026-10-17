@@ -108,8 +108,23 @@ internal class PolynomialProjection private constructor(
             var pending = boundaryFamily(polynomials, equations + exclusions.orEmpty(), arithmetic)
             var fallback = variableCount - 1
             var sectionCount = 0
+            var unchangedCoordinates: Set<Int>? = null
             for (level in variableCount - 1 downTo 0) {
                 arithmetic.step()
+                while (fallback >= 0 && !available[order[fallback]]) {
+                    arithmetic.step()
+                    fallback--
+                }
+                val retained = unchangedCoordinates
+                // Empty levels preserve the family and every graph or root premise.
+                if (retained != null && order[fallback] !in retained) {
+                    val variable = order[fallback]
+                    variables[level] = variable
+                    available[variable] = false
+                    yield(null)
+                    continue
+                }
+                unchangedCoordinates = null
                 if (exclusions == null || inconsistentEquations(equations, arithmetic)) {
                     yield(PolynomialProjection(Array(variableCount) { emptyList() },
                         IntArray(variableCount) { it }, arrayOfNulls(variableCount),
@@ -127,10 +142,6 @@ internal class PolynomialProjection private constructor(
                 val root = if (section == null) {
                     rootSection(equations, preference, available, nonzero, arithmetic)
                 } else null
-                while (fallback >= 0 && !available[order[fallback]]) {
-                    arithmetic.step()
-                    fallback--
-                }
                 val variable = section?.variable ?: root?.variable ?: order[fallback]
                 check(variable >= 0 && available[variable])
                 variables[level] = variable
@@ -192,6 +203,14 @@ internal class PolynomialProjection private constructor(
                         // Rational univariate boundaries contribute no lower-coordinate projection.
                         equations = lowerEquations
                         pending = boundaryFamily(lower, equations + exclusions.orEmpty(), arithmetic)
+                        if (top.isEmpty()) {
+                            unchangedCoordinates = buildSet {
+                                for (polynomial in pending) for (coordinate in polynomial.variables) {
+                                    arithmetic.step()
+                                    add(coordinate)
+                                }
+                            }
+                        }
                         yield(null)
                         continue
                     }

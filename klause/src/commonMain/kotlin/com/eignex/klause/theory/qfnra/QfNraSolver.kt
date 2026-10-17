@@ -164,9 +164,9 @@ internal class QfNraQuery(
                         if (reduction == null) yield(null)
                     }
                     reducedRegionObserver?.invoke(reduction.atoms)
-                    val activeFormula = if (reduction.eliminatedCount == 0) normalized
+                    val activeFormula = if (!reduction.changed) normalized
                     else PolynomialFormula.conjunction(reduction.atoms, arithmetic)
-                    val activeRegion = if (reduction.eliminatedCount == 0) region
+                    val activeRegion = if (!reduction.changed) region
                     else PolynomialBooleanRegion(activeFormula.atoms.indices.associateWith {
                         arithmetic.step()
                         true
@@ -209,7 +209,7 @@ internal class QfNraQuery(
                     val assignment = searchCells(activeFormula, activeRegion, projection, boolCount,
                         arithmetic, algebraic, work, fixed)
                     if (assignment != null) {
-                        val checked = if (reduction.eliminatedCount == 0) assignment else {
+                        val checked = if (!reduction.changed) assignment else {
                             val point = reduction.reconstruct(assignment, arithmetic, algebraic)
                             checkRegionSample(normalized, region, point, boolCount, arithmetic, algebraic)
                         }

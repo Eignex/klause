@@ -20,6 +20,24 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `coincident nonlinear bounds supply required roots without total graphs`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (>= (+ (* x0 x0) (* x1 x1)) 1)) " +
+                "(assert (<= (+ (* x0 x0) (* x1 x1)) 1))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val sat = assertIs<QfNraResult.Satisfiable>(result)
+        val sum = algebraic.add(algebraic.power(sat.assignment.realValue(0), 2),
+            algebraic.power(sat.assignment.realValue(1), 2))
+        assertEquals(0, algebraic.compare(sum, algebraic.rational(BigFraction.ONE)))
+        assertEquals(0L, sat.stats.equationalSections)
+        assertTrue(checkNotNull(sat.stats.equationalRootLevels) > 0)
+    }
+
+    @Test
     fun `scaled opposing weak bounds reconstruct exact nonlinear graphs`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(
