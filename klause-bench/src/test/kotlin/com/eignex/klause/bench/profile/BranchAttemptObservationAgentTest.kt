@@ -1,7 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.search.BooleanBranching
@@ -118,8 +118,8 @@ class BranchAttemptObservationAgentTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `raw source order and its hint wrapper should classify selected dependency roles`(hinted: Boolean) {
-        val source = Problem(numBoolVars = 2,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+        val source = Problem(numBoolVars = 2, numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0L, 1L)),
             factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)))
         ExactLiraSearchComponent(source).use { component ->
             val session = SearchSession(listOf(component))
@@ -151,8 +151,8 @@ class BranchAttemptObservationAgentTest {
     @ParameterizedTest
     @ValueSource(strings = ["ambiguous", "context", "assigned", "mode", "width"])
     fun `incompatible live metadata should withhold branch role qualification`(shape: String) {
-        val source = Problem(numBoolVars = 2,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+        val source = Problem(numBoolVars = 2, numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0L, 1L)),
             factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)))
         ExactLiraSearchComponent(source).use { component ->
             val initialized = SearchSession(listOf(component))

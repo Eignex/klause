@@ -3,8 +3,6 @@ package com.eignex.klause.bench.profile
 import java.io.File
 import java.lang.classfile.ClassFile
 import java.lang.classfile.ClassHierarchyResolver
-import java.lang.classfile.CodeBuilder
-import java.lang.classfile.CodeElement
 import java.lang.classfile.CodeTransform
 import java.lang.classfile.MethodModel
 import java.lang.classfile.MethodTransform
@@ -33,8 +31,12 @@ internal object BranchAttemptObservationAgent {
         "Lcom/eignex/klause/solver/search/ComponentResult;"
     private const val COMPONENT = "com.eignex.klause.theory.qflra.ExactLiraSearchComponent"
     private val helper = ClassDesc.of("com.eignex.klause.bench.profile.BranchAttemptObservationAgent")
-    private val helperType = MethodTypeDesc.of(ConstantDescs.CD_void,
-        ConstantDescs.CD_Object, ConstantDescs.CD_Object, ConstantDescs.CD_Object)
+    private val helperType = MethodTypeDesc.of(
+        ConstantDescs.CD_void,
+        ConstantDescs.CD_Object,
+        ConstantDescs.CD_Object,
+        ConstantDescs.CD_Object,
+    )
     private val access = Access()
     private var observation: BranchAttemptObservation? = null
 
@@ -44,8 +46,17 @@ internal object BranchAttemptObservationAgent {
         val file = File(argument)
         require(file.isFile && file.length() <= 16384L)
         val config = Properties().apply { file.inputStream().use(::load) }
-        require(config.stringPropertyNames() == setOf("report", "coreJar", "agentSha256", "fieldSchemaSha256",
-            "class.$TARGET", "schema.$TARGET", "rewrite.$TARGET"))
+        require(
+            config.stringPropertyNames() == setOf(
+            "report",
+            "coreJar",
+            "agentSha256",
+            "fieldSchemaSha256",
+            "class.$TARGET",
+            "schema.$TARGET",
+            "rewrite.$TARGET",
+        )
+        )
         val ownJar = File(javaClass.protectionDomain.codeSource.location.toURI())
         require(ownJar.isFile && ownJar.length() in 1L..524288L)
         require(sha(ownJar.readBytes()) == config.getProperty("agentSha256"))
@@ -53,7 +64,8 @@ internal object BranchAttemptObservationAgent {
         val recorder = BranchAttemptObservation()
         observation = recorder
         val transformations = ArrayList<Map<String, Any?>>()
-        instrumentation.addTransformer(object : ClassFileTransformer {
+        instrumentation.addTransformer(
+            object : ClassFileTransformer {
             override fun transform(
                 loader: ClassLoader?,
                 className: String?,
@@ -74,8 +86,13 @@ internal object BranchAttemptObservationAgent {
                         require(sha(schemaText(schema).toByteArray()) == config.getProperty("schema.$TARGET"))
                         val output = rewrite(classfileBuffer, selected, loader)
                         require(sha(output) == config.getProperty("rewrite.$TARGET"))
-                        transformations += mapOf("class" to TARGET, "beforeSha256" to sha(classfileBuffer),
-                            "afterSha256" to sha(output), "methods" to schema, "codeSource" to location.toString())
+                        transformations += mapOf(
+                            "class" to TARGET,
+                            "beforeSha256" to sha(classfileBuffer),
+                            "afterSha256" to sha(output),
+                            "methods" to schema,
+                            "codeSource" to location.toString(),
+                        )
                         output
                     } catch (_: Throwable) {
                         recorder.fail("transform-helper")
@@ -83,8 +100,11 @@ internal object BranchAttemptObservationAgent {
                     }
                 }
             }
-        }, false)
-        Runtime.getRuntime().addShutdownHook(Thread({
+        },
+            false
+        )
+        Runtime.getRuntime().addShutdownHook(
+            Thread({
             synchronized(recorder) {
                 if (transformations.size != 1) recorder.fail("transform-coverage")
                 val fields = try {
@@ -95,17 +115,25 @@ internal object BranchAttemptObservationAgent {
                 }
                 val fieldSha = sha(json(fields).toByteArray())
                 if (fieldSha != config.getProperty("fieldSchemaSha256")) recorder.fail("field-schema-mismatch")
-                val report = recorder.snapshot() + mapOf("fieldSchema" to fields, "fieldSchemaSha256" to fieldSha,
+                val report = recorder.snapshot() + mapOf(
+                    "fieldSchema" to fields, "fieldSchemaSha256" to fieldSha,
                     "transformations" to transformations.toList(), "agentSha256" to config.getProperty("agentSha256"),
                     "configSha256" to sha(file.readBytes()), "pid" to ProcessHandle.current().pid(),
                     "javaCommand" to System.getProperty("sun.java.command"),
                     "jvmArguments" to ManagementFactory.getRuntimeMXBean().inputArguments,
-                    "processors" to Runtime.getRuntime().availableProcessors())
+                    "processors" to Runtime.getRuntime().availableProcessors(),
+                )
                 val text = json(report)
-                File(config.getProperty("report")).writeText(if (text.toByteArray().size <= 524288) text else
-                    "{\"status\":\"INCONCLUSIVE\",\"failures\":[\"report-cap\"]}")
+                File(config.getProperty("report")).writeText(
+                    if (text.toByteArray().size <= 524288) {
+                        text
+                    } else {
+                        "{\"status\":\"INCONCLUSIVE\",\"failures\":[\"report-cap\"]}"
+                    },
+                )
             }
-        }, "branch-attempt-report"))
+        }, "branch-attempt-report")
+        )
     }
 
     @JvmStatic
@@ -154,23 +182,36 @@ internal object BranchAttemptObservationAgent {
             val arithmetic = requireNotNull(access.field(component, "arithmeticVariables"))
             require(trustedSet(arithmetic))
             arithmetic as Set<*>
-            recorder.attempted(run, session, component, width, variable, literal and 1 == 0,
-                bools[variable], variable in arithmetic)
+            recorder.attempted(
+                run,
+                session,
+                component,
+                width,
+                variable,
+                literal and 1 == 0,
+                bools[variable],
+                variable in arithmetic,
+            )
         } catch (_: Throwable) {
             recorder.fail("callback-schema")
         }
     }
 
     private val trustedSets = setOf(
-        "java.util.HashSet", "java.util.LinkedHashSet", "java.util.Collections\$SingletonSet",
+        "java.util.HashSet",
+        "java.util.LinkedHashSet",
+        "java.util.Collections\$SingletonSet",
         "java.util.Collections\$EmptySet",
     )
 
     internal fun trustedSet(value: Any): Boolean = trustedCollection(value, trustedSets, "kotlin.collections.EmptySet")
 
     private val trustedLists = setOf(
-        "java.util.ArrayList", "java.util.Arrays\$ArrayList", "java.util.Collections\$SingletonList",
-        "java.util.Collections\$EmptyList", "java.util.ImmutableCollections\$List12",
+        "java.util.ArrayList",
+        "java.util.Arrays\$ArrayList",
+        "java.util.Collections\$SingletonList",
+        "java.util.Collections\$EmptyList",
+        "java.util.ImmutableCollections\$List12",
         "java.util.ImmutableCollections\$ListN",
     )
 
@@ -199,13 +240,24 @@ internal object BranchAttemptObservationAgent {
             if (part is LineNumber) line = part.line()
             if (part is InvokeInstruction && isPush(part)) {
                 require(part.opcode() == Opcode.INVOKEVIRTUAL)
-                sites += mapOf("owner" to part.owner().asInternalName(), "name" to part.name().stringValue(),
-                    "descriptor" to part.type().stringValue(), "opcode" to part.opcode().name, "line" to line)
+                sites += mapOf(
+                    "owner" to part.owner().asInternalName(),
+                    "name" to part.name().stringValue(),
+                    "descriptor" to part.type().stringValue(),
+                    "opcode" to part.opcode().name,
+                    "line" to line,
+                )
             }
         }
         require(sites.size == 1)
-        return listOf(mapOf("name" to METHOD, "descriptor" to METHOD_TYPE,
-            "flags" to method.flags().flagsMask(), "prePushSites" to sites))
+        return listOf(
+            mapOf(
+            "name" to METHOD,
+            "descriptor" to METHOD_TYPE,
+            "flags" to method.flags().flagsMask(),
+            "prePushSites" to sites,
+        )
+        )
     }
 
     private fun isPush(part: InvokeInstruction): Boolean =
@@ -220,15 +272,18 @@ internal object BranchAttemptObservationAgent {
         val factory = ClassFile.of(ClassFile.ClassHierarchyResolverOption.of(resolver))
         return factory.transformClass(factory.parse(bytes)) { builder, element ->
             if (element is MethodModel && element.methodName().stringValue() == METHOD) {
-                builder.transformMethod(element, MethodTransform.transformingCode(object : CodeTransform {
-                    override fun accept(code: CodeBuilder, part: CodeElement) {
+                builder.transformMethod(
+                    element,
+                    MethodTransform.transformingCode(CodeTransform { code, part ->
                         if (part is InvokeInstruction && isPush(part)) {
                             code.dup2().aload(0).invokestatic(helper, "attempted", helperType)
                         }
                         code.with(part)
-                    }
-                }))
-            } else builder.with(element)
+                    }),
+                )
+            } else {
+                builder.with(element)
+            }
         }
     }
 
@@ -258,13 +313,18 @@ internal object BranchAttemptObservationAgent {
 
         companion object {
             val schema = linkedMapOf(
-                SEARCH + "SearchRun" to mapOf("session" to SEARCH + "SearchSession",
-                    "booleanBranching" to SEARCH + "BooleanBranching"),
+                SEARCH + "SearchRun" to mapOf(
+                    "session" to SEARCH + "SearchSession",
+                    "booleanBranching" to SEARCH + "BooleanBranching",
+                ),
                 SEARCH + "HintedBooleanBranching" to mapOf("delegate" to SEARCH + "BooleanBranching"),
                 SEARCH + "BooleanBranching\$SourceOrder" to mapOf("numBoolVars" to "int"),
                 SEARCH + "SearchSession" to mapOf("components" to "java.util.List"),
-                COMPONENT to mapOf("context" to SEARCH + "SearchContext", "bools" to "[I",
-                    "arithmeticVariables" to "java.util.Set"),
+                COMPONENT to mapOf(
+                    "context" to SEARCH + "SearchContext",
+                    "bools" to "[I",
+                    "arithmeticVariables" to "java.util.Set",
+                ),
                 SEARCH + "SearchDecision\$Bool" to mapOf("literal" to "int"),
             )
         }
@@ -276,22 +336,37 @@ internal object BranchAttemptObservationAgent {
 
     fun json(value: Any?): String = when (value) {
         null -> "null"
+
         is Boolean, is Long, is Int -> value.toString()
+
         is String -> buildString {
             append('"')
-            for (character in value) when (character) {
+            for (character in value) {
+                when (character) {
                 '"' -> append("\\\"")
+
                 '\\' -> append("\\\\")
+
                 '\n' -> append("\\n")
+
                 '\r' -> append("\\r")
+
                 '\t' -> append("\\t")
-                else -> if (character.code < 32) append("\\u%04x".format(Locale.ROOT, character.code))
-                    else append(character)
+
+                else -> if (character.code < 32) {
+                    append("\\u%04x".format(Locale.ROOT, character.code))
+                } else {
+                    append(character)
+                }
+            }
             }
             append('"')
         }
+
         is Map<*, *> -> value.entries.joinToString(",", "{", "}") { json(it.key.toString()) + ":" + json(it.value) }
+
         is Iterable<*> -> value.joinToString(",", "[", "]", transform = ::json)
+
         else -> error("unsupported report value")
     }
 }

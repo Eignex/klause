@@ -96,8 +96,14 @@ internal class BranchAttemptObservation(
         owner.attempts++
         counts[role.ordinal]++
         if (trace.size < traceCap) {
-            trace += mapOf("sequence" to events, "owner" to owner.id, "sourceBooleanCount" to width,
-                "variable" to variable, "positive" to positive, "role" to role.name)
+            trace += mapOf(
+                "sequence" to events,
+                "owner" to owner.id,
+                "sourceBooleanCount" to width,
+                "variable" to variable,
+                "positive" to positive,
+                "role" to role.name,
+            )
         }
     }
 
@@ -110,12 +116,23 @@ internal class BranchAttemptObservation(
         "trace" to trace.toList(),
         "traceDropped" to (counts.sum() - trace.size),
         "owners" to owners.map {
-            mapOf("id" to it.id, "sourceBooleanCount" to it.width, "attempts" to it.attempts,
-                "runAlive" to (it.run.get() != null), "sessionAlive" to (it.session.get() != null),
-                "componentAlive" to (it.component.get() != null))
+            mapOf(
+                "id" to it.id,
+                "sourceBooleanCount" to it.width,
+                "attempts" to it.attempts,
+                "runAlive" to (it.run.get() != null),
+                "sessionAlive" to (it.session.get() != null),
+                "componentAlive" to (it.component.get() != null),
+            )
         },
-        "limits" to mapOf("owners" to ownerCap, "componentsPerCallback" to 8,
-            "trace" to traceCap, "events" to eventCap, "failures" to 32, "failureName" to 64),
+        "limits" to mapOf(
+            "owners" to ownerCap,
+            "componentsPerCallback" to 8,
+            "trace" to traceCap,
+            "events" to eventCap,
+            "failures" to 32,
+            "failureName" to 64,
+        ),
         "limitations" to listOf(
             "Membership is not original-input or derived-gate ownership.",
             "No other Boolean slots were scanned; unresolved arithmetic alternatives are not established.",

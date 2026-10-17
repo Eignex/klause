@@ -63,8 +63,10 @@ internal object CliBranchAttemptCapture {
                 val schema = BranchAttemptObservationAgent.schema(bytes, selected)
                 val rewritten = BranchAttemptObservationAgent.rewrite(bytes, selected, javaClass.classLoader)
                 properties.setProperty("class.$type", sha256(bytes))
-                properties.setProperty("schema.$type",
-                    sha256(BranchAttemptObservationAgent.schemaText(schema).toByteArray()))
+                properties.setProperty(
+                    "schema.$type",
+                    sha256(BranchAttemptObservationAgent.schemaText(schema).toByteArray()),
+                )
                 properties.setProperty("rewrite.$type", sha256(rewritten))
                 mapOf(
                     "class" to type,
@@ -76,7 +78,8 @@ internal object CliBranchAttemptCapture {
         }
         File(out, "target-schema.json").writeText(BranchAttemptObservationAgent.json(schemas))
         val fieldSchema = BranchAttemptObservationAgent.json(
-            BranchAttemptObservationAgent.fieldSchema(javaClass.classLoader))
+            BranchAttemptObservationAgent.fieldSchema(javaClass.classLoader),
+        )
         File(out, "field-schema.json").writeText(fieldSchema)
         properties.setProperty("fieldSchemaSha256", sha256(fieldSchema.toByteArray()))
         config.outputStream().use { properties.store(it, null) }
