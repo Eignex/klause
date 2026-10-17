@@ -17,6 +17,7 @@ import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.config.KotlinCompilerVersion
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import java.io.File
+import java.io.OutputStream
 import java.net.URI
 import java.security.MessageDigest
 import java.util.HexFormat
@@ -27,7 +28,8 @@ import java.util.zip.GZIPOutputStream
 internal object JvmSourceDeclarations {
     private const val MAX_INPUT_BYTES = 128L * 1024 * 1024
     private const val MAX_SOURCE_BYTES = 64L * 1024 * 1024
-    private const val MAX_REPORT_BYTES = 512L * 1024 * 1024
+    private const val MAX_REPORT_BYTES = 4L * 1024 * 1024 * 1024
+    private const val MAX_COMPRESSED_REPORT_BYTES = 512L * 1024 * 1024
     private const val MAX_SOURCES = 4096
     private val compact = Json(Reports.json) { prettyPrint = false }
     private val hash = Regex("[0-9a-f]{64}")
@@ -183,7 +185,14 @@ internal object JvmSourceDeclarations {
     }
 
     @Suppress("LongMethod", "TooGenericExceptionCaught")
-    internal fun inspect(sources: List<SourceSyntaxInput>, out: File): JsonObject {
+    internal fun inspect(
+        sources: List<SourceSyntaxInput>,
+        out: File,
+        maximumReportBytes: Long = MAX_REPORT_BYTES,
+        maximumCompressedReportBytes: Long = MAX_COMPRESSED_REPORT_BYTES
+    ): JsonObject {
+        require(maximumReportBytes in 1..MAX_REPORT_BYTES)
+        require(maximumCompressedReportBytes in 1..MAX_COMPRESSED_REPORT_BYTES)
         val report = File(out, "source-declarations.jsonl.gz")
         check(!report.exists())
         val digest = MessageDigest.getInstance("SHA-256")
@@ -193,51 +202,53 @@ internal object JvmSourceDeclarations {
         var uncompressedHash = ""
         val encoding = JvmSourceSyntaxEncoding()
         try {
-            GZIPOutputStream(report.outputStream().buffered()).use { output ->
-                fun write(row: JsonObject) {
-                    val raw = (compact.encodeToString(JsonObject.serializer(), row) + "\n").encodeToByteArray()
-                    bytes += raw.size
-                    check(bytes <= MAX_REPORT_BYTES) { "Complete source declaration report exceeds bounds" }
-                    output.write(raw)
-                    digest.update(raw)
-                    records++
-                }
-                write(buildJsonObject {
-                    put("record", "schema")
-                    put("encoding", JvmSourceSyntaxEncoding.ENCODING)
-                    put("nodeColumns", JsonArray(JvmSourceSyntaxEncoding.NODE_COLUMNS.map(::JsonPrimitive)))
-                    put("rangeColumns", JsonArray(JvmSourceSyntaxEncoding.RANGE_COLUMNS.map(::JsonPrimitive)))
-                })
-                JvmSourceDeclarationParser().use { parser ->
-                    for ((index, source) in sources.withIndex()) {
-                        write(buildJsonObject {
-                            put("record", "source-start")
-                            put("sourceIndex", index)
-                            put("sourceId", source.id)
-                            put("path", source.path)
-                            put("sha256", source.sha256)
-                        })
-                        val result = parser.inspect(source.path, source.text) { row ->
-                            val encoded = encoding.encode(row) { kindIndex, name ->
+            report.outputStream().buffered().use { target ->
+                GZIPOutputStream(SourceReportOutput(target, maximumCompressedReportBytes)).use { output ->
+                    fun write(row: JsonObject) {
+                        val raw = (compact.encodeToString(JsonObject.serializer(), row) + "\n").encodeToByteArray()
+                        bytes += raw.size
+                        check(bytes <= maximumReportBytes) { "Complete source declaration report exceeds bounds" }
+                        output.write(raw)
+                        digest.update(raw)
+                        records++
+                    }
+                    write(buildJsonObject {
+                        put("record", "schema")
+                        put("encoding", JvmSourceSyntaxEncoding.ENCODING)
+                        put("nodeColumns", JsonArray(JvmSourceSyntaxEncoding.NODE_COLUMNS.map(::JsonPrimitive)))
+                        put("rangeColumns", JsonArray(JvmSourceSyntaxEncoding.RANGE_COLUMNS.map(::JsonPrimitive)))
+                    })
+                    JvmSourceDeclarationParser().use { parser ->
+                        for ((index, source) in sources.withIndex()) {
+                            write(buildJsonObject {
+                                put("record", "source-start")
+                                put("sourceIndex", index)
+                                put("sourceId", source.id)
+                                put("path", source.path)
+                                put("sha256", source.sha256)
+                            })
+                            val result = parser.inspect(source.path, source.text) { row ->
+                                val encoded = encoding.encode(row) { kindIndex, name ->
+                                    write(buildJsonObject {
+                                        put("record", "psi-kind")
+                                        put("index", kindIndex)
+                                        put("class", name)
+                                    })
+                                }
                                 write(buildJsonObject {
-                                    put("record", "psi-kind")
-                                    put("index", kindIndex)
-                                    put("class", name)
+                                    put("record", "syntax-node")
+                                    put("sourceIndex", index)
+                                    put("node", encoded)
                                 })
                             }
+                            errors += result.syntaxErrors
                             write(buildJsonObject {
-                                put("record", "syntax-node")
+                                put("record", "source-end")
                                 put("sourceIndex", index)
-                                put("node", encoded)
+                                put("syntaxNodes", result.records)
+                                put("syntaxErrors", result.syntaxErrors)
                             })
                         }
-                        errors += result.syntaxErrors
-                        write(buildJsonObject {
-                            put("record", "source-end")
-                            put("sourceIndex", index)
-                            put("syntaxNodes", result.records)
-                            put("syntaxErrors", result.syntaxErrors)
-                        })
                     }
                 }
             }
@@ -249,7 +260,7 @@ internal object JvmSourceDeclarations {
                     val count = input.read(buffer)
                     if (count < 0) break
                     verifiedBytes += count
-                    check(verifiedBytes <= MAX_REPORT_BYTES)
+                    check(verifiedBytes <= maximumReportBytes)
                     roundTrip.update(buffer, 0, count)
                 }
             }
@@ -335,3 +346,22 @@ internal object JvmSourceDeclarations {
 internal data class SourceSyntaxInput(val id: String, val path: String, val sha256: String, val text: String)
 
 private class SourceJsonObjectKeys(val keys: HashSet<String> = HashSet(), var expectKey: Boolean = true)
+
+private class SourceReportOutput(private val target: OutputStream, private val maximum: Long) : OutputStream() {
+    private var bytes = 0L
+
+    override fun write(value: Int) {
+        reserve(1)
+        target.write(value)
+    }
+
+    override fun write(buffer: ByteArray, offset: Int, length: Int) {
+        reserve(length)
+        target.write(buffer, offset, length)
+    }
+
+    private fun reserve(length: Int) {
+        check(length >= 0 && bytes <= maximum - length) { "Compressed source declaration report exceeds bounds" }
+        bytes += length
+    }
+}

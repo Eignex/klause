@@ -3234,7 +3234,9 @@ node value and object-key order; the observer checks each round trip before writ
 and retain its complete node/error counts. Inspect or expand actual reports only
 on the supported profiling worker.
 Input JSON is bounded to 128 MiB, total source to 64 MiB and 4,096 files, traversal
-to 10 million PSI nodes and depth 4,096, and the uncompressed report to 512 MiB.
+to 10 million PSI nodes and depth 4,096, the uncompressed report to 4 GiB, and
+the compressed report to 512 MiB. Compressed output is bounded while streaming;
+the larger logical report bound does not increase its maximum disk footprint.
 Bounds decline the complete inventory rather than select a smaller source set.
 This is syntax parsing, without symbol resolution, original-source compilation
 or target-program launch. Source ranges do not establish resolved calls,
