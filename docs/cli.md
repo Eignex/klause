@@ -164,12 +164,12 @@ Solver-control flags are common to **every** mode:
   backtrack portfolio); with no `-f` and no `-e`, the built-in default is `mixed`,
   overridable through `klause.engine` / `KLAUSE_ENGINE`.
 - `-t <ms>` time limit, `-r <seed>`, `-s` statistics, `-v` verbose.
-- `-p <n>` — MiniZinc-standard parallelism (core count). Finite portfolio engines
-  run sequentially at `n=1` and use up to `n` lanes at `n>1`; finite `fixed` rejects
-  `n>1`. Finite pool size auto-tunes from `n`, overridable with `--param arms=N`
-  (or the `ls=N`/`bt=N` split). Open linear MIXED/LS/ALNS execution uses up to `n`
-  lanes; its BACKTRACK/FIXED routes run one traversal. Polynomial, nonlinear-integer
-  and quadratic source adapters accept the flag but do not allocate extra lanes.
+- `-p <n>` — MiniZinc-standard parallelism (core count). `fixed` rejects `n>1`
+  across finite and native source execution. Portfolio engines run sequentially
+  at `n=1` and use up to `n` lanes at `n>1`. Finite pool size auto-tunes from `n`,
+  overridable with `--param arms=N` (or the `ls=N`/`bt=N` split). Open linear,
+  polynomial, nonlinear-integer, quadratic and function source factories retain
+  their private workers and native reservations on the requested lanes.
 - `-e <engine>` / `--engine <engine>` — the engine enum (also via the `klause.engine` property):
   - `fixed` — a single naked backtrack. It follows a FlatZinc `int_search` annotation;
     for a finite model with no annotation (DIMACS, OPB, and unannotated FlatZinc/XCSP3/MPS), it uses

@@ -5,13 +5,17 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearSourceProblem
+import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveConfig
@@ -34,6 +38,32 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class SourceExecutionTest {
+    @Test
+    fun `fixed source execution should reject parallel cores across source families`() {
+        val sources = listOf(
+            SourceExecutionKind.FINITE to "(declare-const b Bool) (assert b)",
+            SourceExecutionKind.LINEAR to "(declare-const x Real) (assert (> x 0))",
+            SourceExecutionKind.POLYNOMIAL to "(declare-const x Real) (assert (= (* x x) 2))",
+            SourceExecutionKind.NONLINEAR_INTEGER to "(declare-const x Int) (assert (= (* x x) 2))",
+            SourceExecutionKind.FUNCTIONS to "(declare-const x Real) (assert (= (sin x) 0))",
+        ).map { (kind, text) -> kind to SmtLib.parse(text).source } +
+            (SourceExecutionKind.NUMERICAL to SourceAttachment(
+                LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
+            ))
+        for ((kind, source) in sources) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+            ))
+            assertEquals(kind, SourceSetup.executionKind(invocation))
+
+            val failure = assertFailsWith<PipelineConfigException> {
+                SourceExecutionRequest(invocation, cores = 2)
+            }
+
+            assertTrue("single-core" in assertNotNull(failure.message))
+        }
+    }
+
     @Test
     fun `finite optimization should retain native interruption after another invocation completes`() {
         val source = Problem(2, 0, emptyArray(), arrayOf(Clause(
