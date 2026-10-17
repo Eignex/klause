@@ -9,6 +9,7 @@ import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.WideLinComb
 import com.eignex.klause.lowering.allDifferentWindowSize
+import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.constProduct
 import com.eignex.klause.lowering.isConstant
 import com.eignex.klause.lowering.reifyAllDifferentWitness
@@ -459,6 +460,7 @@ private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
         // A chain of equality tests on one selector defines the same quantity, and defers its lowering
         // until the chain's extent is known.
         chainIte(cond, thenTerm, elseTerm)?.let { return narrowRes(it) }
+        constantIntegerIndicator(cond, thenTerm, elseTerm)?.let { return narrowRes(it) }
         val (aLo, aHi) = linCombRange(thenTerm)
         val (bLo, bHi) = linCombRange(elseTerm)
         val loU = if (aLo == null || bLo == null) null else minOf(aLo, bLo)
@@ -479,6 +481,19 @@ private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
     val self = freshWideInt(magnitude)
     wideIntegerSelection(cond, self, a, b, magnitude)
     return Res.I(self)
+}
+
+private fun Compiler.Builder.constantIntegerIndicator(cond: Int, thenTerm: LinComb, elseTerm: LinComb): LinComb? {
+    if (thenTerm.coeffs.isNotEmpty() || elseTerm.coeffs.isNotEmpty() ||
+        thenTerm.constant !in 0L..1L || elseTerm.constant !in 0L..1L || thenTerm.constant == elseTerm.constant
+    ) return null
+    val variable = newInt(0L, 1L)
+    val start = factors.size
+    channelBoolTo01(factors, Lit.variable(cond), variable,
+        whenTrue = Lit.isPositive(cond) == (thenTerm.constant == 1L))
+    conditionalEqualities.define(variable, listOf(cond), listOf(thenTerm), elseTerm,
+        factors.subList(start, factors.size), listOf(iteChains.guardEquality(cond)))
+    return LinComb(mapOf(variable to 1L), 0L)
 }
 
 private fun Compiler.Builder.branchUnder(term: LinComb, knownLiteral: Int): LinComb {

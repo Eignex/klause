@@ -147,6 +147,11 @@ An integer conditional with a constant guard returns its selected branch directl
 A directly nested single-guard integer conditional can be restricted by the enclosing
 branch's compiled literal or complement. This reads its definition without changing
 shared uses; unmatched, multiple-guard and wide terms retain their exact lowering.
+An integer conditional with distinct constant branches `0` and `1` uses one bounded
+integer and a direct channel to its original signed Boolean guard. The branch
+orientation determines the channel polarity. Equality-selector chains keep their
+existing selection lowering before this indicator case, and dependency closure
+retains every surviving indicator's guard definition.
 Conditional definitions retain immutable equality meanings for their guards.
 When a branch compares a simple integer variable with a constant, these meanings
 can exclude conflicting selector tests and omit guard tests implied by that comparison.

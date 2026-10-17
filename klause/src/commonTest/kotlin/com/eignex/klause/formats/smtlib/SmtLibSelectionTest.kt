@@ -26,6 +26,117 @@ import kotlin.test.assertTrue
 
 class SmtLibSelectionTest {
     @Test
+    fun `integer indicators should preserve signed guards and arm polarity`() {
+        for (positive in listOf(false, true)) {
+            for (thenValue in listOf(0L, 1L)) {
+                for (branch in listOf(false, true)) {
+                    val guard = if (positive) "b" else "(not b)"
+                    val parsed = SmtLib.parse(
+                        """
+                        (declare-const b Bool) (declare-const x Int)
+                        (assert (<= 0 x 1))
+                        (assert (= x (ite $guard $thenValue ${1L - thenValue})))
+                        (assert ${if (branch) "b" else "(not b)"})
+                        """.trimIndent(),
+                    )
+
+                    val sample = assertIs<SolveResult.Sat>(
+                        BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(randomSeed = 0)),
+                    ).assignment
+
+                    val expected = if (branch == positive) thenValue else 1L - thenValue
+                    assertEquals(expected, sample.intValue(parsed.intVarNames.getValue("x")))
+                    assertEquals(branch, sample.boolValue(parsed.boolVarNames.getValue("b")))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `numeric indicators should retain a single private channel column`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const c Bool) (declare-const x Int)
+            (assert (<= 2 x 5))
+            (assert (= x (+ 2 (* 3 (ite (xor b c) 1 0)))))
+            """.trimIndent(),
+        )
+
+        assertEquals(2, parsed.model.numIntVars)
+        assertTrue(parsed.model.factors.none { it is Element })
+    }
+
+    @Test
+    fun `shared composed guards should preserve arithmetic indicator values`() {
+        for (conjunction in listOf(false, true)) {
+            for (b in listOf(false, true)) {
+                for (c in listOf(false, true)) {
+                    val guard = if (conjunction) "(and b c)" else "(xor b c)"
+                    val parsed = SmtLib.parse(
+                        """
+                        (declare-const b Bool) (declare-const c Bool) (declare-const x Int)
+                        (assert (<= 0 x 2))
+                        (assert (= x (let ((g $guard)) (+ (ite g 1 0) (ite (not g) 0 1)))))
+                        (assert ${if (b) "b" else "(not b)"})
+                        (assert ${if (c) "c" else "(not c)"})
+                        """.trimIndent(),
+                    )
+
+                    val sample = assertIs<SolveResult.Sat>(
+                        BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(randomSeed = 0)),
+                    ).assignment
+
+                    val selected = if (conjunction) b && c else b != c
+                    assertEquals(if (selected) 2L else 0L, sample.intValue(parsed.intVarNames.getValue("x")))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `unused indicator channels should preserve a shared live guard definition`() {
+        for (branch in listOf(false, true)) {
+            val source = """
+                (declare-const b Bool) (declare-const c Bool) (declare-const x Int)
+                (assert (<= (- 2) x 2))
+                (assert b) (assert ${if (branch) "c" else "(not c)"})
+            """.trimIndent()
+            val relation = "(= (+ x x) (ite g (+ x 1) (- x 1)))"
+            val live = SmtLib.parse("$source (assert (let ((g (and b c))) $relation))")
+            val parsed = SmtLib.parse(
+                """
+                $source
+                (assert (let ((g (and b c))) (and $relation
+                    (= (let ((v (ite g 1 0))) (- v v)) 0))))
+                """.trimIndent(),
+            )
+
+            val sample = assertIs<SolveResult.Sat>(
+                BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(randomSeed = 0)),
+            ).assignment
+
+            assertEquals(live.model.numIntVars, parsed.model.numIntVars)
+            assertEquals(if (branch) 1L else -1L, sample.intValue(parsed.intVarNames.getValue("x")))
+        }
+    }
+
+    @Test
+    fun `dense binary decision lists should retain their original integer selector`() {
+        val choices = (15 downTo 0).fold("0") { rest, index -> "(ite (= i $index) ${index % 2} $rest)" }
+        val parsed = SmtLib.parse(
+            """
+            (declare-const i Int) (declare-const x Int)
+            (assert (and (<= 0 i 15) (<= 0 x 1)))
+            (assert (= x $choices))
+            """.trimIndent(),
+        )
+
+        val selection = parsed.model.factors.filterIsInstance<Element>().single()
+
+        assertEquals(parsed.intVarNames.getValue("i"), selection.idx)
+    }
+
+    @Test
     fun `affine integer conditionals should retain native selection`() {
         val parsed = SmtLib.parse(
             """
@@ -86,7 +197,7 @@ class SmtLibSelectionTest {
 
         val result = BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(randomSeed = 0))
 
-        assertEquals(2, parsed.model.factors.filterIsInstance<Element>().size)
+        assertEquals(0, parsed.model.factors.filterIsInstance<Element>().size)
         assertIs<SolveResult.Unsat>(result)
     }
 
