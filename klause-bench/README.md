@@ -1017,6 +1017,10 @@ output, checker and runtime hashes retain the same replay custody.
 array for FlatZinc output. It retains original bytes and source-check results,
 including failures, without invoking the CLI. These replays check witness and
 objective semantics; terminal proof claims require their separate evidence checks.
+For larger captures, pass `gzip64=<base64 gzip bytes>` and `sha256=<expanded digest>`
+instead of the single raw base64 argument. The compressed envelope preserves the exact
+record bytes while keeping the launch command small. Its inline encoding is limited
+to 96 KiB and expansion to 64 MiB, matching the saved-source bundle transport limits.
 
 ### SMT reference records
 

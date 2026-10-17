@@ -6,17 +6,17 @@ import com.eignex.klause.bench.metric.MiniZincSourceValidation
 import com.eignex.klause.bench.metric.SourceValidation
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.Base64
+import java.util.zip.GZIPInputStream
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 
 internal object FznStreamChecker {
     @Suppress("TooGenericExceptionCaught")
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size == 1) { "Supply a base64 JSON array of captured FlatZinc records" }
-        val bytes = Base64.getDecoder().decode(args.single())
+        val bytes = decodeRecords(args)
         val records = Json.decodeFromString<List<CapturedStreamRecord>>(bytes.toString(Charsets.UTF_8))
         require(records.isNotEmpty())
         val output = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
@@ -35,6 +35,22 @@ internal object FznStreamChecker {
                 Reports.writeJson(File(directory, "failure.json").path, ReplayFailure(error.toString()))
             }
         }
+    }
+
+    internal fun decodeRecords(args: Array<String>): ByteArray {
+        if (args.size == 1) return Base64.getDecoder().decode(args.single())
+        val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
+        require(args.size == 2 && options.keys == setOf("gzip64", "sha256")) {
+            "Supply a base64 record array or gzip64=<base64 gzip bytes> and sha256=<expanded digest>"
+        }
+        val encoded = options.getValue("gzip64")
+        require(encoded.length <= 96 * 1024) { "Inline compressed records are oversized" }
+        val compressed = Base64.getDecoder().decode(encoded)
+        val bytes = GZIPInputStream(compressed.inputStream()).use { it.readNBytes(64 * 1024 * 1024 + 1) }
+        require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256")) {
+            "Record size or identity differs"
+        }
+        return bytes
     }
 
     fun check(source: String, output: String, interrupted: Boolean, minimumWitnesses: Int): List<SourceValidation> {

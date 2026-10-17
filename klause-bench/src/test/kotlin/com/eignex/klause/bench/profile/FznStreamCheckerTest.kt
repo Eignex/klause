@@ -1,14 +1,46 @@
 package com.eignex.klause.bench.profile
 
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
+import com.eignex.klause.bench.metric.sha256
+import java.io.ByteArrayOutputStream
+import java.util.Base64
+import java.util.zip.GZIPOutputStream
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class FznStreamCheckerTest {
     private val declarations = "var 0..1: i; var float: x; var float: y; " +
         "constraint float_times(x, x, y); constraint float_le(y, 4.0); "
+
+    @ParameterizedTest
+    @ValueSource(strings = ["base64", "gzip64"])
+    fun `record transport should preserve every original byte`(format: String) {
+        val records = "[{\"source\":\"var float: x; solve satisfy;\",\"stdout\":\"x = 1/3;\\n----------\\n\"}]"
+            .toByteArray()
+        val args = if (format == "base64") arrayOf(Base64.getEncoder().encodeToString(records)) else {
+            val compressed = ByteArrayOutputStream().apply {
+                GZIPOutputStream(this).use { it.write(records) }
+            }.toByteArray()
+            arrayOf("gzip64=" + Base64.getEncoder().encodeToString(compressed), "sha256=" + sha256(records))
+        }
+
+        val received = FznStreamChecker.decodeRecords(args)
+
+        assertContentEquals(records, received)
+    }
+
+    @Test
+    fun `compressed records should reject a differing original identity`() {
+        val compressed = ByteArrayOutputStream().apply {
+            GZIPOutputStream(this).use { it.write("[]".toByteArray()) }
+        }.toByteArray()
+        val args = arrayOf("gzip64=" + Base64.getEncoder().encodeToString(compressed), "sha256=" + "0".repeat(64))
+
+        assertFailsWith<IllegalArgumentException> { FznStreamChecker.decodeRecords(args) }
+    }
 
     @ParameterizedTest
     @ValueSource(strings = ["-1/3", "0", "1/3"])
