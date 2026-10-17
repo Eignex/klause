@@ -19,6 +19,14 @@ class SourceFloatGridCoordinate internal constructor(
     val step: SemanticRational,
     /** Number of private bucket values. */
     val buckets: Int,
+    /** Integer coordinate carrying the value used by every private relation. */
+    val valueVariable: Int,
+    /** Exact source value at value-carrier index zero. */
+    val valueOrigin: SemanticRational,
+    /** Exact source increment per value-carrier index. */
+    val valueStep: SemanticRational,
+    /** Number of values in the carrier, including conditional absent values. */
+    val valueBuckets: Int,
 )
 
 /** Immutable correspondence for a selected approximation, without source proof authority. */
@@ -33,8 +41,10 @@ class SourceFloatProjection internal constructor(binding: SelectedFloatGridBindi
     val policy: FloatSemantics.Grid = source.semantics.effective.floats as FloatSemantics.Grid
 
     private val capturedCoordinates = binding.projection.mapping.columns().map {
-        SourceFloatGridCoordinate(it.source, it.coordinate.variable, it.origin.semantic(), it.step.semantic(),
-            it.coordinate.buckets)
+        val selector = it.selector()
+        SourceFloatGridCoordinate(it.source, selector.coordinate.variable, selector.origin.semantic(),
+            selector.step.semantic(), selector.coordinate.buckets, it.coordinate.variable,
+            it.origin.semantic(), it.step.semantic(), it.coordinate.buckets)
     }
     private val origins = binding.projection.mapping.factorOrigins()
 

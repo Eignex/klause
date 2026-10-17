@@ -3,6 +3,7 @@ package com.eignex.klause.solver
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.compile.CompiledSchema
+import com.eignex.klause.compile.bindResult
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
@@ -76,7 +77,7 @@ class SourceStrategy internal constructor(
 ) {
     init {
         require(engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.LOCAL_SEARCH)
-        require(compiledSchema == null || compiledSchema.problem === source)
+        require(compiledSchema == null || compiledSchema.sourceBinding.originalProblem === source)
     }
 
     /** Use this provider bundle for subsequent invocations over the same immutable source. */
@@ -100,7 +101,7 @@ class SourceStrategy internal constructor(
         if (!scope.supportsSource()) return scope.unsupported()
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-                SourceAttachment(source),
+                sourceAttachment(),
                 ExecutionOperation.SATISFY,
                 engine,
                 providers = projectionProviders,
@@ -109,7 +110,8 @@ class SourceStrategy internal constructor(
             ),
             polynomialCancellation = scope.polynomialPreparation(),
         )
-        val route = invocation.route
+        compiledSchema?.sourceBinding?.selectView(invocation)
+        val route = invocation.engineRoute
         if (scope.stop()) return scope.unknown()
         val result = when (route) {
             is SourceProblemRoute.NativeFormula -> {
@@ -160,7 +162,20 @@ class SourceStrategy internal constructor(
 
             SourceProblemRoute.Refuted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
         }
-        return if (scope.stop()) scope.unknown(result.stats) else result
+        if (scope.stop()) return scope.unknown(result.stats)
+        val binding = compiledSchema?.sourceBinding ?: return result
+        if (result is OpenTheoryResult.Sat) {
+            val sample = when (val assignment = result.assignment) {
+                is OpenTheoryAssignment.Sampled -> assignment.sample
+                is OpenTheoryAssignment.Difference -> assignment.sample
+                else -> null
+            }
+            if (sample != null) {
+                val bound = binding.bindOriginalSample(sample, scope.stop) ?: return scope.unknown(result.stats)
+                return result.copy(assignment = OpenTheoryAssignment.Sampled(bound))
+            }
+        }
+        return result
     }
 
     /** Solve with complete finite controls, retaining [polynomial]'s arithmetic limits and common assumptions. */
@@ -200,6 +215,7 @@ class SourceStrategy internal constructor(
         polynomial: PolynomialTheoryParams,
         sense: ObjectiveSense,
     ): QuadraticOptimizationExecution {
+        compiledSchema?.let { return optimizeSource(it.sourceBinding.originalObjective(objective), polynomial, sense) }
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
@@ -258,6 +274,18 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
+        if (compiledSchema != null) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(sourceAttachment(), engine, objective, sense,
+                projectionProviders, scope.stop, scope.stop), polynomialCancellation = scope.polynomialPreparation())
+            return when (val execution = SourceSetup.execute(SourceExecutionRequest(invocation,
+                polynomial = scope.polynomial))) {
+                is SourceExecutionResult.Quadratic -> compiledSchema.sourceBinding.bindResult(execution) {
+                    scope.unknown().reason
+                }
+                is SourceExecutionResult.Declined -> unsupportedQuadratic(sense, execution.reason)
+                else -> unsupportedQuadratic(sense)
+            }
+        }
         val plan = preparePolynomialOptimization(scope.stop, scope.polynomialPreparation())
             .withObjective(objective, sense)
         if (plan.execution !is PreparedExecution.Polynomial ||
@@ -294,6 +322,10 @@ class SourceStrategy internal constructor(
         theory: TheoryParams,
         sense: ObjectiveSense,
     ): OpenTheoryExecution {
+        val sourceObjective = compiledSchema?.sourceBinding?.openObjective(objective)
+            ?: if (compiledSchema == null) objective else return OpenTheoryExecution.Optimize(
+                OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, SolveStats.EMPTY),
+            )
         val scope = scope(polynomial, theory)
         fun incomplete(reason: TerminationReason): OpenTheoryExecution = OpenTheoryExecution.Optimize(
             OpenTheoryOptimum.Bounded(null, null, reason, SolveStats.EMPTY),
@@ -302,10 +334,10 @@ class SourceStrategy internal constructor(
         if (!scope.supportsSource()) return incomplete(TerminationReason.Unsupported)
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-                SourceAttachment(source),
+                sourceAttachment(),
                 ExecutionOperation.OPTIMIZE,
                 engine,
-                objective,
+                sourceObjective,
                 maximize = sense == ObjectiveSense.MAXIMIZE,
                 providers = projectionProviders,
                 cancellation = scope.stop,
@@ -314,7 +346,8 @@ class SourceStrategy internal constructor(
             polynomialCancellation = scope.polynomialPreparation(),
         )
         if (scope.stop()) return incomplete(scope.unknown().reason)
-        val route = invocation.route
+        compiledSchema?.sourceBinding?.selectView(invocation)
+        val route = invocation.engineRoute
         if (route is SourceProblemRoute.UnsupportedOpen &&
             route.preparedPlan.decline == PreparedPlanDecline.RESOURCE
         ) {
@@ -322,8 +355,10 @@ class SourceStrategy internal constructor(
         }
         return when (route) {
             is SourceProblemRoute.Finite -> {
-                if (invocation.admission?.runnable != true) return incomplete(TerminationReason.Unsupported)
-                finiteOptimize(invocation, scope, objective)
+                if (invocation.enginePlan?.capabilities?.admission(engine, invocation.operation)?.runnable != true) {
+                    return incomplete(TerminationReason.Unsupported)
+                }
+                finiteOptimize(invocation, scope, sourceObjective)
             }
 
             is SourceProblemRoute.OpenTheory, is SourceProblemRoute.UnsupportedOpen -> {
@@ -339,6 +374,9 @@ class SourceStrategy internal constructor(
             else -> incomplete(TerminationReason.Unsupported)
         }
     }
+
+    private fun sourceAttachment(): SourceAttachment = compiledSchema?.sourceBinding?.attachment()
+        ?: SourceAttachment(source)
 
     private fun preparePolynomialOptimization(
         boundCancellation: Cancellation,
@@ -374,7 +412,9 @@ class SourceStrategy internal constructor(
     )
 
     private fun finiteSolve(invocation: PreparedSourceInvocation, scope: SourceInvocation): OpenTheoryResult {
-        if (invocation.admission?.runnable != true) return scope.unsupported()
+        if (invocation.enginePlan?.capabilities?.admission(engine, invocation.operation)?.runnable != true) {
+            return scope.unsupported()
+        }
         val result = executeFinite(invocation, scope)
         val outcome = result.outcome as FiniteSolveOutcome.Completed
         return when (outcome.verdict) {

@@ -121,7 +121,11 @@ The same invocation retains its canonical plan and a separate engine plan over t
 private model. Private factor descriptors come from the captured provider bundle;
 original factor indices do not select descriptors for converted factors. Cross-kind
 maps retain real-to-private-integer coordinates, exact rational origins and steps,
-retained real coordinates and private factor origins. Binding closes before a finite
+retained real coordinates and private factor origins. Optional off-grid absent defaults
+use a value carrier with guarded channels to an unchanged present grid. The logical
+selector and actual value carrier have separate exact metadata; all private rows,
+nonlinear relations, objectives and reconstruction read the same carrier. Original
+Boolean and integer prefixes remain distinct from private helpers. Binding closes before a finite
 shape escapes or execution starts. Unsupported factors, open original integer sides,
 unrepresentable geometry/objectives and resource stops decline only this view.
 

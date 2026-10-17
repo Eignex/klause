@@ -8,25 +8,12 @@ import com.eignex.klause.model.ContinuousRealEquality
 import com.eignex.klause.model.ContinuousRealExpr
 
 internal fun Lowering.assertContinuousEquality(equality: ContinuousRealEquality) {
-    fun grid(expression: ContinuousRealExpr): Boolean = when (expression) {
-        is ContinuousRealExpr.Affine -> expression.coefficients.filterValues { it != 0.0 }.keys
-            .any { floatRepresentations.getValue(it).approximate }
-        is ContinuousRealExpr.Power -> grid(expression.base)
-        is ContinuousRealExpr.Multiply -> grid(expression.left) || grid(expression.right)
-    }
-    if (grid(equality.left) || grid(equality.right)) {
-        assertGridContinuousEquality(equality)
-        return
-    }
     val columns = HashMap<ContinuousRealExpr, Int>()
     fun lift(expression: ContinuousRealExpr): Int = columns.getOrPut(expression) {
         when (expression) {
             is ContinuousRealExpr.Affine -> {
                 val terms = expression.coefficients.filterValues { it != 0.0 }
                 val ids = terms.keys.map { name ->
-                    require(!floatRepresentations.getValue(name).approximate) {
-                        "Continuous products require exact real columns: '$name' uses a finite grid"
-                    }
                     realVarIdByName.getValue(name)
                 }
                 if (terms.size == 1 && terms.values.single() == 1.0 && expression.constant == 0.0) {
@@ -62,9 +49,18 @@ internal fun Lowering.assertContinuousEquality(equality: ContinuousRealEquality)
             }
         }
     }
-    val left = lift(equality.left)
-    val right = lift(equality.right)
-    factors += Linear(
-        intArrayOf(), doubleArrayOf(), intArrayOf(left, right), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0,
-    )
+    fun equate(expression: ContinuousRealExpr, result: Int) {
+        when (expression) {
+            is ContinuousRealExpr.Multiply -> continuousProduct(lift(expression.left), lift(expression.right), result)
+            is ContinuousRealExpr.Power -> factors.add(Power(Power.Coordinate.Real(SourceRealId(lift(expression.base))),
+                expression.exponent, Power.Coordinate.Real(SourceRealId(result))))
+            is ContinuousRealExpr.Affine -> factors.add(Linear(intArrayOf(), doubleArrayOf(),
+                intArrayOf(lift(expression), result), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0))
+        }
+    }
+    if (equality.left is ContinuousRealExpr.Affine && equality.right !is ContinuousRealExpr.Affine) {
+        equate(equality.right, lift(equality.left))
+    } else {
+        equate(equality.left, lift(equality.right))
+    }
 }

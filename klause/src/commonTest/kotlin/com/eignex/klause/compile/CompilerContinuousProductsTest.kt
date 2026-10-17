@@ -19,8 +19,6 @@ import com.eignex.klause.schema.pow
 import com.eignex.klause.schema.times
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.skema.SchemaDef
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -28,6 +26,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class CompilerContinuousProductsTest {
     @Test
@@ -91,7 +91,7 @@ class CompilerContinuousProductsTest {
         val compiled = SchemaDef<SchemaEntry>(
             mapOf(
                 "x" to FloatSpec(-2.0, 2.0, 5),
-                "product" to NamedConstraint(((x + 0.5) * x * 0.1) eq 0.1),
+                "product" to NamedConstraint(((x + 0.5) * x * 0.1) eq 0.05),
             ),
         ).compile()
         val values = MutableList(compiled.problem.numRealVars) { BigFraction.ZERO }
@@ -102,7 +102,7 @@ class CompilerContinuousProductsTest {
                 values[id] = BigFraction.ofDouble(compiled.problem.realLower[id])!!
             }
         }
-        for (factor in compiled.problem.factors.dropLast(1)) {
+        for (factor in compiled.problem.factors) {
             when (factor) {
                 is ContinuousProduct -> values[factor.result] = values[factor.a] * values[factor.b]
 
@@ -139,7 +139,7 @@ class CompilerContinuousProductsTest {
 
         assertEquals(product.a, product.b)
         assertNotEquals(rounded, operand * operand)
-        assertEquals(Double.NEGATIVE_INFINITY, problem.realLower[product.result])
+        assertEquals(rounded, BigFraction.ofDouble(problem.realLower[product.result]))
     }
 
     @Test
@@ -186,7 +186,7 @@ class CompilerContinuousProductsTest {
     }
 
     @Test
-    fun `grid affine overflow should decline before wrapping a source coefficient`() {
+    fun `grid affine overflow should retain the original source before finite view decline`() {
         val x = FloatHandle("x", 0.0, 1.0)
         val definition = SchemaDef<SchemaEntry>(
             mapOf(
@@ -196,7 +196,10 @@ class CompilerContinuousProductsTest {
             ),
         )
 
-        assertFailsWith<IllegalArgumentException> { definition.compile() }
+        val compiled = definition.compile()
+
+        assertEquals(1, compiled.sourceBinding.originalProblem.factors.filterIsInstance<ContinuousProduct>().size)
+        assertFailsWith<IllegalStateException> { compiled.problem }
     }
 
     @Test
