@@ -43,7 +43,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
             }
         }
         ValueKind.OPEN_BRANCHING -> params.string(id)?.let { raw ->
-            OpenBranching.of(raw) ?: pipelineConfigError("unknown open branching `$raw`")
+            OpenBranching.of(raw) ?: pipelineConfigError(
+                "engine param `open-branching` expects one of ${OpenBranching.entries.joinToString(", ") { it.id }}, " +
+                    "got `$raw`",
+            )
         }
     } as T?
 
