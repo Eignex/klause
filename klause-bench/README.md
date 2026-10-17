@@ -965,7 +965,10 @@ later cases still capture output and record their unavailable checker outcome.
 flattened-text checker and records its `valid`, `invalid`, or `unknown` outcome in
 `source-check-fzn.json`. Satisfaction publications retain their source assertions
 without an objective cost; optimization publications require exact cost consistency
-and strict improvement in the original direction. It uses authoritative coordinate comments when supplied and
+and strict improvement in the original direction. An exact `_objective` coordinate
+annotation supplies the cost when its display is rounded; the displayed helper must
+agree with its binary64 approximation, and a separate objective comment must agree
+exactly. It uses authoritative coordinate comments when supplied and
 checks binary integer/float extrema, integer array extrema, and constant or variable
 integer/Boolean/set array selection directly from the original predicates. Integer
 `all_different_int` compares exact integral values, including values beyond binary64 precision.

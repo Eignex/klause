@@ -52,29 +52,41 @@ internal object FznStreamChecker {
         require(sense != null || Regex("\\bsatisfy\\s*$").containsMatchIn(solve)) { "Unsupported solve directive" }
         val costs = ArrayList<ExactObjective?>()
         val checked = publications.map { publication ->
+            val exactCoordinates = MiniZincSourceValidation.exactCoordinates(publication + "----------")
             val costLines = publication.lineSequence().filter { it.startsWith("% objective=") }.toList()
             val helperCosts = Regex("(?m)^\\s*_objective\\s*=\\s*([^;]+);\\s*$").findAll(publication)
                 .map { it.groupValues[1].trim() }.toList()
-            require(costLines.size <= 1 && helperCosts.size <= 1) { "FlatZinc publication repeats its cost" }
+            val exactCosts = Regex("(?m)^\\s*_objective\\s*=\\s*([^;]+);\\s*$")
+                .findAll(exactCoordinates.orEmpty()).map { it.groupValues[1].trim() }.toList()
+            require(costLines.size <= 1 && helperCosts.size <= 1 && exactCosts.size <= 1) {
+                "FlatZinc publication repeats its cost"
+            }
             val commentCost = costLines.singleOrNull()?.substringAfter('=')
             val helperCost = helperCosts.singleOrNull()
+            val exactCost = exactCosts.singleOrNull()
             val cost = if (sense != null) {
-                requireNotNull(commentCost ?: helperCost) { "FlatZinc publication requires its exact cost" }
+                requireNotNull(exactCost ?: commentCost ?: helperCost) { "FlatZinc publication requires its exact cost" }
             } else {
-                require(commentCost == null && helperCost == null) {
+                require(commentCost == null && helperCost == null && exactCost == null) {
                     "Satisfaction publication carries an objective cost"
                 }
                 null
             }
-            if (commentCost != null && helperCost != null) {
-                val commentValue = requireNotNull(ExactObjective.parse(commentCost))
-                val helperValue = requireNotNull(ExactObjective.parse(helperCost))
-                require(commentValue.compareTo(helperValue) == 0) {
+            val value = cost?.let { requireNotNull(ExactObjective.parse(it)) }
+            if (commentCost != null) {
+                require(requireNotNull(value).compareTo(requireNotNull(ExactObjective.parse(commentCost))) == 0) {
                     "Conflicting published FlatZinc costs"
                 }
             }
-            costs.add(cost?.let(ExactObjective::parse))
-            val coordinates = MiniZincSourceValidation.exactCoordinates(publication + "----------")
+            if (helperCost != null) {
+                val helperValue = requireNotNull(ExactObjective.parse(helperCost))
+                require(requireNotNull(value).compareTo(helperValue) == 0 ||
+                    (exactCost != null && value.approximate()?.let { it == helperCost.toDoubleOrNull() } == true)) {
+                    "Conflicting published FlatZinc costs"
+                }
+            }
+            costs.add(value)
+            val coordinates = exactCoordinates
                 ?: MiniZincSourceValidation.candidate(publication + "----------")
                 ?: error("FlatZinc publication has no complete coordinates")
             ExactFlatZincValidation.inspect(source, coordinates, cost)

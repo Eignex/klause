@@ -86,6 +86,51 @@ class FznStreamCheckerTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["minimize", "maximize"])
+    fun `exact rational objective annotations should retain their rounded display`(sense: String) {
+        val source = "var float: x; solve $sense x;"
+        val output = "x = 0.6142857142857143;\n_objective = 0.6142857142857143;\n" +
+            "% klause-exact: x = 43/70;\n% klause-exact: _objective = 43/70;\n----------\n"
+
+        val result = FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1).single()
+
+        assertEquals("valid", result.status)
+    }
+
+    @Test
+    fun `a rounded display conflicting with its exact objective should be rejected`() {
+        val source = "var float: x; solve minimize x;"
+        val output = "x = 0.6142857142857143;\n_objective = 0.5;\n" +
+            "% klause-exact: x = 43/70;\n% klause-exact: _objective = 43/70;\n----------\n"
+
+        assertFailsWith<IllegalArgumentException> {
+            FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1)
+        }
+    }
+
+    @Test
+    fun `an exact objective differing from its source value should remain invalid`() {
+        val source = "var float: x; solve minimize x;"
+        val output = "x = 0.6142857142857143;\n_objective = 0.5;\n" +
+            "% klause-exact: x = 43/70;\n% klause-exact: _objective = 1/2;\n----------\n"
+
+        val result = FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1).single()
+
+        assertEquals("invalid", result.status)
+    }
+
+    @Test
+    fun `duplicate exact objective annotations should be rejected`() {
+        val source = "var float: x; solve minimize x;"
+        val output = "x = 0.5;\n_objective = 0.5;\n% klause-exact: x = 1/2;\n" +
+            "% klause-exact: _objective = 1/2;\n% klause-exact: _objective = 1/2;\n----------\n"
+
+        assertFailsWith<IllegalArgumentException> {
+            FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["minimize", "maximize"])
     fun `each improving publication should be checked against original rows and objective`(sense: String) {
         val source = declarations + "solve $sense i;"
         val points = if (sense == "minimize") listOf(1, 0) else listOf(0, 1)
