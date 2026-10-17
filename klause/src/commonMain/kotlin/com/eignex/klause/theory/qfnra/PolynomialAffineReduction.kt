@@ -129,6 +129,15 @@ internal class PolynomialAffineReduction private constructor(
                 current = next
                 yield(null)
             }
+            if (!inconsistent) {
+                val magnitudeChecking = preparePolynomialMagnitudeRefutation(current, arithmetic)
+                var magnitudeConflict: Boolean? = null
+                while (magnitudeConflict == null) {
+                    magnitudeConflict = magnitudeChecking.next()
+                    if (magnitudeConflict == null) yield(null)
+                }
+                inconsistent = magnitudeConflict
+            }
             arithmetic.step()
             yield(PolynomialAffineReduction(current.toList(), fibres.toList(), inconsistent))
         }.iterator()
