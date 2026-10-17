@@ -125,7 +125,10 @@ class SourceExecutionRequest private constructor(
             invocation, executionOptions, finiteRequest, randomSeed, nodeBudget, cores, timeout, cancellation,
             presolveConfig, presolveCancellation, presolveBudget, policy,
         ),
-        cores, presolveCancellation, presolveBudget, policy,
+        cores,
+        presolveCancellation,
+        presolveBudget,
+        policy,
     )
 
     private constructor(
@@ -137,7 +140,8 @@ class SourceExecutionRequest private constructor(
         policy: SourceExecutionPolicy,
     ) : this(
         invocation, controls.finiteRequest, controls.theory, controls.polynomial, cores,
-        controls.presolveConfig, presolveCancellation, presolveBudget, controls.nonlinearInteger, controls.transcendental,
+        controls.presolveConfig, presolveCancellation, presolveBudget,
+        controls.nonlinearInteger, controls.transcendental,
         controls.nodeBudget, policy,
     )
 
@@ -290,9 +294,13 @@ fun SourceSetup.executionKind(invocation: PreparedSourceInvocation): SourceExecu
     when (val route = invocation.engineRoute) {
         is SourceProblemRoute.NativeFormula -> when (route.execution) {
             is NativeSourceExecution.Numerical -> SourceExecutionKind.NUMERICAL
+
             is NativeSourceExecution.IntegerPolynomial -> SourceExecutionKind.NONLINEAR_INTEGER
+
             is NativeSourceExecution.Functions -> SourceExecutionKind.FUNCTIONS
+
             is NativeSourceExecution.Polynomial -> SourceExecutionKind.POLYNOMIAL
+
             null -> when (invocation.source.formula) {
                 is AttachedSourceFormula.Linear -> SourceExecutionKind.NUMERICAL
                 is AttachedSourceFormula.IntegerPolynomial -> SourceExecutionKind.NONLINEAR_INTEGER
@@ -365,7 +373,8 @@ private fun executeCapturedSource(
             require(finite.shape === shape) { "finite execution belongs to a different source invocation" }
             invocation.requireFiniteExecution(finite.shape, finite.engine, finite.operation)
             bindScope?.invoke(
-                finite.cancellation or Cancellation { finite.deadlineExceeded() }, finite.toleranceCheck == null,
+                finite.cancellation or Cancellation { finite.deadlineExceeded() },
+                finite.toleranceCheck == null,
             )
             SourceExecutionResult.Finite(invocation, FinitePipeline.solve(finite, callbacks.finite))
         }
@@ -388,9 +397,14 @@ private fun executeCapturedSource(
         }
 
         is SourceProblemRoute.PolynomialTheory -> {
-            val prepared = if (invocation.linearSource == null) route.request else PolynomialTheoryRequest(
-                route.request.problem, route.preparedPlan.linearWorkingPlan(),
+            val prepared = if (invocation.linearSource == null) {
+                route.request
+            } else {
+                PolynomialTheoryRequest(
+                route.request.problem,
+                route.preparedPlan.linearWorkingPlan(),
             )
+            }
             val params = request.polynomial.boundTo(invocation)
             val objective = invocation.workingLinearObjective
             if (objective == null) {

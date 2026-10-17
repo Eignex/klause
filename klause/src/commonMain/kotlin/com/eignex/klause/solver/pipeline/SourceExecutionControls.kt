@@ -67,7 +67,12 @@ internal fun bindSourceExecutionControls(
         options.validateKnown()
         return SourceExecutionControls(
             TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout, cancellation = cancellation),
-            PolynomialTheoryParams(), null, null, finite, budget, resolvedPresolve,
+            PolynomialTheoryParams(),
+            null,
+            null,
+            finite,
+            budget,
+            resolvedPresolve,
         )
     }
     val decisions = reader[ExecutionOption.maxDecisions] ?: BacktrackParams().maxDecisions
@@ -79,10 +84,16 @@ internal fun bindSourceExecutionControls(
     }
     val strategy = PolynomialStrategyParams(
         backtrack = BacktrackParams(
-            randomSeed = seed, maxDecisions = decisions, maxInstructions = instructions, nodeBudget = budget,
+            randomSeed = seed,
+            maxDecisions = decisions,
+            maxInstructions = instructions,
+            nodeBudget = budget,
         ),
         localSearch = LocalSearchParams(
-            randomSeed = seed, maxFlips = flips, maxInstructions = instructions, nodeBudget = budget,
+            randomSeed = seed,
+            maxFlips = flips,
+            maxInstructions = instructions,
+            nodeBudget = budget,
         ),
         alnsIterations = iterations,
     )
@@ -101,24 +112,40 @@ internal fun bindSourceExecutionControls(
             timeout = timeout, cancellation = cancellation, nodeBudget = budget,
             alnsIterations = iterations, randomSeed = seed, maxFlips = flips, maxInstructions = instructions,
         )
-    } else TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout, cancellation = cancellation)
+    } else {
+        TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout, cancellation = cancellation)
+    }
     val functionDefaults = TranscendentalTheoryParams()
-    val polynomial = if (linear) PolynomialTheoryParams(strategy = strategy) else {
+    val polynomial = if (linear) {
+        PolynomialTheoryParams(strategy = strategy)
+    } else {
         val defaults = PolynomialTheoryParams()
-        val denseDefault = if (kind == SourceExecutionKind.FUNCTIONS) functionDefaults.maximumDenseCoefficients
-            else defaults.maximumDenseCoefficients
+        val denseDefault = if (kind == SourceExecutionKind.FUNCTIONS) {
+            functionDefaults.maximumDenseCoefficients
+        } else {
+            defaults.maximumDenseCoefficients
+        }
         val dense = reader.defaulted(ExecutionOption.nraDenseCoefficients, denseDefault?.toLong())
         if (dense != null && dense !in 1..Int.MAX_VALUE.toLong()) {
             pipelineConfigError("nra-dense-coefficients expects a positive Int or unlimited")
         }
         PolynomialTheoryParams(
-            maximumWork = reader.defaulted(ExecutionOption.nraWorkLimit,
-                if (kind == SourceExecutionKind.FUNCTIONS) functionDefaults.maximumWork else defaults.maximumWork),
+            maximumWork = reader.defaulted(
+                ExecutionOption.nraWorkLimit,
+                if (kind == SourceExecutionKind.FUNCTIONS) functionDefaults.maximumWork else defaults.maximumWork,
+            ),
             maximumDenseCoefficients = dense?.toInt(),
-            maximumMatrixCells = reader.defaulted(ExecutionOption.nraMatrixCells,
-                if (kind == SourceExecutionKind.FUNCTIONS) functionDefaults.maximumMatrixCells
-                else defaults.maximumMatrixCells),
-            timeout = timeout, cancellation = cancellation, strategy = strategy,
+            maximumMatrixCells = reader.defaulted(
+                ExecutionOption.nraMatrixCells,
+                if (kind == SourceExecutionKind.FUNCTIONS) {
+                    functionDefaults.maximumMatrixCells
+                } else {
+                    defaults.maximumMatrixCells
+                },
+            ),
+            timeout = timeout,
+            cancellation = cancellation,
+            strategy = strategy,
         )
     }
     val integer = if (kind == SourceExecutionKind.NONLINEAR_INTEGER) {
@@ -129,12 +156,22 @@ internal fun bindSourceExecutionControls(
             reader.defaulted(ExecutionOption.niaMoves, defaults.maximumMoves) ?: Long.MAX_VALUE,
             budget,
         )
-    } else null
-    val functions = if (kind == SourceExecutionKind.FUNCTIONS) functionDefaults.copy(
-        maximumWork = polynomial.maximumWork, maximumDenseCoefficients = polynomial.maximumDenseCoefficients,
-        maximumMatrixCells = polynomial.maximumMatrixCells, timeout = timeout, cancellation = cancellation,
-        strategy = strategy, nodeBudget = budget,
-    ) else null
+    } else {
+        null
+    }
+    val functions = if (kind == SourceExecutionKind.FUNCTIONS) {
+        functionDefaults.copy(
+            maximumWork = polynomial.maximumWork,
+            maximumDenseCoefficients = polynomial.maximumDenseCoefficients,
+            maximumMatrixCells = polynomial.maximumMatrixCells,
+            timeout = timeout,
+            cancellation = cancellation,
+            strategy = strategy,
+            nodeBudget = budget,
+        )
+    } else {
+        null
+    }
     reader.finish("source ${kind.name.lowercase()}", "common strategy controls and the selected family's native limits")
     return SourceExecutionControls(theory, polynomial, integer, functions, finite, budget, resolvedPresolve)
 }
@@ -157,8 +194,11 @@ private fun FiniteSolveRequest.withSourceControls(
         explicitPresolveConfig || policy.explicitPresolve, solutionSetSensitive,
         cancellation = cancellation or stop, presolveCancellation = presolveCancellation or stop,
         presolveBudget = presolveBudget, cores = cores,
-        executionOptions = policy.options(engine, executionOptions.withoutPresolve()
-            .without("node-limit").overriddenBy(options)),
+        executionOptions = policy.options(
+            engine,
+            executionOptions.withoutPresolve()
+                .without("node-limit").overriddenBy(options),
+        ),
         randomSeed = seed, defaultArms = policy.arms(engine, cores, defaultArms),
         lpConfig = policy.lpConfig(engine, lpConfig),
         zeroObjectivePricing = policy.zeroObjectivePricing ?: zeroObjectivePricing,

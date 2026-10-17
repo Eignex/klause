@@ -26,8 +26,10 @@ class SourceExecutionPolicyEngineTest(private val engine: FiniteEngine) {
         val request = SourceExecutionPolicy().finiteRequest(shape, engine)
 
         assertEquals(if (engine == FiniteEngine.FIXED) 1 else autoArms(1), request.defaultArms)
-        assertEquals(if (engine == FiniteEngine.FIXED) LpEmphasis.OFF else LpEmphasis.AGGRESSIVE,
-            request.lpConfig.emphasis)
+        assertEquals(
+            if (engine == FiniteEngine.FIXED) LpEmphasis.OFF else LpEmphasis.AGGRESSIVE,
+            request.lpConfig.emphasis,
+        )
         assertEquals(0L, request.randomSeed)
     }
 

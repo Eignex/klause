@@ -66,7 +66,8 @@ class SourceExecutionPolicy(
         val seed = reader[ExecutionOption.seed] ?: randomSeed ?: 0L
         return FiniteSolveRequest(
             shape, engine, preparation.config, explicitPresolve, solutionSetSensitive,
-            cancellation, presolveCancellation, presolveBudget, cores, options(engine, executionOptions.withoutPresolve()),
+            cancellation, presolveCancellation, presolveBudget, cores,
+            options(engine, executionOptions.withoutPresolve()),
             seed, arms(engine, cores), lpConfig(engine),
             zeroObjectivePricing ?: LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget,
             solveBudgetMillis.takeIf { engine == FiniteEngine.FIXED }, allSolutions, solutionCap,
@@ -98,7 +99,9 @@ class SourceExecutionPolicy(
     internal fun options(engine: FiniteEngine, options: ExecutionOptions): ExecutionOptions =
         if (engine != FiniteEngine.FIXED && portfolioArms != null && !options.explicitArms) {
             options.overriddenBy(ExecutionOptions(ExecutionOption.arms(portfolioArms)))
-        } else options
+        } else {
+            options
+        }
 
     internal fun arms(engine: FiniteEngine, cores: Int, fallback: Int = autoArms(cores)): Int =
         if (engine == FiniteEngine.FIXED) 1 else portfolioArms ?: fallback
@@ -113,7 +116,10 @@ class SourceExecutionPolicy(
             return LpConfig.OFF
         }
         val ceiling = lpCeiling ?: portfolioLpCeiling
-        return if (fallback != null && ceiling != null) fallback.cappedUnder(ceiling)
-            else fallback ?: ceiling ?: LpConfig.AGGRESSIVE
+        return if (fallback != null && ceiling != null) {
+            fallback.cappedUnder(ceiling)
+        } else {
+            fallback ?: ceiling ?: LpConfig.AGGRESSIVE
+        }
     }
 }
