@@ -217,6 +217,7 @@ class ExactLiraSearchComponent private constructor(
     private var assignment: ExactLiraAssignment? = null
     private var outcome: ComponentCheck? = null
     private var candidate: List<BigFraction>? = null
+    private var prefixPoint: List<BigFraction>? = null
     private var floatCandidate: DoubleArray? = null
     private var pointHintRows: List<PreparedSourceRow>? = null
     private var pointHintValues: IntArray? = null
@@ -415,6 +416,7 @@ class ExactLiraSearchComponent private constructor(
         if (partialPointHintAvailable()) context?.boolValue(variable) else null
 
     internal fun releasePartialPointHints() {
+        prefixPoint = null
         defaultDisjunctionHints = false
         pointHintRows = null
         pointHintValues = null
@@ -652,11 +654,13 @@ class ExactLiraSearchComponent private constructor(
     }
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
     override fun onRestart(context: SearchContext) {
+        prefixPoint = null
         floatCandidate = null
         pointHintValues = null
         lp.onRestart(context)
     }
     override fun close() {
+        prefixPoint = null
         floatCandidate = null
         releasePartialPointHints()
         closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
@@ -907,6 +911,9 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun accept(decision: SearchDecision, context: SearchContext): ComponentResult {
+        if (decision !is SearchDecision.Bool || decision.literal ushr 1 !in bools.indices ||
+            !canReusePrefixPoint()
+        ) prefixPoint = null
         if (decision is SearchDecision.Bool && decision.literal ushr 1 !in bools.indices) {
             return ComponentResult.Consistent
         }
@@ -1038,18 +1045,34 @@ class ExactLiraSearchComponent private constructor(
         } && values.contentEquals(bools) && canCaptureCompletionSource() && !operationStop()
     }
 
+    private fun canReusePrefixPoint(): Boolean =
+        pointHintRows != null && sourceInstalled && !graphFirst && !hasPrivateReals &&
+        model.numIntVars == 0 && model.numRealVars > 0 &&
+        solveContext.certificationPolicy === ProductionLpCertificationPolicy && !hasSourceDisjunctions &&
+        node.rowAssertions.isEmpty() && node.sourceBranches.isEmpty() && node.disequalityDirections.isEmpty() &&
+        node.directionPremises.isEmpty() && node.branches.isEmpty() && node.reducedBranches.isEmpty() &&
+        node.transformedBranches.isEmpty() && node.retainedReduction == null
+
     private fun assertSource(context: SearchContext): ComponentResult {
+        var point = prefixPoint?.takeIf { canReusePrefixPoint() && !pointHintStop() }
+        prefixPoint = null
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) {
             return ComponentResult.Indeterminate
         }
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((index, prepared) in preparedRows.withIndex()) {
+            if (point != null) {
+                operationStop.charge(1L)
+                if (operationStop()) return ComponentResult.Indeterminate
+                if (pointHintStop()) point = null
+            }
             if (impliedDisjunct) {
                 operationStop.charge(1L)
                 if (operationStop()) return ComponentResult.Indeterminate
             }
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
+            // A retained point covers installed rows through its LP producer or a checked extension.
             if (context.decisionLevel > 0 && sourceAssertionLevels[index] >= 0) continue
             val address = prepared.address
             val asserted = node.rowAssertions[address]
@@ -1078,6 +1101,10 @@ class ExactLiraSearchComponent private constructor(
             if (prepared.disjunction && asserted == null) continue
             val truth = node.rowTruth(address, prepared.row, bools) ?: continue
             val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
+            if (point != null) {
+                if (hintTruth(comparison, point) != true) point = null
+                if (operationStop()) return ComponentResult.Indeterminate
+            }
             val leaves = prepared.booleans.map { variable ->
                 SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
             }.toMutableList<SearchAtomPremise>()
@@ -1101,6 +1128,7 @@ class ExactLiraSearchComponent private constructor(
             is LpBoundBatchResult.Applied -> Unit
         }
         if (!assertDisequalities(disequalities)) return ComponentResult.Indeterminate
+        prefixPoint = point?.takeIf { canReusePrefixPoint() && !operationStop() && !pointHintStop() }
         nodesByLevel.put(context.decisionLevel, node)
         return ComponentResult.Consistent
     }
@@ -1177,7 +1205,9 @@ class ExactLiraSearchComponent private constructor(
 
     private fun endOperation(context: SearchContext) {
         lpStop.end()
-        if (operationStop() && !context.cancelled()) {
+        val stopped = operationStop()
+        if (prefixPoint != null && (stopped || pointHintStop() || context.cancelled())) prefixPoint = null
+        if (stopped && !context.cancelled()) {
             operationBudgetExhausted = true
             context.executionControls.reportStop(SearchStopCause.OperationAllowance)
         }
@@ -1217,9 +1247,15 @@ class ExactLiraSearchComponent private constructor(
             bools.indices.all { context.boolValue(it) != null }
         ) return ComponentResult.Consistent
         val enforced = enforceDisjunctions(context)
-        if (enforced !is ComponentResult.Consistent) return enforced
+        if (enforced !is ComponentResult.Consistent) {
+            prefixPoint = null
+            return enforced
+        }
         // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
-        if (impliedDisjunct) return ComponentResult.Consistent
+        if (impliedDisjunct) {
+            prefixPoint = null
+            return ComponentResult.Consistent
+        }
         if (!graphFirst && bools.any { it == UNASSIGNED } && arithmeticRows.none {
                 it.truthUnder(bools) != null
             }
@@ -1264,8 +1300,30 @@ class ExactLiraSearchComponent private constructor(
         val asserted = assertSource(context)
         if (operationStop()) return ComponentResult.Indeterminate
         if (asserted !is ComponentResult.Consistent) return asserted
-        if (impliedDisjunct) return ComponentResult.Consistent
-        if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
+        if (impliedDisjunct) {
+            prefixPoint = null
+            return ComponentResult.Consistent
+        }
+        if (!checked && !context.consumeCheck()) {
+            prefixPoint = null
+            return ComponentResult.Indeterminate
+        }
+        if (pointHintStop()) prefixPoint = null
+        prefixPoint?.let { retained ->
+            prefixPoint = null
+            candidate = retained
+            dirty = false
+            observeCompleteStage("EXACT_POINT_REUSED")
+            if (bools.any { it == UNASSIGNED }) {
+                capturePointHints(retained, context)
+                if (pointHintValues != null && canReusePrefixPoint() && !operationStop() && !pointHintStop()) {
+                    prefixPoint = retained
+                }
+            }
+            if (operationStop()) return ComponentResult.Indeterminate
+            captureCompleteWitness(retained)
+            return ComponentResult.Consistent
+        }
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
         val result = lp.solve(sparsePointRecovery = true)
@@ -1289,7 +1347,8 @@ class ExactLiraSearchComponent private constructor(
         if (result == null) return ComponentResult.Indeterminate
         if (operationStop()) return ComponentResult.Indeterminate
         dirty = false
-        candidate = result.exactPrimal?.take(model.numRealVars + model.numIntVars)
+        val freshPoint = result.exactPrimal?.take(model.numRealVars + model.numIntVars)
+        candidate = freshPoint
         if (result.verdict == LpVerdict.INFEASIBLE) {
             val explanation = lp.explainConflict(result.conflictSupport, context)
             smtStats?.observeConflict(explanation)
@@ -1298,7 +1357,10 @@ class ExactLiraSearchComponent private constructor(
         }
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
         if (bools.any { it == UNASSIGNED }) {
-            candidate?.let { capturePointHints(it, context) }
+            freshPoint?.let { capturePointHints(it, context) }
+            if (pointHintValues != null && canReusePrefixPoint() && !operationStop() && !pointHintStop()) {
+                prefixPoint = freshPoint
+            }
         } else if (candidate == null && mixedPointCompletion && result.float?.optimal == true &&
             model.numRealVars > 0 && (model.numIntVars > 0 || !hasPrivateReals) &&
             solveContext.certificationPolicy === ProductionLpCertificationPolicy
@@ -1581,6 +1643,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun retractSource(decisionLevel: Int) {
+        prefixPoint = null
         for (index in sourceAssertionLevels.indices) {
             if (sourceAssertionLevels[index] > decisionLevel) sourceAssertionLevels[index] = -1
         }

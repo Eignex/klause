@@ -1,8 +1,10 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearForm
@@ -45,6 +47,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
+import com.eignex.klause.theory.EncodedTheoryModel
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
@@ -52,6 +55,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -63,6 +67,396 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class QfLiraSolverLpTest {
+    @Test
+    fun `a compatible Boolean extension should reuse its exact LP point without another query`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ZERO),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.LE, BigFraction.ONE, activator = 0),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
+                    LinearOp.GE, BigFraction.ZERO, activator = 1),
+            ),
+        )
+        var queries = 0
+        val factory = TrackingLpFactory { solver, allowance ->
+            queries++
+            solver.resolveBounds(allowance)
+        }
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            component.useMixedPointCompletion()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(true, hints.preferredBool(0))
+            val initialQueries = queries
+            assertTrue(initialQueries > 0)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertEquals(initialQueries, queries)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            assertTrue(queries > initialQueries)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+            assertNull(component.nextBranch(session))
+            assertIs<ComponentCheck.Feasible>(session.check())
+            val witness = assertNotNull(session.model().valueOf<ExactLiraAssignment>(component))
+            assertEquals(true, witness.boolValue(0))
+            assertEquals(false, witness.boolValue(1))
+            assertTrue(witness.reals[0] > BigFraction.ZERO && witness.reals[0] <= BigFraction.ONE)
+            assertTrue(witness.reals[1] < BigFraction.ZERO)
+            assertEquals(BigFraction.ZERO, witness.reals[0] + witness.reals[1])
+        }
+    }
+
+    @Test
+    fun `restart and retraction should require a fresh LP query before point reuse`() {
+        for (boundary in listOf("root restart", "same level restart", "retraction", "hint release")) {
+            val source = Problem(
+                numBoolVars = 3,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+                numRealVars = 2,
+                realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+                factors = arrayOf(
+                    ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                        listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ZERO),
+                    ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                        LinearOp.LE, BigFraction.ONE, activator = 0),
+                    ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
+                        LinearOp.LE, BigFraction.ONE, activator = 1),
+                ),
+            )
+            var queries = 0
+            val factory = TrackingLpFactory { solver, allowance ->
+                queries++
+                solver.resolveBounds(allowance)
+            }
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(source).use { component ->
+                component.solveWith(LpSolveContext(factory))
+                component.observeWith(stats)
+                component.observeCompleteTraversal()
+                assertNotNull(component.partialPointHints(Cancellation.Never))
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                if (boundary != "root restart") {
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                    assertEquals(1L, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+                }
+                when (boundary) {
+                    "root restart" -> assertIs<ComponentResult.Consistent>(session.restart())
+                    "same level restart" -> assertIs<ComponentResult.Consistent>(
+                        session.restartAt(session.decisionLevel),
+                    )
+                    "hint release" -> component.releasePartialPointHints()
+                    else -> session.popTo(0)
+                }
+                val before = queries
+                val reuses = stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED")
+
+                val variable = if (boundary in listOf("same level restart", "hint release")) 1 else 0
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, true))))
+
+                assertTrue(queries > before)
+                assertEquals(reuses, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+            }
+        }
+    }
+
+    @Test
+    fun `encoded private real coordinates should require fresh LP queries`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ZERO),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.LE, BigFraction.ONE, activator = 0),
+            ),
+        )
+        val encoded = EncodedTheoryModel(source, source.factors + ExactLinear.of(
+            intArrayOf(Term.ofRealVar(2), Term.ofRealVar(0)),
+            listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.EQ, BigFraction.ZERO,
+        ), null, 3)
+        var queries = 0
+        val factory = TrackingLpFactory { solver, allowance ->
+            queries++
+            solver.resolveBounds(allowance)
+        }
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(encoded).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            assertNotNull(component.partialPointHints(Cancellation.Never))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val before = queries
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertTrue(queries > before)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("PREPARED_PRIVATE_REAL_COMPONENTS"))
+            assertNull(stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+        }
+    }
+
+    @Test
+    fun `dormant real disjunctions should forbid prefix point reuse`() {
+        val source = Problem(
+            numBoolVars = 3,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 3,
+            realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ZERO),
+                RealChoice(0, 2, 0, 1),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.LE, BigFraction.ONE, activator = 1),
+            ),
+        )
+        var queries = 0
+        val factory = TrackingLpFactory { solver, allowance ->
+            queries++
+            solver.resolveBounds(allowance)
+        }
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            assertNotNull(component.partialPointHints(Cancellation.Never))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val before = queries
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertTrue(queries > before)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("PREPARED_DISJUNCTION_COMPONENTS"))
+            assertNull(stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+        }
+    }
+
+    @Test
+    fun `an oversized point check should fall back to a fresh LP query`() {
+        val wide = BigFraction.of(BIG_ONE shl 3500, BIG_ONE)
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 3,
+            realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ,
+                    assertNotNull(BigFraction.ofDouble(1e300))),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(2)),
+                    listOf(wide, wide, wide), LinearOp.GE, BigFraction.ZERO, activator = 0),
+            ),
+        )
+        var queries = 0
+        val factory = TrackingLpFactory { solver, allowance ->
+            queries++
+            solver.resolveBounds(allowance)
+        }
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_HINT_LP_CAPTURE"))
+            assertNull(hints.preferredBool(0))
+            val before = queries
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertTrue(queries > before)
+            assertNull(stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+        }
+    }
+
+    @Test
+    fun `stopped prefix validation should lose reuse authority before resuming`() {
+        var charged = 0L
+        var stopOnCharge = false
+        var stopped = false
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = stopped
+            override fun workMeter(): WorkMeter = WorkMeter {
+                charged += it
+                if (stopOnCharge) stopped = true
+            }
+        }
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ZERO),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.LE, BigFraction.ONE, activator = 0),
+            ),
+        )
+        var queries = 0
+        val factory = TrackingLpFactory { solver, allowance ->
+            queries++
+            solver.resolveBounds(allowance)
+        }
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            component.useSolveStop(token)
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            assertNotNull(component.partialPointHints(Cancellation.Never))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val before = queries
+            val work = charged
+            stopOnCharge = true
+
+            assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertTrue(charged > work)
+            assertEquals(before, queries)
+            assertNull(stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+            stopped = false
+            stopOnCharge = false
+
+            assertIs<ComponentResult.Consistent>(session.propagate())
+
+            assertTrue(queries > before)
+            assertNull(stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+        }
+    }
+
+    @Test
+    fun `source theory branches should forbid point reuse on later Boolean extensions`() {
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 2,
+            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ZERO),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.LE, BigFraction.ONE, activator = 0),
+            ),
+        )
+        var queries = 0
+        val factory = TrackingLpFactory { solver, allowance ->
+            queries++
+            solver.resolveBounds(allowance)
+        }
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            assertNotNull(component.partialPointHints(Cancellation.Never))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val split = assertNotNull(SourceBoundAtom.rationalSplit(session,
+                listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ZERO))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
+            val before = queries
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertTrue(queries > before)
+            assertNull(stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+        }
+    }
+
+    @Test
+    fun `a reused prefix should reach typed source refutation when leaf point recovery declines`() {
+        val equations = (1..129).map { coefficient ->
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1), Term.ofRealVar(2)),
+                listOf(BigFraction.ofLong(coefficient.toLong()), BigFraction.ONE, BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ofLong(coefficient.toLong()))
+        }
+        val source = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 3,
+            realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+            factors = (equations + listOf(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(2)),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.EQ, BigFraction.ZERO),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.LE, BigFraction.ofLong(2), activator = 0),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
+                    LinearOp.GE, BigFraction.ZERO, strict = true, activator = 1),
+            )).toTypedArray(),
+        )
+        var unchecked = false
+        var last: FloatLpResult? = null
+        var queries = 0
+        val factory = TrackingLpFactory { solver, allowance ->
+            queries++
+            if (unchecked) {
+                val prior = assertNotNull(last)
+                FloatLpResult(prior.basis, 0.0, DoubleArray(prior.duals.size), DoubleArray(prior.primal.size))
+            } else {
+                solver.resolveBounds(allowance).also { last = it }
+            }
+        }
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            component.useMixedPointCompletion()
+            assertNotNull(component.partialPointHints(Cancellation.Never))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val before = queries
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertEquals(before, queries)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("EXACT_POINT_REUSED"))
+            unchecked = true
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertNull(component.nextBranch(session))
+
+            assertTrue(queries > before)
+            assertEquals(0, stats.snapshot().completeSearchMinUnassignedBooleans)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("RECOVERY_SOURCE_REFUTED"))
+            assertIs<ComponentCheck.Infeasible>(session.check())
+            assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+        }
+    }
+
     @Test
     fun `LP cancellation should retain its parent meter and distinct session stop`() {
         var stopped = false

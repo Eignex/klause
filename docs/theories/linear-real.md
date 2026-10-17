@@ -48,6 +48,21 @@ or alias a source Boolean. Row facts, numerical assertions and their antecedents
 the existing retract/restart scopes, while immutable names retain their session meaning.
 The guarded-row metadata supplies no point-reuse or residual-proof eligibility.
 
+A canonical pure-real conjunction can retain one shared source-coordinate point
+directly from a fresh production LP result after bounded primitive hint capture
+completes. A Boolean extension checks every newly resolved signed comparison,
+including strict boundaries, before recording its assertion level. Installed rows
+remain covered by the producing solve or an earlier checked extension. A compatible
+point avoids the repeated LP solve while preserving source assertions, fixpoint
+delivery, the shared check charge and complete source witness validation.
+This requires no private coordinates, source disjunctions, row assertions, numeric
+branches, disequality directions or retained reductions. Candidate completion,
+floating and graph points cannot seed reuse. Restart, retraction, other decisions,
+hint release, incompatible or declined checks, operation stops and close clear the
+point; a fallback solve retains no earlier point. Existing entry, scalar and work
+limits bound capture and exact checking without another index, point copy or
+allowance. This point cannot supply a cached bound, conflict or residual refutation.
+
 For a source containing integer or real coordinates, the exact-linear component can
 reuse the exact source-coordinate prefix of an existing completed LP witness, or
 the point from its existing feasible difference check,
