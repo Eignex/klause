@@ -22,6 +22,22 @@ import kotlin.test.assertNotNull
 
 class FloatGridFiniteDomainTest {
     @Test
+    fun `constant private grids should retain their original membership attribution`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(RealFiniteDomain(0, doubleArrayOf(0.125))),
+            numRealVars = 1, realLower = doubleArrayOf(0.125), realUpper = doubleArrayOf(0.125),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+        val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
+            listOf(FloatGridVariable(SourceRealId(0), buckets = 3, preserveBuckets = true))), Cancellation.Never))
+
+        val point = BacktrackSolver(prepared.problem.bake()).enumerate().first()
+        val original = assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, Cancellation.Never))
+
+        assertEquals(0, prepared.mapping.sourceFactor(0))
+        assertEquals(BigFraction.ofLong(8).reciprocal(), assertNotNull(original.exactReals).single())
+        assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, original))
+    }
+
+    @Test
     fun `a private product view should retain its unguarded operand membership`() {
         val source = Problem(0, 0, emptyArray(), arrayOf(
             ContinuousProduct(0, 0, 1, 0, doubleArrayOf(-1.0, 0.125, 0.5)),

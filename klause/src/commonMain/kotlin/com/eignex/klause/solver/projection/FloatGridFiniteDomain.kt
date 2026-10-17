@@ -29,7 +29,9 @@ internal fun lowerGridFiniteValues(
         if (cancellation()) return null
         val value = requireNotNull(BigFraction.ofDouble(valueAt(index)))
         if (column.step.isZero) {
-            if (value == column.origin) return emptyList()
+            if (value == column.origin) {
+                return listOf(Linear(longArrayOf(1L), intArrayOf(column.coordinate.variable), LinearOp.GE, 0L))
+            }
         } else {
             val position = (value - column.origin) * column.step.reciprocal()
             if (position.den == BIG_ONE && position.num.fitsLong()) {
