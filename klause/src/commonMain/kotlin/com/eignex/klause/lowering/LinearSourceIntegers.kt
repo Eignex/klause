@@ -51,8 +51,8 @@ internal fun LinearSourceProblem.integralRealBounds(
                 }
             }
             if (target < 0 || multiple) continue
-            val coefficient = requireNotNull(terms[target])
-            val constant = bound / coefficient
+            val inverse = requireNotNull(terms[target]).reciprocal()
+            val constant = bound * inverse
             if (constant.den != BIG_ONE) continue
             var minimum = constant
             var maximum = constant
@@ -61,7 +61,7 @@ internal fun LinearSourceProblem.integralRealBounds(
                 stop.charge(1L)
                 if (stop()) return null
                 if (column == target) continue
-                val weight = (value / coefficient).negated()
+                val weight = (value * inverse).negated()
                 val lo = lower[column]
                 val hi = upper[column]
                 if (weight.den != BIG_ONE || lo == null || hi == null) {
