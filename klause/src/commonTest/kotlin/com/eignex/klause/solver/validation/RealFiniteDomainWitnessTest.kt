@@ -56,6 +56,19 @@ class RealFiniteDomainWitnessTest {
     }
 
     @Test
+    fun `finite binary64 literals should not admit a nearby decimal rational root`() {
+        val tenth = AlgebraicReal(RationalPolynomial.of(-1, 10), 1,
+            RationalInterval(BigFraction.ZERO, BigFraction.ONE))
+        val source = Problem(0, 0, emptyArray(), arrayOf(RealFiniteDomain(0, doubleArrayOf(0.1))),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.1), algebraicReals = listOf(tenth))
+
+        val verdict = verifyRealCoordinates(source, point)
+
+        assertIs<Verification.Rejected>(verdict)
+    }
+
+    @Test
     fun `an enclosing algebraic interval should not establish finite membership`() {
         val root = AlgebraicReal(RationalPolynomial.of(-2, 0, 1), 2,
             RationalInterval(BigFraction.ONE, BigFraction.ofLong(2)))

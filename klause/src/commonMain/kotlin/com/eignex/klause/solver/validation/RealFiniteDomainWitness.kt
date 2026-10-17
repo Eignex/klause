@@ -1,9 +1,5 @@
 package com.eignex.klause.solver.validation
 
-import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
-import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
-import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
-import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
@@ -16,16 +12,12 @@ internal fun checkRealFiniteDomains(
     source: Problem,
     sample: Sample,
     cancellation: Cancellation,
-): Verification<List<BigFraction>, Unit> = try {
-    if (sample.numRealVars != source.numRealVars) {
+): Verification<List<BigFraction>, Unit> {
+    return if (sample.numRealVars != source.numRealVars) {
         Verification.Rejected("assignment does not cover the real variables")
     } else {
         finiteDomainCoordinates(source, sample, cancellation)
     }
-} catch (_: PolynomialInterrupted) {
-    Verification.Indeterminate("finite real membership check cancelled")
-} catch (_: PolynomialResourceLimit) {
-    Verification.Indeterminate("finite real membership check exceeded representation limits")
 }
 
 private fun finiteDomainCoordinates(
@@ -35,7 +27,6 @@ private fun finiteDomainCoordinates(
 ): Verification<List<BigFraction>, Unit> {
     cancellation.charge(source.numRealVars.toLong())
     if (cancellation()) return Verification.Indeterminate("finite real membership check cancelled")
-    val arithmetic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
     val reals = Array<BigFraction?>(source.numRealVars) { id ->
         sample.exactReals?.get(id) ?: sample.algebraicReals?.get(id)?.rational
             ?: sample.symbolicReals?.get(id)?.rational
@@ -56,17 +47,40 @@ private fun finiteDomainCoordinates(
             cancellation.charge(1)
             if (cancellation()) return Verification.Indeterminate("finite real membership check cancelled")
             val value = requireNotNull(BigFraction.ofDouble(factor.valueAt(index)))
-            val matches = if (exact != null) exact == value
-                else arithmetic.compare(requireNotNull(algebraic), arithmetic.rational(value)) == 0
+            val matches = if (exact != null) exact == value else {
+                val root = requireNotNull(algebraic)
+                root.rational?.let { it == value } ?: isolatedRationalRoot(root.definingCoefficients,
+                    root.lowerBound, root.upperBound, value, cancellation)
+                    ?: return Verification.Indeterminate("finite real membership check cancelled")
+            }
             if (matches) {
                 member = value
                 break
             }
         }
+        if (cancellation()) return Verification.Indeterminate("finite real membership check cancelled")
         if (member == null) return Verification.Rejected("real ${factor.variable} is outside its declared values")
         reals[id] = member
     }
     if (cancellation()) return Verification.Indeterminate("finite real membership check cancelled")
     if (reals.any { it == null }) return Verification.Indeterminate("continuous values are not rationally certified")
     return Verification.Accepted(Candidate(reals.map { requireNotNull(it) }, Unit))
+}
+
+private fun isolatedRationalRoot(
+    coefficients: List<BigFraction>,
+    lower: BigFraction,
+    upper: BigFraction,
+    value: BigFraction,
+    cancellation: Cancellation,
+): Boolean? {
+    if (cancellation()) return null
+    if (value <= lower || value >= upper) return false
+    var residual = BigFraction.ZERO
+    for (index in coefficients.indices.reversed()) {
+        cancellation.charge(1)
+        if (cancellation()) return null
+        residual = residual * value + coefficients[index]
+    }
+    return if (cancellation()) null else residual.isZero
 }
