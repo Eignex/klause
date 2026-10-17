@@ -61,6 +61,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.solver.validation.floatingOptimumAcceptance
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
@@ -682,7 +683,7 @@ internal class LpEngine(
             workLimit = leafWorkBudget(model),
             observer = sink.lp.certificationObserver(LpRoute.STANDALONE),
             counterResults = lpCounterResults,
-            floatAccept = toleranceCheck?.let { check ->
+            floatAccept = toleranceCheck.floatingOptimumAcceptance()?.let { check ->
                 { result -> check(leafSample(session, relaxation.floatReals(result.primal, problem))) }
             },
             floatOffset = relaxation.objectiveConstant.toDouble(),

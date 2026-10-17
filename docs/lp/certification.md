@@ -39,6 +39,13 @@ Exact rejection of one candidate is not a refutation of the model. Cross-arm
 publication also requires the [portfolio model and objective scope](../solver/portfolio.md#witnesses-and-proof-scope);
 its adapter certificate does not replace these numerical checks.
 
+Model-facing finite consumers keep source-point acceptance separate from permission
+to accept a floating optimum. A zero-tolerance source still checks every candidate
+under its captured policy, while LP completion must establish its exact proof
+package. The presence of a source check or an additional restrictive filter grants
+no floating optimum permission. This distinction is carried by the immutable
+acceptance adapter; numerical engine dependencies remain source-independent.
+
 ## Certification mechanisms
 
 The dispatcher selects applicable mechanisms under consumer budgets. They are

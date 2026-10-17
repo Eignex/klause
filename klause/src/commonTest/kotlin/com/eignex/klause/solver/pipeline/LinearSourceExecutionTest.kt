@@ -17,11 +17,11 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.LinearSourceWitness
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
@@ -37,6 +37,91 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LinearSourceExecutionTest {
+    @Test
+    fun `declining optional bound closure should retain required numerical source execution`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("n", true)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                upper = SemanticRational.ofLong(5))),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                sense = ObjectiveSense.MAXIMIZE),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
+            maximize = true, boundCancellation = Cancellation { true },
+        ))
+
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
+            finiteRequest = { error("declined closure installed finite execution") }))
+
+        assertIs<SourceExecutionResult.Numerical>(result)
+        val outcome = assertNotNull(result.linearSource)
+        assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
+        assertEquals(BigFraction.ofLong(5), outcome.incumbent?.objective)
+    }
+
+    @Test
+    fun `zero source tolerance should retain an exact one sided real optimum`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ofLong(10))),
+                lower = SemanticRational.ONE)),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
+        ))
+
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+            FiniteSolveRequest(
+                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
+                randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
+            )
+        }))
+
+        val outcome = assertNotNull(result.linearSource)
+        assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
+        assertEquals(BigFraction.ofLong(10).reciprocal(), outcome.incumbent?.objective)
+        assertEquals(listOf(BigFraction.ofLong(10).reciprocal()), outcome.incumbent?.values)
+    }
+
+    @Test
+    fun `an extra exact source filter should remain separate from optimum permission`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ofLong(10))),
+                lower = SemanticRational.ONE)),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
+        ))
+        var checked = 0
+
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+            FiniteSolveRequest(
+                shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+                presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
+                randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
+                toleranceCheck = { checked++; true },
+            )
+        }))
+
+        val outcome = assertNotNull(result.linearSource)
+        assertTrue(checked > 0)
+        assertFalse(outcome.nativeClaimsUnrestricted)
+        assertEquals(BigFraction.ofLong(10).reciprocal(), outcome.incumbent?.objective)
+        assertEquals(LinearSourceConclusion.OPTIMAL, outcome.nativeConclusion)
+        assertEquals(LinearSourceConclusion.SATISFIABLE, outcome.conclusion)
+    }
+
     @Test
     fun `open numerical maximization should retain scaled native costs and original exact units`() {
         val source = LinearSourceProblem(

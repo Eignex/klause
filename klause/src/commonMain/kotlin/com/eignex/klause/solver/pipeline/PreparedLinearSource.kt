@@ -40,7 +40,7 @@ internal fun prepareLinearSource(
     val maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE
     val native = NumericalLinearRequest(view.model, objective, maximize, stop)
     val route = if (native.numericalRowsSupported(stop)) {
-        val finite = native.finiteRoute(onLpStats ?: {})
+        val finite = native.finiteRoute(request.boundCancellation or stop, onLpStats ?: {})
         if (finite is SourceProblemRoute.Finite && finite.problem.requiresExactObjectiveRoute(objective, stop)) {
             SourceProblemRoute.NativeFormula(NativeSourceExecution.Numerical(native, view.numericalPlan(objective)))
         } else finite ?: SourceProblemRoute.NativeFormula(

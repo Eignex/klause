@@ -13,6 +13,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.solver.validation.floatingOptimumAcceptance
 import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
@@ -54,7 +55,7 @@ internal class LeafRealSolver(
             cancellation = cancellation,
             workLimit = workLimit,
             observer = sink?.certificationObserver(LpRoute.STANDALONE),
-            floatAccept = toleranceCheck?.let { check ->
+            floatAccept = toleranceCheck.floatingOptimumAcceptance()?.let { check ->
                 { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem))) }
             },
             floatOffset = relaxation.objectiveConstant.toDouble(),

@@ -68,6 +68,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.solver.validation.floatingOptimumAcceptance
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.encodingSourceRealCount
 import com.eignex.klause.theory.finiteLinearModel
@@ -408,7 +409,7 @@ internal fun leafRealFeasibility(
         observer = sink?.certificationObserver(LpRoute.STANDALONE),
         context = context,
         pricing = pricing,
-        floatAccept = toleranceCheck?.let { check ->
+        floatAccept = toleranceCheck.floatingOptimumAcceptance()?.let { check ->
             { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem))) }
         },
         floatOffset = relaxation.objectiveConstant.toDouble(),

@@ -57,6 +57,12 @@ Cancellation declines the check. Finite execution installs this check before wor
 admission, after reconstructing source coordinates. Pipeline publication checks native
 points through the same service and retains native conclusions separately from their
 accepted-source qualification; tolerance acceptance does not transfer nominal proofs.
+A captured finite acceptance check retains a separate immutable permission for
+floating optimum completion. Zero source tolerance withholds that permission even
+when an extra caller filter accepts a floating point. Reconstruction and worker
+callback adapters preserve both the check and its precision policy. Accepting a
+point does not substitute for an equal exact objective bound; binary64 coordinates
+can still be valid exact witnesses when the arithmetic checks establish attainment.
 
 ## Dependencies
 
