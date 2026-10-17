@@ -8,10 +8,11 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.OpenIntBounds
+import com.eignex.klause.lp.cut.AggregationMirSeparator
 import com.eignex.klause.lp.cut.CutContext
 import com.eignex.klause.lp.cut.CutSeparator
-import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpSolveContext
@@ -141,8 +142,10 @@ class LpEngineTest {
                 if (root) {
                     engine.harvestRootCuts(relaxer, session, listOf(separator), false, false, token)
                 } else {
-                    engine.lpSeparators = listOf(separator)
-                    engine.lpBoundAndFix(relaxer, session, 10.0, sink, -1, true, token, cutsAllowed = true)
+                    val relaxation = relaxer.build(session)
+                    separator.separate(CutContext(
+                        problem, relaxation, doubleArrayOf(), session, engine.separationWork(token, root = false),
+                    ))
                 }
             }
             assertEquals(1, calls)
@@ -150,51 +153,92 @@ class LpEngineTest {
     }
 
     @Test
-    fun `root and node separation should stop later families without pruning or learning inactivity`() {
-        for (root in listOf(true, false)) {
-            val problem = boundedProblem()
-            val sink = SolveStatsSink(backend = "separation-stop")
-            var stopped = false
-            val token = Cancellation { stopped }
-            val session = PropagationSession(problem)
-            if (!root) session.pinInt(0, 1L)
-            var calls = 0
-            LpEngine(
-                problem,
-                LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)),
-                LpParams(lpPlan = LpPlan(bounding = true, cuts = true), solveBudgetMillis = 1_000L),
-                sink,
-            ).use { engine ->
-                val first = object : CutSeparator {
-                    override fun separate(ctx: CutContext): List<Cut> {
-                        calls++
-                        assertTrue(ctx.spendSeparationWork(7L))
-                        stopped = true
-                        assertFalse(ctx.spendSeparationWork())
-                        return emptyList()
-                    }
-                }
-                val second = object : CutSeparator {
-                    override fun separate(ctx: CutContext): List<Cut> = error("separation continued after stop")
-                }
-                val separators = listOf(first, second)
-                val relaxer = assertNotNull(engine.lpRelaxer)
-                if (root) {
-                    assertTrue(engine.harvestRootCuts(relaxer, session, separators, false, false, token).isEmpty())
-                } else {
-                    engine.lpSeparators = separators
-                    engine.lpSeparatorGate = LpSeparatorGate(2, warmup = 0, window = 1, reprobeBase = Int.MAX_VALUE)
-
-                    val outcome = engine.lpBoundAndFix(
-                        relaxer, session, 10.0, sink, -1, true, token, cutsAllowed = true,
-                    )
-
-                    assertFalse(outcome.prune)
-                    assertEquals(null, outcome.explanation)
-                    assertTrue(engine.lpSeparatorGate.shouldRun(0))
+    fun `root separation should stop later families on containing cancellation`() {
+        val problem = boundedProblem()
+        val sink = SolveStatsSink(backend = "root-separation-stop")
+        var stopped = false
+        val token = Cancellation { stopped }
+        var calls = 0
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)),
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true), solveBudgetMillis = 1_000L),
+            sink,
+        ).use { engine ->
+            val first = object : CutSeparator {
+                override fun separate(ctx: CutContext): List<Cut> {
+                    calls++
+                    assertTrue(ctx.spendSeparationWork(7L))
+                    stopped = true
+                    assertFalse(ctx.spendSeparationWork())
+                    return emptyList()
                 }
             }
-            assertEquals(1, calls)
+            val second = object : CutSeparator {
+                override fun separate(ctx: CutContext): List<Cut> = error("separation continued after stop")
+            }
+
+            val cuts = engine.harvestRootCuts(
+                assertNotNull(engine.lpRelaxer), PropagationSession(problem), listOf(first, second), false, false, token,
+            )
+
+            assertTrue(cuts.isEmpty())
+        }
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun `interrupted node MIR should retain its gate without pruning or continuing families`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf<Factor>(
+            Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 3),
+        ))
+        val sink = SolveStatsSink(backend = "node-separation-stop")
+        val session = PropagationSession(problem)
+        session.pinInt(2, 0L)
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(-1L, -1L, 0L)),
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true), solveBudgetMillis = 1_000L),
+            sink,
+        ).use { engine ->
+            val mir = engine.lpSeparators.indexOfFirst { it is AggregationMirSeparator }
+            assertTrue(mir >= 0)
+            for (family in engine.lpSeparators.indices) {
+                repeat(LpSeparatorGate.DEFAULT_WARMUP - 1) {
+                    assertTrue(engine.lpSeparatorGate.shouldRun(family))
+                    engine.lpSeparatorGate.record(family, false)
+                }
+            }
+            var stopped = false
+            var totalBefore = 0L
+            var nodeBefore = 0L
+            var overheadBefore = 0.0
+            // MIR reserves 49 row slots and 16 cut slots before scanning factors.
+            val reservation = 49L + 16L
+            val token = object : Cancellation {
+                override fun isCancelled(): Boolean = stopped
+                override fun workMeter(): WorkMeter = WorkMeter { units ->
+                    if (units == reservation) {
+                        totalBefore = engine.totalSolveWork()
+                        nodeBefore = engine.pendingNodeSolveWork()
+                        overheadBefore = sink.snapshot().lp.overheadOps.sum
+                        stopped = true
+                    }
+                }
+            }
+
+            val outcome = engine.lpBoundAndFix(
+                assertNotNull(engine.lpRelaxer), session, 10.0, sink, -1, true, token, cutsAllowed = true,
+            )
+
+            assertTrue(stopped)
+            assertFalse(outcome.prune)
+            assertEquals(null, outcome.explanation)
+            assertEquals(reservation, engine.totalSolveWork() - totalBefore)
+            assertEquals(reservation, engine.pendingNodeSolveWork() - nodeBefore)
+            assertEquals(reservation.toDouble(), sink.snapshot().lp.overheadOps.sum - overheadBefore)
+            for (family in 0 until mir) assertFalse(engine.lpSeparatorGate.isEnabled(family))
+            for (family in mir until engine.lpSeparators.size) assertTrue(engine.lpSeparatorGate.isEnabled(family))
         }
     }
 
