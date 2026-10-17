@@ -9,6 +9,8 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialRealProblem
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -17,6 +19,7 @@ import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
@@ -34,11 +37,14 @@ import kotlinx.serialization.json.Json
 internal object PolynomialPhaseProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..3 && args[0].startsWith("request64="))
+        require(args.size in 1..4 && args[0].startsWith("request64="))
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.size == args.size - 1 && options.keys.all { it in setOf("pipeline", "timeoutMs") })
+        require(options.size == args.size - 1 && options.keys.all { it in setOf("pipeline", "timeoutMs", "shapeOnly") })
         require(options["pipeline"] == null || options["pipeline"] == "true")
+        require(options["shapeOnly"] == null || options["shapeOnly"] == "true")
         val pipelineMode = options["pipeline"] == "true"
+        val shapeOnly = options["shapeOnly"] == "true"
+        require(!pipelineMode || !shapeOnly)
         val timeoutMs = options["timeoutMs"]?.toLong() ?: 60_000L
         require(timeoutMs > 0)
         val encoded = args[0].substringAfter('=')
@@ -61,11 +67,14 @@ internal object PolynomialPhaseProfile {
             "containingTimeoutMs" to timeoutMs.toString(),
             "maximumWork" to "null",
             "representationLimits" to "default",
-            "route" to if (pipelineMode) "source admission and default MIXED pipeline/P1/seed3"
-                else "direct normalized QfNraQuery; separate gate inspection",
-            "arithmeticObservations" to if (pipelineMode) "disabled"
+            "route" to when {
+                shapeOnly -> "source admission and captured setup shape; no execution"
+                pipelineMode -> "source admission and default MIXED pipeline/P1/seed3"
+                else -> "direct normalized QfNraQuery; separate gate inspection"
+            },
+            "arithmeticObservations" to if (pipelineMode || shapeOnly) "disabled"
                 else "last subresultant and division requests; metadata read after query",
-            "projectionObservations" to if (pipelineMode) "disabled"
+            "projectionObservations" to if (pipelineMode || shapeOnly) "disabled"
                 else "last elimination input family; metadata read after query",
         )))
         val access = PhaseAccess()
@@ -77,7 +86,9 @@ internal object PolynomialPhaseProfile {
             val directory = out.resolve(index.toString()).apply { mkdirs() }
             directory.resolve("source.smt2").writeBytes(bytes)
             val text = bytes.decodeToString()
-            if (pipelineMode) {
+            if (shapeOnly) {
+                directory.resolve("source-shape.json").writeText(Json.encodeToString(sourceShape(text, timeoutMs)))
+            } else if (pipelineMode) {
                 directory.resolve("pipeline.json").writeText(Json.encodeToString(pipeline(text, timeoutMs)))
             } else {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
@@ -86,6 +97,24 @@ internal object PolynomialPhaseProfile {
                 )
             }
         }
+    }
+
+    internal fun sourceShape(text: String, timeoutMs: Long = 60_000L): PhaseSourceShape {
+        val observation = DeadlineObservation(timeoutMs)
+        val source = SmtLib.parse(text, cancellation = observation)
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source.source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = observation,
+        ))
+        val original = source.source.originalSource
+        val factors = original as? Problem
+        val polynomial = (invocation.route as? SourceProblemRoute.PolynomialTheory)?.request?.problem
+            ?: original as? PolynomialRealProblem
+        return PhaseSourceShape(
+            source.realVarNames.size, source.boolVarNames.size, source.intVarNames.size,
+            factors?.numRealVars, factors?.numBoolVars, factors?.numIntVars, factors?.numFactors,
+            polynomial?.realCount, polynomial?.boolCount, invocation.route.javaClass.simpleName,
+            observation.charges,
+        )
     }
 
     internal fun pipeline(text: String, timeoutMs: Long = 60_000L): PipelinePhaseTrace {
@@ -419,6 +448,21 @@ internal data class PhaseGate(
     val conjunctiveAtoms: Int?,
     val normalizedNodeKinds: Map<String, Int>,
     val separateInspectionWork: Long,
+)
+
+@Serializable
+internal data class PhaseSourceShape(
+    val declaredRealCount: Int,
+    val declaredBoolCount: Int,
+    val declaredIntCount: Int,
+    val factorRealCount: Int?,
+    val factorBoolCount: Int?,
+    val factorIntCount: Int?,
+    val factors: Int?,
+    val queryRealCount: Int?,
+    val queryBoolCount: Int?,
+    val route: String,
+    val preparationCharges: Long,
 )
 
 @Serializable

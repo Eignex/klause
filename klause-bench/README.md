@@ -2710,6 +2710,13 @@ parsing and retains those bytes. Run the committed profile through the lab with 
 The measured child uses one active processor, Serial GC and a 3 GiB heap, retaining
 its command, streams, actual exit, installed CLI/harness/runtime hashes and options.
 
+`shapeOnly=true` records declared coordinate counts, canonical factor counts and
+selected polynomial query counts in `source-shape.json` after ordinary source
+admission and captured setup. It performs no solver execution and cannot be combined
+with `pipeline=true`. Null factor or query fields identify an absent representation;
+the route name records the selected source contract. Preparation charges belong to
+that diagnostic setup only. This mode supplies no result, witness or timing credit.
+
 Each direct query uses default polynomial representation limits, unlimited native
 work and a 60-second containing deadline. Optional `timeoutMs=<positive milliseconds>`
 selects the containing deadline for source-matched diagnostics at another budget;
