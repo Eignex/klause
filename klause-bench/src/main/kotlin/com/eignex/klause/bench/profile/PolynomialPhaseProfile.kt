@@ -548,7 +548,36 @@ private fun graphFamilyShape(atoms: List<*>): PhaseGraphFamily {
         }
     }
     return PhaseGraphFamily(atoms.size, equations, occurrences.size, graphs, leaves, triangular,
-        triangularCoordinates.size, occurrences.values.groupingBy { it }.eachCount())
+        triangularCoordinates.size, occurrences.values.groupingBy { it }.eachCount(), opposingWeakRows(atoms))
+}
+
+private fun opposingWeakRows(atoms: List<*>): Int {
+    val atomType = Class.forName("com.eignex.klause.theory.qfnra.PolynomialAtom")
+    val polynomial = atomType.getMethod("getPolynomial")
+    val relation = atomType.getMethod("getRelation")
+    val terms = Class.forName("com.eignex.klause.arithmetic.polynomial.Polynomial").getMethod("getTerms")
+    val termType = Class.forName("com.eignex.klause.arithmetic.polynomial.PolynomialTerm")
+    val monomial = termType.getMethod("getMonomial")
+    val coefficient = termType.getMethod("getCoefficient")
+    val directions = HashMap<List<Pair<Any, String>>, Int>()
+    for (atom in atoms) {
+        val direction = when (relation.invoke(atom).toString()) {
+            "LE" -> 1
+            "GE" -> 2
+            else -> continue
+        }
+        val payload = terms.invoke(polynomial.invoke(atom)) as List<*>
+        if (payload.isEmpty()) continue
+        val negative = coefficient.invoke(payload.first()).toString().startsWith('-')
+        val key = payload.map { term ->
+            val value = coefficient.invoke(term).toString()
+            val normalized = if (!negative) value else if (value.startsWith('-')) value.drop(1) else "-$value"
+            monomial.invoke(term) to normalized
+        }
+        val normalizedDirection = if (negative) 3 - direction else direction
+        directions[key] = (directions[key] ?: 0) or normalizedDirection
+    }
+    return directions.values.count { it == 3 }
 }
 
 @Serializable
@@ -686,6 +715,7 @@ internal data class PhaseGraphFamily(
     val triangularGraphEquations: Int,
     val triangularGraphCoordinates: Int,
     val coordinateOccurrenceHistogram: Map<Int, Int>,
+    val opposingWeakRows: Int,
 )
 
 @Serializable

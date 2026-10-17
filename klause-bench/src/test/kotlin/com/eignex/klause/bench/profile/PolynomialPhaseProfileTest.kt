@@ -1,5 +1,7 @@
 package com.eignex.klause.bench.profile
 
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -7,6 +9,28 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialPhaseProfileTest {
+    @ParameterizedTest
+    @CsvSource(
+        delimiter = '|',
+        value = [
+            "(>= x 1)|(<= x 1)|1",
+            "(<= (- x 1) 0)|(<= (- 1 x) 0)|1",
+            "(>= x 1)|(<= x 2)|0",
+            "(> x 1)|(<= x 1)|0",
+        ],
+    )
+    fun `opposing weak rows require identical boundaries and both closed directions`(
+        first: String,
+        second: String,
+        expected: Int,
+    ) {
+        val source = "(declare-const x Real) (assert $first) (assert $second)"
+
+        val family = assertNotNull(PolynomialPhaseProfile.PhaseAccess().gate(source).graphFamily)
+
+        assertEquals(expected, family.opposingWeakRows)
+    }
+
     @Test
     fun `graph family metadata distinguishes independent leaves from shared triangular graphs`() {
         val source = """

@@ -2768,6 +2768,11 @@ separate from the number of equations. Coordinate-occurrence histograms distingu
 shared definitions from independent leaves. These counts are read after stopping
 and do not select pivots or establish eliminability of a whole family. Direct gate
 inspection reports the same metadata on its separately normalized input atoms.
+`opposingWeakRows` counts distinct identical polynomial boundaries, up to overall
+sign, constrained in both weak directions. Strict bounds and different endpoints
+do not form a pair. This structural count uses canonical coefficients and monomial
+equality after stopping; it does not normalize arbitrary rational scale factors
+or change constraints.
 `lastGraphPlan` reports the latest completed graph plan's candidate, cyclic and
 selected-coordinate counts and whether it used triangular ordering. Cyclic
 definitions remain in the residual constraints. A retained plan does not establish
