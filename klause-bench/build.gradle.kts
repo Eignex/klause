@@ -471,7 +471,7 @@ tasks.named("check") {
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
 tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {
     from("tools") {
-        include("smt_witness_validation.py", "verify_nra_source_results.py",
+        include("smt_witness_validation.py", "mps_witness_validation.py", "verify_nra_source_results.py",
             "verify_source_results.py", "requirements-source-checks.txt")
         into("smt-witness-validation")
     }

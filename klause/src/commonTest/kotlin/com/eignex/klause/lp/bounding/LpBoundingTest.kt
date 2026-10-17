@@ -365,12 +365,14 @@ class LpBoundingTest {
 
     @Test
     fun `LP stats should be populated on a cumulative makespan minimize`() {
-        val n = 5
-        val p = makespanProblem(n, longArrayOf(3, 2, 4, 2, 3), longArrayOf(1, 2, 1, 2, 1), capacity = 2L, hi = 8)
+        val n = 3
+        val p = makespanProblem(n, longArrayOf(3, 2, 4), longArrayOf(1, 2, 1), capacity = 2L, hi = 4)
         val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == n) 1L else 0L })
         val params = BacktrackParams(randomSeed = 7L, lpConfig = LpConfig.AGGRESSIVE)
         val res = BacktrackSolver(p.bake()).minimize(obj, params)
         assertTrue(res is MinimizeResult.Optimal, "got $res")
+        assertEquals(6L, res.sample.ints[n])
+        assertEquals(6.0, res.objective)
         val s = res.stats
 
         assertTrue(s.lp.solves.sum > 0.0)
