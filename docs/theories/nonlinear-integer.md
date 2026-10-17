@@ -29,6 +29,9 @@ model and source objective. Publication checking reconstructs exact source integ
 and real coordinates against the complete captured formula, including declared
 domains; wide integers do not pass through a finite-word checker. The derived
 formula's private identity cannot replace the original source binding.
+Selected polynomial row lowering omits a unit coefficient and a unary sum wrapper,
+so source-fixed integer equalities remain visible to the existing proposal scan.
+This preserves exact source values without adding candidate moves or source bounds.
 
 ## Solving and composition
 

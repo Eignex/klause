@@ -37,7 +37,8 @@ internal fun polynomialRow(
                 else constants.realCoefficients.at(index - constants.intCoefficients.size),
             ))
         }
-        PolynomialExpression.Product(listOf(constant(coefficient), value))
+        if (coefficient == BigFraction.ONE) value
+        else PolynomialExpression.Product(listOf(constant(coefficient), value))
     }
     val rhs = when (val constants = row.constants) {
         is IntegralConstants -> BigFraction.of(constants.exactBound, BIG_ONE)
@@ -49,7 +50,8 @@ internal fun polynomialRow(
         LinearOp.GE -> if (row.strict) PolynomialRelation.GT else PolynomialRelation.GE
         LinearOp.NE -> PolynomialRelation.NE
     }
-    val atom = PolynomialRealFormula.Atom(PolynomialExpression.Sum(terms), relation, constant(rhs))
+    val expression = if (terms.size == 1) terms.single() else PolynomialExpression.Sum(terms)
+    val atom = PolynomialRealFormula.Atom(expression, relation, constant(rhs))
     return if (row.activator == LinearRow.ALWAYS) atom else PolynomialRealLowering.equivalent(
         PolynomialRealFormula.BooleanVariable(SourceBoolId(row.activator)), atom,
     )

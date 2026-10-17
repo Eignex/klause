@@ -130,6 +130,21 @@ class FactorPolynomialProjectionTest {
     }
 
     @Test
+    fun `one heuristic move should publish a source fixed wide integer`() {
+        val source = SmtLib.parse("(declare-const n Int) (assert (= n 100000000000000000000)) " +
+            "(minimize (* n n))")
+        val invocation = SourceSetup.prepare(SourceSetupRequest(source.source, FiniteEngine.LOCAL_SEARCH,
+            assertNotNull(source.quadraticObjective), source.sense))
+
+        val execution = assertIs<SourceExecutionResult.Quadratic>(SourceSetup.execute(SourceExecutionRequest(
+            invocation, NonlinearIntegerTheoryParams(maximumMoves = 1))))
+
+        val point = assertIs<QuadraticOptimizationResult.BestFound>(execution.result.result).incumbent
+        assertEquals(parseBigInt("100000000000000000000"), point.sample.exactIntValue(0))
+        assertEquals("10000000000000000000000000000000000000000", point.value.rational.toString())
+    }
+
+    @Test
     fun `factor backed quadratic checking should reject an invalid mixed point`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 0)), arrayOf(RealProduct(0, 0, 1, 1.0, 1.0)),
             openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true),
