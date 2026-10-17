@@ -1,9 +1,11 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.sha256
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.TestInstance
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.File
+import java.util.zip.GZIPInputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -48,6 +51,21 @@ class JvmSourceDeclarationsTest {
         assertSame(failure, actual)
         assertTrue(File(out, "source-declarations.partial.jsonl.gz").isFile)
         assertFalse(File(out, "source-declarations.jsonl.gz").exists())
+    }
+
+    @Test
+    fun `successful inventory retains a readable complete report`(@TempDir out: File) {
+        val text = "fun pick() = 1"
+        val sources = listOf(SourceSyntaxInput("pick", "Pick.kt", sha256(text.encodeToByteArray()), text))
+
+        JvmSourceDeclarations.inspect(sources, out)
+
+        val rows = GZIPInputStream(File(out, "source-declarations.jsonl.gz").inputStream())
+            .bufferedReader().useLines { lines -> lines.map { Json.parseToJsonElement(it).jsonObject }.toList() }
+        val start = rows.single { it["record"] == JsonPrimitive("source-start") }
+        assertEquals(JsonPrimitive("pick"), start["sourceId"])
+        assertEquals(JsonPrimitive("source-end"), rows.last()["record"])
+        assertEquals(JsonPrimitive(0), rows.last()["syntaxErrors"])
     }
 
     @ParameterizedTest
