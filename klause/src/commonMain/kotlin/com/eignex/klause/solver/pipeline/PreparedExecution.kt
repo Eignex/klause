@@ -124,7 +124,8 @@ internal class PreparedSourceStructure(
                     require(originalSource === projection.original && execution.source === projection.formula)
                     require(factorProjections === projection.projections)
                     require(sourceBoolCount == projection.model.numBoolVars &&
-                        sourceIntCount == projection.model.numIntVars && sourceRealCount == projection.model.numRealVars)
+                        sourceIntCount == projection.model.numIntVars &&
+                        sourceRealCount == projection.model.numRealVars)
                     require(this.integerCoordinates == execution.source.integerCoordinates &&
                         this.realCoordinates == execution.source.realCoordinates)
                 }
