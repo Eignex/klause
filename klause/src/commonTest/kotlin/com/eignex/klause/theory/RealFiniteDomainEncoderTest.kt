@@ -59,7 +59,8 @@ class RealFiniteDomainEncoderTest {
 
         model.service.invocation().use { owner ->
             for (truth in listOf(false, true, false)) {
-                val result = assertIs<QfNraResult.Satisfiable>(owner.check(PolynomialCondition(bools = mapOf(0 to truth))))
+                val result = assertIs<QfNraResult.Satisfiable>(
+                    owner.check(PolynomialCondition(bools = mapOf(0 to truth))))
 
                 assertEquals(0, arithmetic.compare(result.assignment.realValue(0),
                     arithmetic.rational(BigFraction.ofLong(if (truth) 2 else -1))))

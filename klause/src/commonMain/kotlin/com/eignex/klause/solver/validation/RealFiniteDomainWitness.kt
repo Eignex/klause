@@ -37,12 +37,14 @@ private fun finiteDomainCoordinates(
     if (cancellation()) return Verification.Indeterminate("finite real membership check cancelled")
     val arithmetic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
     val reals = Array<BigFraction?>(source.numRealVars) { id ->
-        sample.exactReals?.get(id) ?: sample.algebraicReals?.get(id)?.rational ?: sample.symbolicReals?.get(id)?.rational
+        sample.exactReals?.get(id) ?: sample.algebraicReals?.get(id)?.rational
+            ?: sample.symbolicReals?.get(id)?.rational
     }
     for (factor in source.factors) {
         cancellation.charge(1)
         if (cancellation()) return Verification.Indeterminate("finite real membership check cancelled")
         if (factor !is RealFiniteDomain) continue
+        if (factor.size == 0) return Verification.Rejected("real ${factor.variable} has an empty declared value set")
         val id = factor.variable
         val exact = sample.exactReals?.get(id)
         val algebraic = sample.algebraicReals?.get(id) ?: sample.symbolicReals?.get(id)?.algebraic
