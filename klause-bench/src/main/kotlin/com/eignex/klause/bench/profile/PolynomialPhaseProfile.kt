@@ -37,7 +37,9 @@ internal object PolynomialPhaseProfile {
     fun main(args: Array<String>) {
         require(args.size in 1..4 && args[0].startsWith("request64="))
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.size == args.size - 1 && options.keys.all { it in setOf("pipeline", "timeoutMs", "queryTrace") })
+        require(options.size == args.size - 1 && options.keys.all {
+            it in setOf("pipeline", "timeoutMs", "queryTrace")
+        })
         require(options["pipeline"] == null || options["pipeline"] == "true")
         val pipelineMode = options["pipeline"] == "true"
         require(options["queryTrace"] == null || options["queryTrace"] == "true")
