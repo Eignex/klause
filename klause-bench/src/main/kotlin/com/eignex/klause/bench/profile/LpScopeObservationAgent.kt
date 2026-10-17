@@ -85,7 +85,7 @@ internal object LpScopeObservationAgent {
                 }
             }
         }, false)
-        Runtime.getRuntime().addShutdownHook(Thread {
+        Runtime.getRuntime().addShutdownHook(Thread({
             synchronized(recorder) {
                 if (transformations.map { it["class"] }.toSet() != methods.keys) recorder.fail("transform-coverage")
                 val report = recorder.snapshot() + mapOf(
@@ -209,10 +209,10 @@ internal object LpScopeObservationAgent {
     }
 
     private fun emitEntry(code: CodeBuilder, tag: LpScopeObservation.Method, type: MethodTypeDesc) {
-        code.iconst(tag.ordinal).aload(0).iconst(type.parameterCount()).anewarray(objectType)
+        code.loadConstant(tag.ordinal).aload(0).loadConstant(type.parameterCount()).anewarray(objectType)
         var slot = 1
         for ((index, parameter) in type.parameterList().withIndex()) {
-            code.dup().iconst(index)
+            code.dup().loadConstant(index)
             if (parameter.descriptorString() == "Z") {
                 code.iload(slot).invokestatic(ClassDesc.of("java.lang.Boolean"), "valueOf",
                     MethodTypeDesc.of(ClassDesc.of("java.lang.Boolean"), ConstantDescs.CD_boolean))
@@ -233,7 +233,7 @@ internal object LpScopeObservationAgent {
             Opcode.RETURN -> code.aconst_null()
             else -> error("unsupported return opcode")
         }
-        code.iconst(tag.ordinal).aload(0).invokestatic(helper, "returned", returnType)
+        code.loadConstant(tag.ordinal).aload(0).invokestatic(helper, "returned", returnType)
     }
 
     private class Access {
