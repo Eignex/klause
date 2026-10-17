@@ -738,6 +738,7 @@ public final class com/eignex/klause/compile/CompiledSchema {
 	public final fun minimize (Lcom/eignex/klause/schema/IntHandle;)Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun sourceId-pKhLlgM (Lcom/eignex/klause/schema/BoolHandle;)I
 	public final fun sourceId-qEcKiRM (Lcom/eignex/klause/schema/IntHandle;)I
+	public final fun sourceObjective (Lcom/eignex/klause/solver/objective/LinearObjective;)Lcom/eignex/klause/ir/QuadraticObjectiveSpec;
 	public final fun sourceRealId-osvNY_8 (Lcom/eignex/klause/schema/FloatHandle;)Lcom/eignex/klause/ir/SourceRealId;
 }
 

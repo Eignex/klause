@@ -5896,6 +5896,7 @@ final class com.eignex.klause.compile/CompiledSchema { // com.eignex.klause.comp
     final fun minimize(com.eignex.klause.schema/IntHandle): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.compile/CompiledSchema.minimize|minimize(com.eignex.klause.schema.IntHandle){}[0]
     final fun sourceId(com.eignex.klause.schema/BoolHandle): com.eignex.klause.ir/SourceBoolId // com.eignex.klause.compile/CompiledSchema.sourceId|sourceId(com.eignex.klause.schema.BoolHandle){}[0]
     final fun sourceId(com.eignex.klause.schema/IntHandle): com.eignex.klause.ir/SourceIntId // com.eignex.klause.compile/CompiledSchema.sourceId|sourceId(com.eignex.klause.schema.IntHandle){}[0]
+    final fun sourceObjective(com.eignex.klause.solver.objective/LinearObjective): com.eignex.klause.ir/QuadraticObjectiveSpec // com.eignex.klause.compile/CompiledSchema.sourceObjective|sourceObjective(com.eignex.klause.solver.objective.LinearObjective){}[0]
     final fun sourceRealId(com.eignex.klause.schema/FloatHandle): com.eignex.klause.ir/SourceRealId? // com.eignex.klause.compile/CompiledSchema.sourceRealId|sourceRealId(com.eignex.klause.schema.FloatHandle){}[0]
 }
 
