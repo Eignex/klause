@@ -739,7 +739,6 @@ class ExactLiraSearchComponent private constructor(
                 observeCompleteStage("INTEGER_SELECTION_ROW_IMPLIED")
             }
             impliedDisjunct = true
-            return ComponentResult.Consistent
         }
         return ComponentResult.Consistent
     }

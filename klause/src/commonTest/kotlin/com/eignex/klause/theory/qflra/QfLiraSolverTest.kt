@@ -160,6 +160,38 @@ class QfLiraSolverTest {
     }
 
     @Test
+    fun `concurrent integer selections should publish in the same propagation pass`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(6), factors = arrayOf(
+            Element(2, 0, longArrayOf(1, 3), arrIsVars = true, indexOffset = 0),
+            Element(2, 4, longArrayOf(5, 3), arrIsVars = true, indexOffset = 0),
+        ))
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        var implications = 0
+        var checks = 0
+        val context = object : SearchContext by session {
+            override fun imply(literal: Int, explanation: SearchExplanation): ComponentResult {
+                implications++
+                return session.imply(literal, explanation)
+            }
+            override fun consumeCheck(): Boolean {
+                checks++
+                return true
+            }
+        }
+        ExactLiraSearchComponent(model).use { component ->
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            val pin = SearchDecision.IntEqual(2, 0L)
+            assertIs<ComponentResult.Consistent>(session.push(pin))
+            assertIs<ComponentResult.Consistent>(component.assert(pin, context))
+
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+
+            assertEquals(2, implications)
+            assertEquals(0, checks)
+        }
+    }
+
+    @Test
     fun `missing selector premises should refuse before naming a row`() {
         for (missingLower in listOf(false, true)) {
             val model = Problem(numBoolVars = 1, intBounds = openBounds(4), factors = arrayOf(
