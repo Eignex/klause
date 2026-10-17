@@ -54,8 +54,8 @@ class MpsExactSourceTest {
         val tolerance = source.toProblem()
         val exact = source.toExactSourceProblem()
 
-        assertFalse(tolerance.sourceExact)
-        tolerance.sourceWitness(listOf(value))
+        assertTrue(tolerance.sourceExact)
+        assertFalse(tolerance.sourceWitness(listOf(value)).exact)
         assertFailsWith<MpsLoweringException> { exact.sourceWitness(listOf(value)) }
     }
 
@@ -109,6 +109,25 @@ class MpsExactSourceTest {
         }
         assertEquals(LinearOp.EQ, row.relation)
         assertEquals(BigFraction.of(constants.exactBound, BIG_ONE), activity)
+    }
+
+    @Test
+    fun `retained integer objectives should map back to the original decimal value`() {
+        for ((coefficient, denominator) in listOf("0.5" to 2L, "0.2" to 5L)) {
+            val source = Mps.parse(
+                "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST $coefficient\n" +
+                    " M1 'MARKER' 'INTEND'\nBOUNDS\n FX B I 1\nENDATA",
+            )
+            val compiled = source.toExactSourceProblem()
+
+            val witness = compiled.sourceWitness(listOf(BigFraction.ONE))
+            val retained = checkNotNull(compiled.objective)
+            val workingValue = BigFraction.ofLong(retained.intCoefficients.single() + retained.constant)
+            val originalValue = workingValue * BigFraction.ofLong(compiled.objectiveScale).reciprocal()
+
+            assertEquals(BigFraction.ofLong(denominator).reciprocal(), witness.objective)
+            assertEquals(witness.objective, originalValue)
+        }
     }
 
     @Test

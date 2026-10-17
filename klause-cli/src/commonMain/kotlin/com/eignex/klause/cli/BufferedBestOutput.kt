@@ -5,20 +5,22 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.SolveStats
 
 /**
- * Shared competition output plumbing. Finite assignments buffer until a feasible terminal verdict;
+ * Shared competition output plumbing. Formats may stream finite optimization assignments;
  * accepted arithmetic assignments stream with their exact objectives. Terminal status and proof
  * metadata remain separate from incumbent output. Subclasses supply comment and objective formatting,
  * status lines and the statistics filter.
  */
 internal abstract class BufferedBestOutput : OutputProtocol {
     protected var best: String? = null
-    private var emittedArithmeticWitness: String? = null
+    private var emittedWitness: String? = null
 
     /** Comment-line prefix for the statistics block (e.g. `;`, `c`). */
     protected abstract val commentPrefix: String
 
     /** When true, print the objective as each improving incumbent streams in. */
     protected open val streamObjective: Boolean = false
+
+    protected open val streamFiniteWitness: Boolean = false
 
     protected open val objectivePrefix: String = "o "
 
@@ -73,12 +75,16 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         } else if (objective != null) {
             println("$objectivePrefix${formatObjective(objective)}")
         }
+        if (streamFiniteWitness && (objective != null || continuousObjective != null)) emitWitness(rendered)
     }
 
     final override fun onExactSolution(rendered: String, objective: BigFraction) {
         if (!acceptsSourceWitness()) return
         best = rendered
-        if (streamObjective) println("$objectivePrefix${formatExactObjective(objective)}")
+        if (streamObjective) {
+            println("$objectivePrefix${formatExactObjective(objective)}")
+            if (streamFiniteWitness) emitWitness(rendered)
+        }
     }
 
     protected open fun formatArithmeticObjective(objective: SourceValue): String = arithmeticObjectiveText(objective)
@@ -90,11 +96,15 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         val value = formatArithmeticObjective(objective)
         best = rendered
         if (streamObjective) println("$objectivePrefix$value")
+        emitWitness(rendered)
+        return true
+    }
+
+    private fun emitWitness(rendered: String) {
         arithmeticWitnessStatus()?.let(::println)
         println(rendered)
         flushCliOutput()
-        emittedArithmeticWitness = rendered
-        return true
+        emittedWitness = rendered
     }
 
     final override fun onComplete(verdict: Verdict) {
@@ -103,9 +113,9 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         // A comment, so it rides alongside the status line without touching what either protocol
         // promises: `;` is an SMT-LIB comment and `c` is one in the competition protocol.
         verdictReason(verdict)?.let { println("$commentPrefix $it") }
-        // The buffered model follows a feasible verdict only; UNSAT / UNKNOWN print the status alone.
+        // A terminal status does not republish an incumbent already streamed with its objective.
         if (verdict in FEASIBLE_VERDICTS) {
-            best?.takeUnless { it == emittedArithmeticWitness }?.let { println(it) }
+            best?.takeUnless { it == emittedWitness }?.let { println(it) }
         }
     }
 

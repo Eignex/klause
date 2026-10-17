@@ -7,22 +7,25 @@ import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
+import com.eignex.klause.solver.pipeline.SourceExecutionRequest
+import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
-import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -87,17 +90,33 @@ internal object PolynomialPhaseProfile {
 
     internal fun pipeline(text: String, timeoutMs: Long = 60_000L): PipelinePhaseTrace {
         val observation = DeadlineObservation(timeoutMs)
-        val source = SmtLibAdmission.parse(text, cancellation = observation)
-        require(source is SmtLibInput.Polynomial) { "Source did not select polynomial admission: ${source.javaClass}" }
-        val request = source.problem.pipelineRequest()
+        val source = try {
+            SmtLib.parse(text, cancellation = observation)
+        } catch (_: CancellationException) {
+            return PipelinePhaseTrace("Unknown", "Timeout", "source-admission", null,
+                "not started", "not started", observation.charges, 0, observation.stack)
+        }
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source.source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = observation,
+        ))
         val preparedCharges = observation.charges
-        val execution = OpenTheoryPipeline.execute(request, PolynomialTheoryParams(
+        val completed = SourceSetup.execute(SourceExecutionRequest(invocation, polynomial = PolynomialTheoryParams(
             timeout = observation,
             strategy = PolynomialStrategyParams(
                 backtrack = BacktrackParams(randomSeed = 3),
                 localSearch = LocalSearchParams(randomSeed = 3),
             ),
-        ), FiniteEngine.MIXED, 1)
+        ), cores = 1))
+        if (completed is SourceExecutionResult.Declined || completed is SourceExecutionResult.Refuted) {
+            return PipelinePhaseTrace(
+                if (completed is SourceExecutionResult.Refuted) "SourceRefuted" else "Unknown",
+                (completed as? SourceExecutionResult.Declined)?.reason?.toString(),
+                "source-preparation", null, "not started", "not started",
+                preparedCharges, observation.charges - preparedCharges, observation.stack,
+            )
+        }
+        val execution = (completed as? SourceExecutionResult.Polynomial)?.result
+            ?: error("source setup did not install polynomial satisfaction")
         return PipelinePhaseTrace(execution.result.javaClass.simpleName,
             (execution.result as? OpenTheoryResult.Unknown)?.reason?.toString(),
             execution.resource?.toString(), execution.nativeResource,

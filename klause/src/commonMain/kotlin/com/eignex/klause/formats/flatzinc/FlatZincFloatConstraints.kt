@@ -114,7 +114,7 @@ internal sealed interface FloatRef {
 internal fun FlatZincCompiler.resolveFloatElement(
     e: FznExpr,
     name: String,
-    lpOnly: Boolean = name in lpOnlyFloats,
+    lpOnly: Boolean = !forFloatPlanning || name in lpOnlyFloats,
 ): FloatBucketing = when (val ref = resolveFloatVarOrConst(e)) {
     is FloatRef.Var -> ref.bk
 

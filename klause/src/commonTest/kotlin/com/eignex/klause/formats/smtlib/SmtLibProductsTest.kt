@@ -6,11 +6,11 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -72,11 +72,13 @@ class SmtLibProductsTest {
             "(assert (= x (- 9223372036854775808))) (assert (<= 1 y 2)) " +
             "(assert (= (* (+ (- x) 1) y) 1))"
 
-        assertFailsWith<UnsupportedSmtException> { SmtLib.parse(source) }
+        val captured = SmtLib.parse(source)
+
+        assertIs<NonlinearIntegerProblem>(captured.source.originalSource)
     }
 
     @Test
-    fun `word overflowing and open products should decline finite lowering`() {
+    fun `word overflowing and open products should retain exact source coordinates`() {
         val sources = listOf(
             "(declare-const x Int) (assert (= (* x x) 4))",
             "(declare-const x Int) (assert (and (<= 3037000500 x 3037000501) (= (* x x) 1)))",
@@ -85,6 +87,10 @@ class SmtLibProductsTest {
                 "(assert (= (* (to_real x) y) 1))",
         )
 
-        for (source in sources) assertFailsWith<UnsupportedSmtException> { SmtLib.parse(source) }
+        for (source in sources) {
+            val captured = SmtLib.parse(source)
+
+            assertIs<NonlinearIntegerProblem>(captured.source.originalSource)
+        }
     }
 }

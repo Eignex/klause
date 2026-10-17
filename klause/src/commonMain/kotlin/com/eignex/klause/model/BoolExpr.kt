@@ -167,8 +167,8 @@ data class IntCompare(
 
 /**
  * Schema representation of a float linear comparison, built by FloatExpr/FloatHandle
- * operators. The compiler buckets float variables into integers and emits scaled-integer
- * linear factors. This [BoolExpr] node supports Boolean composition before lowering.
+ * operators. Compilation retains real source rows, including strictness and disequality.
+ * This [BoolExpr] node supports Boolean composition before lowering.
  */
 @Serializable
 @SerialName("floatlin")

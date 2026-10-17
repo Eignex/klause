@@ -68,15 +68,8 @@ internal object Compiler {
             var lit: Int? = null
             var real: RealComb? = null
 
-            /**
-             * A Bool binding's source term while it is still uncompiled.
-             *
-             * Compiling it on sight costs the reified form even where the value is only ever forced true:
-             * a `distinct` over n operands reifies to n(n-1)/2 auxiliary literals and as many reified
-             * rows, where asserting the same term posts plain disequalities and allocates nothing. So the
-             * term is kept until something asks for its literal, which lets [assert] recognise a binding
-             * it can post directly.
-             */
+            // Delay reification so asserted bindings can retain hard source relations
+            // without an auxiliary Boolean definition.
             var srcBool: SExpr? = null
             var sourceScope: BindingSnapshot? = null
         }
@@ -266,15 +259,19 @@ internal object Compiler {
             val name = e.atomAt(1, "define-fun name")
             val paramList = e.items.getOrNull(2) as? SExpr.SList
                 ?: smtUnsupported("define-fun '$name': bad params")
+            val parameterSorts = ArrayList<Sort>(paramList.items.size)
             val params = paramList.items.map { p ->
                 val param = p as? SExpr.SList
                     ?: smtUnsupported("define-fun '$name': bad parameter")
                 param.requireSize(2, "define-fun '$name' parameter")
                 val paramName = param.atomAt(0, "define-fun '$name' parameter")
-                requireSort(
-                    param.atomAt(1, "define-fun '$name' parameter sort"),
-                    "define-fun '$name' parameter '$paramName'",
-                )
+                val parameterSort = param.atomAt(1, "define-fun '$name' parameter sort")
+                requireSort(parameterSort, "define-fun '$name' parameter '$paramName'")
+                parameterSorts.add(when (parameterSort) {
+                    "Bool" -> Sort.BOOL
+                    "Real" -> Sort.REAL
+                    else -> Sort.INT
+                })
                 paramName
             }
             val retSort = e.atomAt(3, "define-fun '$name' return sort")
@@ -285,6 +282,7 @@ internal object Compiler {
             requireFreshName(name)
             macros[name] = Macro(
                 params,
+                parameterSorts,
                 e.argAt(4, "define-fun '$name' body"),
                 isBool = retSort == "Bool",
                 isReal = retSort == "Real",
@@ -313,15 +311,19 @@ internal object Compiler {
             }
         }
 
-        fun build(): SmtLibProblem {
+        fun build(): SmtLibProblem = build(includeObjective = true)
+
+        internal fun buildSource(): SmtLibProblem = build(includeObjective = false)
+
+        private fun build(includeObjective: Boolean): SmtLibProblem {
             inferBounds()
             retainDeclarationBounds()
             if (hasOpenProductOperand()) closeProductBounds()
             for (a in asserts) assert(a)
             lowerOpenIteChains()
-            val compiledObjective = objectiveSpec?.let { (t, neg) ->
-                if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
-            }
+            val compiledObjective = if (includeObjective) objectiveSpec?.let { (t, _) ->
+                if (isRealExpr(t)) realObjective(t, false) else linearObjective(t, false)
+            } else null
             lowerOpenIteChains() // an objective term can open chains of its own
             conditionalEqualities.expandPending(this)
             val removed = conditionalEqualities.retainNeededDefinitions(
@@ -403,5 +405,11 @@ internal object Compiler {
      *  what lets the syntactic real classifier see through a macro reference: a `Real`-returning macro
      *  used in a relation is a real relation even when nothing else in the relation is syntactically
      *  real, so its body is inlined in a real — not integer — context. */
-    internal class Macro(val params: List<String>, val body: SExpr, val isBool: Boolean, val isReal: Boolean)
+    internal class Macro(
+        val params: List<String>,
+        val parameterSorts: List<Sort>,
+        val body: SExpr,
+        val isBool: Boolean,
+        val isReal: Boolean,
+    )
 }

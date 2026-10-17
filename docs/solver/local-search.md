@@ -15,6 +15,15 @@ A run prepares its model projection, initializes an assignment, generates and sc
 moves, accepts selected changes, and restarts when needed. Candidate publication
 checks every required source constraint, including arithmetic completion. A low
 score guides the walk; it does not prove feasibility, optimality or infeasibility.
+When all declarations are continuous, the first candidate requests the configured
+completion independently of its floating violation score. Exact rational solutions
+need not have a zero-violation floating representation. Completion work consumes the
+same move and node allowances; a completed witness can be published after that
+atomic completion exhausts the remaining slice. A zero allowance starts no completion.
+Mixed finite optimization requests its configured real completion for generated
+starting points that pass the finite checks. Completed move evaluation then compares
+exact completed objectives under the same allowance. The finite source facade passes
+the working minimized objective into real completion for each finite pin.
 Propagation-only custom factors use the shared [source validation](validation.md)
 service for a private full-coordinate check before
 publication. Finite-only checks precede caller completion; checks needing real
@@ -143,7 +152,11 @@ or ALNS configurations and checking their source admission. A complete-only pool
 including an explicit backtrack-only selection, does not request that view.
 Immutable native descriptors can be shared; each worker constructs its own invariant
 network and objective state. A declined optional definition view retains ordinary
-heuristic execution and every source constraint.
+heuristic execution and every source constraint. With empty source definition metadata,
+the selected consumer retains native unhinted absolute-value, product, integer-power,
+quotient and remainder maintenance from its actual working factors. Their dependency
+ordering and optional objective gradient spend the same containing allowance; loading
+and complete-only pools do not instantiate this view.
 
 Original-to-routed coordinates come from the retained source plan. Presolve's actual
 mapping then projects definition and search hints, excluding coordinates recovered by
@@ -151,6 +164,21 @@ its reconstruction records. Opaque reconstruction withholds optional hint projec
 A rewritten factor model selects its own descriptors and execution plan while keeping
 the original source identity and objective binding. Coordinate and metadata visits
 spend the containing construction allowance; cancellation discards the whole view.
+
+Finite source attachments also capture factor-backed integer orientations and Boolean-fold
+roles supplied by compatibility callers. The selected heuristic consumer remaps these
+containers through the retained source plan and actual presolve mapping, then infers
+native definitions from that working factor model. Inference and projection spend the
+containing work allowance and discard the entire optional view on interruption.
+Complete-only execution does not request inference. Explicit neutral relations own
+their hinted outputs when combined with inferred definitions; dependency ordering
+keeps competing or cyclic outputs searched.
+
+For compatibility Boolean folds, the move view retains unit folds and wider folds
+whose inputs all carry objective weight. Other folds remain searched for feasibility
+repair. The separate objective-gradient view reads all retained folds, while the
+canonical working objective keeps its direction and coefficients. Satisfaction does
+not use those compatibility folds to exclude Boolean coordinates from search.
 
 `DefinitionalSweep.fromSource` reads neutral `DefinitionHint` relations from an
 unchanged source problem and builds the native dependency graph when requested.

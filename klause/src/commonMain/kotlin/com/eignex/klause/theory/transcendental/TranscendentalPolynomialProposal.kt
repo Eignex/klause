@@ -1,8 +1,10 @@
 package com.eignex.klause.theory.transcendental
 
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
+import com.eignex.klause.ir.PolynomialDistinct
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.TranscendentalDistinct
 import com.eignex.klause.ir.TranscendentalExpression
 import com.eignex.klause.ir.TranscendentalFormula
 
@@ -17,6 +19,10 @@ internal fun polynomialProposal(
         arithmetic.step()
         when (val node = pending.removeLast()) {
             is TranscendentalFormula.And -> pending.addAll(node.operands)
+            is TranscendentalDistinct -> {
+                val values = node.operands.map { polynomial(it, arithmetic) }
+                if (values.all { it != null }) atoms.add(PolynomialDistinct(values.filterNotNull()))
+            }
             is TranscendentalFormula.Atom -> {
                 val left = polynomial(node.left, arithmetic)
                 val right = polynomial(node.right, arithmetic)

@@ -35,6 +35,15 @@ the source relation.
 Generic `Problem` polynomial composition keeps its [finite integer boundary](theories/polynomial-real.md#scope-and-boundaries);
 admitted open/wide SMT powers retain their exact nonlinear source snapshots.
 
+`RealFiniteDomain` retains one original real coordinate and an immutable finite set
+of exact binary64-authoritative values. Empty sets contradict the source; duplicate
+mathematical values and signed zeros share membership. The selected linear or
+polynomial encoder installs an equality cover in its private scope. Original witness
+checks compare exact values, including algebraic roots whose storage is not a rational
+point. Every declared membership remains in source scope, including disconnected
+coordinates. A selected finite grid filters its private integer values by exact
+membership; it cannot round a declared value onto the grid or certify source exhaustion.
+
 ## Source definition hints
 
 `ir.DefinitionHint` records an integer or Boolean output orientation and its source
@@ -68,11 +77,18 @@ result rather than becoming satisfaction. Required preparation interruption publ
 no runnable partial plan.
 Automatic pure-real and wide integral-objective preferences belong to setup; the
 objective interval scan observes and charges the containing preparation allowance.
-DIMACS, WCNF, OPB, XCSP3, exact or original-real FlatZinc and SMT-LIB linear admission
+A bounded integer/Boolean source with supported native propagation and no exact-objective
+preference selects finite ownership before arithmetic installation. Declaration and
+factor inspection charge the containing preparation allowance. Captured descriptors,
+original checks and engine admission still govern the resulting finite plan. LP-work
+observation also runs for an empty deduction phase, and a stop raised by that observer
+withholds the plan. Real coordinates and exact-objective preferences retain arithmetic
+preparation.
+DIMACS, WCNF, OPB, XCSP3, exact or original-real FlatZinc and SMT-LIB source admission
 use the same selection policy and retain the selected route through finite adaptation.
 Finite format adapters preserve their existing private definition and objective hints;
 these compatibility shapes retain their existing finite execution controls.
-`SourceSetup.execute` dispatches captured finite, open-linear and polynomial operations.
+`SourceSetup.execute` dispatches captured finite and exact arithmetic operations.
 Its result retains the entire producing native execution alongside the original source
 interpretation. Exact linear and polynomial publication callbacks keep their own
 accepted samples, values and receipts. Heuristic fallback retains the captured plan,
@@ -83,6 +99,55 @@ minimize-oriented projection. Enumeration retains its operation identity even wh
 its solution cap is one. Source, operation and engine mismatches reject before finite
 preparation. An observed setup stop remains effective when execution supplies another
 token. Mutable search state belongs to the existing worker or executor lifetime.
+
+`LinearSourceProblem` retains immutable original rational linear terms, variable
+bounds, row sides, indicator pins and affine objective coefficients before any
+working normalization. Declaration order is independent of integer and real output
+namespaces. Generic lowering preserves absent bounds, uses numerical real rows when
+admitted by the source policy, and retains exact rows otherwise. Rational integer
+objectives use a positive integral scale when representable; other affine objectives
+use a private defining column. Public source counts and original objective descriptors
+exclude that column. Source-safe finite rewrites preserve the original attachment and
+the distinct working factor source used for reconstruction and native certification.
+An unconditional exact equality can give an original real declaration an integer
+backing when its constant and coefficient ratios are integral and bounded integer
+inputs imply a signed-word range. Recognition follows chained definitions under the
+containing preparation token. Guarded or fractional definitions retain real storage;
+original rows, declaration kinds and tolerance qualification remain authoritative.
+The typed working coordinate records the storage namespace independently of the
+original declaration namespace.
+
+## Private float projections
+
+An explicitly selected finite compatibility or heuristic consumer may request a
+private integer grid under the captured `FloatSemantics.Grid` permission. Ordinary
+source setup does not materialize that view. Original real declarations, bounds,
+relations and objective remain on the attachment. An absent endpoint may use the
+private search window; an explicit endpoint wins. Derived auxiliary windows describe
+private search geometry and supply no original-source bounds.
+
+The same invocation retains its canonical plan and a separate engine plan over the
+private model. Private factor descriptors come from the captured provider bundle;
+original factor indices do not select descriptors for converted factors. Cross-kind
+maps retain real-to-private-integer coordinates, exact rational origins and steps,
+retained real coordinates and private factor origins. Optional off-grid absent defaults
+use a value carrier with guarded channels to an unchanged present grid. The logical
+selector and actual value carrier have separate exact metadata; all private rows,
+nonlinear relations, objectives and reconstruction read the same carrier. Original
+Boolean and integer prefixes remain distinct from private helpers. Binding closes before a finite
+shape escapes or execution starts. Unsupported factors, open original integer sides,
+unrepresentable geometry/objectives and resource stops decline only this view.
+
+Publication reconstructs engine/presolve coordinates into the private grid frame,
+then original real coordinates, and checks the original model and effective acceptance
+policy. The lift clears private proof receipts. Original objective values retain their
+constant, exact positive affine conversion and maximization direction. Grid exhaustion
+and optimization prove only private-grid claims: `FiniteSolveResult.nativeGridOutcome`
+retains that native result and immutable `SourceFloatProjection`, while the ordinary
+outcome publishes checked source points without transferring unproved global claims.
+Per-solve publication state and retained result metadata do not share mutable worker
+state or renew the containing allowance. See [source checking](solver/validation.md)
+and [reconstruction](solver/presolve.md#guarantees-and-source-mappings).
 
 ## Distinct integer positions
 
@@ -104,8 +169,9 @@ Unconditional Hall and assignment cuts apply only to plain mandatory distinctnes
 Excepted and optional relations retain finite enforcement without those cuts;
 overflowing sum cuts decline. Finite globals compose with arithmetic completion
 through their finite owner and pinned source coordinates, as described by
-[theory composition](theories.md#shared-composition-contract). This path does not
-provide a standalone open-integer distinctness encoder.
+[theory composition](theories.md#shared-composition-contract). Selected linear and
+polynomial encoders preserve mandatory, optional and excepted source relations.
+Their guarded comparisons use exact source values; open integer declarations stay open.
 
 ## Distinct-value counts
 
@@ -215,7 +281,9 @@ repeated coordinates and normalize complemented Boolean terms without changing
 their zero/one values. Coefficients and activities retain arbitrary-width rational
 arithmetic. An optional Boolean activator is equivalent to the whole relation;
 a false activator requires a collision. Remapping preserves repeated operand roles,
-strict coordinate namespaces and activation identity.
+strict coordinate namespaces and activation identity. Structural coloring maps
+identifiers directly, preserving namespaces and exact coefficients under focal
+color markers without constructing a source remap.
 
 Finite propagation checks pinned operands and pins the reifying Boolean only when
 all operand coordinates are known. Local search grades collisions exactly over
@@ -226,10 +294,13 @@ and rational reals. A checked ray preserves every affine separation; false
 reification requires a permanent affine collision. Distinctness supplies no
 unconditional numerical relaxation.
 
-Caller-selected linear and polynomial encoders expand the retained relation into
-exact pairwise comparisons. Whole-relation reification includes both truth
-directions. Encoding uses the source coordinate namespaces, carries factor
-attribution, and checks cancellation before publishing an enforcing fragment.
+Selected linear encoders expand the retained relation into exact pairwise comparisons.
+Polynomial encoders retain the operand list until query normalization constructs
+its comparisons under the native arithmetic allowance. Whole-relation reification
+includes both truth directions. Encoding uses the source coordinate namespaces,
+carries factor attribution, and checks cancellation before publishing an enforcing fragment.
+Already finite integer/Boolean sources with complete native finite support select
+their finite owner before arithmetic installation, avoiding unused pairwise encodings.
 
 ## Published assignments and objectives
 
@@ -486,6 +557,19 @@ indexes belong to a propagation projection, keyed by shared immutable relation
 arrays. Local-search projections prepare table column maps, AllDifferent occurrence counts
 and circuit scoring. Each engine interprets presence literals in its own state.
 Source lowering shares relation data without allocating engine preparation.
+
+### Factor-backed open polynomial plans
+
+A selected nonlinear integer execution can retain a factor model as its original
+source and an internal complete polynomial projection as its execution formula.
+The binding validates factor identity, captured providers, declaration counts and
+exact coordinate maps. Every source factor must have a complete selected encoder;
+finite peers cannot silently supply omitted relations in this execution. Integer
+endpoints and finite membership exclusions remain source constraints. Private
+continuous auxiliaries are omitted from declaration output. The native integer
+service checks the complete encoded formula and integrality before publication;
+its incomplete candidate search supplies no finite-box exhaustion proof.
+See [nonlinear integer composition](theories/nonlinear-integer.md#solving-and-composition).
 
 ## Public strategy construction
 

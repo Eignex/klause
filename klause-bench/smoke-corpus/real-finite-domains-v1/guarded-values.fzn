@@ -1,0 +1,11 @@
+var bool: a;
+var bool: b;
+var 0.0..1.0: x :: output_var;
+var 0.5..0.5: y;
+var float: z :: output_var;
+constraint array_bool_or([a, b], true);
+constraint float_eq_reif(x, 0.125, a);
+constraint float_eq_reif(x, 0.375, b);
+constraint bool_eq(b, true);
+constraint float_times(x, y, z);
+solve satisfy;

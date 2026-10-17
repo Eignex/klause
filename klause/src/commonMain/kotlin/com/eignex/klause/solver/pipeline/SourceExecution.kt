@@ -1,12 +1,15 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.EffectiveSourceSemantics
+import com.eignex.klause.ir.LinearSourceObjective
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 
@@ -32,6 +35,9 @@ enum class SourceExecutionKind {
 
     /** Exact real functions with their native source and resource diagnostics. */
     FUNCTIONS,
+
+    /** Numerical linear traversal retaining its native bound and certificate payload. */
+    NUMERICAL,
 }
 
 /** Original objective captured by this source operation. */
@@ -39,6 +45,13 @@ val PreparedSourceInvocation.sourceObjective: LinearObjective? get() = request.o
 
 /** Original exact quadratic objective captured by this source operation. */
 val PreparedSourceInvocation.sourceQuadraticObjective: QuadraticObjectiveSpec? get() = request.quadraticObjective
+
+/** Original rational affine objective, before a working scale or private defining column. */
+val PreparedSourceInvocation.sourceLinearObjective: LinearSourceObjective? get() =
+    (source.originalSource as? com.eignex.klause.ir.LinearSourceProblem)?.objective
+
+internal val PreparedSourceInvocation.workingLinearObjective: LinearObjective?
+    get() = linearSource?.objective ?: request.objective
 
 /** Original direction captured independently of the engine's minimized objective. */
 val PreparedSourceInvocation.maximizeSourceObjective: Boolean get() = request.maximize
@@ -65,7 +78,73 @@ class SourceExecutionRequest private constructor(
     val nonlinearInteger: NonlinearIntegerTheoryParams?,
     /** Optional full native function controls, including representation and depth limits. */
     val transcendental: TranscendentalTheoryParams?,
+    /** Containing decision and heuristic allowance when resolved through common execution options. */
+    val nodeBudget: NodeBudget?,
+    /** Caller policy retained independently of immutable source declarations. */
+    val policy: SourceExecutionPolicy = SourceExecutionPolicy(explicitPresolve = presolveConfig != null),
 ) {
+    /**
+     * Resolve common options once for the captured route. Omitted native limits use their parameter
+     * types' defaults. The finite factory supplies optional application hooks and policy defaults.
+     */
+    constructor(
+        invocation: PreparedSourceInvocation,
+        executionOptions: ExecutionOptions,
+        finiteRequest: ((FiniteSolveShape) -> FiniteSolveRequest)? = null,
+        cores: Int = 1,
+        randomSeed: Long? = null,
+        nodeBudget: NodeBudget? = null,
+        timeout: Cancellation = Cancellation.Never,
+        cancellation: Cancellation = Cancellation.Never,
+        presolveConfig: PresolveConfig? = null,
+        presolveCancellation: Cancellation = Cancellation.Never,
+        presolveBudget: PresolveBudget? = null,
+    ) : this(
+        invocation, SourceExecutionPolicy(explicitPresolve = presolveConfig != null), executionOptions,
+        finiteRequest, cores, randomSeed, nodeBudget, timeout, cancellation, presolveConfig,
+        presolveCancellation, presolveBudget,
+    )
+
+    /** Resolve caller policy and common options for the captured source before constructing workers. */
+    constructor(
+        invocation: PreparedSourceInvocation,
+        policy: SourceExecutionPolicy,
+        executionOptions: ExecutionOptions = ExecutionOptions(),
+        finiteRequest: ((FiniteSolveShape) -> FiniteSolveRequest)? = null,
+        cores: Int = 1,
+        randomSeed: Long? = null,
+        nodeBudget: NodeBudget? = null,
+        timeout: Cancellation = Cancellation.Never,
+        cancellation: Cancellation = Cancellation.Never,
+        presolveConfig: PresolveConfig? = null,
+        presolveCancellation: Cancellation = Cancellation.Never,
+        presolveBudget: PresolveBudget? = null,
+    ) : this(
+        invocation,
+        bindSourceExecutionControls(
+            invocation, executionOptions, finiteRequest, randomSeed, nodeBudget, cores, timeout, cancellation,
+            presolveConfig, presolveCancellation, presolveBudget, policy,
+        ),
+        cores,
+        presolveCancellation,
+        presolveBudget,
+        policy,
+    )
+
+    private constructor(
+        invocation: PreparedSourceInvocation,
+        controls: SourceExecutionControls,
+        cores: Int,
+        presolveCancellation: Cancellation,
+        presolveBudget: PresolveBudget?,
+        policy: SourceExecutionPolicy,
+    ) : this(
+        invocation, controls.finiteRequest, controls.theory, controls.polynomial, cores,
+        controls.presolveConfig, presolveCancellation, presolveBudget,
+        controls.nonlinearInteger, controls.transcendental,
+        controls.nodeBudget, policy,
+    )
+
     /** Bind existing finite, linear or polynomial controls to their captured source. */
     constructor(
         invocation: PreparedSourceInvocation,
@@ -78,7 +157,7 @@ class SourceExecutionRequest private constructor(
         presolveBudget: PresolveBudget? = null,
     ) : this(
         invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
-        presolveCancellation, presolveBudget, null, null,
+        presolveCancellation, presolveBudget, null, null, theory.nodeBudget,
     )
 
     /** Bind full native integer controls without replacing their polynomial or node ledger. */
@@ -88,7 +167,7 @@ class SourceExecutionRequest private constructor(
         cores: Int = 1,
     ) : this(
         invocation, null, TheoryParams(), nonlinearInteger.polynomial, cores, null,
-        Cancellation.Never, null, nonlinearInteger, null,
+        Cancellation.Never, null, nonlinearInteger, null, nonlinearInteger.nodeBudget,
     )
 
     /** Bind full exact function controls without renewing the containing invocation. */
@@ -98,11 +177,15 @@ class SourceExecutionRequest private constructor(
         cores: Int = 1,
     ) : this(
         invocation, null, TheoryParams(), PolynomialTheoryParams(), cores, null,
-        Cancellation.Never, null, null, transcendental,
+        Cancellation.Never, null, null, transcendental, transcendental.nodeBudget,
     )
 
     init {
         require(cores > 0)
+        if (invocation.request.engine == FiniteEngine.FIXED && cores > 1) {
+            throw PipelineConfigException("engine 'fixed' is single-core; use 'backtrack' for a parallel pool")
+        }
+        policy.validate(SourceSetup.executionKind(invocation), invocation.request.engine)
     }
 }
 
@@ -114,13 +197,33 @@ class SourceExecutionCallbacks(
     val onLinearIncumbent: ((SourceIncumbentPublication) -> Unit)? = null,
     /** Checked exact polynomial source improvements, including algebraic values. */
     val onQuadraticIncumbent: ((QuadraticIncumbentPublication) -> Unit)? = null,
-)
+) {
+    private var sourceIncumbent: ((com.eignex.klause.solver.validation.LinearSourceWitness) -> Unit)? = null
+
+    /** Checked original-unit linear point, emitted before its ordinary engine callback. */
+    val onLinearSourceIncumbent: ((com.eignex.klause.solver.validation.LinearSourceWitness) -> Unit)?
+        get() = sourceIncumbent
+
+    /** Observe original declaration coordinates and source-unit values after source checking. */
+    constructor(
+        onLinearSourceIncumbent: (com.eignex.klause.solver.validation.LinearSourceWitness) -> Unit,
+        finite: FiniteSolveCallbacks = FiniteSolveCallbacks({}, {}),
+        onLinearIncumbent: ((SourceIncumbentPublication) -> Unit)? = null,
+        onQuadraticIncumbent: ((QuadraticIncumbentPublication) -> Unit)? = null,
+    ) : this(finite, onLinearIncumbent, onQuadraticIncumbent) {
+        sourceIncumbent = onLinearSourceIncumbent
+    }
+}
 
 /** Native result of a source operation; adapters retain every producing mechanism's payload. */
 sealed class SourceExecutionResult protected constructor(
     /** Original source binding, whose source identity and interpretation remain immutable. */
     val invocation: PreparedSourceInvocation,
+    /** Original-unit point acceptance and claim qualification, absent for another source representation. */
+    val linearSource: LinearSourceOutcome?,
 ) : SourceSemanticsOwner {
+    /** Bind an invocation without an additional original-unit linear qualification. */
+    protected constructor(invocation: PreparedSourceInvocation) : this(invocation, null)
     override val semantics: EffectiveSourceSemantics = invocation.source.semantics
 
     /** Finite preparation, native outcome and scoped engine evidence. */
@@ -128,54 +231,82 @@ sealed class SourceExecutionResult protected constructor(
         invocation: PreparedSourceInvocation,
         /** Unmodified native result. */
         val result: FiniteSolveResult,
-    ) : SourceExecutionResult(invocation)
+        linearSource: LinearSourceOutcome? = null,
+    ) : SourceExecutionResult(invocation, linearSource)
 
     /** Exact linear or source-checked heuristic result, including values, limits and rays. */
     class Linear internal constructor(
         invocation: PreparedSourceInvocation,
         /** Unmodified native result. */
         val result: OpenTheoryExecution,
-    ) : SourceExecutionResult(invocation)
+        linearSource: LinearSourceOutcome? = null,
+    ) : SourceExecutionResult(invocation, linearSource)
+
+    /** Numerical traversal's full native source certificate, values, bounds and interruption cause. */
+    class Numerical internal constructor(
+        invocation: PreparedSourceInvocation,
+        /** Unmodified native numerical result. */
+        val result: LinearOptimizationResult,
+        linearSource: LinearSourceOutcome? = null,
+    ) : SourceExecutionResult(invocation, linearSource)
 
     /** Polynomial source satisfaction and native resource telemetry. */
     class Polynomial internal constructor(
         invocation: PreparedSourceInvocation,
         /** Unmodified native result. */
         val result: PolynomialTheoryExecution,
-    ) : SourceExecutionResult(invocation)
+        linearSource: LinearSourceOutcome? = null,
+    ) : SourceExecutionResult(invocation, linearSource)
 
     /** Exact affine optimization with polynomial completion and its native certificates. */
     class Quadratic internal constructor(
         invocation: PreparedSourceInvocation,
         /** Unmodified native result. */
         val result: QuadraticOptimizationExecution,
-    ) : SourceExecutionResult(invocation)
+        linearSource: LinearSourceOutcome? = null,
+    ) : SourceExecutionResult(invocation, linearSource)
 
     /** Exact function result with its complete native resource observations. */
     class Transcendental internal constructor(
         invocation: PreparedSourceInvocation,
         /** Unmodified native result. */
         val result: TranscendentalTheoryExecution,
-    ) : SourceExecutionResult(invocation)
+        linearSource: LinearSourceOutcome? = null,
+    ) : SourceExecutionResult(invocation, linearSource)
 
     /** Required preparation declined before a native worker could execute. */
     class Declined internal constructor(
         invocation: PreparedSourceInvocation,
         /** Containing interruption or unsupported source preparation. */
         val reason: TerminationReason,
-    ) : SourceExecutionResult(invocation)
+        linearSource: LinearSourceOutcome? = null,
+    ) : SourceExecutionResult(invocation, linearSource)
 
     /** Source preparation refutation, without fabricating a producing engine's certificate. */
-    class Refuted internal constructor(invocation: PreparedSourceInvocation) : SourceExecutionResult(invocation)
+    class Refuted internal constructor(
+        invocation: PreparedSourceInvocation,
+        linearSource: LinearSourceOutcome? = null,
+    ) : SourceExecutionResult(invocation, linearSource)
 }
 
 /** Inspect the selected execution family without allocating a worker or changing the source plan. */
 fun SourceSetup.executionKind(invocation: PreparedSourceInvocation): SourceExecutionKind =
-    when (val route = invocation.route) {
-        is SourceProblemRoute.NativeFormula -> when (invocation.source.formula) {
-            is AttachedSourceFormula.IntegerPolynomial -> SourceExecutionKind.NONLINEAR_INTEGER
-            is AttachedSourceFormula.Functions -> SourceExecutionKind.FUNCTIONS
-            is AttachedSourceFormula.Polynomial, null -> SourceExecutionKind.POLYNOMIAL
+    when (val route = invocation.engineRoute) {
+        is SourceProblemRoute.NativeFormula -> when (route.execution) {
+            is NativeSourceExecution.Numerical -> SourceExecutionKind.NUMERICAL
+
+            is NativeSourceExecution.IntegerPolynomial -> SourceExecutionKind.NONLINEAR_INTEGER
+
+            is NativeSourceExecution.Functions -> SourceExecutionKind.FUNCTIONS
+
+            is NativeSourceExecution.Polynomial -> SourceExecutionKind.POLYNOMIAL
+
+            null -> when (invocation.source.formula) {
+                is AttachedSourceFormula.Linear -> SourceExecutionKind.NUMERICAL
+                is AttachedSourceFormula.IntegerPolynomial -> SourceExecutionKind.NONLINEAR_INTEGER
+                is AttachedSourceFormula.Functions -> SourceExecutionKind.FUNCTIONS
+                is AttachedSourceFormula.Polynomial, null -> SourceExecutionKind.POLYNOMIAL
+            }
         }
 
         is SourceProblemRoute.Finite -> SourceExecutionKind.FINITE
@@ -201,8 +332,18 @@ fun SourceSetup.execute(
     request: SourceExecutionRequest,
     callbacks: SourceExecutionCallbacks = SourceExecutionCallbacks(),
 ): SourceExecutionResult {
+    if (request.invocation.linearSource != null) return executeLinearSource(request, callbacks, ::executeCapturedSource)
+    return executeCapturedSource(request, callbacks)
+}
+
+private fun executeCapturedSource(
+    request: SourceExecutionRequest,
+    callbacks: SourceExecutionCallbacks,
+    bindScope: ((Cancellation, Boolean) -> Unit)? = null,
+): SourceExecutionResult {
     val invocation = request.invocation
-    val kind = executionKind(invocation)
+    invocation.freezeExecution()
+    val kind = SourceSetup.executionKind(invocation)
     if (invocation.operation !in setOf(
             ExecutionOperation.SATISFY,
             ExecutionOperation.OPTIMIZE,
@@ -222,7 +363,7 @@ fun SourceSetup.execute(
         "native function controls require their captured function source"
     }
     val engine = invocation.request.engine
-    return when (val route = invocation.route) {
+    return when (val route = invocation.engineRoute) {
         is SourceProblemRoute.NativeFormula -> executeNativeSource(request, route, callbacks)
 
         is SourceProblemRoute.Finite -> {
@@ -231,6 +372,10 @@ fun SourceSetup.execute(
                 ?: throw PipelineConfigException("finite source execution requires its typed finite controls")
             require(finite.shape === shape) { "finite execution belongs to a different source invocation" }
             invocation.requireFiniteExecution(finite.shape, finite.engine, finite.operation)
+            bindScope?.invoke(
+                finite.cancellation or Cancellation { finite.deadlineExceeded() },
+                finite.toleranceCheck == null,
+            )
             SourceExecutionResult.Finite(invocation, FinitePipeline.solve(finite, callbacks.finite))
         }
 
@@ -252,19 +397,27 @@ fun SourceSetup.execute(
         }
 
         is SourceProblemRoute.PolynomialTheory -> {
+            val prepared = if (invocation.linearSource == null) {
+                route.request
+            } else {
+                PolynomialTheoryRequest(
+                route.request.problem,
+                route.preparedPlan.linearWorkingPlan(),
+            )
+            }
             val params = request.polynomial.boundTo(invocation)
-            val objective = invocation.sourceObjective
+            val objective = invocation.workingLinearObjective
             if (objective == null) {
                 SourceExecutionResult.Polynomial(
                     invocation,
-                    OpenTheoryPipeline.execute(route.request, params, engine, request.cores),
+                    OpenTheoryPipeline.execute(prepared, params, engine, request.cores),
                 )
             } else {
                 val sense = if (invocation.maximizeSourceObjective) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
                 SourceExecutionResult.Quadratic(
                     invocation,
                     OpenTheoryPipeline.optimize(
-                        route.request,
+                        prepared,
                         objective,
                         params,
                         engine,
@@ -300,7 +453,7 @@ private fun executeSourceHeuristic(
 ): OpenTheoryExecution = OpenTheoryPipeline.searchWithoutTheory(
     plan,
     params,
-    invocation.request.finiteObjective(),
+    invocation.request.finiteObjective(invocation.workingLinearObjective),
     invocation.request.engine,
     invocation.maximizeSourceObjective,
     cores,

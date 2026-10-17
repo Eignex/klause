@@ -2,15 +2,15 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
 
 /** A polynomial request composing exact continuous constraints with finite factors. */
 class PolynomialTheoryRequest internal constructor(
@@ -21,7 +21,10 @@ class PolynomialTheoryRequest internal constructor(
 ) {
     internal val sharedModel: SharedPolynomialModel?
         get() = preparedPlan.execution.polynomial?.completion
-            .takeIf { preparedPlan.originalSource is Problem }
+            .takeIf {
+                preparedPlan.originalSource is Problem ||
+                    preparedPlan.originalSource is com.eignex.klause.ir.LinearSourceProblem
+            }
 }
 
 /** Select the complete polynomial-real theory without materializing finite domains. */
@@ -43,8 +46,13 @@ internal fun PreparedSourcePlan.polynomialRequest(): PolynomialTheoryRequest {
     val shared = requireNotNull(execution.polynomial).completion
     return PolynomialTheoryRequest(
         PolynomialRealProblem(
-            shared.service.formula, shared.service.realCount, shared.source.numBoolVars,
-            sourceRealCount, sourceBoolCount, emptyMap(), emptyMap(),
+            shared.service.formula,
+            shared.service.realCount,
+            shared.source.numBoolVars,
+            sourceRealCount,
+            sourceBoolCount,
+            emptyMap(),
+            emptyMap(),
             semantics = sourceSemantics ?: shared.source.semantics,
         ),
         this,
@@ -110,23 +118,36 @@ data class PolynomialTheoryStats(
         projectedPolynomials: Long = this.projectedPolynomials,
         liftedCells: Long = this.liftedCells,
         workSpent: Long = this.workSpent,
-    ): PolynomialTheoryStats = PolynomialTheoryStats(projectedPolynomials, liftedCells, workSpent,
-        dyadicAttempts, dyadicBases, coupledWorkDeclines, dyadicPreExtractionDeclines)
+    ): PolynomialTheoryStats = PolynomialTheoryStats(
+        projectedPolynomials,
+        liftedCells,
+        workSpent,
+        dyadicAttempts,
+        dyadicBases,
+        coupledWorkDeclines,
+        dyadicPreExtractionDeclines,
+    )
 
     override fun toString(): String {
         val prefix = "PolynomialTheoryStats(projectedPolynomials=$projectedPolynomials, " +
             "liftedCells=$liftedCells, workSpent=$workSpent"
         return if (dyadicAttempts == null && dyadicBases == null && coupledWorkDeclines == null &&
             dyadicPreExtractionDeclines == null
-        ) "$prefix)" else "$prefix, dyadicAttempts=$dyadicAttempts, dyadicBases=$dyadicBases, " +
+        ) {
+            "$prefix)"
+        } else {
+            "$prefix, dyadicAttempts=$dyadicAttempts, dyadicBases=$dyadicBases, " +
             "coupledWorkDeclines=$coupledWorkDeclines, dyadicPreExtractionDeclines=$dyadicPreExtractionDeclines)"
+        }
     }
 
     override fun hashCode(): Int {
         val native = (31 * projectedPolynomials.hashCode() + liftedCells.hashCode()) * 31 + workSpent.hashCode()
         if (dyadicAttempts == null && dyadicBases == null && coupledWorkDeclines == null &&
             dyadicPreExtractionDeclines == null
-        ) return native
+        ) {
+            return native
+        }
         var hash = native
         hash = 31 * hash + (dyadicAttempts?.hashCode() ?: 0)
         hash = 31 * hash + (dyadicBases?.hashCode() ?: 0)
@@ -203,8 +224,10 @@ private fun minimizePolynomial(
     if (objective.realCoefficientValues.any { it != 0.0 } ||
         !operation.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
     ) {
-        return PolynomialOptimizationExecution(MinimizeResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY),
-            PolynomialTheoryStats())
+        return PolynomialOptimizationExecution(
+            MinimizeResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY),
+            PolynomialTheoryStats(),
+        )
     }
     val shared = request.resolvedModel()
     val scope = PolynomialInvocationScope(shared.service, params)
@@ -222,15 +245,22 @@ private fun minimizePolynomial(
         stop() -> TerminationReason.Cancelled
         else -> TerminationReason.BudgetExhausted
     }
-    val published = if (!stop() && !nativeStopped) result else when (result) {
-        is MinimizeResult.WithSample -> MinimizeResult.BestFound(result.sample, result.objective, reason, result.stats)
+    val published = if (!stop() && !nativeStopped) {
+        result
+    } else {
+        when (result) {
+        is MinimizeResult.WithSample -> MinimizeResult.BestFound(
+            result.sample, result.objective, reason, result.stats,
+        )
         else -> MinimizeResult.Unknown(reason, result.stats)
+    }
     }
     return PolynomialOptimizationExecution(published, scope.stats)
 }
 
 private fun PolynomialTheoryRequest.capture(sample: Sample): Sample = Sample(
-    BooleanArray(problem.sourceBoolCount) { sample.boolValue(it) }, sample.ints,
+    BooleanArray(problem.sourceBoolCount) { sample.boolValue(it) },
+    sample.ints,
     DoubleArray(problem.sourceRealCount) { sample.approximateRealValue(it) },
     algebraicReals = requireNotNull(sample.algebraicReals).take(problem.sourceRealCount),
 )
@@ -266,13 +296,15 @@ private fun executePolynomial(
         reason: TerminationReason,
         stats: PolynomialTheoryStats,
         searchStats: SolveStats,
-    ): PolynomialTheoryExecution =
-        PolynomialTheoryExecution(
-            OpenTheoryResult.Unknown(reason, searchStats.copy(
-                run = searchStats.run.copy(timedOut = reason == TerminationReason.Timeout),
-            )),
-            stats,
+    ): PolynomialTheoryExecution = PolynomialTheoryExecution(
+        OpenTheoryResult.Unknown(
+            reason,
+            searchStats.copy(
+            run = searchStats.run.copy(timedOut = reason == TerminationReason.Timeout),
         )
+        ),
+        stats,
+    )
     val source = request.problem
     if (!request.preparedPlan.capabilities.admission(engine).runnable) {
         return incomplete(TerminationReason.Unsupported, PolynomialTheoryStats(), SolveStats.EMPTY)
@@ -284,7 +316,9 @@ private fun executePolynomial(
     val stats = scope.stats
     if (stop()) {
         return incomplete(
-            if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled, stats, result.stats,
+            if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled,
+            stats,
+            result.stats,
         )
     }
     return when (result) {
@@ -295,24 +329,34 @@ private fun executePolynomial(
                 List(source.sourceRealCount) { requireNotNull(sample.algebraicReals)[it] },
             )
             val exact = OpenTheoryAssignment.ExactNra(assignment)
-            val published = if (shared.source.numIntVars == 0) exact else OpenTheoryAssignment.Rebuilt(
-                exact, assignment.bools,
+            val published = if (shared.source.numIntVars == 0) {
+                exact
+            } else {
+                OpenTheoryAssignment.Rebuilt(
+                exact,
+                assignment.bools,
                 Array(shared.source.numIntVars) { bigIntOf(sample.intValue(it)) },
             )
+            }
             if (stop()) {
                 incomplete(
                     if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled,
-                    stats, result.stats,
+                    stats,
+                    result.stats,
                 )
             } else {
                 PolynomialTheoryExecution(OpenTheoryResult.Sat(published, result.stats), stats)
             }
         }
+
         is SolveResult.Unsat -> PolynomialTheoryExecution(OpenTheoryResult.Unsat(result.stats), stats)
+
         is SolveResult.Unknown -> incomplete(
             if (scope.stopped) {
                 TerminationReason.BudgetExhausted
-            } else result.reason,
+            } else {
+                result.reason
+            },
             stats,
             result.stats,
         ).copy(

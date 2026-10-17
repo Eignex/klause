@@ -1,14 +1,9 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
-import com.eignex.klause.lowering.allDifferentWindow
 import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
@@ -103,10 +98,8 @@ internal fun Compiler.Builder.assert(top: SExpr) {
                 }
 
                 h == "distinct" -> {
-                    if (!isRealRelation(node)) {
-                        assertDistinct(args)
-                        continue
-                    }
+                    assertDistinct(args)
+                    continue
                 }
             }
         }
@@ -163,52 +156,6 @@ internal fun Compiler.Builder.isBoolExpr(t: SExpr): Boolean {
     }
 }
 
-internal fun Compiler.Builder.assertDistinct(args: List<SExpr>) {
-    if (args.size < 2) return
-    if (args.all { !isBoolExpr(it) }) {
-        val terms = args.map { linearTermNarrow(it) }
-        val simpleVars = terms.mapNotNull { it.asSimpleVar() }
-        if (simpleVars.size == terms.size && simpleVars.toSet().size == simpleVars.size) {
-            val vars = simpleVars.toIntArray()
-            val window = allDifferentWindow(vars, { finiteDomainOf(it)?.min }, { finiteDomainOf(it)?.max })
-            if (window != null) {
-                factors.add(AllDifferent(vars = vars, domainMin = window.min, domainSize = window.size))
-            } else {
-                assertPairwiseStrictOrder(terms)
-            }
-        } else {
-            assertPairwiseNe(terms)
-        }
-    } else {
-        assertPairwiseNe(args.map { if (isBoolExpr(it)) litToIntTerm(compileBool(it)) else linearTermNarrow(it) })
-    }
-}
-
-/** The declared domain of [variable] when both its sides are known, else null — a column still open on
- *  either side has no window a value-indexed global can address. */
-private fun Compiler.Builder.finiteDomainOf(variable: Int): IntDomain? =
-    (intDomains[variable] as? PresolveDomain.Finite)?.domain
-
-/** Post pairwise `!=` as linear NE constraints. */
-internal fun Compiler.Builder.assertPairwiseNe(terms: List<LinComb>) {
-    for (i in terms.indices) {
-        for (j in i + 1 until terms.size) factors.add(neLinear(terms[i], terms[j]))
-    }
-}
-
-/** Post every integer disequality as the Boolean-theory choice `a < b ∨ a > b`. */
-private fun Compiler.Builder.assertPairwiseStrictOrder(terms: List<LinComb>) {
-    for (i in terms.indices) {
-        for (j in i + 1 until terms.size) {
-            val left = IntComb.Narrow(terms[i])
-            val right = IntComb.Narrow(terms[j])
-            val less = reifyRelation("<", left, right)
-            val greater = reifyRelation(">", left, right)
-            factors.add(Clause(intArrayOf(less, greater)))
-        }
-    }
-}
-
 /** Channel a bool literal to a fresh 0/1 int term. */
 internal fun Compiler.Builder.litToIntTerm(lit: Int): LinComb {
     val z = newInt(0L, 1L)
@@ -220,12 +167,6 @@ internal fun Compiler.Builder.litToIntTerm(lit: Int): LinComb {
     return LinComb(mapOf(z to 1), 0)
 }
 
-internal fun Compiler.Builder.neLinear(a: LinComb, b: LinComb): Linear {
-    val (vars, coeffs, bound) = diff(a, b)
-    return Linear(coeffs, vars, LinearOp.NE, bound)
-}
-
-internal fun Compiler.Builder.reifyNe(a: LinComb, b: LinComb): Int = reifyRelTerms(a, b, LinearOp.NE)
 internal fun Compiler.Builder.reifyEq(a: LinComb, b: LinComb): Int = reifyRelTerms(a, b, LinearOp.EQ)
 
 internal fun Compiler.Builder.reifyRelTerms(a: LinComb, b: LinComb, op: LinearOp): Int {

@@ -30,6 +30,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.QuadraticWitnessPublication
 import com.eignex.klause.solver.objective.evaluateExact
 import com.eignex.klause.solver.objective.openPolynomial
+import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticCertificate
 import com.eignex.klause.solver.result.QuadraticClaim
@@ -116,7 +117,11 @@ fun OpenTheoryPipeline.minimize(
             } else {
                 val budget = params.nodeBudget ?: controls.strategy.backtrack.nodeBudget
                     ?: controls.strategy.localSearch.nodeBudget
-                val operation = request.preparedPlan.withObjective(objective, sense)
+                val prepared = request.preparedPlan
+                val affine = prepared.objective
+                val operation = if (affine != null && affine.toQuadraticObjectiveSpec() == objective &&
+                    prepared.maximize == (sense == ObjectiveSense.MAXIMIZE)
+                ) prepared else prepared.withObjective(objective, sense)
                 val scoped = controls.copy(strategy = controls.strategy.copy(
                     backtrack = controls.strategy.backtrack.copy(nodeBudget = budget),
                     localSearch = controls.strategy.localSearch.copy(nodeBudget = budget)))
@@ -231,7 +236,7 @@ internal class QuadraticIntegerOptimization(
         root = source.integerBounds(invocation, relaxation.arithmetic)
         scope = requireNotNull(plan.quadraticEngineInvocation(objective, sense,
             quadraticAssumptions(controls, engine)))
-        identity = ModelIdentity.of(source, objective)
+        identity = ModelIdentity.of(plan.originalSource, objective)
         initialized = true
     }
 
@@ -256,7 +261,7 @@ internal class QuadraticIntegerOptimization(
     }
 
     fun worker(arm: Int, prepared: PreparedSourcePlan = plan): PortfolioWorker {
-        val model = ModelIdentity.of(source, objective)
+        val model = ModelIdentity.of(plan.originalSource, objective)
         val invocation = plan.quadraticEngineInvocation(objective, sense, quadraticAssumptions(controls, engine))
         val binding = SourceWorkerBinding(model, provesResults = arm == 0, preparedPlan = prepared,
             quadraticInvocation = invocation)

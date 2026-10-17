@@ -3,6 +3,9 @@ package com.eignex.klause.cli
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.formats.flatzinc.flatZincSemantics
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.formats.flatzinc.prepareFiniteCompatibility
+import com.eignex.klause.formats.flatzinc.sourceAttachment
+import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
@@ -11,7 +14,10 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.result.ConflictAnalysisStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
@@ -120,12 +126,56 @@ class CliModeVerdictTest {
     }
 
     @Test
+    fun `a published checked grid point should retain its source witness qualification`() {
+        val program = parseFlatZinc("var 0.0..1.0: x :: output_var; " +
+            "constraint float_le(x,0.5); solve satisfy;", floatBuckets = 3)
+        val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
+            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
+        assertNotNull(invocation.floatProjection)
+        val solvable = Solvable(invocation.finiteShape(), { writeFlatZincSolution(program.sourceProgram, it) }, null)
+        val common = CommonOptions().apply {
+            engine = "fixed"
+            parallel = 1
+            randomSeed = 17
+        }
+
+        val out = capture { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
+
+        assertTrue("x = " in out, out)
+        assertTrue("original source points checked" in out, out)
+        assertTrue("no global source proof" in out, out)
+        assertTrue("==========" !in out.lines(), out)
+    }
+
+    @Test
+    fun `a private grid result without source publications should not report checked original points`() {
+        val program = parseFlatZinc("var 0.0..1.0: x; var 0.0..1.0: y; " +
+            "constraint float_eq(x,0.5); constraint float_times(x,x,y); solve satisfy;", floatBuckets = 3)
+        val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
+            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
+        assertNotNull(invocation.floatProjection)
+        val solvable = Solvable(invocation.finiteShape(), { "unexpected source point" }, null)
+        val common = CommonOptions().apply {
+            engine = "fixed"
+            parallel = 1
+            randomSeed = 17
+        }
+
+        val out = capture { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
+
+        assertTrue("=====UNKNOWN=====" in out, out)
+        assertTrue("scope=private-grid" in out, out)
+        assertTrue("original source points checked" !in out, out)
+        assertTrue("unexpected source point" !in out, out)
+    }
+
+    @Test
     fun `grid completion should not publish source refutation or unboundedness`() {
         for (verdict in listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED)) {
             val out = capture { MiniZincOutput(floatApproximation = true).onComplete(verdict) }
 
             assertTrue("=====UNKNOWN=====" in out, out)
-            assertTrue("no source proof" in out, out)
+            assertTrue("no global source proof" in out, out)
             assertTrue("=====UNSATISFIABLE=====" !in out && "=====UNBOUNDED=====" !in out, out)
         }
     }
@@ -160,7 +210,7 @@ class CliModeVerdictTest {
                 }
             }
 
-            assertEquals("; objective=$objective\nsat\n; optimizationStatus=optimal\n(model)\n", out)
+            assertEquals("; objective=$objective\nsat\n(model)\nsat\n; optimizationStatus=optimal\n", out)
         }
     }
 
@@ -220,7 +270,7 @@ class CliModeVerdictTest {
                 }
             }
 
-            assertEquals("; objective=7\nsat\n; optimizationStatus=best-found\n(model)\n", out)
+            assertEquals("; objective=7\nsat\n(model)\nsat\n; optimizationStatus=best-found\n", out)
         }
     }
 

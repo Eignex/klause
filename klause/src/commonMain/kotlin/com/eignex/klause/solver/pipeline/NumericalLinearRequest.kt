@@ -52,12 +52,17 @@ class NumericalLinearRequest(
      * Finite numerical execution or a source refutation from numerical bound closure.
      * Null retains numerical traversal over the original open sides.
      */
-    fun finiteRoute(onLpStats: (LpStats) -> Unit = {}): SourceProblemRoute? {
+    fun finiteRoute(onLpStats: (LpStats) -> Unit = {}): SourceProblemRoute? = finiteRoute(cancellation, onLpStats)
+
+    internal fun finiteRoute(
+        boundCancellation: Cancellation,
+        onLpStats: (LpStats) -> Unit,
+    ): SourceProblemRoute? {
         if (!numericalRowsSupported()) return null
         var routed = model
         if (!routed.hasFiniteIntegerRanges()) {
             val sink = LpStatsSink(LpRoute.STANDALONE)
-            val closed = routed.closeOpenBounds(cancellation, sink)
+            val closed = routed.closeOpenBounds(boundCancellation or cancellation, sink)
             onLpStats(sink.snapshot())
             if (closed == OpenPresolveResult.Refuted) return SourceProblemRoute.Refuted
             routed = (closed as OpenPresolveResult.Tightened).spec

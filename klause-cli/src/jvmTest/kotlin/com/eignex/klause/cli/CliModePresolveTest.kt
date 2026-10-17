@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.util.Cancellation
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -292,8 +293,9 @@ class CliModePresolveTest {
 
         val loaded = SmtLibMode.newSession().load(source.absolutePath, common)
 
-        val pipeline = assertIs<SolvablePipeline.OpenTheory>(loaded.pipeline)
-        assertEquals(ProblemPipeline.EXACT_LIRA, pipeline.request.route)
+        val pipeline = assertIs<SourceRendering.ExactSource>(loaded.rendering)
+        val route = assertIs<SourceProblemRoute.OpenTheory>(pipeline.invocation.route)
+        assertEquals(ProblemPipeline.EXACT_LIRA, route.request.route)
         assertTrue(common.routingCancellation()())
         assertFalse(common.routingPreparationCancellation()())
     }

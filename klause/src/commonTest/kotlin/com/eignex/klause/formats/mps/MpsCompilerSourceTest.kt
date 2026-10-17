@@ -21,7 +21,7 @@ class MpsCompilerSourceTest {
             "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 1\nBOUNDS\n LO B X 0\nENDATA",
         ).toExactSourceProblem()
 
-        val witness = compiled.sourceWitnessOrNull(LongArray(0), listOf(BigFraction.ONE), maxEntries = 4)
+        val witness = compiled.sourceWitnessOrNull(longArrayOf(1), null, maxEntries = 4)
 
         assertEquals(BigFraction.ONE, assertNotNull(witness).objective)
     }
@@ -32,7 +32,7 @@ class MpsCompilerSourceTest {
             "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 1\nBOUNDS\n LO B X 0\nENDATA",
         ).toExactSourceProblem()
 
-        val witness = compiled.sourceWitnessOrNull(LongArray(0), listOf(BigFraction.ONE), maxEntries = 3)
+        val witness = compiled.sourceWitnessOrNull(longArrayOf(1), null, maxEntries = 3)
 
         assertNull(witness)
     }
@@ -43,7 +43,7 @@ class MpsCompilerSourceTest {
             "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 1\nBOUNDS\n LO B X 0\nENDATA",
         ).toExactSourceProblem()
 
-        val witness = compiled.sourceWitnessOrNull(LongArray(0), listOf(BigFraction.ZERO), maxEntries = 4)
+        val witness = compiled.sourceWitnessOrNull(longArrayOf(0), null, maxEntries = 4)
 
         assertNull(witness)
     }
@@ -160,9 +160,10 @@ class MpsCompilerSourceTest {
                 " M1 'MARKER' 'INTEND'\n Z COST 1 DEF 1.0000000000000001\nBOUNDS\n BV B X\n FR B Z\nENDATA",
         ).toProblem()
 
-        val witness = compiled.sourceWitness(longArrayOf(1L), listOf(BigFraction.ofLong(2L)))
+        val witness = compiled.sourceWitness(longArrayOf(1L, 2L), null)
 
-        assertEquals(1, compiled.columns.count { it.real })
+        assertEquals(1, compiled.floatColumns)
+        assertEquals(0, compiled.columns.count { it.real })
         assertEquals("2", witness.objective.toString())
     }
 
@@ -173,9 +174,10 @@ class MpsCompilerSourceTest {
                 " M1 'MARKER' 'INTEND'\n Z COST 10000000000000001 DEF 1\nBOUNDS\n BV B X\n FR B Z\nENDATA",
         ).toProblem()
 
-        val witness = compiled.sourceWitness(longArrayOf(1L), listOf(BigFraction.ofLong(3L)))
+        val witness = compiled.sourceWitness(longArrayOf(1L, 3L), null)
 
-        assertEquals(1, compiled.columns.count { it.real })
+        assertEquals(1, compiled.floatColumns)
+        assertEquals(0, compiled.columns.count { it.real })
         assertEquals("30000000000000003", witness.objective.toString())
     }
 
@@ -299,7 +301,7 @@ class MpsCompilerSourceTest {
                 "RHS\n RHS R 2 COST 3\nENDATA",
         ).toProblem()
 
-        val witness = compiled.sourceWitness(LongArray(0), listOf(BigFraction.ofLong(2L)))
+        val witness = compiled.sourceWitness(longArrayOf(2L), null)
 
         assertTrue(compiled.maximize)
         assertTrue(compiled.sourceExact)

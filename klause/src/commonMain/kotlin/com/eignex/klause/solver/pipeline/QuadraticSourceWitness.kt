@@ -33,28 +33,38 @@ internal fun checkQuadraticSourceWitness(
     ) SourceEvidenceCheck.Rejected("quadratic witness has different source coordinates")
     else when (val source = plan.originalSource) {
         is PolynomialRealProblem -> checkProjectedPolynomialWitness(source, point, cancellation, limits)
-        is NonlinearIntegerProblem -> {
-            val algebraic = AlgebraicArithmetic(arithmetic)
-            val reals = exactQuadraticReals(point, algebraic)
-            if (reals == null) SourceEvidenceCheck.Unavailable("quadratic witness has no exact real coordinates")
-            else {
-                val values = source.realCoordinates.withIndex().associate { it.value to reals[it.index] }
-                    .toMutableMap()
-                for ((id, column) in source.integerCoordinates.withIndex()) {
-                    arithmetic.step()
-                    values[column] = algebraic.rational(BigFraction.of(point.exactIntValue(id), BIG_ONE))
-                }
-                checkProjectedPolynomialFormula(source.formula, source.boolCount, source.numericCount,
-                    point.bools, values, cancellation, arithmetic, limits)
-            }
+        is NonlinearIntegerProblem -> checkQuadraticIntegerWitness(source, point, cancellation, arithmetic, limits)
+        is Problem -> {
+            val projection = (plan.execution as? PreparedExecution.NonlinearInteger)?.projection
+            if (projection != null) {
+                checkQuadraticIntegerWitness(projection.formula, point, cancellation, arithmetic, limits)
+            } else checkQuadraticIrWitness(plan, point, cancellation, arithmetic, limits)
         }
-        is Problem -> checkQuadraticIrWitness(plan, point, cancellation, arithmetic, limits)
         else -> SourceEvidenceCheck.Unavailable("quadratic source has no installed witness checker")
     }
 } catch (_: PolynomialInterrupted) {
     SourceEvidenceCheck.Unavailable("quadratic source witness checking interrupted")
 } catch (_: PolynomialResourceLimit) {
     SourceEvidenceCheck.Unavailable("quadratic source witness checking exceeded representation limits")
+}
+
+private fun checkQuadraticIntegerWitness(
+    source: NonlinearIntegerProblem,
+    point: Sample,
+    cancellation: Cancellation,
+    arithmetic: PolynomialArithmetic,
+    limits: PolynomialLimits,
+): SourceEvidenceCheck {
+    val algebraic = AlgebraicArithmetic(arithmetic)
+    val reals = exactQuadraticReals(point, algebraic)
+        ?: return SourceEvidenceCheck.Unavailable("quadratic witness has no exact real coordinates")
+    val values = source.realCoordinates.withIndex().associate { it.value to reals[it.index] }.toMutableMap()
+    for ((id, column) in source.integerCoordinates.withIndex()) {
+        arithmetic.step()
+        values[column] = algebraic.rational(BigFraction.of(point.exactIntValue(id), BIG_ONE))
+    }
+    return checkProjectedPolynomialFormula(source.formula, source.boolCount, source.numericCount,
+        point.bools, values, cancellation, arithmetic, limits)
 }
 
 private fun checkQuadraticIrWitness(

@@ -29,7 +29,7 @@ The facade retains the historical conversion constant for compiled callers.
 
 ## Configuration and lifetime
 
-The CLI parses `auto`, `unlimited` and a nonnegative remaining amount as distinct
+`ExecutionOptions` captures `auto`, `unlimited` and a nonnegative remaining amount as distinct
 settings. Omission selects `auto`. For `node-limit`, automatic and unlimited both resolve
 to no solve work cap; `0` resolves to an exhausted `NodeBudget`. For
 `presolve-work-limit`, automatic derives work from the preparation time policy,
@@ -37,6 +37,15 @@ unlimited removes the work cap and `0` stops optional preparation. The preparati
 clock and whole-solve deadline still apply. The legacy nonpositive
 `klause.presolve.budget.ms` disables the derived preparation work cap and its clock;
 an explicit work setting can still supply an exhausted or finite work allowance.
+
+The common `SourceExecutionRequest` option binding resolves the ledger once, using
+the caller's existing ledger when supplied. Conflicting resource declarations reject.
+Native arithmetic and representation caps use their parameter types' defaults.
+`open-work-limit` bounds open arithmetic policy work; it does not change the shared
+decision/move allowance. `nra-work-limit`, dense coefficient and matrix caps retain
+their polynomial or function units. Native integer candidate and move limits retain
+their own attempt units. One resolved seed, default zero, reaches every selected
+strategy. Captured CLI source execution delegates this binding to the library.
 
 Built-in `withCancellation` adapters replace the invocation token while retaining any
 separately bound lifetime scope. `withLifetimeCancellation` composes a persistent token
@@ -55,6 +64,23 @@ calls only the selected finite request factory and retains the typed native cont
 arithmetic execution. Their cooperative stop composes with the captured source token;
 the original deadline also bounds native timeout reporting. Heuristic fallback reuses
 the captured source plan and ledger without another routing allowance.
+Numerical finite-route discovery applies the optional bound-closure token only to
+that deduction. Declining closure retains required source admission and numerical
+execution under the containing token. Raw linear finite consumers select numerical
+continuous completion before heuristic workers are built; fixed discrete coordinates
+do not replace their requested heuristic execution with an exact neighborhood worker.
+Integral real-column recognition charges source declarations, exact defining rows
+and dependency passes to that same preparation token. An interrupted capture exports
+no partial projection. Derived finite ranges require exact signed-word endpoints;
+representation decline retains the real column and its original rows.
+
+CLI routing preparation owns a scoped view of the shared presolve meter. Required
+admission keeps charging it after optional probing exhausts its slice. Source
+conversion and setup release that meter on every exit before retained native execution;
+the containing deadline and cancellation stay live. Native operations use their
+invocation meters and decision/move ledgers. A released preparation meter cannot
+force native arithmetic into work-metered polling. See [presolve](presolve.md#phase-allowance-and-telemetry)
+for phase ownership.
 
 ## Units and boundaries
 
@@ -95,7 +121,12 @@ see [private CP preparation](portfolio.md#private-cp-preparation).
 
 The solve-wide decision/move currency excludes propagation and LP work. Ordinary LS
 instructions and CP repair decisions charge the same containing `NodeBudget`. The
-private clausal primal search and walk also charge that ledger. Their decisions and
+complete open traversal, retained linear queries and numerical source traversal charge
+committed decisions to that same ledger. Remaining decision capacity is read again for
+each feasibility round; rebuilding a traversal does not renew it. A root witness or
+refutation that needs no decision can survive an exhausted node allowance. Source
+strategies bind one supplied ledger across their finite and arithmetic projections.
+The private clausal primal search and walk also charge that ledger. Their decisions and
 walk instructions are not included in the enclosing arm's `nodes` and `lsMoves`
 counters, so those exported counters alone cannot reconstruct the solve charge. ALNS
 charges each outer iteration's declared flip allowance once; the inner LS repair is
@@ -497,3 +528,20 @@ function controls retain their work, bit, depth and matrix limits. Default polyn
 controls retain the existing function-wrapper interpretation. A mismatched native
 control family rejects before worker construction. Neither a fresh execution request
 nor an unused finite factory can renew stopped source preparation.
+
+Original-unit linear lowering, row/coordinate capture, tolerance qualification and
+point checks poll and charge the containing source invocation token. Stopped
+preparation exports no partial source binding. Every execution owns a fresh checked
+incumbent and immutable result qualification; retained outcomes do not read later
+publication state. The selected finite request contributes its actual cancellation
+and deadline to original-unit publication checking before workers begin; supplying
+those controls through a deferred factory does not leave checking outside its scope.
+Native numerical execution retains its existing theory-work
+currency and cleanup owner, including when an original-unit callback fails.
+
+Factor-to-polynomial preparation shares one latched containing encoding scope across
+preflight, factor installation, declared domain rows and native snapshot capture.
+A transient cancellation discards the private projection. Installation failure and
+missing conditions cannot publish a prefix or restart with a renewed allowance.
+Choosing the smaller finite member or hole traversal avoids scanning a declared
+interval merely to preserve its membership constraints.

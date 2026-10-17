@@ -5,9 +5,10 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
@@ -125,11 +126,13 @@ class QuadraticSourceWitnessTest {
 
     @Test
     fun `native integer checking should keep interleaved original numeric coordinates`() {
-        val source = assertIs<SmtLibInput.NonlinearInteger>(
-            SmtLibAdmission.parse(
-                "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n)))",
-            ),
-        ).problem
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n)))",
+            allowIntegers = true,
+        ).let {
+            NonlinearIntegerProblem(it.formula, it.realCount, it.boolCount,
+                it.intVarNames, it.realVarNames, it.boolVarNames, smtLibSemantics.resolve())
+        }
         val root = AlgebraicArithmetic().roots(
             RationalPolynomial(
                 listOf(BigFraction.ofLong(-2), BigFraction.ZERO, BigFraction.ONE),
@@ -149,11 +152,13 @@ class QuadraticSourceWitnessTest {
 
     @Test
     fun `native integer checking should reject a wrong original integer coordinate`() {
-        val source = assertIs<SmtLibInput.NonlinearInteger>(
-            SmtLibAdmission.parse(
-                "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n)))",
-            ),
-        ).problem
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n)))",
+            allowIntegers = true,
+        ).let {
+            NonlinearIntegerProblem(it.formula, it.realCount, it.boolCount,
+                it.intVarNames, it.realVarNames, it.boolVarNames, smtLibSemantics.resolve())
+        }
         val point = Sample(
             booleanArrayOf(),
             longArrayOf(2),
@@ -173,12 +178,14 @@ class QuadraticSourceWitnessTest {
 
     @Test
     fun `native integer producers should publish their original wide point and exact value`() {
-        val source = assertIs<SmtLibInput.NonlinearInteger>(
-            SmtLibAdmission.parse(
-                "(declare-const n Int) (declare-const x Real) " +
-                    "(assert (= n 9223372036854775808)) (assert (= (* x x) 2))",
-            ),
-        ).problem
+        val source = SmtLibPolynomial.parse(
+            "(declare-const n Int) (declare-const x Real) " +
+                "(assert (= n 9223372036854775808)) (assert (= (* x x) 2))",
+            allowIntegers = true,
+        ).let {
+            NonlinearIntegerProblem(it.formula, it.realCount, it.boolCount,
+                it.intVarNames, it.realVarNames, it.boolVarNames, smtLibSemantics.resolve())
+        }
         val request = source.pipelineRequest()
         val objective = QuadraticObjectiveSpec(
             listOf(

@@ -13,12 +13,14 @@ private val FLOAT_LINEAR_NAMES = setOf(
     "float_abs", "float_min", "float_max", "array_float_element",
 )
 
-internal fun FlatZincCompiler.selectFloatRepresentations(): Map<String, FloatRepresentation> {
+internal fun FlatZincCompiler.selectFloatRepresentations(
+    exact: Boolean = exactFloats,
+): Map<String, FloatRepresentation> {
     val hasFloatColumns = model.varDecls.any { it.isVar && it.type.hasFloats() }
-    val hasExactSelection = exactFloats && model.constraints.any { it.name == "array_float_element" }
+    val hasExactSelection = exact && model.constraints.any { it.name == "array_float_element" }
     if (!hasFloatColumns && !hasExactSelection) return emptyMap()
     val declarations = floatPlanningDeclarations()
-    return FloatChoicePlanner(declarations, exactFloats, floatChoiceLimit).select()
+    return FloatChoicePlanner(declarations, exact, floatChoiceLimit).select()
 }
 
 private fun FznType.hasFloats(): Boolean = when (this) {

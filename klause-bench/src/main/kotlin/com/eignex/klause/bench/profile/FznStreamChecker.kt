@@ -6,17 +6,17 @@ import com.eignex.klause.bench.metric.MiniZincSourceValidation
 import com.eignex.klause.bench.metric.SourceValidation
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.Base64
+import java.util.zip.GZIPInputStream
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 
 internal object FznStreamChecker {
     @Suppress("TooGenericExceptionCaught")
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size == 1) { "Supply a base64 JSON array of captured FlatZinc records" }
-        val bytes = Base64.getDecoder().decode(args.single())
+        val bytes = decodeRecords(args)
         val records = Json.decodeFromString<List<CapturedStreamRecord>>(bytes.toString(Charsets.UTF_8))
         require(records.isNotEmpty())
         val output = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
@@ -37,6 +37,22 @@ internal object FznStreamChecker {
         }
     }
 
+    internal fun decodeRecords(args: Array<String>): ByteArray {
+        if (args.size == 1) return Base64.getDecoder().decode(args.single())
+        val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
+        require(args.size == 2 && options.keys == setOf("gzip64", "sha256")) {
+            "Supply a base64 record array or gzip64=<base64 gzip bytes> and sha256=<expanded digest>"
+        }
+        val encoded = options.getValue("gzip64")
+        require(encoded.length <= 96 * 1024) { "Inline compressed records are oversized" }
+        val compressed = Base64.getDecoder().decode(encoded)
+        val bytes = GZIPInputStream(compressed.inputStream()).use { it.readNBytes(64 * 1024 * 1024 + 1) }
+        require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256")) {
+            "Record size or identity differs"
+        }
+        return bytes
+    }
+
     fun check(source: String, output: String, interrupted: Boolean, minimumWitnesses: Int): List<SourceValidation> {
         require(minimumWitnesses > 0)
         require(!interrupted || output.lineSequence().none {
@@ -52,29 +68,43 @@ internal object FznStreamChecker {
         require(sense != null || Regex("\\bsatisfy\\s*$").containsMatchIn(solve)) { "Unsupported solve directive" }
         val costs = ArrayList<ExactObjective?>()
         val checked = publications.map { publication ->
+            val exactCoordinates = MiniZincSourceValidation.exactCoordinates(publication + "----------")
             val costLines = publication.lineSequence().filter { it.startsWith("% objective=") }.toList()
             val helperCosts = Regex("(?m)^\\s*_objective\\s*=\\s*([^;]+);\\s*$").findAll(publication)
                 .map { it.groupValues[1].trim() }.toList()
-            require(costLines.size <= 1 && helperCosts.size <= 1) { "FlatZinc publication repeats its cost" }
+            val exactCosts = Regex("(?m)^\\s*_objective\\s*=\\s*([^;]+);\\s*$")
+                .findAll(exactCoordinates.orEmpty()).map { it.groupValues[1].trim() }.toList()
+            require(costLines.size <= 1 && helperCosts.size <= 1 && exactCosts.size <= 1) {
+                "FlatZinc publication repeats its cost"
+            }
             val commentCost = costLines.singleOrNull()?.substringAfter('=')
             val helperCost = helperCosts.singleOrNull()
+            val exactCost = exactCosts.singleOrNull()
             val cost = if (sense != null) {
-                requireNotNull(commentCost ?: helperCost) { "FlatZinc publication requires its exact cost" }
+                requireNotNull(exactCost ?: commentCost ?: helperCost) {
+                    "FlatZinc publication requires its exact cost"
+                }
             } else {
-                require(commentCost == null && helperCost == null) {
+                require(commentCost == null && helperCost == null && exactCost == null) {
                     "Satisfaction publication carries an objective cost"
                 }
                 null
             }
-            if (commentCost != null && helperCost != null) {
-                val commentValue = requireNotNull(ExactObjective.parse(commentCost))
-                val helperValue = requireNotNull(ExactObjective.parse(helperCost))
-                require(commentValue.compareTo(helperValue) == 0) {
+            val value = cost?.let { requireNotNull(ExactObjective.parse(it)) }
+            if (commentCost != null) {
+                require(requireNotNull(value).compareTo(requireNotNull(ExactObjective.parse(commentCost))) == 0) {
                     "Conflicting published FlatZinc costs"
                 }
             }
-            costs.add(cost?.let(ExactObjective::parse))
-            val coordinates = MiniZincSourceValidation.exactCoordinates(publication + "----------")
+            if (helperCost != null) {
+                val helperValue = requireNotNull(ExactObjective.parse(helperCost))
+                require(requireNotNull(value).compareTo(helperValue) == 0 ||
+                    (exactCost != null && value.approximate()?.let { it == helperCost.toDoubleOrNull() } == true)) {
+                    "Conflicting published FlatZinc costs"
+                }
+            }
+            costs.add(value)
+            val coordinates = exactCoordinates
                 ?: MiniZincSourceValidation.candidate(publication + "----------")
                 ?: error("FlatZinc publication has no complete coordinates")
             ExactFlatZincValidation.inspect(source, coordinates, cost)

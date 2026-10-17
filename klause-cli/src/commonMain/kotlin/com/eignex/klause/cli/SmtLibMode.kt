@@ -1,7 +1,6 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
@@ -10,7 +9,6 @@ import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
-import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.symbolicRealValue
 import com.eignex.klause.solver.result.LinearOptimizationResult
@@ -21,6 +19,7 @@ import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
 import com.eignex.klause.util.unaryMinus
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.TimeSource
 
 /**
@@ -44,124 +43,43 @@ internal object SmtLibMode : CliMode {
             latestSourceObjective = null
             val admissionStart = TimeSource.Monotonic.markNow()
             val stop = Cancellation { common.deadlineAtMs?.let { nowMillis() >= it } == true }
-            val admitted = SmtLibAdmission.parse(
-                { openFileSource(path) },
-                settings = config.problemSettings(),
-                cancellation = stop,
-                semanticOverrides = overrides,
-            )
-            val parsed = when (admitted) {
-                is SmtLibInput.Linear -> admitted.problem
-
-                is SmtLibInput.Polynomial -> {
-                    val source = admitted.problem
-                    val bools = source.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
-                    val reals = source.realVarNames.mapKeys { smtSourceSymbol(it.key) }
-                    return attachedSourceSolvable(
-                        SourceAttachment(source, config.problemSettings()),
-                        common,
-                        { assignment -> renderOpenTheoryModel(emptyMap(), bools, reals, assignment) },
-                        admissionStart.elapsedNow().inWholeMilliseconds,
-                    )
-                }
-
-                is SmtLibInput.NonlinearInteger -> {
-                    val source = admitted.problem
-                    val ints = source.intVarNames.mapKeys { smtSourceSymbol(it.key) }
-                    val bools = source.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
-                    val reals = source.realVarNames.mapKeys { smtSourceSymbol(it.key) }
-                    return attachedSourceSolvable(
-                        SourceAttachment(source, config.problemSettings()),
-                        common,
-                        { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
-                        admissionStart.elapsedNow().inWholeMilliseconds,
-                    )
-                }
-
-                is SmtLibInput.Transcendental -> {
-                    val source = admitted.problem
-                    val ints = source.intVarNames.mapKeys { smtSourceSymbol(it.key) }
-                    val bools = source.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
-                    val reals = source.realVarNames.mapKeys { smtSourceSymbol(it.key) }
-                    return attachedSourceSolvable(
-                        SourceAttachment(source, config.problemSettings()),
-                        common,
-                        { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
-                        admissionStart.elapsedNow().inWholeMilliseconds,
-                    )
-                }
-
-                is SmtLibInput.Quadratic -> {
-                    return quadraticSmtSolvable(admitted, common, admissionStart.elapsedNow().inWholeMilliseconds)
-                }
-
-                SmtLibInput.Interrupted -> return interruptedSolvable(
+            val parsed = try {
+                SmtLib.parse(
+                    { openFileSource(path) },
+                    settings = config.problemSettings(),
+                    cancellation = stop,
+                    semanticOverrides = overrides,
+                )
+            } catch (_: CancellationException) {
+                return interruptedSolvable(
                     if (stop()) TerminationReason.Timeout else TerminationReason.Cancelled,
                     admissionStart.elapsedNow().inWholeMilliseconds,
                 )
             }
-            cliLogger(common.verbose).v {
-                "parsed ${fileName(path)}: bool=${parsed.model.numBoolVars} int=${parsed.model.numIntVars} " +
-                    "real=${parsed.model.numRealVars} factors=${parsed.model.factors.size}"
-            }
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
-            val minimizedObjective = parsed.objective?.toLinearObjective()
-            val maximize = parsed.sense == ObjectiveSense.MAXIMIZE
-            val objective = if (maximize) minimizedObjective?.negated() else minimizedObjective
-            val render: (Sample) -> String = { sample ->
-                latestSourceObjective = objective?.evaluateExact(sample)
-                renderModel(ints, bools, reals, sample)
+            cliLogger(common.verbose).v {
+                "parsed ${fileName(path)}: bool=${bools.size} int=${ints.size} real=${reals.size}"
             }
-            return sourceSolvable(
-                parsed.model,
-                minimizedObjective,
-                maximize,
+            val objective = parsed.objective?.toLinearObjective()
+            return attachedSourceSolvable(
+                parsed.source,
                 common,
-                render,
                 { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
+                admissionStart.elapsedNow().inWholeMilliseconds,
+                parsed.quadraticObjective,
+                parsed.sense,
+                objective = objective,
+                renderFinite = { sample ->
+                    latestSourceObjective = objective?.evaluateExact(sample)
+                    renderModel(ints, bools, reals, sample)
+                },
             )
         }
 
         override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput { latestSourceObjective }
     }
-}
-
-private fun quadraticSmtSolvable(
-    input: SmtLibInput.Quadratic,
-    common: CommonOptions,
-    admissionElapsedMs: Long,
-): Solvable {
-    val attachment: SourceAttachment
-    val ints: Map<String, Int>
-    val bools: Map<String, Int>
-    val reals: Map<String, Int>
-    when (val source = input.source) {
-        is SmtLibInput.Polynomial -> {
-            attachment = SourceAttachment(source.problem, common.config.problemSettings())
-            ints = emptyMap()
-            bools = source.problem.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
-            reals = source.problem.realVarNames.mapKeys { smtSourceSymbol(it.key) }
-        }
-
-        is SmtLibInput.NonlinearInteger -> {
-            attachment = SourceAttachment(source.problem, common.config.problemSettings())
-            ints = source.problem.intVarNames.mapKeys { smtSourceSymbol(it.key) }
-            bools = source.problem.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
-            reals = source.problem.realVarNames.mapKeys { smtSourceSymbol(it.key) }
-        }
-
-        else -> error("quadratic SMT source snapshot is invalid")
-    }
-    return attachedSourceSolvable(
-        attachment,
-        common,
-        { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
-        admissionElapsedMs,
-        input.objective,
-        input.sense,
-    )
 }
 
 /** Render an SMT-LIB `(get-model)`-style model: one `(define-fun name () Sort value)` per
@@ -230,6 +148,7 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
 
     override val commentPrefix: String = ";"
     override val streamObjective: Boolean = true
+    override val streamFiniteWitness: Boolean = true
     override val objectivePrefix: String = "; objective="
 
     override fun begin(optimize: Boolean, maximize: Boolean) {

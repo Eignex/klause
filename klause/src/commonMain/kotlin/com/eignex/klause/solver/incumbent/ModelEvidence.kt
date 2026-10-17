@@ -112,7 +112,7 @@ internal class EvidenceCertificate private constructor(
                 completion.evidence?.let { it.engineScope != completion.scope } == true
             ) return null
             if ((kind == EvidenceKind.Bound || kind == EvidenceKind.Unbounded) &&
-                completion.scope?.objective == null && completion.invocation?.sourceObjective == null
+                completion.scope?.objective == null && completion.invocation?.hasSourceObjective != true
             ) {
                 return null
             }

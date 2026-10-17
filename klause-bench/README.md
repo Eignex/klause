@@ -47,6 +47,24 @@ forwarded to the bench JVM. Keep the CLI distribution and runtime fixed during a
 | `corpus status`, `corpus gc`, `corpus compress [path]` | Inspect, evict or compress fetched collections |
 | `mine [by=config\|suite\|family\|format\|category\|kind] <cases.json> ...` | Report portfolio holder share, set cover, work and rewards; retain quarantined cases |
 
+`com.eignex.klause.bench.profile.LinearSourceCapture` records direct-library
+`LinearSourceProblem` invocations. Supply one base64 JSON array with original MPS
+bytes and SHA-256, declaration-order rational variables/rows/objective, tolerance,
+engine and limits. Fractions use integer or `numerator/denominator` strings.
+The profile retains input/runtime/build identities, original bytes, every checked
+source point, original objective value and separate native/source conclusions.
+Optional `nodeLimit` supplies the finite invocation's shared decision/move allowance;
+`work` retains its arithmetic meaning. `openBoundProof=false` declines only optional
+bound closure. Measurements retain these controls, original/working coordinate
+counts and the actual scheduled worker labels and segments.
+`cases.json` can be replayed by `SourceRecordCheck` against those original bytes.
+Source replay installs the Python venv package on Linux; macOS lab hosts use their
+existing `python3` venv support. Checker dependencies remain isolated in the job's
+captured environment. The supplied neutral descriptor is a caller construction, not a certified MPS
+translation. Point/reference agreement does not verify exported native certificates
+or establish accepted-set completeness. Run through the maintained lab client at
+a pushed revision with `host=auto`; retain the actual host/runtime provenance.
+
 ## Selection and named sets
 
 `sets/<name>.txt` fixes membership as one `<suite>/<problem>` identity per line,
@@ -402,8 +420,31 @@ these diagnostic timings; they are not ordinary CLI throughput measurements.
 `bench.profile.EncoderProviderProfile` runs caller-supplied factor-admitted SMT files
 through normal source routing with default and private equivalent linear encoders.
 Pass `inputs=<comma-separated repository-relative or absolute paths> repeats=N warmups=N seed=N`.
-`parser=admission` requires linear factor admission; `parser=factor` exercises the
-existing library SMT factor facade, including representable bounded mixed products.
+The profile uses `SmtLib.parse` and shared source setup. The `parser=admission`
+and `parser=factor` options are aliases for that same source entry. Mechanism
+probes require an original factor source, including representable bounded mixed products.
+`entry=source engine=cp|ls` instead calls the public source-strategy satisfaction
+facade with the same selected providers, containing token and seed. This mode rejects
+objectives and records its actual native backend beside the requested entry and engine;
+`entry=pipeline engine=cp` retains the direct pipeline comparison. Compare matched
+revisions and check the recorded backend to distinguish finite and open controls.
+`entry=source-optimize engine=cp|ls` calls the public affine source optimizer with
+the original objective and direction. Both source facade entries accept `nodeLimit=N`
+for one shared decision/move ledger. `binding=selected` supplies it through the native
+strategy and common theory controls; `binding=common` supplies it through only the
+common controls. Captures record the actual ledger limit and spend, open decisions
+and native backend. Captures retain the native optimization verdict, minimized
+exact incumbent value and interruption cause separately from the rendered SMT point.
+The SMT replay checks points and objectives; global optimum, ray and refutation
+claims require separate original-source checking. Optimization captures retain each
+encoder verdict and a per-source comparison, including UNKNOWN differences caused
+by admission or bounded work; verdict equality supplies no proof verification.
+The finite in-process SMT adapter checks its finite factor-source precondition
+before preparing lazily through shared setup. It disables optional bound-closing
+deductions; other sources use the CLI adapter.
+Source preparation declines remain explicit diagnostic UNKNOWN records with no
+native execution work or optimization certificate. Source preparation refutations
+are labelled separately from a native optimization result.
 The original source bytes remain the checking authority. Constant nonzero integer
 `div`/`mod` are checked with their original Euclidean SMT semantics; variable and zero
 divisors decline independent checking. Each input also interrupts
@@ -416,8 +457,8 @@ encoding. Modes alternate in a measured JVM with one active processor, Serial GC
 source/output hashes, installation counts, charged native work, elapsed construction
 and execution time, source revision and runtime/classpath hashes. Each SAT stream is
 independently checked against the original source after measurement; UNSAT agreement
-supplies no independent proof verification. Run the committed profile on AWS through
-the documented lab client. These component/provider measurements include preparation
+supplies no independent proof verification. Run the committed profile with `host=auto`
+through the documented lab client and wait for capacity. These component/provider measurements include preparation
 and differ from ordinary whole-CLI timings; pair them with matched source-checked CLI
 controls before claiming end-to-end parity.
 
@@ -904,6 +945,12 @@ To capture several cases on one provisioned instance, supply only
 and creates numbered directories for each case. A failed case records `failure.json`
 and does not skip later planned cases.
 
+`smoke-corpus/real-finite-domains-v1` supplies sparse disconnected sets, finite products
+and aliases, original Boolean conditions, signed zeros and singleton membership.
+The six satisfiable inputs support `checkFzn=true` original-source witness checks.
+`empty-intersection.fzn` is a separate contradictory-source observation; absence of
+a witness does not independently certify its refutation.
+
 `planned.json` records the requested input and settings before launch. `capture.json`
 records exit, marker count, interruption trigger, reader failure, and output hashes;
 `arrivals.jsonl` preserves all observed lines, including terminal metadata. Marker counts
@@ -934,7 +981,10 @@ later cases still capture output and record their unavailable checker outcome.
 flattened-text checker and records its `valid`, `invalid`, or `unknown` outcome in
 `source-check-fzn.json`. Satisfaction publications retain their source assertions
 without an objective cost; optimization publications require exact cost consistency
-and strict improvement in the original direction. It uses authoritative coordinate comments when supplied and
+and strict improvement in the original direction. An exact `_objective` coordinate
+annotation supplies the cost when its display is rounded; the displayed helper must
+agree with its binary64 approximation, and a separate objective comment must agree
+exactly. It uses authoritative coordinate comments when supplied and
 checks binary integer/float extrema, integer array extrema, and constant or variable
 integer/Boolean/set array selection directly from the original predicates. Integer
 `all_different_int` compares exact integral values, including values beyond binary64 precision.
@@ -983,6 +1033,10 @@ output, checker and runtime hashes retain the same replay custody.
 array for FlatZinc output. It retains original bytes and source-check results,
 including failures, without invoking the CLI. These replays check witness and
 objective semantics; terminal proof claims require their separate evidence checks.
+For larger captures, pass `gzip64=<base64 gzip bytes>` and `sha256=<expanded digest>`
+instead of the single raw base64 argument. The compressed envelope preserves the exact
+record bytes while keeping the launch command small. Its inline encoding is limited
+to 96 KiB and expansion to 64 MiB, matching the saved-source bundle transport limits.
 
 ### SMT reference records
 
@@ -1309,8 +1363,8 @@ python3 klause-bench/tools/verify_source_results.py /path/to/cases.json \
   --output /path/to/source-checks.json
 ```
 
-`bench.profile.SourceRecordCheck` runs this verifier on saved records through an
-AWS lab profile without rerunning the solver. Pass `bundle=<https URL>` and
+`bench.profile.SourceRecordCheck` runs this verifier on saved records through a
+lab analysis profile without rerunning the solver. Pass `bundle=<https URL>` and
 `sha256=<compressed SHA-256>` for a gzip JSON object containing `cases` (the case
 array) and `sources` (original source SHA-256 keys with base64 original bytes).
 For small saved-record bundles, `input64=<base64 gzip bytes>` replaces `bundle`;
@@ -1332,6 +1386,8 @@ With `catalog=true`, missing sources are resolved through the maintained corpus
 catalog on the analysis host and must match each record's original model hash.
 This permits record-only bundles for fetched collections without redistributing
 their inputs. Resolved suite/name identities are retained in `catalog-sources.json`.
+It first creates a private environment with `python3 -m venv`. If creation fails,
+it attempts the Linux `python3-venv` bootstrap through `sudo apt-get` and retries.
 It checks bundle/source identities, provisions the pinned checker dependencies,
 and retains checker logs, versions and a checked prefix on failure under `$OUT`.
 Original unknown records retain their no-claim outcome; reference agreement does
@@ -1387,6 +1443,15 @@ without rediscovering it through a satisfiability search. Strict improvement exc
 still requires its independent source query.
 Tolerance acceptance cannot justify either optimum or infeasibility. Unknown
 records make no proof claim. Unbounded claims and unsupported constructs decline.
+Records marked `stats.sourcePolicy=captured-linear-source` carry accepted-source
+claims and require case-level `sourceTolerance` with `absolute` and `relative`
+rational text from the captured request. Their MPS infeasibility and strict-improvement
+queries use the same configured tolerance-accepted constraints as point checking;
+exact requests require zero metadata and use the nominal source. Reports identify
+this scope and policy in `sourceQuerySemantics` and `sourceTolerance`, and
+cached nominal checks cannot supply an accepted-source proof. Other MPS records
+retain their nominal-source proof scope. These checks establish individual source
+claims, without verifying exported native certificates or general completeness.
 An explicit default-MPS `tolerance-optimum` retains its source point, objective
 and scaled-tolerance checks separately. It receives no exact-source optimality
 credit; native tolerance-certificate verification is unavailable from saved records.
@@ -1398,14 +1463,16 @@ function/sort declarations are rejected rather than guessed. The verifier is
 independent of paired timing analysis and Klause's internal certificates.
 
 [verify_boolean_source_results.py](tools/verify_boolean_source_results.py) checks
-`DIMACS`, `WCNF` and linear `OPB`/WBO records against original source bytes in that same
+`DIMACS`, `WCNF` and polynomial `OPB`/WBO records against original source bytes in that same
 hash-named directory. It accepts complete signed-literal assignments, OPB variable
 names and WCNF bitstrings. Clauses, hard weights, Boolean integrality and integer
 objectives use exact arithmetic. WBO checks evaluate weighted soft-relation
 violations and enforce the strict soft-top ceiling on that violation cost. UTF-8
 comments preserve original byte hashes.
-Linear OPB bodies can omit the variable-count comment; their range is inferred
-from referenced indices. Nonlinear or unsupported syntax is declined.
+OPB products use Boolean conjunction, including complemented and repeated literals,
+in constraints, objectives and weighted soft relations. OPB bodies can omit the
+variable-count comment; their range is inferred from every product literal.
+Malformed terms and unsupported syntax are declined.
 
 ```sh
 python3 klause-bench/tools/verify_boolean_source_results.py /path/to/cases.json \
@@ -1423,7 +1490,7 @@ only a completed independent check; an undecided floor uses `boundCheck=unknown`
 Floor telemetry and floor checking do not establish an optimum without a matching witness.
 Errors are recorded per case and make the command exit unsuccessfully. The checker
 supports JSON, gzip and xz inputs and preserves cases with no claimed verdict.
-Pass `checker=boolean` to the saved-record `SourceRecordCheck` AWS profile to run
+Pass `checker=boolean` to the saved-record `SourceRecordCheck` lab profile to run
 this checker against the same hash-pinned `cases`/`sources` bundle. Its retained
 source checks, runtime/package versions, checker hashes and process log distinguish
 verified witnesses/objectives, independently checked proofs and unknown proof queries.
@@ -1454,6 +1521,10 @@ symbolic comparisons report unavailable; they are never rounded or accepted by
 residual. This checker does not verify refutations, optimization claims or exported
 proofs. Preserve unknown/decline records and check cancellation charges and portfolio
 arm segments separately from mathematical witness acceptance.
+
+The exact ground function checker retains lexical helper closures and parallel
+`let` bindings. Function `distinct` checks exact operand values and repeated roles;
+uncertified symbolic comparisons remain unavailable.
 
 ### Ground witness profile
 
@@ -1507,6 +1578,14 @@ including native numeric absolute-value terms.
 It reconstructs rational coordinates and `root-obj` algebraic coordinates using the
 pinned Z3 dependency, pins every source variable, and requires every
 original assertion and Boolean query assumption to evaluate exactly to true.
+Source serialization quotes identifiers beginning with a minus sign and digit,
+preserving their symbol identity for dependency parsing. Quoted numeral symbols
+remain distinct from numeral literals. Original source bytes retain their recorded
+hash; model-coordinate numeral decoding uses its separate scalar grammar.
+Constant positive integer powers are serialized as shared multiplication expressions,
+preserving integer helper result sorts. Fresh lexical bindings avoid source names;
+zero powers retain the dependency's partial-power interpretation. Original source
+hashes remain unchanged.
 Algebraic coordinates use integer defining polynomials and one-based distinct
 ordered real-root indices. Approximate decimal coordinates do not establish exact
 irrational equalities. Missing, duplicate, unknown or sort-mismatched coordinates
@@ -2369,6 +2448,39 @@ source refutation, independent witness acceptance or optimization claim.
 
 ### Saved JVM compilation census
 
+`bench.profile.JvmDeclarationBindings` accepts `catalog=`, `catalog-sha256=`,
+`declarations=` and `declarations-sha256=` HTTPS inputs. Its input catalog has
+`schema: 1` and an `inputs` array. Each input supplies a unique `id`, `manifest`,
+`manifestSha256`, `archive`, `rowsMember`, `completionMember` and `inventoryMember`.
+These identify complete published installed-JAR or runtime-image metadata archives.
+Every archive and member is authenticated before any declaration row is read,
+including unselected members. Completion and inventory headers stay verbatim;
+failed declarations and inconsistent inventory counts prevent completion.
+
+The declaration specification has `schema: 1` and a `sources` array. Each source
+supplies a unique `id`, original source `path` and `sha256`, `sourceFile` basename,
+explicit `packages` and a `members` array of unique `id`/`name` queries. Additional
+source headers, phases and obligations stay verbatim. Matching retains every class
+with that source-file attribute in those packages, including all unqueried/private
+members, generated classes and alternate multi-release entries. Package matching
+does not select a class prefix or a successful observed compilation. Rows outside
+the requested files retain original input/entry/row identities and source attributes.
+Every same-named overload remains a candidate for each requested source declaration;
+source types are not erased or guessed. Mangled/generated and accessor names remain
+distinct candidates, absent members stay unavailable, and source-debug/line metadata
+is opaque. Alternative declarations and multiple source-file attributes stay explicit.
+
+This is a declaration concordance, not an ordinary-phase mapping or loaded-source,
+executed-path, inlining, physical-root or cost proof. Source hashes in the supplied
+specification are annotations, not proof of a class's source. Full input archives
+remain recoverable by their public identities. Run this saved-metadata reader on a
+lab worker; it invokes no solver, checker, original JVM or recording exporter.
+Limits are eight archives totalling 2 GiB compressed, 16 GiB expanded per archive,
+100,000 members per archive, 2 GiB staged metadata, 512 MiB per metadata stream,
+100,000 class rows per input, 16 MiB per JSON document/row, 4,096 source entries,
+10,000 source member queries and a 64 MiB complete report. A limit decline is
+negative, and never permits a smaller successful subset or a raised bound.
+
 `com.eignex.klause.bench.profile.JvmCompilationCohortReview` accepts `manifest=`,
 `manifest-sha256=` and `archive=` HTTPS inputs. It authenticates the complete
 original archive and every member before decoding any recording. It extracts
@@ -2712,11 +2824,53 @@ JVM with `-XX:ActiveProcessorCount` and its own `objective-probe.jfr`; the lab's
 parent recording covers the wrapper. Settings record the actual execution JVM.
 `schema=<JSON SchemaDef>` selects the compiled/schema path for the same original
 polynomial real sources. Declaration names must agree; real coordinates use public
-compiled source IDs and float objective handles. Finite-grid floats, integer schema
-declarations absent from the original source and aliased named real coordinates
-decline. The captured schema bytes
+compiled source IDs and float objective handles. Preparation and capture use the
+canonical source Problem, including floats with a private compatibility bucket.
+Integer schema declarations absent from the original source and aliased named real
+coordinates decline. The captured schema bytes
 and hash accompany exact named original-source results; compiler auxiliaries are
 excluded from the original witness map.
+With `entry=source` and `engines=BACKTRACK,LOCAL_SEARCH`, the compiled path uses the
+public source strategy factories. Its affine objective is assembled through each
+public helper's actual native unit coordinate and copied onto a captured helper
+basis. A private float can use a separate value carrier; its helper weights must
+fit Long exactly. `sourceObjective` retains the actual helper's exact carrier for
+result capture; the quadratic arm uses the
+same canonical typed objective. Records identify `compiled-source-strategy` and
+retain the existing independent original-source checks. `entry=setup` is the default
+shared setup probe. Source result capture uses the exact quadratic carrier for both
+source strategy arms. Checker provisioning first uses the host's existing Python
+venv support; the Linux package bootstrap runs only when environment creation fails.
+Dependencies remain inside the owned job environment.
+Source strategy records also check the original sample frame and public FloatHandle
+decoders, including optional presence-first decoding. `pinAbsent=false` supplies the
+schema compiler's absent-value semantic override and records its effective value.
+
+Without a schema, `entry=source` uses the admitted factor source with the public
+Problem strategy factories and default source semantics. Native formula inputs
+decline. `source-strategy-v1` contains open integer affine minimization and bound
+refutation controls. `requireIncumbent=false` permits missing points for refuted or
+incomplete records; the independent checker still validates every reported point,
+bound and refutation. The default requires an incumbent for every record. Checker
+runtime and dependency versions accompany the source checks.
+
+The `schema-source-floats-v1` inputs exercise optional x in [-1,1] with two requested
+buckets, y in [0,4], the unguarded product y=(x+1)*(x+1) and cost 3*x+5*y+7. Use its
+`absent` or `present` source directory with the matching schema file. Absence has
+x=0, y=1 and cost 12, including an intermediate value outside its compatibility
+grid. Presence retains extrema 4 and 30. Use `absent-unpinned` with the absent schema
+and `pinAbsent=false` to leave the underlying absent value unconstrained; optional
+decoding still returns null. Every case retains its original SMT constraints for
+independent witness and bound checking. Its shifted-product absent point is outside
+both the intermediate and output compatibility grids, so that private view cannot
+provide a positive absence witness.
+
+The complementary `schema-source-floats-square-v1` inputs retain the same optional
+x with two buckets, y in [0,1], y=x*x and cost 3*x+y+7. The absent source point
+x=0, y=0 has cost 7; the optional value carrier must represent x=0 outside the
+present grid {-1,1}. Present and absent-unpinned extrema are 5 and 11. Use the
+matching schema and source directories, including `pinAbsent=false` for the
+unpinned source, to qualify positive public-helper and decoder behavior.
 The source objective must be affine, with integer Boolean weights/constant fitting
 Long and real coefficients exactly representable in binary64. Other objectives
 decline rather than acquire rounded coefficients. Each execution gets fresh state,

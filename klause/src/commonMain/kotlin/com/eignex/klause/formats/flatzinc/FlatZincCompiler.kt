@@ -9,11 +9,11 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FloatSemantics
-import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.FloatBucketing
@@ -42,7 +42,7 @@ internal class FlatZincCompiler(
     private val settings: ProblemSettings = KlauseConfig.current.problemSettings(),
     internal val floatChoiceLimit: Int = DEFAULT_FLOAT_CHOICE_LIMIT,
     internal val booleanZeroSumClauseLimit: Int = 32_768,
-    private val forFloatPlanning: Boolean = false,
+    internal val forFloatPlanning: Boolean = false,
     private val semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ) : CnfLowering {
     internal val sourceSemantics = FlatZincSemantics(
@@ -64,8 +64,8 @@ internal class FlatZincCompiler(
     internal val floatScale = gridSemantics.linearScale
     internal val unboundedIntLo = integerSemantics.lower ?: Long.MIN_VALUE
     internal val unboundedIntHi = integerSemantics.upper ?: Long.MAX_VALUE
-    internal val unboundedFloatLo = checkNotNull(gridSemantics.unrangedBounds.lower).gridFloat()
-    internal val unboundedFloatHi = checkNotNull(gridSemantics.unrangedBounds.upper).gridFloat()
+    internal val unboundedFloatLo: Double get() = checkNotNull(gridSemantics.unrangedBounds.lower).gridFloat()
+    internal val unboundedFloatHi: Double get() = checkNotNull(gridSemantics.unrangedBounds.upper).gridFloat()
     internal val exactFloats = sourceSemantics.effective.floats == FloatSemantics.Continuous
     private val openIntegerLower = IntHashSet()
     private val openIntegerUpper = IntHashSet()
@@ -75,11 +75,6 @@ internal class FlatZincCompiler(
         require(floatScale > 0) { "floatScale must be positive" }
         require(booleanZeroSumClauseLimit >= 0) { "booleanZeroSumClauseLimit must be nonnegative" }
         require(floatChoiceLimit > 0) { "floatChoiceLimit must be positive" }
-        if (!this.exactFloats) {
-            require(
-                this.unboundedFloatLo <= this.unboundedFloatHi,
-            ) { "unbounded float search bounds must be finite and ordered" }
-        }
     }
 
     internal val params = HashMap<String, ParamValue>()
@@ -98,6 +93,8 @@ internal class FlatZincCompiler(
     override var trueLitCache: Int = -1
 
     internal var lpOnlyFloats: Set<String> = emptySet()
+    private var declaredRealCount: Int = 0
+    private val finiteRepresentations by lazy { selectFloatRepresentations(exact = false) }
     internal val realLo = ArrayList<Double>()
     internal val realHi = ArrayList<Double>()
     internal val finiteFloatChoices = HashMap<Int, DoubleArray>()
@@ -117,9 +114,10 @@ internal class FlatZincCompiler(
     internal val setVarsByName = LinkedHashMap<String, SetVarLayout>()
 
     internal fun compile(): FlatZincProgram {
-        floatRepresentations = selectFloatRepresentations()
-        lpOnlyFloats = floatRepresentations.filterValues { !it.approximate }.keys
         processDeclarations()
+        declaredRealCount = realLo.size
+        lpOnlyFloats = floatVars.keys.toSet()
+        floatRepresentations = floatVars.mapValues { FloatRepresentation(it.value.varId, null) }
         integerFloatImages.putAll(collectIntegerFloatImages(onlyRealColumns = true))
         collectAffineFloatImages()
         if (lpOnlyFloats.isNotEmpty()) {
@@ -140,14 +138,14 @@ internal class FlatZincCompiler(
         forLocalSearch = forLocalSearch,
         unboundedIntLo = unboundedIntLo,
         unboundedIntHi = unboundedIntHi,
-        unboundedFloatLo = unboundedFloatLo,
-        unboundedFloatHi = unboundedFloatHi,
+        unboundedFloatLo = DEFAULT_UNBOUNDED_FLOAT_LO,
+        unboundedFloatHi = DEFAULT_UNBOUNDED_FLOAT_HI,
         exactFloats = exactFloats,
         settings = settings,
         floatChoiceLimit = floatChoiceLimit,
         booleanZeroSumClauseLimit = booleanZeroSumClauseLimit,
         forFloatPlanning = true,
-        semanticOverrides = semanticOverrides,
+        semanticOverrides = semanticOverrides.copy(floats = sourceSemantics.effective.floats),
     ).also { it.processDeclarations() }
 
     internal fun processDeclarations() {
@@ -222,7 +220,10 @@ internal class FlatZincCompiler(
             floatRepresentations = floatRepresentations,
             semantics = sourceSemantics,
             definitionHints = definitionHints,
-        )
+        ).also { program ->
+            program.retainSource(FlatZincSourceState(program.suppliedCopy(), declaredRealCount,
+                selectLegacy = { finiteRepresentations }, projectSearch = { compileSearchAnnotation(it) }))
+        }
     }
 
     internal fun processDecl(d: FznVarDecl) {
@@ -537,20 +538,23 @@ internal class FlatZincCompiler(
     }
 
     internal fun allocOpenFloat(name: String): Int {
+        if (!forFloatPlanning) return allocFloat(name, sourceRealLower, sourceRealUpper)
         if (name in lpOnlyFloats || (forFloatPlanning && (exactFloats || hasDefaultRealBounds))) {
             return allocFloat(name, sourceRealLower, sourceRealUpper)
         }
         val lower = if (realSemantics.lower == null) unboundedFloatLo else sourceRealLower
         val upper = if (realSemantics.upper == null) unboundedFloatHi else sourceRealUpper
-        if (lower > upper) {
-            unsupportedHere("float variable `$name`: approximation window excludes its effective source bounds")
-        }
         return allocFloat(name, lower, upper).also {
             if (forFloatPlanning) floatSearchWindowIds.add(it)
         }
     }
 
-    internal fun allocFloat(name: String, lo: Double, hi: Double, lpOnly: Boolean = name in lpOnlyFloats): Int {
+    internal fun allocFloat(
+        name: String,
+        lo: Double,
+        hi: Double,
+        lpOnly: Boolean = !forFloatPlanning || name in lpOnlyFloats,
+    ): Int {
         if (lpOnly) {
             // LP-only continuous column: a real variable, absent from CP search. The linear
             // float handlers emit real rows over it; the returned id is a real var id (not an int var).

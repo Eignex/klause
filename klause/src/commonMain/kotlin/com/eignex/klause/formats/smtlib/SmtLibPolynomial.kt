@@ -3,6 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.ir.requireVariableCounts
@@ -53,6 +54,13 @@ internal class SmtLibPolynomialProblem(
     private val bools = boolVarNames.toMap()
     val realVarNames: Map<String, Int> get() = reals.toMap()
     val boolVarNames: Map<String, Int> get() = bools.toMap()
+}
+
+internal fun SmtLibPolynomialProblem.realSource(semantics: EffectiveSourceSemantics = smtLibSemantics.resolve()):
+    PolynomialRealProblem {
+    require(intVarNames.isEmpty()) { "real source contains integer declarations" }
+    return PolynomialRealProblem(formula, realCount, boolCount, sourceRealCount, sourceBoolCount,
+        realVarNames, boolVarNames, semantics)
 }
 
 internal object SmtLibPolynomial {
@@ -156,11 +164,7 @@ internal class SmtLibPolynomialCompiler(
             }
             "set-logic" -> {
                 command.polynomialSize(2)
-                if (command.polynomialAtom(1) !in setOf("QF_NRA", "QF_LRA", "QF_RDL", "ALL") &&
-                    !(allowIntegers && command.polynomialAtom(1) in setOf("QF_NIA", "QF_NIRA", "QF_LIA", "QF_LIRA"))
-                ) {
-                    smtUnsupported("unsupported polynomial logic '${command.polynomialAtom(1)}'")
-                }
+                command.polynomialName(1)
             }
             "set-info", "set-option" -> command.polynomialSize(3)
             "check-sat" -> {

@@ -21,8 +21,7 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
-import com.eignex.klause.solver.pipeline.OpenTheoryRequest
+import com.eignex.klause.solver.pipeline.NativeGridOutcome
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.LpStats
@@ -30,6 +29,7 @@ import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.time.Duration.Companion.milliseconds
 
 /*
@@ -54,11 +54,22 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
 }
 
 // Required admission observes the containing stop while retaining the shared routing work ledger.
-internal fun CommonOptions.routingPreparationCancellation(): Cancellation {
-    val meter = routingCancellation().workMeter()
-    return object : Cancellation {
-        override fun isCancelled(): Boolean = deadlineAtMs?.let { nowMillis() >= it } == true
-        override fun workMeter() = meter
+internal fun CommonOptions.routingPreparationCancellation(): RoutingPreparationScope = RoutingPreparationScope(
+    { deadlineAtMs?.let { nowMillis() >= it } == true },
+    routingCancellation().workMeter(),
+)
+
+internal class RoutingPreparationScope(
+    private val stopped: () -> Boolean,
+    private var meter: WorkMeter?,
+) : Cancellation, AutoCloseable {
+    override fun isCancelled(): Boolean = stopped()
+
+    override fun workMeter(): WorkMeter? = meter
+
+    override fun close() {
+        // Retained source invocations keep the containing stop, not the preparation ledger.
+        meter = null
     }
 }
 
@@ -189,8 +200,15 @@ internal class CommonOptions {
      */
     var lp: String? = null
 
+    var lpPricingExplicit: Boolean = false
+        private set
+
     /** `--lp-pricing POLICY`: entering-column policy for zero-objective LP solves. */
     var lpPricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT
+        set(value) {
+            field = value
+            lpPricingExplicit = true
+        }
 
     /** Raw repeatable `--param key=value` engine params; interpreted per engine (see
      *  [com.eignex.klause.solver.pipeline.EngineParams]). */
@@ -588,6 +606,8 @@ internal interface OutputProtocol {
         rendered?.let { onSolution(it, null) }
     }
     fun onLinearResult(result: LinearOptimizationResult) {}
+    fun onLinearSourceResult(result: com.eignex.klause.solver.pipeline.SourceExecutionResult) {}
+    fun onNativeGridOutcome(result: NativeGridOutcome) {}
     fun onComplete(verdict: Verdict)
     fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long)
     fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {}
@@ -608,77 +628,6 @@ internal interface OutputProtocol {
         println("%%%klause-arm: label=$arm objective=$objective$continuous time=$elapsedMs")
     }
 }
-
-/** Build an instance from a pipeline-selected complete open-theory request. */
-internal fun openTheorySolvable(
-    request: OpenTheoryRequest,
-    renderOpenTheory: (OpenTheoryAssignment) -> String,
-    routingLpStats: LpStats = LpStats(),
-    routingElapsedMs: Long = 0L,
-): Solvable = Solvable(
-    problem = null,
-    optimize = request.objective != null,
-    maximize = request.maximize,
-    lsObjective = null,
-    linearObjective = null,
-    objVarId = null,
-    definitionalSweep = null,
-    render = { error("open-theory witnesses are rendered without narrowing to Sample") },
-    objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(
-        request,
-        render = renderOpenTheory,
-    ),
-    routingLpStats = routingLpStats,
-    routingElapsedMs = routingElapsedMs,
-)
-
-/**
- * Build an open model no theory decides, for local search to look for a witness of, or incumbents for [objective] in
- * minimized form.
- */
-internal fun openLocalSearchSolvable(
-    model: Problem,
-    renderOpenTheory: (OpenTheoryAssignment) -> String,
-    routingLpStats: LpStats = LpStats(),
-    routingElapsedMs: Long = 0L,
-    objective: LinearObjective? = null,
-    maximize: Boolean = false,
-): Solvable = Solvable(
-    problem = null,
-    optimize = objective != null,
-    maximize = maximize,
-    lsObjective = null,
-    linearObjective = null,
-    objVarId = null,
-    definitionalSweep = null,
-    render = { error("open local-search witnesses are rendered without narrowing to Sample") },
-    objectiveValue = null,
-    pipeline = SolvablePipeline.OpenLocalSearch(model, renderOpenTheory, objective, maximize),
-    routingLpStats = routingLpStats,
-    routingElapsedMs = routingElapsedMs,
-)
-
-/**
- * Build an instance already decided unsatisfiable by routing, so no engine runs.
- *
- * Routing refutes over the model's genuinely open ranges rather than inside an invented box, so the
- * verdict is the model's own. Nothing here narrows to a [Sample]: there is no assignment to render.
- */
-internal fun refutedSolvable(routingLpStats: LpStats = LpStats(), routingElapsedMs: Long = 0L): Solvable = Solvable(
-    problem = null,
-    optimize = false,
-    maximize = false,
-    lsObjective = null,
-    linearObjective = null,
-    objVarId = null,
-    definitionalSweep = null,
-    render = { error("a refuted model has no assignment to render") },
-    objectiveValue = null,
-    pipeline = SolvablePipeline.Refuted,
-    routingLpStats = routingLpStats,
-    routingElapsedMs = routingElapsedMs,
-)
 
 /** Per-invocation parsing + loading + output for one front-end. Created fresh per run via
  *  [CliMode.newSession] so mode-specific flag state never leaks between invocations. */

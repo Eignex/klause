@@ -7,6 +7,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.polynomial.ceilInteger
 import com.eignex.klause.ir.NonlinearIntegerProblem
+import com.eignex.klause.ir.PolynomialDistinct
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialSelection
@@ -313,6 +314,7 @@ private fun sourceIntegerHints(formula: PolynomialRealFormula, arithmetic: Polyn
                 expressions.addLast(node.left)
                 expressions.addLast(node.right)
             }
+            is PolynomialDistinct -> expressions.addAll(node.operands)
             is PolynomialSelection -> {
                 formulas.addLast(node.condition)
                 expressions.addLast(node.whenTrue)

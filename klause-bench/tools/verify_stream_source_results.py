@@ -8,7 +8,7 @@ import re
 
 import z3
 
-from verify_nra_source_results import check_witness, exact_value, expressions, sexpr, source_formula, witness_values
+from verify_nra_source_results import check_witness, exact_value, expressions, sexpr, source_formula, source_sexprs, witness_values
 from verify_source_results import symbol
 
 
@@ -31,8 +31,7 @@ def source_objective(source):
         marker_name += '_'
     marker = z3.Real(marker_name)
     equality = z3.parse_smt2_string(
-        '\n'.join(sexpr(command) for command in declarations)
-        + '\n(assert (= ' + marker_name + ' ' + sexpr(objective[1]) + '))',
+        '\n'.join(source_sexprs(declarations + [['assert', ['=', marker_name, objective[1]]]])),
         decls={marker_name: marker},
     )[0]
     return semantic_source, variables, equality.arg(1), objective[0]

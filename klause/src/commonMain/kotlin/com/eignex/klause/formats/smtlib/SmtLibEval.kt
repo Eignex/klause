@@ -4,14 +4,12 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lowering.ALL_DIFFERENT_WITNESS_MIN_ARITY
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.WideLinComb
-import com.eignex.klause.lowering.allDifferentWindowSize
 import com.eignex.klause.lowering.constProduct
 import com.eignex.klause.lowering.isConstant
-import com.eignex.klause.lowering.reifyAllDifferentWitness
+import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.lowering.scaleByConst
 import com.eignex.klause.lowering.scaleIntComb
 import com.eignex.klause.lowering.sumIntCombs
@@ -54,6 +52,7 @@ private sealed interface Frame {
     class Combine(val node: SExpr.SList, val sort: Sort, val argc: Int) : Frame
     class MakeScope(val names: List<String>, val bools: BooleanArray, val isolated: Boolean = false) : Frame
     class RestoreBindings(val scope: Compiler.Builder.BindingScope) : Frame
+    object PromoteReal : Frame
     object PopScope : Frame
 }
 
@@ -69,8 +68,11 @@ internal fun Compiler.Builder.evalTerm(root: SExpr, sort: Sort): Res {
     work.addLast(Frame.Eval(root, sort))
 
     while (work.isNotEmpty()) {
+        sourceCancellation.polynomialSourceCheckpoint(1)
         when (val fr = work.removeLast()) {
             is Frame.PopScope -> popLetScope()
+
+            is Frame.PromoteReal -> vals.addLast(Res.R(vals.removeLast().asReal()))
 
             is Frame.RestoreBindings -> bindingScope = fr.scope
 
@@ -168,19 +170,21 @@ private fun Compiler.Builder.scheduleMacro(node: SExpr.SList, head: String, sort
     if (callArgs.size != m.params.size) {
         smtUnsupported("'$head' applied to ${callArgs.size} args, expected ${m.params.size}")
     }
-    val bools = BooleanArray(callArgs.size) { isBoolExpr(callArgs[it]) }
+    val resultSort = when {
+        m.isBool -> Sort.BOOL
+        m.isReal -> Sort.REAL
+        else -> Sort.INT
+    }
+    if ((sort == Sort.BOOL) != m.isBool || (sort == Sort.INT && m.isReal)) {
+        smtUnsupported("'$head' result has an incompatible sort")
+    }
+    val bools = BooleanArray(callArgs.size) { m.parameterSorts[it] == Sort.BOOL }
     // Arguments see the caller; free names in the body see declarations and its own parameters.
     work.addLast(Frame.RestoreBindings(bindingScope))
-    work.addLast(Frame.Eval(m.body, sort))
+    if (sort == Sort.REAL && resultSort == Sort.INT) work.addLast(Frame.PromoteReal)
+    work.addLast(Frame.Eval(m.body, resultSort))
     work.addLast(Frame.MakeScope(m.params, bools, isolated = true))
-    for (i in callArgs.indices.reversed()) {
-        val argumentSort = when {
-            bools[i] -> Sort.BOOL
-            isRealExpr(callArgs[i]) -> Sort.REAL
-            else -> Sort.INT
-        }
-        work.addLast(Frame.Eval(callArgs[i], argumentSort))
-    }
+    for (i in callArgs.indices.reversed()) work.addLast(Frame.Eval(callArgs[i], m.parameterSorts[i]))
 }
 
 /** The child sub-terms to fold (with their sorts) for a non-`let` list node. */
@@ -359,18 +363,7 @@ private fun Compiler.Builder.combineBool(node: SExpr.SList, head: String, args: 
         Res.B(reifyRelArgs(node, head, args))
     }
 
-    "distinct" -> if (args.any { it is Res.R }) {
-        val terms = args.map { it.asReal() }
-        val neLits = ArrayList<Int>()
-        for (i in terms.indices) {
-            for (j in i + 1 until terms.size) {
-                neLits.add(Lit.negate(reifyRealRel("=", terms[i], terms[j])))
-            }
-        }
-        Res.B(reifyAnd(neLits))
-    } else {
-        Res.B(distinctFromArgs(args))
-    }
+    "distinct" -> Res.B(distinctFromArgs(args))
 
     "ite" -> Res.B(tseitinIte(args[0].asLit(), args[1].asLit(), args[2].asLit()))
 
@@ -561,45 +554,6 @@ private fun Compiler.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: L
 private inline fun Compiler.Builder.chainReified(n: Int, reifyPair: (Int) -> Int): Int =
     if (n == 2) reifyPair(0) else reifyAnd((0 until n - 1).map(reifyPair))
 
-/** Reified `distinct` over folded operands (bool operands channelled to a 0/1 int term): the linear-size
- *  witness encoding where every operand is a bare finite-domain variable, else pairwise strict-order choices. */
-private fun Compiler.Builder.distinctFromArgs(args: List<Res>): Int {
-    if (args.size < 2) return trueLit()
-    val terms = args.map {
-        if (it is Res.B) IntComb.Narrow(litToIntTerm(it.lit)) else it.asIntComb()
-    }
-    witnessDistinct(terms)?.let { return it }
-    val orderLits = ArrayList<Int>()
-    for (i in terms.indices) {
-        for (j in i + 1 until terms.size) {
-            val less = reifyRelation("<", terms[i], terms[j])
-            val greater = reifyRelation(">", terms[i], terms[j])
-            orderLits.add(reifyOr(listOf(less, greater)))
-        }
-    }
-    return reifyAnd(orderLits)
-}
-
-/** The witness reification of `distinct`, or null when an operand is not a bare variable, repeats another,
- *  or carries an open domain — the same gate the asserted form uses to reach the native global. */
-private fun Compiler.Builder.witnessDistinct(terms: List<IntComb>): Int? {
-    if (terms.size < ALL_DIFFERENT_WITNESS_MIN_ARITY) return null
-    val vars = IntArray(terms.size) { i ->
-        val narrow = terms[i] as? IntComb.Narrow ?: return null
-        narrow.lin.asSimpleVar() ?: return null
-    }
-    if (vars.toHashSet().size != vars.size) return null
-    var lo = Long.MAX_VALUE
-    var hi = Long.MIN_VALUE
-    for (v in vars) {
-        val d = intDomains[v] as? PresolveDomain.Finite ?: return null
-        if (d.domain.min < lo) lo = d.domain.min
-        if (d.domain.max > hi) hi = d.domain.max
-    }
-    val size = allDifferentWindowSize(lo, hi) ?: return null
-    return reifyAllDifferentWitness(vars, lo, size) { min, max -> newInt(min, max) }
-}
-
 /** Fold an atom to a boolean literal, integer term, or real term. */
 private fun Compiler.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (sort == Sort.REAL) {
     evalRealAtom(node)
@@ -618,8 +572,16 @@ private fun Compiler.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (s
             )
     }
 } else {
+    val binding = lookup(node.text)
+    val variable = intNames[node.text]
     val n = node.text.toLongOrNull()
     when {
+        binding != null -> Res.I(intBinding(node.text, binding))
+
+        variable != null -> narrowRes(LinComb(mapOf(variable to 1), 0))
+
+        node.text in realNames -> smtUnsupported("real variable '${node.text}' used as Int")
+
         n != null -> narrowRes(LinComb(emptyMap(), n))
 
         // An integer literal beyond Long is carried as a wide combination and lowered to a wide factor.
@@ -631,27 +593,13 @@ private fun Compiler.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (s
         node.text.startsWith("#") ->
             smtUnsupported("bitvector literal '${node.text}' (integer context)")
 
-        else -> lookup(node.text)?.let { Res.I(intBinding(node.text, it)) }
-            ?: narrowRes(
-                LinComb(
-                    mapOf(
-                        (
-                            intNames[node.text] ?: smtUnsupported(
-                                "unknown int var '${node.text}'",
-                            )
-                            ) to 1,
-                    ),
-                    0,
-                ),
-            )
+        else -> smtUnsupported("unknown int var '${node.text}'")
     }
 }
 
 /** Fold a real-sorted atom: numeral / decimal literals, real variables, bindings, and (via the
  *  implicit embedding) integer variables reached from a real context through `to_real`. */
 private fun Compiler.Builder.evalRealAtom(node: SExpr.Atom): Res {
-    val lit = parseRealLiteral(node.text)
-    if (lit != null) return Res.R(RealComb(emptyMap(), emptyMap(), lit))
     val binding = lookup(node.text)
     if (binding != null) {
         return when {
@@ -669,6 +617,8 @@ private fun Compiler.Builder.evalRealAtom(node: SExpr.Atom): Res {
     }
     val rv = realNames[node.text]
     if (rv != null) return Res.R(RealComb(emptyMap(), mapOf(rv to BigFraction.ONE), BigFraction.ZERO))
-    val iv = intNames[node.text] ?: smtUnsupported("unknown real var '${node.text}'")
-    return Res.R(LinComb(mapOf(iv to 1), 0).toRealComb())
+    val iv = intNames[node.text]
+    if (iv != null) return Res.R(LinComb(mapOf(iv to 1), 0).toRealComb())
+    val literal = parseRealLiteral(node.text) ?: smtUnsupported("unknown real var '${node.text}'")
+    return Res.R(RealComb(emptyMap(), emptyMap(), literal))
 }

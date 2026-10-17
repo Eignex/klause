@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.hasFiniteIntegerRanges
@@ -18,8 +19,8 @@ enum class ProblemPipeline {
     /**
      * Finite search and optimization route.
      *
-     * This is a frontend policy, not variable ownership: [Problem.componentPlan] may still select a
-     * complete arithmetic theory for the same finite source model when no finite-domain factor is present.
+     * Source setup selects this execution family independently of variable ownership.
+     * [Problem.componentPlan] can describe complete arithmetic mechanisms for the same finite source.
      */
     FINITE_CP,
 
@@ -102,32 +103,25 @@ sealed interface SourceProblemRoute {
 }
 
 /**
- * Select a pipeline once for this source model.
+ * Select the same source route as [SourceSetup.prepare].
  *
- * Finite source ranges defer their root-propagated CP projection. Open models carry a complete theory
- * request when one exists; callers only need to render its uniform assignment surface. A frontend that
- * supports exact pure-real solving sets [routePureRealToTheory] to select that lane instead of finite CP.
- * [routeLinearToTheory] also offers bounded mixed integer/real linear models to the exact theory.
- *
- * A model the source left open is first offered to [proveBounded], because what the lane must be chosen
- * from is the model as it can be proved, not as it was written. [boundCancellation] bounds that proof.
+ * [routePureRealToTheory] and [routeLinearToTheory] are compatibility arguments; source mathematics and
+ * objective precision determine ownership. [boundCancellation] bounds optional deduction and required admission.
  */
+@Suppress("UNUSED_PARAMETER")
 fun Problem.pipelineRoute(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     routePureRealToTheory: Boolean = false,
     boundCancellation: Cancellation = Cancellation.Never,
     routeLinearToTheory: Boolean = false,
-): SourceProblemRoute = pipelineRouteObserved(
-    objective,
-    maximize,
-    routePureRealToTheory,
-    boundCancellation,
-    onLpStats = null,
-    routeLinearToTheory = routeLinearToTheory,
-)
+): SourceProblemRoute = sharedPipelineRoute(objective, maximize, boundCancellation, boundCancellation)
 
-/** Select a pipeline and report the LP work performed while proving bounds for that selection. */
+/**
+ * Select the shared source route and observe bound-probing LP work.
+ * [routePureRealToTheory] and [routeLinearToTheory] retain compatibility without overriding source ownership.
+ */
+@Suppress("UNUSED_PARAMETER")
 fun Problem.pipelineRoute(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
@@ -135,16 +129,15 @@ fun Problem.pipelineRoute(
     boundCancellation: Cancellation = Cancellation.Never,
     routeLinearToTheory: Boolean = false,
     onLpStats: (LpStats) -> Unit,
-): SourceProblemRoute = pipelineRouteObserved(
-    objective,
-    maximize,
-    routePureRealToTheory,
-    boundCancellation,
-    onLpStats,
-    routeLinearToTheory,
+): SourceProblemRoute = sharedPipelineRoute(
+    objective, maximize, boundCancellation, boundCancellation, onLpStats = onLpStats,
 )
 
-/** Select the shared source route with per-invocation factor projection providers. */
+/**
+ * Select the shared source route with per-invocation factor projection providers.
+ * [routePureRealToTheory] and [routeLinearToTheory] retain compatibility without overriding source ownership.
+ */
+@Suppress("UNUSED_PARAMETER")
 fun Problem.pipelineRoute(
     providers: FactorProjectionProviders,
     objective: LinearObjective? = null,
@@ -153,23 +146,19 @@ fun Problem.pipelineRoute(
     boundCancellation: Cancellation = Cancellation.Never,
     routeLinearToTheory: Boolean = false,
     onLpStats: ((LpStats) -> Unit)? = null,
-): SourceProblemRoute = pipelineRouteObserved(
-    objective,
-    maximize,
-    routePureRealToTheory,
-    boundCancellation,
-    onLpStats,
-    routeLinearToTheory,
-    providers,
+): SourceProblemRoute = sharedPipelineRoute(
+    objective, maximize, boundCancellation, boundCancellation, providers, onLpStats,
 )
 
 /**
- * Select a route with separate optional bound probing and required admission allowances.
+ * Select the shared source route with separate optional deduction and required admission allowances.
  *
  * [boundCancellation] stops optional deductions. [preparationCancellation] bounds complete source
- * installation and must retain the containing invocation's deadline and work allowance. Completed
- * bounds survive either stop; an exhausted optional probe does not decline complete linear admission.
+ * installation and retains the containing invocation's deadline and work allowance. Completed bounds
+ * survive either stop. [routePureRealToTheory] and [routeLinearToTheory] retain compatibility without
+ * overriding source ownership.
  */
+@Suppress("UNUSED_PARAMETER")
 fun Problem.pipelineRoute(
     boundCancellation: Cancellation,
     preparationCancellation: Cancellation,
@@ -177,13 +166,35 @@ fun Problem.pipelineRoute(
     maximize: Boolean = false,
     routePureRealToTheory: Boolean = false,
     routeLinearToTheory: Boolean = false,
-    providers: FactorProjectionProviders = FactorProjectionProviders.Default,
+    providers: FactorProjectionProviders = (this as? BakedProblem)?.projectionProviders
+        ?: FactorProjectionProviders.Default,
     onLpStats: ((LpStats) -> Unit)? = null,
-): SourceProblemRoute = pipelineRouteObserved(
-    objective, maximize, routePureRealToTheory,
-    boundCancellation, onLpStats, routeLinearToTheory, providers,
-    polynomialCancellation = preparationCancellation, preparationCancellation = preparationCancellation,
+): SourceProblemRoute = sharedPipelineRoute(
+    objective, maximize, boundCancellation, preparationCancellation, providers, onLpStats,
 )
+
+private fun Problem.sharedPipelineRoute(
+    objective: LinearObjective?,
+    maximize: Boolean,
+    boundCancellation: Cancellation,
+    preparationCancellation: Cancellation,
+    providers: FactorProjectionProviders? = null,
+    onLpStats: ((LpStats) -> Unit)? = null,
+): SourceProblemRoute {
+    val source = SourceAttachment(this)
+    val request = SourceSetupRequest(
+        source,
+        if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
+        FiniteEngine.MIXED,
+        objective,
+        maximize,
+        providers ?: source.providers,
+        preparationCancellation,
+        boundCancellation,
+    )
+    return if (onLpStats == null) SourceSetup.prepare(request).route
+    else SourceSetup.prepare(request, onLpStats).route
+}
 
 internal fun Problem.pipelineRoute(
     projections: PreparedFactorProjections,
@@ -223,6 +234,16 @@ private fun Problem.pipelineRouteObserved(
     preparationCancellation: Cancellation = boundCancellation,
 ): SourceProblemRoute {
     val selection = projectionCapture ?: providers.prepare(this)
+    if (!routeLinearToTheory && nativeFiniteSource(selection, preparationCancellation)) {
+        onLpStats?.invoke(LpStatsSink(LpRoute.STANDALONE).snapshot())
+        val prepared = prepareExecutionPlan(this, objective, maximize, true, providers, selection,
+            preparationCancellation)
+        return if (prepared.decline == PreparedPlanDecline.RESOURCE) {
+            SourceProblemRoute.UnsupportedOpen(null, this, prepared)
+        } else {
+            SourceProblemRoute.Finite(this, requireNotNull(prepared.componentPlan), prepared)
+        }
+    }
     val source = if (requiresPolynomialCompletion(selection)) {
         null
     } else {
@@ -250,9 +271,11 @@ private fun Problem.pipelineRouteObserved(
         initial.objective === objective && initial.maximize == maximize
     val stopped = reuseInitial && preparationCancellation()
     val preparationStop = if (stopped) Cancellation { true } or preparationCancellation else preparationCancellation
-    val finiteCompletion = finiteIntegerRanges &&
+    val nativeFiniteAfterBounds = !routeLinearToTheory &&
+        routed.nativeFiniteSource(projections, preparationStop)
+    val finiteCompletion = nativeFiniteAfterBounds || (finiteIntegerRanges &&
         objective?.realCoefficientValues?.any { it != 0.0 } != true &&
-        routed.requiresPolynomialCompletion(projections) && routed.finiteRealCompletionSupported(projections)
+        routed.requiresPolynomialCompletion(projections) && routed.finiteRealCompletionSupported(projections))
     val arithmeticStop = if (routed.requiresPolynomialCompletion(projections, preferFinite = finiteCompletion)) {
         polynomialCancellation
     } else {
@@ -282,8 +305,12 @@ private fun Problem.pipelineRouteObserved(
 
         is PreparedExecution.FiniteLinear -> execution
 
-        is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental ->
-            error("factor source requires factor execution")
+        is PreparedExecution.NonlinearInteger -> return SourceProblemRoute.NativeFormula(
+            NativeSourceExecution.IntegerPolynomial(NonlinearIntegerTheoryRequest(execution.source, arithmetic)),
+        )
+
+        is PreparedExecution.Transcendental, is PreparedExecution.Numerical ->
+            error("factor source requires polynomial execution")
     }
     val arithmeticRoute = arithmeticExecution.ownership.theoryPipeline
     val preferExact = routeLinearToTheory &&
@@ -291,7 +318,7 @@ private fun Problem.pipelineRouteObserved(
     val preferFinite = finiteIntegerRanges && !preferExact &&
         (!routePureRealToTheory || arithmeticRoute != ProblemPipeline.EXACT_LRA) &&
         routed.finiteRealCompletionSupported(projections)
-    val prepared = if (preferFinite) {
+    val prepared = if (preferFinite && arithmeticRoute != ProblemPipeline.FINITE_CP) {
         routed.prepareExecutionPlan(
             this,
             objective,
@@ -319,6 +346,19 @@ private fun Problem.pipelineRouteObserved(
     } else {
         SourceProblemRoute.OpenTheory(request)
     }
+}
+
+private fun Problem.nativeFiniteSource(projections: PreparedFactorProjections, stop: Cancellation): Boolean {
+    if (numRealVars != 0) return false
+    for (variable in 0 until numIntVars) {
+        stop.charge(1)
+        if (stop() || !intBounds.hasLower(variable) || !intBounds.hasUpper(variable)) return false
+    }
+    for (index in factors.indices) {
+        stop.charge(1)
+        if (stop() || !finiteRealFactorSupported(index, projections)) return false
+    }
+    return !stop()
 }
 
 /**
@@ -365,11 +405,10 @@ private sealed interface BoundedRouting {
 }
 
 /**
- * Finite and linear route classification. Use [pipelineRoute] for polynomial composition.
+ * Inspect finite and linear component ownership without selecting a source invocation.
  *
- * A fully bounded model stays on the finite route: that is a frontend policy about which engine owns a
- * finite domain, not a statement that no theory could decide it. Anything with an open integer side is
- * classified by [componentPlan], which reads column and factor ownership rather than demanding one
- * theory cover the whole model.
+ * This inspection prefers finite ownership for bounded integer declarations and performs no source
+ * bound closure. [SourceSetup.prepare] selects an operation's route with source deductions, objective
+ * precision and polynomial composition; this component view does not replace that setup.
  */
 fun Problem.sourceRoute(): ProblemPipeline = componentPlan(preferFinite = hasFiniteIntegerRanges()).theoryPipeline

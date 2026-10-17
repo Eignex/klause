@@ -321,7 +321,8 @@ data class BacktrackParams(
     /**
      * Tolerance semantics for continuous leaves: when set, a float LP optimum is accepted without exact
      * certification if this check accepts the completed sample, and an incumbent without exact reals is admitted
-     * when it passes the same check. `null` keeps exact semantics.
+     * when it passes the same check. A captured source policy can require exact optimum certification while
+     * retaining this point filter. `null` keeps exact semantics.
      */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
     /** Cooperative cancellation predicate; see [Cancellation]. */

@@ -85,7 +85,7 @@ data class TheoryParams(
     val timeout: Cancellation = Cancellation.Never,
     /** Cooperative cancellation token. */
     val cancellation: Cancellation = Cancellation.Never,
-    /** Solve-wide node allowance the local-search arms of an open portfolio charge their moves to, or null for none. */
+    /** Solve-wide allowance shared by committed open decisions and heuristic moves, or null for none. */
     val nodeBudget: NodeBudget? = null,
     /** Destroy/repair proposal cap for an explicit open ALNS invocation. */
     val alnsIterations: Int = 50,

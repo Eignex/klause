@@ -443,8 +443,16 @@ val checkJvmMethodCosts = tasks.register<Exec>("checkJvmMethodCosts") {
         "tools/review_native_vm_live_arguments.py", "tools/native_vm_event_loss.py")
 }
 
+val checkJvmDeclarationBindings = tasks.register<Exec>("checkJvmDeclarationBindings") {
+    group = "verification"
+    description = "Test complete saved declaration candidates without source or loader attribution."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_jvm_declaration_bindings.py")
+    inputs.files("tools/review_jvm_declaration_bindings.py", "tools/test_review_jvm_declaration_bindings.py")
+}
+
 tasks.named("check") {
-    dependsOn(checkJvmRecordingContext, checkJvmMethodCosts)
+    dependsOn(checkJvmRecordingContext, checkJvmMethodCosts, checkJvmDeclarationBindings)
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,

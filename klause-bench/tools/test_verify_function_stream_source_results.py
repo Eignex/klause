@@ -71,6 +71,34 @@ class FunctionStreamSourceTest(unittest.TestCase):
         self.assertTrue(report['truncatedPublication'])
         self.assertEqual(1, len(report['witnesses']))
 
+    def test_helpers_retain_lexical_values_and_function_identity(self):
+        source = '(declare-const x Real) (define-fun answer ((n Real)) Real (log n)) ' \
+                 '(assert (let ((x 9.0)) (= (answer 1.0) 0.0))) (assert (= x 2.0))'
+
+        report = check_stream(source, '(\n  (define-fun x () Real 2.0)\n)\n')
+
+        self.assertTrue(report['allOriginalAssertions'])
+
+    def test_a_helper_body_does_not_capture_caller_let_bindings(self):
+        source = '(declare-const x Real) (define-fun saved () Real x) ' \
+                 '(assert (let ((x 9.0)) (= saved 2.0)))'
+
+        report = check_stream(source, '(\n  (define-fun x () Real 2.0)\n)\n')
+
+        self.assertEqual(1, len(report['witnesses']))
+
+    def test_function_distinct_checks_exact_values_and_rejects_repeated_roles(self):
+        for assertion, accepted in (('(distinct (exp 0.0) x)', True),
+                                    ('(distinct x x)', False)):
+            source = '(declare-const x Real) (assert ' + assertion + ')'
+            output = '(\n  (define-fun x () Real 2.0)\n)\n'
+            with self.subTest(assertion=assertion):
+                if accepted:
+                    self.assertTrue(check_stream(source, output)['allOriginalAssertions'])
+                else:
+                    with self.assertRaises(ValueError):
+                        check_stream(source, output)
+
     def test_optimization_metadata_receives_no_function_witness_credit(self):
         source = '(declare-const x Real) (assert (= x (exp 0)))'
         with self.assertRaises(ValueError):

@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
+import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.Distinct
@@ -23,16 +24,30 @@ import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 
-internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification<Sample, Unit> {
+internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification<Sample, Unit> =
+    verifyRealCoordinates(model, sample, Cancellation.Never)
+
+internal fun verifyRealCoordinates(
+    model: Problem,
+    sample: Sample,
+    cancellation: Cancellation,
+): Verification<Sample, Unit> {
+    cancellation.charge(1L)
+    if (cancellation()) return Verification.Indeterminate("source coordinate check cancelled")
     if (model.factors.any { it is Distinct || it is AllDifferent } &&
         (sample.numIntVars != model.numIntVars || sample.numBoolVars != model.numBoolVars)
     ) return Verification.Rejected("assignment does not cover distinctness coordinates")
     for ((id, factor) in model.factors.withIndex()) {
+        cancellation.charge(1)
+        if (cancellation()) return Verification.Indeterminate("source coordinate check cancelled")
         if (factor !is Abs && factor !is AffineAbs && factor !is AllDifferent &&
             !(factor is Distinct && factor.variables.reals.isEmpty())
         ) continue
@@ -48,14 +63,23 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             }
             else -> false
         }
+        if (cancellation()) return Verification.Indeterminate("real witness check cancelled")
         if (!valid) {
             return Verification.Rejected("integer factor $id refutes the assignment")
         }
     }
     if (model.numRealVars == 0) return Verification.Accepted(Candidate(sample, Unit))
-    val reals = sample.exactReals ?: return Verification.Indeterminate("continuous values are not certified")
+    val reals = if (model.factors.any { it is RealFiniteDomain }) {
+        when (val membership = checkRealFiniteDomains(model, sample, cancellation)) {
+            is Verification.Accepted -> membership.candidate.assignment
+            is Verification.Rejected -> return membership
+            is Verification.Indeterminate -> return membership
+        }
+    } else sample.exactReals ?: return Verification.Indeterminate("continuous values are not certified")
     if (reals.size != model.numRealVars) return Verification.Rejected("assignment does not cover the real variables")
     for (id in reals.indices) {
+        cancellation.charge(1)
+        if (cancellation()) return Verification.Indeterminate("source coordinate check cancelled")
         val lower = BigFraction.ofDouble(model.realLower[id])
         val upper = BigFraction.ofDouble(model.realUpper[id])
         if ((lower != null && reals[id] < lower) || (upper != null && reals[id] > upper)) {
@@ -68,20 +92,30 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             BigFraction.of(sample.exactIntValue(column - model.numRealVars), BIG_ONE)
         }
     }
-    fun holds(row: LinearRow): Boolean = row.exactComparison(
-        model.numRealVars, row.activator == LinearRow.ALWAYS || witness.truth(row.activator), witness::truth,
-    ).holdsAt(witness)
+    fun holds(row: LinearRow): Boolean {
+        cancellation.charge(row.size.toLong() + 1L)
+        if (cancellation()) return false
+        return row.exactComparison(
+            model.numRealVars, row.activator == LinearRow.ALWAYS || witness.truth(row.activator), witness::truth,
+        ).holdsAt(witness)
+    }
     for ((id, factor) in model.factors.withIndex()) {
+        cancellation.charge(1)
+        if (cancellation()) return Verification.Indeterminate("source coordinate check cancelled")
         if (factor.variables.reals.isEmpty()) continue
+        if (factor is RealFiniteDomain) continue
         if (factor is Distinct) {
             if (!factor.isSatisfied(sample::exactIntValue, sample::boolValue, reals::get)) {
                 return Verification.Rejected("real factor $id refutes the assignment")
             }
             continue
         }
-        if (factor is Power && factor.base is Power.Coordinate.Real && factor.exponent <= 1) {
-            val expected = if (factor.exponent == 0) BigFraction.ONE else reals[factor.base.id.index]
-            if (expected != reals[(factor.result as Power.Coordinate.Real).id.index]) {
+        if (factor is Power && factor.base is Power.Coordinate.Real) {
+            val matches = rationalPowerEquals(reals[factor.base.id.index], factor.exponent,
+                reals[(factor.result as Power.Coordinate.Real).id.index], cancellation)
+                ?: return Verification.Indeterminate("source power check unavailable or cancelled")
+            if (cancellation()) return Verification.Indeterminate("source power check cancelled")
+            if (!matches) {
                 return Verification.Rejected("real factor $id refutes the assignment")
             }
             continue
@@ -93,6 +127,8 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             factor.finiteChoices?.let { choices ->
                 var admitted = false
                 for (index in 0 until choices.size) {
+                    cancellation.charge(1)
+                    if (cancellation()) return Verification.Indeterminate("source choice check cancelled")
                     val matches = reals[choices.operand] == BigFraction.ofDouble(choices.valueAt(index))
                     admitted = admitted || matches
                     if (choices.hasGuards) {
@@ -124,6 +160,8 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
         if (factor is RealArrayMinMax) {
             var selected = reals[factor.xs[0]]
             for (operand in factor.xs) {
+                cancellation.charge(1)
+                if (cancellation()) return Verification.Indeterminate("source extrema check cancelled")
                 val value = reals[operand]
                 if (if (factor.max) value > selected else value < selected) selected = value
             }
@@ -141,7 +179,9 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
         }
         if (factor is LinearIndicator) {
             val trigger = bigIntOf(if (factor.whenOne) 1L else 0L)
-            if (sample.exactIntValue(factor.indicator) == trigger && !holds(factor.row)) {
+            val valid = sample.exactIntValue(factor.indicator) != trigger || holds(factor.row)
+            if (cancellation()) return Verification.Indeterminate("real witness check cancelled")
+            if (!valid) {
                 return Verification.Rejected("real factor $id refutes the assignment")
             }
             continue
@@ -155,9 +195,69 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             is LinearForm.Disjunction -> form.rows.any(::holds)
             is LinearForm.Relaxation -> false
         }
+        if (cancellation()) return Verification.Indeterminate("source row check cancelled")
         if (!valid) return Verification.Rejected("real factor $id refutes the assignment")
     }
-    return Verification.Accepted(Candidate(sample, Unit))
+    return if (cancellation()) Verification.Indeterminate("source coordinate check cancelled")
+    else Verification.Accepted(Candidate(sample, Unit))
+}
+
+private fun rationalPowerEquals(
+    value: BigFraction,
+    exponent: Int,
+    expected: BigFraction,
+    cancellation: Cancellation,
+): Boolean? {
+    cancellation.charge(1)
+    if (cancellation()) return null
+    val direct = when {
+        exponent == 0 || value == BigFraction.ONE -> expected == BigFraction.ONE
+        value.isZero -> expected.isZero
+        value == BigFraction.MINUS_ONE -> expected ==
+            if (exponent and 1 == 0) BigFraction.ONE else BigFraction.MINUS_ONE
+        expected.isZero || (expected.signum() < 0) != (value.signum() < 0 && exponent and 1 != 0) -> false
+        else -> null
+    }
+    if (direct != null) return direct.takeUnless { cancellation() }
+    val numerator = positivePowerEquals(value.num.abs(), exponent, expected.num.abs(), cancellation)
+        ?: return null
+    if (!numerator) return false.takeUnless { cancellation() }
+    val denominator = positivePowerEquals(value.den, exponent, expected.den, cancellation)
+    return denominator?.takeUnless { cancellation() }
+}
+
+private fun positivePowerEquals(
+    value: BigInt,
+    exponent: Int,
+    expected: BigInt,
+    cancellation: Cancellation,
+): Boolean? {
+    if (value == BIG_ONE) return (expected == BIG_ONE).takeUnless { cancellation() }
+    val width = expected.magnitudeBitLength().toLong()
+    if ((value.magnitudeBitLength() - 1L) * exponent + 1L > width) return false
+    var remaining = exponent
+    var base = value
+    var result = BIG_ONE
+    while (remaining > 0) {
+        cancellation.charge(1)
+        if (cancellation()) return null
+        if (remaining and 1 != 0) {
+            val bits = result.magnitudeBitLength().toLong() + base.magnitudeBitLength()
+            if (bits - 1L > width) return false
+            if (bits > Int.MAX_VALUE) return null
+            result *= base
+            if (cancellation()) return null
+        }
+        remaining = remaining ushr 1
+        if (remaining > 0) {
+            val bits = 2L * base.magnitudeBitLength()
+            if (bits - 1L > width) return false
+            if (bits > Int.MAX_VALUE) return null
+            base *= base
+            if (cancellation()) return null
+        }
+    }
+    return if (cancellation()) null else result == expected
 }
 
 private fun AllDifferent.isSatisfied(sample: Sample): Boolean {

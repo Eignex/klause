@@ -2,7 +2,9 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.boundsMidpoint
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
@@ -769,7 +771,10 @@ private class ResidualRealComponent(
 ) : SearchComponent,
     LpSearchResource {
     private val toleranceCheck = params.toleranceCheck
-    private val absCompletion = if (problem.factors.any { it is RealAbs }) AbsRealCompletion(problem) else null
+    private val absCompletion = if (problem.factors.any {
+            it is RealAbs || it is RealFiniteDomain ||
+                (it is ContinuousProduct && it.finiteChoices != null && !it.finiteChoices.hasGuards)
+        }) AbsRealCompletion(problem) else null
     private val solveContext = solveContext
     private var absWork = 0L
     private val engine = LpEngine(
@@ -801,8 +806,9 @@ private class ResidualRealComponent(
                 is AbsRealCompletion.Result.Witness -> {
                     val sample = discrete.copy(reals = DoubleArray(result.reals.size) { result.reals[it].toDouble() },
                         exactReals = result.reals)
-                    if (verifyRealCoordinates(problem, sample) !is Verification.Accepted) ComponentCheck.Indeterminate
-                    else ComponentCheck.Feasible.also { completed = sample }
+                    if (verifyRealCoordinates(problem, sample, stop) !is Verification.Accepted) {
+                        ComponentCheck.Indeterminate
+                    } else ComponentCheck.Feasible.also { completed = sample }
                 }
                 AbsRealCompletion.Result.Refuted -> ComponentCheck.Infeasible()
                 AbsRealCompletion.Result.Undecided -> ComponentCheck.Indeterminate

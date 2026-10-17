@@ -9,8 +9,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
@@ -374,18 +373,17 @@ class EncoderRoutingTest {
 
     @Test
     fun `relaxation only encoders should not authorize open source enforcement`() {
-        val input = assertIs<SmtLibInput.Linear>(
-            SmtLibAdmission.parse(
+        val input = assertIs<Problem>((
+            SmtLib.parse(
                 "(declare-const x Real) (assert (> x 0))",
-            ),
-        )
+            )).source.originalSource)
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { _, _ ->
                 Encoder(EncoderSupport.RELAXATION_ONLY)
             },
         )
 
-        val admission = input.problem.model.prepareExecutionPlan(providers).capabilities
+        val admission = input.prepareExecutionPlan(providers).capabilities
             .admission(ExecutionStrategy.COMPLETE)
 
         assertFalse(admission.runnable)
@@ -425,12 +423,11 @@ class EncoderRoutingTest {
 
     @Test
     fun `difference provider replacement should combine factors in one graph`() {
-        val input = assertIs<SmtLibInput.Linear>(
-            SmtLibAdmission.parse(
+        val input = assertIs<Problem>((
+            SmtLib.parse(
                 "(declare-const x Int) (declare-const y Int) " +
                     "(assert (<= (- x y) 0)) (assert (<= (- y x) (- 1)))",
-            ),
-        )
+            )).source.originalSource)
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
                 if (target != EncodingTarget.DIFFERENCE) {
@@ -440,7 +437,7 @@ class EncoderRoutingTest {
                 }
             },
         )
-        val source = input.problem.model
+        val source = input
         val plan = source.prepareExecutionPlan(providers)
         val ownership = assertNotNull(plan.componentPlan)
 
@@ -637,7 +634,7 @@ class EncoderRoutingTest {
         assertIs<SearchResult.Exhausted>(result)
         assertEquals(IntVariableOwner.CP, plan.intOwner(1))
         assertEquals(FactorOwner.CP, plan.factorOwner(0))
-        assertFalse(plan.factorEncoded(0))
+        assertTrue(plan.factorEncoded(0))
         assertEquals(holes, source.intDomainOrNull(0))
     }
 
@@ -666,8 +663,8 @@ class EncoderRoutingTest {
 
     @Test
     fun `a Boolean relation installed in the difference component should be fully enforced`() {
-        val input = assertIs<SmtLibInput.Linear>(SmtLibAdmission.parse("(declare-const b Bool) (assert b)"))
-        val source = input.problem.model
+        val input = assertIs<Problem>((SmtLib.parse("(declare-const b Bool) (assert b)")).source.originalSource)
+        val source = input
         val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { null })
         val plan = assertNotNull(source.prepareExecutionPlan(providers).componentPlan)
 
@@ -683,11 +680,10 @@ class EncoderRoutingTest {
     @Test
     fun `open heuristic entry points should control selected encoder construction`() {
         for (entry in listOf("routed", "legacy", "neighborhood", "portfolio")) {
-            val source = assertIs<SmtLibInput.Linear>(
-                SmtLibAdmission.parse(
+            val source = (
+                SmtLib.parse(
                     "(declare-const x Real) (assert (= x 1))",
-                ),
-            ).problem.model
+                )).model
             var cancelled = false
             var installations = 0
             var charged = 0L

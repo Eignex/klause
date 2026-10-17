@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.PolynomialDistinct
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialSelection
@@ -31,6 +32,7 @@ internal fun validatePolynomialEncodingCoordinates(
                 pending.addLast(node.left)
                 pending.addLast(node.right)
             }
+            is PolynomialDistinct -> pending.addAll(node.operands)
             is PolynomialSelection -> {
                 require(node.result.index in realIds) { "unattributed polynomial selection result" }
                 pending.addLast(node.condition)

@@ -1,16 +1,16 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.result.TerminationReason
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
@@ -22,15 +22,14 @@ class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
 
     @Test
     fun `explicit cores should reach the source dispatcher while fixed keeps a single worker`() {
-        val source = assertIs<SmtLibInput.Transcendental>(
-            SmtLibAdmission.parse(
+        val source = assertIs<TranscendentalProblem>((
+            SmtLib.parse(
                 """
             (declare-const x Real)
             (assert (= (exp x) 2))
             (check-sat)
                 """.trimIndent(),
-            ),
-        ).problem
+            )).source.originalSource)
         val params = PolynomialTheoryParams(
             maximumWork = 100000,
             strategy = PolynomialStrategyParams(
@@ -49,8 +48,8 @@ class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
 
     @Test
     fun `parallel invocation should keep common pins without mutating the source`() {
-        val source = assertIs<SmtLibInput.Transcendental>(
-            SmtLibAdmission.parse(
+        val source = assertIs<TranscendentalProblem>((
+            SmtLib.parse(
                 """
             (declare-const b Bool)
             (declare-const x Real)
@@ -58,8 +57,7 @@ class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
             (assert (= (exp x) 1))
             (check-sat)
                 """.trimIndent(),
-            ),
-        ).problem
+            )).source.originalSource)
         val params = TranscendentalTheoryParams(
             maximumWork = 100000,
             maximumDepth = 0,
@@ -86,16 +84,15 @@ class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
 
     @Test
     fun `parallel workers should not optimize a captured function objective`() {
-        val source = assertIs<SmtLibInput.Transcendental>(
-            SmtLibAdmission.parse(
+        val source = assertIs<TranscendentalProblem>((
+            SmtLib.parse(
                 """
             (declare-const x Real)
             (assert (> (exp x) 0))
             (minimize (exp x))
             (check-sat)
                 """.trimIndent(),
-            ),
-        ).problem
+            )).source.originalSource)
 
         val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), TranscendentalTheoryParams(), engine, 4)
 

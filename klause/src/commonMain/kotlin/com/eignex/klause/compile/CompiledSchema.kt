@@ -3,6 +3,7 @@ package com.eignex.klause.compile
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
@@ -30,13 +31,12 @@ import com.eignex.klause.solver.objective.minimizeInt
  * Result of compiling a [com.eignex.klause.schema.VariableSchema] to a solver-side `Problem`,
  * carrying the index needed to decode an assignment back to schema values.
  *
- * Boolean-side names map to packed-bit ids in `boolVarIdByName`; integer/float-side names map
- * to int-array ids in `intVarIdByName`. Float vars round-trip through their bucket index
- * using the [FloatSpec] in `floatDecoders`; real columns retain certified coordinates separately.
+ * Boolean-side names map to packed-bit ids. The compatibility maps describe finite integer,
+ * bucket and retained-real coordinates. Source strategies use the original declarations;
+ * decoding distinguishes their namespace by the assignment's captured frame.
  */
 class CompiledSchema internal constructor(
-    /** The compiled solver problem. */
-    val problem: Problem,
+    problem: Problem,
     /** Boolean variable id by schema name. */
     boolVarIdByName: Map<String, Int>,
     /** Integer variable id by schema name. */
@@ -58,10 +58,19 @@ class CompiledSchema internal constructor(
     /** Real (LP-only continuous) variable id by schema name, for floats lowered as LP-only columns
      *  rather than bucketed; their value is read from [Sample.reals]. Empty when floats
      *  are bucketed (see [floatDecoders]). */
-    internal val realVarIdByName: Map<String, Int> = emptyMap(),
+    realVarIdByName: Map<String, Int> = emptyMap(),
     /** Per-component representation and approximation reason by source float name. */
     floatRepresentations: Map<String, FloatRepresentation> = emptyMap(),
+    sourceBinding: CompiledSourceBinding? = null,
 ) {
+    internal val sourceBinding = sourceBinding ?: CompiledSourceBinding(problem, intVarIdByName, realVarIdByName,
+        representations = floatRepresentations)
+
+    /** Explicit finite compatibility view; source strategies retain the original declarations. */
+    val problem: Problem get() = sourceBinding.legacyProblem
+
+    internal val realVarIdByName: Map<String, Int> get() = sourceBinding.legacyRealNames()
+
     private val booleanIds: Map<String, Int> = boolVarIdByName.toMap()
 
     /** Boolean variable id by schema name (a defensive copy). */
@@ -70,7 +79,7 @@ class CompiledSchema internal constructor(
     private val integerIds: Map<String, Int> = intVarIdByName.toMap()
 
     /** Integer variable id by schema name (a defensive copy). */
-    val intVarIdByName: Map<String, Int> get() = integerIds.toMap()
+    val intVarIdByName: Map<String, Int> get() = sourceBinding.legacyIntegerNames()
 
     private val nominalIds: Map<String, Map<String, Int>> = nominalIndicators.mapValues { it.value.toMap() }
 
@@ -87,10 +96,8 @@ class CompiledSchema internal constructor(
     /** Label order of each nominal-set variable (a defensive copy). */
     val setNominalLabels: Map<String, List<String>> get() = setLabels.mapValues { it.value.toList() }
 
-    private val representations: Map<String, FloatRepresentation> = floatRepresentations.toMap()
-
     /** Per-component float representation by source name (a defensive copy). */
-    val floatRepresentations: Map<String, FloatRepresentation> get() = representations.toMap()
+    val floatRepresentations: Map<String, FloatRepresentation> get() = sourceBinding.floatRepresentations()
 
     /** Source Boolean location for a compiled schema handle. */
     fun sourceId(handle: BoolHandle): SourceBoolId = SourceBoolId(
@@ -102,14 +109,21 @@ class CompiledSchema internal constructor(
         requireNotNull(integerIds[handle.name]) { "No integer variable named '${handle.name}'" },
     )
 
-    /** Source continuous location, or null for a float represented by an integer bucket. */
-    fun sourceRealId(handle: FloatHandle): SourceRealId? = realVarIdByName[handle.name]?.let(::SourceRealId)
+    /** Original real location, independent of the selected finite representation. */
+    fun sourceRealId(handle: FloatHandle): SourceRealId? = sourceBinding.realNames[handle.name]?.let(::SourceRealId)
 
     /** The schema's declared [defaultBacktrackParams] if any, else [BacktrackPresets.conflictDriven]. */
     fun backtrackParams(): BacktrackParams = defaultBacktrackParams ?: BacktrackPresets.conflictDriven()
 
+    /**
+     * Resolve a helper's exact original-coordinate objective for source execution or evidence capture.
+     * An unbound objective uses original source coordinates; a helper from another compilation rejects.
+     */
+    fun sourceObjective(objective: LinearObjective): QuadraticObjectiveSpec = sourceBinding.originalObjective(objective)
+
     /** Decode [handle]'s Boolean value from [sample]. */
     fun decode(handle: BoolHandle, sample: Sample): Boolean {
+        sourceBinding.isOriginal(sample)
         val id = booleanIds[handle.name]
             ?: error("No Boolean variable named '${handle.name}'")
         return sample.boolValue(id)
@@ -117,6 +131,7 @@ class CompiledSchema internal constructor(
 
     /** Decode [handle]'s label from [sample]. */
     fun decode(handle: NominalHandle, sample: Sample): String {
+        sourceBinding.isOriginal(sample)
         val map = nominalIds[handle.name]
             ?: error("No nominal variable named '${handle.name}'")
         return map.entries.firstOrNull { sample.boolValue(it.value) }?.key
@@ -125,6 +140,7 @@ class CompiledSchema internal constructor(
 
     /** Decode [handle]'s integer value from [sample]. */
     fun decode(handle: IntHandle, sample: Sample): Long {
+        sourceBinding.isOriginal(sample)
         val id = integerIds[handle.name]
             ?: error("No integer variable named '${handle.name}'")
         return sample.intValue(id)
@@ -159,6 +175,7 @@ class CompiledSchema internal constructor(
     /** Read a set var's indicators back into a `Set<Int>`. Universe elements whose
      *  indicator bool is `true` in [sample] form the result; others are filtered out. */
     fun decode(handle: IntSetHandle, sample: Sample): Set<Int> {
+        sourceBinding.isOriginal(sample)
         val layout = setLayouts[handle.name]
             ?: error("No set variable named '${handle.name}'")
         val out = LinkedHashSet<Int>()
@@ -171,6 +188,7 @@ class CompiledSchema internal constructor(
     /** Read a nominal-set var's indicators back into a `Set<String>` of currently-selected
      *  labels. */
     fun decode(handle: NominalSetHandle, sample: Sample): Set<String> {
+        sourceBinding.isOriginal(sample)
         val layout = setLayouts[handle.name]
             ?: error("No nominal-set variable named '${handle.name}'")
         val labels = setLabels[handle.name]
@@ -185,11 +203,18 @@ class CompiledSchema internal constructor(
     /** Decode [handle]'s real value from [sample] — from [Sample.approximateRealValue] for an LP-only continuous
      *  column, else from the bucket index. */
     fun decode(handle: FloatHandle, sample: Sample): Double {
+        if (sourceBinding.isOriginal(sample)) {
+            val id = sourceBinding.realNames[handle.name] ?: error("No float variable named '${handle.name}'")
+            return sample.approximateRealValue(id)
+        }
+        sourceBinding.legacyColumn(handle.name)?.let { column ->
+            return checkNotNull(column.value(sample.intValue(column.coordinate.variable))) {
+                "Float '${handle.name}' has an invalid value-carrier index"
+            }.toDouble()
+        }
         realVarIdByName[handle.name]?.let { return sample.approximateRealValue(it) }
-        val spec = floatSpecs[handle.name]
-            ?: error("No float variable named '${handle.name}'")
-        val id = integerIds[handle.name]
-            ?: error("Float '${handle.name}' has no int-side id")
+        val spec = floatSpecs[handle.name] ?: error("No float variable named '${handle.name}'")
+        val id = integerIds[handle.name] ?: error("Float '${handle.name}' has no int-side id")
         return spec.realValue(sample.intValue(id).toInt())
     }
 
@@ -197,28 +222,28 @@ class CompiledSchema internal constructor(
     fun minimize(handle: IntHandle): LinearObjective {
         val id = integerIds[handle.name]
             ?: error("No integer variable named '${handle.name}'")
-        return problem.minimizeInt(id)
+        return sourceBinding.paired(problem.minimizeInt(id))
     }
 
     /** A [LinearObjective] that maximises [handle]. */
     fun maximize(handle: IntHandle): LinearObjective {
         val id = integerIds[handle.name]
             ?: error("No integer variable named '${handle.name}'")
-        return problem.maximizeInt(id)
+        return sourceBinding.paired(problem.maximizeInt(id))
     }
 
     /** A [LinearObjective] that minimises [handle]. */
     fun minimize(handle: BoolHandle): LinearObjective {
         val id = booleanIds[handle.name]
             ?: error("No Boolean variable named '${handle.name}'")
-        return problem.minimizeBool(id)
+        return sourceBinding.paired(problem.minimizeBool(id))
     }
 
     /** A [LinearObjective] that maximises [handle]. */
     fun maximize(handle: BoolHandle): LinearObjective {
         val id = booleanIds[handle.name]
             ?: error("No Boolean variable named '${handle.name}'")
-        return problem.maximizeBool(id)
+        return sourceBinding.paired(problem.maximizeBool(id))
     }
 
     /**
@@ -227,20 +252,26 @@ class CompiledSchema internal constructor(
      * preserves their ordering; decoding recovers the real value.
      */
     fun minimize(handle: FloatHandle): LinearObjective {
+        sourceBinding.legacyColumn(handle.name)?.let {
+            return sourceBinding.paired(problem.minimizeInt(it.coordinate.variable))
+        }
         realVarIdByName[handle.name]?.let { return realObjective(it, maximize = false) }
         floatSpecs[handle.name] ?: error("No float variable named '${handle.name}'")
         val id = integerIds[handle.name]
             ?: error("Float '${handle.name}' has no int-side id")
-        return problem.minimizeInt(id)
+        return sourceBinding.paired(problem.minimizeInt(id))
     }
 
     /** A [LinearObjective] that maximises [handle] — minimise the negated bucket id (or real column). */
     fun maximize(handle: FloatHandle): LinearObjective {
+        sourceBinding.legacyColumn(handle.name)?.let {
+            return sourceBinding.paired(problem.maximizeInt(it.coordinate.variable))
+        }
         realVarIdByName[handle.name]?.let { return realObjective(it, maximize = true) }
         floatSpecs[handle.name] ?: error("No float variable named '${handle.name}'")
         val id = integerIds[handle.name]
             ?: error("Float '${handle.name}' has no int-side id")
-        return problem.maximizeInt(id)
+        return sourceBinding.paired(problem.maximizeInt(id))
     }
 
     /** A single-real-column [LinearObjective] over LP-only continuous var [realId]; the always-minimising
@@ -248,6 +279,6 @@ class CompiledSchema internal constructor(
     private fun realObjective(realId: Int, maximize: Boolean): LinearObjective {
         val coeffs = DoubleArray(problem.numRealVars)
         coeffs[realId] = if (maximize) -1.0 else 1.0
-        return LinearObjective(realCoefficients = coeffs)
+        return sourceBinding.paired(LinearObjective(realCoefficients = coeffs))
     }
 }

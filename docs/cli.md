@@ -136,6 +136,35 @@ retains `best-found` status.
 [Portfolio admission](solver/portfolio.md) owns acceptance;
 [source values](model.md#published-assignments-and-objectives) own exact payloads.
 
+Frontend solve paths retain a `PreparedSourceInvocation`. `SourceRendering` carries
+only finite, exact arithmetic or original linear coordinate renderers, plus an
+admission interruption. It holds no concrete theory request. `SolveCore` captures application defaults and explicit flag provenance in
+`SourceExecutionPolicy`, which binds finite LP ceilings, pricing and arm defaults.
+The library consumes presolve tuning and checks applicability before worker construction; output adapters consume `SourceExecutionResult` from
+`SourceSetup.execute` without selecting another solver or parsing native limits.
+Pipeline telemetry derives from the retained library invocation.
+Native satisfaction verdicts retain the library's source claim qualification.
+The CLI reports complete-pool metadata separately; it does not reinterpret a
+native refutation from the requested engine name. Heuristic exhaustion remains
+incomplete through the producing adapter.
+
+The internal `linearSourceSolvable` adapter accepts an attached `LinearSourceProblem`
+and a renderer of checked `LinearSourceWitness` values. It captures one invocation;
+`SolveCore` supplies the existing finite request factory or selected arithmetic
+controls to `SourceSetup.execute`. Finite controls use the actual invocation's
+retained shape. The adapter publishes declaration-order coordinates and original
+rational objective values through `ArithmeticPublication`, and selects terminal
+markers from `SourceExecutionResult.linearSource.conclusion`. A native nominal
+optimum qualified only as source feasibility produces `BEST_FOUND` during optimization.
+A rendering veto cannot establish an optimum marker.
+
+`OutputProtocol.onLinearSourceResult` receives the full retained native result beside
+its immutable original-unit qualification. Renderers must use that qualification
+for source bounds and terminal claims; a native working objective can have a different
+scale or private column. MPS format registration uses this original-coordinate
+adapter. Numerical strategy interpretation
+and parallel execution retain their current library limitations.
+
 ## Flags
 
 Solver-control flags are common to **every** mode:
@@ -147,12 +176,12 @@ Solver-control flags are common to **every** mode:
   backtrack portfolio); with no `-f` and no `-e`, the built-in default is `mixed`,
   overridable through `klause.engine` / `KLAUSE_ENGINE`.
 - `-t <ms>` time limit, `-r <seed>`, `-s` statistics, `-v` verbose.
-- `-p <n>` — MiniZinc-standard parallelism (core count). Finite portfolio engines
-  run sequentially at `n=1` and use up to `n` lanes at `n>1`; finite `fixed` rejects
-  `n>1`. Finite pool size auto-tunes from `n`, overridable with `--param arms=N`
-  (or the `ls=N`/`bt=N` split). Open linear MIXED/LS/ALNS execution uses up to `n`
-  lanes; its BACKTRACK/FIXED routes run one traversal. Polynomial, nonlinear-integer
-  and quadratic source adapters accept the flag but do not allocate extra lanes.
+- `-p <n>` — MiniZinc-standard parallelism (core count). `fixed` rejects `n>1`
+  across finite and native source execution. Portfolio engines run sequentially
+  at `n=1` and use up to `n` lanes at `n>1`. Finite pool size auto-tunes from `n`,
+  overridable with `--param arms=N` (or the `ls=N`/`bt=N` split). Open linear,
+  polynomial, nonlinear-integer, quadratic and function source factories retain
+  their private workers and native reservations on the requested lanes.
 - `-e <engine>` / `--engine <engine>` — the engine enum (also via the `klause.engine` property):
   - `fixed` — a single naked backtrack. It follows a FlatZinc `int_search` annotation;
     for a finite model with no annotation (DIMACS, OPB, and unannotated FlatZinc/XCSP3/MPS), it uses
@@ -170,15 +199,18 @@ Solver-control flags are common to **every** mode:
     `violated,argmin`), `scoring` (`weighted|raw`), `acceptance` (`greedy|walksat|probsat|skew|sa`) —
     edited across the pool, for A/B-testing each axis.
 - `--presolve <strength>` — `off`, `conservative`, `default`, or `aggressive`, with
-  `+/-<pass>` deltas to toggle individual passes.
+  `+/-<pass>` deltas to toggle individual passes. Explicit overrides and presolve
+  tuning apply to finite or linear source preparation; other native routes decline.
 - `--lp <ceiling>` — relaxation ceiling `off`, `conservative`, `default`, or `aggressive`,
   with `+/-<technique>` deltas. Portfolio arms choose intensity below this ceiling.
   Finite `fixed` uses no LP relaxation and accepts only `off` when this flag is supplied.
+  Native arithmetic routes reject an explicit ceiling.
 - Backtrack overrides `--param lp-variable-shaving=true` and `lp-prune-hulls=true`
   enable objective-independent root work on satisfaction and optimization models.
   `lp-root-cuts=false` disables root cut harvesting independently of node separation.
 - `--lp-pricing <policy>` — zero-objective LP entering selection:
-  `min-bound-support` (default) or `largest-pivot`.
+  `min-bound-support` (default) or `largest-pivot`. An explicit pricing flag applies
+  to finite execution; native arithmetic routes reject it, including the default value.
 - `--exact` — require continuous float interpretation and zero source feasibility tolerance
   for the policies the selected format declares. Already-exact formats retain their exact
   interpretation. An explicit grid or positive tolerance conflicts with this request. Unsupported
@@ -288,16 +320,18 @@ rows for those strategies; default continuous LP tolerance remains separate. SMT
 objectives that lack a complete theory route can use open local search for witnesses;
 its engine policy is described by
 [input semantics](formats.md#finite-and-open-models).
-`--param node-limit=N` is a solve-wide work budget. Finite routes charge decision nodes
-and counted local-search instructions at five quarters per instruction; parallel finite
-portfolios assign persistent worker quotas. Complete open routes charge native open-theory decisions, checks, LIA row visits, and the
-candidate hint's local-search moves on an open route. `--param open-hint-flips=N` spends up to N
+`--param node-limit=N` is a solve-wide decision and heuristic instruction budget.
+Finite and open routes charge committed decisions and counted local-search instructions
+at five quarters per instruction; parallel portfolios assign persistent worker quotas.
+`--param open-work-limit=auto|unlimited|N` separately bounds native open arithmetic
+policy work, including checks, LIA row visits and hint production. Omitted limits
+are unlimited. `--param open-hint-flips=N` spends up to N
 local-search flips, once per request, on an unverified first-branch order over the model's shared
 clauses; it is off unless asked for, changes only which side of a Boolean split is tried first, and
 reports under `-s` (`openHint*`) what it drew and how many splits it went on to order. The flips come
-out of the same `node-limit` budget the search spends — the draw gets what is left of it and is
+out of the same `open-work-limit` budget the search spends — the draw gets what is left of it and is
 charged for what it uses — so hinted and unhinted runs share the same total
-allowance. Without a `node-limit` there is nothing to divide and the draw gets the N it asked for; ask
+allowance. Without an `open-work-limit` there is nothing to divide and the draw gets the N it asked for; ask
 for more flips than the limit holds and the draw takes the whole remainder, leaving the traversal
 none. The allowance is not spent until `--param open-hint-min-splits=N` splits have asked for a
 hint (default 128), so a model the theory dominates — which reaches almost no split — never pays

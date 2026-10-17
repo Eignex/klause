@@ -85,6 +85,10 @@ class LinearObjective(
      */
     realCoefficients: DoubleArray = EmptyDoubleArray,
 ) : Objective {
+    private var capturedSourcePairing: SourceObjectivePairing? = null
+
+    internal val sourcePairing: SourceObjectivePairing? get() = capturedSourcePairing
+
     internal val boolWeightValues: LongArray = boolWeights.copyOf()
 
     /** Independent copy of the boolWeights coordinates. */
@@ -106,7 +110,14 @@ class LinearObjective(
         intCoefficients: LongArray = intCoefficientValues,
         constant: Long = this.constant,
         realCoefficients: DoubleArray = realCoefficientValues,
-    ): LinearObjective = LinearObjective(boolWeights, intCoefficients, constant, realCoefficients)
+    ): LinearObjective = LinearObjective(boolWeights, intCoefficients, constant, realCoefficients).also {
+        it.capturedSourcePairing = capturedSourcePairing?.copied(this, it)
+    }
+
+    internal fun paired(pairing: SourceObjectivePairing): LinearObjective =
+        LinearObjective(boolWeightValues, intCoefficientValues, constant, realCoefficientValues).also {
+            it.capturedSourcePairing = pairing
+        }
 
     /** Independent Boolean coefficients for destructuring. */
     operator fun component1(): LongArray = boolWeights
@@ -130,7 +141,7 @@ class LinearObjective(
         intCoefficients = LongArray(intCoefficientValues.size) { -intCoefficientValues[it] },
         constant = -constant,
         realCoefficients = DoubleArray(realCoefficientValues.size) { -realCoefficientValues[it] },
-    )
+    ).also { it.capturedSourcePairing = capturedSourcePairing?.negated() }
 
     /** Exact integer objective value of [sample]; lower is better. */
     fun evaluateLong(sample: Sample): Long {
@@ -159,7 +170,7 @@ class LinearObjective(
             val c = realCoefficientValues[r]
             if (c == 0.0) continue
             val symbolic = sample.symbolicReals?.get(r)
-            val x = sample.exactReals?.get(r) ?: if (symbolic != null) {
+            val x = sample.exactReals?.get(r) ?: sample.algebraicReals?.get(r)?.rational ?: if (symbolic != null) {
                 requireNotNull(symbolic.rational) { "a symbolic objective coordinate requires exact real arithmetic" }
             } else checkNotNull(BigFraction.ofDouble(sample.approximateRealValue(r)))
             value += checkNotNull(BigFraction.ofDouble(c)) * x

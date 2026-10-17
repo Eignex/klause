@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.BoolFoldDefinition
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -24,6 +25,56 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class DefinitionalSweepTest {
+    @Test
+    fun `definition inference should not spend work after its containing allowance stops`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(10, 20)),
+            arrayOf(Element(0, 1, longArrayOf(10, 20), arrIsVars = false, indexOffset = 0)))
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 23
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+
+        val view = DefinitionalSweep.infer(problem, intArrayOf(1), emptyList(), stop)
+
+        assertNull(view)
+        assertEquals(23L, charged)
+    }
+
+    @Test
+    fun `an explicit source relation should retain its inferred downstream definition cone`() {
+        val problem = Problem(0, 5, Array(5) { IntDomain(0, 100) }, labsShapedFactors())
+        val inferred = DefinitionalSweep.infer(problem, intArrayOf(2, 3, 4))
+        val source = listOf(DefinitionHint.Product(2,
+            DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)))
+        val assignment = com.eignex.klause.solver.Assignment(0, 5)
+        assignment.setInt(0, 2)
+        assignment.setInt(1, 3)
+
+        val sweep = assertNotNull(DefinitionalSweep.withSource(problem, inferred, source, Cancellation.Never))
+        sweep.sweep(assignment, problem.finiteIntDomains(), problem.factors)
+
+        assertEquals(6L, assignment.intValue(2))
+        assertEquals(36L, assignment.intValue(4))
+    }
+
+    @Test
+    fun `interrupted definition inference should discard the view without poisoning a fresh call`() {
+        val problem = Problem(0, 5, Array(5) { IntDomain(0, 16) }, labsShapedFactors())
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 8
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+
+        val interrupted = DefinitionalSweep.infer(problem, intArrayOf(2, 3, 4), emptyList(), stop)
+        val fresh = DefinitionalSweep.infer(problem, intArrayOf(2, 3, 4), emptyList(), Cancellation.Never)
+
+        assertNull(interrupted)
+        assertEquals(8L, charged)
+        assertNotNull(fresh)
+    }
+
     @Test
     fun `objective materialization should retain its containing work allowance`() {
         val problem = Problem(0, 5, Array(5) { IntDomain(0, 16) }, labsShapedFactors())

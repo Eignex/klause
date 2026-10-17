@@ -2,6 +2,9 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.RealFiniteDomain
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.DomainStorageSettings
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.intdomain.AbstractIntDomain
@@ -12,6 +15,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FlatZincFloatPolicyTest {
@@ -142,9 +147,13 @@ class FlatZincFloatPolicyTest {
             solve satisfy;
         """.trimIndent()
 
-        assertFailsWith<UnsupportedFlatZincException> {
-            parseFlatZinc(source, exactFloats = true, unboundedFloatLo = 0.5, unboundedFloatHi = 0.5)
-        }
+        val program = parseFlatZinc(source, exactFloats = true,
+            unboundedFloatLo = 0.5, unboundedFloatHi = 0.5).sourceProgram
+
+        assertEquals(0, program.problem.numIntVars)
+        assertTrue(program.problem.realLower.all { it == Double.NEGATIVE_INFINITY })
+        assertTrue(program.problem.realUpper.all { it == Double.POSITIVE_INFINITY })
+        assertNull(program.problem.factors.filterIsInstance<ContinuousProduct>().single().finiteChoices)
     }
 
     @Test
@@ -159,7 +168,9 @@ class FlatZincFloatPolicyTest {
                 solve satisfy;
             """.trimIndent()
 
-            assertFailsWith<UnsupportedFlatZincException> { parseFlatZinc(source, exactFloats = true) }
+            val exact = parseFlatZinc(source, exactFloats = true).sourceProgram
+            assertTrue(exact.floatVarsByName.values.all { it.lpOnly })
+            assertNull(exact.problem.factors.filterIsInstance<ContinuousProduct>().single().finiteChoices)
         }
     }
 
@@ -191,7 +202,9 @@ class FlatZincFloatPolicyTest {
             val program = parseFlatZinc(source, floatBuckets = 2)
 
             assertFalse(program.floatVarsByName.getValue("x").lpOnly)
-            assertFailsWith<UnsupportedFlatZincException> { parseFlatZinc(source, exactFloats = true) }
+            val exact = parseFlatZinc(source, exactFloats = true).sourceProgram
+            assertTrue(exact.floatVarsByName.values.all { it.lpOnly })
+            assertNull(exact.problem.factors.filterIsInstance<ContinuousProduct>().single().finiteChoices)
         }
     }
 
@@ -219,9 +232,12 @@ class FlatZincFloatPolicyTest {
             assertEquals(limit == 5, program.floatVarsByName.getValue("x").lpOnly)
         }
         val model = FlatZincParser(FlatZincLexer(source)).parse()
-        assertFailsWith<UnsupportedFlatZincException> {
-            FlatZincCompiler(model, exactFloats = true, floatChoiceLimit = 4).compile()
-        }
+        val exact = FlatZincCompiler(model, exactFloats = true, floatChoiceLimit = 4).compile().sourceProgram
+        assertEquals(3, exact.problem.numRealVars)
+        val choices = assertNotNull(exact.problem.factors.filterIsInstance<ContinuousProduct>().single().finiteChoices)
+        assertEquals(2, choices.size)
+        assertFalse(choices.hasGuards)
+        assertEquals(2, exact.problem.factors.filterIsInstance<RealFiniteDomain>().single().size)
     }
 
     @Test
@@ -271,7 +287,7 @@ class FlatZincFloatPolicyTest {
             constraint float_times(independent, multiplier, answer);
             solve satisfy;
             """.trimIndent(),
-            floatBuckets = 2,
+            floatBuckets = 9,
         )
 
         for (name in listOf("x", "alias", "y", "intermediate", "z")) {
@@ -283,6 +299,33 @@ class FlatZincFloatPolicyTest {
 
         val assignment = assertIs<SolveResult.Sat>(result).assignment
         assertTrue("answer = 0.0625;" in writeFlatZincSolution(program, assignment))
+    }
+
+    @Test
+    fun `an incompatible private grid should not round away original finite membership`() {
+        val program = parseFlatZinc(
+            """
+            var 0.0..1.0: x;
+            var 0.0..1.0: y;
+            var 0.0..1.0: intermediate;
+            var 0.0..1.0: z;
+            var 1..1: i;
+            constraint array_float_element(i, [0.375], x);
+            constraint float_times(x, y, intermediate);
+            constraint float_times(intermediate, y, z);
+            solve satisfy;
+            """.trimIndent(),
+            floatBuckets = 2,
+        )
+        val original = program.sourceProgram
+
+        val privateResult = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+
+        assertIs<SolveResult.Unsat>(privateResult)
+        val domain = original.problem.factors.filterIsInstance<RealFiniteDomain>().single()
+        assertEquals(original.floatVarsByName.getValue("x").varId, domain.variable)
+        assertEquals(0.375, domain.values.single())
+        assertEquals(4, original.problem.numRealVars)
     }
 
     @Test
@@ -312,7 +355,7 @@ class FlatZincFloatPolicyTest {
     }
 
     @Test
-    fun `exact mode should decline an oversized finite encoding`() {
+    fun `exact mode should retain source selection beyond the private encoding limit`() {
         for (result in listOf("x", "0.125")) {
             val model = FlatZincParser(
                 FlatZincLexer(
@@ -325,12 +368,10 @@ class FlatZincFloatPolicyTest {
                 ),
             ).parse()
 
-            val error = assertFailsWith<UnsupportedFlatZincException> {
-                FlatZincCompiler(model, exactFloats = true, floatChoiceLimit = 2).compile()
-            }
+            val program = FlatZincCompiler(model, exactFloats = true, floatChoiceLimit = 2).compile().sourceProgram
 
-            assertTrue(error.message.orEmpty().contains("2 alternative limit"))
-            assertTrue(error.message.orEmpty().contains("(at 3:1)"))
+            assertTrue(program.floatVarsByName.values.all { it.lpOnly })
+            assertEquals(3, program.problem.factors.filterIsInstance<RealElement>().single().size)
         }
     }
 

@@ -2,12 +2,9 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.IntBounds
-import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
-import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.portfolio.ArmFault
-import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
@@ -20,36 +17,29 @@ import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
+import com.eignex.klause.solver.pipeline.FiniteSolveShape
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.NODE_LIMIT_KEY
-import com.eignex.klause.solver.pipeline.OpenBranching
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
-import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
-import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.solver.pipeline.QuadraticIncumbentPublication
 import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
+import com.eignex.klause.solver.pipeline.SourceExecutionKind
+import com.eignex.klause.solver.pipeline.SourceExecutionPolicy
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
-import com.eignex.klause.solver.pipeline.SourceIncumbentPublication
 import com.eignex.klause.solver.pipeline.SourceSetup
-import com.eignex.klause.solver.pipeline.TheoryParams
-import com.eignex.klause.solver.pipeline.autoArms
 import com.eignex.klause.solver.pipeline.execute
-import com.eignex.klause.solver.pipeline.minimize
-import com.eignex.klause.solver.pipeline.optimize
+import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.solver.pipeline.solve
 import com.eignex.klause.solver.pipeline.variablePartition
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.TimeSource
 
 /**
  * The unified, mode-agnostic solve driver. Every CLI mode (MiniZinc, XCSP3, SMT-LIB) feeds a
@@ -60,7 +50,7 @@ import kotlin.time.TimeSource
 internal object SolveCore {
 
     fun solve(rawSolvable: Solvable, common: CommonOptions, protocol: OutputProtocol) {
-        val invocationStats = cliInvocationStats(common, rawSolvable.pipeline)
+        val invocationStats = cliInvocationStats(common, rawSolvable.rendering)
         val output = object : OutputProtocol by protocol {
             override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
                 protocol.onAllowanceStatistics(nodeBudgetStatPairs(common.nodeBudget))
@@ -76,11 +66,8 @@ internal object SolveCore {
         // the one transformed problem. The pipeline drops solution-set-altering passes (symmetry
         // breaking, value precedence) for a pure-LS engine unless `--presolve` is explicit;
         // solutions are reconstructed at render time.
-        val base = common.presolve?.let { PresolveConfig.parse(it) } ?: common.config.presolveConfig()
-        // `affine-pivot-order` selects how affine elimination orders its pivots. A cost knob only: the
-        // orders differ in what they fold first, never in what the problem means.
-        val pivotPlan = affinePivotOrderParam(common)?.let { base.withAffinePivotOrder(it) } ?: base
-        val config = presolveEffortParams(common.engineParams, pivotPlan)
+        val policy = executionPolicy(common, common.presolve != null)
+        val config = common.presolve?.let { PresolveConfig.parse(it) } ?: common.config.presolveConfig()
         // Symmetry breaking collapses symmetric solutions, so disable it (via auto resolution) when
         // the run wants the full solution set: enumeration (`-a`) or a multi-solution cap (`-n N`),
         // unless we're optimizing (a single optimum, where symmetry breaking is sound).
@@ -93,281 +80,41 @@ internal object SolveCore {
         val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel)
         // `-p N` gives the open portfolio a lane per core, as it does the finite one.
         val openCores = common.parallel ?: 1
-        when (val pipeline = rawSolvable.pipeline) {
-            is SolvablePipeline.NativeSource -> {
-                solveNativeSource(rawSolvable, pipeline, common, output, publication, deadlineCancel, openCores)
+        val sourceControls = rawSolvable.sourceInvocation?.let { invocation ->
+            val kind = SourceSetup.executionKind(invocation)
+            val options = common.engineParams.filterNot {
+                it.substringBefore('=') == "dry-run-presolve" &&
+                    kind in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.LINEAR)
+            }
+            SourceExecutionRequest(
+                invocation, policy, ExecutionOptions.parse(options),
+                finiteRequest = { shape ->
+                    finiteRequest(
+                        shape, common, engine, openCores, config, solutionSetSensitive,
+                        presolveCancel, presolveBudget, deadlineCancel, deadline, common.nodeBudget, policy,
+                        rawSolvable.numericalCompletion, rawSolvable.toleranceCheck,
+                    )
+                },
+                cores = openCores, randomSeed = common.randomSeed, nodeBudget = common.nodeBudget,
+                timeout = deadlineCancel, presolveConfig = config,
+                presolveCancellation = presolveCancel, presolveBudget = presolveBudget,
+            ).also { common.nodeBudget = it.nodeBudget }
+        }
+        when (val pipeline = rawSolvable.rendering) {
+            is SourceRendering.LinearSource -> {
+                solveLinearSource(rawSolvable, pipeline, requireNotNull(sourceControls), common, output, publication)
                 return
             }
 
-            is SolvablePipeline.NumericalLinear -> {
-                if (solutionSetSensitive) usageError("all-solution enumeration is unavailable for numerical MIP")
-                val work = takeOpenNodeLimit(common) ?: Long.MAX_VALUE
-                val params = TheoryParams(
-                    openWorkLimit = work,
-                    maxDecisions = takeOpenLongParam(common, "max-decisions", nonNegative = true) ?: Long.MAX_VALUE,
-                    timeout = deadlineCancel,
-                    cancellation = deadlineCancel,
-                )
-                dropOpenOnlyParams(common)
-                output.begin(optimize = rawSolvable.optimize, maximize = rawSolvable.maximize)
-                val complete = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS
-                val result = pipeline.request.solve(params, complete) { sample, value ->
-                    if (rawSolvable.optimize) {
-                        publication.publish(
-                            pipeline.render(OpenTheoryAssignment.Sampled(sample)),
-                            SourceValue.Rational(value),
-                        )
-                    }
-                }
-                if (rawSolvable.optimize) {
-                    reportLinearOptimization(
-                        result,
-                        { pipeline.render(OpenTheoryAssignment.Sampled(it)) },
-                        output,
-                        publication,
-                        common.statistics,
-                        rawSolvable.routingElapsedMs,
-                        completePool = complete,
-                        routingLpStats = rawSolvable.routingLpStats,
-                    )
-                } else {
-                    output.onVerdictContext(VerdictContext(terminationReason = result.reason))
-                    val point = result.incumbent
-                    if (point != null) output.onSolution(pipeline.render(OpenTheoryAssignment.Sampled(point)), null)
-                    output.onComplete(
-                        when {
-                            point != null -> Verdict.SATISFIABLE
-
-                            result.terminal?.claim == com.eignex.klause.solver.evidence.SourceClaim.Refutation ->
-                                Verdict.UNSATISFIABLE
-
-                            else -> Verdict.UNKNOWN
-                        },
-                    )
-                    if (common.statistics) {
-                        output.onStatistics(
-                            result.stats,
-                            result.stats.run.wallMs + rawSolvable.routingElapsedMs,
-                            if (point == null) 0 else 1,
-                        )
-                    }
-                }
+            is SourceRendering.ExactSource -> {
+                solveCapturedSource(
+                    rawSolvable, pipeline, common, output, publication, requireNotNull(sourceControls),
+                    config, presolveCancel, presolveBudget,
+                ) { budgetSpent(common, it) }
                 return
             }
 
-            is SolvablePipeline.QuadraticTheory -> {
-                if (solutionSetSensitive) usageError("all-solution enumeration is unavailable for quadratic objectives")
-                output.begin(optimize = true, maximize = pipeline.sense == ObjectiveSense.MAXIMIZE)
-                val onAccepted: (QuadraticIncumbentPublication) -> Unit = { accepted ->
-                    publication.publish(
-                        pipeline.render(accepted.incumbent.sample),
-                        SourceValue.Algebraic(accepted.incumbent.value),
-                        accepted.version,
-                    )
-                }
-                val execution = when (val request = pipeline.request) {
-                    is QuadraticRequest.Polynomial -> OpenTheoryPipeline.minimize(
-                        request.request,
-                        pipeline.objective,
-                        polynomialParams(common, deadlineCancel),
-                        engine,
-                        pipeline.sense,
-                        openCores,
-                        onAccepted,
-                    )
-
-                    is QuadraticRequest.Integer -> {
-                        val budget = takeNodeBudget(common).also { common.nodeBudget = it }
-                        OpenTheoryPipeline.minimize(
-                            request.request,
-                            pipeline.objective,
-                            nonlinearIntegerParams(common, deadlineCancel, budget),
-                            engine,
-                            pipeline.sense,
-                            openCores,
-                            onAccepted,
-                        )
-                    }
-                }
-                reportQuadraticOptimization(
-                    execution,
-                    pipeline,
-                    output,
-                    common.statistics,
-                    rawSolvable.routingElapsedMs,
-                    completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
-                    publication = publication,
-                )
-                return
-            }
-
-            is SolvablePipeline.PolynomialTheory -> {
-                if (solutionSetSensitive) {
-                    usageError("all-solution enumeration is unavailable for polynomial real models")
-                }
-                val polynomialParams = polynomialParams(common, deadlineCancel)
-                pipeline.objective?.let { sourceObjective ->
-                    output.begin(optimize = true, maximize = pipeline.maximize)
-                    val sense = if (pipeline.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
-                    val accepted: (QuadraticIncumbentPublication) -> Unit = { value ->
-                        publication.publish(
-                            pipeline.render(polynomialAssignment(value.incumbent.sample)),
-                            SourceValue.Algebraic(value.incumbent.value),
-                            value.version,
-                        )
-                    }
-                    val execution = rawSolvable.sourceInvocation?.let { invocation ->
-                        (
-                            SourceSetup.execute(
-                                SourceExecutionRequest(
-                                    invocation,
-                                    polynomial = polynomialParams,
-                                    cores = openCores,
-                                ),
-                                SourceExecutionCallbacks(onQuadraticIncumbent = accepted),
-                            )
-                                as SourceExecutionResult.Quadratic
-                            ).result
-                    } ?: OpenTheoryPipeline.optimize(
-                        pipeline.request,
-                        sourceObjective,
-                        polynomialParams,
-                        engine,
-                        sense,
-                        openCores,
-                        accepted,
-                    )
-                    reportQuadraticOptimization(
-                        execution,
-                        { pipeline.render(polynomialAssignment(it)) },
-                        output,
-                        common.statistics,
-                        rawSolvable.routingElapsedMs,
-                        completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
-                        publication = publication,
-                    )
-                    return
-                }
-                error("polynomial satisfaction requires the exact source execution request")
-            }
-
-            is SolvablePipeline.ExactTheorySatisfaction -> {
-                if (solutionSetSensitive) usageError("all-solution enumeration is unavailable for this exact source")
-                val polynomialParams = polynomialParams(common, deadlineCancel)
-                output.begin(optimize = false, maximize = false)
-                val execution = rawSolvable.sourceInvocation?.let { invocation ->
-                    (
-                        SourceSetup.execute(
-                            SourceExecutionRequest(
-                                invocation,
-                                polynomial = polynomialParams,
-                                cores = openCores,
-                            ),
-                        ) as SourceExecutionResult.Polynomial
-                        ).result
-                } ?: pipeline.request.execute(polynomialParams, engine, openCores)
-                val result = if ((engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) &&
-                    execution.result is OpenTheoryResult.Unsat
-                ) {
-                    OpenTheoryResult.Unknown(TerminationReason.BudgetExhausted, execution.result.stats)
-                } else {
-                    execution.result
-                }
-                output.onVerdictContext(
-                    VerdictContext(
-                        terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
-                        completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
-                    ),
-                )
-                when (result) {
-                    is OpenTheoryResult.Sat -> {
-                        output.onSolution(pipeline.render(result.assignment), null)
-                        output.onComplete(Verdict.SATISFIABLE)
-                    }
-
-                    is OpenTheoryResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
-
-                    is OpenTheoryResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
-                }
-                if (common.statistics) {
-                    output.onStatistics(
-                        result.stats,
-                        result.stats.run.wallMs + rawSolvable.routingElapsedMs,
-                        if (result is OpenTheoryResult.Sat) 1L else 0L,
-                    )
-                    val native = execution.stats
-                    val pairs = if (execution.nativeWorkScope == "transcendental") {
-                        listOf("transcendentalWork" to native.workSpent.toString()) +
-                            execution.nativeResource?.let { listOf("transcendentalResource" to it) }.orEmpty()
-                    } else {
-                        listOf(
-                            "nraWork" to native.workSpent.toString(),
-                            "nraProjectedPolynomials" to native.projectedPolynomials.toString(),
-                            "nraLiftedCells" to native.liftedCells.toString(),
-                        ) + listOfNotNull(
-                            native.dyadicAttempts?.let { "nraDyadicAttempts" to it.toString() },
-                            native.dyadicBases?.let { "nraDyadicBases" to it.toString() },
-                            native.coupledWorkDeclines?.let { "nraCoupledWorkDeclines" to it.toString() },
-                            native.dyadicPreExtractionDeclines?.let {
-                                "nraDyadicPreExtractionDeclines" to it.toString()
-                            },
-                        ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty()
-                    }
-                    output.onAllowanceStatistics(pairs)
-                }
-                return
-            }
-
-            is SolvablePipeline.NonlinearIntegerTheory -> {
-                if (solutionSetSensitive) {
-                    usageError("all-solution enumeration is unavailable for nonlinear integer sources")
-                }
-                val nonlinearBudget = takeNodeBudget(common).also { common.nodeBudget = it }
-                val nonlinearParams = nonlinearIntegerParams(common, deadlineCancel, nonlinearBudget)
-                output.begin(optimize = false, maximize = false)
-                val execution = OpenTheoryPipeline.execute(pipeline.request, nonlinearParams, engine, openCores)
-                val result = execution.result
-                output.onVerdictContext(
-                    VerdictContext(
-                        terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
-                        completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
-                    ),
-                )
-                when (result) {
-                    is OpenTheoryResult.Sat -> {
-                        output.onSolution(pipeline.render(result.assignment), null)
-                        output.onComplete(Verdict.SATISFIABLE)
-                    }
-
-                    is OpenTheoryResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
-
-                    is OpenTheoryResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
-                }
-                if (common.statistics) {
-                    output.onStatistics(
-                        result.stats,
-                        result.stats.run.wallMs + rawSolvable.routingElapsedMs,
-                        if (result is OpenTheoryResult.Sat) 1L else 0L,
-                    )
-                    output.onAllowanceStatistics(
-                        listOf(
-                            "nraWork" to execution.stats.workSpent.toString(),
-                            "nraProjectedPolynomials" to execution.stats.projectedPolynomials.toString(),
-                            "nraLiftedCells" to execution.stats.liftedCells.toString(),
-                        ) + listOfNotNull(
-                            execution.stats.dyadicAttempts?.let { "nraDyadicAttempts" to it.toString() },
-                            execution.stats.dyadicBases?.let { "nraDyadicBases" to it.toString() },
-                            execution.stats.coupledWorkDeclines?.let { "nraCoupledWorkDeclines" to it.toString() },
-                            execution.stats.dyadicPreExtractionDeclines?.let {
-                                "nraDyadicPreExtractionDeclines" to it.toString()
-                            },
-                        ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty(),
-                    )
-                }
-                return
-            }
-
-            is SolvablePipeline.Interrupted -> {
+            is SourceRendering.Interrupted -> {
                 output.begin(optimize = false, maximize = false)
                 output.onVerdictContext(VerdictContext(terminationReason = pipeline.reason))
                 output.onComplete(Verdict.UNKNOWN)
@@ -375,222 +122,15 @@ internal object SolveCore {
                 return
             }
 
-            is SolvablePipeline.OpenLocalSearch -> {
-                // Local search proves no optimum, so a run without a deadline ends where its node allowance does.
-                val nodeBudget = takeOpenNodeLimit(common)?.let(::NodeBudget).also { common.nodeBudget = it }
-                val stop = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
-                val params = TheoryParams(
-                    cancellation = stop,
-                    timeout = deadlineCancel,
-                    nodeBudget = nodeBudget,
-                    randomSeed = takeOpenLongParam(common, "seed", nonNegative = true, signed = true)
-                        ?: common.randomSeed ?: 0,
-                    maxFlips = takeOpenLongParam(common, "max-flips", nonNegative = true) ?: Long.MAX_VALUE,
-                    maxInstructions = takeOpenLongParam(common, "max-instructions", nonNegative = true),
-                    alnsIterations = takeOpenIntParam(common, "alns-iterations", nonNegative = true) ?: 50,
-                )
-                fun executeHeuristic(onAccepted: ((SourceIncumbentPublication) -> Unit)? = null): OpenTheoryExecution =
-                    rawSolvable.sourceInvocation?.let { invocation ->
-                        (
-                            SourceSetup.execute(
-                                SourceExecutionRequest(invocation, theory = params, cores = openCores),
-                                SourceExecutionCallbacks(onLinearIncumbent = onAccepted),
-                            ) as SourceExecutionResult.Linear
-                            ).result
-                    } ?: OpenTheoryPipeline.searchWithoutTheory(
-                        pipeline.model,
-                        params,
-                        pipeline.objective,
-                        engine,
-                        openCores,
-                        pipeline.maximize,
-                        onAccepted,
+            SourceRendering.FiniteCp -> {
+                if (sourceControls != null) {
+                    executeFinite(
+                        requireNotNull(sourceControls.finiteRequest).invoke(rawSolvable.finiteShape),
+                        rawSolvable, common, output,
                     )
-                val objective = pipeline.objective
-                if (objective != null) {
-                    output.begin(optimize = true, maximize = pipeline.maximize)
-                    val execution = executeHeuristic { accepted ->
-                        val rendered = pipeline.render(OpenTheoryAssignment.Sampled(accepted.sample))
-                        publication.publish(rendered, accepted.value, accepted.version)
-                    }
-                    reportOpenTheoryOptimum(
-                        execution as OpenTheoryExecution.Optimize,
-                        pipeline.maximize,
-                        pipeline.render,
-                        common.statistics,
-                        output,
-                        rawSolvable.routingLpStats,
-                        rawSolvable.routingElapsedMs,
-                        completePool = false,
-                        publication = publication,
-                    ) {
-                        budgetSpent(common, it)
-                    }
                     return
                 }
-                output.begin(optimize = false, maximize = false)
-                val execution = executeHeuristic()
-                val result = (execution as OpenTheoryExecution.Satisfy).result
-                output.onVerdictContext(
-                    VerdictContext(
-                        budgetExhausted = budgetSpent(common, result.stats.run.timedOut),
-                        terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
-                    ),
-                )
-                when (result) {
-                    is OpenTheoryResult.Sat -> {
-                        output.onSolution(pipeline.render(result.assignment), null)
-                        output.onComplete(Verdict.SATISFIABLE)
-                    }
-
-                    // Local search never refutes; an unsat here would be a bug, not a verdict to print.
-                    is OpenTheoryResult.Unsat, is OpenTheoryResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
-                }
-                if (common.statistics) {
-                    output.onStatistics(
-                        result.stats,
-                        result.stats.run.wallMs + rawSolvable.routingElapsedMs,
-                        if (result is OpenTheoryResult.Sat) 1L else 0L,
-                    )
-                }
-                return
             }
-
-            is SolvablePipeline.OpenTheory -> {
-                val nodeLimit = takeOpenNodeLimit(common)
-                if (solutionSetSensitive) {
-                    usageError("all-solution enumeration is unavailable for open theory models")
-                }
-                val theoryParams = TheoryParams(
-                    maxLeaves = Long.MAX_VALUE,
-                    openWorkLimit = nodeLimit ?: Long.MAX_VALUE,
-                    maxDecisions = takeOpenLongParam(common, "max-decisions", nonNegative = true) ?: Long.MAX_VALUE,
-                    sharedRestart = takeOpenLongParam(common, "shared-restart", nonNegative = false),
-                    maxLearnedClauses = takeOpenIntParam(common, "max-learned", nonNegative = true),
-                    lbdGlue = takeOpenIntParam(common, "lbd-glue", nonNegative = true) ?: 2,
-                    openHintFlips = takeOpenLongParam(common, "open-hint-flips", nonNegative = true),
-                    openBranching = takeOpenBranching(common) ?: TheoryParams().openBranching,
-                    openHintMinSplits = takeOpenLongParam(common, "open-hint-min-splits", nonNegative = false)
-                        ?: TheoryParams().openHintMinSplits,
-                    cancellation = deadlineCancel,
-                    timeout = deadlineCancel,
-                    randomSeed = takeOpenLongParam(common, "seed", nonNegative = true, signed = true)
-                        ?: common.randomSeed ?: 0,
-                    maxFlips = takeOpenLongParam(common, "max-flips", nonNegative = true) ?: Long.MAX_VALUE,
-                    maxInstructions = takeOpenLongParam(common, "max-instructions", nonNegative = true),
-                    alnsIterations = takeOpenIntParam(common, "alns-iterations", nonNegative = true) ?: 50,
-                )
-                val request = pipeline.request.withPresolve(
-                    config,
-                    cancellation = presolveCancel,
-                    budget = presolveBudget,
-                )
-                // The open route reaches no engine below, so the dry run has to be answered here or the
-                // flag is silently ignored on exactly the models whose only reduction is this phase.
-                if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) {
-                    val mark = TimeSource.Monotonic.markNow()
-                    val prepared = OpenTheoryPipeline.prepare(request)
-                    printPresolved(
-                        request.model,
-                        prepared.model,
-                        prepared.stats,
-                        mark.elapsedNow(),
-                        loadElapsedMs = null,
-                        constructionBakeElapsed = Duration.ZERO,
-                    )
-                    errPrintln("  open sides closed: ${prepared.closedSides}")
-                    presolveBudget?.let { errPrintln("  work: ${it.spent()} of ${it.allowance}") }
-                    if (prepared.infeasible) errPrintln("  preparation refuted the model")
-                    return
-                }
-                fun executeOpen(onAccepted: ((SourceIncumbentPublication) -> Unit)? = null): OpenTheoryExecution =
-                    rawSolvable.sourceInvocation?.let { invocation ->
-                        (
-                            SourceSetup.execute(
-                                SourceExecutionRequest(
-                                    invocation,
-                                    theory = theoryParams,
-                                    cores = openCores,
-                                    presolveConfig = config,
-                                    presolveCancellation = presolveCancel,
-                                    presolveBudget = presolveBudget,
-                                ),
-                                SourceExecutionCallbacks(onLinearIncumbent = onAccepted),
-                            )
-                                as SourceExecutionResult.Linear
-                            ).result
-                    } ?: OpenTheoryPipeline.execute(request, theoryParams, engine, openCores, onAccepted)
-                val objective = request.objective
-                if (objective != null) {
-                    output.begin(optimize = true, maximize = request.maximize)
-                    val execution = executeOpen { accepted ->
-                        val rendered = pipeline.render(OpenTheoryAssignment.Sampled(accepted.sample))
-                        publication.publish(rendered, accepted.value, accepted.version)
-                    }
-                    reportOpenTheoryOptimum(
-                        execution as OpenTheoryExecution.Optimize,
-                        request.maximize,
-                        pipeline.render,
-                        common.statistics,
-                        output,
-                        rawSolvable.routingLpStats,
-                        rawSolvable.routingElapsedMs,
-                        completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
-                        publication = publication,
-                    ) {
-                        budgetSpent(common, it)
-                    }
-                    logOpenPresolveWork(common, presolveBudget)
-                    return
-                }
-                output.begin(optimize = false, maximize = false)
-                val execution = executeOpen()
-                val result = (execution as OpenTheoryExecution.Satisfy).result
-                val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(rawSolvable.routingLpStats))
-                output.onVerdictContext(
-                    VerdictContext(
-                        budgetExhausted = budgetSpent(common, resultStats.run.timedOut),
-                        terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
-                    ),
-                )
-                when (result) {
-                    is OpenTheoryResult.Sat -> {
-                        output.onSolution(pipeline.render(result.assignment), null)
-                        output.onComplete(Verdict.SATISFIABLE)
-                    }
-
-                    is OpenTheoryResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
-
-                    is OpenTheoryResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
-                }
-                if (common.statistics) {
-                    output.onStatistics(
-                        resultStats,
-                        resultStats.run.wallMs + rawSolvable.routingElapsedMs,
-                        if (result is OpenTheoryResult.Sat) 1L else 0L,
-                    )
-                }
-                logOpenPresolveWork(common, presolveBudget)
-                return
-            }
-
-            // Routing already decided the model over its genuinely open ranges, so no engine runs and
-            // there is nothing for a budget to have cut short.
-            SolvablePipeline.Refuted -> {
-                rawSolvable.sourceInvocation?.let { SourceSetup.execute(SourceExecutionRequest(it)) }
-                output.begin(optimize = rawSolvable.optimize, maximize = rawSolvable.maximize)
-                output.onComplete(Verdict.UNSATISFIABLE)
-                if (common.statistics) {
-                    output.onStatistics(
-                        SolveStats(lp = rawSolvable.routingLpStats),
-                        rawSolvable.routingElapsedMs,
-                        0L,
-                    )
-                }
-                return
-            }
-
-            SolvablePipeline.FiniteCp -> dropOpenOnlyParams(common)
         }
         val nodeBudget = takeNodeBudget(common).also { common.nodeBudget = it }
         val cancel = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
@@ -603,10 +143,9 @@ internal object SolveCore {
             // the heuristic and per-solver selector --params are rejected; an unannotated model has
             // no heuristic to preserve, so its one run accepts them (see runBacktrack).
             FiniteEngine.FIXED -> {
-                rejectParallel(engine, cores, alt = null)
                 runBacktrack(
                     rawSolvable, common, output, config, solutionSetSensitive, presolveCancel, presolveBudget,
-                    cancel, deadline, nodeBudget,
+                    cancel, deadline, nodeBudget, policy,
                 )
             }
 
@@ -617,7 +156,7 @@ internal object SolveCore {
             FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
                 runPortfolio(
                     rawSolvable, common, output, cores, engine, config, solutionSetSensitive, presolveCancel,
-                    presolveBudget, cancel, nodeBudget,
+                    presolveBudget, cancel, nodeBudget, policy,
                 )
         }
     }
@@ -630,78 +169,17 @@ internal object SolveCore {
     private fun budgetSpent(common: CommonOptions, backendTimedOut: Boolean): Boolean =
         backendTimedOut || common.deadlineAtMs?.let { nowMillis() >= it } == true
 
-    /** Reject `-p N>1` for a single-core engine; [alt], when given, is the parallel engine to suggest. */
-    private fun rejectParallel(engine: FiniteEngine, cores: Int, alt: FiniteEngine?) {
-        if (cores <= 1) return
-        val hint = alt?.let { "; use '${it.id}' for a parallel pool" } ?: " (FD track); drop -p"
-        usageError("engine '${engine.id}' is single-core$hint")
-    }
-
     /**
      * Consumes `node-limit` as a shared [NodeBudget] and removes it from [CommonOptions.engineParams].
      * Every arm spends the same invocation allowance; engines must not consume the key again.
      */
     internal fun takeNodeBudget(common: CommonOptions): NodeBudget? = takeOpenNodeLimit(common)?.let(::NodeBudget)
 
-    // The engine params only the open-theory route reads. A sweep that sets them for its open models also runs its
-    // finite ones, where they mean nothing, so they are dropped there rather than failing the run as unknown keys.
-    private val openOnlyParams = setOf("shared-restart", "open-branching", "open-hint-flips", "open-hint-min-splits")
-
-    private fun dropOpenOnlyParams(common: CommonOptions) {
-        common.engineParams.removeAll { it.substringBefore('=') in openOnlyParams }
-    }
-
     /** Consume the route-local fixed-work limit for an open-theory solve. */
     private fun takeOpenNodeLimit(common: CommonOptions): Long? =
         when (val setting = takeAllowanceSetting(common.engineParams, NODE_LIMIT_KEY)) {
             AllowanceSetting.Automatic, AllowanceSetting.Unlimited -> null
             is AllowanceSetting.Remaining -> setting.units
-        }
-
-    private fun takeOpenLongParam(
-        common: CommonOptions,
-        key: String,
-        nonNegative: Boolean,
-        signed: Boolean = false,
-    ): Long? {
-        val entry = common.engineParams.firstOrNull { it.startsWith("$key=") } ?: return null
-        common.engineParams.remove(entry)
-        val raw = entry.substringAfter('=')
-        val value = raw.toLongOrNull() ?: usageError("engine param `$key` expects an integer, got `$raw`")
-        val invalid = !signed && if (nonNegative) value < 0 else value <= 0
-        if (invalid) {
-            usageError(
-                "engine param `$key` expects a ${if (nonNegative) "non-negative" else "positive"} integer, got $value",
-            )
-        }
-        return value
-    }
-
-    /** Consume the open route's Boolean branching selection. */
-    private fun takeOpenBranching(common: CommonOptions): OpenBranching? {
-        val entry = common.engineParams.firstOrNull { it.startsWith("open-branching=") } ?: return null
-        common.engineParams.remove(entry)
-        val raw = entry.substringAfter('=')
-        return OpenBranching.of(raw) ?: usageError(
-            "engine param `open-branching` expects one of ${OpenBranching.entries.joinToString(", ") { it.id }}, " +
-                "got `$raw`",
-        )
-    }
-
-    private fun takeOpenBoolParam(common: CommonOptions, key: String): Boolean? {
-        val entry = common.engineParams.firstOrNull { it.startsWith("$key=") } ?: return null
-        common.engineParams.remove(entry)
-        return when (val raw = entry.substringAfter('=').lowercase()) {
-            "true", "1", "on", "yes" -> true
-            "false", "0", "off", "no" -> false
-            else -> usageError("engine param `$key` expects a boolean, got `$raw`")
-        }
-    }
-
-    private fun takeOpenIntParam(common: CommonOptions, key: String, nonNegative: Boolean): Int? =
-        takeOpenLongParam(common, key, nonNegative)?.let {
-            if (it > Int.MAX_VALUE) usageError("engine param `$key` exceeds Int.MAX_VALUE")
-            it.toInt()
         }
 
     private fun deadlineCancellation(common: CommonOptions): Pair<Long?, Cancellation> {
@@ -760,58 +238,18 @@ internal object SolveCore {
         cancel: Cancellation,
         deadline: Long?,
         nodeBudget: NodeBudget?,
+        policy: SourceExecutionPolicy,
     ) {
-        // This route is propagation only, for every input, whether or not the model carries a search
-        // annotation. It serves the CSP/COP fixed-search track, where a model states its own search and
-        // a relaxation bound is not among the permitted deductions. An explicit `--lp` asking for
-        // anything but `off` is refused rather than quietly dropped. A relaxation on one deterministic
-        // solver is `-e cp --param bt-arm=<label>`, a pool of one with the portfolio's LP surface.
-        if (common.lp != null) {
-            val asked = runCatching { LpConfig.parse(common.lp!!) }
-                .getOrElse { e -> usageError("--lp: ${e.message}") }
-            if (asked.emphasis != LpEmphasis.OFF) {
-                usageError("--lp: `-e fixed` solves by propagation alone; only `off` applies here")
-            }
-        }
-        val lpConfig = LpConfig.OFF
         executeFinite(
-            FiniteSolveRequest(
-                shape = solvable.finiteShape,
-                engine = FiniteEngine.FIXED,
-                presolveConfig = presolveConfig,
-                explicitPresolveConfig = common.presolve != null,
-                solutionSetSensitive = solutionSetSensitive,
-                presolveBudget = presolveBudget,
-                cores = 1,
-                executionOptions = ExecutionOptions.parse(common.engineParams).let {
-                    if (solvable.numericalCompletion) it.withNumericalCompletion() else it
-                },
-                randomSeed = common.randomSeed,
-                defaultArms = 1,
-                lpConfig = lpConfig,
-                zeroObjectivePricing = common.lpPricing,
-                cancellation = cancel,
-                presolveCancellation = presolveCancellation,
-                nodeBudget = nodeBudget,
-                solveBudgetMillis = common.timeLimitMs,
-                allSolutions = common.allSolutions,
-                solutionCap = common.solutionCap,
-                deadlineExceeded = { deadline != null && nowMillis() > deadline },
-                onEvent = verboseListener(common.verbose),
-                onPortfolioEvent = null,
-                prepareOnly = EngineParams(common.engineParams).bool("dry-run-presolve") == true,
-                toleranceCheck = solvable.toleranceCheck,
+            finiteRequest(
+                solvable.finiteShape, common, FiniteEngine.FIXED, common.parallel ?: 1, presolveConfig,
+                solutionSetSensitive, presolveCancellation, presolveBudget, cancel, deadline, nodeBudget,
+                policy, solvable.numericalCompletion, solvable.toleranceCheck,
             ),
             solvable,
             common,
             output,
         )
-    }
-
-    /** The open route's presolve work under `-v`: routing, source preparation and bound closing together. */
-    private fun logOpenPresolveWork(common: CommonOptions, budget: PresolveBudget?) {
-        if (budget == null) return
-        cliLogger(common.verbose).v { "presolve [open]: work ${budget.spent()} of ${budget.allowance}" }
     }
 
     /**
@@ -826,7 +264,7 @@ internal object SolveCore {
      * Print presolve timing, size and factor-count changes, LP harvest statistics and proven
      * infeasibility for `dry-run-presolve`. Timing excludes JVM startup and parsing.
      */
-    private fun printPresolved(
+    internal fun printPresolved(
         original: Problem,
         presolved: Problem,
         stats: PresolveStats?,
@@ -961,25 +399,6 @@ internal object SolveCore {
     private fun spanText(problem: Problem): String =
         domainSpan(problem).let { if (it == Long.MAX_VALUE) "unbounded" else it.toString() }
 
-    /**
-     * The `affine-pivot-order` param, or `null` to keep the configured default. This is a *presolve*
-     * knob sharing the `--param` namespace the engines validate, so it is consumed out of
-     * [CommonOptions.engineParams] here — otherwise every engine's unknown-key check would reject it.
-     */
-    private fun affinePivotOrderParam(common: CommonOptions): AffinePivotOrder? {
-        val prefix = "$AFFINE_PIVOT_ORDER_KEY="
-        val idx = common.engineParams.indexOfFirst { it.startsWith(prefix) }
-        if (idx < 0) return null
-        val id = common.engineParams.removeAt(idx).removePrefix(prefix)
-        return AffinePivotOrder.entries.firstOrNull { it.name.equals(id, ignoreCase = true) }
-            ?: usageError(
-                "engine param `$AFFINE_PIVOT_ORDER_KEY` expects " +
-                    AffinePivotOrder.entries.joinToString("|") { it.name.lowercase() } + ", got `$id`",
-            )
-    }
-
-    private const val AFFINE_PIVOT_ORDER_KEY = "affine-pivot-order"
-
     private fun factorHistogram(problem: Problem): Map<String, Int> =
         problem.factors.groupingBy { it::class.simpleName ?: "?" }.eachCount()
 
@@ -995,54 +414,74 @@ internal object SolveCore {
         presolveBudget: PresolveBudget?,
         cancel: Cancellation,
         nodeBudget: NodeBudget?,
+        policy: SourceExecutionPolicy,
     ) {
-        val configuredArms = cliProp(CliKnobs.portfolioArms)?.toIntOrNull()
-        val defaultArms = configuredArms ?: autoArms(cores)
-        val engineParams = if (configuredArms != null &&
-            common.engineParams.none { it.substringBefore('=') in listOf("arms", "ls", "bt") }
-        ) {
-            common.engineParams + "arms=$configuredArms"
-        } else {
-            common.engineParams
-        }
-        // `--lp CEILING` caps the portfolio's LP emphasis; the flag wins, then the `klause.lp`
-        // env default, else AGGRESSIVE (uncapped — the pool spreads the LP intensity itself); `off`
-        // disables LP across the pool.
-        val lpCeiling = (common.lp ?: defaultLp())?.let {
-            runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
-        } ?: LpConfig.AGGRESSIVE
         executeFinite(
-            FiniteSolveRequest(
-                shape = solvable.finiteShape,
-                engine = engine,
-                presolveConfig = presolveConfig,
-                explicitPresolveConfig = common.presolve != null,
-                solutionSetSensitive = solutionSetSensitive,
-                presolveBudget = presolveBudget,
-                cores = cores,
-                executionOptions = ExecutionOptions.parse(engineParams).let {
-                    if (solvable.numericalCompletion) it.withNumericalCompletion() else it
-                },
-                randomSeed = common.randomSeed,
-                defaultArms = defaultArms,
-                lpConfig = lpCeiling,
-                zeroObjectivePricing = common.lpPricing,
-                cancellation = cancel,
-                presolveCancellation = presolveCancellation,
-                nodeBudget = nodeBudget,
-                solveBudgetMillis = null,
-                allSolutions = common.allSolutions,
-                solutionCap = common.solutionCap,
-                deadlineExceeded = { false },
-                onEvent = null,
-                onPortfolioEvent = portfolioVerboseListener(common.verbose),
-                onPortfolioFault = ::warnPortfolioFault,
-                prepareOnly = EngineParams(common.engineParams).bool("dry-run-presolve") == true,
-                toleranceCheck = solvable.toleranceCheck,
+            finiteRequest(
+                solvable.finiteShape, common, engine, cores, presolveConfig,
+                solutionSetSensitive, presolveCancellation, presolveBudget, cancel, null, nodeBudget,
+                policy, solvable.numericalCompletion, solvable.toleranceCheck,
             ),
             solvable,
             common,
             output,
+        )
+    }
+
+    private fun executionPolicy(common: CommonOptions, explicitPresolve: Boolean): SourceExecutionPolicy {
+        fun ceiling(value: String?): LpConfig? = value?.let {
+            runCatching { LpConfig.parse(it) }.getOrElse { failure -> usageError("--lp: ${failure.message}") }
+        }
+        val arms = cliProp(CliKnobs.portfolioArms)?.let { value ->
+            value.toIntOrNull()?.takeIf { it > 0 }
+                ?: usageError("portfolio arm default expects a positive integer")
+        }
+        return SourceExecutionPolicy(
+            ceiling(common.lp), ceiling(defaultLp()), arms,
+            common.lpPricing.takeIf { common.lpPricingExplicit }, explicitPresolve,
+        )
+    }
+
+    private fun finiteRequest(
+        shape: FiniteSolveShape,
+        common: CommonOptions,
+        engine: FiniteEngine,
+        cores: Int,
+        presolveConfig: PresolveConfig,
+        solutionSetSensitive: Boolean,
+        presolveCancellation: Cancellation,
+        presolveBudget: PresolveBudget?,
+        cancel: Cancellation,
+        deadline: Long?,
+        nodeBudget: NodeBudget?,
+        policy: SourceExecutionPolicy,
+        numericalCompletion: Boolean = false,
+        toleranceCheck: ((Sample) -> Boolean)? = null,
+    ): FiniteSolveRequest {
+        val fixed = engine == FiniteEngine.FIXED
+        return policy.finiteRequest(
+            shape = shape,
+            engine = engine,
+            presolveConfig = presolveConfig,
+            solutionSetSensitive = solutionSetSensitive,
+            presolveBudget = presolveBudget,
+            cores = cores,
+            executionOptions = ExecutionOptions.parse(common.engineParams).let {
+                if (numericalCompletion) it.withNumericalCompletion() else it
+            },
+            randomSeed = common.randomSeed,
+            cancellation = cancel,
+            presolveCancellation = presolveCancellation,
+            nodeBudget = nodeBudget,
+            solveBudgetMillis = common.timeLimitMs,
+            allSolutions = common.allSolutions,
+            solutionCap = common.solutionCap,
+            deadlineExceeded = { fixed && deadline != null && nowMillis() > deadline },
+            onEvent = if (fixed) verboseListener(common.verbose) else null,
+            onPortfolioEvent = if (fixed) null else portfolioVerboseListener(common.verbose),
+            onPortfolioFault = if (fixed) null else ::warnPortfolioFault,
+            prepareOnly = EngineParams(common.engineParams).bool("dry-run-presolve") == true,
+            toleranceCheck = toleranceCheck,
         )
     }
 
@@ -1081,6 +520,7 @@ internal object SolveCore {
                 ) as SourceExecutionResult.Finite
                 ).result
         }
+        result.nativeGridOutcome?.let(output::onNativeGridOutcome)
         val preparation = result.preparation
         cliLogger(common.verbose).v {
             val p0 = solvable.finiteProblem
@@ -1218,7 +658,7 @@ internal fun portfolioVerboseListener(verbose: Boolean): ((String, SearchEvent) 
 /** Bytes per mebibyte — heap figures are reported in MiB, the unit `-Xmx` is set in. */
 private const val MIB = 1024L * 1024L
 
-private fun reportOpenTheoryOptimum(
+internal fun reportOpenTheoryOptimum(
     execution: OpenTheoryExecution.Optimize,
     maximize: Boolean,
     render: (OpenTheoryAssignment) -> String,

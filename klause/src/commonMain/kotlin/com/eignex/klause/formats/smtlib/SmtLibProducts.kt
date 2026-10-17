@@ -8,6 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.isConstant
+import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.lowering.scaleByConst
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.bigIntOf
@@ -19,10 +20,11 @@ import com.eignex.klause.util.toLongExact
 internal fun Compiler.Builder.integerProduct(parts: List<IntComb>): IntComb {
     var result: IntComb = IntComb.Narrow(LinComb(emptyMap(), 1L))
     for (part in parts) {
+        sourceCancellation.polynomialSourceCheckpoint(1)
         result = if (result.isConstant()) scaleByConst(part, result)
         else if (part.isConstant()) scaleByConst(result, part)
         else {
-            if (inferringBounds || macros.isNotEmpty()) smtUnsupported("nonlinear product requires source lowering")
+            if (inferringBounds) smtUnsupported("nonlinear product requires source lowering")
             val left = (result as? IntComb.Narrow)?.lin ?: smtUnsupported("wide nonlinear product")
             val right = (part as? IntComb.Narrow)?.lin ?: smtUnsupported("wide nonlinear product")
             val (leftLo, leftHi) = finiteProductRange(left)
@@ -80,11 +82,12 @@ internal fun Compiler.Builder.productIntColumn(term: LinComb): Int {
 internal fun Compiler.Builder.realProduct(parts: List<RealComb>): Res.R {
     var result = RealComb(emptyMap(), emptyMap(), BigFraction.ONE)
     for (part in parts) {
+        sourceCancellation.polynomialSourceCheckpoint(1)
         result = when {
             result.isConstant -> part.scaled(result.constant)
             part.isConstant -> result.scaled(part.constant)
             else -> {
-                if (inferringBounds || macros.isNotEmpty()) smtUnsupported("nonlinear product requires source lowering")
+                if (inferringBounds) smtUnsupported("nonlinear product requires source lowering")
                 val leftInt = result.toLinCombOrNull()
                 val rightInt = part.toLinCombOrNull()
                 if (leftInt != null && rightInt != null) {

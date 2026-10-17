@@ -52,7 +52,7 @@ class EncodingAttribution internal constructor(
     val integers: List<SourceIntId> get() = intIds.toList()
     /** Source real coordinates; linear targets retain their identity. */
     val reals: List<SourceRealId> get() = realIds.toList()
-    /** Finite integer embeddings used only under their source conditions. */
+    /** Exact integer embeddings retaining their declared domains and source conditions. */
     val integerEmbeddings: Map<SourceIntId, TheoryRealId> get() = intMap.toMap()
     /** Original real coordinates represented in the private theory namespace. */
     val realEmbeddings: Map<SourceRealId, TheoryRealId> get() = realMap.toMap()

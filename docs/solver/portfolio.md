@@ -20,6 +20,17 @@ replicas. Native reservations divide the complete family's allowance across its
 materialized slots. Complete-only invocations divide the whole native allowance
 among their admitted slots.
 Heuristic-only factories carry witness authority.
+Shared source execution rejects multiple cores for `FIXED` when binding execution
+controls, before constructing a native worker. The finite request boundary enforces
+the same single-core rule for its deferred consumer.
+
+`SourceExecutionPolicy` owns finite application arm defaults and LP ceilings before
+worker construction. Explicit `arms`, `ls` or `bt` settings take precedence over the
+application recipe count. A supplied finite factory retains its callbacks and
+containing allowance; common source binding applies the selected ceiling without
+raising the factory's lower emphasis. Fixed execution uses one arm and LP off.
+Native arithmetic routes reject finite-only explicit policy instead of silently
+ignoring it. Recipe defaults and ceilings carry no witness or proof authority.
 
 The [solver vision](../vision.md#shared-model-breadth) requires an available
 complete-search/local-search pair for every supported model. Current admission gaps
@@ -31,7 +42,10 @@ Optimization exhaustion without an incumbent is an original-source refutation on
 when its installed complete worker routes objective cutoffs through the scheduler
 and used no finite shared cutoff. The scheduler retains observed cutoffs for proof admission: a callback that returned only positive infinity leaves
 the source space unrestricted; a finite cutoff supports its conditional bound.
-Heuristic and improvement-only arms do not gain refutation authority from exhaustion.
+With a checked incumbent, the same unrestricted complete exhaustion establishes
+attainment even when root completion finishes before consulting a shared cutoff.
+The completion still passes the model, objective, invocation and witness checks.
+Heuristic and improvement-only arms gain no completion authority from exhaustion.
 
 ## Witnesses and proof scope
 
@@ -75,6 +89,9 @@ Ordinary finite portfolio verdicts and incumbent callbacks retain the common sou
 interpretation when every worker is bound to the same source model. An unbound or
 mixed-source low-level portfolio cannot infer that metadata for a sample-free aggregate.
 Policy metadata does not establish witness or proof authority.
+Raw linear invocation bindings recognize their embedded original objective when
+admitting completed native bound evidence. The execution objective remains in working
+units; original-source qualification separately checks scope and source transfer.
 
 Portfolio evidence names its source model and objective. These are opaque in-memory
 identities: a fresh or transformed model needs its own check, even if structurally

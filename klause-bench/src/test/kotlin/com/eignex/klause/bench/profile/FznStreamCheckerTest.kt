@@ -1,14 +1,46 @@
 package com.eignex.klause.bench.profile
 
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
+import com.eignex.klause.bench.metric.sha256
+import java.io.ByteArrayOutputStream
+import java.util.Base64
+import java.util.zip.GZIPOutputStream
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class FznStreamCheckerTest {
     private val declarations = "var 0..1: i; var float: x; var float: y; " +
         "constraint float_times(x, x, y); constraint float_le(y, 4.0); "
+
+    @ParameterizedTest
+    @ValueSource(strings = ["base64", "gzip64"])
+    fun `record transport should preserve every original byte`(format: String) {
+        val records = "[{\"source\":\"var float: x; solve satisfy;\",\"stdout\":\"x = 1/3;\\n----------\\n\"}]"
+            .toByteArray()
+        val args = if (format == "base64") arrayOf(Base64.getEncoder().encodeToString(records)) else {
+            val compressed = ByteArrayOutputStream().apply {
+                GZIPOutputStream(this).use { it.write(records) }
+            }.toByteArray()
+            arrayOf("gzip64=" + Base64.getEncoder().encodeToString(compressed), "sha256=" + sha256(records))
+        }
+
+        val received = FznStreamChecker.decodeRecords(args)
+
+        assertContentEquals(records, received)
+    }
+
+    @Test
+    fun `compressed records should reject a differing original identity`() {
+        val compressed = ByteArrayOutputStream().apply {
+            GZIPOutputStream(this).use { it.write("[]".toByteArray()) }
+        }.toByteArray()
+        val args = arrayOf("gzip64=" + Base64.getEncoder().encodeToString(compressed), "sha256=" + "0".repeat(64))
+
+        assertFailsWith<IllegalArgumentException> { FznStreamChecker.decodeRecords(args) }
+    }
 
     @ParameterizedTest
     @ValueSource(strings = ["-1/3", "0", "1/3"])
@@ -33,7 +65,7 @@ class FznStreamCheckerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["% objective=0\n", "_objective = 0;\n"])
+    @ValueSource(strings = ["% objective=0\n", "_objective = 0;\n", "% klause-exact: _objective = 0;\n"])
     fun `satisfaction publications should not supply an optimization cost`(metadata: String) {
         val source = "var float: x; var float: y; constraint float_abs(x,y); solve satisfy;"
         val output = metadata + "x = 0;\ny = 0;\n----------\n"
@@ -78,6 +110,52 @@ class FznStreamCheckerTest {
     fun `conflicting comment and finite objective fields should be rejected`() {
         val source = "var 0..2: i; solve minimize i;"
         val output = "% objective=2\ni = 2;\n_objective = 1;\n----------\n"
+
+        assertFailsWith<IllegalArgumentException> {
+            FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["minimize", "maximize"])
+    fun `exact rational objective annotations should retain their rounded display`(sense: String) {
+        val source = "var float: x; solve $sense x;"
+        val output = "x = 0.6142857142857143;\n_objective = 0.6142857142857143;\n" +
+            "% klause-exact: x = 43/70;\n% klause-exact: _objective = 43/70;\n----------\n"
+
+        val result = FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1).single()
+
+        assertEquals("valid", result.status)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["_objective = 0.5;\n", "% objective=1/2\n_objective = 0.6142857142857143;\n"])
+    fun `cost metadata conflicting with its exact objective should be rejected`(metadata: String) {
+        val source = "var float: x; solve minimize x;"
+        val output = "x = 0.6142857142857143;\n" + metadata +
+            "% klause-exact: x = 43/70;\n% klause-exact: _objective = 43/70;\n----------\n"
+
+        assertFailsWith<IllegalArgumentException> {
+            FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1)
+        }
+    }
+
+    @Test
+    fun `an exact objective differing from its source value should remain invalid`() {
+        val source = "var float: x; solve minimize x;"
+        val output = "x = 0.6142857142857143;\n_objective = 0.5;\n" +
+            "% klause-exact: x = 43/70;\n% klause-exact: _objective = 1/2;\n----------\n"
+
+        val result = FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1).single()
+
+        assertEquals("invalid", result.status)
+    }
+
+    @Test
+    fun `duplicate exact objective annotations should be rejected`() {
+        val source = "var float: x; solve minimize x;"
+        val output = "x = 0.5;\n_objective = 0.5;\n% klause-exact: x = 1/2;\n" +
+            "% klause-exact: _objective = 1/2;\n% klause-exact: _objective = 1/2;\n----------\n"
 
         assertFailsWith<IllegalArgumentException> {
             FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1)

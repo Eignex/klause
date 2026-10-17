@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
@@ -9,17 +10,25 @@ import com.eignex.klause.compile.CompiledSchema
 import com.eignex.klause.compile.compile
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.json.JsonSchema
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.formats.smtlib.SmtLibProblem
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
+import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.model.FloatSpec
+import com.eignex.klause.model.IntSpec
+import com.eignex.klause.model.PresenceSpec
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.schema.BoolHandle
 import com.eignex.klause.schema.FloatHandle
+import com.eignex.klause.schema.IntHandle
+import com.eignex.klause.schema.OptFloatHandle
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceRevision
@@ -30,13 +39,18 @@ import com.eignex.klause.solver.evidence.sourceResultCapture
 import com.eignex.klause.solver.evidence.verifySourceEvidence
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
+import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryRequest
+import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceExecutionRequest
+import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.minimize
-import com.eignex.klause.solver.pipeline.optimize
 import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.util.BIG_ONE
@@ -66,6 +80,8 @@ internal object ObjectiveRepresentationProbe {
     private data class CompiledInput(
         val model: CompiledSchema, val request: PolynomialTheoryRequest,
         val reals: Map<String, Int>, val handles: Map<String, FloatHandle>,
+        val originalSource: Problem, val integers: Map<String, IntHandle>,
+        val optionals: Map<String, OptFloatHandle>,
     )
 
     @JvmStatic
@@ -78,7 +94,7 @@ internal object ObjectiveRepresentationProbe {
         require(options.keys.all {
             it in setOf(
                 "source", "engines", "out", "work", "seed", "moves", "timeout",
-                "checker", "processors", "schema", "conditions", "capture",
+                "checker", "processors", "schema", "conditions", "capture", "entry", "pinAbsent", "requireIncumbent",
             )
         })
         val capture = when (options["capture"] ?: "none") {
@@ -86,6 +102,13 @@ internal object ObjectiveRepresentationProbe {
             "required" -> true
             else -> error("capture must be none or required")
         }
+        val sourceEntry = when (options["entry"] ?: "setup") {
+            "setup" -> false
+            "source" -> true
+            else -> error("entry must be setup or source")
+        }
+        val absentPinning = options["pinAbsent"]?.toBooleanStrict()
+        val requireIncumbent = options["requireIncumbent"]?.toBooleanStrict() ?: true
         val processors = options["processors"]?.toInt() ?: 1
         require(processors > 0)
         if (Runtime.getRuntime().availableProcessors() != processors) {
@@ -109,9 +132,17 @@ internal object ObjectiveRepresentationProbe {
         val conditionBytes = options["conditions"]?.let { File(it).readBytes() }
         val conditions = conditionBytes?.let { Json.parseToJsonElement(it.toString(Charsets.UTF_8)).jsonObject }
         Reports.writeJson(File(output, "provenance.json").path, InstalledBuild.reference)
+        val schema = schemaBytes?.toString(Charsets.UTF_8)?.let(JsonSchema::parse)
+        val compiled = schema?.compile(KlauseConfig.DEFAULT,
+            SemanticOverrides(pinAbsentOptionalValues = absentPinning))
+        require(absentPinning == null || compiled != null) { "pinAbsent requires a schema input" }
+        val originalSource = compiled?.let { BacktrackSolver.source(it).source }
         File(output, "settings.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha())
             put("capture", if (capture) "required" else "none")
+            put("entry", if (sourceEntry) "source" else "setup")
+            put("requireIncumbent", requireIncumbent)
+            put("pinAbsentOptionalValues", originalSource?.semantics?.effective?.pinAbsentOptionalValues)
             put("seed", seed)
             put("nativeWork", work)
             put("maxFlips", moves)
@@ -122,41 +153,55 @@ internal object ObjectiveRepresentationProbe {
             put("schemaSha256", schemaBytes?.let(::sha256))
             put("conditionsSha256", conditionBytes?.let(::sha256))
         }.toString() + "\n")
-        val schema = schemaBytes?.toString(Charsets.UTF_8)?.let(JsonSchema::parse)
-        val compiled = schema?.compile(KlauseConfig.DEFAULT)
         val handles = schema?.entries?.mapNotNull { (name, entry) ->
             if (entry is FloatSpec) name to FloatHandle(name, entry.min, entry.max) else null
         }?.toMap().orEmpty()
         val realIds = handles.mapValues { (name, handle) ->
             requireNotNull(compiled?.sourceRealId(handle)) {
-                "Schema float is represented by a finite grid: $name"
+                "Schema float lacks an original real coordinate: $name"
             }.index
         }
+        val integerHandles = schema?.entries?.mapNotNull { (name, entry) ->
+            if (entry is IntSpec) name to IntHandle(name, entry.min, entry.max) else null
+        }?.toMap().orEmpty()
+        val optionals = schema?.entries?.mapNotNull { (name, entry) ->
+            if (entry !is PresenceSpec) return@mapNotNull null
+            val value = handles[entry.valueName] ?: return@mapNotNull null
+            entry.valueName to OptFloatHandle(entry.valueName, BoolHandle(name), value)
+        }?.toMap().orEmpty()
         schemaBytes?.let {
             File(output, "schema.json").writeBytes(it)
             File(output, "schema-sha256.txt").writeText(sha256(it) + "\n")
         }
         conditionBytes?.let { File(output, "conditions.json").writeBytes(it) }
-        val prepared = compiled?.let { CompiledInput(it, it.problem.pipelineRequest(), realIds, handles) }
+        val prepared = compiled?.let {
+            val original = requireNotNull(originalSource)
+            CompiledInput(it, original.pipelineRequest(), realIds, handles, original, integerHandles, optionals)
+        }
         require(!capture || prepared != null) { "Original IR capture requires a compiled schema" }
+        require(!sourceEntry || engines.all {
+            it == FiniteEngine.BACKTRACK || it == FiniteEngine.LOCAL_SEARCH
+        }) { "Source strategy entry requires BACKTRACK or LOCAL_SEARCH engines" }
         for (source in sources.sortedBy { it.path }) {
-            measure(source, output, engines, work, seed, moves, timeout, prepared, conditions, capture)
+            measure(source, output, engines, work, seed, moves, timeout, prepared, conditions, capture, sourceEntry)
         }
         when (options["checker"] ?: "none") {
             "none" -> Unit
-            "existing" -> checkOutput(output, engines, "python3")
+            "existing" -> checkOutput(output, engines, "python3", requireIncumbent)
             "provision" -> {
                 val log = File(output, "checker-install.log")
-                runProcess(log, "sudo", "apt-get", "update")
-                runProcess(log, "sudo", "apt-get", "install", "-y", "python3-venv")
                 val environment = File(output, "checker-venv")
                 require(!environment.exists()) { "Checker environment already exists: $environment" }
-                runProcess(log, "python3", "-m", "venv", environment.absolutePath)
+                if (runProcess(log, "python3", "-m", "venv", environment.absolutePath, required = false) != 0) {
+                    runProcess(log, "sudo", "apt-get", "update")
+                    runProcess(log, "sudo", "apt-get", "install", "-y", "python3-venv")
+                    runProcess(log, "python3", "-m", "venv", environment.absolutePath)
+                }
                 val python = File(environment, "bin/python").absolutePath
                 runProcess(log, python, "-m", "pip", "install", "-r",
                     "klause-bench/tools/requirements-source-checks.txt")
                 runProcess(File(output, "checker-dependencies.txt"), python, "-m", "pip", "freeze")
-                checkOutput(output, engines, python)
+                checkOutput(output, engines, python, requireIncumbent)
                 check(environment.deleteRecursively()) { "Could not dispose the owned checker environment" }
             }
             else -> error("checker must be none, existing or provision")
@@ -178,10 +223,13 @@ internal object ObjectiveRepresentationProbe {
         check(child.waitFor() == 0) { "Objective probe JVM failed" }
     }
 
-    private fun checkOutput(output: File, engines: List<FiniteEngine>, python: String) {
-        runProcess(File(output, "checker.log"), python, "klause-bench/tools/verify_objective_probe.py",
+    private fun checkOutput(output: File, engines: List<FiniteEngine>, python: String, requireIncumbent: Boolean) {
+        runProcess(File(output, "checker-runtime.txt"), python, "--version")
+        val command = listOf(python, "klause-bench/tools/verify_objective_probe.py",
             output.absolutePath, "--engines", engines.joinToString(",") { it.name },
-            "--require-incumbent", "--output", File(output, "source-checks.json").absolutePath)
+        ) + (if (requireIncumbent) listOf("--require-incumbent") else emptyList()) +
+            listOf("--output", File(output, "source-checks.json").absolutePath)
+        runProcess(File(output, "checker.log"), command)
         val tools = listOf("verify_objective_probe.py", "verify_nra_source_results.py", "verify_source_results.py",
             "requirements-source-checks.txt")
         File(output, "checker-tool-hashes.json").writeText(buildJsonObject {
@@ -189,27 +237,44 @@ internal object ObjectiveRepresentationProbe {
         }.toString() + "\n")
     }
 
-    private fun runProcess(log: File, vararg command: String) {
-        val process = ProcessBuilder(command.toList()).redirectErrorStream(true)
+    private fun runProcess(log: File, vararg command: String, required: Boolean = true): Int =
+        runProcess(log, command.toList(), required)
+
+    private fun runProcess(log: File, command: List<String>, required: Boolean = true): Int {
+        val process = ProcessBuilder(command).redirectErrorStream(true)
             .redirectOutput(ProcessBuilder.Redirect.appendTo(log)).start()
-        check(process.waitFor() == 0) { "${command.first()} failed; see ${log.path}" }
+        val exit = process.waitFor()
+        check(!required || exit == 0) { "${command.first()} failed; see ${log.path}" }
+        return exit
     }
 
     private fun measure(
         input: File, output: File, engines: List<FiniteEngine>, work: Long, seed: Long, moves: Int, timeout: Long,
-        compiled: CompiledInput?, conditions: JsonObject?, capture: Boolean,
+        compiled: CompiledInput?, conditions: JsonObject?, capture: Boolean, sourceEntry: Boolean,
     ) {
         val bytes = input.readBytes()
         val identity = sha256(bytes)
         File(output, "$identity.smt2").writeBytes(bytes)
-        val captured = SmtLibAdmission.parse(bytes.toString(Charsets.UTF_8), Long.MIN_VALUE, Long.MAX_VALUE)
-        require(captured is SmtLibInput.Quadratic) { "Probe requires an admitted exact source objective: $input" }
-        val source = sourceNames(captured.source)
-        require(compiled != null || source.ints.isEmpty()) { "Integer sources require an explicit compiled schema" }
-        val original = affineObjective(source, captured.objective)
+        val captured = if (sourceEntry && compiled == null) SmtLib.parse(bytes.toString(Charsets.UTF_8))
+            else SmtLib.parse(bytes.toString(Charsets.UTF_8), Long.MIN_VALUE, Long.MAX_VALUE)
+        val capturedObjective = requireNotNull(
+            captured.quadraticObjective ?: captured.objective?.toQuadraticObjectiveSpec(),
+        ) {
+            "Probe requires a captured exact source objective: $input"
+        }
+        val source = sourceNames(captured)
+        require(compiled != null || source.ints.isEmpty() || sourceEntry) {
+            "Integer sources require a compiled schema or source strategy entry"
+        }
+        val factorSource = if (sourceEntry && compiled == null) {
+            requireNotNull(captured.source.originalSource as? Problem) {
+                "Source strategy entry requires a factor source"
+            }
+        } else null
+        val original = affineObjective(source, capturedObjective)
         val affine = if (compiled == null) original else compiledObjective(compiled, source, original)
-        val quadratic = if (compiled == null) captured.objective else affine.toQuadraticObjectiveSpec()
-        val request = compiled?.request ?: (captured.source as SmtLibInput.Polynomial).problem.pipelineRequest()
+        val quadratic = if (compiled == null) capturedObjective else affine.toQuadraticObjectiveSpec()
+        val attachment = compiled?.let { SourceAttachment(it.originalSource) } ?: captured.source
         val condition = conditions?.getValue(identity)?.jsonObject ?: buildJsonObject { }
         val pins = assumptions(condition, source, compiled)
         for ((index, engine) in engines.withIndex()) {
@@ -224,26 +289,80 @@ internal object ObjectiveRepresentationProbe {
                     ),
                 )
                 val started = System.nanoTime()
-                val execution = if (encoding == "linear") {
-                    OpenTheoryPipeline.optimize(request, affine, params, engine, captured.sense)
-                } else OpenTheoryPipeline.minimize(request, quadratic, params, engine, captured.sense)
+                val completed = if (sourceEntry) null else {
+                    val setup = if (encoding == "linear") {
+                        SourceSetupRequest(attachment, ExecutionOperation.OPTIMIZE, engine, affine,
+                            captured.sense == ObjectiveSense.MAXIMIZE, cancellation = params.timeout)
+                    } else SourceSetupRequest(attachment, engine, quadratic, captured.sense,
+                        cancellation = params.timeout)
+                    SourceSetup.execute(SourceExecutionRequest(SourceSetup.prepare(setup), polynomial = params))
+                }
+                if (completed is SourceExecutionResult.Declined || completed is SourceExecutionResult.Refuted) {
+                    val record = buildJsonObject {
+                        put("sourceSha256", identity)
+                        put("engine", engine.name)
+                        put("encoding", encoding)
+                        put("entry", if (sourceEntry) "compiled-source-strategy"
+                            else if (compiled == null) "polynomial-source" else "compiled-schema")
+                        put("condition", condition)
+                        put("elapsedNanos", System.nanoTime() - started)
+                        put("nativeWork", 0)
+                        put("javaCores", Runtime.getRuntime().availableProcessors())
+                        put("result", buildJsonObject {
+                            put("kind", if (completed is SourceExecutionResult.Refuted) "SourceRefuted" else "Unknown")
+                            put("reason", (completed as? SourceExecutionResult.Declined)?.reason?.toString())
+                            put("phase", "source-preparation")
+                            put("nativeOptimizationStarted", false)
+                        })
+                        if (capture) put("sourceCapture", buildJsonObject {
+                            put("captured", false)
+                            put("reason", "native optimization did not start")
+                        })
+                    }
+                    File(output, "$identity.${engine.name}.$encoding.json").writeText(record.toString() + "\n")
+                    continue
+                }
+                var sourceQuadratic = quadratic
+                val execution = if (sourceEntry) {
+                    val strategy = if (compiled != null) {
+                        if (engine == FiniteEngine.BACKTRACK) BacktrackSolver.source(compiled.model)
+                        else LocalSearchSolver.source(compiled.model)
+                    } else {
+                        if (engine == FiniteEngine.BACKTRACK) BacktrackSolver.source(requireNotNull(factorSource))
+                        else LocalSearchSolver.source(requireNotNull(factorSource))
+                    }
+                    if (encoding == "linear") {
+                        val paired = if (compiled != null) pairedObjective(compiled, affine) else affine
+                        sourceQuadratic = compiled?.model?.sourceObjective(paired) ?: quadratic
+                        strategy.optimize(paired, params, captured.sense)
+                    } else strategy.optimize(quadratic, params, captured.sense)
+                } else (completed as? SourceExecutionResult.Quadratic)?.result
+                    ?: error("source setup did not install quadratic optimization: $completed")
                 val elapsed = System.nanoTime() - started
-                val scopeRecord = if (capture) captureRecord(
-                    requireNotNull(compiled), affine, quadratic, pins, identity, execution.result, encoding,
-                ) else null
                 val record = buildJsonObject {
                     put("sourceSha256", identity)
                     put("engine", engine.name)
                     put("encoding", encoding)
-                    put("entry", if (compiled == null) "polynomial-source" else "compiled-schema")
+                    put("entry", if (sourceEntry && compiled != null) "compiled-source-strategy"
+                            else if (sourceEntry) "source-strategy"
+                            else if (compiled == null) "polynomial-source" else "compiled-schema")
                     put("condition", condition)
                     put("elapsedNanos", elapsed)
                     put("nativeWork", execution.nativeWork)
                     put("javaCores", Runtime.getRuntime().availableProcessors())
-                    put("result", resultRecord(execution.result, source, compiled))
-                    if (scopeRecord != null) put("sourceCapture", scopeRecord)
+                    put("result", resultRecord(execution.result, source, compiled, sourceEntry))
                 }
-                File(output, "$identity.${engine.name}.$encoding.json").writeText(record.toString() + "\n")
+                val recordFile = File(output, "$identity.${engine.name}.$encoding.json")
+                recordFile.writeText(record.toString() + "\n")
+                if (capture) {
+                    val scopeRecord = captureRecord(requireNotNull(compiled), affine, sourceQuadratic, pins,
+                        identity, execution.result, if (sourceEntry) "quadratic" else encoding)
+                    val capturedRecord = buildJsonObject {
+                        for ((key, value) in record) put(key, value)
+                        put("sourceCapture", scopeRecord)
+                    }
+                    recordFile.writeText(capturedRecord.toString() + "\n")
+                }
                 println("${input.name} $engine $encoding ${execution.result::class.simpleName} $elapsed ns")
             }
         }
@@ -256,7 +375,7 @@ internal object ObjectiveRepresentationProbe {
         val revision = SourceRevision(identity, "klause-ir-exact-v1")
         val plan = compiled.request.preparedPlan.withObjective(affine, result.sense == ObjectiveSense.MAXIMIZE)
         val capture = requireNotNull(if (encoding == "linear") plan.sourceResultCapture(revision, pins, "cost")
-            else compiled.model.problem.quadraticSourceResultCapture(
+            else compiled.originalSource.quadraticSourceResultCapture(
                 SourceScope(revision, pins.sourceCondition(), SourceObjective("cost", result.sense)), quadratic,
             ))
         val retained = capture.quadratic(result, "objective-representation-probe")
@@ -279,6 +398,21 @@ internal object ObjectiveRepresentationProbe {
                     check(unrestricted.quadratic(result, "weaker-condition") === result)
                     weaker = "weaker original condition rejected"
                 }
+            } else {
+                val replacement = requireNotNull(compiled.originalSource.quadraticSourceResultCapture(
+                    capture.context.scope, QuadraticObjectiveSpec(quadratic.terms, quadratic.constant),
+                ))
+                check(replacement.quadratic(result, "replacement-objective") === result)
+                replay = "foreign original objective rejected"
+                if (pins.sourceCondition() != Assumptions.None.sourceCondition()) {
+                    val unrestricted = requireNotNull(compiled.originalSource.quadraticSourceResultCapture(
+                        SourceScope(revision, Assumptions.None.sourceCondition(),
+                            SourceObjective("cost", result.sense)),
+                        quadratic,
+                    ))
+                    check(unrestricted.quadratic(result, "weaker-condition") === result)
+                    weaker = "weaker original condition rejected"
+                }
             }
         }
         val checked = retained.verifySourceEvidence(capture.context)
@@ -294,13 +428,10 @@ internal object ObjectiveRepresentationProbe {
         }
     }
 
-    private fun sourceNames(source: SmtLibInput): SourceNames = when (source) {
-        is SmtLibInput.Polynomial -> SourceNames(source.problem.realVarNames, source.problem.boolVarNames)
-        is SmtLibInput.NonlinearInteger -> SourceNames(
-            source.problem.realVarNames, source.problem.boolVarNames, source.problem.intVarNames,
-        )
-        else -> error("Source is not an admitted polynomial or nonlinear integer input")
-    }
+    private fun sourceNames(source: SmtLibProblem): SourceNames =
+        SourceNames(source.realVarNames.mapKeys { it.key.removeSurrounding("|") },
+            source.boolVarNames.mapKeys { it.key.removeSurrounding("|") },
+            source.intVarNames.mapKeys { it.key.removeSurrounding("|") })
 
     private fun assumptions(condition: JsonObject, source: SourceNames, compiled: CompiledInput?): Assumptions {
         require(condition.keys.all { it in setOf("bools", "ints") }) { "Unsupported source condition" }
@@ -312,7 +443,7 @@ internal object ObjectiveRepresentationProbe {
         }
         for ((name, value) in condition["ints"]?.jsonObject.orEmpty()) {
             val sourceId = source.ints.getValue(name)
-            val id = compiled?.model?.intVarIdByName?.getValue(name) ?: sourceId
+            val id = compiled?.let { it.model.sourceId(it.integers.getValue(name)).index } ?: sourceId
             pins = pins.withInt(id, value.jsonPrimitive.long)
         }
         return pins
@@ -354,35 +485,99 @@ internal object ObjectiveRepresentationProbe {
     ): LinearObjective {
         val model = compiled.model
         require(compiled.reals.keys == source.reals.keys && model.boolVarIdByName.keys == source.bools.keys &&
-            model.intVarIdByName.keys == source.ints.keys) { "Source and schema declarations differ" }
+            compiled.integers.keys == source.ints.keys) { "Source and schema declarations differ" }
         require(compiled.reals.values.distinct().size == compiled.reals.size) {
             "Schema real coordinates alias source declarations"
         }
-        val bools = LongArray(model.problem.numBoolVars)
-        val ints = LongArray(model.problem.numIntVars)
-        val reals = DoubleArray(model.problem.numRealVars)
+        val bools = LongArray(compiled.originalSource.numBoolVars)
+        val ints = LongArray(compiled.originalSource.numIntVars)
+        val reals = DoubleArray(compiled.originalSource.numRealVars)
         for ((name, id) in source.bools) bools[model.sourceId(BoolHandle(name)).index] = original.boolWeights[id]
-        for ((name, id) in source.ints) ints[model.intVarIdByName.getValue(name)] = original.intCoefficients[id]
+        for ((name, id) in source.ints) {
+            ints[model.sourceId(compiled.integers.getValue(name)).index] = original.intCoefficients[id]
+        }
         for ((name, id) in source.reals) {
             val column = compiled.reals.getValue(name)
-            val objective = model.minimize(compiled.handles.getValue(name))
-            require(column in objective.realCoefficients.indices &&
-                objective.realCoefficients.withIndex().all { (index, coefficient) ->
-                    coefficient == if (index == column) 1.0 else 0.0
-                }) { "Compiled float objective differs from its named continuous source coordinate" }
             reals[column] = original.realCoefficients[id]
         }
         return LinearObjective(bools, ints, original.constant, reals)
     }
 
+    private fun pairedObjective(compiled: CompiledInput, original: LinearObjective): LinearObjective {
+        val model = compiled.model
+        val native = model.problem
+        val bools = LongArray(native.numBoolVars)
+        val ints = LongArray(native.numIntVars)
+        val reals = DoubleArray(native.numRealVars)
+        val basis = compiled.handles.values.firstOrNull()?.let(model::minimize)
+            ?: model.boolVarIdByName.keys.firstOrNull()?.let { model.minimize(BoolHandle(it)) }
+            ?: compiled.integers.values.firstOrNull()?.let(model::minimize)
+            ?: error("A source helper probe requires a named variable")
+        fun add(helper: LinearObjective, coefficient: BigFraction) {
+            if (coefficient.isZero) return
+            var terms = 0
+            require(helper.constant == 0L)
+            for ((target, weights) in listOf(bools to helper.boolWeights, ints to helper.intCoefficients)) {
+                for ((id, unit) in weights.withIndex()) if (unit != 0L) {
+                    require(unit == 1L && target[id] == 0L) { "Compiled helper is not a distinct unit coordinate" }
+                    target[id] = exactLong(coefficient)
+                    terms++
+                }
+            }
+            for ((id, unit) in helper.realCoefficients.withIndex()) if (unit != 0.0) {
+                require(unit == 1.0 && reals[id] == 0.0) { "Compiled helper is not a distinct real unit coordinate" }
+                val value = coefficient.toDouble()
+                require(BigFraction.ofDouble(value) == coefficient) { "Helper real weight is not losslessly binary64" }
+                reals[id] = value
+                terms++
+            }
+            require(terms == 1) { "Compiled helper does not identify one native coordinate" }
+        }
+        for (name in model.boolVarIdByName.keys) {
+            val handle = BoolHandle(name)
+            add(model.minimize(handle), BigFraction.ofLong(original.boolWeights[model.sourceId(handle).index]))
+        }
+        for (handle in compiled.integers.values) {
+            add(model.minimize(handle), BigFraction.ofLong(original.intCoefficients[model.sourceId(handle).index]))
+        }
+        for ((name, handle) in compiled.handles) {
+            add(model.minimize(handle), requireNotNull(BigFraction.ofDouble(original.realCoefficients[
+                compiled.reals.getValue(name)])))
+        }
+        return basis.copy(bools, ints, original.constant, reals)
+    }
+
+    private fun sourceDecoders(compiled: CompiledInput, sample: Sample): JsonObject = buildJsonObject {
+        check(sample.coordinateFrame === compiled.originalSource) { "Source publication lost its original frame" }
+        put("frame", "original-source")
+        put("floats", buildJsonObject {
+            for ((name, handle) in compiled.handles) {
+                val decoded = compiled.model.decode(handle, sample)
+                check(decoded == sample.approximateRealValue(compiled.reals.getValue(name)))
+                put(name, decoded)
+            }
+        })
+        put("optionals", buildJsonObject {
+            for ((name, handle) in compiled.optionals) {
+                val decoded = compiled.model.decode(handle, sample)
+                val expected = if (sample.boolValue(compiled.model.sourceId(handle.present).index)) {
+                    compiled.model.decode(handle.value, sample)
+                } else null
+                check(decoded == expected)
+                put(name, decoded)
+            }
+        })
+    }
+
     private fun resultRecord(
-        result: QuadraticOptimizationResult, source: SourceNames, compiled: CompiledInput?,
+        result: QuadraticOptimizationResult, source: SourceNames, compiled: CompiledInput?, sourceEntry: Boolean,
     ) = buildJsonObject {
         put("status", result::class.simpleName)
         put("sense", result.sense.name)
         put("lsMoves", result.stats.ls.moves.sum)
         if (result is QuadraticOptimizationResult.WithIncumbent) {
             val sample = result.incumbent.sample
+            if (sourceEntry && compiled != null) put("decoders", sourceDecoders(compiled, sample))
             put("objective", scalar(result.incumbent.value))
             put("witness", buildJsonObject {
                 for ((name, id) in source.reals) {
@@ -390,7 +585,7 @@ internal object ObjectiveRepresentationProbe {
                     put(name, scalar(requireNotNull(sample.algebraicReals)[mapped]))
                 }
                 for ((name, id) in source.ints) {
-                    val mapped = compiled?.model?.intVarIdByName?.getValue(name) ?: id
+                    val mapped = compiled?.let { it.model.sourceId(it.integers.getValue(name)).index } ?: id
                     put(name, sample.exactIntValue(mapped).toString())
                 }
                 for ((name, id) in source.bools) {

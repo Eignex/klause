@@ -2,16 +2,24 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.formats.smtlib.realSource
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.Encoder
+import com.eignex.klause.theory.EncoderProvider
+import com.eignex.klause.theory.EncoderSupport
+import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -43,11 +51,9 @@ class ExecutionCapabilitiesTest {
 
     @Test
     fun `native source completion should not invent a counting surface`() {
-        val source = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val source = SmtLibPolynomial.parse(
                 "(declare-const x Real) (assert (= (* x x) 2))",
-            ),
-        ).problem
+            ).realSource()
         val plan = source.prepareExecutionPlan()
 
         val admission = plan.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.EXACT_COUNT)
@@ -63,18 +69,21 @@ class ExecutionCapabilitiesTest {
         val source = Problem(
             0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
-            factors = arrayOf(ContinuousProduct(0, 0, 0)),
+            factors = arrayOf(ContinuousProduct(0, 0, 0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0)),
             numRealVars = 1,
             realLower = doubleArrayOf(1.0),
             realUpper = doubleArrayOf(1.0),
         )
-        val supported = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val supported = SmtLibPolynomial.parse(
                 "(declare-const x Real) (assert (= (* x x) 2))",
-            ),
-        ).problem.pipelineRequest()
+            ).realSource().pipelineRequest()
 
-        val unsupported = source.prepareExecutionPlan().capabilities.admission(FiniteEngine.BACKTRACK)
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            if (factor is Linear && target == EncodingTarget.POLYNOMIAL) Encoder(EncoderSupport.UNSUPPORTED)
+            else BuiltInEncoderProvider.select(factor, target)
+        })
+        val unsupported = source.prepareExecutionPlan(providers).capabilities.admission(FiniteEngine.BACKTRACK)
         val exhausted = OpenTheoryPipeline.execute(
             supported,
             PolynomialTheoryParams(maximumWork = 0),
@@ -136,11 +145,9 @@ class ExecutionCapabilitiesTest {
 
     @Test
     fun `polynomial invocation pins should not change prepared source admission or later witnesses`() {
-        val source = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse(
+        val source = SmtLibPolynomial.parse(
                 "(declare-const x Real) (declare-const b Bool) (assert (= (* x x) 2)) (assert b)",
-            ),
-        ).problem
+            ).realSource()
         val request = source.pipelineRequest()
         val scoped = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(

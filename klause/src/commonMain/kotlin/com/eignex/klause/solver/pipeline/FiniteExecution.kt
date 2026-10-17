@@ -9,6 +9,7 @@ import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpSolveContext
@@ -19,6 +20,7 @@ import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.presolve.PresolveBudget
@@ -39,6 +41,8 @@ import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.withPresolve
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
+import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
 import kotlin.time.TimeMark
@@ -99,6 +103,38 @@ class FiniteSolveRequest(
      */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
 ) {
+    private var capturedSourceControls: SourceFiniteControls? = null
+    internal val sourceControls: SourceFiniteControls? get() = capturedSourceControls
+
+    internal constructor(shape: FiniteSolveShape, controls: SourceFiniteControls) : this(
+        shape = shape,
+        engine = controls.engine,
+        presolveConfig = PresolveConfig.NONE,
+        explicitPresolveConfig = true,
+        solutionSetSensitive = true,
+        cancellation = controls.cancellation,
+        presolveBudget = null,
+        cores = 1,
+        executionOptions = ExecutionOptions(),
+        randomSeed = controls.randomSeed,
+        defaultArms = 1,
+        lpConfig = LpConfig.OFF,
+        zeroObjectivePricing = (controls as? SourceFiniteControls.Backtrack)?.params?.zeroObjectivePricing
+            ?: LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+        nodeBudget = controls.nodeBudget,
+        solveBudgetMillis = (controls as? SourceFiniteControls.Backtrack)?.params?.solveBudgetMillis,
+        allSolutions = false,
+        solutionCap = 1L,
+        deadlineExceeded = { controls.cancellation.deadline()?.hasPassedNow() == true },
+        onEvent = null,
+        onPortfolioEvent = null,
+    ) {
+        require(shape.sourceInvocation?.source?.originalSource is Problem &&
+            operation in setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE)
+        ) { "native finite controls require their captured factor-source operation" }
+        capturedSourceControls = controls
+    }
+
     /** Source operation; a solution cap bounds enumeration without changing its identity. */
     val operation: ExecutionOperation = shape.sourceInvocation?.operation ?: when {
         shape.optimize -> ExecutionOperation.OPTIMIZE
@@ -179,7 +215,41 @@ class FiniteSolveResult(
     val preparationElapsed: Duration,
     /** Terminal result after preparation. */
     val outcome: FiniteSolveOutcome,
-)
+) {
+    private var retainedSourceResult: SolveResult? = null
+    internal val nativeSourceResult: SolveResult? get() = retainedSourceResult
+    private var retainedSourceMinimum: MinimizeResult? = null
+    internal val nativeSourceMinimum: MinimizeResult? get() = retainedSourceMinimum
+
+    internal constructor(
+        preparation: FinitePipelinePreparation,
+        preparationElapsed: Duration,
+        outcome: FiniteSolveOutcome,
+        nativeSourceResult: SolveResult?,
+    ) : this(preparation, preparationElapsed, outcome) {
+        retainedSourceResult = nativeSourceResult
+    }
+
+    internal constructor(
+        preparation: FinitePipelinePreparation,
+        preparationElapsed: Duration,
+        outcome: FiniteSolveOutcome,
+        nativeSourceResult: SolveResult?,
+        nativeSourceMinimum: MinimizeResult?,
+    ) : this(preparation, preparationElapsed, outcome, nativeSourceResult) {
+        retainedSourceMinimum = nativeSourceMinimum
+    }
+
+    private var grid: NativeGridOutcome? = null
+
+    /** Native private-grid claims, retained independently of [outcome]'s original-source qualification. */
+    val nativeGridOutcome: NativeGridOutcome? get() = grid
+
+    internal fun bindNativeGridOutcome(value: NativeGridOutcome) {
+        require(grid == null) { "finite result already retains its native grid outcome" }
+        grid = value
+    }
+}
 
 /** Streaming hooks exposed by the finite solve facade. */
 class FiniteSolveCallbacks(
@@ -308,6 +378,7 @@ internal class FiniteExecutionRequest(
     val toleranceCheck: ((Sample) -> Boolean)? = null,
     val sourceInvocation: PreparedSourceInvocation? = null,
     val sourceMapping: SourceMapping? = null,
+    val sourceControls: SourceFiniteControls? = null,
 )
 
 /** Streaming hooks owned by a rendering frontend. */
@@ -346,6 +417,8 @@ private sealed class FiniteExecutionResult {
         val elapsedMs: Long,
         /** On [FiniteExecutionVerdict.UNBOUNDED], the recession ray of the reals through [bestSample]. */
         val unboundedDirection: List<BigFraction>? = null,
+        val nativeSourceResult: SolveResult? = null,
+        val nativeSourceMinimum: MinimizeResult? = null,
     ) : FiniteExecutionResult()
 
     /** The route was inspected instead of executed. */
@@ -382,7 +455,9 @@ private enum class FiniteExecutionVerdict {
 private fun FinitePipeline.execute(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,
-): FiniteExecutionResult = when (request.engine) {
+): FiniteExecutionResult = if (request.sourceControls != null) {
+    executeSourceFinite(request, callbacks)
+} else when (request.engine) {
     FiniteEngine.FIXED -> executeFixed(request, callbacks)
 
     FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
@@ -402,11 +477,24 @@ internal fun FinitePipeline.solve(
     require(request.engine == FiniteEngine.FIXED || lpSolveContext == LpSolveContext.Production) {
         "custom LP dependencies require the fixed finite route"
     }
+    request.shape.sourceInvocation?.freezeExecution()
     val stop = request.shape.sourceInvocation?.let {
         (request.cancellation or it.cancellation).encodingPreparationScope()
     } ?: request.cancellation
+    val gridPublication = request.shape.sourceInvocation?.floatGrid?.let {
+        FloatGridPublication(it, stop, request.toleranceCheck, callbacks)
+    }
+    fun result(
+        preparation: FinitePipelinePreparation,
+        elapsed: Duration,
+        outcome: FiniteSolveOutcome,
+        nativeSourceResult: SolveResult? = null,
+        nativeSourceMinimum: MinimizeResult? = null,
+    ): FiniteSolveResult =
+        gridPublication?.result(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
+            ?: FiniteSolveResult(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
     if (request.shape.sourceInvocation != null && stop()) {
-        return FiniteSolveResult(
+        return result(
             FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
             Duration.ZERO,
             FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
@@ -436,9 +524,9 @@ internal fun FinitePipeline.solve(
         ),
     )
     val preparationElapsed = preparationStart.elapsedNow()
-    if (request.prepareOnly) return FiniteSolveResult(preparation, preparationElapsed, FiniteSolveOutcome.PreparedOnly)
+    if (request.prepareOnly) return result(preparation, preparationElapsed, FiniteSolveOutcome.PreparedOnly)
     if (preparation.presolve?.infeasible == true) {
-        return FiniteSolveResult(
+        return result(
             preparation,
             preparationElapsed,
             FiniteExecutionResult.Completed(
@@ -459,10 +547,30 @@ internal fun FinitePipeline.solve(
         }
     }
     if ((request.shape.sourceInvocation != null && stop()) || executionPlan.decline == PreparedPlanDecline.RESOURCE) {
-        return FiniteSolveResult(
+        return result(
             preparation,
             preparationElapsed,
             FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
+        )
+    }
+    val invocation = request.shape.sourceInvocation
+    val linearSource = invocation?.linearSource
+    val permitsToleranceOptimum = invocation?.let {
+        it.source.semantics.effective.feasibilityTolerance?.isExact == false
+    } ?: true
+    val sourceCheck: ((Sample) -> Boolean)? = if (linearSource == null) {
+        request.toleranceCheck?.let { check ->
+            FiniteSourceAcceptance(check, permitsToleranceOptimum && check.permitsToleranceOptimum())
+        }
+    } else {
+        FiniteSourceAcceptance(
+            { sample ->
+                linearSource.check(sample, stop) is com.eignex.klause.solver.validation.LinearSourceCheck.Accepted &&
+                    request.toleranceCheck?.invoke(sample) != false
+            },
+            permitsToleranceOptimum =
+                permitsToleranceOptimum &&
+                    (request.toleranceCheck == null || request.toleranceCheck.permitsToleranceOptimum()),
         )
     }
     val execution = execute(
@@ -476,7 +584,8 @@ internal fun FinitePipeline.solve(
             definitionalSweep = request.shape.definitionalSweep,
             searchHints = searchHints,
             cores = request.cores,
-            executionOptions = request.executionOptions,
+            executionOptions = if (linearSource == null) request.executionOptions else
+                request.executionOptions.withNumericalCompletion(),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpConfig = request.lpConfig,
@@ -492,14 +601,25 @@ internal fun FinitePipeline.solve(
             onPortfolioEvent = request.onPortfolioEvent,
             onPortfolioFault = request.onPortfolioFault,
             lpSolveContext = lpSolveContext,
-            toleranceCheck = request.toleranceCheck?.let { check -> { check(preparation.reconstruct(it)) } },
+            toleranceCheck = if (gridPublication == null) {
+                sourceCheck?.let { check ->
+                    FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum())
+                }
+            } else null,
             sourceInvocation = request.shape.sourceInvocation,
             sourceMapping = preparation.sourceMapping,
+            sourceControls = request.sourceControls,
         ),
         FiniteExecutionCallbacks(
-            onSample = { sample -> callbacks.onSample(preparation.reconstruct(sample)) },
+            onSample = { sample ->
+                val lifted = preparation.reconstruct(sample)
+                if (gridPublication == null) callbacks.onSample(lifted) else gridPublication.onSample(lifted)
+            },
             onImprovement = { improvement ->
-                callbacks.onImprovement(
+                if (gridPublication != null) {
+                    gridPublication.onImprovement(preparation.reconstruct(improvement.sample),
+                        improvement.workerLabel, improvement.elapsedMs)
+                } else callbacks.onImprovement(
                     FiniteSolveImprovement(
                         preparation.reconstruct(improvement.sample),
                         improvement.workerLabel,
@@ -510,11 +630,13 @@ internal fun FinitePipeline.solve(
             },
         ),
     )
-    return FiniteSolveResult(
+    return result(
         preparation,
         preparationElapsed,
         execution.reconstructed(preparation.reconstruct, request.shape.finiteProblem, request.shape.linearObjective)
             .toSolveOutcome().withPresolve(preparation.presolve),
+        (execution as? FiniteExecutionResult.Completed)?.nativeSourceResult,
+        (execution as? FiniteExecutionResult.Completed)?.nativeSourceMinimum,
     )
 }
 
@@ -600,6 +722,72 @@ private fun FiniteExecutionResult.Completed.liftedDirection(
     if (!stepped.bools.contentEquals(point.bools) || !stepped.ints.contentEquals(point.ints)) return null
     if (from.size != to.size) return null
     return List(from.size) { to[it] - from[it] }
+}
+
+private fun executeSourceFinite(
+    request: FiniteExecutionRequest,
+    callbacks: FiniteExecutionCallbacks,
+): FiniteExecutionResult {
+    require(request.sourceInvocation != null && request.toleranceCheck == null)
+    if (request.optimize) return executeSourceMinimum(request, callbacks)
+    val start = TimeSource.Monotonic.markNow()
+    val solved = when (val controls = requireNotNull(request.sourceControls)) {
+        is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).solve(
+            controls.params.copy(cancellation = controls.cancellation or request.cancellation),
+        )
+        is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
+            request.problem,
+            completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, null) else null,
+        ).solve(controls.params.copy(cancellation = controls.cancellation or request.cancellation))
+    }
+    val sample = (solved as? SolveResult.Sat)?.assignment
+    if (sample != null) callbacks.onSample(sample)
+    return FiniteExecutionResult.Completed(
+        when (solved) {
+            is SolveResult.Sat -> FiniteExecutionVerdict.SAT
+            is SolveResult.Unsat -> FiniteExecutionVerdict.UNSAT
+            is SolveResult.Unknown -> FiniteExecutionVerdict.UNKNOWN
+        },
+        solved.stats,
+        if (sample == null) 0L else 1L,
+        sample,
+        start.elapsedNow().inWholeMilliseconds,
+        nativeSourceResult = solved,
+    )
+}
+
+private fun executeSourceMinimum(
+    request: FiniteExecutionRequest,
+    callbacks: FiniteExecutionCallbacks,
+): FiniteExecutionResult {
+    val objective = requireNotNull(request.objective)
+    val start = TimeSource.Monotonic.markNow()
+    val result = when (val controls = requireNotNull(request.sourceControls)) {
+        is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).minimize(
+            objective, controls.params.copy(cancellation = controls.cancellation or request.cancellation),
+        )
+        is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
+            request.problem,
+            completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, objective) else null,
+        ).minimize(objective, controls.params.copy(cancellation = controls.cancellation or request.cancellation))
+    }
+    val sample = result.assignment
+    if (sample != null) callbacks.onSample(sample)
+    return FiniteExecutionResult.Completed(
+        when (result) {
+            is MinimizeResult.Optimal -> FiniteExecutionVerdict.OPTIMAL
+            is MinimizeResult.BestFound -> FiniteExecutionVerdict.BEST_FOUND
+            is MinimizeResult.Unbounded -> FiniteExecutionVerdict.UNBOUNDED
+            is MinimizeResult.Infeasible -> FiniteExecutionVerdict.UNSAT
+            is MinimizeResult.Unknown -> FiniteExecutionVerdict.UNKNOWN
+        },
+        result.stats,
+        if (sample == null) 0L else 1L,
+        sample,
+        start.elapsedNow().inWholeMilliseconds,
+        (result as? MinimizeResult.Unbounded)?.direction,
+        nativeSourceMinimum = result,
+    )
 }
 
 private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecutionCallbacks): FiniteExecutionResult {

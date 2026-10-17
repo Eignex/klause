@@ -2,18 +2,19 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
@@ -74,7 +75,11 @@ class PreparedSourcePlanTest {
             realUpper = doubleArrayOf(2.0, 2.0),
         )
 
-        val plan = source.prepareExecutionPlan()
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            if (factor is AllDifferent && target == EncodingTarget.POLYNOMIAL) Encoder(EncoderSupport.UNSUPPORTED)
+            else BuiltInEncoderProvider.select(factor, target)
+        })
+        val plan = source.prepareExecutionPlan(providers)
 
         val ownership = assertNotNull(plan.componentPlan)
         val finite = ownership.cpProjection(source, ownership.cpSourceDomains(source)).problem
@@ -319,31 +324,27 @@ class PreparedSourcePlanTest {
     }
 
     @Test
-    fun `finite ownership selection should decline when the containing stop follows arithmetic reuse`() {
+    fun `finite ownership selection should decline when the containing stop follows bound publication`() {
         val source = Problem(
             0,
             1,
             arrayOf(IntDomain(0, 2)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
+            arrayOf(ExactLinear.of(
+                intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ONE,
+            )),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1), constant = 7)
         var boundsComplete = false
-        var reuseAllowed = false
         var stopObserved = false
         val stop = Cancellation {
-            when {
-                !boundsComplete -> false
-
-                !reuseAllowed -> {
-                    reuseAllowed = true
-                    false
-                }
-
-                else -> {
-                    stopObserved = true
-                    true
-                }
-            }
+            if (boundsComplete) {
+                stopObserved = true
+                true
+            } else false
         }
 
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(
@@ -902,7 +903,7 @@ class PreparedSourcePlanTest {
                 it.responsibility == ComponentResponsibility.COMPLETION
             }.factorIndices,
         )
-        assertEquals(3, plan.polynomialIntegerCoordinate(1))
+        assertEquals(4, plan.polynomialIntegerCoordinate(1))
         assertEquals(
             listOf(0, 1),
             plan.components.single {
@@ -965,11 +966,10 @@ class PreparedSourcePlanTest {
 
     @Test
     fun `nonlinear source declarations should keep interleaved exact numeric coordinates`() {
-        val source = assertIs<SmtLibInput.NonlinearInteger>(
-            SmtLibAdmission.parse(
+        val source = assertIs<NonlinearIntegerProblem>((
+            SmtLib.parse(
                 "(declare-const x Int) (declare-const r Real) (declare-const z Int) (assert (= (* x z) r))",
-            ),
-        ).problem
+            )).source.originalSource)
 
         val plan = source.prepareExecutionPlan()
 

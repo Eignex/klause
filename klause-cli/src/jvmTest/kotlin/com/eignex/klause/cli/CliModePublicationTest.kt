@@ -75,7 +75,7 @@ class CliModePublicationTest {
 
         try {
             val solvable = session.load(source.absolutePath, common)
-            assertIs<SolvablePipeline.OpenTheory>(solvable.pipeline)
+            assertIs<SourceRendering.ExactSource>(solvable.rendering)
             assertSame(expected, assertFailsWith<IOException> { SolveCore.solve(solvable, common, failed) })
             val later = CommonOptions().apply {
                 engine = "fixed"
@@ -123,7 +123,7 @@ class CliModePublicationTest {
 
         try {
             val solvable = session.load(source.absolutePath, common)
-            assertIs<SolvablePipeline.OpenTheory>(solvable.pipeline)
+            assertIs<SourceRendering.ExactSource>(solvable.rendering)
             SolveCore.solve(solvable, common, output)
         } finally {
             source.delete()
@@ -470,6 +470,23 @@ class CliModePublicationTest {
     }
 
     @Test
+    fun `finite SMT improvements should each stream a complete model before completion`() {
+        val output = SmtLibOutput()
+        val first = "(\n  (define-fun i () Int 0)\n)"
+        val second = "(\n  (define-fun i () Int 1)\n)"
+
+        val progress = capture {
+            output.begin(optimize = true, maximize = true)
+            output.onSolution(first, 7L)
+            output.onSolution(second, 9L)
+        }
+        val terminal = capture { output.onComplete(Verdict.OPTIMAL) }
+
+        assertEquals("; objective=7\nsat\n$first\n; objective=9\nsat\n$second\n", progress)
+        assertEquals("sat\n; optimizationStatus=optimal\n", terminal)
+    }
+
+    @Test
     fun `arithmetic SMT witnesses should stream before terminal proof status`() {
         val output = SmtLibOutput()
         val publication = ArithmeticPublication(output)
@@ -494,11 +511,10 @@ class CliModePublicationTest {
             writeText("(declare-const x Real) (assert (= (* x x) 2)) (assert (> x 0)) (minimize x)")
             deleteOnExit()
         }
-        val pipeline = assertIs<SolvablePipeline.NativeSource>(
-            SmtLibMode.newSession().load(source.absolutePath, CommonOptions().apply { engine = "cp" }).pipeline,
-        )
+        val solvable = SmtLibMode.newSession().load(source.absolutePath, CommonOptions().apply { engine = "cp" })
+        val pipeline = assertIs<SourceRendering.ExactSource>(solvable.rendering)
         val execution = assertIs<SourceExecutionResult.Quadratic>(
-            SourceSetup.execute(SourceExecutionRequest(pipeline.invocation)),
+            SourceSetup.execute(SourceExecutionRequest(assertNotNull(solvable.sourceInvocation))),
         )
         val result = execution.result.result
         val point = assertIs<QuadraticOptimizationResult.Optimal>(result).incumbent

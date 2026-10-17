@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
@@ -17,6 +18,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -36,6 +38,7 @@ import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.times
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
@@ -45,9 +48,11 @@ import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
+import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.pipelineRequest
+import com.eignex.klause.solver.result.QuadraticClaim
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.BIG_ONE
@@ -58,9 +63,246 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SourceStrategyTest {
+    @Test
+    fun `an explicit source portfolio should retain the compiled coordinate frame`() {
+        val x = FloatHandle("x", 0.125, 0.125)
+        val compiled = SchemaDef<SchemaEntry>(mapOf("x" to FloatSpec(0.125, 0.125, 2))).compile()
+        val strategy = BacktrackSolver.source(compiled)
+
+        val result = strategy.solve(FiniteEngine.MIXED)
+
+        val point = assertIs<OpenTheoryAssignment.Sampled>(assertIs<OpenTheoryResult.Sat>(result).assignment).sample
+        assertSame(strategy.source, point.coordinateFrame)
+        assertEquals(0.125, compiled.decode(x, point))
+    }
+
+    @Test
+    fun `finite source traversal should retain the common node allowance`() {
+        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(AllDifferent(intArrayOf(0, 1), 0, 2)))
+        val budget = NodeBudget(0)
+
+        val result = BacktrackSolver.source(source).solve(theory = TheoryParams(nodeBudget = budget))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
+        assertEquals(0L, budget.spent)
+    }
+
+    @Test
+    fun `finite source heuristic should retain the common node allowance`() {
+        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(AllDifferent(intArrayOf(0, 1), 0, 2)))
+        val budget = NodeBudget(0)
+
+        val result = LocalSearchSolver.source(source).solve(
+            LocalSearchParams(initialAssignment = Sample(booleanArrayOf(), longArrayOf(0, 0)), randomSeed = 17),
+            theory = TheoryParams(nodeBudget = budget),
+        )
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
+        assertEquals(0L, budget.spent)
+    }
+
+    @Test
+    fun `open source traversal should accept its typed node allowance`() {
+        val source = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+            openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true))
+        val budget = NodeBudget(1)
+
+        val result = BacktrackSolver.source(source).solve(BacktrackParams(nodeBudget = budget))
+
+        assertIs<OpenTheoryResult.Sat>(result)
+        assertEquals(1L, budget.spent)
+    }
+
+    @Test
+    fun `finite affine optimization should preserve complete decision limits`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(Clause(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+        )))
+        val objective = LinearObjective(boolWeights = longArrayOf(1, 2), constant = 7)
+        val strategy = BacktrackSolver.source(source)
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            backtrack = BacktrackParams(maxDecisions = 0L, nativeSat = false),
+        ))
+
+        val stopped = assertIs<OpenTheoryExecution.Optimize>(strategy.optimizeOpen(objective, params)).result
+        val completed = assertIs<OpenTheoryExecution.Optimize>(strategy.optimizeOpen(objective)).result
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryOptimum.Bounded>(stopped).reason)
+        assertEquals(BigFraction.ofLong(8), assertIs<OpenTheoryOptimum.Optimal>(completed).value)
+    }
+
+    @Test
+    fun `finite affine optimization should keep assumption scopes isolated`() {
+        val source = Problem(1, 0, emptyArray(), emptyArray())
+        val objective = LinearObjective(boolWeights = longArrayOf(1), constant = 7)
+        val strategy = BacktrackSolver.source(source)
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            backtrack = BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to true))),
+        ))
+
+        val pinned = assertIs<OpenTheoryExecution.Optimize>(strategy.optimizeOpen(objective, params)).result
+        val unpinned = assertIs<OpenTheoryExecution.Optimize>(strategy.optimizeOpen(objective)).result
+
+        assertEquals(BigFraction.ofLong(8), assertIs<OpenTheoryOptimum.Optimal>(pinned).value)
+        assertEquals(BigFraction.ofLong(7), assertIs<OpenTheoryOptimum.Optimal>(unpinned).value)
+    }
+
+    @Test
+    fun `finite affine optimization should retain a heuristic starting point`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 100)), emptyArray())
+        val initial = Sample(booleanArrayOf(), longArrayOf(73))
+        val objective = LinearObjective(constant = 7)
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(initialAssignment = initial, maxFlips = 1L, randomSeed = 17L),
+        ))
+
+        val execution = LocalSearchSolver.source(source).optimizeOpen(objective, params)
+
+        val result = assertIs<OpenTheoryOptimum.Bounded>(assertIs<OpenTheoryExecution.Optimize>(execution).result)
+        assertEquals("73", assertNotNull(result.incumbent).intValue(0))
+        assertEquals(BigFraction.ofLong(7), result.value)
+        assertEquals(TerminationReason.BudgetExhausted, result.reason)
+        assertEquals(73L, initial.intValue(0))
+    }
+
+    @Test
+    fun `finite affine heuristic completion should optimize its real objective in the original direction`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(constant = 7, realCoefficients = doubleArrayOf(3.0))
+        for (sense in ObjectiveSense.entries) {
+            val budget = NodeBudget(1000)
+            val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17, nodeBudget = budget,
+                    initialAssignment = Sample(booleanArrayOf(), longArrayOf(0), doubleArrayOf(0.0))),
+            ))
+
+            val execution = assertIs<OpenTheoryExecution.Optimize>(LocalSearchSolver.source(source).optimizeOpen(
+                objective, params, TheoryParams(randomSeed = 17, nodeBudget = budget), sense,
+            ))
+
+            val result = assertIs<OpenTheoryOptimum.Bounded>(execution.result)
+            val maximize = sense == ObjectiveSense.MAXIMIZE
+            assertEquals(if (maximize) "1" else "0", assertNotNull(result.incumbent).realValue(0))
+            assertEquals(BigFraction.ofLong(if (maximize) -10 else 7), result.value)
+            assertEquals(BigFraction.ofLong(if (maximize) 10 else 7),
+                assertIs<SourceValue.Rational>(assertNotNull(execution.acceptedIncumbent).value).value)
+            assertEquals("ls", result.stats.run.backend)
+        }
+    }
+
+    @Test
+    fun `finite affine heuristic optimization should complete rational coordinates without a supplied start`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 2)),
+            arrayOf(Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(3.0),
+                LinearOp.EQ, 0.0)), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        for (sense in ObjectiveSense.entries) {
+            val budget = NodeBudget(1000)
+            val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17, nodeBudget = budget),
+            ))
+
+            val execution = assertIs<OpenTheoryExecution.Optimize>(LocalSearchSolver.source(source).optimizeOpen(
+                objective, params, TheoryParams(randomSeed = 17, nodeBudget = budget), sense,
+            ))
+
+            val result = assertIs<OpenTheoryOptimum.Bounded>(execution.result)
+            val point = assertNotNull(result.incumbent)
+            val exact = assertIs<SourceValue.Rational>(assertNotNull(execution.acceptedIncumbent).value).value
+            assertEquals(exact.toString(), point.realValue(0))
+            assertTrue(point.intValue(0) in setOf("1", "2"))
+            assertEquals(BigFraction.of(parseBigInt(point.intValue(0)), BIG_ONE), exact * BigFraction.ofLong(3))
+            assertEquals(if (sense == ObjectiveSense.MAXIMIZE) exact.negated() else exact, result.value)
+            assertEquals("ls", result.stats.run.backend)
+        }
+    }
+
+    @Test
+    fun `affine optimization should retain original direction after source bound closure`() {
+        val source = Problem(
+            0, 1, arrayOf(IntDomain(0, 3)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
+            openIntHi = booleanArrayOf(true),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(3), constant = 7)
+        val strategy = BacktrackSolver.source(source)
+
+        for (sense in ObjectiveSense.entries) {
+            val execution = strategy.optimizeOpen(objective, sense = sense)
+
+            val completed = assertIs<OpenTheoryExecution.Optimize>(execution)
+            val result = assertIs<OpenTheoryOptimum.Optimal>(completed.result)
+            val maximize = sense == ObjectiveSense.MAXIMIZE
+            assertEquals(if (maximize) "2" else "0", result.assignment.intValue(0))
+            assertEquals(BigFraction.ofLong(if (maximize) -13 else 7), result.value)
+            val publication = assertNotNull(completed.acceptedIncumbent)
+            assertEquals(BigFraction.ofLong(if (maximize) 13 else 7),
+                assertIs<SourceValue.Rational>(publication.value).value)
+        }
+    }
+
+    @Test
+    fun `affine optimization should retain a source preparation refutation`() {
+        val source = Problem(
+            0, 1, arrayOf(IntDomain(-3, 3)),
+            arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ),
+            openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true),
+        )
+
+        val execution = BacktrackSolver.source(source).optimizeOpen(LinearObjective(intCoefficients = longArrayOf(1)))
+
+        assertIs<OpenTheoryOptimum.Infeasible>(assertIs<OpenTheoryExecution.Optimize>(execution).result)
+    }
+
+    @Test
+    fun `finite source satisfaction should preserve typed complete decision limits`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(Clause(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+        )))
+        val strategy = BacktrackSolver.source(source)
+
+        val stopped = strategy.solve(BacktrackParams(maxDecisions = 0L, nativeSat = false))
+        val completed = strategy.solve(BacktrackParams(randomSeed = 17L))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(stopped).reason)
+        val point = assertIs<OpenTheoryResult.Sat>(completed).assignment
+        assertTrue(point.boolValue(0) || point.boolValue(1))
+    }
+
+    @Test
+    fun `finite source satisfaction should preserve a supplied heuristic starting point`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 100)), emptyArray())
+        val initial = Sample(booleanArrayOf(), longArrayOf(73))
+        val strategy = LocalSearchSolver.source(source)
+
+        val result = strategy.solve(LocalSearchParams(initialAssignment = initial, maxFlips = 1L, randomSeed = 17L))
+
+        assertEquals("73", assertIs<OpenTheoryResult.Sat>(result).assignment.intValue(0))
+        assertEquals(73L, initial.intValue(0))
+    }
+
+    @Test
+    fun `finite source satisfaction should keep complete assumption scopes isolated`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))))
+        val strategy = BacktrackSolver.source(source)
+        val pinned = BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to false)))
+
+        val refuted = strategy.solve(pinned)
+        val unpinned = strategy.solve(BacktrackParams())
+
+        assertIs<OpenTheoryResult.Unsat>(refuted)
+        assertTrue(assertIs<OpenTheoryResult.Sat>(unpinned).assignment.boolValue(0))
+    }
+
     @Test
     fun `source optimize should close open integer bounds before exact continuous preparation`() {
         val source = Problem(
@@ -742,7 +984,7 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `polynomial optimize should decline open integer sources`() {
+    fun `source optimize should retain open integer lower bounds`() {
         val source = Problem(
             0,
             1,
@@ -756,6 +998,30 @@ class SourceStrategyTest {
 
         val result = BacktrackSolver.source(source).optimize(LinearObjective(intCoefficients = longArrayOf(1))).result
 
-        assertEquals(TerminationReason.Unsupported, assertIs<QuadraticOptimizationResult.Unknown>(result).reason)
+        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result)
+        assertEquals(BigFraction.ofLong(42), optimum.incumbent.value.rational)
+        assertEquals("42", optimum.incumbent.sample.exactIntValue(0).toString())
+        assertTrue(source.intBounds.isOpenLower(0))
+        assertTrue(source.intBounds.isOpenUpper(0))
+    }
+
+    @Test
+    fun `source optimize should retain the native certificate after bound refutation`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(-3, 3)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        val result = BacktrackSolver.source(source).optimize(LinearObjective(intCoefficients = longArrayOf(1))).result
+
+        val infeasible = assertIs<QuadraticOptimizationResult.Infeasible>(result)
+        assertEquals(QuadraticClaim.Infeasible, infeasible.certificate.claim)
     }
 }

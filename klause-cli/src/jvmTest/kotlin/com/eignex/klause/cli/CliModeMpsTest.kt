@@ -64,7 +64,8 @@ class CliModeMpsTest {
         }
 
         assertTrue("s SATISFIABLE" in out.lines(), out)
-        assertTrue("v X=0.3333333333333333" in out.lines(), out)
+        assertTrue("o 0.333333333333333314829616256247390992939472198486328125" in out.lines(), out)
+        assertTrue("v X=0.333333333333333314829616256247390992939472198486328125" in out.lines(), out)
         assertTrue("c workingModelOptimizationStatus=tolerance-optimum" in out.lines(), out)
         assertTrue("tolerance-accepted optimality unproved" in out, out)
     }
@@ -164,8 +165,9 @@ class CliModeMpsTest {
                 )
             }
 
-            assertTrue("solvePipeline=finite-cp" in kept, kept)
-            assertTrue("solvePipeline=numerical-mip" in declined, declined)
+            assertTrue("c frontendRoutingOutcome=finite" in kept.lines(), kept)
+            assertTrue("c frontendRoutingOutcome=native-formula" in declined.lines(), declined)
+            assertTrue("c reportedBackend=numerical-mip" in declined.lines(), declined)
             assertTrue("s OPTIMUM FOUND" in declined, declined)
             assertTrue("v x=5" in declined, declined)
             assertFalse("cancelled" in declined, declined)

@@ -29,6 +29,7 @@ class SourceSetupRequest private constructor(
     val boundCancellation: Cancellation,
     /** Original exact quadratic source objective, when the operation supplies one. */
     val quadraticObjective: QuadraticObjectiveSpec?,
+    internal val requiresQuadraticCompletion: Boolean = false,
 ) {
     /** Bind an affine operation or the objective already embedded in a native formula. */
     constructor(
@@ -56,6 +57,20 @@ class SourceSetupRequest private constructor(
         providers, cancellation, boundCancellation, quadraticObjective,
     )
 
+    internal constructor(
+        source: SourceAttachment,
+        engine: FiniteEngine,
+        quadraticObjective: QuadraticObjectiveSpec,
+        sense: ObjectiveSense,
+        providers: FactorProjectionProviders,
+        cancellation: Cancellation,
+        boundCancellation: Cancellation,
+        requiresQuadraticCompletion: Boolean,
+    ) : this(
+        source, ExecutionOperation.OPTIMIZE, engine, null, sense == ObjectiveSense.MAXIMIZE,
+        providers, cancellation, boundCancellation, quadraticObjective, requiresQuadraticCompletion,
+    )
+
     init {
         val embedded = source.embeddedObjectiveSense
         require(embedded == null || (objective == null && quadraticObjective == null)) {
@@ -75,8 +90,8 @@ class SourceSetupRequest private constructor(
         ) { "maximization requires a source objective" }
     }
 
-    internal fun finiteObjective(): LinearObjective? {
-        val selected = objective ?: return null
+    internal fun finiteObjective(workingObjective: LinearObjective? = objective): LinearObjective? {
+        val selected = workingObjective ?: return null
         if (!maximize) return selected
         require(
             selected.constant != Long.MIN_VALUE &&
@@ -108,13 +123,20 @@ object SourceSetup {
     ): PreparedSourceInvocation {
         val stop = request.cancellation.encodingPreparationScope()
         request.source.formula?.let { formula ->
+            if (formula is AttachedSourceFormula.Linear) {
+                return prepareLinearSource(request, formula.problem, stop, onLpStats)
+            }
             val route = prepareNativeSource(request, formula, stop)
             return PreparedSourceInvocation(request, route, stop)
         }
         val problem = request.source.problem
         val projections = (problem as? BakedProblem)?.factorProjections
             ?.takeIf { it.providers === request.providers } ?: request.providers.prepare(problem)
-        if (request.quadraticObjective != null) {
+        val exactNormalization = request.maximize && request.objective?.let { objective ->
+            objective.constant == Long.MIN_VALUE || objective.intCoefficientValues.any { it == Long.MIN_VALUE } ||
+                objective.boolWeightValues.any { it == Long.MIN_VALUE }
+        } == true
+        if (request.quadraticObjective != null || exactNormalization) {
             return PreparedSourceInvocation(
                 request,
                 prepareFactorQuadratic(request, projections, polynomialCancellation or stop, stop),

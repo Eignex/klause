@@ -3,14 +3,21 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
-import com.eignex.klause.formats.smtlib.SmtLibAdmission
-import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
+import com.eignex.klause.solver.pipeline.PolynomialTheoryExecution
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
-import com.eignex.klause.solver.pipeline.pipelineRequest
+import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
+import com.eignex.klause.solver.pipeline.SourceExecutionRequest
+import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import java.io.File
@@ -59,8 +66,7 @@ internal object TranscendentalSourceProbe {
         val results = buildJsonArray {
             for (entry in captured) {
                 val source = entry.jsonObject
-                val problem = (SmtLibAdmission.parse(source.getValue("text").jsonPrimitive.content)
-                    as SmtLibInput.Transcendental).problem
+                val parsed = SmtLib.parse(source.getValue("text").jsonPrimitive.content)
                 for (seed in seeds) repeat(repeats) { repetition ->
                     for (control in if (repetition % 2 == 0) controls else controls.reversed()) {
                         val engine = FiniteEngine.valueOf(control.substringBefore(':'))
@@ -76,7 +82,26 @@ internal object TranscendentalSourceProbe {
                                 backtrack = BacktrackParams(randomSeed = seed), localSearch = LocalSearchParams(
                                 randomSeed = seed, maxFlips = 16, maxInstructions = maximumWork), alnsIterations = 16))
                         val started = TimeSource.Monotonic.markNow()
-                        val execution = problem.pipelineRequest().execute(params, engine, cores)
+                        val invocation = SourceSetup.prepare(SourceSetupRequest(
+                            parsed.source, ExecutionOperation.SATISFY, engine,
+                            cancellation = params.timeout or cancellation,
+                        ))
+                        val completed = SourceSetup.execute(SourceExecutionRequest(invocation,
+                            polynomial = params, cores = cores))
+                        val execution = when (completed) {
+                            is SourceExecutionResult.Transcendental -> {
+                                val native = completed.result
+                                PolynomialTheoryExecution(native.result,
+                                    PolynomialTheoryStats(workSpent = native.workSpent),
+                                    nativeWorkScope = "transcendental",
+                                    nativeResource = if (native.representationDeclined) "RepresentationLimit" else null)
+                            }
+                            is SourceExecutionResult.Declined -> PolynomialTheoryExecution(
+                                OpenTheoryResult.Unknown(completed.reason, SolveStats.EMPTY, parsed.semantics),
+                                PolynomialTheoryStats(), nativeWorkScope = "source-preparation",
+                            )
+                            else -> error("source setup did not install function satisfaction: $completed")
+                        }
                         val elapsed = started.elapsedNow().inWholeNanoseconds
                         val result = execution.result
                         add(buildJsonObject {
@@ -91,6 +116,7 @@ internal object TranscendentalSourceProbe {
                             put("elapsedNanos", elapsed)
                             put("kind", result::class.simpleName)
                             put("reason", (result as? OpenTheoryResult.Unknown)?.reason?.name)
+                            put("preparationDeclined", completed is SourceExecutionResult.Declined)
                             put("nativeScope", execution.nativeWorkScope)
                             put("nativeResource", execution.nativeResource)
                             put("nativeWork", execution.stats.workSpent)
@@ -108,11 +134,11 @@ internal object TranscendentalSourceProbe {
                                 }) }
                             })
                             if (result is OpenTheoryResult.Sat) put("witness", buildJsonObject {
-                                problem.boolVarNames.forEach { (name, id) ->
+                                parsed.boolVarNames.forEach { (name, id) ->
                                     put(name, result.assignment.boolValue(id))
                                 }
-                                problem.intVarNames.forEach { (name, id) -> put(name, result.assignment.intValue(id)) }
-                                problem.realVarNames.forEach { (name, id) ->
+                                parsed.intVarNames.forEach { (name, id) -> put(name, result.assignment.intValue(id)) }
+                                parsed.realVarNames.forEach { (name, id) ->
                                     put(name, result.assignment.realValue(id))
                                 }
                             })

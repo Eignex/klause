@@ -18,6 +18,7 @@ import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.kind
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
@@ -35,6 +36,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
@@ -83,6 +85,8 @@ internal class OpenPortfolio(
     private val preparedPlan = preparedSource ?: request?.preparedPlan ?:
         model.prepareExecutionPlan(cancellation = lifetime)
     private val sourceModel = preparedPlan.originalSource as? Problem ?: model
+    private val witnessProjection = PropagationProblem(sourceModel,
+        preparedPlan.factorProjections?.forEngineView(sourceModel) ?: sourceModel.selectedFactorProjections())
 
     private fun workerParams(slot: PortfolioWorkerSlot): TheoryParams = theoryParams.copy(
         randomSeed = slot.seed,
@@ -134,7 +138,7 @@ internal class OpenPortfolio(
                 cancellation = lifetime or cancellation,
                 nodeBudget = theoryParams.nodeBudget,
             ),
-            PortfolioEvidence(identity, openWitnessVerifier(sourceModel, null))
+            PortfolioEvidence(identity, openWitnessVerifier(sourceModel, null, null, stop, witnessProjection))
                 .bindInvocation(binding, lifetime or cancellation),
         ) { workers ->
             PortfolioInvocationPolicy(
@@ -246,7 +250,7 @@ internal class OpenPortfolio(
                 binding = { SourceWorkerBinding(binding, provesResults = it.permitsSourceProofs) },
             ) { slot -> factory.materialize(preparedPlan, slot) }
         }
-        val verifier = openWitnessVerifier(sourceModel, objective, context, stop)
+        val verifier = openWitnessVerifier(sourceModel, objective, context, stop, witnessProjection)
         val evidence = PortfolioEvidence(identity, verifier).bindInvocation(binding, stop)
         val profile = ProblemProfile.of(model, optimizing = true)
         val share = if (integral != null || rational) DESCENT_SHARE else 0.0
@@ -545,6 +549,16 @@ internal fun openWitnessVerifier(
     objective: LinearObjective?,
     context: SourceProofContext? = null,
     cancellation: Cancellation = Cancellation.Never,
+): CandidateVerifier<Sample, Double?> = openWitnessVerifier(
+    model, objective, context, cancellation, PropagationProblem(model),
+)
+
+private fun openWitnessVerifier(
+    model: Problem,
+    objective: LinearObjective?,
+    context: SourceProofContext?,
+    cancellation: Cancellation,
+    projection: PropagationProblem,
 ): CandidateVerifier<Sample, Double?> = CandidateVerifier { candidate ->
     val sample = candidate.assignment
     val claimed = candidate.objective
@@ -565,7 +579,7 @@ internal fun openWitnessVerifier(
             ?: model.linearAuthorityContext(objective ?: LinearObjective(), ObjectiveSense.MINIMIZE, cancellation)
             ?: return@CandidateVerifier Verification.Indeterminate("exact original-source witness check unavailable")
         source.linearWitnessVerifier(cancellation).verify(candidate)
-    } else verifyOpenWitness(model, sample, cancellation)
+    } else verifyOpenWitness(model, sample, cancellation, projection)
     when (checked) {
         is Verification.Rejected -> return@CandidateVerifier checked
         is Verification.Indeterminate -> return@CandidateVerifier checked

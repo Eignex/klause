@@ -1,8 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.DefinitionHint
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.unhintedDefinitionSweep
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.retainedCoordinates
 import com.eignex.klause.propagation.BakedProblem
@@ -21,8 +24,8 @@ internal fun PreparedSourceInvocation.heuristicHints(
     strategies: Set<ExecutionStrategy>,
     capabilities: ExecutionCapabilities,
 ): PreparedSourceHints? {
-    val plan = requireNotNull(preparedPlan)
-    val route = this.route as? SourceProblemRoute.Finite ?: return null
+    val plan = requireNotNull(enginePlan)
+    val route = engineRoute as? SourceProblemRoute.Finite ?: return null
     val projection = requireNotNull(mapping) { "hint projection requires its source mapping" }
     require(projection.source === route.problem) { "hint projection belongs to a different source model" }
     require(
@@ -41,9 +44,13 @@ internal fun PreparedSourceInvocation.heuristicHints(
         return null
     }
     val definitions = source.definitionHints
-    if (definitions.isEmpty()) return null
     val stop = (cancellation or this.cancellation).encodingPreparationScope()
     if (stop()) return null
+    if (definitions.isEmpty() && source.definitionReferences == null) {
+        val sweep = unhintedDefinitionSweep(problem, stop) ?: return null
+        val functional = objective?.let { sweep.functionalObjective(it, stop) }
+        return if (stop()) null else PreparedSourceHints(sweep, functional)
+    }
     val projected = projection.retainedCoordinates(stop) ?: return null
     val coordinates = plan.sourceCoordinates(stop)?.followedBy(projected, stop) ?: return null
     val hints = ArrayList<DefinitionHint>()
@@ -52,8 +59,47 @@ internal fun PreparedSourceInvocation.heuristicHints(
         stop.charge(1)
         hint.remap(coordinates)?.let(hints::add)
     }
-    val sweep = DefinitionalSweep.fromSource(problem, hints, stop)
+    val references = source.definitionReferences?.let { it.remapped(coordinates, stop) ?: return null }
+    if (references == null) {
+        val sweep = DefinitionalSweep.fromSource(problem, hints, stop)
+        if (stop()) return null
+        val functional = objective?.let { sweep?.functionalObjective(it, stop) }
+        return if (stop()) null else PreparedSourceHints(sweep, functional)
+    }
+    val moveFolds = references.foldsForMoves(objective, stop) ?: return null
+    val inferred = DefinitionalSweep.infer(problem, references.integers, moveFolds, stop)
     if (stop()) return null
-    val functional = objective?.let { sweep?.functionalObjective(it, stop) }
+    val sweep = DefinitionalSweep.withSource(problem, inferred, hints, stop)
+    if (stop()) return null
+    val gradient = if (objective != null && references.folds.isNotEmpty()) {
+        val allFolds = DefinitionalSweep.infer(problem, references.integers, references.folds, stop)
+        if (stop()) return null
+        DefinitionalSweep.withSource(problem, allFolds, hints, stop)
+    } else sweep
+    if (stop()) return null
+    val functional = objective?.let { gradient?.functionalObjective(it, stop) }
     return if (stop()) null else PreparedSourceHints(sweep, functional)
+}
+
+private fun SourceDefinitionReferences.foldsForMoves(
+    objective: LinearObjective?,
+    cancellation: Cancellation,
+): List<BoolFoldDefinition>? {
+    if (objective == null) return emptyList()
+    val weights = objective.boolWeights
+    val retained = ArrayList<BoolFoldDefinition>()
+    for (fold in folds) {
+        cancellation.charge(1)
+        if (cancellation()) return null
+        var priced = true
+        for (literal in fold.lits) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            val id = Lit.variable(literal)
+            if (id !in weights.indices || weights[id] == 0L) priced = false
+        }
+        // Unit folds preserve literal moves; wider unpriced folds remain searched for feasibility repair.
+        if (fold.lits.size == 1 || priced) retained += fold
+    }
+    return if (cancellation()) null else retained
 }

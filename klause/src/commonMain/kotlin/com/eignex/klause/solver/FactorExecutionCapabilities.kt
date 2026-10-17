@@ -138,6 +138,12 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     is RealElement -> realArithmetic.copy(propagation = PropagationCapability.BOUNDS_FILTERING, inertReason = null)
     is RealArrayMinMax -> realArithmetic.copy(propagation = PropagationCapability.UNSUPPORTED, inertReason = null)
     is RealAbs, is RealProduct, is ReifiedRealLinear -> realArithmetic
+    is RealFiniteDomain -> if (size == 0) realArithmetic.copy(
+        propagation = PropagationCapability.SOUND_FILTERING,
+        propagationCheck = AssignmentCheckCapability.EXACT,
+        scoring = ScoringCapability.INERT, relaxation = RelaxationCapability.NONE,
+        inertReason = "Empty real membership is enforced by finite propagation and exact source certification.",
+    ) else realArithmetic.copy(scoring = ScoringCapability.INERT, relaxation = RelaxationCapability.NONE)
     is ContinuousProduct -> if (finiteChoices?.hasGuards == true) realArithmetic else
         realArithmetic.copy(relaxation = RelaxationCapability.NONE)
     is ObjectiveBoundFactor -> objectiveOverlay

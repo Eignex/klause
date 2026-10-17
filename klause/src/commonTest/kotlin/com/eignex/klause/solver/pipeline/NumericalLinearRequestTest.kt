@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.simplex.exact.BigFraction
@@ -19,6 +20,26 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class NumericalLinearRequestTest {
+    @Test
+    fun `a shared node allowance should withhold uncovered numerical refutations`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n G R0\n G R1\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R0 1 R1 1\nRHS\n RHS R0 1 R1 1\n" +
+                "BOUNDS\n BV B I\n FX B X 0\nINDICATORS\n IF R0 I 0\n IF R1 I 1\nENDATA\n",
+        ).toExactSourceProblem()
+        val request = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective())
+        for (limit in listOf(0L, 1L)) {
+            val budget = NodeBudget(limit)
+
+            val result = request.solve(TheoryParams(nodeBudget = budget))
+
+            assertNull(result.terminal)
+            assertNull(result.incumbent)
+            assertEquals(TerminationReason.BudgetExhausted, result.reason)
+            assertEquals(limit, budget.spent)
+        }
+    }
+
     @Test
     fun `source fixed integer guards should keep exact tiny numerical optima`() {
         for (trigger in listOf(0L, 1L)) {

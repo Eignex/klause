@@ -720,8 +720,9 @@ class SearchSession(
         candidateHints: SearchCandidateHints = SearchCandidateHints.None,
         observer: SearchRunObserver = SearchRunObserver.None,
         branchSelection: SearchBranchSelection = SearchBranchSelection.Default,
+        decisionBudget: SearchDecisionBudget = SearchDecisionBudget.Unlimited,
     ): SearchRun = openRunAt(
-        numBoolVars, params, booleanBranching, SearchDecisionBudget.Unlimited,
+        numBoolVars, params, booleanBranching, decisionBudget,
         observer, SearchModelContinuation.Chronological, SearchModelPolicy.SurfaceAll,
         nodePolicy, SearchRunLifecycle.None, candidateHints, branchSelection, decisionLevel,
     )

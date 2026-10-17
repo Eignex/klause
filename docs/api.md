@@ -51,26 +51,81 @@ locations. `solve` returns `OpenTheoryResult` and exact source-coordinate assign
 including algebraic reals and arbitrary-width open integers. Finite globals remain
 part of the same source rather than becoming an unconstrained finite projection.
 
+Explicit `FiniteEngine` overloads of `solve` and both affine and quadratic `optimize`
+accept FIXED, BACKTRACK, LOCAL_SEARCH, MIXED and ALNS per call. They bind common
+`ExecutionOptions`, lane count, timeout, cancellation and a containing `NodeBudget`
+through `SourceExecutionRequest`. Compiled source names, objective ownership and
+published coordinate frames retain the same binding. The factory-selected `engine`
+remains the default for typed compatibility overloads. FIXED rejects multiple lanes;
+inapplicable options and conflicting node limits reject through the common entry.
+Satisfaction retains the reconstructed callback witness when a finite terminal
+envelope carries no point.
+
+`SourceExecutionPolicy` captures explicit LP ceilings, zero-objective pricing,
+application portfolio defaults and whether a presolve emphasis was explicitly selected.
+The policy overload of `SourceExecutionRequest` validates applicability before invoking
+an application finite factory. LP ceilings and pricing apply to finite execution;
+explicit finite controls decline on native arithmetic routes. `finiteRequest` binds
+fixed execution to one arm with LP off, and portfolio execution to the requested or
+automatic arm count and LP ceiling. Explicit arm settings take precedence over the
+application count. Deferred factories retain typed callbacks, stops and the containing
+node ledger while the common binding applies captured policy.
+
+Typed `ExecutionOption` presolve settings cover affine pivot order, abort fraction,
+rounds and probe allowances. The source boundary consumes them for finite or linear
+preparation and rejects them for other routes. Effort tuning alone preserves the
+implicit local-search emphasis policy; only an explicit emphasis override enables
+that override. Captured options and application input lists remain reusable.
+
+Finite `SourceStrategy.solve` and affine `optimizeOpen` dispatch their captured invocations through
+`SourceSetup.execute` and `FinitePipeline.solve`. Its internal single-consumer adapter
+retains the full typed CP or LS parameters, including assumptions, hooks, starting
+points and the same node ledger. Finite preparation uses the retained shape without
+additional presolve reductions. Each completed envelope keeps its native result
+privately beside the reconstructed source outcome, preserving the original stop
+reason without a live worker or a later mutable result getter.
+
 Typed `BacktrackParams` and `LocalSearchParams` overloads retain their finite and
 polynomial controls. `PolynomialTheoryParams` supplies native polynomial limits and
 common pins; `TheoryParams` supplies open-linear limits. These are distinct work
 currencies. A source operation owns fresh private state; shared node allowances retain
-their identity. Deduction scopes and CP tolerance acceptance explicitly decline because
+their identity. An allowance supplied by either the selected finite parameters or
+`TheoryParams` reaches finite, polynomial and open execution through the same source
+binding. Different ledgers in the selected parameters and `TheoryParams` reject before
+preparation. Complete open decisions
+and heuristic moves charge that ledger; required arithmetic work keeps its own currency.
+Deduction scopes and CP tolerance acceptance explicitly decline because
 source execution requires exact coordinates and cannot discard restrictions. Extra CP
 components, open pins and finite-only open hooks return `Unknown(Unsupported)`.
 Exact polynomial LS also declines finite seeding, incumbent exchange, custom scoring
 and event hooks that its native neighborhood cannot consume.
 
 `optimize` preserves the existing `QuadraticOptimizationExecution` surface through
-the shared exact affine or quadratic entry point. It supports bounded integer
-sources, continuous products and open real coordinates, with exact objective values,
+`SourceSetup.prepare` and `SourceSetup.execute` for affine and quadratic objectives.
+Its result contract requires the native completion certificate. Shared setup retains
+the original source after an optional bound refutation so that the producing engine
+can establish that certificate under the containing allowance.
+It supports bounded and supported open integer sources, continuous products and
+open real coordinates, with exact objective values,
 direction-aware bounds, attainment and incomplete results. `optimizeOpen` exposes
-the existing native `OpenTheoryExecution` for supported open-integer linear sources;
-its values retain native minimization sense. Neither entry point converts rounded
+the existing native `OpenTheoryExecution` for finite and supported open-integer linear sources.
+Compiled helper objectives retain exact original-coordinate pairings independently
+of their finite native units. The exact `optimize` interface consumes that pairing;
+`optimizeOpen` explicitly declines coefficients without a lossless linear mapping.
+`CompiledSchema.sourceObjective` exposes a helper's exact source carrier without
+converting a private bucket into an original integer. Its immutable identity can
+be retained for original-source result capture.
+The caller's objective sense applies once to the helper's already captured sign.
+It uses the same route selection as satisfaction, including finite execution after
+source-safe bound closure. Typed finite optimization retains assumptions, supplied
+heuristic starting points and interruption causes. Its values retain native minimization
+sense and are evaluated exactly from reconstructed source coordinates, independently
+of the native floating score. Neither entry point converts rounded
 finite scores into exact source claims. Source `optimize` proves available integer
 bounds before polynomial preparation, retaining source identity, provider capture
-and declared holes. Surviving open integers retain the explicit unsupported result;
-a presolve refutation alone does not fabricate a quadratic engine certificate.
+and declared holes. Surviving open integers use supported native integer optimization;
+unsupported encodings decline. A presolve refutation alone does not fabricate a
+quadratic engine certificate.
 
 The baked `BacktrackSolver` and `LocalSearchSolver` classes retain their finite
 sessions, streams, enumeration and resumable APIs. Their compiled/schema constructors
@@ -90,28 +145,70 @@ For source orchestration, attach a canonical `Problem` with
 source direction and units; `maximize` records its sense. Setup prefers exact arithmetic
 for pure-real models and for admitted linear integer objectives whose declared range
 exceeds binary64's exact integral range. Other finite models retain finite execution.
+The public `Problem.pipelineRoute` overloads delegate to this setup and retain their
+existing signatures. Their compatibility route preferences do not override canonical
+source ownership. Default calls retain baked source providers; explicit providers,
+LP observation and separate optional-deduction/required-admission stops retain the
+same ownership as a direct setup request.
+
 The same policy serves DIMACS, WCNF, OPB, XCSP3, exact or original-real FlatZinc,
-SMT-LIB linear admission and source-strategy satisfaction. Finite format adapters
+SMT-LIB source admission and source-strategy satisfaction. Finite format adapters
 retain the selected route and their existing definition, Boolean-fold, functional
 objective and search hints. Arithmetic adapters render original exact coordinates;
 XCSP3 objective values beyond binary64's exact integral range retain their original units.
+Callers with factor-backed integer orientations and Boolean-fold roles can use
+`SourceAttachment(problem, definedVars, boolFolds, definitionHints, searchHints)`.
+The attachment owns those compatibility containers. The selected finite heuristic
+consumer projects and infers them under the captured invocation; complete-only
+execution does not construct a sweep or gradient. The original three-argument
+constructor retains its neutral-hint behavior. See [source definition materialization](solver/local-search.md#source-definition-materialization)
+for move and objective-gradient policies.
 Native `PolynomialRealProblem`, `NonlinearIntegerProblem` and `TranscendentalProblem`
 snapshots use the same attachment through `SourceAttachment(source, settings)`, with
-explicit immutable `ProblemSettings`. Their actual source identity, exact formula,
+explicit immutable `ProblemSettings`. Attaching metadata does not initialize the
+default mechanism providers; setup binding resolves the immutable default bundle
+or the bundle retained by a baked source. Their actual source identity, exact formula,
 integer/real namespaces and effective semantics remain retained. Pure polynomial
 preparation applies those settings to its private factor view. No finite source model
 is substituted for the native input. `SourceSetupRequest(source, engine,
 quadraticObjective, sense)` captures an exact quadratic objective and its original
 direction. Affine requests retain their existing constructor. An embedded function
 objective must agree with the requested operation and direction and cannot be replaced.
+`LinearSourceProblem` uses engine-neutral `SemanticRational` coefficients and bounds.
+It attaches original rational linear declarations, row sides,
+indicator pins and an embedded affine objective through the same `(source, settings)`
+constructor. Its row terms precede normalization so absolute and relative feasibility
+tolerances retain original units. Declare effective bounds before attachment; setup
+adds no undeclared sides or private grid window. The embedded objective and direction
+must match the operation and cannot be replaced. `sourceLinearObjective` exposes the
+original exact descriptor; working scales and auxiliary cost columns remain private.
+
 `PreparedSourceInvocation` retains the actual selected route, source plan and operation admission. Its
-`finiteShape()` supplies the same captured plan to `FiniteSolveRequest` and
-`FinitePipeline.solve`; it does not select a second route. An explicit enumeration
+`finiteShape()` supplies the captured engine plan to `FiniteSolveRequest` and
+`FinitePipeline.solve`; it does not repeat routing. An explicit enumeration
 operation remains enumeration under a cap of one.
 
+An internally selected private float grid retains the canonical `route` and
+`preparedPlan`, with a separate engine plan for its private model. Its immutable
+`floatProjection` describes original-real and private bucket namespaces and exact
+objective units. `FiniteSolveResult.outcome` reports only source-qualified points and
+claims; `nativeGridOutcome` separately retains the unmodified private-grid outcome,
+including refutations and optima without an original-source transfer. Neither metadata
+nor one checked source point establishes global completeness. Ordinary
+`SourceSetup.prepare` does not implicitly select a grid for complete/exact consumers.
+
+FlatZinc exposes canonical real data through `FlatZincProgram.sourceProgram` and
+`sourceAttachment()`. Its explicit `prepareFiniteCompatibility(request)` retains the
+caller's original source request while selecting the historical finite view when
+representable. Automatic `prepareSourceExecution(request)` preserves an admitted original
+complete arm; only its absence permits a private view. `parseFlatZincExecution` exposes the captured invocation beside its
+native hint data. Automatic CLI loading reads only canonical metadata before binding
+its containing controls. Historical FlatZinc model/decoder access remains lazy; the callable
+constructor/copy/component descriptors are retained, while Kotlin `isData` changes.
+
 `SourceSetup.execute(SourceExecutionRequest(invocation, ...))` dispatches that captured
-operation. Finite callers supply their existing full `FiniteSolveRequest` factory over
-its selected shape. Arithmetic callers supply `TheoryParams` or `PolynomialTheoryParams`,
+operation. Its typed compatibility constructors accept the existing full
+`FiniteSolveRequest` factory over the selected shape, or `TheoryParams` and `PolynomialTheoryParams`,
 with explicit lane count and optional linear preparation controls. Additional request
 constructors accept complete `NonlinearIntegerTheoryParams` or
 `TranscendentalTheoryParams`, retaining the existing node ledger and native limits.
@@ -120,23 +217,71 @@ finite factory is called. A foreign shape, engine or operation binding rejects b
 execution; nonfinite enumeration explicitly declines. Source deductions can refute an
 empty enumeration without constructing a worker.
 
+The `ExecutionOptions` request constructor resolves common controls in the library.
+It binds one seed (default zero) and one `NodeBudget` across the selected native
+strategies. A supplied ledger retains its spent work; a conflicting `node-limit`
+rejects. Native limits use the existing parameter types' defaults. Parsed `auto`
+selects that default, `unlimited` removes the cap and a nonnegative amount supplies
+the cap in its native units. Typed nullable allowance options use null for unlimited.
+Finite dense coefficient capacities must be positive.
+Unknown and inapplicable keys reject on the selected route. Finite consumers can use
+the built-in request factory or supply their application hooks and LP policy; binding
+preserves those controls while applying the common seed, ledger and containing stop.
+
 `SourceExecutionResult` retains the complete native finite, linear, polynomial,
 quadratic or transcendental execution rather than narrowing exact values, bounds, limits, rays, resource
 telemetry or publication receipts. Callback types retain their native source coordinates
 and objective units. Captured interpretation does not upgrade a native claim beyond
 its producing model and proof scope; source-specific transfer qualification still applies.
+For a `LinearSourceProblem`, `SourceExecutionResult.linearSource` retains an immutable
+original-unit point and conclusion beside the full native payload. The optional
+`onLinearSourceIncumbent` callback receives checked declaration-order coordinates and
+exact original objective values. Ordinary native callbacks and payloads retain their
+working coordinates and costs; `objectiveScale` records a positive integral scaling
+when used. Numerical payloads keep
+their own evidence scope, bounds, terminal and reason. Original accepted-set claims
+require nominal correspondence, tolerance coverage and an unrestricted native scope,
+or an independently established accepted-set bound attained by a checked point.
+Feasibility correspondence is tracked separately from objective projection, so a
+private approximate cost definition does not erase a checked constraint refutation.
+A checked nominal recession base and ray retain their existing unboundedness authority.
+Source acceptance alone cannot promote a nominal optimum to a tolerance optimum.
+An accepted original objective must also attain the native bound after applying its
+working scale; a private cost coordinate cannot substitute for that comparison.
+An additional finite acceptance callback restricts the native scope; its exhaustion
+cannot refute or optimize the whole original source.
+The numerical route uses `TheoryParams` and its existing serial LP/MIP traversal;
+LS/ALNS requests retain witness-only native results. Common strategy controls and
+format-specific CLI registration remain separate from this library surface.
+Raw affine sources retain numerical execution when their working coefficients
+decline numerical admission. Nonzero underflow or nonfinite projection returns an
+unsupported native numerical result with no witness, bound or terminal claim; exact
+source storage does not select an arithmetic-theory fallback.
+
+`PreparedSourcePlan.workingCoordinate` maps a typed original coordinate into its
+canonical working namespace, including real declarations with proved integer
+backings. Original declaration counts retain their source meaning. `realCoordinate`
+requires real storage; a cross-kind backing uses the typed mapping. Integer-only
+hint remaps use original integer identities. A cross-kind plan withholds the
+same-kind remap and retains its typed working coordinates.
+
 `executionKind` inspects the installed family; library policy owns
 unsupported-linear optimization fallback to source-checked heuristic execution on the
 same prepared plan. Exact and original-real FlatZinc use the same arithmetic fallback
-as SMT-LIB linear admission. Those paths, the MiniZinc finite invocation path and
+as SMT-LIB source admission. Those paths, the MiniZinc finite invocation path and
 source-strategy arithmetic satisfaction consume this dispatcher. Native SMT formula
-and quadratic consumers also submit their attachments through it; their CLI carrier
-owns rendering only. Existing SMT admission still chooses its source representation.
+and quadratic consumers also submit their attachments through it. CLI carriers retain
+coordinate renderers and the captured invocation; their output adapters consume the
+full `SourceExecutionResult` without constructing route-specific solver requests.
+SMT admission retains factor or exact-expression content according
+to its representation, independently of the installed solving mechanisms.
 Required native preparation charges source-coordinate capture to the containing token;
 an interrupted preparation exports no executable plan and returns `Declined`, with
 its original source and stop reason. This supplies no engine refutation or certificate.
-Legacy typed compatibility entries and MPS retain their existing execution surfaces;
-common parameter interpretation has separate adapters.
+Typed compatibility entries preserve their public descriptors while delegating to
+shared source preparation. The common execution constructor owns native parameter
+defaults and containing allowances; original linear result qualification remains
+separate from native working-coordinate evidence.
 
 These setup types are part of the experimental composition surface. Source arrays
 stay borrowed read-only, metadata containers are captured, and the returned shape
@@ -181,6 +326,12 @@ products use their existing polynomial completion for affine and quadratic objec
 Each affine operation retains its original source snapshot and caller objective on
 its bound request; changing the objective does not rebind an earlier request.
 
+Affine source objectives over selected polynomial real completion use the exact
+quadratic execution surface with their original constant, coefficients and direction.
+Maximization whose signed-word coefficients cannot be negated losslessly selects
+exact normalization or returns a typed preparation decline. Source operation metadata
+is retained independently of that consumer choice.
+
 ### Nonlinear integer sources
 
 `NonlinearIntegerProblem.pipelineRequest()` exposes exact polynomial integer/mixed
@@ -193,9 +344,10 @@ The quadratic `minimize` overload uses shared exact integer branching and return
 the same quadratic incumbent/bound result surface for open and arbitrary-width
 integer coordinates. Heuristic engines retain checked incumbents; complete
 traversal must cover every remaining integer branch before a global claim.
-SMT-LIB quadratic admission retains the same existing source snapshots under
-`SmtLibInput.Quadratic`, with exact original coordinate terms and objective sense.
-The CLI forwards this captured request and renders its exact optimization result.
+SMT-LIB admission retains factor or exact-expression content through
+`SmtLibProblem.source`, with affine or exact quadratic metadata in original
+coordinates and its source sense. The CLI binds this attachment and objective through shared
+setup and renders the exact optimization result.
 
 
 ## Compatibility and implementation surfaces
@@ -333,8 +485,8 @@ invocation restrictions and [evidence admission](solver/evidence.md) retain thei
 ## Identities at mapping boundaries
 
 `SourceBoolId`, `SourceIntId` and `SourceRealId` name separate source namespaces.
-`CompiledSchema.sourceId`/`sourceRealId` expose those locations; a bucketed float has no
-continuous source location. `VarRemap` owns its primitive tables and returns typed source
+`CompiledSchema.sourceId`/`sourceRealId` expose original locations, including real
+locations for floats with a private compatibility bucket. `VarRemap` owns its primitive tables and returns typed source
 locations or null for an absent target. Internal symmetry refinement borrows its owner's
 mutable tables through an explicit workspace view, confined to that synchronous operation.
 

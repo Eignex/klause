@@ -263,7 +263,7 @@ class LpTerminalDeclineTest {
         assertEquals(FiniteSolveVerdict.UNKNOWN, declined.verdict)
         assertNull(declined.bestSample)
         assertEquals(FiniteSolveVerdict.SAT, accepted.verdict)
-        assertEquals(0.5, acceptedSamples.single().reals.single())
+        assertEquals(0.5, acceptedSamples.single().reals[continuous.columns.single().id])
         assertTrue(rejectingPolicy.observedSuccessful(LpCertifier.EXACT_BASIS))
         assertEquals(rejectingFactory.generalSolvers, rejectingFactory.generalCloses)
         assertEquals(rejectingFactory.persistentSolversCreated, rejectingFactory.persistentCloses)
@@ -288,16 +288,18 @@ class LpTerminalDeclineTest {
     @Test
     fun `finite MPS optimizer should keep incumbent non optimal after a later decline`() {
         val factory = TerminalRecordingFactory()
-        val policy = TerminalPolicy { _, successful -> successful && factory.leafSolves == 1 }
-        val result = run(mixed, optimize = true, context = LpSolveContext(factory, policy))
+        val acceptedSamples = ArrayList<Sample>()
+        val policy = TerminalPolicy { _, successful -> successful && acceptedSamples.isEmpty() }
+        val result = run(mixed, optimize = true, context = LpSolveContext(factory, policy), samples = acceptedSamples)
         val accepted = run(mixed, optimize = true)
 
         assertEquals(FiniteSolveVerdict.BEST_FOUND, result.verdict)
         val incumbent = assertNotNull(result.bestSample)
-        assertEquals(0.5, incumbent.reals.single())
+        assertTrue(acceptedSamples.isNotEmpty())
+        assertEquals(0.5, incumbent.reals[mixed.columns.first().id])
         assertTrue(incumbent.ints.single() in 0L..1L)
         val optimum = assertNotNull(accepted.bestSample)
-        assertEquals(0.5, optimum.reals.single())
+        assertEquals(0.5, optimum.reals[mixed.columns.first().id])
         assertTrue(optimum.ints.single() in 0L..1L)
         assertEquals(FiniteSolveVerdict.OPTIMAL, accepted.verdict)
         assertTrue(factory.solves >= 2)
@@ -317,7 +319,7 @@ class LpTerminalDeclineTest {
         val result = run(continuous, optimize = true, context = LpSolveContext(factory, policy))
 
         assertEquals(FiniteSolveVerdict.BEST_FOUND, result.verdict)
-        assertEquals(0.5, assertNotNull(result.bestSample).reals.single())
+        assertEquals(0.5, assertNotNull(result.bestSample).reals[continuous.columns.single().id])
         assertTrue(policy.observedSuccessful(LpCertifier.EXACT_BASIS))
         assertEquals(factory.generalSolvers, factory.generalCloses)
         assertEquals(factory.persistentSolversCreated, factory.persistentCloses)

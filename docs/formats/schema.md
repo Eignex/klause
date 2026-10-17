@@ -2,8 +2,8 @@
 
 The Kotlin schema DSL compiles named variables and expressions into the shared
 model, then retains metadata for decoding assignments. Integer and Boolean factors
-use finite representations. Float components choose continuous real columns or an
-explicit finite grid according to the operations in that component.
+use finite representations. Floats retain real source declarations; selected finite
+consumers may construct a private grid over those declarations.
 
 This page owns source correspondence and refused contexts during schema lowering.
 [Development](../development.md#kotlin-dsl) gives a small DSL example;
@@ -37,34 +37,68 @@ canonicalization. Both schema compile entries resolve `SemanticOverrides` before
 lowering and retain the result on `Problem.semantics`. Integer and real declarations
 require explicit ranges, so undeclared-range overrides are inapplicable. The legacy
 configuration arguments adapt their float bucket and absent-value choices into the
-same capture; resource settings remain separate. Float-linear constraints and
-grid-affine equalities use the captured linear scale. The scale must be exactly
-representable in binary64, and quantized rows must fit signed 64-bit coefficients
-and bounds; unsupported values decline before they can wrap.
+same capture; resource settings remain separate. Compilation preserves original real
+bounds, strict comparisons, disequalities, reified rows and nonlinear relations.
 
 An omitted `FloatSpec.buckets` or DSL bucket argument remains unspecified until
-compilation, which applies the effective grid default. An explicit count retains
-that variable's declared grid size. Compiled float decoders hold resolved counts;
-evaluating an unresolved source grid directly requires compilation first.
+compilation, which captures the effective grid default. An explicit count retains
+that variable's present-value grid size. These counts describe consumer geometry;
+they do not replace the original real namespace or constrain an exact source route.
 
-Schema float rows join the names they reference into components. Top-level
-non-strict linear equalities and inequalities use real columns unless their component
-also contains a strict/disequal row or an optional float. Such a component uses its
-declared integer grid; unrelated Boolean constraints and float components do not
-change that choice. Nested reified schema float expressions still decline. Shared
-`lowering.SetLayout` owns sorted indicator universes and membership lookup; source
-names, labels and set expressions stay with their callers.
-An explicit continuous-only policy rejects a component requiring a grid rather than
-admitting its approximation. A bucket count selects grid resolution when that
-component needs a grid; it does not force an otherwise exact component onto one.
+`CompiledSchema` retains one original source binding. `sourceId` and `sourceRealId`
+refer to its original namespaces. Source solver factories use that identity and
+compile a schema once. Each operation attaches fresh invocation state, using the
+captured providers, caller controls and containing cancellation. A private view
+cannot suppress an admitted original complete arm. A representation decline keeps
+the original model available.
 
-Schema and FlatZinc compilers expose `FloatRepresentation` by source name, with component identity
-and an explicit approximation reason. A null reason denotes source correspondence,
-not a certificate from a solve. Grid search has no source completeness or optimum
-claim. Independently check every original row and bound at the returned coordinates
-before admitting a mixed model's witness; checking only the exact component is
-insufficient. Schema callers can inspect this provenance before decoding or reporting
-results. The benchmark strips grid proof credit even for a source-valid witness.
+The compatibility `problem` getter and finite solver constructors request a lazy
+immutable finite view directly, without creating an unrelated solving invocation.
+The compatibility policy selects connected strict, disequal and optional float
+components for grids under `FloatSemantics.Grid`; unrelated exact components remain
+real. Products and affine auxiliaries join their participating real components.
+`FloatRepresentation` describes that compatibility choice. A continuous-only policy
+retains original real rows, including strict and optional relations.
+
+Selected grids own finite filtering, local scoring, scaled row coefficients and
+private arithmetic encodings. Their linear scale and integer payload must be
+representable; a declined geometry, linear scale or coefficient does not reject
+schema intake. Compatibility float-linear rows retain truncation of scaled
+coefficients and non-strict bounds; private affine helper rows use nearest-integer
+quantization. These choices belong to the selected view, not the original rows.
+Grid exhaustion supplies no original-source refutation. Source execution reconstructs
+and checks complete original coordinates before publication, with private proof
+claims retained separately. See [private projections](../model.md#private-float-projections).
+
+An absent optional float equals zero clamped to its original real declaration when
+absent pinning is enabled. If that value lies between present grid points, a separate
+private lattice carrier represents both the requested present grid and the absent
+default. Presence guards channel that carrier to the unchanged present grid; absence
+pins the default and the dead selector. Every private relation and objective uses
+the carrier. No extra present value or different bucket count is introduced. A
+nonrepresentable carrier declines the view. Disabling absent pinning removes the
+source pin and its conditional carrier.
+
+Decoders distinguish captured original and compatibility frames by identity. A
+caller-created unbound sample follows the compatibility convention; a foreign
+frame rejects. Optional decoding tests presence first. Exact source publications
+retain their original frame after checking and preserve exact coordinates and
+certificates independently of the invocation lifetime.
+
+Helper objectives retain their finite native frame plus an immutable pairing to
+original typed coordinates. Copy and negation preserve or explicitly replace exact
+coefficients and constants. Source `optimize` resolves this pairing through the
+exact quadratic carrier, including affine objectives and coefficients wider than
+binary64's integer precision. `CompiledSchema.sourceObjective` exposes the captured
+exact objective for explicit execution and evidence contexts; repeated resolution
+of the same helper retains that immutable identity. The context-free affine bridge
+rejects a private pairing whose native and source meanings differ. A maximize helper is already negated; the operation's
+explicit sense remains authoritative. `optimizeOpen` uses a lossless linear mapping
+when representable and otherwise returns its incomplete unsupported result. Foreign
+helper owners reject before execution.
+
+Shared `lowering.SetLayout` owns sorted indicator universes and membership lookup;
+source names, labels and set expressions stay with their callers.
 
 ## Product representations
 
@@ -124,17 +158,15 @@ coefficient construction semantics. Model AST serialization preserves the produc
 tree and named affine operands. Source AST maps are borrowed read-only during
 compilation, like other model payloads.
 
-Products connect all participating float variables before representation selection.
-A product or fixed power connected to a grid-selected strict, disequal or optional
-float component retains `GridProduct` or `GridPower` with the declared source index
-ranges and rounding metadata. Expression auxiliaries use finite ranges derived from
-those declarations; nonfinite ranges and affine coefficient overflow decline.
-Native finite filtering and scoring consume the retained relation. Private enforcing
-encodings admit at most 4096 operand combinations and preserve the rounded grid
-relation; larger encodings decline without disabling native finite execution.
-Grid exhaustion supplies no original-source refutation, and every decoded witness
-still requires an original-source check. Continuous equalities requiring Boolean
-reification are rejected; top-level constraints and conjunctions are supported.
+A named or constant result can be the retained product or power's result coordinate;
+intermediate expressions use shared real auxiliaries. Selected private grids lower
+these original relations to `GridProduct` and `GridPower`, using the same value
+carrier for optional operands and all other rows. Auxiliary ranges belong to the
+private geometry. Native finite filtering and scoring consume those private
+relations. Enforcing encodings admit at most 4096 operand combinations; larger
+requests decline that encoding while native finite execution remains available.
+Continuous equalities requiring Boolean reification are rejected; top-level
+constraints and conjunctions are supported.
 Continuous products declare inert finite deduction, heuristic scoring requiring
 source certification and no LP relaxation. LP leaf publication declines feasible or tolerance-accepted completions
 when a continuous product remains; exact linear refutations remain sound. The

@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
@@ -12,6 +13,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
@@ -26,23 +29,106 @@ import kotlin.test.assertTrue
 
 class ProblemPipelineTest {
 
-    private fun withAllDifferentOverOpenColumn(): Problem {
+    @Test
+    fun `public route overloads should retain canonical pure real ownership`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val expected = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.MIXED,
+        ))
+
+        for (real in listOf(false, true)) {
+            for (linear in listOf(false, true)) {
+                val routes = listOf(
+                    source.pipelineRoute(routePureRealToTheory = real, routeLinearToTheory = linear),
+                    source.pipelineRoute(routePureRealToTheory = real, routeLinearToTheory = linear, onLpStats = {}),
+                    source.pipelineRoute(FactorProjectionProviders.Default,
+                        routePureRealToTheory = real, routeLinearToTheory = linear),
+                    source.pipelineRoute(Cancellation.Never, Cancellation.Never,
+                        routePureRealToTheory = real, routeLinearToTheory = linear),
+                )
+
+                for (route in routes) {
+                    val selected = assertIs<SourceProblemRoute.OpenTheory>(route)
+                    assertEquals(assertIs<SourceProblemRoute.OpenTheory>(expected.route).request.route,
+                        selected.request.route)
+                    assertSame(source, selected.preparedPlan.originalSource)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `public route flags should retain exact ownership for wide source objectives`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(-1, 1), IntDomain(-1, 1)),
+            arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf((1L shl 53) + 1, 0), constant = 7)
+
+        for (real in listOf(false, true)) {
+            for (linear in listOf(false, true)) {
+                val selected = assertIs<SourceProblemRoute.OpenTheory>(source.pipelineRoute(
+                    objective, maximize = true, routePureRealToTheory = real, routeLinearToTheory = linear,
+                ))
+
+                assertEquals(ProblemPipeline.EXACT_LIRA, selected.request.route)
+                assertSame(source, selected.preparedPlan.originalSource)
+                assertSame(objective, selected.request.objective)
+                assertTrue(selected.request.maximize)
+            }
+        }
+    }
+
+    @Test
+    fun `public route flags should retain finite ownership for exact integral objectives`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(-1, 1), IntDomain(-1, 1)),
+            arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L shl 53, 0))
+
+        val selected = assertIs<SourceProblemRoute.Finite>(source.pipelineRoute(
+            objective, routePureRealToTheory = true, routeLinearToTheory = true,
+        ))
+
+        assertSame(source, selected.preparedPlan.originalSource)
+        assertSame(objective, selected.preparedPlan.objective)
+    }
+
+    @Test
+    fun `public route defaults should retain baked source providers`() {
+        val providers = FactorProjectionProviders()
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 2))).bake(providers)
+
+        val routes = listOf(
+            source.pipelineRoute(),
+            source.pipelineRoute(onLpStats = {}),
+            source.pipelineRoute(Cancellation.Never, Cancellation.Never),
+        )
+
+        for (route in routes) {
+            val selected = assertIs<SourceProblemRoute.Finite>(route)
+            assertSame(providers, selected.preparedPlan.factorProjections?.providers)
+            assertSame(source, selected.preparedPlan.originalSource)
+        }
+    }
+
+
+    private fun withNValueOverOpenColumn(): Problem {
         val openHi = Bits(2).also { it.set(1) }
         return Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(5, 0), null, openHi),
-            factors = arrayOf(AllDifferent(vars = intArrayOf(0, 1), domainMin = 0, domainSize = 6)),
+            factors = arrayOf(NValue(0, intArrayOf(1))),
         )
     }
 
     @Test
     fun `refused model should name the column and the constraint that demanded it`() {
-        val plan = withAllDifferentOverOpenColumn().componentPlan()
+        val plan = withNValueOverOpenColumn().componentPlan()
 
         assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, plan.theoryPipeline)
         val unplaceable = assertNotNull(plan.unplaceable)
         assertEquals(1, unplaceable.column)
-        assertEquals("AllDifferent", unplaceable.factorKind)
+        assertEquals("NValue", unplaceable.factorKind)
     }
 
     @Test
@@ -154,7 +240,7 @@ class ProblemPipelineTest {
 
     @Test
     fun `optional stop should retain genuine unsupported source refusal`() {
-        val model = withAllDifferentOverOpenColumn()
+        val model = withNValueOverOpenColumn()
         val budget = PresolveBudget(0)
 
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(model.pipelineRoute(
@@ -163,7 +249,7 @@ class ProblemPipelineTest {
         ))
 
         assertEquals(1, assertNotNull(route.unplaceable).column)
-        assertEquals("AllDifferent", route.unplaceable?.factorKind)
+        assertEquals("NValue", route.unplaceable?.factorKind)
         assertTrue(route.preparedPlan.decline != PreparedPlanDecline.RESOURCE)
         assertFalse(route.problem.intBounds.hasUpper(1))
     }
@@ -219,7 +305,6 @@ class ProblemPipelineTest {
 
     @Test
     fun `refuted model should be decided rather than declined for an unplaceable column`() {
-        // AllDifferent leaves column 1 unplaceable while open, and the two rows contradict over its range.
         val openHi = Bits(2).also { it.set(1) }
         val model = Problem(
             numBoolVars = 0,
@@ -246,7 +331,6 @@ class ProblemPipelineTest {
 
     @Test
     fun `column bounded by a row should be placed while another column stays open`() {
-        // The row bounds column 1, which AllDifferent needs finite; column 2 stays unbounded.
         val openHi = Bits(3).also {
             it.set(1)
             it.set(2)
@@ -385,7 +469,7 @@ class ProblemPipelineTest {
     }
 
     @Test
-    fun `unsupported open model should be classified the same by route and plan`() {
+    fun `open distinct should retain its exact arithmetic route and open declaration`() {
         val openUpper = Bits(2).also { it.set(1) }
         val spec = Problem(
             numBoolVars = 0,
@@ -393,9 +477,9 @@ class ProblemPipelineTest {
             factors = arrayOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 10)),
         )
 
-        assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, spec.sourceRoute())
-        assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, spec.componentPlan().theoryPipeline)
-        assertIs<SourceProblemRoute.UnsupportedOpen>(spec.pipelineRoute())
+        assertEquals(ProblemPipeline.EXACT_LIRA, spec.sourceRoute())
+        assertEquals(ProblemPipeline.EXACT_LIRA, spec.componentPlan().theoryPipeline)
+        assertIs<SourceProblemRoute.OpenTheory>(spec.pipelineRoute())
         assertEquals(null, spec.intDomainOrNull(1))
     }
 

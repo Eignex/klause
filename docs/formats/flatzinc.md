@@ -31,10 +31,11 @@ Continuous columns retain their effective finite or open sides, including bounds
 outside the grid window. Explicit source ranges and their aliases remain
 authoritative. A finite default range defines the grid for a bucketed declaration;
 a missing side uses the approximation window. A disjoint window declines that grid
-representation without refuting the source. Rational endpoints must be exactly
-representable under binary64 authority; unsupported endpoints are not rounded.
-Float-linear grid scales must also be exactly representable as binary64 integers;
-unsupported precision is rejected before lowering.
+representation without refuting the source. Rational source-bound endpoints must
+be exactly representable under binary64 authority; unsupported source endpoints
+are not rounded. Private grid windows retain rational origins and steps separately
+from their native approximate coordinates. Unsupported private scales or geometry
+decline the view while preserving the original model and independently admitted routes.
 
 Float grid windows remain separate from continuous source bounds. Typed grid
 settings pass through the same declaration planner and its private placeholder
@@ -136,6 +137,42 @@ as multiplication. Negative/fractional exponents and variable real exponents dec
 
 ## FlatZinc floats
 
+Canonical compilation retains original real declarations and strong real relations.
+`FlatZincProgram.sourceProgram` and `sourceAttachment()` expose that frame without
+requesting a grid. Unrestricted products remain `ContinuousProduct` relations for
+selected polynomial completion; finite-choice metadata preserves the existing
+guarded linear consumers. A Grid policy grants permission to a selected private
+view and does not replace original real bounds or namespaces.
+
+The historical `problem`, name/array decoders and component metadata request a lazy
+finite compatibility view. `prepareFiniteCompatibility` binds that view to the same
+source invocation with the caller's actual operation, providers and containing stop.
+`parseFlatZincExecution` uses this binding and exposes its `sourceInvocation`.
+`prepareSourceExecution` selects automatic execution from the same original invocation.
+The CLI reads canonical metadata and captures this invocation before requesting any
+optional geometry; legacy compatibility getters do not select its route. The observed
+overload retains actual preparation LP work, and CLI timing/logging covers that same
+invocation for both original and private execution.
+An actually admitted original complete arm takes precedence over a private grid; mixed
+requests retain that original arm through the common dispatcher. Otherwise the permitted
+compatibility view may run, with the original route retained on decline. Admission uses
+the captured operation, objective and participating arms. Explicit
+`prepareFiniteCompatibility` requests may still select private-grid CP or mixed execution.
+Original execution uses original renderers and proof qualification; availability of a
+legacy grid does not downgrade an original-source proof.
+Cached geometry retains only immutable source/model definitions; another operation
+binds its own consumer, checks and stop. Structured view declines preserve the
+canonical original route. Source-frame samples use the original decoder; unbound
+samples retain the documented legacy convention, and a bound foreign frame is rejected.
+
+`FlatZincProgram` preserves its thirteen constructor, copy, component and property
+signatures as an ordinary class. Positional access, logical equality, hashing and
+string rendering use the public fields. A copy over the same model retains source
+correspondence and legacy problem identity; an explicit foreign model drops it.
+Kotlin data-class metadata and reflection `isData` change. Copying, equality, hashing
+and string rendering may request the historical compatibility fields; source-only
+metadata access uses `sourceProgram`.
+
 A source-fixed float-array index also pins its finite value literal, preserving
 Boolean propagation across the shared finite choices.
 Continuous `float_min` and `float_max` retain `RealArrayMinMax`, including constant
@@ -154,7 +191,7 @@ one-based source index and repeated entries. Grid entries use the result's exist
 bucket conversion and representability checks. Lowering visits array positions
 inside the index domain, including domains wider than a signed integer.
 
-Representation planning resolves aliases in a private declaration pass with one
+The requested legacy compatibility view resolves aliases in a private declaration pass with one
 shared integer placeholder namespace for integer and float columns. It captures the
 caller's bounds, exact-float mode and `ProblemSettings`, including integer domain
 storage. Exact-mode open floats stay open in this pass. Grid search bounds on
@@ -169,21 +206,30 @@ values, minimum/maximum, constant-array selection, multiplication/division by
 constants, and products with a finite selected operand. Exact absolute values retain
 `RealAbs` in the source model; the selected consumer installs its complete equality
 alternatives privately. Implied inequalities alone do not enforce this relation.
-Finite-choice products retain `ContinuousProduct` with their declared values and
-source Boolean equality literals, including constant results and operand aliases.
+Finite membership retains `RealFiniteDomain` for every applicable original real,
+including disconnected declarations and compatibility components. No domain-cover
+Booleans are allocated at intake. Finite-choice products retain `ContinuousProduct`
+with their declared operand values, including constant results and operand aliases.
+Other products retain their unrestricted original equality. The alternative limit
+selects a requested compatibility representation; it does not discard canonical
+operand membership or reject original source intake. Selected exact encoders retain
+their containing resource and representation limits.
 Private selected linear consumers install the complete product alternatives;
 frontends do not expand those products into guarded rows. Literal-only exact
 products retain fixed real operands so binary64 multiplication cannot round away
 a failed exact source equality.
+The finite backtracking facade uses the same selected exact linear completion for
+these value covers. An LP relaxation alone cannot establish membership or a product.
 
 Finite integer float images retain affine maps to source integer values. Fixed
 integer selections and products can be eliminated while preserving source values
 and output reconstruction. These maps must survive preparation and source checks.
 
-A component requiring approximation, or more than 4096 finite alternatives, uses
+A requested compatibility component requiring approximation, or more than 4096 finite alternatives, uses
 integer buckets at a configurable resolution. Repeated array entries count toward
-the alternative limit. Continuous components without finite choices also use the
-grid under default lowering. Unconstrained floats outside the objective can remain
+the alternative limit. This limit selects a private representation and does not limit
+original real declarations or selection relations. Continuous components without finite choices also use the
+grid in that compatibility view. Unconstrained floats outside the objective can remain
 continuous. Unrestricted continuous-by-continuous products are outside linear
 arithmetic.
 
@@ -201,8 +247,8 @@ grid witness does not turn a grid optimum or refutation into a source proof.
 
 `--exact` preserves continuous variables and open bounds, routes supported linear
 satisfaction through the shared real/mixed theory, and requires exact certification
-for continuous objectives. It declines unsupported float operations and expansion
-above the alternative limit. Arithmetic overflow during lowering also declines
+for continuous objectives. Other retained real relations use their selected complete
+or incomplete consumers without requesting a grid. Arithmetic overflow during lowering declines
 with a diagnostic. Integer constants used in float arithmetic also decline when
 their exact source value cannot be represented in binary64.
 

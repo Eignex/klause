@@ -6,7 +6,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,15 +37,15 @@ class SolveCoreCancellationTest {
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         )
         val objective = LinearObjective(boolWeights = longArrayOf(-2, -1), constant = 7)
-        val solvable = openTheorySolvable(OpenTheoryRequest(model, objective), {
-            renderOpenTheoryModel(emptyMap(), mapOf("a" to 0, "b" to 1), mapOf("x" to 0), it)
-        })
         val common = CommonOptions().apply {
             engine = "cp"
             parallel = 1
             randomSeed = 17
             presolve = "off"
         }
+        val solvable = sourceSolvable(model, objective, false, common, { "" }, {
+            renderOpenTheoryModel(emptyMap(), mapOf("a" to 0, "b" to 1), mapOf("x" to 0), it)
+        })
         val expected = CancellationException("linear consumer cancelled")
         val values = mutableListOf<BigFraction>()
         var terminal = false

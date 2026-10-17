@@ -63,7 +63,9 @@ object IncrementalMoveProfile {
                 val text = source.getValue("text").jsonPrimitive.content
                 val problem = when (source.getValue("format").jsonPrimitive.content) {
                     "flatzinc" -> parseFlatZinc(text).problem
-                    "smtlib" -> SmtLib.parse(text).model
+                    "smtlib" -> requireNotNull(SmtLib.parse(text).source.originalSource as? Problem) {
+                        "incremental grading requires original factor storage"
+                    }
                     "xcsp3" -> Xcsp3.parse(text).problem
                     else -> error("format must be flatzinc, smtlib or xcsp3")
                 }

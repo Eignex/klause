@@ -29,6 +29,13 @@ unchanged. Solve, sample, enumerate and minimize require parameters that enforce
 assumptions; unsupported parameters reject non-empty pins or deductions explicitly. The
 default methods of custom sessions reject scoped operations they cannot implement.
 
+Finite source compatibility callers capture integer-definition orientations and
+Boolean-fold roles in the same attachment as the source. Their optional native
+views are requested only after actual heuristic admission and presolve, using the
+same containing cancellation and work meter. An interrupted construction publishes
+no partial view and cannot renew that allowance for search. Reusing an attachment
+in a fresh invocation retains its owned metadata and creates a fresh execution scope.
+
 ## Streams and exclusive ownership
 
 `openSamples`, `openEnumerate`, `openExactCount` and `openImprovements` return
@@ -112,6 +119,16 @@ approximate interval with proven bounds retains the fallback's confidence and ca
 establish exactness merely because the interval collapses to one value.
 
 ## Theory invocation scopes
+
+Source-strategy satisfaction and affine or quadratic optimization use the captured
+source execution entry. Explicit-engine calls bind common options and portfolio
+lanes per invocation; typed compatibility calls retain their single-consumer finite
+controls. Compiled objective ownership and result frames belong to the captured
+source binding. The native result and reconstructed source outcome are retained in
+that call's completed envelope; another call cannot replace its interruption reason
+or coordinates. The native optimization result remains separate from the reconstructed
+point and its exactly evaluated source objective. Native solving and publication use
+the containing captured stop.
 
 Theory services can retain immutable source snapshots while each solve owns a fresh
 invocation. Published exact scalars outlive that invocation; its mutable traversal,

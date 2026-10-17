@@ -15,10 +15,17 @@ import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.hasFiniteIntegerRanges
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.sourceRoute
+import com.eignex.klause.util.Cancellation
 import java.io.File
 
 /**
@@ -100,16 +107,34 @@ internal object Xcsp3Format : ProblemFormat {
     }
 }
 
-/** SMT-LIB parsing with the benchmark strict-bounds setting. */
+/** SMT-LIB source setup for the finite in-process benchmark adapter. */
 internal object SmtLibFormat : ProblemFormat {
     override val format = Format.SMTLIB
     override val inProcess = true
     override fun ingest(file: File): Ingested {
-        val strict = System.getProperty("klause.bench.smtlib.strictBounds")?.toBooleanStrictOrNull() ?: false
-        val parsed = SmtLib.parse(CorpusFiles.readText(file), strictBounds = strict)
+        val parsed = SmtLib.parse(CorpusFiles.readText(file))
+        require(parsed.quadraticObjective == null) { "finite in-process benchmark requires an affine source objective" }
+        val objective = parsed.objective?.toLinearObjective()
+        val maximize = parsed.sense == ObjectiveSense.MAXIMIZE
         return Ingested(
-            lazy { parsed.model.requireFiniteBenchModel(file) },
-            parsed.objective?.toLinearObjective(),
+            lazy {
+                val source = parsed.source.originalSource as? Problem
+                check(source?.hasFiniteIntegerRanges() == true) {
+                    "${file.name}: in-process benchmarks require a finite factor source; use the CLI for open models"
+                }
+                val operation = if (objective != null || parsed.source.embeddedObjectiveSense != null) {
+                    ExecutionOperation.OPTIMIZE
+                } else ExecutionOperation.SATISFY
+                val invocation = SourceSetup.prepare(SourceSetupRequest(
+                    parsed.source, operation, FiniteEngine.BACKTRACK, objective, maximize,
+                    boundCancellation = Cancellation { true },
+                ))
+                check(invocation.route is SourceProblemRoute.Finite) {
+                    "${file.name}: in-process benchmarks require finite source bounds; use the CLI for open models"
+                }
+                invocation.finiteShape().problem.bake()
+            },
+            if (maximize) objective?.negated() else objective,
             parsed.sense == ObjectiveSense.MAXIMIZE,
         )
     }
