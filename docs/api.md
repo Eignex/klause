@@ -269,9 +269,13 @@ An accepted original objective must also attain the native bound after applying 
 working scale; a private cost coordinate cannot substitute for that comparison.
 An additional finite acceptance callback restricts the native scope; its exhaustion
 cannot refute or optimize the whole original source.
-The numerical route uses `TheoryParams` and its existing serial LP/MIP traversal;
-LS/ALNS requests retain witness-only native results. Common strategy controls and
-format-specific CLI registration remain separate from this library surface.
+The numerical route uses `TheoryParams`. FIXED retains its single traversal;
+BACKTRACK and MIXED use complete numerical workers on the requested parallel lanes,
+with private mutable LP state, shared node accounting and partitioned native quotas.
+MIXED composes only installed workers. Open numerical fallback has no LS or ALNS
+worker and returns Unsupported without publication for those requests. Finite
+numerical LS and ALNS retain their existing completion. The legacy direct
+`NumericalLinearRequest.solve(params, complete, onIncumbent)` contract is preserved.
 Raw affine sources retain numerical execution when their working coefficients
 decline numerical admission. Nonzero underflow or nonfinite projection returns an
 unsupported native numerical result with no witness, bound or terminal claim; exact

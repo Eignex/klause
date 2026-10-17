@@ -164,8 +164,9 @@ A rendering veto cannot establish an optimum marker.
 its immutable original-unit qualification. Renderers must use that qualification
 for source bounds and terminal claims; a native working objective can have a different
 scale or private column. MPS format registration uses this original-coordinate
-adapter. Numerical strategy interpretation
-and parallel execution retain their current library limitations.
+adapter. Open numerical fallback runs `fixed` on one lane and `backtrack` or
+`mixed` as a complete numerical pool on the requested lanes. LS and ALNS are
+unavailable on that fallback; finite numerical sources retain both strategies.
 
 ## Flags
 

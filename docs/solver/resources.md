@@ -481,8 +481,8 @@ strategy/node currency; arithmetic units are not charged again as decisions.
 
 Supported linear portfolios reserve persistent native work, check and decision
 quotas for their workers. A complete worker receives three quarters of a finite
-allowance; heuristic workers divide the remainder. Heuristic-only pools divide it
-equally. Unlimited controls stay unlimited, and unused quota is not transferred.
+allowance when heuristic siblings are present; heuristic workers divide the remainder.
+Complete-only and heuristic-only pools each divide the full allowance equally. Unlimited controls stay unlimited, and unused quota is not transferred.
 Proposal and instruction caps divide among heuristic workers; completion work also
 charges their instruction ledger. Zero proposal, instruction or native work
 allowance prevents a heuristic completion. Timeout and external cancellation retain

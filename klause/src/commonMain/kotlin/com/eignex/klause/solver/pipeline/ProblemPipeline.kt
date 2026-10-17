@@ -309,7 +309,7 @@ private fun Problem.pipelineRouteObserved(
             NativeSourceExecution.IntegerPolynomial(NonlinearIntegerTheoryRequest(execution.source, arithmetic)),
         )
 
-        is PreparedExecution.Transcendental, is PreparedExecution.Numerical ->
+        is PreparedExecution.Transcendental, is PreparedExecution.Numerical, is PreparedExecution.NumericalWorking ->
             error("factor source requires polynomial execution")
     }
     val arithmeticRoute = arithmeticExecution.ownership.theoryPipeline
