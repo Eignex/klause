@@ -34,6 +34,17 @@ class VerifyStreamSourceResultsTest(unittest.TestCase):
         self.assertEqual(1, len(result['witnesses']))
         self.assertEqual(hashlib.sha256(source.encode()).hexdigest(), result['sourceSha256'])
 
+    def test_integer_helper_power_objectives_keep_original_units(self):
+        source = '(declare-const n Int) (assert (= n 2)) ' \
+                 '(define-fun square ((x Int)) Int (^ x 2)) (minimize (square n))'
+        output = '; objective=4\nsat\n(\n(define-fun n () Int 2)\n)\n'
+
+        result = check_stream(source, output)
+
+        self.assertTrue(result['allOriginalAssertions'])
+        self.assertTrue(result['exactOriginalObjective'])
+        self.assertEqual(hashlib.sha256(source.encode()).hexdigest(), result['sourceSha256'])
+
     def test_satisfaction_point_violating_its_source_is_rejected(self):
         source = '(declare-const n Int) (assert (= (* n n) 4)) (check-sat)'
         output = 'sat\n(\n(define-fun n () Int 3)\n)\n'
