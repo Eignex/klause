@@ -38,6 +38,40 @@ import kotlin.test.assertTrue
 
 class LinearSourceExecutionTest {
     @Test
+    fun `an integral real backing should reconstruct an optimized original source point`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("z", false),
+                LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
+                LinearSourceTerm(1, SemanticRational.ofLong(-3))),
+                SemanticRational.ofLong(2), SemanticRational.ofLong(2))),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                sense = ObjectiveSense.MAXIMIZE),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
+            maximize = true,
+        ))
+
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+            FiniteSolveRequest(
+                shape, FiniteEngine.BACKTRACK, PresolveConfig(), false, false, Cancellation.Never,
+                presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
+                randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+                nodeBudget = com.eignex.klause.backtrack.NodeBudget(100),
+                solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
+            )
+        }))
+
+        val outcome = assertNotNull(result.linearSource)
+        assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
+        assertEquals(listOf(BigFraction.ofLong(5), BigFraction.ONE), outcome.incumbent?.values)
+        assertEquals(BigFraction.ofLong(5), outcome.incumbent?.objective)
+    }
+
+    @Test
     fun `a complete finite portfolio should certify an embedded original objective`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("n", true, SemanticRational.ZERO, SemanticRational.ofLong(2))),

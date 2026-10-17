@@ -30,8 +30,8 @@ internal class LinearSourceView(
     val model: Problem,
     val objective: LinearObjectiveSpec?,
     val columns: IntArray,
-    val sourceIntCount: Int,
-    val sourceRealCount: Int,
+    val sourceIntegerCoordinates: List<Int>,
+    val sourceRealCoordinates: List<Int>,
     val exact: Boolean,
     val constraintsExact: Boolean,
     val objectiveScale: BigFraction,
@@ -44,19 +44,24 @@ internal fun lowerLinearSource(
     stop: Cancellation,
 ): LinearSourceView? {
     if (stop()) return null
-    val floating = numerical && source.variableValues.none { it.integer } && source.canProjectToDouble(stop)
+    val integralBounds = source.integralRealBounds(stop) ?: return null
+    val floating = numerical && source.variableValues.none { it.integer } && integralBounds.all { it == null } &&
+        source.canProjectToDouble(stop)
     if (stop()) return null
     var integers = 0
     var reals = 0
     val columns = IntArray(source.variableValues.size)
+    val sourceIntegers = ArrayList<Int>()
+    val sourceReals = ArrayList<Int>()
     for (index in columns.indices) {
         stop.charge(1L)
         if (stop()) return null
-        columns[index] = if (source.variableValues[index].integer) {
+        val variable = source.variableValues[index]
+        columns[index] = if (variable.integer || integralBounds[index] != null) {
             Term.ofIntVar(integers++)
         } else Term.ofRealVar(reals++)
+        if (variable.integer) sourceIntegers += Term.intVar(columns[index]) else sourceReals += columns[index]
     }
-    val sourceReals = reals
     val lower = LongArray(integers)
     val upper = LongArray(integers)
     val openLower = Bits(integers)
@@ -104,10 +109,12 @@ internal fun lowerLinearSource(
             val terms = listOf(LinearSourceTerm(index, SemanticRational.ONE))
             variable.lower?.let { factors += row(terms, LinearOp.GE, it.fraction()) as Factor }
             variable.upper?.let { factors += row(terms, LinearOp.LE, it.fraction()) as Factor }
-            if (variable.integer) {
+            if (Term.isInt(reference)) {
                 val id = Term.intVar(reference)
-                val lo = variable.lower?.fraction()?.ceilInteger()?.takeIf { it.fitsLong() }
-                val hi = variable.upper?.fraction()?.negated()?.ceilInteger()?.let { -it }?.takeIf { it.fitsLong() }
+                val derived = integralBounds[index]
+                val lo = (derived?.first?.num ?: variable.lower?.fraction()?.ceilInteger())?.takeIf { it.fitsLong() }
+                val hi = (derived?.second?.num ?: variable.upper?.fraction()?.negated()?.ceilInteger()?.let { -it })
+                    ?.takeIf { it.fitsLong() }
                 if (lo == null) openLower.set(id) else lower[id] = lo.toLongExact()
                 if (hi == null) openUpper.set(id) else upper[id] = hi.toLongExact()
                 if (lo != null && hi != null && lower[id] > upper[id]) upper[id] = lower[id]
@@ -199,7 +206,7 @@ internal fun lowerLinearSource(
         realUpper = DoubleArray(reals) { if (it < realUpper.size) realUpper[it] else Double.POSITIVE_INFINITY },
     )
     return LinearSourceView(
-        source, model, objective, columns, integers, sourceReals, exact, constraintsExact, objectiveScale,
+        source, model, objective, columns, sourceIntegers, sourceReals, exact, constraintsExact, objectiveScale,
     ).takeUnless { stop() }
 }
 

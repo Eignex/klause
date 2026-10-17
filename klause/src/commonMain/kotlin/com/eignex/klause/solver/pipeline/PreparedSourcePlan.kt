@@ -9,10 +9,12 @@ import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.QuadraticObjectiveSpec
+import com.eignex.klause.ir.Term
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
@@ -115,8 +117,9 @@ enum class PreparedPlanDecline {
  * Immutable model-facing execution plan shared by complete and heuristic route construction.
  *
  * [originalSource] retains the source object by identity. Source arrays and factors remain borrowed
- * read-only under the model contract. [model] may contain proved bound narrowing; its coordinate
- * namespaces agree with the source. Arithmetic-owned values never become guessed finite domains.
+ * read-only under the model contract. [model] may contain proved bound narrowing and integral
+ * backings; [workingCoordinate] retains their typed mapping. Arithmetic-owned values never
+ * become guessed finite domains.
  */
 class PreparedSourcePlan private constructor(
     private val preparation: PreparedSourceStructure,
@@ -251,13 +254,13 @@ class PreparedSourcePlan private constructor(
 
     internal fun withLinearSource(
         source: LinearSourceProblem,
-        integerCount: Int,
-        realCount: Int,
+        integerCoordinates: List<Int>,
+        realCoordinates: List<Int>,
         workingObjective: LinearObjective?,
     ): PreparedSourcePlan = PreparedSourcePlan(
         PreparedSourceStructure(
-            source, preparation.execution, preparation.components, 0, integerCount, realCount,
-            (0 until integerCount).toList(), (0 until realCount).toList(),
+            source, preparation.execution, preparation.components, 0, integerCoordinates.size, realCoordinates.size,
+            integerCoordinates, realCoordinates,
             preparation.operations, preparation.factorProjections, preparation.sourceModel,
         ),
         PreparedOperationBinding(
@@ -265,6 +268,12 @@ class PreparedSourcePlan private constructor(
             workingLinearObjective = workingObjective,
         ),
     )
+
+    internal fun bindLinearSource(plan: PreparedSourcePlan): PreparedSourcePlan {
+        val source = originalSource as? LinearSourceProblem ?: return plan
+        return plan.withLinearSource(source, preparation.integerCoordinates, preparation.realCoordinates,
+            workingLinearObjective)
+    }
 
     /** Bind an immutable linear objective without reselecting source ownership. */
     fun withObjective(objective: LinearObjective, maximize: Boolean = false): PreparedSourcePlan {
@@ -337,10 +346,32 @@ class PreparedSourcePlan private constructor(
         return preparation.integerCoordinates[sourceId]
     }
 
-    /** Original real coordinate's canonical location; lowering auxiliaries are not source coordinates. */
+    /**
+     * Original real coordinate's canonical real location; lowering auxiliaries are excluded.
+     * An integral backing requires [workingCoordinate] instead.
+     */
     fun realCoordinate(sourceId: Int): Int {
         require(sourceId in 0 until sourceRealCount)
-        return preparation.realCoordinates[sourceId]
+        val reference = preparation.realCoordinates[sourceId]
+        if (originalSource !is LinearSourceProblem) return reference
+        require(Term.isReal(reference)) { "source real has an integer backing; use workingCoordinate" }
+        return Term.realVar(reference)
+    }
+
+    /** Typed canonical location of an original coordinate, including proved integral real backings. */
+    fun workingCoordinate(source: SourceCoordinate): SourceCoordinate = when (source.kind) {
+        SourceCoordinate.Kind.Boolean -> SourceCoordinate(source.kind, booleanCoordinate(source.id))
+        SourceCoordinate.Kind.Integer -> SourceCoordinate(
+            if (originalSource is NonlinearIntegerProblem) SourceCoordinate.Kind.Real else source.kind,
+            integerCoordinate(source.id),
+        )
+        SourceCoordinate.Kind.Real -> {
+            require(source.id in 0 until sourceRealCount)
+            val reference = preparation.realCoordinates[source.id]
+            if (originalSource !is LinearSourceProblem) SourceCoordinate(source.kind, reference)
+            else if (Term.isInt(reference)) SourceCoordinate(SourceCoordinate.Kind.Integer, Term.intVar(reference))
+            else SourceCoordinate(source.kind, Term.realVar(reference))
+        }
     }
 
     /** Polynomial completion column for a finite integer, or null when no embedding is required. */
@@ -688,8 +719,7 @@ fun NonlinearIntegerProblem.prepareExecutionPlan(): PreparedSourcePlan = Prepare
 )
 
 internal fun PreparedSourcePlan.retainingLinearSource(binding: PreparedSourcePlan): PreparedSourcePlan {
-    val source = binding.originalSource as? LinearSourceProblem ?: return this
-    return withLinearSource(source, binding.sourceIntCount, binding.sourceRealCount, binding.workingLinearObjective)
+    return binding.bindLinearSource(this)
 }
 
 internal fun PreparedSourcePlan.linearWorkingPlan(): PreparedSourcePlan {

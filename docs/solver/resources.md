@@ -60,6 +60,10 @@ that deduction. Declining closure retains required source admission and numerica
 execution under the containing token. Raw linear finite consumers select numerical
 continuous completion before heuristic workers are built; fixed discrete coordinates
 do not replace their requested heuristic execution with an exact neighborhood worker.
+Integral real-column recognition charges source declarations, exact defining rows
+and dependency passes to that same preparation token. An interrupted capture exports
+no partial projection. Derived finite ranges require exact signed-word endpoints;
+representation decline retains the real column and its original rows.
 
 ## Units and boundaries
 
