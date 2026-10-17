@@ -726,6 +726,17 @@ equality alone supplies no factor zero or nonzero premise. Other coordinate
 occurrences remain for subsequent projection; only total rational polynomial
 graphs are substituted.
 
+Regional graph reduction can close multiple required total definitions together.
+It first selects highest-coordinate definitions whose dependencies have smaller
+coordinate IDs. Otherwise, it chooses at most one constant-coefficient graph per
+equation and coordinate using the single-pivot fill preference. Every cyclic
+strongly connected component remains unselected, retaining its required equations.
+Selected acyclic definitions share a private resumable substitution closure; every
+unselected predicate is rewritten. Reverse dependency order reconstructs every
+original coordinate. Fewer than two selected definitions retain the single-pivot
+path. All closure, rewriting and reconstruction use the containing arithmetic
+owner; an unfinished closure publishes neither a partial reduction nor a proof.
+
 Complete regional reduction first propagates necessary coordinate signs through
 its signed polynomial predicates. Private sign sets denote negative, zero and
 positive real values; they do not materialize finite CP domains or provide a
