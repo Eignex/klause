@@ -29,7 +29,7 @@ The facade retains the historical conversion constant for compiled callers.
 
 ## Configuration and lifetime
 
-The CLI parses `auto`, `unlimited` and a nonnegative remaining amount as distinct
+`ExecutionOptions` captures `auto`, `unlimited` and a nonnegative remaining amount as distinct
 settings. Omission selects `auto`. For `node-limit`, automatic and unlimited both resolve
 to no solve work cap; `0` resolves to an exhausted `NodeBudget`. For
 `presolve-work-limit`, automatic derives work from the preparation time policy,
@@ -37,6 +37,15 @@ unlimited removes the work cap and `0` stops optional preparation. The preparati
 clock and whole-solve deadline still apply. The legacy nonpositive
 `klause.presolve.budget.ms` disables the derived preparation work cap and its clock;
 an explicit work setting can still supply an exhausted or finite work allowance.
+
+The common `SourceExecutionRequest` option binding resolves the ledger once, using
+the caller's existing ledger when supplied. Conflicting resource declarations reject.
+Native arithmetic and representation caps use their parameter types' defaults.
+`open-work-limit` bounds open arithmetic policy work; it does not change the shared
+decision/move allowance. `nra-work-limit`, dense coefficient and matrix caps retain
+their polynomial or function units. Native integer candidate and move limits retain
+their own attempt units. One resolved seed, default zero, reaches every selected
+strategy. Captured CLI source execution delegates this binding to the library.
 
 Built-in `withCancellation` adapters replace the invocation token while retaining any
 separately bound lifetime scope. `withLifetimeCancellation` composes a persistent token
