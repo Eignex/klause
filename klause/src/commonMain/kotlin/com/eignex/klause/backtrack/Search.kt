@@ -806,8 +806,9 @@ private class ResidualRealComponent(
                 is AbsRealCompletion.Result.Witness -> {
                     val sample = discrete.copy(reals = DoubleArray(result.reals.size) { result.reals[it].toDouble() },
                         exactReals = result.reals)
-                    if (verifyRealCoordinates(problem, sample, stop) !is Verification.Accepted) ComponentCheck.Indeterminate
-                    else ComponentCheck.Feasible.also { completed = sample }
+                    if (verifyRealCoordinates(problem, sample, stop) !is Verification.Accepted) {
+                        ComponentCheck.Indeterminate
+                    } else ComponentCheck.Feasible.also { completed = sample }
                 }
                 AbsRealCompletion.Result.Refuted -> ComponentCheck.Infeasible()
                 AbsRealCompletion.Result.Undecided -> ComponentCheck.Indeterminate
