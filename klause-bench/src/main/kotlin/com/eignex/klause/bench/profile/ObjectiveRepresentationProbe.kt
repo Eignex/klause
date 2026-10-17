@@ -248,7 +248,9 @@ internal object ObjectiveRepresentationProbe {
         val identity = sha256(bytes)
         File(output, "$identity.smt2").writeBytes(bytes)
         val captured = SmtLib.parse(bytes.toString(Charsets.UTF_8), Long.MIN_VALUE, Long.MAX_VALUE)
-        val capturedObjective = requireNotNull(captured.quadraticObjective) {
+        val capturedObjective = requireNotNull(
+            captured.quadraticObjective ?: captured.objective?.toQuadraticObjectiveSpec(),
+        ) {
             "Probe requires a captured exact source objective: $input"
         }
         val source = sourceNames(captured)
