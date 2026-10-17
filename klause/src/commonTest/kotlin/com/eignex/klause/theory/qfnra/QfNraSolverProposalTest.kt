@@ -739,7 +739,9 @@ class QfNraSolverProposalTest {
 
         val result = solveQfNra(source.formula, source.boolCount, source.realCount)
 
-        assertTrue(assertIs<QfNraResult.Unsatisfiable>(result).stats.projectedPolynomials > 0)
+        val refuted = assertIs<QfNraResult.Unsatisfiable>(result)
+        assertEquals(0L, refuted.stats.dyadicAttempts)
+        assertTrue(checkNotNull(refuted.stats.booleanTheoryRegions) > 0)
     }
 
     @Test
