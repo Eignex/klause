@@ -17,6 +17,17 @@ import kotlin.test.assertNull
 
 class RealFiniteDomainWitnessTest {
     @Test
+    fun `an empty membership should reject a point without exact payloads`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(RealFiniteDomain(0, doubleArrayOf())),
+            numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0))
+
+        val verdict = verifyRealCoordinates(source, point)
+
+        assertIs<Verification.Rejected>(verdict)
+    }
+
+    @Test
     fun `source membership should reject a rational outside a sparse domain`() {
         val source = Problem(0, 0, emptyArray(), arrayOf(RealFiniteDomain(0, doubleArrayOf(-2.5, 0.125, 7.0))),
             numRealVars = 1, realLower = doubleArrayOf(-10.0), realUpper = doubleArrayOf(10.0))
