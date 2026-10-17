@@ -9,6 +9,7 @@ import java.lang.classfile.CodeTransform
 import java.lang.classfile.MethodModel
 import java.lang.classfile.MethodTransform
 import java.lang.classfile.Opcode
+import java.lang.classfile.instruction.LineNumber
 import java.lang.classfile.instruction.ReturnInstruction
 import java.lang.constant.ClassDesc
 import java.lang.constant.ConstantDescs
@@ -27,6 +28,7 @@ internal object LpScopeObservationAgent {
     private const val ENGINE = "com.eignex.klause.lp.engine."
     private const val SYSTEM = "com/eignex/klause/lp/engine/LpScopedSolver"
     private const val PROPAGATOR = "com/eignex/klause/lp/bounding/LpPropagator"
+    private const val POINT = "com/eignex/klause/lp/engine/ExactPointFeasibleKt"
     private val helper = ClassDesc.of("com.eignex.klause.bench.profile.LpScopeObservationAgent")
     private val objectType = ConstantDescs.CD_Object
     private val enterType = MethodTypeDesc.of(
@@ -41,6 +43,10 @@ internal object LpScopeObservationAgent {
         ConstantDescs.CD_int,
         objectType,
     )
+    private val helperEnterType = MethodTypeDesc.of(ConstantDescs.CD_void, ConstantDescs.CD_int)
+    private val helperReturnType = MethodTypeDesc.of(
+        ConstantDescs.CD_void, objectType, ConstantDescs.CD_int, ConstantDescs.CD_int,
+    )
     private val methods = mapOf(
         SYSTEM to linkedMapOf(
             "push" to LpScopeObservation.Method.PUSH,
@@ -52,6 +58,10 @@ internal object LpScopeObservationAgent {
             "replace" to LpScopeObservation.Method.REPLACE,
         ),
         PROPAGATOR to mapOf("solve" to LpScopeObservation.Method.PROPAGATOR),
+        POINT to linkedMapOf(
+            "scanPoint" to LpScopeObservation.Method.SCAN_POINT,
+            "choosePointCorrection" to LpScopeObservation.Method.CHOOSE_POINT_CORRECTION,
+        ),
     )
     private val access = Access()
     private var observation: LpScopeObservation? = null
@@ -229,6 +239,36 @@ internal object LpScopeObservationAgent {
         }
     }
 
+    @JvmStatic
+    fun enteredStatic(tag: Int) {
+        val recorder = observation ?: return
+        synchronized(recorder) {
+            val method = LpScopeObservation.Method.entries[tag]
+            recorder.ledger(method, true)
+            if (recorder.disabled) return
+            try {
+                recorder.helperEntered(method, Thread.currentThread().threadId())
+            } catch (failure: Throwable) {
+                recorder.fail("helper-entry:${failure.javaClass.simpleName}")
+            }
+        }
+    }
+
+    @JvmStatic
+    fun returnedStatic(result: Any?, tag: Int, site: Int) {
+        val recorder = observation ?: return
+        synchronized(recorder) {
+            val method = LpScopeObservation.Method.entries[tag]
+            recorder.ledger(method, false)
+            if (recorder.disabled) return
+            try {
+                recorder.helperReturned(method, Thread.currentThread().threadId(), site, result != null)
+            } catch (failure: Throwable) {
+                recorder.fail("helper-return:${failure.javaClass.simpleName}")
+            }
+        }
+    }
+
     fun targetMethods(): Map<String, Map<String, LpScopeObservation.Method>> = methods
 
     fun fieldSchema(loader: ClassLoader): Map<String, List<String>> = Access.schema.mapValues { (type, names) ->
@@ -244,7 +284,7 @@ internal object LpScopeObservationAgent {
         return selected.map { (name, tag) ->
             val method = model.methods().single {
                 it.methodName().stringValue() == name &&
-                    it.flags().flagsMask() and 8 == 0
+                    (it.flags().flagsMask() and 8 != 0) == tag.staticHelper
             }
             val type = method.methodTypeSymbol()
             if (tag == LpScopeObservation.Method.REPLACE) {
@@ -261,17 +301,48 @@ internal object LpScopeObservationAgent {
             }
             )
             val returns = method.code().orElseThrow().count { it is ReturnInstruction }
-            mapOf(
-                "name" to name,
-                "descriptor" to type.descriptorString(),
-                "tag" to tag.ordinal,
-                "normalReturns" to returns,
+            val result = mapOf(
+                "name" to name, "descriptor" to type.descriptorString(),
+                "tag" to tag.ordinal, "normalReturns" to returns,
             )
+            if (tag.staticHelper) {
+                require(method.flags().flagsMask() and 15 == 10)
+                val descriptor = if (tag == LpScopeObservation.Method.SCAN_POINT) {
+                    "(Lcom/eignex/klause/lp/engine/LpModel;Ljava/util/List;" +
+                        "Lcom/eignex/klause/lp/engine/RefinementMeter;)Lcom/eignex/klause/lp/engine/PointScan;"
+                } else {
+                    "(Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/lp/engine/PointScan;" +
+                        "Ljava/util/List;Lcom/eignex/klause/lp/engine/RefinementMeter;)" +
+                        "Lcom/eignex/klause/lp/engine/PointCorrection;"
+                }
+                require(type.descriptorString() == descriptor) {
+                    "unexpected static descriptor: ${type.descriptorString()}"
+                }
+                val sites = returnSites(method)
+                val lines = if (tag == LpScopeObservation.Method.SCAN_POINT) listOf(153, 186, 191) else listOf(214, 259)
+                require(sites.map { it["line"] } == lines && sites.all { it["opcode"] == "ARETURN" }) {
+                    "unexpected static return sites for $name: ${json(sites)}"
+                }
+                result + mapOf("flags" to method.flags().flagsMask(), "returnSites" to sites)
+            } else result
         }
     }
 
+    private fun returnSites(method: MethodModel): List<Map<String, Any?>> {
+        var line = -1
+        val sites = ArrayList<Map<String, Any?>>()
+        for (part in method.code().orElseThrow()) {
+            if (part is LineNumber) line = part.line()
+            if (part is ReturnInstruction) {
+                sites += mapOf("ordinal" to sites.size, "opcode" to part.opcode().name, "line" to line)
+            }
+        }
+        return sites
+    }
+
     fun schemaText(schema: List<Map<String, Any?>>): String = schema.joinToString("\n", postfix = "\n") {
-        listOf(it["name"], it["descriptor"], it["tag"], it["normalReturns"]).joinToString("\t")
+        listOf(it["name"], it["descriptor"], it["tag"], it["normalReturns"]).joinToString("\t") +
+            if ("returnSites" in it) "\t" + it["flags"] + "\t" + json(it["returnSites"]) else ""
     }
 
     fun rewrite(bytes: ByteArray, selected: Map<String, LpScopeObservation.Method>, loader: ClassLoader?): ByteArray {
@@ -282,17 +353,27 @@ internal object LpScopeObservationAgent {
         val model = factory.parse(bytes)
         return factory.transformClass(model) { builder, element ->
             val tag = (element as? MethodModel)?.methodName()?.stringValue()?.let(selected::get)
-            if (element is MethodModel && tag != null && element.flags().flagsMask() and 8 == 0) {
+            if (element is MethodModel && tag != null) {
                 val type = element.methodTypeSymbol()
                 builder.transformMethod(
                     element,
                     MethodTransform.transformingCode(object : CodeTransform {
+                    private var site = 0
+
                     override fun atStart(code: CodeBuilder) {
-                        emitEntry(code, tag, type)
+                        if (tag.staticHelper) {
+                            code.loadConstant(tag.ordinal).invokestatic(helper, "enteredStatic", helperEnterType)
+                        } else emitEntry(code, tag, type)
                     }
 
                     override fun accept(code: CodeBuilder, part: CodeElement) {
-                        if (part is ReturnInstruction) emitReturn(code, tag, part.opcode())
+                        if (part is ReturnInstruction) {
+                            if (tag.staticHelper) {
+                                require(part.opcode() == Opcode.ARETURN)
+                                code.dup().loadConstant(tag.ordinal).loadConstant(site++)
+                                    .invokestatic(helper, "returnedStatic", helperReturnType)
+                            } else emitReturn(code, tag, part.opcode())
+                        }
                         code.with(part)
                     }
                 })

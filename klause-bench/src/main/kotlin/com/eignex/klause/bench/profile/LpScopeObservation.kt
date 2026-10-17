@@ -7,7 +7,11 @@ internal class LpScopeObservation(
     private val traceLimit: Int = 1024,
     private val eventLimit: Long = 1_000_000L,
 ) {
-    enum class Method { PUSH, PUBLISH, SOLVE, FLOAT, WORKING, CLOSE, PROPAGATOR, REPLACE }
+    enum class Method {
+        PUSH, PUBLISH, SOLVE, FLOAT, WORKING, CLOSE, PROPAGATOR, REPLACE, SCAN_POINT, CHOOSE_POINT_CORRECTION;
+
+        val staticHelper: Boolean get() = this == SCAN_POINT || this == CHOOSE_POINT_CORRECTION
+    }
 
     class State(
         val identity: Any,
@@ -48,6 +52,21 @@ internal class LpScopeObservation(
         val recovery: Map<String, Recovery?>,
     )
 
+    private class PointSites {
+        val entries = LongArray(2)
+        val returns = LongArray(2)
+        val sites = LongArray(6)
+
+        fun snapshot(): Map<String, Any?> = mapOf(
+            "entries" to listOf("SCAN_POINT", "CHOOSE_POINT_CORRECTION").zip(entries.toList()).toMap(),
+            "normalReturns" to listOf("SCAN_POINT", "CHOOSE_POINT_CORRECTION").zip(returns.toList()).toMap(),
+            "sites" to listOf(
+                "SCAN_SOURCE_COLUMN_BOUND", "SCAN_STRICT_LOGICAL_BOUNDARY", "SCAN_READY",
+                "CORRECTION_CANDIDATE_CAP", "CORRECTION_NO_ADMISSIBLE", "CORRECTION_SELECTED",
+            ).zip(sites.toList()).toMap(),
+        )
+    }
+
     private class RecoveryCell {
         var present = 0L
         var absent = 0L
@@ -62,6 +81,7 @@ internal class LpScopeObservation(
         val production: Boolean,
     ) {
         var returns = 0L
+        val pointSites = PointSites()
         val recovery = listOf("reconstruction", "exactPoint", "refinement", "basisVerification")
             .associateWith { RecoveryCell() }
     }
@@ -148,7 +168,12 @@ internal class LpScopeObservation(
         val started: Long,
         val entryMatch: Boolean,
         val shape: ShapeFrame?,
-    )
+        val observationSequence: Long,
+    ) {
+        val pointSites: PointSites? = if (method == Method.SOLVE) PointSites() else null
+    }
+
+    private class HelperFrame(val method: Method, val thread: Long, val ownerId: Long, val solve: Frame)
 
     private class Owner(value: Any, val id: Long) {
         val reference = WeakReference(value)
@@ -171,6 +196,7 @@ internal class LpScopeObservation(
     }
 
     private val owners = ArrayList<Owner>()
+    private val helperFrames = ArrayDeque<HelperFrame>()
     private val entries = LongArray(Method.entries.size)
     private val returns = LongArray(Method.entries.size)
     private val trace = ArrayList<Map<String, Any?>>()
@@ -243,7 +269,9 @@ internal class LpScopeObservation(
     ) {
         if (disabled || method == Method.PROPAGATOR) return
         val owner = owner(value) ?: return
-        if (owner.frames.size >= 16 || (owner.frames.isNotEmpty() && owner.thread != thread)) {
+        if (owner.frames.size + helperFrames.count { it.ownerId == owner.id } >= 16 ||
+            (owner.frames.isNotEmpty() && owner.thread != thread)
+        ) {
             fail("owner-overlap-or-frame-cap")
             return
         }
@@ -269,7 +297,7 @@ internal class LpScopeObservation(
             priorKinds[origin.kind] = priorKinds.getValue(origin.kind) + 1L
         }
         owner.frames.addLast(
-            Frame(method, Stamp(state), controls, origin, owner.serial, owner.binding, now, match, replacement)
+            Frame(method, Stamp(state), controls, origin, owner.serial, owner.binding, now, match, replacement, events)
         )
         if (method != Method.PUSH) {
             owner.origin = null
@@ -280,6 +308,86 @@ internal class LpScopeObservation(
             owner.serial++
         }
         emit(owner, method, "entry", state, match)
+    }
+
+    fun helperEntered(method: Method, thread: Long) {
+        if (disabled) return
+        if (!method.staticHelper || helperFrames.size >= ownerLimit * 16 ||
+            helperFrames.count { it.thread == thread } >= 16
+        ) {
+            fail("helper-method-or-frame-cap")
+            return
+        }
+        val contexts = owners.filter { it.thread == thread }.flatMap { owner ->
+            owner.frames.map { owner to it }
+        }
+        val latest = contexts.maxOfOrNull { it.second.observationSequence }
+        val matches = contexts.filter { it.second.observationSequence == latest }
+        if (matches.size != 1) {
+            fail(if (matches.isEmpty()) "helper-missing-solve-context" else "helper-ambiguous-solve-context")
+            return
+        }
+        val (owner, solve) = matches.single()
+        if (solve.method != Method.SOLVE) {
+            fail("helper-intervening-observed-context")
+            return
+        }
+        if (owner.frames.size + helperFrames.count { it.ownerId == owner.id } >= 16) {
+            fail("helper-method-or-frame-cap")
+            return
+        }
+        val frame = HelperFrame(method, thread, owner.id, solve)
+        helperFrames.addLast(frame)
+        requireNotNull(solve.pointSites).entries[if (method == Method.SCAN_POINT) 0 else 1]++
+        emitHelper(frame, "entry", null, null)
+    }
+
+    fun helperReturned(method: Method, thread: Long, site: Int, nonNull: Boolean) {
+        if (disabled) return
+        val frame = helperFrames.lastOrNull { it.thread == thread }
+        if (frame == null || frame.method != method || !method.staticHelper) {
+            fail("helper-unmatched-normal-return")
+            return
+        }
+        val live = owners.singleOrNull { it.id == frame.ownerId }
+        if (live == null || frame.solve !in live.frames) {
+            fail("helper-retired-solve-context")
+            return
+        }
+        val label = when (method) {
+            Method.SCAN_POINT -> when {
+                site in 0..1 && !nonNull -> site
+                site == 2 && nonNull -> 2
+                else -> -1
+            }
+            Method.CHOOSE_POINT_CORRECTION -> when {
+                site == 0 && !nonNull -> 3
+                site == 1 -> if (nonNull) 5 else 4
+                else -> -1
+            }
+            else -> -1
+        }
+        if (label < 0) {
+            fail("helper-return-site-value-mismatch")
+            return
+        }
+        helperFrames.remove(frame)
+        val counts = requireNotNull(frame.solve.pointSites)
+        counts.returns[if (method == Method.SCAN_POINT) 0 else 1]++
+        counts.sites[label]++
+        emitHelper(frame, "return", site, nonNull)
+    }
+
+    private fun emitHelper(frame: HelperFrame, stage: String, site: Int?, nonNull: Boolean?) {
+        if (trace.size >= traceLimit) {
+            droppedTrace++
+            return
+        }
+        trace += mapOf(
+            "owner" to frame.ownerId, "method" to frame.method.name, "stage" to stage,
+            "solveObservationSequence" to frame.solve.observationSequence,
+            "returnSite" to site, "nonNull" to nonNull,
+        )
     }
 
     fun returned(
@@ -326,8 +434,10 @@ internal class LpScopeObservation(
             }
 
             Method.SOLVE -> {
+                if (helperFrames.any { it.solve === frame }) fail("helper-unfinished-at-solve-return")
                 if (certificate == null) fail("missing-certificate-metadata")
-                else recordCertificate(resultKind, certificate, owner.bound, state.production)
+                else recordCertificate(resultKind, certificate, owner.bound, state.production,
+                    requireNotNull(frame.pointSites))
                 val duration = (now - frame.started).coerceAtLeast(0L)
                 solveNanos = add(solveNanos, duration)
                 val unchanged = frame.stamp.identity.matches(state.identity) && frame.stamp.sameMath(state) &&
@@ -380,7 +490,12 @@ internal class LpScopeObservation(
         }
         val replacementEntries = shapeCells.filterNotNull().sumOf { it.entries }
         val replacementReturns = shapeCells.filterNotNull().sumOf { it.accepted + it.rejected }
-        val complete = certificateReturns == returns[Method.SOLVE.ordinal] &&
+        val helpersComplete = listOf(Method.SCAN_POINT, Method.CHOOSE_POINT_CORRECTION).withIndex().all { (i, method) ->
+            certificateCells.values.sumOf { it.pointSites.entries[i] } == entries[method.ordinal] &&
+                certificateCells.values.sumOf { it.pointSites.returns[i] } == returns[method.ordinal]
+        }
+        val complete = helpersComplete && helperFrames.isEmpty() &&
+            certificateReturns == returns[Method.SOLVE.ordinal] &&
             replacementEntries == entries[Method.REPLACE.ordinal] &&
             replacementReturns == returns[Method.REPLACE.ordinal] && !disabled &&
             unmatched.values.all { it == 0L } && missingRootCandidates == 0L &&
@@ -428,7 +543,9 @@ internal class LpScopeObservation(
         else -> null
     }
 
-    private fun recordCertificate(kind: String, certificate: Certificate, sourceBound: Boolean, production: Boolean) {
+    private fun recordCertificate(
+        kind: String, certificate: Certificate, sourceBound: Boolean, production: Boolean, pointSites: PointSites,
+    ) {
         if (certificateKind(certificate) != kind) {
             fail("certificate-cohort-mismatch")
             return
@@ -452,6 +569,13 @@ internal class LpScopeObservation(
         }
         certificateReturns++
         cell.returns++
+        for (i in pointSites.entries.indices) {
+            cell.pointSites.entries[i] = certificateAdd(cell.pointSites.entries[i], pointSites.entries[i])
+            cell.pointSites.returns[i] = certificateAdd(cell.pointSites.returns[i], pointSites.returns[i])
+        }
+        for (i in pointSites.sites.indices) {
+            cell.pointSites.sites[i] = certificateAdd(cell.pointSites.sites[i], pointSites.sites[i])
+        }
         for ((name, recovery) in certificate.recovery) {
             val detail = cell.recovery.getValue(name)
             if (recovery == null) {
@@ -495,6 +619,8 @@ internal class LpScopeObservation(
         "normalSolveReturns" to certificateReturns,
         "missingMetadataMeaning" to "unobserved retained result metadata; does not establish an absent attempt",
         "completeCertifierItinerary" to false,
+        "helperAssociationScope" to
+            "innermost same-thread observed SOLVE interval; not direct numerical owner authority",
         "cohorts" to certificateCells.map { (key, cell) ->
             mapOf(
                 "key" to key, "sourceBound" to cell.sourceBound, "production" to cell.production,
@@ -502,6 +628,7 @@ internal class LpScopeObservation(
                 "floatOptimal" to cell.certificate.floatOptimal,
                 "witnessPresent" to cell.certificate.witness, "boundPresent" to cell.certificate.bound,
                 "normalReturns" to cell.returns,
+                "pointRecoverySites" to cell.pointSites.snapshot(),
                 "recovery" to cell.recovery.mapValues { (_, detail) ->
                     mapOf(
                         "present" to detail.present, "absent" to detail.absent,

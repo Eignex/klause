@@ -454,6 +454,129 @@ class LpScopeObservationTest {
         assertEquals(mapOf("work" to Long.MAX_VALUE), (details["refinement"] as Map<*, *>)["counterSums"])
     }
 
+    @ParameterizedTest
+    @CsvSource(
+        "SCAN_POINT,0,false,SCAN_SOURCE_COLUMN_BOUND",
+        "SCAN_POINT,1,false,SCAN_STRICT_LOGICAL_BOUNDARY",
+        "SCAN_POINT,2,true,SCAN_READY",
+        "CHOOSE_POINT_CORRECTION,0,false,CORRECTION_CANDIDATE_CAP",
+        "CHOOSE_POINT_CORRECTION,1,false,CORRECTION_NO_ADMISSIBLE",
+        "CHOOSE_POINT_CORRECTION,1,true,CORRECTION_SELECTED",
+    )
+    fun `private helper return sites should join the current cohort after trace saturation`(
+        name: String, site: Int, nonNull: Boolean, label: String,
+    ) {
+        val case = ObservationCase(LpScopeObservation(traceLimit = 0))
+        val method = LpScopeObservation.Method.valueOf(name)
+        repeat(3) {
+            case.enter(LpScopeObservation.Method.SOLVE)
+            case.enter(method)
+            case.returned(method, site = site, nonNull = nonNull)
+            case.returned(LpScopeObservation.Method.SOLVE, "BOUND")
+        }
+
+        val report = case.report()
+        val cohorts = (report["returnedCertificateMetadata"] as Map<*, *>)["cohorts"] as List<*>
+        val counts = (cohorts.single() as Map<*, *>)["pointRecoverySites"] as Map<*, *>
+
+        assertEquals("COMPLETE", report["status"])
+        assertEquals(3L, (counts["entries"] as Map<*, *>)[name])
+        assertEquals(3L, (counts["normalReturns"] as Map<*, *>)[name])
+        assertEquals(3L, (counts["sites"] as Map<*, *>)[label])
+        assertEquals(12L, report["traceDropped"])
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = [1, 2])
+    fun `helper events should join the innermost solve on their own thread`(innerThread: Long) {
+        val observer = LpScopeObservation()
+        val outer = ObservationCase(observer)
+        val inner = ObservationCase(observer)
+        outer.enter(LpScopeObservation.Method.SOLVE)
+        inner.thread = innerThread
+        inner.enter(LpScopeObservation.Method.SOLVE)
+
+        outer.enter(LpScopeObservation.Method.SCAN_POINT)
+        outer.returned(LpScopeObservation.Method.SCAN_POINT, site = 0)
+        inner.returned(LpScopeObservation.Method.SOLVE, "BOUND")
+        outer.returned(LpScopeObservation.Method.SOLVE, "BOTH")
+
+        val report = observer.snapshot()
+        val cohorts = (report["returnedCertificateMetadata"] as Map<*, *>)["cohorts"] as List<*>
+        assertEquals("COMPLETE", report["status"])
+        for (entry in cohorts) {
+            val cohort = entry as Map<*, *>
+            val counts = cohort["pointRecoverySites"] as Map<*, *>
+            val expected = if ((cohort["verdict"] == "CERTIFIED_BOUND") == (innerThread == 1L)) 1L else 0L
+            assertEquals(expected, (counts["sites"] as Map<*, *>)["SCAN_SOURCE_COLUMN_BOUND"])
+        }
+    }
+
+    @Test
+    fun `a helper without a same thread solve should remain inconclusive`() {
+        val case = ObservationCase()
+
+        case.enter(LpScopeObservation.Method.SCAN_POINT)
+        case.returned(LpScopeObservation.Method.SCAN_POINT)
+
+        assertEquals("INCONCLUSIVE", case.report()["status"])
+        assertEquals(listOf("helper-missing-solve-context"), case.report()["failures"])
+    }
+
+    @Test
+    fun `an intervening observed boundary should prevent guessing a helper owner`() {
+        val observer = LpScopeObservation()
+        val outer = ObservationCase(observer)
+        val inner = ObservationCase(observer)
+        outer.enter(LpScopeObservation.Method.SOLVE)
+        inner.enter(LpScopeObservation.Method.WORKING)
+
+        outer.enter(LpScopeObservation.Method.SCAN_POINT)
+
+        assertEquals("INCONCLUSIVE", observer.snapshot()["status"])
+        assertEquals(listOf("helper-intervening-observed-context"), observer.snapshot()["failures"])
+    }
+
+    @Test
+    fun `an interrupted helper should retain its unmatched entry after a normal solve return`() {
+        val case = ObservationCase()
+        case.enter(LpScopeObservation.Method.SOLVE)
+        case.enter(LpScopeObservation.Method.SCAN_POINT)
+
+        case.returned(LpScopeObservation.Method.SOLVE, "NULL")
+
+        assertEquals("INCONCLUSIVE", case.report()["status"])
+        assertEquals(1L, (case.report()["methodUnmatchedEntries"] as Map<*, *>)["SCAN_POINT"])
+        assertEquals(listOf("helper-unfinished-at-solve-return"), case.report()["failures"])
+    }
+
+    @ParameterizedTest
+    @CsvSource("SCAN_POINT,0,true", "SCAN_POINT,2,false", "CHOOSE_POINT_CORRECTION,0,true", "SCAN_POINT,-1,false")
+    fun `a helper return with inconsistent site and nullness should be inconclusive`(
+        name: String, site: Int, nonNull: Boolean,
+    ) {
+        val case = ObservationCase()
+        val method = LpScopeObservation.Method.valueOf(name)
+        case.enter(LpScopeObservation.Method.SOLVE)
+        case.enter(method)
+
+        case.returned(method, site = site, nonNull = nonNull)
+
+        assertEquals("INCONCLUSIVE", case.report()["status"])
+        assertEquals(listOf("helper-return-site-value-mismatch"), case.report()["failures"])
+    }
+
+    @Test
+    fun `helper frames should share the existing owner frame ceiling`() {
+        val case = ObservationCase()
+        case.enter(LpScopeObservation.Method.SOLVE)
+
+        repeat(16) { case.enter(LpScopeObservation.Method.SCAN_POINT) }
+
+        assertEquals("INCONCLUSIVE", case.report()["status"])
+        assertEquals(listOf("helper-method-or-frame-cap"), case.report()["failures"])
+    }
+
     private class ObservationCase(val observer: LpScopeObservation = LpScopeObservation()) {
         val owner = Any()
         val root = Any()
@@ -461,6 +584,7 @@ class LpScopeObservationTest {
         var context = Any()
         var policy = Any()
         var production = true
+        var thread = 1L
         var factory = Any()
         var model = Any()
         var numerical: Any? = Any()
@@ -491,8 +615,12 @@ class LpScopeObservationTest {
             append: Boolean = true
         ) {
             observer.ledger(method, true)
+            if (method.staticHelper) {
+                observer.helperEntered(method, thread)
+                return
+            }
             observer.enter(
-                method, owner, state(), controls, clock++, 1L,
+                method, owner, state(), controls, clock++, thread,
                 LpScopeObservation.Shapes(
                     LpScopeObservation.Shape(model, matrix, rows, matrix.size + rows), candidate, append
                 ),
@@ -516,8 +644,14 @@ class LpScopeObservationTest {
                 listOf("reconstruction", "exactPoint", "refinement", "basisVerification")
                     .associateWith { null },
             ),
+            site: Int = 0,
+            nonNull: Boolean = false,
         ) {
             observer.ledger(method, false)
+            if (method.staticHelper) {
+                observer.helperReturned(method, thread, site, nonNull)
+                return
+            }
             observer.returned(
                 method, owner, state(), kind, push, clock++,
                 LpScopeObservation.Shape(model, matrix, rows, matrix.size + rows), metadata,

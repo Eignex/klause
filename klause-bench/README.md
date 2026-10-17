@@ -1683,7 +1683,8 @@ do not establish full tree-search or whole-CLI gains. Keep raw measurements exte
 `com.eignex.klause.bench.profile.CliLpScopeCapture` observes LP solve and scope
 and private model replacement boundaries in the installed CLI child on JDK 25. Supply `suite=`, `problem=`, the
 original decoded `sha256=`, `timeout=` and `seed=` through the maintained lab client.
-The startup agent transforms only the scoped solver and model-facing LP adapter;
+The startup agent transforms only the scoped solver, model-facing LP adapter and
+two private static point-recovery helpers;
 records include original/transformed class hashes, descriptors, source and runtime
 identities, bounded weak-reference metadata and unmatched method entries. Missing
 coverage, interrupted methods or observation failures make the capture inconclusive.
@@ -1702,6 +1703,21 @@ certifier never ran. The report does not describe the complete certification pat
 Schema mismatches, missing observations, inconsistent cohorts and sum overflow make
 it inconclusive. Work and allocation sums retain their reported modeled units;
 they establish neither physical allocation nor recoverable solve time.
+
+The private `scanPoint` and `choosePointCorrection` hooks record entry and normal
+return-site ordinal/nullness without reading arguments. Actual compiled private
+static descriptors, return counts, source-line mappings and class hashes qualify
+the sites. They distinguish source-column-bound refusal, strict logical-boundary
+refusal, completed scans, candidate ceilings and absent or selected local corrections.
+Each event joins the innermost same-thread observed scoped solve using the existing
+observation sequence; its fixed scalar counts join that solve's returned cohort.
+Missing, retired or ambiguous contexts, a newer active observed boundary,
+interrupted helpers and inconsistent return sites make the capture inconclusive.
+Association names an observed interval, not direct numerical-owner authority. Helper frames share the existing owner/frame
+and event limits; all normal-return totals survive trace saturation. Paths before
+the scan remain unresolved, and an absent returned recovery packet does not erase
+observed helper activity. Return sites identify control flow, not a numerical
+offender, proof, complete certification itinerary or recoverable solve time.
 
 Replacement aggregates retain joint old/candidate structural, row and total widths
 in fixed logarithmic buckets, including calls beyond the trace prefix. Native owner

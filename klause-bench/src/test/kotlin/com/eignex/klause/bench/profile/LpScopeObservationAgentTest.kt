@@ -13,6 +13,7 @@ import java.lang.reflect.InvocationTargetException
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 
@@ -60,6 +61,7 @@ class LpScopeObservationAgentTest {
     @ValueSource(strings = [
         "com/eignex/klause/lp/engine/LpScopedSolver",
         "com/eignex/klause/lp/bounding/LpPropagator",
+        "com/eignex/klause/lp/engine/ExactPointFeasibleKt",
     ])
     fun `compiled targets should have complete method and field schemas`(name: String) {
         val loader = javaClass.classLoader
@@ -112,8 +114,50 @@ class LpScopeObservationAgentTest {
         assertFailsWith<IllegalArgumentException> { fixture(suffix) }
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = [0, 1, 2])
+    fun `static transformation should preserve nullable reference returns`(mode: Int) {
+        val type = fixture("StaticNullable$mode")
+        val method = type.declaredMethods.single { it.name == "scanPoint" }.apply { isAccessible = true }
+        val input = when (mode) {
+            0 -> null
+            1 -> emptyList<Any>()
+            else -> listOf(Any())
+        }
+
+        val result = method.invoke(null, null, input, null)
+
+        if (mode < 2) assertNull(result) else assertNotNull(result)
+    }
+
+    @Test
+    fun `static transformation should propagate the original throwable`() {
+        val type = fixture("StaticThrow")
+        val method = type.declaredMethods.single { it.name == "scanPoint" }.apply { isAccessible = true }
+        val failure = IllegalStateException("original static failure")
+
+        val actual = assertFailsWith<InvocationTargetException> {
+            method.invoke(null, null, listOf(failure), null)
+        }
+
+        assertSame(failure, actual.cause)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["StaticPublic", "StaticDescriptor", "StaticLine"])
+    fun `static schema should reject changed visibility descriptors and return mappings`(suffix: String) {
+        assertFailsWith<IllegalArgumentException> { fixture(suffix) }
+    }
+
+    @Test
+    fun `static schema should reject an instance helper`() {
+        assertFailsWith<NoSuchElementException> { fixture("StaticInstance") }
+    }
+
     private fun fixture(suffix: String): Class<*> {
-        val type = ClassDesc.of("com.eignex.klause.bench.profile.ScopeFixture$suffix")
+        val packageName = if (suffix.startsWith("Static")) "com.eignex.klause.lp.engine" else
+            "com.eignex.klause.bench.profile"
+        val type = ClassDesc.of("$packageName.ScopeFixture$suffix")
         val objectType = ConstantDescs.CD_Object
         val voidType = ConstantDescs.CD_void
         val methodFlags = AccessFlag.PUBLIC.mask()
@@ -121,6 +165,51 @@ class LpScopeObservationAgentTest {
             builder.withFlags(methodFlags or AccessFlag.SUPER.mask())
             builder.withMethodBody("<init>", MethodTypeDesc.of(voidType), methodFlags) {
                 it.aload(0).invokespecial(objectType, "<init>", MethodTypeDesc.of(voidType)).return_()
+            }
+            if (suffix.startsWith("Static")) {
+                val privateFlags = if (suffix == "StaticPublic") AccessFlag.PUBLIC.mask() else AccessFlag.PRIVATE.mask()
+                val flags = privateFlags or if (suffix == "StaticInstance") 0 else AccessFlag.STATIC.mask()
+                val pointType = ClassDesc.of("com.eignex.klause.lp.engine.PointScan")
+                val listType = ClassDesc.of("java.util.List")
+                val arrayList = ClassDesc.of("java.util.ArrayList")
+                builder.withMethodBody(
+                    "scanPoint",
+                    MethodTypeDesc.of(
+                        pointType,
+                        if (suffix == "StaticDescriptor") objectType else
+                            ClassDesc.of("com.eignex.klause.lp.engine.LpModel"),
+                        listType,
+                        ClassDesc.of("com.eignex.klause.lp.engine.RefinementMeter"),
+                    ),
+                    flags,
+                ) { code ->
+                    val input = code.parameterSlot(1)
+                    val present = code.newLabel()
+                    val populated = code.newLabel()
+                    code.aload(input).ifnonnull(present)
+                    code.lineNumber(if (suffix == "StaticLine") 154 else 153).aconst_null().areturn()
+                    code.labelBinding(present).aload(input)
+                        .invokeinterface(listType, "isEmpty", MethodTypeDesc.of(ConstantDescs.CD_boolean))
+                        .ifeq(populated)
+                    code.lineNumber(186).aconst_null().areturn()
+                    code.labelBinding(populated)
+                    if (suffix == "StaticThrow") {
+                        val success = code.newLabel()
+                        val slot = 3
+                        val throwable = ClassDesc.of("java.lang.Throwable")
+                        code.aload(input).loadConstant(0)
+                            .invokeinterface(listType, "get", MethodTypeDesc.of(objectType, ConstantDescs.CD_int))
+                            .astore(slot).aload(slot).ifnull(success)
+                        code.aload(slot).checkcast(throwable).athrow()
+                        code.labelBinding(success)
+                    }
+                    code.lineNumber(191).new_(pointType).dup()
+                    repeat(3) {
+                        code.new_(arrayList).dup().invokespecial(arrayList, "<init>", MethodTypeDesc.of(voidType))
+                    }
+                    code.invokespecial(pointType, "<init>", MethodTypeDesc.of(voidType, listType, listType, listType))
+                        .areturn()
+                }
             }
             if (suffix.startsWith("Replace")) {
                 builder.withMethodBody(
@@ -155,7 +244,9 @@ class LpScopeObservationAgentTest {
                 it.aload(1).athrow()
             }
         }
-        val selected = if (suffix.startsWith("Replace")) {
+        val selected = if (suffix.startsWith("Static")) {
+            mapOf("scanPoint" to LpScopeObservation.Method.SCAN_POINT)
+        } else if (suffix.startsWith("Replace")) {
             mapOf("replace" to LpScopeObservation.Method.REPLACE)
         } else mapOf(
             "push" to LpScopeObservation.Method.PUSH,
@@ -164,6 +255,12 @@ class LpScopeObservationAgentTest {
             "close" to LpScopeObservation.Method.CLOSE,
         )
         val rewritten = LpScopeObservationAgent.rewrite(bytes, selected, javaClass.classLoader)
-        return MethodHandles.lookup().defineClass(rewritten)
+        val lookup = if (suffix.startsWith("Static")) {
+            MethodHandles.privateLookupIn(
+                Class.forName("com.eignex.klause.lp.engine.LpScopedSolver", false, javaClass.classLoader),
+                MethodHandles.lookup(),
+            )
+        } else MethodHandles.lookup()
+        return lookup.defineClass(rewritten)
     }
 }
