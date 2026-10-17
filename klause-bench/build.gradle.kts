@@ -459,8 +459,35 @@ val checkJvmDeclarationBindings = tasks.register<Exec>("checkJvmDeclarationBindi
     inputs.files("tools/review_jvm_declaration_bindings.py", "tools/test_review_jvm_declaration_bindings.py")
 }
 
+val checkJvmSourceDebug = tasks.register<Exec>("checkJvmSourceDebug") {
+    group = "verification"
+    description = "Test source-debug byte decoding and complete resolved-SMAP strata and rules."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_jvm_source_debug.py")
+    inputs.files("tools/jvm_source_debug.py", "tools/test_jvm_source_debug.py")
+}
+
+val checkJvmSourceLineBindings = tasks.register<Exec>("checkJvmSourceLineBindings") {
+    group = "verification"
+    description = "Test original source-byte and region identities and every declared line candidate."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_jvm_source_line_bindings.py")
+    inputs.files("tools/jvm_source_line_bindings.py", "tools/test_jvm_source_line_bindings.py",
+        "tools/jvm_source_debug.py", "tools/review_jvm_declaration_bindings.py")
+}
+
+val checkJvmSourceLineReview = tasks.register<Exec>("checkJvmSourceLineReview") {
+    group = "verification"
+    description = "Test complete archive authentication and source-line report admission."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_review_jvm_source_lines.py")
+    inputs.files("tools/review_jvm_source_lines.py", "tools/test_review_jvm_source_lines.py",
+        "tools/jvm_source_line_bindings.py", "tools/jvm_source_debug.py", "tools/review_jvm_declaration_bindings.py")
+}
+
 tasks.named("check") {
     dependsOn(checkJvmRecordingContext, checkJvmMethodCosts, checkJvmRuntimeArchive, checkJvmDeclarationBindings)
+    dependsOn(checkJvmSourceDebug, checkJvmSourceLineBindings, checkJvmSourceLineReview)
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,

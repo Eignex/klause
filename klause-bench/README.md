@@ -2419,6 +2419,55 @@ members, 512 MiB per member and 2 MiB per provenance JSON document. JAR/class an
 report bounds remain those of the installed-JAR reader. Use the supported lab
 route for the profiling worker and remove owned input staging after preservation.
 
+`bench.profile.JvmSourceLineBindings` accepts the same four pinned HTTPS arguments
+and complete archive catalog as `JvmDeclarationBindings`. The declaration
+specification additionally requires each source's complete UTF-8 `sourceText`;
+its unchanged bytes must match that source's SHA-256. Optional `regions` contain
+unique `id`, inclusive `firstLine`/`lastLine` and `sha256` values over the exact
+source slice, including original line terminators. Optional `debugPaths` are
+explicit path annotations. These source inputs describe implementation code;
+they do not grant publication of additional original models or generated inputs.
+
+All archives and every member authenticate before any class row is interpreted.
+The reader checks class identities and debug-payload byte identities, decodes
+modified UTF-8 and interprets resolved SMAPs according to
+[JVMS 4.7.11](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.7.11)
+and [Debugging Support for Other Languages](https://jakarta.ee/specifications/debugging/2.0/jdsol-spec-2.0.pdf).
+It retains every stratum, file, rule, overlap, vendor and future section. The first
+matching rule is marked within each stratum; later matches remain visible. Zero
+output increments keep their empty output ranges. Embedded maps are unresolved
+and remain unavailable, together with malformed or missing debug payloads.
+An absent attribute remains distinct from a present empty payload.
+
+`source-line-bindings.jsonl.gz` streams every declared class, including outside,
+private, generated and alternate entries. Original method descriptors and line
+tables retain order, duplicate positions and separate table identities. Every
+distinct generated line retains final-source and all debug-stratum candidates;
+basename collisions and overlapping source regions keep every candidate. Package
+and path agreement are annotations. No code attribute, empty line tables and
+out-of-source lines remain explicit; no bytecode interval or executed path is
+inferred. Class rows link to their complete original stream ordinal, byte hash
+and archive entry. Duplicate origins, failed classes, input-identity failures and
+inconsistent header counts prevent completion. A bound failure retains an explicit
+partial gzip and a negative completion, without accepting its prefix.
+
+The complete gzip is round-trip size/hash checked. A completed review establishes
+processing and source-input byte checks; it does not establish selected source,
+source-overload or ordinary-phase ownership, loaded/generated class selection,
+inlining, compiler roots, elapsed time, code size or accepted savings. Original
+archives remain recoverable by pinned public identities. Inspect these saved
+metadata streams only on the supported profiling worker, preserving all positive
+and negative outputs and deleting ended owned server files after byte transfer.
+
+Archive, staging, class-row and source-member limits remain those of the declaration
+reader. This reader additionally bounds the source JSON to 128 MiB, implementation
+source bytes to 64 MiB, source regions to 100,000, each debug payload to 16 MiB,
+each SMAP to 100,000 lines and 4,096 sections, and numeric SMAP fields to signed
+32-bit nonnegative values. Source line starts and repeat counts must be positive.
+The complete uncompressed report and its summary are each bounded to 512 MiB.
+These limits decline the complete review; they never permit selecting a smaller
+source, class, method, stratum or successful-outcome subset.
+
 The installed-JAR and runtime-image class readers retain every source-debug
 extension as opaque `sourceDebugExtensionContentsBase64`, in the same attribute
 order as `sourceDebugExtensionIdentities`. Empty payloads remain distinct from
