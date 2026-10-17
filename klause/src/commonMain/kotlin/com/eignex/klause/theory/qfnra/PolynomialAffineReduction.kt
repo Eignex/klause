@@ -60,6 +60,13 @@ internal class PolynomialAffineReduction private constructor(
             val fibres = ArrayList<AffineFibre>()
             var inconsistent = false
             while (true) {
+                val closure = prepareWeakEqualities(current, arithmetic)
+                var closed: List<PolynomialAtom>? = null
+                while (closed == null) {
+                    closed = closure.next()
+                    if (closed == null) yield(null)
+                }
+                current = closed
                 val equations = current.mapNotNull { atom ->
                     arithmetic.step()
                     if (atom.relation == PolynomialRelation.EQ) atom.polynomial else null
@@ -157,6 +164,39 @@ internal class PolynomialAffineReduction private constructor(
         }.iterator()
     }
 }
+
+private fun prepareWeakEqualities(
+    atoms: List<PolynomialAtom>,
+    arithmetic: PolynomialArithmetic,
+): Iterator<List<PolynomialAtom>?> = sequence {
+    val boundaries = HashMap<Int, Polynomial>()
+    val directions = HashMap<Polynomial, Int>()
+    for ((index, atom) in atoms.withIndex()) {
+        arithmetic.step()
+        val direction = when (atom.relation) {
+            PolynomialRelation.LE -> 1
+            PolynomialRelation.GE -> 2
+            else -> continue
+        }
+        val coefficient = atom.polynomial.terms.firstOrNull()?.coefficient ?: continue
+        val boundary = arithmetic.scale(atom.polynomial, coefficient.reciprocal())
+        val normalizedDirection = if (coefficient.signum() < 0) 3 - direction else direction
+        boundaries[index] = boundary
+        directions[boundary] = (directions[boundary] ?: 0) or normalizedDirection
+        yield(null)
+    }
+    val emitted = HashSet<Polynomial>()
+    val result = ArrayList<PolynomialAtom>()
+    for ((index, atom) in atoms.withIndex()) {
+        arithmetic.step()
+        val boundary = boundaries[index]
+        if (boundary == null || directions[boundary] != 3) result.add(atom)
+        else if (emitted.add(boundary)) result.add(PolynomialAtom(boundary, PolynomialRelation.EQ))
+        yield(null)
+    }
+    arithmetic.step()
+    yield(result)
+}.iterator()
 
 private class AffineBound(val polynomial: Polynomial, val strict: Boolean)
 private class AffineFibre(

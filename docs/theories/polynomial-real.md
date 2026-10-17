@@ -748,6 +748,15 @@ and evaluates each wave from smaller coordinates to larger ones. A single candid
 uses the ordinary graph-pivot policy. Interrupted or refused closure publishes no
 partial reduced region.
 
+Within the selected region, coincident weak lower and upper polynomial boundaries
+become one equality. Boundary comparison divides only by a nonzero rational
+coefficient and reverses direction for a negative scale. Strict predicates and
+distinct endpoints remain constraints. Matching belongs to that region and the
+query's existing arithmetic and cancellation owner; predicates from separate
+Boolean regions cannot supply a pair. The equality stays whole, including product
+zero fibres, and can expose total graphs for ordinary reduction. The source
+formula and its final assignment check retain the original inequalities.
+
 Without a multi-coordinate triangular wave, reduction selects constant-coefficient
 graph candidates by fill, coefficient size and coordinate preference. Each equation
 and defined coordinate has at most one selected definition. Iterative strongly

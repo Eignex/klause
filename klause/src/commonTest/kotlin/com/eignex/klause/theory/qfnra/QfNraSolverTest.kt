@@ -20,6 +20,82 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `scaled opposing weak bounds reconstruct exact nonlinear graphs`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (<= (* 2 x1) (* 2 x0 x0))) " +
+                "(assert (<= (* -3 x1) (* -3 x0 x0))) " +
+                "(assert (>= x2 (+ x1 1))) (assert (<= x2 (+ x1 1))) " +
+                "(assert (= (+ x0 1) 3))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 100_000))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(BigFraction.ofLong(4), witness.realValue(1).rational)
+        assertEquals(BigFraction.ofLong(5), witness.realValue(2).rational)
+    }
+
+    @Test
+    fun `opposing weak bounds retain a conflicting strict boundary`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (>= x1 (* x0 x0))) (assert (<= x1 (* x0 x0))) " +
+                "(assert (> x1 (* x0 x0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
+    fun `different weak endpoints preserve an open interior witness`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (>= x0 0)) (assert (<= x0 2)) " +
+                "(assert (> x0 0)) (assert (< x0 1))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertTrue(algebraic.sign(witness.realValue(0)) > 0)
+        assertTrue(algebraic.compare(witness.realValue(0), algebraic.rational(BigFraction.ONE)) < 0)
+    }
+
+    @Test
+    fun `weak bounds from separate Boolean regions cannot form an equality`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (or (and (>= x0 0) (= x1 1)) (and (<= x0 0) (= x1 2)))) " +
+                "(assert (= (+ x0 1) 0)) (assert (= (+ x1 1) 3))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(BigFraction.MINUS_ONE, witness.realValue(0).rational)
+        assertEquals(BigFraction.ofLong(2), witness.realValue(1).rational)
+    }
+
+    @Test
+    fun `opposing product bounds preserve singular zero coefficient fibers`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (>= (* x0 x1) 0)) (assert (<= (* x0 x1) 0)) " +
+                "(assert (= (+ x0 1) 1)) (assert (= (+ x1 1) 2))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(BigFraction.ZERO, witness.realValue(0).rational)
+        assertEquals(BigFraction.ONE, witness.realValue(1).rational)
+    }
+
+    @Test
     fun `acyclic graphs reconstruct reverse coordinate dependencies`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val equations = (1..8).joinToString(" ") { "(assert (= x$it (+ (* x0 x${it + 1}) 1)))" }
