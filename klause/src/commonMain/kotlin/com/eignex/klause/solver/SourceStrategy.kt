@@ -156,7 +156,9 @@ class SourceStrategy internal constructor(
         nodeBudget: NodeBudget? = null,
     ): QuadraticOptimizationExecution {
         val original = compiledSchema?.sourceBinding?.originalObjective(objective) ?: run {
-            require(objective.sourcePairing == null) { "compiled helper objective requires its compiled source strategy" }
+            require(objective.sourcePairing == null) {
+                "compiled helper objective requires its compiled source strategy"
+            }
             objective.toQuadraticObjectiveSpec()
         }
         return optimize(original, engine, executionOptions, sense, cores, timeout, cancellation, nodeBudget)

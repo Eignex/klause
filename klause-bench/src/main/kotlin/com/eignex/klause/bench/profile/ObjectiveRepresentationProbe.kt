@@ -225,10 +225,11 @@ internal object ObjectiveRepresentationProbe {
 
     private fun checkOutput(output: File, engines: List<FiniteEngine>, python: String, requireIncumbent: Boolean) {
         runProcess(File(output, "checker-runtime.txt"), python, "--version")
-        runProcess(File(output, "checker.log"), python, "klause-bench/tools/verify_objective_probe.py",
+        val command = listOf(python, "klause-bench/tools/verify_objective_probe.py",
             output.absolutePath, "--engines", engines.joinToString(",") { it.name },
-            *(if (requireIncumbent) arrayOf("--require-incumbent") else emptyArray()),
-            "--output", File(output, "source-checks.json").absolutePath)
+        ) + (if (requireIncumbent) listOf("--require-incumbent") else emptyList()) +
+            listOf("--output", File(output, "source-checks.json").absolutePath)
+        runProcess(File(output, "checker.log"), command)
         val tools = listOf("verify_objective_probe.py", "verify_nra_source_results.py", "verify_source_results.py",
             "requirements-source-checks.txt")
         File(output, "checker-tool-hashes.json").writeText(buildJsonObject {
@@ -236,8 +237,11 @@ internal object ObjectiveRepresentationProbe {
         }.toString() + "\n")
     }
 
-    private fun runProcess(log: File, vararg command: String, required: Boolean = true): Int {
-        val process = ProcessBuilder(command.toList()).redirectErrorStream(true)
+    private fun runProcess(log: File, vararg command: String, required: Boolean = true): Int =
+        runProcess(log, command.toList(), required)
+
+    private fun runProcess(log: File, command: List<String>, required: Boolean = true): Int {
+        val process = ProcessBuilder(command).redirectErrorStream(true)
             .redirectOutput(ProcessBuilder.Redirect.appendTo(log)).start()
         val exit = process.waitFor()
         check(!required || exit == 0) { "${command.first()} failed; see ${log.path}" }
@@ -263,7 +267,9 @@ internal object ObjectiveRepresentationProbe {
             "Integer sources require a compiled schema or source strategy entry"
         }
         val factorSource = if (sourceEntry && compiled == null) {
-            requireNotNull(captured.source.originalSource as? Problem) { "Source strategy entry requires a factor source" }
+            requireNotNull(captured.source.originalSource as? Problem) {
+                "Source strategy entry requires a factor source"
+            }
         } else null
         val original = affineObjective(source, capturedObjective)
         val affine = if (compiled == null) original else compiledObjective(compiled, source, original)
