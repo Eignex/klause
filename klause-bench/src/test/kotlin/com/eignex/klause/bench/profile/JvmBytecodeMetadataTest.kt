@@ -3,10 +3,11 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.bench.metric.sha256
 import java.lang.classfile.ClassFile
 import java.lang.constant.ClassDesc
+import java.lang.constant.ConstantDesc
 import java.lang.constant.ConstantDescs.CD_void
-import java.lang.constant.DirectMethodHandleDesc
 import java.lang.constant.DirectMethodHandleDesc.Kind.STATIC
 import java.lang.constant.DynamicCallSiteDesc
+import java.lang.constant.MethodHandleDesc
 import java.lang.constant.MethodTypeDesc
 import java.lang.invoke.MethodType
 import java.util.ArrayList
@@ -76,14 +77,14 @@ class JvmBytecodeMetadataTest {
 
     @Test
     fun `dynamic calls retain bootstrap argument references without exposing unrelated literals`() {
-        val bootstrap = DirectMethodHandleDesc.ofMethod(STATIC, ClassDesc.of("BootstrapHost"), "choose",
+        val bootstrap = MethodHandleDesc.ofMethod(STATIC, ClassDesc.of("BootstrapHost"), "choose",
             MethodTypeDesc.of(ClassDesc.of("java.lang.invoke.CallSite"),
                 ClassDesc.of("java.lang.invoke.MethodHandles\$Lookup"), ClassDesc.of("java.lang.String"),
                 ClassDesc.of("java.lang.invoke.MethodType")))
-        val worker = DirectMethodHandleDesc.ofMethod(STATIC, ClassDesc.of("MissingTarget"), "worker",
+        val worker = MethodHandleDesc.ofMethod(STATIC, ClassDesc.of("MissingTarget"), "worker",
             MethodTypeDesc.of(CD_void))
         val site = DynamicCallSiteDesc.of(bootstrap, "dispatch", MethodTypeDesc.of(CD_void), worker,
-            MethodTypeDesc.of(CD_void), "literal-private")
+            MethodTypeDesc.of(CD_void), ConstantDesc::class.java.cast("literal-private"))
         val bytes = ClassFile.of().build(ClassDesc.of("BytecodeSample")) { builder ->
             builder.withMethodBody("entry", MethodTypeDesc.of(CD_void), ClassFile.ACC_STATIC) {
                 it.invokedynamic(site).return_()

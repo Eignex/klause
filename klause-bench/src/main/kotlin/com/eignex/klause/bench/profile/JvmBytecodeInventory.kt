@@ -1,8 +1,10 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.sha256
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
@@ -61,15 +63,23 @@ internal object JvmBytecodeInventory {
                 val duplicates = entries.groupingBy { it.name }.eachCount().filterValues { it > 1 }.keys
                 for ((index, entry) in entries.withIndex()) {
                     if (entry.isDirectory || !entry.name.endsWith(".class")) continue
-                    val bytes = if (entry.name in duplicates) null else jar.getInputStream(entry).use {
+                    val bytes = if (entry.name in duplicates) {
+                        null
+                    } else {
+                        jar.getInputStream(entry).use {
                         it.readNBytes(MAX_CLASS_BYTES + 1)
                     }
-                    record(input, buildJsonObject {
+                    }
+                    record(
+                        input,
+                        buildJsonObject {
                         put("jar", name)
                         put("jarSha256", input.files.getValue(name).sha256)
                         put("entryIndex", index)
                         put("entry", entry.name)
-                    }, bytes, emit, counts)
+                    },
+                        bytes, emit, counts
+                    )
                 }
             }
         }
@@ -94,11 +104,15 @@ internal object JvmBytecodeInventory {
                     val relative = modules.relativize(path)
                     require(relative.nameCount >= 2)
                     val bytes = Files.newInputStream(path).use { it.readNBytes(MAX_CLASS_BYTES + 1) }
-                    record(input, buildJsonObject {
+                    record(
+                        input,
+                        buildJsonObject {
                         put("module", relative.getName(0).toString())
                         put("entryIndex", classIndex++)
                         put("entry", relative.subpath(1, relative.nameCount).toString())
-                    }, bytes, emit, counts)
+                    },
+                        bytes, emit, counts
+                    )
                 }
             }
         }
@@ -114,7 +128,9 @@ internal object JvmBytecodeInventory {
     ) {
         require(++counts.classes <= MAX_CLASSES) { "Whole class inventory exceeds bounds" }
         require(bytes == null || bytes.size <= MAX_CLASS_BYTES) { "Class byte input exceeds bounds" }
-        val parsed = if (bytes == null) Result.failure(IllegalArgumentException("Ambiguous duplicate entry")) else {
+        val parsed = if (bytes == null) {
+            Result.failure(IllegalArgumentException("Ambiguous duplicate entry"))
+        } else {
             try {
                 Result.success(JvmBytecodeMetadataReader.read(bytes))
             } catch (failure: RuntimeException) {
@@ -122,17 +138,19 @@ internal object JvmBytecodeInventory {
             }
         }
         if (parsed.isFailure) counts.errors++
-        emit(buildJsonObject {
+        emit(
+            buildJsonObject {
             put("record", "class")
             put("inputId", input.id)
             put("inputKind", input.kind)
-            put("sourceHead", input.sourceHead)
+            put("studySourceHeads", JsonArray(input.studySourceHeads.map(::JsonPrimitive)))
             put("origin", origin)
             put("classSha256", bytes?.let(::sha256))
             put("metadata", parsed.getOrNull()?.let(JvmBytecodeEncoding::encode) ?: JsonNull)
             put("errorType", parsed.exceptionOrNull()?.javaClass?.name)
             put("entryBytesAmbiguous", bytes == null)
-        })
+        }
+        )
     }
 
     private class Counts(var jars: Int = 0, var entries: Int = 0, var classes: Int = 0, var errors: Int = 0)

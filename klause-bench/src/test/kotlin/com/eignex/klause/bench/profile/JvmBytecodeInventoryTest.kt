@@ -33,7 +33,7 @@ class JvmBytecodeInventoryTest {
                 output.closeEntry()
             }
         }
-        val input = JvmBytecodeInput("original", "jars", "a".repeat(40), root.path,
+        val input = JvmBytecodeInput("original", "jars", listOf("a".repeat(40)), root.path,
             mapOf(jar.name to CaptureFile(jar.length(), sha256(jar.readBytes()))))
         val rows = mutableListOf<JsonObject>()
 
@@ -59,7 +59,7 @@ class JvmBytecodeInventoryTest {
             output.write(bytes)
             output.closeEntry()
         }
-        val input = JvmBytecodeInput("original", "jars", "a".repeat(40), root.path,
+        val input = JvmBytecodeInput("original", "jars", listOf("a".repeat(40)), root.path,
             mapOf(jar.name to CaptureFile(jar.length(), sha256(jar.readBytes()))))
         val rows = mutableListOf<JsonObject>()
 
@@ -86,7 +86,7 @@ class JvmBytecodeInventoryTest {
         }
         jar.writeBytes(String(jar.readBytes(), Charsets.ISO_8859_1).replace("Other.class", "First.class")
             .toByteArray(Charsets.ISO_8859_1))
-        val input = JvmBytecodeInput("original", "jars", "a".repeat(40), root.path,
+        val input = JvmBytecodeInput("original", "jars", listOf("a".repeat(40)), root.path,
             mapOf(jar.name to CaptureFile(jar.length(), sha256(jar.readBytes()))))
         val rows = mutableListOf<JsonObject>()
 
@@ -107,7 +107,7 @@ class JvmBytecodeInventoryTest {
             output.write(bytes)
             output.closeEntry()
         }
-        val input = JvmBytecodeInput("original", "jars", "a".repeat(40), root.path,
+        val input = JvmBytecodeInput("original", "jars", listOf("a".repeat(40)), root.path,
             mapOf(jar.name to CaptureFile(jar.length(), sha256(jar.readBytes()))))
 
         assertFailsWith<IllegalArgumentException> {

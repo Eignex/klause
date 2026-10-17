@@ -27,8 +27,11 @@ internal object JvmBytecodeLayout {
                     val entries = high.toLong() - low + 1
                     require(entries > 0 && entries <= (code.size - start - 12) / 4) { "Invalid tableswitch" }
                     repeat(entries.toInt()) { index ->
-                        targets += JvmBytecodeTarget("case", input.target(bci, input.s4(start + 12 + index * 4)),
-                            low + index)
+                        targets += JvmBytecodeTarget(
+                            "case",
+                            input.target(bci, input.s4(start + 12 + index * 4)),
+                            low + index,
+                        )
                     }
                     12 + entries.toInt() * 4
                 } else {
@@ -69,8 +72,16 @@ internal object JvmBytecodeLayout {
             if (encoded == 186) require(input.u2(bci + 3) == 0) { "Invalid invokedynamic operands" }
             if (encoded == 188) require(input.u1(bci + 1) in 4..11) { "Invalid newarray type" }
             if (encoded == 197) require(input.u1(bci + 3) > 0) { "Invalid multianewarray dimensions" }
-            result += JvmBytecodeInstruction(bci, opcode.name, size, pool, local, targets, padding,
-                opcode == Opcode.RET || opcode == Opcode.RET_W)
+            result += JvmBytecodeInstruction(
+                bci,
+                opcode.name,
+                size,
+                pool,
+                local,
+                targets,
+                padding,
+                opcode == Opcode.RET || opcode == Opcode.RET_W,
+            )
             bci += size
         }
         require(bci == code.size)

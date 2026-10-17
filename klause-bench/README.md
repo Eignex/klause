@@ -3319,12 +3319,14 @@ remain false independently of complete byte and range checks.
 and runtime images on the supported profiling worker. It accepts `specification=`
 and `specification-sha256=` for one pinned HTTPS JSON document. The document has
 `schema: 1` and an `inputs` array. Each input supplies a unique `id`, `kind` (`jars`
-or `runtime-image`), `sourceHead`, absolute `root`, and a `files` object mapping every
+or `runtime-image`), `studySourceHeads`, absolute `root`, and a `files` object mapping every
 relative regular-file path to its `bytes` and `sha256`. Roots must be distinct,
 canonical directories; symbolic links, missing files and unlisted files decline
 the inventory. Every listed file is authenticated before and after inspection.
-`sourceHead` retains the request's provenance claim; establishing that claim requires
-the original capture manifests and archive identities, independently of these checks.
+`studySourceHeads` retains one to sixteen distinct original study context heads,
+including both arms when an image is shared. These are request provenance claims,
+not source revisions of SDK classes. Establishing the claims requires the original
+capture manifests and archive identities, independently of these checks.
 
 Prepare inputs from the complete authenticated original captures, preserving their
 private raw bytes and original manifest mappings. Preparation and cleanup belong to

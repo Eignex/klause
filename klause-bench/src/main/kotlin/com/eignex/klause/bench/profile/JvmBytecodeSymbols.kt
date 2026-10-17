@@ -31,10 +31,15 @@ internal object JvmBytecodeSymbols {
             entry.index() to children
         }
         return entries.map { entry ->
-            JvmBytecodeSymbol(entry.index(), entry.tag(), entry.width(), links.getValue(entry.index()),
+            JvmBytecodeSymbol(
+                entry.index(),
+                entry.tag(),
+                entry.width(),
+                links.getValue(entry.index()),
                 (entry as? DynamicConstantPoolEntry)?.bootstrapMethodIndex(),
                 (entry as? MethodHandleEntry)?.kind(),
-                if (entry is Utf8Entry && entry.index() in symbolicStrings) entry.stringValue() else null)
+                if (entry is Utf8Entry && entry.index() in symbolicStrings) entry.stringValue() else null,
+            )
         }
     }
 

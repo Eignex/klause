@@ -52,13 +52,20 @@ internal object JvmBytecodeReport {
                         bytes += raw.size
                         records++
                     }
-                    emit(buildJsonObject {
+                    emit(
+                        buildJsonObject {
                         put("record", "schema")
                         put("encoding", JvmBytecodeEncoding.ENCODING)
-                        put("columns", JsonObject(JvmBytecodeEncoding.columns.mapValues { (_, names) ->
+                        put(
+                            "columns",
+                            JsonObject(
+                                JvmBytecodeEncoding.columns.mapValues { (_, names) ->
                             JsonArray(names.map(::JsonPrimitive))
-                        }))
-                    })
+                        }
+                            )
+                        )
+                    }
+                    )
                     action(::emit).also { result ->
                         emit(JsonObject(linkedMapOf("record" to JsonPrimitive("inventory-end")) + result))
                     }
@@ -85,7 +92,8 @@ internal object JvmBytecodeReport {
             }
             throw failure
         }
-        return JsonObject(summary + buildJsonObject {
+        return JsonObject(
+            summary + buildJsonObject {
             put("reportFile", report.name)
             put("reportEncoding", JvmBytecodeEncoding.ENCODING)
             put("reportBytes", report.length())
@@ -94,7 +102,8 @@ internal object JvmBytecodeReport {
             put("uncompressedReportSha256", uncompressedHash)
             put("records", records)
             put("completeGzipRoundTripVerified", true)
-        })
+        }
+        )
     }
 }
 
