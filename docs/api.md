@@ -186,6 +186,16 @@ finite factory is called. A foreign shape, engine or operation binding rejects b
 execution; nonfinite enumeration explicitly declines. Source deductions can refute an
 empty enumeration without constructing a worker.
 
+The `ExecutionOptions` request constructor resolves common controls in the library.
+It binds one seed (default zero) and one `NodeBudget` across the selected native
+strategies. A supplied ledger retains its spent work; a conflicting `node-limit`
+rejects. Native limits use the existing parameter types' defaults. Parsed `auto`
+selects that default, `unlimited` removes the cap and a nonnegative amount supplies
+the cap in its native units. Typed nullable allowance options use null for unlimited.
+Unknown and inapplicable keys reject on the selected route. Finite consumers can use
+the built-in request factory or supply their application hooks and LP policy; binding
+preserves those controls while applying the common seed, ledger and containing stop.
+
 `SourceExecutionResult` retains the complete native finite, linear, polynomial,
 quadratic or transcendental execution rather than narrowing exact values, bounds, limits, rays, resource
 telemetry or publication receipts. Callback types retain their native source coordinates

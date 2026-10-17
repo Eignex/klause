@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.LinearSourceObjective
 import com.eignex.klause.ir.ObjectiveSense
@@ -77,7 +78,47 @@ class SourceExecutionRequest private constructor(
     val nonlinearInteger: NonlinearIntegerTheoryParams?,
     /** Optional full native function controls, including representation and depth limits. */
     val transcendental: TranscendentalTheoryParams?,
+    /** Containing decision and heuristic allowance when resolved through common execution options. */
+    val nodeBudget: NodeBudget?,
 ) {
+    /**
+     * Resolve common options once for the captured route. Omitted native limits use their parameter
+     * types' defaults. The finite factory supplies optional application hooks and LP policy.
+     */
+    constructor(
+        invocation: PreparedSourceInvocation,
+        executionOptions: ExecutionOptions,
+        finiteRequest: ((FiniteSolveShape) -> FiniteSolveRequest)? = null,
+        cores: Int = 1,
+        randomSeed: Long? = null,
+        nodeBudget: NodeBudget? = null,
+        timeout: Cancellation = Cancellation.Never,
+        cancellation: Cancellation = Cancellation.Never,
+        presolveConfig: PresolveConfig? = null,
+        presolveCancellation: Cancellation = Cancellation.Never,
+        presolveBudget: PresolveBudget? = null,
+    ) : this(
+        invocation,
+        bindSourceExecutionControls(
+            invocation, executionOptions, finiteRequest, randomSeed, nodeBudget, cores, timeout, cancellation,
+            presolveConfig, presolveCancellation, presolveBudget,
+        ),
+        cores, presolveConfig, presolveCancellation, presolveBudget,
+    )
+
+    private constructor(
+        invocation: PreparedSourceInvocation,
+        controls: BoundSourceExecutionControls,
+        cores: Int,
+        presolveConfig: PresolveConfig?,
+        presolveCancellation: Cancellation,
+        presolveBudget: PresolveBudget?,
+    ) : this(
+        invocation, controls.finiteRequest, controls.theory, controls.polynomial, cores,
+        presolveConfig, presolveCancellation, presolveBudget, controls.nonlinearInteger, controls.transcendental,
+        controls.nodeBudget,
+    )
+
     /** Bind existing finite, linear or polynomial controls to their captured source. */
     constructor(
         invocation: PreparedSourceInvocation,
@@ -90,7 +131,7 @@ class SourceExecutionRequest private constructor(
         presolveBudget: PresolveBudget? = null,
     ) : this(
         invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
-        presolveCancellation, presolveBudget, null, null,
+        presolveCancellation, presolveBudget, null, null, theory.nodeBudget,
     )
 
     /** Bind full native integer controls without replacing their polynomial or node ledger. */
@@ -100,7 +141,7 @@ class SourceExecutionRequest private constructor(
         cores: Int = 1,
     ) : this(
         invocation, null, TheoryParams(), nonlinearInteger.polynomial, cores, null,
-        Cancellation.Never, null, nonlinearInteger, null,
+        Cancellation.Never, null, nonlinearInteger, null, nonlinearInteger.nodeBudget,
     )
 
     /** Bind full exact function controls without renewing the containing invocation. */
@@ -110,7 +151,7 @@ class SourceExecutionRequest private constructor(
         cores: Int = 1,
     ) : this(
         invocation, null, TheoryParams(), PolynomialTheoryParams(), cores, null,
-        Cancellation.Never, null, null, transcendental,
+        Cancellation.Never, null, null, transcendental, transcendental.nodeBudget,
     )
 
     init {

@@ -9,6 +9,47 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CliModeOpenTheoryTest {
+    @Test
+    fun `unknown execution parameters should be refused across captured source families`() {
+        for (source in listOf(
+            "(declare-const b Bool) (assert b)",
+            "(declare-const x Real) (assert (> x 0))",
+            "(declare-const x Real) (assert (= (* x x) 2))",
+            "(declare-const x Int) (assert (= (* x x) 2))",
+            "(declare-const x Real) (assert (= (sin x) 0))",
+        )) {
+            val smt = File.createTempFile("cliunknownsource", ".smt2").apply {
+                writeText(source)
+                deleteOnExit()
+            }
+            var code = -1
+
+            val err = captureErr {
+                code = runCli(arrayOf("-e", "backtrack", "--param", "unknown=1", smt.absolutePath))
+            }
+
+            assertEquals(2, code, err)
+            assertTrue("unknown" in err, err)
+        }
+    }
+
+    @Test
+    fun `a zero node allowance should retain an open root witness and report its ledger`() {
+        val smt = File.createTempFile("clisourcenodes", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (> x 0)) (check-sat)")
+            deleteOnExit()
+        }
+        var code = -1
+
+        val out = capture {
+            code = runCli(arrayOf("-s", "-e", "backtrack", "--param", "node-limit=0", smt.absolutePath))
+        }
+
+        assertEquals(0, code, out)
+        assertEquals("sat", out.lines().first())
+        assertTrue("; nodeBudgetLimit=0" in out, out)
+        assertTrue("; nodeBudgetSpent=0" in out, out)
+    }
 
     @Test
     fun `fixed parallel selection should be rejected across source families`() {
@@ -118,7 +159,7 @@ class CliModeOpenTheoryTest {
 
         var code = -1
         val out = capture {
-            code = runCli(arrayOf("-s", "-e", "backtrack", "--param", "node-limit=0", smt.absolutePath))
+            code = runCli(arrayOf("-s", "-e", "backtrack", "--param", "open-work-limit=0", smt.absolutePath))
         }
 
         assertEquals(0, code, out)

@@ -96,49 +96,34 @@ internal object SolveCore {
         val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel)
         // `-p N` gives the open portfolio a lane per core, as it does the finite one.
         val openCores = common.parallel ?: 1
+        val sourceControls = rawSolvable.sourceInvocation?.let { invocation ->
+            val kind = SourceSetup.executionKind(invocation)
+            val options = common.engineParams.filterNot {
+                it.substringBefore('=') == "dry-run-presolve" &&
+                    kind in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.LINEAR)
+            }
+            SourceExecutionRequest(
+                invocation, ExecutionOptions.parse(options),
+                finiteRequest = { shape ->
+                    finiteRequest(
+                        shape, common, engine, openCores, config, solutionSetSensitive,
+                        presolveCancel, presolveBudget, deadlineCancel, deadline, common.nodeBudget,
+                        rawSolvable.numericalCompletion, rawSolvable.toleranceCheck,
+                    )
+                },
+                cores = openCores, randomSeed = common.randomSeed, nodeBudget = common.nodeBudget,
+                timeout = deadlineCancel, presolveConfig = config,
+                presolveCancellation = presolveCancel, presolveBudget = presolveBudget,
+            ).also { common.nodeBudget = it.nodeBudget }
+        }
         when (val pipeline = rawSolvable.pipeline) {
             is SolvablePipeline.LinearSource -> {
-                val kind = SourceSetup.executionKind(pipeline.invocation)
-                val controls = when (kind) {
-                    SourceExecutionKind.FINITE -> {
-                        dropOpenOnlyParams(common)
-                        val budget = (common.nodeBudget ?: takeNodeBudget(common)).also { common.nodeBudget = it }
-                        val cancel = budget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
-                        SourceExecutionRequest(pipeline.invocation, finiteRequest = { shape ->
-                            finiteRequest(
-                                shape, common, engine, openCores, config, solutionSetSensitive,
-                                presolveCancel, presolveBudget, cancel, deadline, budget,
-                            )
-                        })
-                    }
-
-                    SourceExecutionKind.POLYNOMIAL -> SourceExecutionRequest(
-                        pipeline.invocation,
-                        polynomial = polynomialParams(common, deadlineCancel),
-                        cores = openCores,
-                    )
-
-                    else -> {
-                        val params = theoryParams(common, deadlineCancel)
-                        if (common.engineParams.isNotEmpty()) {
-                            usageError("unsupported linear source parameter `${common.engineParams.first()}`")
-                        }
-                        SourceExecutionRequest(
-                            pipeline.invocation,
-                            theory = params,
-                            cores = openCores,
-                            presolveConfig = config,
-                            presolveCancellation = presolveCancel,
-                            presolveBudget = presolveBudget,
-                        )
-                    }
-                }
-                solveLinearSource(rawSolvable, pipeline, controls, common, output, publication)
+                solveLinearSource(rawSolvable, pipeline, requireNotNull(sourceControls), common, output, publication)
                 return
             }
 
             is SolvablePipeline.NativeSource -> {
-                solveNativeSource(rawSolvable, pipeline, common, output, publication, deadlineCancel, openCores)
+                solveNativeSource(rawSolvable, pipeline, common, output, publication, requireNotNull(sourceControls))
                 return
             }
 
@@ -248,7 +233,7 @@ internal object SolveCore {
                 if (solutionSetSensitive) {
                     usageError("all-solution enumeration is unavailable for polynomial real models")
                 }
-                val polynomialParams = polynomialParams(common, deadlineCancel)
+                val polynomialParams = sourceControls?.polynomial ?: polynomialParams(common, deadlineCancel)
                 pipeline.objective?.let { sourceObjective ->
                     output.begin(optimize = true, maximize = pipeline.maximize)
                     val sense = if (pipeline.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
@@ -259,14 +244,10 @@ internal object SolveCore {
                             value.version,
                         )
                     }
-                    val execution = rawSolvable.sourceInvocation?.let { invocation ->
+                    val execution = sourceControls?.let { controls ->
                         (
                             SourceSetup.execute(
-                                SourceExecutionRequest(
-                                    invocation,
-                                    polynomial = polynomialParams,
-                                    cores = openCores,
-                                ),
+                                controls,
                                 SourceExecutionCallbacks(onQuadraticIncumbent = accepted),
                             )
                                 as SourceExecutionResult.Quadratic
@@ -296,16 +277,12 @@ internal object SolveCore {
 
             is SolvablePipeline.ExactTheorySatisfaction -> {
                 if (solutionSetSensitive) usageError("all-solution enumeration is unavailable for this exact source")
-                val polynomialParams = polynomialParams(common, deadlineCancel)
+                val polynomialParams = sourceControls?.polynomial ?: polynomialParams(common, deadlineCancel)
                 output.begin(optimize = false, maximize = false)
-                val execution = rawSolvable.sourceInvocation?.let { invocation ->
+                val execution = sourceControls?.let { controls ->
                     (
                         SourceSetup.execute(
-                            SourceExecutionRequest(
-                                invocation,
-                                polynomial = polynomialParams,
-                                cores = openCores,
-                            ),
+                            controls,
                         ) as SourceExecutionResult.Polynomial
                         ).result
                 } ?: pipeline.request.execute(polynomialParams, engine, openCores)
@@ -420,9 +397,11 @@ internal object SolveCore {
 
             is SolvablePipeline.OpenLocalSearch -> {
                 // Local search proves no optimum, so a run without a deadline ends where its node allowance does.
-                val nodeBudget = takeOpenNodeLimit(common)?.let(::NodeBudget).also { common.nodeBudget = it }
+                val nodeBudget = if (sourceControls != null) sourceControls.nodeBudget
+                    else takeOpenNodeLimit(common)?.let(::NodeBudget)
+                common.nodeBudget = nodeBudget
                 val stop = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
-                val params = TheoryParams(
+                val params = sourceControls?.theory ?: TheoryParams(
                     cancellation = stop,
                     timeout = deadlineCancel,
                     nodeBudget = nodeBudget,
@@ -433,10 +412,10 @@ internal object SolveCore {
                     alnsIterations = takeOpenIntParam(common, "alns-iterations", nonNegative = true) ?: 50,
                 )
                 fun executeHeuristic(onAccepted: ((SourceIncumbentPublication) -> Unit)? = null): OpenTheoryExecution =
-                    rawSolvable.sourceInvocation?.let { invocation ->
+                    sourceControls?.let { controls ->
                         (
                             SourceSetup.execute(
-                                SourceExecutionRequest(invocation, theory = params, cores = openCores),
+                                controls,
                                 SourceExecutionCallbacks(onLinearIncumbent = onAccepted),
                             ) as SourceExecutionResult.Linear
                             ).result
@@ -503,7 +482,7 @@ internal object SolveCore {
                 if (solutionSetSensitive) {
                     usageError("all-solution enumeration is unavailable for open theory models")
                 }
-                val theoryParams = theoryParams(common, deadlineCancel)
+                val theoryParams = sourceControls?.theory ?: theoryParams(common, deadlineCancel)
                 val request = pipeline.request.withPresolve(
                     config,
                     cancellation = presolveCancel,
@@ -528,17 +507,10 @@ internal object SolveCore {
                     return
                 }
                 fun executeOpen(onAccepted: ((SourceIncumbentPublication) -> Unit)? = null): OpenTheoryExecution =
-                    rawSolvable.sourceInvocation?.let { invocation ->
+                    sourceControls?.let { controls ->
                         (
                             SourceSetup.execute(
-                                SourceExecutionRequest(
-                                    invocation,
-                                    theory = theoryParams,
-                                    cores = openCores,
-                                    presolveConfig = config,
-                                    presolveCancellation = presolveCancel,
-                                    presolveBudget = presolveBudget,
-                                ),
+                                controls,
                                 SourceExecutionCallbacks(onLinearIncumbent = onAccepted),
                             )
                                 as SourceExecutionResult.Linear
@@ -601,7 +573,7 @@ internal object SolveCore {
             // Routing already decided the model over its genuinely open ranges, so no engine runs and
             // there is nothing for a budget to have cut short.
             SolvablePipeline.Refuted -> {
-                rawSolvable.sourceInvocation?.let { SourceSetup.execute(SourceExecutionRequest(it)) }
+                sourceControls?.let { SourceSetup.execute(it) }
                 output.begin(optimize = rawSolvable.optimize, maximize = rawSolvable.maximize)
                 output.onComplete(Verdict.UNSATISFIABLE)
                 if (common.statistics) {
@@ -614,7 +586,16 @@ internal object SolveCore {
                 return
             }
 
-            SolvablePipeline.FiniteCp -> dropOpenOnlyParams(common)
+            SolvablePipeline.FiniteCp -> {
+                if (sourceControls != null) {
+                    executeFinite(
+                        requireNotNull(sourceControls.finiteRequest).invoke(rawSolvable.finiteShape),
+                        rawSolvable, common, output,
+                    )
+                    return
+                }
+                dropOpenOnlyParams(common)
+            }
         }
         val nodeBudget = takeNodeBudget(common).also { common.nodeBudget = it }
         val cancel = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
