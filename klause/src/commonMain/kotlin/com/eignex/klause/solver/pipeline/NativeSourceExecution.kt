@@ -20,7 +20,9 @@ internal fun prepareFactorQuadratic(
         source
     } else {
         when (val result = source.closeOpenBounds(request.boundCancellation or stop)) {
-            OpenPresolveResult.Refuted -> return SourceProblemRoute.Refuted
+            // A typed quadratic result requires its producing engine's completion certificate.
+            OpenPresolveResult.Refuted -> if (request.requiresQuadraticCompletion) source
+                else return SourceProblemRoute.Refuted
             is OpenPresolveResult.Tightened -> result.spec
         }
     }

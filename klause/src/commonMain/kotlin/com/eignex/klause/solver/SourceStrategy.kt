@@ -9,12 +9,11 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
-import com.eignex.klause.presolve.OpenPresolveResult
-import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
@@ -24,14 +23,11 @@ import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
-import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
-import com.eignex.klause.solver.pipeline.PreparedExecution
 import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
-import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
@@ -45,10 +41,6 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.admission
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.maximizeSourceObjective
-import com.eignex.klause.solver.pipeline.minimize
-import com.eignex.klause.solver.pipeline.optimize
-import com.eignex.klause.solver.pipeline.polynomialRequest
-import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
 import com.eignex.klause.solver.pipeline.withSourceSemantics
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
@@ -217,24 +209,7 @@ class SourceStrategy internal constructor(
     ): QuadraticOptimizationExecution {
         compiledSchema?.let { return optimizeSource(it.sourceBinding.originalObjective(objective), polynomial, sense) }
         require(objective.sourcePairing == null) { "compiled helper objective requires its compiled source strategy" }
-        val scope = scope(polynomial, TheoryParams())
-        if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
-        if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
-        val plan = preparePolynomialOptimization(scope.stop, scope.polynomialPreparation())
-            .withObjective(objective, maximize = sense == ObjectiveSense.MAXIMIZE)
-        if (plan.execution !is PreparedExecution.Polynomial ||
-            !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
-        ) {
-            return unsupportedQuadratic(
-                sense,
-                if (plan.decline == PreparedPlanDecline.RESOURCE) {
-            if (scope.stop()) scope.unknown().reason else TerminationReason.BudgetExhausted
-        } else {
-            TerminationReason.Unsupported
-        }
-            )
-        }
-        return OpenTheoryPipeline.optimize(plan.polynomialRequest(), objective, scope.polynomial, engine, sense)
+        return optimizeSource(objective.toQuadraticObjectiveSpec(), polynomial, sense)
     }
 
     /** Optimize with complete finite controls and the shared exact affine-objective bridge. */
@@ -259,7 +234,7 @@ class SourceStrategy internal constructor(
         return optimize(objective, polynomial.copy(strategy = polynomial.strategy.copy(localSearch = params)), sense)
     }
 
-    /** Optimize a captured exact quadratic objective over the same bounded-integer source and real constraints. */
+    /** Optimize a captured exact quadratic objective over the source's integer and real constraints. */
     fun optimize(
         objective: QuadraticObjectiveSpec,
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
@@ -275,33 +250,18 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
-        if (compiledSchema != null) {
-            val invocation = SourceSetup.prepare(SourceSetupRequest(sourceAttachment(), engine, objective, sense,
-                projectionProviders, scope.stop, scope.stop), polynomialCancellation = scope.polynomialPreparation())
-            return when (val execution = SourceSetup.execute(SourceExecutionRequest(invocation,
-                polynomial = scope.polynomial))) {
-                is SourceExecutionResult.Quadratic -> compiledSchema.sourceBinding.bindResult(execution) {
-                    scope.unknown().reason
-                }
-                is SourceExecutionResult.Declined -> unsupportedQuadratic(sense, execution.reason)
-                else -> unsupportedQuadratic(sense)
-            }
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            sourceAttachment(), engine, objective, sense, projectionProviders, scope.stop, scope.stop,
+            requiresQuadraticCompletion = true,
+        ), polynomialCancellation = scope.polynomialPreparation())
+        return when (val execution = SourceSetup.execute(SourceExecutionRequest(invocation,
+            theory = scope.theory, polynomial = scope.polynomial))) {
+            is SourceExecutionResult.Quadratic -> compiledSchema?.sourceBinding?.bindResult(execution) {
+                scope.unknown().reason
+            } ?: execution.result
+            is SourceExecutionResult.Declined -> unsupportedQuadratic(sense, execution.reason)
+            else -> unsupportedQuadratic(sense)
         }
-        val plan = preparePolynomialOptimization(scope.stop, scope.polynomialPreparation())
-            .withObjective(objective, sense)
-        if (plan.execution !is PreparedExecution.Polynomial ||
-            !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
-        ) {
-            return unsupportedQuadratic(
-                sense,
-                if (plan.decline == PreparedPlanDecline.RESOURCE) {
-            if (scope.stop()) scope.unknown().reason else TerminationReason.BudgetExhausted
-        } else {
-            TerminationReason.Unsupported
-        }
-            )
-        }
-        return OpenTheoryPipeline.minimize(plan.polynomialRequest(), objective, scope.polynomial, engine, sense)
     }
 
     /**
@@ -381,29 +341,6 @@ class SourceStrategy internal constructor(
 
     private fun sourceAttachment(): SourceAttachment = compiledSchema?.sourceBinding?.attachment()
         ?: SourceAttachment(source)
-
-    private fun preparePolynomialOptimization(
-        boundCancellation: Cancellation,
-        polynomialCancellation: Cancellation,
-    ): PreparedSourcePlan {
-        val selected = projectionProviders.prepare(source)
-        val bounded = if (source.hasFiniteIntegerRanges()) {
-            source
-        } else {
-            when (val outcome = source.closeOpenBounds(boundCancellation)) {
-                is OpenPresolveResult.Tightened -> outcome.spec
-
-                // The quadratic result requires its producing engine's completion certificate.
-                OpenPresolveResult.Refuted -> source
-            }
-        }
-        return bounded.preparePolynomialExecutionPlan(
-            original = source,
-            providers = projectionProviders,
-            projections = selected.forEngineView(bounded),
-            cancellation = polynomialCancellation,
-        )
-    }
 
     private fun unsupportedQuadratic(
         sense: ObjectiveSense,

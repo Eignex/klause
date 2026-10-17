@@ -75,8 +75,12 @@ Exact polynomial LS also declines finite seeding, incumbent exchange, custom sco
 and event hooks that its native neighborhood cannot consume.
 
 `optimize` preserves the existing `QuadraticOptimizationExecution` surface through
-the shared exact affine or quadratic entry point. It supports bounded integer
-sources, continuous products and open real coordinates, with exact objective values,
+`SourceSetup.prepare` and `SourceSetup.execute` for affine and quadratic objectives.
+Its result contract requires the native completion certificate. Shared setup retains
+the original source after an optional bound refutation so that the producing engine
+can establish that certificate under the containing allowance.
+It supports bounded and supported open integer sources, continuous products and
+open real coordinates, with exact objective values,
 direction-aware bounds, attainment and incomplete results. `optimizeOpen` exposes
 the existing native `OpenTheoryExecution` for finite and supported open-integer linear sources.
 Compiled helper objectives retain exact original-coordinate pairings independently

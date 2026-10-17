@@ -52,6 +52,7 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.pipelineRequest
+import com.eignex.klause.solver.result.QuadraticClaim
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.BIG_ONE
@@ -969,7 +970,7 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `polynomial optimize should decline open integer sources`() {
+    fun `source optimize should retain open integer lower bounds`() {
         val source = Problem(
             0,
             1,
@@ -983,6 +984,30 @@ class SourceStrategyTest {
 
         val result = BacktrackSolver.source(source).optimize(LinearObjective(intCoefficients = longArrayOf(1))).result
 
-        assertEquals(TerminationReason.Unsupported, assertIs<QuadraticOptimizationResult.Unknown>(result).reason)
+        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result)
+        assertEquals(BigFraction.ofLong(42), optimum.incumbent.value.rational)
+        assertEquals("42", optimum.incumbent.sample.exactIntValue(0).toString())
+        assertTrue(source.intBounds.isOpenLower(0))
+        assertTrue(source.intBounds.isOpenUpper(0))
+    }
+
+    @Test
+    fun `source optimize should retain the native certificate after bound refutation`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(-3, 3)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        val result = BacktrackSolver.source(source).optimize(LinearObjective(intCoefficients = longArrayOf(1))).result
+
+        val infeasible = assertIs<QuadraticOptimizationResult.Infeasible>(result)
+        assertEquals(QuadraticClaim.Infeasible, infeasible.certificate.claim)
     }
 }
