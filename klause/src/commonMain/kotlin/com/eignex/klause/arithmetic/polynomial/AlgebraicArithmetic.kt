@@ -70,9 +70,11 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
     fun compare(left: AlgebraicReal, right: AlgebraicReal): Int {
         arithmetic.step()
         if (left === right) return 0
-        if (left.definingPolynomial == right.definingPolynomial && left.rootIndex == right.rootIndex) return 0
+        if (left.definingPolynomial == right.definingPolynomial) return left.rootIndex.compareTo(right.rootIndex)
         left.rational?.let { return -compareRational(right, it) }
         right.rational?.let { return compareRational(left, it) }
+        if (left.interval.upper <= right.interval.lower) return -1
+        if (right.interval.upper <= left.interval.lower) return 1
         val common = univariate.gcd(left.definingPolynomial, right.definingPolynomial)
         val sequence = if (common.degree > 0) univariate.sturm(common) else emptyList()
         var a = left

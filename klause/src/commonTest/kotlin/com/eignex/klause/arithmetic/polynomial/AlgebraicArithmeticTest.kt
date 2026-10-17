@@ -13,6 +13,62 @@ class AlgebraicArithmeticTest {
     private val arithmetic = AlgebraicArithmetic(polynomial)
 
     @Test
+    fun `captured root indices retain their order within remaining caller work`() {
+        val first = arithmetic.roots(RationalPolynomial.of(-2, 0, 1))
+        val second = AlgebraicArithmetic().roots(RationalPolynomial.of(-2, 0, 1))
+        var spent = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= 8
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+        val remaining = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
+
+        val ascending = remaining.compare(first.first(), second.last())
+        val descending = remaining.compare(second.last(), first.first())
+        val equal = remaining.compare(first.last(), second.last())
+
+        assertEquals(-1, ascending)
+        assertEquals(1, descending)
+        assertEquals(0, equal)
+    }
+
+    @Test
+    fun `disjoint captured intervals compare within remaining caller work`() {
+        val negative = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).first()
+        val positive = arithmetic.roots(RationalPolynomial.of(-3, 0, 1)).last()
+        var spent = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= 8
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+        val remaining = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
+
+        val ascending = remaining.compare(negative, positive)
+        val descending = remaining.compare(positive, negative)
+
+        assertEquals(-1, ascending)
+        assertEquals(1, descending)
+    }
+
+    @Test
+    fun `overlapping different defining polynomials retain equal root values`() {
+        val quadratic = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val quartic = arithmetic.roots(RationalPolynomial.of(-4, 0, 0, 0, 1)).last()
+
+        val compared = arithmetic.compare(quadratic, quartic)
+
+        assertEquals(0, compared)
+    }
+
+    @Test
+    fun `cancellation precedes comparison of captured root indices`() {
+        val roots = arithmetic.roots(RationalPolynomial.of(-2, 0, 1))
+        val stopped = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { true }))
+
+        assertFailsWith<PolynomialInterrupted> { stopped.compare(roots.first(), roots.last()) }
+    }
+
+    @Test
     fun `completed root counts should fit negative affine transforms in remaining caller work`() {
         var spent = 0L
         var limit = Long.MAX_VALUE

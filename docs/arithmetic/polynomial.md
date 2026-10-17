@@ -88,7 +88,10 @@ retain a nonminimal defining polynomial; metadata still selects its exact root.
 Refinement creates another value with the same root identity. Values survive
 arithmetic context disposal and do not retain mutable isolation workspaces.
 
-Comparison uses exact gcd/common-root tests and interval separation. Polynomial
+Comparison uses captured root indices when defining polynomials agree and exact
+interval separation when isolating bounds are disjoint. Overlapping roots of
+different defining polynomials use exact gcd/common-root tests and refinement.
+Every route retains the caller's initial work and cancellation poll. Polynomial
 sign evaluation first detects zero with gcd, then refines exact rational interval
 enclosures until a nonzero sign is certified. Equal values with different defining
 polynomials compare equal. Structural object identity is not numerical equality;
