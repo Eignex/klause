@@ -114,13 +114,14 @@ class PolynomialArithmeticTest {
     @Test
     fun `affine subresultants agree with Sylvester determinants without matrix allocation`() {
         val z = Polynomial.variable(2)
-        for ((a, b, c, d) in listOf(
-            listOf(y, Polynomial.ONE, y, constant(2)),
-            listOf(arithmetic.add(y, Polynomial.ONE), arithmetic.subtract(arithmetic.power(z, 2), Polynomial.ONE),
-                arithmetic.subtract(y, Polynomial.ONE), arithmetic.add(z, constant(2))),
+        for ((left, right) in listOf(
+            arithmetic.add(arithmetic.multiply(y, x), Polynomial.ONE) to
+                arithmetic.add(arithmetic.multiply(y, x), constant(2)),
+            arithmetic.add(arithmetic.multiply(arithmetic.add(y, Polynomial.ONE), x),
+                arithmetic.subtract(arithmetic.power(z, 2), Polynomial.ONE)) to
+                arithmetic.add(arithmetic.multiply(arithmetic.subtract(y, Polynomial.ONE), x),
+                    arithmetic.add(z, constant(2))),
         )) {
-            val left = arithmetic.add(arithmetic.multiply(a, x), b)
-            val right = arithmetic.add(arithmetic.multiply(c, x), d)
             val expected = arithmetic.resultant(left, right, 0)
             val limited = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0))
 
