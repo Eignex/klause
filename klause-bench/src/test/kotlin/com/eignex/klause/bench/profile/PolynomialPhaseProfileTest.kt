@@ -28,26 +28,6 @@ class PolynomialPhaseProfileTest {
     }
 
     @Test
-    fun `interleaved query observations retain work performed after another query starts`() {
-        val observation = PipelineQueryObservation()
-        val access = PolynomialPhaseProfile.PhaseAccess()
-        var nested: PhaseTrace? = null
-        val first = access.measure("(assert false)", onQuery = { query ->
-            observation.observe(Any(), 1, query)
-            nested = access.measure("(assert false)", onQuery = { observation.observe(Any(), 1, it) })
-        })
-
-        val snapshot = observation.snapshot()
-
-        assertEquals(2L, snapshot.observed)
-        assertEquals(first.nativeWork + assertNotNull(nested).nativeWork, snapshot.observedNativeWork)
-        assertTrue(snapshot.previous.isEmpty())
-        assertEquals(listOf("Unsatisfiable", "Unsatisfiable"),
-            snapshot.latestByInvocation.map { it.query.result })
-        assertTrue(snapshot.latestByInvocation.all { it.query.nativeWork > 0 })
-    }
-
-    @Test
     fun `phase observations retain subresultant operand shapes and matrix index`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = "$declarations (assert (= (+ (* x0 x0) (* x1 x1)) 1))"

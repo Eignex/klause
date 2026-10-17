@@ -230,12 +230,7 @@ internal object PolynomialPhaseProfile {
                 atoms.size, guides?.size, kinds, charges, graphFamilyShape(atoms))
         }
 
-        fun measure(
-            text: String,
-            maximumWork: Long? = null,
-            timeoutMs: Long = 60_000L,
-            onQuery: ((Any) -> Unit)? = null,
-        ): PhaseTrace {
+        fun measure(text: String, maximumWork: Long? = null, timeoutMs: Long = 60_000L): PhaseTrace {
             val clock = Cancellation.after(timeoutMs.milliseconds)
             var charges = 0L
             var stop: List<String>? = null
@@ -258,7 +253,6 @@ internal object PolynomialPhaseProfile {
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
             val arithmetic = queryType.getDeclaredField("arithmetic").apply { isAccessible = true }.get(owner)
             val observation = ArithmeticObservation(arithmetic, owner)
-            onQuery?.invoke(owner)
             val checkpoints = ArrayList<PhaseCheckpoint>()
             val start = System.nanoTime()
             var calls = 0L
