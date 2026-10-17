@@ -10,6 +10,7 @@ import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.Distinct
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearRow
@@ -158,6 +159,20 @@ internal fun verifyRealCoordinates(
                 if (if (factor.max) value > selected else value < selected) selected = value
             }
             if (selected != reals[factor.result]) return Verification.Rejected("real factor $id refutes the assignment")
+            continue
+        }
+        if (factor is RealChoice) {
+            if (Lit.variable(factor.condition) >= sample.numBoolVars) {
+                return Verification.Rejected("assignment does not cover the real choice guard")
+            }
+            val selected = if (Lit.evaluate(factor.condition, sample.boolValue(Lit.variable(factor.condition)))) {
+                factor.whenTrue
+            } else {
+                factor.whenFalse
+            }
+            val valid = reals[selected] == reals[factor.result]
+            if (cancellation()) return Verification.Indeterminate("source choice check cancelled")
+            if (!valid) return Verification.Rejected("real factor $id refutes the assignment")
             continue
         }
         if (factor is RealElement) {

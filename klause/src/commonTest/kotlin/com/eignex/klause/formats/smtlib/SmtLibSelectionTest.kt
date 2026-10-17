@@ -4,7 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.table.Element
-import com.eignex.klause.factor.table.RealElement
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.propagation.bake
@@ -26,6 +26,103 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SmtLibSelectionTest {
+    @Test
+    fun `Boolean cardinalities and signed real choices should retain only real numeric coordinates`() {
+        for (mask in 0..7) {
+            val a = mask and 1 != 0
+            val b = mask and 2 != 0
+            val c = mask and 4 != 0
+            val expected = (if (a xor b) 1 else 0) + (if (c) 0 else 1) <= 1
+            val parsed = SmtLib.parse(
+                """
+                (declare-const a Bool) (declare-const b Bool) (declare-const c Bool)
+                (declare-const x Real) (declare-const y Real)
+                (assert (= x 1.0))
+                (assert (let ((g (xor a b)) (h (and c (< x 2.0)))) (and
+                    (<= (+ (ite g 1 0) (ite h 0 1)) 1)
+                    (= y (ite (not g) x (+ x 1.0))))))
+                (assert ${if (a) "a" else "(not a)"})
+                (assert ${if (b) "b" else "(not b)"})
+                (assert ${if (c) "c" else "(not c)"})
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver.source(parsed.model)
+                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+            assertEquals(0, parsed.model.numIntVars)
+            assertEquals(1, parsed.model.factors.filterIsInstance<Cardinality>().size)
+            assertEquals(1, parsed.model.factors.filterIsInstance<RealChoice>().size)
+            if (expected) {
+                val point = assertIs<OpenTheoryResult.Sat>(result).assignment
+                assertEquals(if (a xor b) "2" else "1", point.realValue(parsed.realVarNames.getValue("y")))
+            } else {
+                assertIs<OpenTheoryResult.Unsat>(result)
+            }
+        }
+    }
+
+    @Test
+    fun `equal real arms should preserve guards used by Boolean cardinalities`() {
+        for (count in listOf(0, 1)) {
+            val parsed = SmtLib.parse(
+                """
+                (declare-const b Bool) (declare-const c Bool)
+                (declare-const x Real) (declare-const y Real) (declare-const z Real)
+                (assert (= x 2.0)) (assert (= z x)) (assert (not c))
+                (assert (= (+ (ite b 1 0) (ite c 1 0)) $count))
+                (assert (= y (ite (not b) x z)))
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver.source(parsed.model)
+                .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+            val point = assertIs<OpenTheoryResult.Sat>(result).assignment
+            assertEquals(0, parsed.model.numIntVars)
+            assertEquals(count == 1, point.boolValue(parsed.boolVarNames.getValue("b")))
+            assertEquals("2", point.realValue(parsed.realVarNames.getValue("y")))
+        }
+    }
+
+    @Test
+    fun `complemented real choices should preserve wide rational arm values`() {
+        for (branch in listOf(false, true)) {
+            val parsed = SmtLib.parse(
+                """
+                (declare-const b Bool) (declare-const x Real) (declare-const y Real)
+                (assert ${if (branch) "b" else "(not b)"}) (assert (= x 1.0))
+                (assert (= y (ite (not b) (+ x (/ 1 1152921504606846976)) x)))
+                """.trimIndent(),
+            )
+
+            val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+            assertEquals(
+                if (branch) "1" else "1152921504606846977/1152921504606846976",
+                assertIs<OpenTheoryResult.Sat>(result).assignment.realValue(parsed.realVarNames.getValue("y")),
+            )
+        }
+    }
+
+    @Test
+    fun `mixed real choices should retain original integer coordinates without selector columns`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const i Int) (declare-const y Real)
+            (assert (not b)) (assert (= i 2))
+            (assert (= y (ite b (+ (to_real i) 0.5) (- (to_real i) 0.5))))
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        val point = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertEquals(1, parsed.model.numIntVars)
+        assertEquals("2", point.intValue(parsed.intVarNames.getValue("i")))
+        assertEquals("3/2", point.realValue(parsed.realVarNames.getValue("y")))
+    }
+
     @Test
     fun `indicator cardinalities should preserve signed guards and opposite arms`() {
         for ((guard, thenValue) in listOf("b" to 1, "b" to 0, "(not b)" to 1, "(not b)" to 0)) {
@@ -454,7 +551,8 @@ class SmtLibSelectionTest {
                 assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
                     .realValue(parsed.realVarNames.getValue("y")),
             )
-            assertEquals(1, parsed.model.factors.filterIsInstance<RealElement>().size)
+            assertEquals(1, parsed.model.factors.filterIsInstance<RealChoice>().size)
+            assertEquals(0, parsed.model.numIntVars)
         }
     }
 

@@ -14,6 +14,7 @@ import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
@@ -56,6 +57,7 @@ internal fun Factor.buildLpRelaxation(builder: RelaxationBuilder, linearProjecti
         is ContinuousProduct -> emitLpRelaxation(builder)
         is Element -> emitLpRelaxation(builder)
         is RealElement -> emitLpRelaxation(builder)
+        is RealChoice -> emitLpRelaxation(builder)
         is GlobalCardinality -> emitLpRelaxation(builder)
         is Mdd -> emitLpRelaxation(builder)
         is NValue -> emitLpRelaxation(builder)

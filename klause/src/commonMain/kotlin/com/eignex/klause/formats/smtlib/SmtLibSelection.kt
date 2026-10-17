@@ -3,7 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
-import com.eignex.klause.factor.table.RealElement
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -53,10 +53,10 @@ internal fun Compiler.Builder.realSelection(condition: Int, whenTrue: RealComb, 
         if (condition == trueLitCache) return whenTrue
         if (condition == Lit.negate(trueLitCache)) return whenFalse
     }
-    val entries = intArrayOf(selectionRealColumn(whenFalse), selectionRealColumn(whenTrue))
-    val index = selectionIndex(listOf(condition))
+    val falseColumn = selectionRealColumn(whenFalse)
+    val trueColumn = selectionRealColumn(whenTrue)
     val result = nextReal++
-    factors.add(RealElement(index, result, entries, indexOffset = 0))
+    factors.add(RealChoice(condition, result, trueColumn, falseColumn))
     return RealComb(emptyMap(), mapOf(result to BigFraction.ONE), BigFraction.ZERO)
 }
 
@@ -91,8 +91,15 @@ internal fun Compiler.Builder.wideIntegerSelection(
         val falseDigits = selectionDigits(falseTerm.constant, columns)
         val index = selectionIndex(listOf(condition))
         for ((position, column) in columns.withIndex()) {
-            factors.add(Element(index, column, longArrayOf(falseDigits[position], trueDigits[position]),
-                arrIsVars = false, indexOffset = 0))
+            factors.add(
+                Element(
+                index,
+                column,
+                longArrayOf(falseDigits[position], trueDigits[position]),
+                arrIsVars = false,
+                indexOffset = 0,
+            )
+            )
         }
         return
     }
@@ -102,10 +109,13 @@ internal fun Compiler.Builder.wideIntegerSelection(
     when (result) {
         is IntComb.Narrow -> {
             val column = checkNotNull(result.lin.asSimpleVar())
-            val entries = longArrayOf(checkNotNull((falseValue as IntComb.Narrow).lin.asSimpleVar()).toLong(),
-                checkNotNull((trueValue as IntComb.Narrow).lin.asSimpleVar()).toLong())
+            val entries = longArrayOf(
+                checkNotNull((falseValue as IntComb.Narrow).lin.asSimpleVar()).toLong(),
+                checkNotNull((trueValue as IntComb.Narrow).lin.asSimpleVar()).toLong(),
+            )
             factors.add(Element(index, column, entries, arrIsVars = true, indexOffset = 0))
         }
+
         is IntComb.Wide -> {
             val trueColumns = (trueValue as IntComb.Wide).lin.coeffs.entries.associate { it.value to it.key }
             val falseColumns = (falseValue as IntComb.Wide).lin.coeffs.entries.associate { it.value to it.key }
@@ -140,7 +150,9 @@ private fun selectionColumns(value: IntComb): List<Int> = when (value) {
 private fun Compiler.Builder.selectionDigits(constant: BigInt, columns: List<Int>): LongArray {
     var remaining = constant
     return LongArray(columns.size) { position ->
-        if (position == columns.lastIndex) remaining.toLongExact() else {
+        if (position == columns.lastIndex) {
+            remaining.toLongExact()
+        } else {
             val column = columns[position]
             val domain = (intDomains[column] as PresolveDomain.Finite).domain
             val radix = bigIntOf(domain.max) + BIG_ONE
@@ -157,26 +169,47 @@ private fun Compiler.Builder.selectionIndex(conditions: List<Int>): Int {
     val start = factors.size
     for ((position, condition) in conditions.withIndex()) {
         val relation = if (Lit.isPositive(condition)) LinearOp.EQ else LinearOp.NE
-        factors.add(ReifiedLinear(Lit.variable(condition), longArrayOf(1), intArrayOf(index),
-            relation, position.toLong() + 1))
+        factors.add(
+            ReifiedLinear(
+            Lit.variable(condition),
+            longArrayOf(1),
+            intArrayOf(index),
+            relation,
+            position.toLong() + 1,
+        )
+        )
     }
-    conditionalEqualities.define(index, conditions, List(conditions.size) { LinComb(emptyMap(), it.toLong() + 1) },
-        LinComb(emptyMap(), 0), factors.subList(start, factors.size), conditions.map(iteChains::guardEquality))
+    conditionalEqualities.define(
+        index,
+        conditions,
+        List(conditions.size) { LinComb(emptyMap(), it.toLong() + 1) },
+        LinComb(emptyMap(), 0),
+        factors.subList(start, factors.size),
+        conditions.map(iteChains::guardEquality),
+    )
     return index
 }
 
 private fun Compiler.Builder.selectionColumn(term: LinComb): Int {
     term.asSimpleVar()?.let { return it }
-    if (term.coeffs.isEmpty()) return iteChains.fixedVar(term.constant) {
+    if (term.coeffs.isEmpty()) {
+        return iteChains.fixedVar(term.constant) {
         newInt(it, it).also { variable ->
             conditionalEqualities.define(variable, emptyList(), emptyList(), term, emptyList(), emptyList())
         }
+    }
     }
     val (lower, upper) = linCombRange(term)
     val result = newInt(lower, upper)
     val start = factors.size
     postLinearRel(LinComb(mapOf(result to 1L), 0), term, LinearOp.EQ)
-    conditionalEqualities.define(result, emptyList(), emptyList(), term,
-        factors.subList(start, factors.size), emptyList())
+    conditionalEqualities.define(
+        result,
+        emptyList(),
+        emptyList(),
+        term,
+        factors.subList(start, factors.size),
+        emptyList(),
+    )
     return result
 }

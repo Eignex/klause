@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.table.RealChoice
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -22,6 +23,53 @@ import kotlin.test.Test
 import kotlin.test.assertIs
 
 class RealWitnessVerificationTest {
+    @Test
+    fun `real choice should check the exact arm selected by its signed guard`() {
+        val source = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf(RealChoice(Lit.make(0, false), 0, 1, 2)),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3) { 3.0 },
+        )
+        for (truth in listOf(false, true)) {
+            val point = Sample(
+                booleanArrayOf(truth),
+                longArrayOf(),
+                doubleArrayOf(1.0, 1.0, 2.0),
+                exactReals = listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ofLong(2)),
+            )
+
+            val result = verifyRealCoordinates(source, point)
+
+            if (truth) {
+                assertIs<Verification.Rejected>(result)
+            } else {
+                assertIs<Verification.Accepted<*, *>>(result)
+            }
+        }
+    }
+
+    @Test
+    fun `real choice should reject a witness without its Boolean guard`() {
+        val source = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf(RealChoice(Lit.make(0, true), 0, 0, 0)),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(0.0),
+        )
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))
+
+        val result = verifyRealCoordinates(source, point)
+
+        assertIs<Verification.Rejected>(result)
+    }
+
     @Test
     fun `exact real point checks should stop on the containing work allowance`() {
         val source = Problem(0, 0, emptyArray(), arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), true)),

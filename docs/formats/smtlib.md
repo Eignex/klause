@@ -197,10 +197,12 @@ for arithmetic branch preferences. Guards are inputs to each conditional definit
 their source or predicate definitions remain independently owned when unused
 choice state is removed or the same guard controls several selections.
 
-Affine real conditionals retain `RealElement` over materialized branch columns.
-Their choice index shares the source Boolean guard. Affine branch definitions keep
-exact rational coefficients, including mixed integer/real terms, and source real
-declarations remain arithmetic-owned.
+Affine real conditionals retain `RealChoice` over the original signed Boolean guard
+and materialized real branch columns, without an integer choice index. Their native
+and selected arithmetic consumers preserve both guarded equalities and equal-arm
+freedom; see [source choice ownership](../model.md#real-choices).
+Affine branch definitions keep exact rational coefficients, including mixed
+integer/real terms, and source real declarations remain arithmetic-owned.
 
 The exact real component can certify supported difference fragments with a graph,
 retaining the LP route for other states and conflict explanations. Its admission,

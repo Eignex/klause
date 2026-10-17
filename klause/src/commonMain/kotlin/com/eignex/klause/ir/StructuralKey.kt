@@ -112,6 +112,7 @@ internal enum class FactorKind {
     EXACT_LINEAR,
     LINEAR_INDICATOR,
     DISTINCT,
+    REAL_CHOICE,
 }
 
 // Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments into a
