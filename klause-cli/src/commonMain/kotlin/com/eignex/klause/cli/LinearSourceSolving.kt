@@ -22,13 +22,13 @@ import com.eignex.klause.solver.validation.LinearSourceWitness
 
 internal fun solveLinearSource(
     solvable: Solvable,
-    pipeline: SolvablePipeline.LinearSource,
+    rendering: SourceRendering.LinearSource,
     controls: SourceExecutionRequest,
     common: CommonOptions,
     output: OutputProtocol,
     publication: ArithmeticPublication,
 ) {
-    val invocation = pipeline.invocation
+    val invocation = rendering.invocation
     if (invocation.operation == ExecutionOperation.ENUMERATE &&
         SourceSetup.executionKind(invocation) !in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.REFUTED)
     ) {
@@ -43,9 +43,9 @@ internal fun solveLinearSource(
         lastPoint = point
         val value = point.objective
         lastAccepted = if (value != null) {
-            publication.publish(pipeline.render(point), SourceValue.Rational(value))
+            publication.publish(rendering.render(point), SourceValue.Rational(value))
         } else {
-            output.onSolution(pipeline.render(point), null)
+            output.onSolution(rendering.render(point), null)
             points++
             true
         }

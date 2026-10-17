@@ -38,7 +38,7 @@ class MiniZincModeRoutingTest(private val engine: String, private val sourceText
             }
 
             val solvable = MiniZincMode.newSession().load(source.absolutePath, common)
-            val pairs = cliInvocationStats(common, solvable.pipeline).pairs(SolveStats.EMPTY).toMap()
+            val pairs = cliInvocationStats(common, solvable.rendering).pairs(SolveStats.EMPTY).toMap()
 
             assertNotNull(solvable.sourceInvocation)
             assertNotNull(pairs["frontendRoutingOutcome"])

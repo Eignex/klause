@@ -1,21 +1,14 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.pipeline.ExactTheorySatisfactionRequest
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteSolveShape
-import com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryRequest
-import com.eignex.klause.solver.pipeline.NumericalLinearRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
-import com.eignex.klause.solver.pipeline.OpenTheoryRequest
-import com.eignex.klause.solver.pipeline.PolynomialTheoryRequest
 import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.maximizeSourceObjective
@@ -36,29 +29,23 @@ internal class Solvable(
     val objectiveValue: ((Sample) -> Long)?,
     /** Sign-corrected objective including continuous-column contributions. */
     val continuousObjectiveValue: ((Sample) -> Double)? = null,
-    /** The component set selected once while loading the source model. */
-    val pipeline: SolvablePipeline = SolvablePipeline.FiniteCp,
-    /** LP work performed while proving bounds for pipeline selection. */
+    val rendering: SourceRendering = SourceRendering.FiniteCp,
+    /** LP work performed while proving bounds for source routing. */
     val routingLpStats: LpStats = LpStats(),
-    /** Wall time spent proving bounds for pipeline selection. */
+    /** Wall time spent proving bounds for rendering selection. */
     val routingElapsedMs: Long = 0L,
     /** Tolerance semantics for continuous leaves: a check of a source-space sample; `null` keeps exact semantics. */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
     val numericalCompletion: Boolean = false,
     val sourceInvocation: PreparedSourceInvocation? = finite?.sourceInvocation,
 ) {
-    fun withSourceInvocation(invocation: PreparedSourceInvocation): Solvable = Solvable(
-        finite, render, objectiveValue, continuousObjectiveValue, pipeline, routingLpStats, routingElapsedMs,
-        toleranceCheck, numericalCompletion, invocation,
-    )
-
     /** This instance solved under tolerance semantics with [check]. */
     fun withToleranceCheck(check: (Sample) -> Boolean): Solvable = Solvable(
         finite,
         render,
         objectiveValue,
         continuousObjectiveValue,
-        pipeline,
+        rendering,
         routingLpStats,
         routingElapsedMs,
         check,
@@ -68,7 +55,7 @@ internal class Solvable(
 
     fun withNumericalCompletion(): Solvable = Solvable(
         finite, render, objectiveValue,
-        continuousObjectiveValue, pipeline, routingLpStats, routingElapsedMs, toleranceCheck, true, sourceInvocation,
+        continuousObjectiveValue, rendering, routingLpStats, routingElapsedMs, toleranceCheck, true, sourceInvocation,
     )
 
     constructor(
@@ -98,11 +85,10 @@ internal class Solvable(
         continuousObjectiveValue: ((Sample) -> Double)? = null,
         /** Model-supplied finite search intent. */
         searchHints: SearchHints? = null,
-        /** The component set selected once while loading the source model. */
-        pipeline: SolvablePipeline = SolvablePipeline.FiniteCp,
-        /** LP work performed while proving bounds for pipeline selection. */
+        rendering: SourceRendering = SourceRendering.FiniteCp,
+        /** LP work performed while proving bounds for source routing. */
         routingLpStats: LpStats = LpStats(),
-        /** Wall time spent proving bounds for pipeline selection. */
+        /** Wall time spent proving bounds for rendering selection. */
         routingElapsedMs: Long = 0L,
         /** Existing finite source ownership selected by the frontend. */
         preparedRoute: SourceProblemRoute.Finite? = null,
@@ -120,7 +106,7 @@ internal class Solvable(
         render = render,
         objectiveValue = objectiveValue,
         continuousObjectiveValue = continuousObjectiveValue,
-        pipeline = pipeline,
+        rendering = rendering,
         routingLpStats = routingLpStats,
         routingElapsedMs = routingElapsedMs,
     )
@@ -128,18 +114,8 @@ internal class Solvable(
     /** Finite CP problem. */
     val problem: Problem? get() = finite?.problem
     val optimize: Boolean get() = finite?.optimize
-        ?: sourceInvocation?.let { it.operation == ExecutionOperation.OPTIMIZE } ?: (
-        openRequest?.objective != null || polynomial?.objective != null || quadratic != null ||
-            numerical?.request?.objective != null
-        )
-    val maximize: Boolean get() = finite?.maximize ?: sourceInvocation?.maximizeSourceObjective ?: (
-        openRequest?.maximize ?: polynomial?.maximize ?: numerical?.request?.maximize
-            ?: (quadratic?.sense == ObjectiveSense.MAXIMIZE)
-        )
-    private val numerical: SolvablePipeline.NumericalLinear? get() = pipeline as? SolvablePipeline.NumericalLinear
-    private val quadratic: SolvablePipeline.QuadraticTheory? get() = pipeline as? SolvablePipeline.QuadraticTheory
-    private val polynomial: SolvablePipeline.PolynomialTheory? get() = pipeline as? SolvablePipeline.PolynomialTheory
-    private val openRequest: OpenTheoryRequest? get() = (pipeline as? SolvablePipeline.OpenTheory)?.request
+        ?: (sourceInvocation?.operation == ExecutionOperation.OPTIMIZE)
+    val maximize: Boolean get() = finite?.maximize ?: sourceInvocation?.maximizeSourceObjective ?: false
     val lsObjective: IncrementalObjective? get() = finite?.localSearchObjective
     val linearObjective: LinearObjective? get() = finite?.linearObjective
     val objVarId: Int? get() = finite?.objectiveIntVar
@@ -185,71 +161,16 @@ private fun sourceRouteName(route: SourceProblemRoute): String = when (route) {
     SourceProblemRoute.Refuted -> "a model routing refuted"
 }
 
-/** A concrete solve pipeline, selected before [SolveCore] starts its finite CP loop. */
-internal sealed interface SolvablePipeline {
+internal sealed interface SourceRendering {
     data class LinearSource(
         val invocation: PreparedSourceInvocation,
         val render: (com.eignex.klause.solver.validation.LinearSourceWitness) -> String,
-    ) : SolvablePipeline
+    ) : SourceRendering
 
-    data class NativeSource(val invocation: PreparedSourceInvocation, val render: (OpenTheoryAssignment) -> String) :
-        SolvablePipeline
+    data class ExactSource(val invocation: PreparedSourceInvocation, val render: (OpenTheoryAssignment) -> String) :
+        SourceRendering
 
-    data class NumericalLinear(val request: NumericalLinearRequest, val render: (OpenTheoryAssignment) -> String) :
-        SolvablePipeline
+    data object FiniteCp : SourceRendering
 
-    data class ExactTheorySatisfaction(
-        val request: ExactTheorySatisfactionRequest,
-        val render: (OpenTheoryAssignment) -> String,
-        val pipelineName: String = "exact-theory-satisfaction",
-        val declaredTheoryRoute: String? = null,
-    ) : SolvablePipeline
-
-    /** The ordinary finite-domain CP, LP, and search components. */
-    data object FiniteCp : SolvablePipeline
-
-    /** A complete open-model theory, selected by the solver-side route builder. */
-    data class OpenTheory(
-        /** Mode-neutral pipeline request; this wrapper owns only output rendering. */
-        val request: OpenTheoryRequest,
-        val render: (OpenTheoryAssignment) -> String,
-    ) : SolvablePipeline
-
-    data class PolynomialTheory(
-        val request: PolynomialTheoryRequest,
-        val render: (OpenTheoryAssignment) -> String,
-        val objective: LinearObjective? = null,
-        val maximize: Boolean = false,
-    ) : SolvablePipeline
-
-    data class NonlinearIntegerTheory(
-        val request: NonlinearIntegerTheoryRequest,
-        val render: (OpenTheoryAssignment) -> String,
-    ) : SolvablePipeline
-
-    data class QuadraticTheory(
-        val request: QuadraticRequest,
-        val objective: QuadraticObjectiveSpec,
-        val sense: ObjectiveSense,
-        val render: (Sample) -> String,
-    ) : SolvablePipeline
-
-    data class Interrupted(val reason: TerminationReason) : SolvablePipeline
-
-    /**
-     * An open model no theory decides, searched by local search alone: shown satisfiable, or given incumbents for
-     * [objective], or left unknown.
-     */
-    data class OpenLocalSearch(
-        /** The model as routing proved it. */
-        val model: Problem,
-        val render: (OpenTheoryAssignment) -> String,
-        /** The objective in minimized form, or null for satisfaction. */
-        val objective: LinearObjective? = null,
-        /** Whether [objective] is the negation of a maximized one. */
-        val maximize: Boolean = false,
-    ) : SolvablePipeline
-
-    /** Routing refuted the model while bounding its open sides, so no engine runs. */
-    data object Refuted : SolvablePipeline
+    data class Interrupted(val reason: TerminationReason) : SourceRendering
 }

@@ -239,14 +239,18 @@ unsupported-linear optimization fallback to source-checked heuristic execution o
 same prepared plan. Exact and original-real FlatZinc use the same arithmetic fallback
 as SMT-LIB source admission. Those paths, the MiniZinc finite invocation path and
 source-strategy arithmetic satisfaction consume this dispatcher. Native SMT formula
-and quadratic consumers also submit their attachments through it; their CLI carrier
-owns rendering only. SMT admission retains factor or exact-expression content according
+and quadratic consumers also submit their attachments through it. CLI carriers retain
+coordinate renderers and the captured invocation; their output adapters consume the
+full `SourceExecutionResult` without constructing route-specific solver requests.
+SMT admission retains factor or exact-expression content according
 to its representation, independently of the installed solving mechanisms.
 Required native preparation charges source-coordinate capture to the containing token;
 an interrupted preparation exports no executable plan and returns `Declined`, with
 its original source and stop reason. This supplies no engine refutation or certificate.
-Legacy typed compatibility entries and MPS retain their existing execution surfaces;
-common parameter interpretation has separate adapters.
+Typed compatibility entries preserve their public descriptors while delegating to
+shared source preparation. The common execution constructor owns native parameter
+defaults and containing allowances; original linear result qualification remains
+separate from native working-coordinate evidence.
 
 These setup types are part of the experimental composition surface. Source arrays
 stay borrowed read-only, metadata containers are captured, and the returned shape

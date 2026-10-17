@@ -17,7 +17,6 @@ import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.executionKind
-import com.eignex.klause.solver.pipeline.maximizeSourceObjective
 import com.eignex.klause.solver.pipeline.sourceObjective
 import com.eignex.klause.solver.result.LpStats
 import kotlin.time.TimeSource
@@ -162,7 +161,7 @@ internal fun linearSourceSolvable(
         finite = null,
         render = { error("linear source publication requires its checked original coordinates") },
         objectiveValue = null,
-        pipeline = SolvablePipeline.LinearSource(invocation, render),
+        rendering = SourceRendering.LinearSource(invocation, render),
         routingLpStats = lpStats,
         routingElapsedMs = admissionElapsedMs + elapsed,
         sourceInvocation = invocation,
@@ -176,70 +175,28 @@ internal fun preparedSourceSolvable(
     routingLpStats: LpStats = LpStats(),
     routingElapsedMs: Long = 0,
 ): Solvable {
-    if (invocation.route is SourceProblemRoute.NativeFormula) {
+    if (SourceSetup.executionKind(invocation) != SourceExecutionKind.FINITE) {
         return Solvable(
             finite = null,
-            render = { error("native source formulas retain their exact original coordinate renderer") },
+            render = { error("source arithmetic retains its exact coordinate renderer") },
             objectiveValue = null,
-            pipeline = SolvablePipeline.NativeSource(invocation, renderOpen),
+            rendering = SourceRendering.ExactSource(invocation, renderOpen),
             routingLpStats = routingLpStats,
             routingElapsedMs = routingElapsedMs,
             sourceInvocation = invocation,
         )
     }
     val objective = invocation.sourceObjective
-    val maximize = invocation.maximizeSourceObjective
-    return when (SourceSetup.executionKind(invocation)) {
-        SourceExecutionKind.FINITE -> {
-            val realObjective = objective?.takeIf { it.realCoefficients.any { coefficient -> coefficient != 0.0 } }
-            Solvable(
-                finite = invocation.finiteShape(),
-                render = render,
-                objectiveValue = objective?.takeIf { realObjective == null }
-                    ?.let { linear -> { sample -> linear.evaluateLong(sample) } },
-                continuousObjectiveValue = realObjective?.let { linear ->
-                    { sample -> linear.evaluateExact(sample).toDouble() }
-                },
-                routingLpStats = routingLpStats,
-                routingElapsedMs = routingElapsedMs,
-            )
-        }
-
-        SourceExecutionKind.LINEAR -> openTheorySolvable(
-            (invocation.route as SourceProblemRoute.OpenTheory).request,
-            renderOpen,
-            routingLpStats,
-            routingElapsedMs,
-        ).withSourceInvocation(invocation)
-
-        SourceExecutionKind.HEURISTIC -> {
-            val model = when (val route = invocation.route) {
-                is SourceProblemRoute.OpenTheory -> route.request.model
-                is SourceProblemRoute.UnsupportedOpen -> route.problem
-                else -> error("heuristic execution requires its source route")
-            }
-            openLocalSearchSolvable(
-                model,
-                renderOpen,
-                routingLpStats,
-                routingElapsedMs,
-                if (maximize) objective?.negated() else objective,
-                maximize,
-            ).withSourceInvocation(invocation)
-        }
-
-        SourceExecutionKind.POLYNOMIAL -> polynomialSolvable(
-            invocation.route as SourceProblemRoute.PolynomialTheory,
-            renderOpen,
-            routingElapsedMs,
-        ).withSourceInvocation(invocation)
-
-        SourceExecutionKind.NONLINEAR_INTEGER, SourceExecutionKind.FUNCTIONS, SourceExecutionKind.NUMERICAL ->
-            error("native formula execution requires its captured native source route")
-
-        SourceExecutionKind.REFUTED -> refutedSolvable(
-            routingLpStats,
-            routingElapsedMs,
-        ).withSourceInvocation(invocation)
-    }
+    val realObjective = objective?.takeIf { it.realCoefficients.any { coefficient -> coefficient != 0.0 } }
+    return Solvable(
+        finite = invocation.finiteShape(),
+        render = render,
+        objectiveValue = objective?.takeIf { realObjective == null }
+            ?.let { linear -> { sample -> linear.evaluateLong(sample) } },
+        continuousObjectiveValue = realObjective?.let { linear ->
+            { sample -> linear.evaluateExact(sample).toDouble() }
+        },
+        routingLpStats = routingLpStats,
+        routingElapsedMs = routingElapsedMs,
+    )
 }

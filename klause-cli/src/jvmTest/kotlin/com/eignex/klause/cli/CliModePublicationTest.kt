@@ -75,7 +75,7 @@ class CliModePublicationTest {
 
         try {
             val solvable = session.load(source.absolutePath, common)
-            assertIs<SolvablePipeline.OpenTheory>(solvable.pipeline)
+            assertIs<SourceRendering.ExactSource>(solvable.rendering)
             assertSame(expected, assertFailsWith<IOException> { SolveCore.solve(solvable, common, failed) })
             val later = CommonOptions().apply {
                 engine = "fixed"
@@ -123,7 +123,7 @@ class CliModePublicationTest {
 
         try {
             val solvable = session.load(source.absolutePath, common)
-            assertIs<SolvablePipeline.OpenTheory>(solvable.pipeline)
+            assertIs<SourceRendering.ExactSource>(solvable.rendering)
             SolveCore.solve(solvable, common, output)
         } finally {
             source.delete()
@@ -512,7 +512,7 @@ class CliModePublicationTest {
             deleteOnExit()
         }
         val solvable = SmtLibMode.newSession().load(source.absolutePath, CommonOptions().apply { engine = "cp" })
-        val pipeline = assertIs<SolvablePipeline.PolynomialTheory>(solvable.pipeline)
+        val pipeline = assertIs<SourceRendering.ExactSource>(solvable.rendering)
         val execution = assertIs<SourceExecutionResult.Quadratic>(
             SourceSetup.execute(SourceExecutionRequest(assertNotNull(solvable.sourceInvocation))),
         )

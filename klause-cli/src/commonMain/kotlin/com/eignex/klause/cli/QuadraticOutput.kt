@@ -1,43 +1,8 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.pipeline.PolynomialTheoryRequest
-import com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryRequest
 import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
-
-internal sealed interface QuadraticRequest {
-    data class Polynomial(val request: PolynomialTheoryRequest) : QuadraticRequest
-    data class Integer(val request: NonlinearIntegerTheoryRequest) : QuadraticRequest
-}
-
-internal fun quadraticSolvable(
-    request: QuadraticRequest,
-    objective: QuadraticObjectiveSpec,
-    sense: ObjectiveSense,
-    render: (Sample) -> String,
-    admissionElapsedMs: Long,
-): Solvable = Solvable(
-    finite = null,
-    render = render,
-    objectiveValue = null,
-    pipeline = SolvablePipeline.QuadraticTheory(request, objective, sense, render),
-    routingElapsedMs = admissionElapsedMs,
-)
-
-internal fun reportQuadraticOptimization(
-    execution: QuadraticOptimizationExecution,
-    pipeline: SolvablePipeline.QuadraticTheory,
-    output: OutputProtocol,
-    statistics: Boolean,
-    routingElapsedMs: Long,
-    completePool: Boolean,
-    publication: ArithmeticPublication,
-) = reportQuadraticOptimization(
-    execution, pipeline.render, output, statistics, routingElapsedMs, completePool, publication,
-)
 
 internal fun reportQuadraticOptimization(
     execution: QuadraticOptimizationExecution,

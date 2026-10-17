@@ -195,7 +195,8 @@ class SourceExecutionControlsTest {
             "(declare-const x Real) (assert (= (sin x) 0))",
         )) {
             val invocation = SourceSetup.prepare(SourceSetupRequest(
-                SmtLib.parse(text).source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+                SmtLib.parse(text).source,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
             ))
 
             val failure = assertFailsWith<PipelineConfigException> {
@@ -222,5 +223,55 @@ class SourceExecutionControlsTest {
             assertEquals(0L, finite.randomSeed)
             assertEquals(0L, finite.executionOptions.reader()[ExecutionOption.seed])
         }
+    }
+
+    @Test
+    fun `polynomial strategy controls should reach the finite workers`() {
+        val options = ExecutionOptions.parse(listOf(
+            "max-decisions=3", "max-flips=7", "max-instructions=11", "alns-iterations=2",
+        ))
+
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SmtLib.parse("(declare-const x Real) (assert (= (* x x) 2))").source,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val params = SourceExecutionRequest(invocation, options, randomSeed = 17).polynomial.strategy
+
+        assertEquals(17L, params.backtrack.randomSeed)
+        assertEquals(17L, params.localSearch.randomSeed)
+        assertEquals(3L, params.backtrack.maxDecisions)
+        assertEquals(7L, params.localSearch.maxFlips)
+        assertEquals(11L, params.localSearch.maxInstructions)
+        assertEquals(2, params.alnsIterations)
+    }
+
+    @Test
+    fun `nonlinear source controls should retain explicit candidate and move allowances`() {
+        val options = ExecutionOptions.parse(listOf("nia-candidates=7", "nia-moves=11", "nra-work-limit=128"))
+
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val params = assertNotNull(SourceExecutionRequest(invocation, options).nonlinearInteger)
+
+        assertEquals(7L, params.maximumCandidates)
+        assertEquals(11L, params.maximumMoves)
+        assertEquals(128L, params.polynomial.maximumWork)
+    }
+
+    @Test
+    fun `polynomial finite workers should share one generic node allowance`() {
+        val options = ExecutionOptions.parse(listOf("node-limit=7"))
+
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val request = SourceExecutionRequest(invocation, options)
+
+        assertEquals(7L, request.nodeBudget?.limit)
+        assertSame(request.nodeBudget, request.polynomial.strategy.backtrack.nodeBudget)
+        assertSame(request.nodeBudget, request.polynomial.strategy.localSearch.nodeBudget)
     }
 }
