@@ -20,9 +20,9 @@ completion independently of its floating violation score. Exact rational solutio
 need not have a zero-violation floating representation. Completion work consumes the
 same move and node allowances; a completed witness can be published after that
 atomic completion exhausts the remaining slice. A zero allowance starts no completion.
-Mixed finite optimization also requests its configured real completion for the first
-candidate admitted by finite checks, including generated starts. Completed move
-evaluation then compares exact completed objectives under the same allowance.
+Mixed finite optimization requests its configured real completion for generated
+starting points that pass the finite checks. Completed move evaluation then compares
+exact completed objectives under the same allowance.
 Propagation-only custom factors use the shared [source validation](validation.md)
 service for a private full-coordinate check before
 publication. Finite-only checks precede caller completion; checks needing real
