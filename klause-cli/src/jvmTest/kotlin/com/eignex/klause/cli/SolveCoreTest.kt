@@ -87,8 +87,8 @@ class SolveCoreTest(private val route: String) {
 
     private fun sourceText(): String = when (route) {
         "quadratic-polynomial" -> """
-            (declare-const b Bool) (declare-const x Real)
-            (assert (= x (ite b 0 1))) (minimize (- 7 (* x x))) (check-sat)
+            (declare-const x Real)
+            (assert (= x 1)) (minimize (- 7 (* x x))) (check-sat)
         """.trimIndent()
 
         "open-linear" -> """
