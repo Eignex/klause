@@ -596,11 +596,49 @@ instrumented queries and does not establish coverage of its unobserved portions.
 These aggregate events identify
 execution stages, not the private cause of a failed proposal or an inner cost clock.
 
-Complete Collins projection followed by exact lifting partitions the real space
-into cells invariant for the retained numeric signs when probing supplies no witness.
-Source Boolean feasibility is invariant on each cell. Refutation requires
-exhaustion of the relevant cells and Boolean alternatives; unsuccessful repairs
-supply no refutation authority. Both witness paths retain the final stop check.
+After the unchanged optional probe, complete traversal enumerates Boolean regions
+before constructing their numeric projection families. Each region is a source
+implicant: assigned Boolean leaves and signed numeric predicates suffice to establish
+the original formula. Numeric truth assignments are premises to check, not witnesses.
+A satisfying result still requires complete exact source checking. Refutation requires
+complete Boolean coverage and numeric refutation of every covered region.
+
+### Boolean regions
+
+[PolynomialBooleanRegions](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialBooleanRegions.kt)
+uses shared Boolean propagation over the original normalized DAG, treating numeric
+predicates as opaque leaves. Decisions visit source Boolean leaves before numeric
+leaves, trying false before true. The bounded optional refuter retains its original
+admission and charged traversal; complete region enumeration does not call it with
+larger limits or reopen optional admission.
+
+A topological proof scan distinguishes imposed gate truth from a witnessed Boolean
+value. True conjunctions and false disjunctions require all children; a true
+disjunction or false conjunction needs one witnessed decisive child. Negation
+reverses the required truth. An iterative walk captures only the supporting leaf
+literals, preserving shared reference identity. Other leaves are irrelevant within
+that implicant. Each region's numeric family retains the polynomials of its signed
+numeric literals in original atom order.
+
+Private exclusion clauses prevent revisiting emitted leaf cubes, including their
+irrelevant completions. They describe coverage of this traversal and never enter
+shared clause learning or explanation exchange. Exhausting the remaining Boolean
+abstraction covers every source model only when every emitted region was numerically
+refuted. A representation-limited region can be skipped while searching another
+region for SAT, but it permanently withholds global UNSAT. If no witness is found,
+its resource refusal remains UNKNOWN even after Boolean enumeration finishes.
+Containing cancellation or work exhaustion stops the entire query immediately.
+
+Normalization, the single optional prefix, Boolean propagation and exclusions,
+conditional projection, lifting and full source checking share one native arithmetic
+and cancellation owner. Region changes and resumable checkpoints renew no allowance.
+Original real and Boolean counts, fixed source values and the immutable source
+formula remain captured; no region creates finite CP domains or a fresh probe.
+A private counter records issued numeric regions, including constant contradictions;
+another records their selected atom occurrences. Neither counts certified refutations.
+Projection and lifting counts accumulate
+across regions. Invocation snapshots merge observations with saturation, and an
+unvisited complete stage remains absent.
 
 ### Projection families
 
@@ -609,28 +647,6 @@ constructs a complete Collins projection family for rational multivariate
 polynomials. It reads the [exact polynomial kernel](../arithmetic/polynomial.md)
 and owns selection of projection operations and declared variable order.
 The theory does not materialize finite CP domains or depend on the linear engines.
-
-After the unchanged optional probe, formulas with Boolean source variables derive
-entailed Boolean-variable facts by unit propagation without decisions. Numeric
-predicates remain opaque. Conflicting closure retains the original boundary family;
-it supplies no separate refutation. The bounded optional Boolean refuter keeps its
-original admission, work sequence and branch traversal.
-
-Only those Boolean leaves are substituted in a private structural evaluation of
-the normalized formula. A compound gate's required truth is not a replacement for
-its constraint. Constant folding removes irrelevant subtrees, and projection keeps
-every numeric atom reachable through the residual formula. For each numeric
-valuation, source satisfaction is equivalent to satisfaction after the entailed
-Boolean substitutions. The retained signs therefore determine Boolean feasibility,
-even when an omitted atom's sign varies within a cell.
-
-This preparation retains the original formula, all original numeric and Boolean
-coordinate counts, fixed values and complete source checks. Reduced structure does
-not reopen optional admission or renew its work prefix. Unit propagation, folding,
-boundary collection, projection and lifting share the containing native arithmetic
-and cancellation scope. Interruption exposes no partial boundary family. A private
-counter observes completed atom removals; invocation aggregation saturates and
-unvisited preparation remains absent. Aggregate counts do not identify a root query.
 
 The returned family owns its level buffers. Input list mutation and mutation of a
 returned list do not change captured families. Immutable kernel polynomials may be
@@ -667,19 +683,23 @@ union. Each root is a section sample; kernel rational samples lie strictly insid
 the intervening and unbounded sectors. Empty families still contribute a whole-line
 sector, so every declared dimension receives a coordinate.
 
-At a prefix, only original atoms whose variables are all assigned have definite
-truth. Higher atoms and every Boolean variable remain unknown. A three-valued false
-formula prunes that base cell: the entailed Boolean substitutions preserve source
-satisfaction, and retained lower signs are invariant throughout the cell. Omitted
-signs cannot change the residual formula's Boolean feasibility. No prefix supplies
-a satisfying result. At a complete sample, exact
-algebraic evaluation decides every atom and iterative Boolean search preserves
-reference correlation. Unused Boolean IDs receive false. The complete assignment
-is checked against the normalized source formula before capture.
+At a prefix, region literals whose numeric variables are all assigned have definite
+truth. A violated literal prunes the base cell because its polynomial belongs to
+that region's sign-invariant family. Higher literals remain unresolved. No prefix
+supplies a satisfying result. An omitted source atom need not have invariant sign;
+the region's Boolean proof establishes source truth independently of it whenever
+all selected literals hold.
 
-Full Collins projection and exhaustive section/sector traversal provide a
-sign-invariant decomposition of the retained boundaries, including degree loss and
-nullification. A satisfying result requires a complete exact witness; an unsatisfiable
-result requires exhaustion of every unpruned cell and its Boolean alternatives. Root indices in returned
+At a complete region sample, exact algebraic evaluation checks every original atom.
+The region supplies its Boolean leaf assignments; Boolean IDs outside the proof
+receive false. The complete assignment is checked against the original normalized
+formula before capture. It retains every declared numeric coordinate, including
+empty-family dimensions and fixed values.
+
+Full Collins projection and exhaustive section/sector traversal refute a region's
+signed numeric conjunction, including degree loss and nullification. A source
+UNSAT requires every Boolean region to be covered and numerically refuted; any
+unfinished region withholds that verdict. Both SAT and UNSAT retain the final
+containing stop check. Root indices in returned
 `AlgebraicReal` values identify their rational defining polynomial's distinct roots,
 not the position in a specialized lifting family.

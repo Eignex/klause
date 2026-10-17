@@ -5,16 +5,168 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class PolynomialBooleanProjectionTest {
+class PolynomialBooleanRegionsTest {
+    @Test
+    fun `a refuted first region does not hide a later numeric root`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const b Bool)
+            (assert (or (and (not b) (= x0 0) (= x0 1)) (and b (= x0 3))))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertTrue(witness.boolValue(0))
+        assertEquals(BigFraction.ofLong(3), witness.realValue(0).rational)
+    }
+
+    @Test
+    fun `all numeric regions must be refuted before source exhaustion`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const b Bool)
+            (assert (or (and (not b) (= x0 0) (= x0 1)) (and b (> x0 0) (< x0 0))))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
+    fun `an indeterminate numeric region withholds source exhaustion`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const b Bool)
+            (assert (or (and (not b) (= (+ (* x0 x0) (* x1 x1)) 1))
+                        (and b (> x0 0) (< x0 0))))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val stopped = assertIs<QfNraResult.Unknown>(result)
+        assertEquals(QfNraReason.ResourceLimit, stopped.reason)
+        assertEquals(PolynomialResource.MATRIX_CELLS, stopped.resource)
+    }
+
+    @Test
+    fun `a refused first region permits a later checked numeric witness`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const b Bool)
+            (assert (or (and (not b) (= (+ (* x0 x0) (* x1 x1)) 1)) (and b (= x0 3))))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertTrue(witness.boolValue(0))
+        assertEquals(BigFraction.ofLong(3), witness.realValue(0).rational)
+    }
+
+    @Test
+    fun `numeric disjunctions preserve alternatives without source Boolean variables`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (or (and (= x0 0) (= x0 1)) (= x0 3)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        assertEquals(BigFraction.ofLong(3), assertIs<QfNraResult.Satisfiable>(result).assignment.realValue(0).rational)
+    }
+
+    @Test
+    fun `shared predicates retain their correlation across Boolean regions`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const b Bool)
+            (assert (and (or b (= x0 3)) (or (not b) (= x0 3)) (not (= x0 3))))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
+    fun `region checkpoints resume without repeating native work`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const b Bool)
+            (assert (or (and (not b) (= x0 0) (= x0 1)) (and b (= x0 3))))
+            """.trimIndent(),
+        )
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        val complete = service.invocation().use { it.check() }
+
+        service.invocation().use { invocation ->
+            val pending = invocation.prepareCheck()
+            var result: QfNraResult? = null
+            while (result == null) result = pending.next()
+
+            assertIs<QfNraResult.Satisfiable>(result)
+            assertEquals(complete.stats, result.stats)
+        }
+    }
+
+    @Test
+    fun `numeric regions share the containing work limit`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const b Bool)
+            (assert (or (and (not b) (= x0 0) (= x0 1)) (and b (= x0 3))))
+            """.trimIndent(),
+        )
+        val complete = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val stopped = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = complete.stats.workSpent - 1))
+
+        assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(stopped).reason)
+    }
+
+    @Test
+    fun `empty Boolean gates preserve their source truth`() {
+        for ((formula, feasible) in listOf(
+            PolynomialRealFormula.And(emptyList()) to true,
+            PolynomialRealFormula.Or(emptyList()) to false,
+        )) {
+            val result = solveQfNra(formula, 0, 33)
+
+            if (feasible) assertIs<QfNraResult.Satisfiable>(result)
+            else assertIs<QfNraResult.Unsatisfiable>(result)
+        }
+    }
+
     @Test
     fun `fixed guards remove inactive boundaries while retaining every source coordinate`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" } +
@@ -55,7 +207,7 @@ class PolynomialBooleanProjectionTest {
     }
 
     @Test
-    fun `an unresolved guard retains all numeric alternatives`() {
+    fun `a refused numeric region does not suppress a feasible Boolean alternative`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(
             "$declarations (declare-const b Bool) (assert (or b (= (+ (* x0 x0) (* x1 x1)) 1)))",
@@ -64,8 +216,7 @@ class PolynomialBooleanProjectionTest {
         val result = solveQfNra(source.formula, source.boolCount, source.realCount,
             QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
 
-        val stopped = assertIs<QfNraResult.Unknown>(result)
-        assertEquals(PolynomialResource.MATRIX_CELLS, stopped.resource)
+        assertTrue(assertIs<QfNraResult.Satisfiable>(result).assignment.boolValue(0))
     }
 
     @Test
@@ -114,7 +265,7 @@ class PolynomialBooleanProjectionTest {
     }
 
     @Test
-    fun `a conflicting unit closure retains the original projection obligation`() {
+    fun `complete Boolean contradiction refutes before numeric projection`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(
             "$declarations (declare-const b Bool) (assert (and b (not b) (= (+ (* x0 x0) (* x1 x1)) 1)))",
@@ -123,7 +274,8 @@ class PolynomialBooleanProjectionTest {
         val result = solveQfNra(source.formula, source.boolCount, source.realCount,
             QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
 
-        assertEquals(PolynomialResource.MATRIX_CELLS, assertIs<QfNraResult.Unknown>(result).resource)
+        assertIs<QfNraResult.Unsatisfiable>(result)
+        assertEquals(0L, result.stats.projectedPolynomials)
     }
 
     @Test
@@ -208,14 +360,14 @@ class PolynomialBooleanProjectionTest {
     }
 
     @Test
-    fun `interruption exposes no partially reduced projection family`() {
+    fun `interruption exposes no incomplete region coverage`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const b Bool) (declare-const x Real) (assert (and b (or b (= (* x x) 2))))",
         )
         val normalized = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
         val stopped = PolynomialArithmetic(Cancellation { true })
 
-        assertFailsWith<PolynomialInterrupted> { normalized.projectionPolynomials(stopped) }
+        assertFailsWith<PolynomialInterrupted> { normalized.booleanRegions(stopped).hasNext() }
     }
 
     @Test
@@ -235,7 +387,7 @@ class PolynomialBooleanProjectionTest {
     }
 
     @Test
-    fun `invocation observations accumulate completed boundary reductions`() {
+    fun `invocation observations accumulate conditional theory regions`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(
             "$declarations (declare-const b Bool) (assert (and b (or b (= (+ (* x0 x0) (* x1 x1)) 1))))",
@@ -246,18 +398,18 @@ class PolynomialBooleanProjectionTest {
             assertIs<QfNraResult.Satisfiable>(invocation.check())
             assertIs<QfNraResult.Satisfiable>(invocation.check())
 
-            assertEquals(2L, invocation.stats.booleanProjectionAtomsPruned)
+            assertEquals(2L, invocation.stats.booleanTheoryRegions)
         }
     }
 
     @Test
-    fun `numeric sources have no Boolean projection observation`() {
+    fun `numeric conjunctions retain a single complete region`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse("$declarations (assert (= x0 3))")
 
         val result = solveQfNra(source.formula, source.boolCount, source.realCount)
 
         assertIs<QfNraResult.Satisfiable>(result)
-        assertNull(result.stats.booleanProjectionAtomsPruned)
+        assertEquals(1L, result.stats.booleanTheoryRegions)
     }
 }

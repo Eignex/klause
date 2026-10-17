@@ -37,7 +37,8 @@ internal data class QfNraStats(
     val dyadicBases: Long? = null,
     val coupledWorkDeclines: Long? = null,
     val dyadicPreExtractionDeclines: Long? = null,
-    val booleanProjectionAtomsPruned: Long? = null,
+    val booleanTheoryRegions: Long? = null,
+    val booleanTheoryAtoms: Long? = null,
 )
 
 internal enum class QfNraReason { Interrupted, WorkLimit, ResourceLimit }
@@ -119,22 +120,51 @@ internal class QfNraQuery(
                 return@sequence
             }
             yield(null)
-            val polynomials = normalized.projectionPolynomials(arithmetic)
-            if (normalized.booleanVariables.isNotEmpty()) {
-                work.booleanProjectionAtomsPruned = normalized.atoms.size.toLong() - polynomials.size
+            work.booleanTheoryRegions = 0
+            work.booleanTheoryAtoms = 0
+            val regions = normalized.booleanRegions(arithmetic)
+            var incomplete: PolynomialResource? = null
+            while (regions.hasNext()) {
+                val region = regions.next()
+                if (region == null) {
+                    yield(null)
+                    continue
+                }
+                val count = checkNotNull(work.booleanTheoryRegions)
+                work.booleanTheoryRegions = count + minOf(1L, Long.MAX_VALUE - count)
+                val atoms = checkNotNull(work.booleanTheoryAtoms)
+                work.booleanTheoryAtoms = atoms + minOf(region.atoms.size.toLong(), Long.MAX_VALUE - atoms)
+                try {
+                    if (!regionFeasible(normalized, region, emptyMap(), arithmetic, algebraic)) continue
+                    val polynomials = region.atoms.keys.map {
+                        arithmetic.step()
+                        normalized.atoms[it].polynomial
+                    }
+                    val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic)
+                    var projection: PolynomialProjection? = null
+                    while (projection == null) {
+                        projection = pending.next()
+                        if (projection == null) yield(null)
+                    }
+                    work.projectedPolynomials += minOf(projection.polynomialCount,
+                        Long.MAX_VALUE - work.projectedPolynomials)
+                    yield(null)
+                    val assignment = searchCells(normalized, region, projection, boolCount,
+                        arithmetic, algebraic, work, fixed)
+                    if (assignment != null) {
+                        arithmetic.step()
+                        yield(QfNraResult.Satisfiable(assignment, work.snapshot()))
+                        return@sequence
+                    }
+                } catch (stop: PolynomialResourceLimit) {
+                    // An incomplete region can be skipped for SAT search, but withholds source exhaustion.
+                    if (incomplete == null) incomplete = stop.resource
+                    yield(null)
+                }
             }
-            val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic)
-            var projection: PolynomialProjection? = null
-            while (projection == null) {
-                projection = pending.next()
-                if (projection == null) yield(null)
-            }
-            work.projectedPolynomials = projection.polynomialCount
-            yield(null)
-            val assignment = searchCells(normalized, projection, boolCount, arithmetic, algebraic, work, fixed)
             arithmetic.step()
-            yield(if (assignment == null) QfNraResult.Unsatisfiable(work.snapshot())
-                else QfNraResult.Satisfiable(assignment, work.snapshot()))
+            yield(if (incomplete == null) QfNraResult.Unsatisfiable(work.snapshot())
+                else QfNraResult.Unknown(QfNraReason.ResourceLimit, work.snapshot(), incomplete))
         } catch (_: PolynomialInterrupted) {
             val reason = if (work.limitReached) QfNraReason.WorkLimit else QfNraReason.Interrupted
             yield(QfNraResult.Unknown(reason, work.snapshot()))
@@ -155,7 +185,8 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
     var dyadicAttempts: Long = 0
     var dyadicBases: Long = 0
     var dyadicPreExtraction = false
-    var booleanProjectionAtomsPruned: Long? = null
+    var booleanTheoryRegions: Long? = null
+    var booleanTheoryAtoms: Long? = null
     private var coupledWorkDeclines: Long = 0
     private var dyadicPreExtractionDeclines: Long = 0
     private var spent: Long = 0
@@ -213,7 +244,8 @@ internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMe
         }
     }
     fun snapshot(): QfNraStats = QfNraStats(projectedPolynomials, liftedCells, spent,
-        dyadicAttempts, dyadicBases, coupledWorkDeclines, dyadicPreExtractionDeclines, booleanProjectionAtomsPruned)
+        dyadicAttempts, dyadicBases, coupledWorkDeclines, dyadicPreExtractionDeclines,
+        booleanTheoryRegions, booleanTheoryAtoms)
 }
 
 private const val MAX_WITNESS_WORK = 65_536L
@@ -1394,6 +1426,7 @@ internal class WitnessProbe(
 // https://doi.org/10.1007/3-540-07407-4_17
 private fun searchCells(
     formula: PolynomialFormula,
+    region: PolynomialBooleanRegion,
     projection: PolynomialProjection,
     boolCount: Int,
     arithmetic: PolynomialArithmetic,
@@ -1403,7 +1436,7 @@ private fun searchCells(
 ): QfNraAssignment? {
     val coordinates = HashMap<Int, AlgebraicReal>()
     if (projection.variableCount == 0) {
-        return checkSample(formula, coordinates, boolCount, arithmetic, algebraic)
+        return checkRegionSample(formula, region, coordinates, boolCount, arithmetic, algebraic)
     }
     val frames = ArrayDeque<CadFrame>()
     frames.addLast(liftFrame(projection, 0, coordinates, arithmetic, algebraic, fixed))
@@ -1423,11 +1456,13 @@ private fun searchCells(
         coordinates[frame.variable] = coordinate
         if (work.liftedCells < Long.MAX_VALUE) work.liftedCells++
         if (frame.variable + 1 < projection.variableCount) {
-            if (prefixFeasible(formula, coordinates, boolCount, arithmetic, algebraic)) {
+            if (regionFeasible(formula, region, coordinates, arithmetic, algebraic)) {
                 frames.addLast(liftFrame(projection, frame.variable + 1, coordinates, arithmetic, algebraic, fixed))
             }
         } else {
-            val assignment = checkSample(formula, coordinates, boolCount, arithmetic, algebraic)
+            val assignment = if (regionFeasible(formula, region, coordinates, arithmetic, algebraic)) {
+                checkRegionSample(formula, region, coordinates, boolCount, arithmetic, algebraic)
+            } else null
             if (assignment != null) return assignment
         }
     }
@@ -1463,26 +1498,52 @@ private fun liftFrame(
     return CadFrame(variable, distinct)
 }
 
-private fun prefixFeasible(
+private fun regionFeasible(
     formula: PolynomialFormula,
+    region: PolynomialBooleanRegion,
+    coordinates: Map<Int, AlgebraicReal>,
+    arithmetic: PolynomialArithmetic,
+    algebraic: AlgebraicArithmetic,
+): Boolean {
+    for ((index, required) in region.atoms) {
+        arithmetic.step()
+        val atom = formula.atoms[index]
+        val variable = atom.polynomial.mainVariable
+        if (variable != null && variable >= coordinates.size) continue
+        val sign = algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))
+        if (atom.holds(sign) != required) return false
+    }
+    return true
+}
+
+private fun checkRegionSample(
+    formula: PolynomialFormula,
+    region: PolynomialBooleanRegion,
     coordinates: Map<Int, AlgebraicReal>,
     boolCount: Int,
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
-): Boolean {
+): QfNraAssignment {
     val atoms = IntArray(formula.atoms.size) { index ->
         arithmetic.step()
         val atom = formula.atoms[index]
-        val variable = atom.polynomial.mainVariable
-        if (variable != null && variable >= coordinates.size) PolynomialFormula.UNASSIGNED
-        else if (atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates)))) PolynomialFormula.TRUE
-        else PolynomialFormula.FALSE
+        val sign = algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))
+        if (atom.holds(sign)) PolynomialFormula.TRUE else PolynomialFormula.FALSE
     }
-    val bools = IntArray(boolCount) {
+    val bools = BooleanArray(boolCount) {
         arithmetic.step()
-        PolynomialFormula.UNASSIGNED
+        region.bools[it] ?: false
     }
-    return formula.truth(bools, atoms, arithmetic) != PolynomialFormula.FALSE
+    val values = IntArray(boolCount) {
+        arithmetic.step()
+        if (bools[it]) PolynomialFormula.TRUE else PolynomialFormula.FALSE
+    }
+    check(formula.truth(values, atoms, arithmetic) == PolynomialFormula.TRUE)
+    arithmetic.step()
+    return QfNraAssignment(bools, List(coordinates.size) {
+        arithmetic.step()
+        coordinates.getValue(it)
+    })
 }
 
 private fun checkSample(
