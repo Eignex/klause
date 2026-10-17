@@ -25,10 +25,15 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
     @Suppress("UNCHECKED_CAST")
     internal fun decode(params: EngineParams): T? = when (kind) {
         ValueKind.LONG -> params.long(id)
+
         ValueKind.INT -> params.int(id)
+
         ValueKind.DOUBLE -> params.double(id)
+
         ValueKind.BOOLEAN -> params.bool(id)
+
         ValueKind.STRING -> params.string(id)
+
         ValueKind.AFFINE_PIVOT_ORDER -> params.string(id)?.let { raw ->
             AffinePivotOrder.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
                 ?: pipelineConfigError(
@@ -36,20 +41,28 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                         AffinePivotOrder.entries.joinToString("|") { it.name.lowercase() } + ", got `$raw`",
                 )
         }
+
         ValueKind.VARIABLE_SELECTOR -> params.varSelectorKind(id)
+
         ValueKind.VALUE_SELECTOR -> params.valSelectorKind(id)
+
         ValueKind.SOURCES -> params.string(id)?.let { AxisEdits.tokens(it) }
+
         ValueKind.SCALAR_AXIS -> params.string(id)?.let { scalarTokens(it, id) }
+
         ValueKind.LABELS -> params.string(id)?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+
         ValueKind.ALLOWANCE -> params.string(id)?.let { raw ->
             when (raw.lowercase()) {
                 "unlimited" -> null
+
                 else -> raw.toLongOrNull()?.takeIf { it >= 0 }
                     ?: pipelineConfigError(
                         "engine param `$id` expects auto, unlimited or a non-negative integer, got `$raw`",
                     )
             }
         }
+
         ValueKind.OPEN_BRANCHING -> params.string(id)?.let { raw ->
             OpenBranching.of(raw) ?: pipelineConfigError(
                 "engine param `open-branching` expects one of ${OpenBranching.entries.joinToString(", ") { it.id }}, " +
@@ -59,8 +72,19 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
     } as T?
 
     private enum class ValueKind {
-        LONG, INT, DOUBLE, BOOLEAN, STRING, VARIABLE_SELECTOR, VALUE_SELECTOR, SOURCES, SCALAR_AXIS, LABELS,
-        ALLOWANCE, OPEN_BRANCHING, AFFINE_PIVOT_ORDER,
+        LONG,
+        INT,
+        DOUBLE,
+        BOOLEAN,
+        STRING,
+        VARIABLE_SELECTOR,
+        VALUE_SELECTOR,
+        SOURCES,
+        SCALAR_AXIS,
+        LABELS,
+        ALLOWANCE,
+        OPEN_BRANCHING,
+        AFFINE_PIVOT_ORDER,
     }
 
     internal val allowance: Boolean get() = kind == ValueKind.ALLOWANCE
@@ -72,7 +96,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
             ExecutionOption("affine-pivot-order", ValueKind.AFFINE_PIVOT_ORDER)
 
         /** Minimum relative gain that keeps a presolve round active. */
-        val presolveAbortFraction: ExecutionOption<Double> = ExecutionOption("presolve-abort-fraction", ValueKind.DOUBLE)
+        val presolveAbortFraction: ExecutionOption<Double> = ExecutionOption(
+            "presolve-abort-fraction",
+            ValueKind.DOUBLE,
+        )
 
         /** Maximum presolve rounds. */
         val presolveMaxRounds: ExecutionOption<Int> = ExecutionOption("presolve-max-rounds", ValueKind.INT)
@@ -365,7 +392,10 @@ class ExecutionOptions private constructor(
 ) {
     /** Capture typed settings. Library callers need no frontend strings or consumption ordering. */
     constructor(vararg settings: ExecutionSetting<*>) : this(
-        captureSettings(settings), null, emptyList(), false,
+        captureSettings(settings),
+        null,
+        emptyList(),
+        false,
     )
 
     /** Restrict finite workers to numerical continuous completion without changing tuning or allowances. */
@@ -380,12 +410,16 @@ class ExecutionOptions private constructor(
     }
 
     internal fun without(vararg keys: String): ExecutionOptions = ExecutionOptions(
-        values - keys.toSet(), malformed, originalPairs.filter { it.substringBefore('=') !in keys },
+        values - keys.toSet(),
+        malformed,
+        originalPairs.filter { it.substringBefore('=') !in keys },
         numericalCompletion,
     )
 
     internal fun overriddenBy(other: ExecutionOptions): ExecutionOptions = ExecutionOptions(
-        values + other.values, other.malformed ?: malformed, originalPairs + other.originalPairs,
+        values + other.values,
+        other.malformed ?: malformed,
+        originalPairs + other.originalPairs,
         numericalCompletion || other.numericalCompletion,
     )
 
@@ -410,28 +444,41 @@ class ExecutionOptions private constructor(
             val conflicting = mutableSetOf<String>()
             for (pair in captured) {
                 val eq = pair.indexOf('=')
-                if (eq <= 0) return ExecutionOptions(
-                    emptyMap(), "malformed engine param `$pair`; expected key=value", captured, false,
+                if (eq <= 0) {
+                    return ExecutionOptions(
+                    emptyMap(),
+                    "malformed engine param `$pair`; expected key=value",
+                    captured,
+                    false,
                 )
+                }
                 val key = pair.take(eq)
                 val value = pair.substring(eq + 1)
                 if (ExecutionOption.byId[key]?.allowance == true && raw[key]?.lowercase()?.let {
                         it != value.lowercase() &&
                             (it.toLongOrNull() == null || it.toLongOrNull() != value.toLongOrNull())
                     } == true
-                ) conflicting += key
+                ) {
+                    conflicting += key
+                }
                 raw[key] = value
             }
             val values = raw.mapValues { (key, value) ->
                 val option = ExecutionOption.byId[key]
-                if (key in conflicting) OptionValue.Invalid("conflicting engine param `$key`", configuration = true)
-                else if (option?.allowance == true && value.lowercase() == "auto") OptionValue.Automatic
-                else if (option == null) OptionValue.Valid(Unit) else try {
+                if (key in conflicting) {
+                    OptionValue.Invalid("conflicting engine param `$key`", configuration = true)
+                } else if (option?.allowance == true && value.lowercase() == "auto") {
+                    OptionValue.Automatic
+                } else if (option == null) {
+                    OptionValue.Valid(Unit)
+                } else {
+                    try {
                     OptionValue.Valid(option.decode(EngineParams(key, value)))
                 } catch (failure: PipelineConfigException) {
                     OptionValue.Invalid(requireNotNull(failure.message), configuration = true)
                 } catch (failure: IllegalArgumentException) {
                     OptionValue.Invalid(requireNotNull(failure.message), configuration = false)
+                }
                 }
             }
             return ExecutionOptions(values, null, captured, false)
@@ -444,8 +491,11 @@ class ExecutionOptions private constructor(
                 val value = setting.value
                 values[setting.option.id] = if (setting.option.allowance && previous != null &&
                     (previous !is OptionValue.Valid || value !is OptionValue.Valid || previous.value != value.value)
-                ) OptionValue.Invalid("conflicting engine param `${setting.option.id}`", configuration = true)
-                else value
+                ) {
+                    OptionValue.Invalid("conflicting engine param `${setting.option.id}`", configuration = true)
+                } else {
+                    value
+                }
             }
             return values
         }
@@ -464,15 +514,19 @@ internal abstract class ExecutionOptionReader {
     abstract fun finish(engine: String, valid: String)
 }
 
-private class CapturedExecutionOptionReader(
-    private val values: MutableMap<String, OptionValue>,
-) : ExecutionOptionReader() {
+private class CapturedExecutionOptionReader(private val values: MutableMap<String, OptionValue>) :
+    ExecutionOptionReader() {
     @Suppress("UNCHECKED_CAST")
     override operator fun <T> get(option: ExecutionOption<T>): T? = when (val entry = values.remove(option.id)) {
         null, OptionValue.Automatic -> null
+
         is OptionValue.Valid -> entry.value as T?
-        is OptionValue.Invalid -> if (entry.configuration) pipelineConfigError(entry.message)
-        else throw IllegalArgumentException(entry.message)
+
+        is OptionValue.Invalid -> if (entry.configuration) {
+            pipelineConfigError(entry.message)
+        } else {
+            throw IllegalArgumentException(entry.message)
+        }
     }
 
     @Suppress("UNCHECKED_CAST")

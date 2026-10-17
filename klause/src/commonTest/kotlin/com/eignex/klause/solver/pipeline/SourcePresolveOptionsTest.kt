@@ -15,7 +15,8 @@ class SourcePresolveOptionsTest {
 
         val edited = SourceExecutionPolicy().finiteRequest(
             FiniteSolveShape(Problem(0, 0, emptyArray(), emptyArray()), false, false, null, null, null, null),
-            FiniteEngine.BACKTRACK, executionOptions = ExecutionOptions.parse(params),
+            FiniteEngine.BACKTRACK,
+            executionOptions = ExecutionOptions.parse(params),
         ).presolveConfig
         val next = PresolveConfig.DEFAULT
 
@@ -33,7 +34,9 @@ class SourcePresolveOptionsTest {
 
         val adapted = SourceExecutionPolicy().finiteRequest(
             FiniteSolveShape(Problem(0, 0, emptyArray(), emptyArray()), false, false, null, null, null, null),
-            FiniteEngine.LOCAL_SEARCH, presolveConfig = base, executionOptions = ExecutionOptions.parse(params),
+            FiniteEngine.LOCAL_SEARCH,
+            presolveConfig = base,
+            executionOptions = ExecutionOptions.parse(params),
         ).presolveConfig.forLocalSearch()
             .withAffinePivotOrder(AffinePivotOrder.STABLE_ID)
 

@@ -29,17 +29,23 @@ class SourceExecutionPolicyApplicabilityTest(private val sourceText: String?) {
     @Test
     fun `native sources should reject explicit finite LP policy before constructing workers`() {
         val source = sourceText?.let { SmtLib.parse(it).source } ?: SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()),
+            ProblemSettings(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK),
+        )
         var calls = 0
 
         assertFailsWith<PipelineConfigException> {
-            SourceExecutionRequest(invocation, SourceExecutionPolicy(lpCeiling = LpConfig.OFF),
+            SourceExecutionRequest(
+                invocation,
+                SourceExecutionPolicy(lpCeiling = LpConfig.OFF),
                 finiteRequest = { shape ->
                     calls++
                     SourceExecutionPolicy().finiteRequest(shape, invocation.request.engine)
-                })
+                },
+            )
         }
         assertEquals(0, calls)
     }
@@ -47,23 +53,32 @@ class SourceExecutionPolicyApplicabilityTest(private val sourceText: String?) {
     @Test
     fun `native sources should reject explicit pricing even when it equals the default`() {
         val source = sourceText?.let { SmtLib.parse(it).source } ?: SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()),
+            ProblemSettings(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK),
+        )
 
         assertFailsWith<PipelineConfigException> {
-            SourceExecutionRequest(invocation, SourceExecutionPolicy(
+            SourceExecutionRequest(
+                invocation,
+                SourceExecutionPolicy(
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
-            ))
+            )
+            )
         }
     }
 
     @Test
     fun `native presolve tuning should require linear source preparation`() {
         val source = sourceText?.let { SmtLib.parse(it).source } ?: SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()),
+            ProblemSettings(),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK),
+        )
         val options = ExecutionOptions(ExecutionOption.presolveMaxRounds(2))
 
         if (SourceSetup.executionKind(invocation) == SourceExecutionKind.LINEAR) {

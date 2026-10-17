@@ -30,20 +30,28 @@ class SourceExecutionPolicyTest {
 
     @Test
     fun `deferred finite policy should retain containing controls and application hooks`() {
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const b Bool) (assert b)").source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
         val budget = NodeBudget(7)
         val stop = Cancellation { true }
         val events: (SearchEvent) -> Unit = {}
         val policy = SourceExecutionPolicy(
-            lpCeiling = LpConfig.OFF, portfolioArms = 3,
+            lpCeiling = LpConfig.OFF,
+            portfolioArms = 3,
             zeroObjectivePricing = LpZeroObjectivePricing.LARGEST_PIVOT,
         )
         val request = SourceExecutionRequest(
-            invocation, policy, ExecutionOptions(ExecutionOption.seed(19L)), nodeBudget = budget,
-            cancellation = stop, finiteRequest = { shape ->
+            invocation,
+            policy,
+            ExecutionOptions(ExecutionOption.seed(19L)),
+            nodeBudget = budget,
+            cancellation = stop,
+            finiteRequest = { shape ->
                 SourceExecutionPolicy().finiteRequest(shape, FiniteEngine.BACKTRACK, onEvent = events)
             },
         )
@@ -64,15 +72,21 @@ class SourceExecutionPolicyTest {
 
     @Test
     fun `linear source preparation should receive typed presolve tuning`() {
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
-        ))
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
+        )
 
-        val request = SourceExecutionRequest(invocation, SourceExecutionPolicy(), ExecutionOptions(
+        val request = SourceExecutionRequest(
+            invocation, SourceExecutionPolicy(),
+            ExecutionOptions(
             ExecutionOption.affinePivotOrder(AffinePivotOrder.STABLE_ID),
             ExecutionOption.presolveMaxRounds(2),
-        ))
+        )
+        )
 
         val preparation = assertNotNull(request.presolveConfig)
         assertEquals(AffinePivotOrder.STABLE_ID, preparation.affinePivotOrder)
@@ -82,13 +96,20 @@ class SourceExecutionPolicyTest {
 
     @Test
     fun `presolve effort tuning should preserve implicit local search emphasis`() {
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
             SmtLib.parse("(declare-const b Bool) (assert b)").source,
-            ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH,
-        ))
-        val request = SourceExecutionRequest(invocation, SourceExecutionPolicy(), ExecutionOptions(
+            ExecutionOperation.SATISFY,
+            FiniteEngine.LOCAL_SEARCH,
+        )
+        )
+        val request = SourceExecutionRequest(
+            invocation, SourceExecutionPolicy(),
+            ExecutionOptions(
             ExecutionOption.presolveMaxRounds(2),
-        ), presolveConfig = PresolveConfig.DEFAULT)
+        ),
+            presolveConfig = PresolveConfig.DEFAULT
+        )
 
         val finite = assertNotNull(request.finiteRequest).invoke(invocation.finiteShape())
 
