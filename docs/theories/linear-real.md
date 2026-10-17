@@ -72,6 +72,47 @@ Explicit zero retains bounded construction observations without component steeri
 positive values permit indexed preferences. Arithmetic and index work keep their
 existing cumulative owners and limits, independently of the Boolean draw's flip ceiling.
 
+At a complete Boolean leaf, an optimal floating LP point can propose source-aware
+completion when numerical exact-point recovery declines. Pure-real sources with
+no private real coordinates use the same completion with an empty integer part.
+Rational reconstruction, closed source-equality repair and residual real completion
+retain their existing scalar, storage and numerical limits and the containing
+operation allowance. Only a point checked against every selected exact source row
+can become a witness; a floating point or declined completion supplies no proof.
+
+Completion distinguishes a checked point, an exact residual contradiction and a
+declined operation. Closed equality elimination and positive-parallel compaction
+preserve residual infeasibility. A completed exact graph conflict or certified
+numerical infeasibility can reject a complete pure-real Boolean leaf. This requires
+the canonical source frame: no integer or private real coordinates, source
+disjunctions, private row assertions, source branches, disequality directions or
+retained reductions, under the production certification policy. The caller captures
+at most 4,096 complete Boolean values before source-row capture and checks them
+against both its live values and the shared context before rejecting the leaf.
+The rejection uses the shared traversal's conservative leaf-conflict protocol;
+it imports no residual LP support into another owner and creates no learned source
+explanation. Rounded integer candidates, partial or changed frames, cancellation
+and numerical decline cannot authorize rejection. Point-only consumers retain
+their nullable witness surface. The completion retains the same operation token
+and numerical invocation; no refutation adds a solve or renews an allowance.
+Numerical owner cleanup precedes the final cancellation poll and result publication.
+
+A general residual component that exceeds the source LP dimension limit can first
+compact exact positive-parallel inequalities. It keeps the strongest original side;
+strictness wins at equal bounds, and opposite directions remain separate. Compaction
+uses the row type's canonical column order and retains only original row references.
+It admits at most 65,536 input row/term entries, examined row pairs and conservative
+64-bit cells independently. The cell reservation is `96R + 4T + 16C + 8192 + O` for
+`R` input rows, `T` terms and `C` coordinates, covering live component views, survivor
+lists and bounded rational scratch. `O` reserves an enclosing Boolean snapshot's
+coordinate count plus 64 cells when leaf refutation is eligible; point-only callers
+use zero. Existing 4,096-bit arithmetic checks charge
+the current operation token. A cancelled or declined scan publishes no partial list.
+The numerical owner retains its dimension, entry, bit and work limits. A point from
+a compacted component is checked against all its original residual rows before
+source reconstruction and full source acceptance. Completed row counts and numerical
+status observations establish neither a source verdict nor allocation savings.
+
 Linear completion also serves finite mixed models and local-search candidates.
 Boolean pins and source rows stay intact through completion. The shared search
 session owns traversal; [LP architecture](../lp/architecture.md) owns numerical
