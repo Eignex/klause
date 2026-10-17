@@ -371,6 +371,8 @@ class LpBoundingTest {
         val params = BacktrackParams(randomSeed = 7L, lpConfig = LpConfig.AGGRESSIVE)
         val res = BacktrackSolver(p.bake()).minimize(obj, params)
         assertTrue(res is MinimizeResult.Optimal, "got $res")
+        assertEquals(6L, res.sample.ints[n])
+        assertEquals(6.0, res.objective)
         val s = res.stats
 
         assertTrue(s.lp.solves.sum > 0.0)
