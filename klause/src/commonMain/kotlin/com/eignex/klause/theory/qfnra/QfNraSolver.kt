@@ -168,6 +168,23 @@ internal class QfNraQuery(
                         arithmetic.step()
                         true
                     }, region.bools)
+                    when (val linear = decidePolynomialLinearRegion(reduction.atoms, arithmetic, work)) {
+                        PolynomialLinearResult.Unsatisfiable -> continue
+                        is PolynomialLinearResult.Satisfiable -> {
+                            val coordinates = (0 until realCount).associateWith { id ->
+                                arithmetic.step()
+                                algebraic.rational(fixed[id] ?: linear.point[id] ?: BigFraction.ZERO)
+                            }
+                            val assignment = checkRegionSample(activeFormula, activeRegion, coordinates,
+                                boolCount, arithmetic, algebraic)
+                            val point = reduction.reconstruct(assignment, arithmetic, algebraic)
+                            val checked = checkRegionSample(normalized, region, point, boolCount, arithmetic, algebraic)
+                            arithmetic.step()
+                            yield(QfNraResult.Satisfiable(checked, work.snapshot()))
+                            return@sequence
+                        }
+                        null -> Unit
+                    }
                     val nonzero = ArrayList<Polynomial>()
                     val polynomials = activeRegion.atoms.map { (index, truth) ->
                         arithmetic.step()

@@ -687,8 +687,21 @@ need no remaining inequality. A coordinate is selected only when these pairs do 
 increase the active constraint count; every completed step removes one coordinate
 from that conjunction. All work and suspension checkpoints use the same query owner.
 
-CAD receives the equivalent reduced conjunction with the original real count and
-the region's source Boolean assignment. After a reduced witness, stored graph and
+If the entire reduced conjunction is affine, `PolynomialLinearRegion` can decide
+it through the reusable exact feasibility primitive in `simplex.exact`. It checks
+constant predicates, retains strict sides and equalities, and declines nonconstant
+disequalities. Active coordinates have a private source-ID map; original query counts
+and Boolean pins remain unchanged. The exact primitive retains its default row,
+column, cell, bit, allocation and work limits. Its opt-in native meter streams every
+admitted work unit into the same polynomial query and polls that containing stop;
+returned metrics are not charged again. Default callers retain their accounting.
+Rational points are checked against every reduced row. A conflict combines the exact
+rows, cancels every free coefficient and verifies a contradictory bound or strict
+endpoint before refuting the region. A primitive-only decline retains spent work
+and leaves CAD available; a containing stop remains terminal.
+
+CAD receives other reduced conjunctions with the original real count and
+the region's source Boolean assignment. After either kind of reduced witness, stored graph and
 interval fibres are reconstructed together in reverse order. A graph evaluates its
 polynomial at the reconstructed remaining coordinates. Exact algebraic maxima/minima determine an interval;
 coincident weak endpoints retain their exact value, and nonempty open intervals use

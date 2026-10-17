@@ -1,6 +1,7 @@
 package com.eignex.klause.simplex.exact
 
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
@@ -110,7 +111,11 @@ internal class ExactContinuationResult(
 internal class ContinuationStop(val reason: ContinuationDecline) : RuntimeException()
 private class ContinuationOverflow : RuntimeException()
 
-internal class ContinuationBudget(val limits: ExactContinuationLimits, val token: Cancellation) {
+internal class ContinuationBudget(
+    val limits: ExactContinuationLimits,
+    val token: Cancellation,
+    private val nativeWork: WorkMeter? = null,
+) {
     private val started = Monotonic.markNow()
     var work = 0L
         private set
@@ -141,6 +146,10 @@ internal class ContinuationBudget(val limits: ExactContinuationLimits, val token
         }
         phaseWork[index] += units
         phaseAllocation[index] += bytes
+        nativeWork?.let {
+            it.charge(units)
+            if (token()) throw ContinuationStop(ContinuationDecline.CANCELLED)
+        }
     }
 
     private fun phaseSnapshot(values: LongArray): Map<ContinuationPhase, Long> = buildMap {
@@ -202,6 +211,7 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
     fun resume(
         limits: ExactContinuationLimits = ExactContinuationLimits(),
         cancellation: Cancellation = Cancellation.Never,
+        nativeWork: WorkMeter? = null,
     ): ExactContinuationResult {
         val budget = ContinuationBudget(
             limits.copy(
@@ -210,6 +220,7 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
                 maxTimeNs = limits.maxTimeNs?.let { (it - elapsed).coerceAtLeast(0) },
             ),
             cancellation,
+            nativeWork,
         )
         val oldImports = imports
         val oldPivots = pivots

@@ -20,6 +20,76 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `dense strict affine regions retain all original coordinates and Boolean pins`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val rows = listOf("(+ x0 x1)" to 2, "(- x0 x1)" to 2,
+            "(+ (* 2 x0) x1)" to 4, "(- (* 2 x0) x1)" to 4)
+        val bounds = rows.joinToString(" ") { (term, upper) ->
+            "(assert (> $term 0)) (assert (< $term $upper))"
+        }
+        val source = SmtLibPolynomial.parse("$declarations (declare-const b Bool) (assert b) $bounds")
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val x = witness.realValue(0)
+        val y = witness.realValue(1)
+        for ((value, upper) in listOf(algebraic.add(x, y) to 2L, algebraic.subtract(x, y) to 2L,
+            algebraic.add(algebraic.multiply(algebraic.rational(BigFraction.ofLong(2)), x), y) to 4L,
+            algebraic.subtract(algebraic.multiply(algebraic.rational(BigFraction.ofLong(2)), x), y) to 4L)) {
+            assertTrue(algebraic.sign(value) > 0)
+            assertTrue(algebraic.compare(value, algebraic.rational(BigFraction.ofLong(upper))) < 0)
+        }
+        assertEquals(33, witness.realCount)
+        assertTrue(witness.boolValue(0))
+        assertEquals(0L, result.stats.dyadicAttempts)
+        assertEquals(0L, result.stats.liftedCells)
+    }
+
+    @Test
+    fun `dense affine conflicts refute weak and strict endpoint contradictions`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val other = listOf("(- x0 x1)", "(+ (* 2 x0) x1)", "(- (* 2 x0) x1)")
+            .joinToString(" ") { "(assert (>= $it (- 10))) (assert (<= $it 10))" }
+        for ((relation, lower) in listOf(">=" to 1, ">" to 0)) {
+            val source = SmtLibPolynomial.parse(
+                "$declarations (assert ($relation (+ x0 x1) $lower)) (assert (<= (+ x0 x1) 0)) $other",
+            )
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+            assertIs<QfNraResult.Unsatisfiable>(result)
+            assertEquals(0L, result.stats.liftedCells)
+        }
+    }
+
+    @Test
+    fun `an enclosing work meter interrupts affine completion without publication`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val rows = listOf("(+ x0 x1)" to 2, "(- x0 x1)" to 2,
+            "(+ (* 2 x0) x1)" to 4, "(- (* 2 x0) x1)" to 4)
+        val bounds = rows.joinToString(" ") { (term, upper) ->
+            "(assert (> $term 0)) (assert (< $term $upper))"
+        }
+        val source = SmtLibPolynomial.parse("$declarations $bounds")
+        val completed = solveQfNra(source.formula, source.boolCount, source.realCount)
+        val limit = completed.stats.workSpent / 2
+        var charged = 0L
+        val meter = WorkMeter { charged += it }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= limit
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount, QfNraParams(cancellation = token))
+
+        assertIs<QfNraResult.Unknown>(result)
+        assertEquals(QfNraReason.Interrupted, result.reason)
+        assertEquals(charged, result.stats.workSpent)
+        assertTrue(charged >= limit)
+    }
+
+    @Test
     fun `reduced region observation retains predicates without changing native work`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(

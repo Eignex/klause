@@ -2,6 +2,7 @@ package com.eignex.klause.simplex.exact
 
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -9,6 +10,42 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExactContinuationTest {
+    @Test
+    fun `streaming work reports exactly the continuation cost`() {
+        val input = ExactContinuationInput(listOf(emptyList()), emptyList(),
+            listOf(BigFraction.ZERO), listOf(BigFraction.ONE), emptyList(),
+            listOf(ContinuationStatus.LOWER), lowerStrict = listOf(true))
+        var charges = 0L
+        val meter = WorkMeter { charges += it }
+        val plain = ExactContinuation(input).resume()
+
+        val observed = ExactContinuation(input).resume(nativeWork = meter)
+
+        assertNotNull(observed.values)
+        assertEquals(plain.values, observed.values)
+        assertEquals(plain.metrics.work, observed.metrics.work)
+        assertEquals(observed.metrics.work, charges)
+        assertEquals(plain.metrics.workByPhase, observed.metrics.workByPhase)
+    }
+
+    @Test
+    fun `streaming work observes enclosing meter cancellation before publication`() {
+        val input = ExactContinuationInput(listOf(emptyList()), emptyList(),
+            listOf(BigFraction.ZERO), listOf(BigFraction.ONE), emptyList(),
+            listOf(ContinuationStatus.LOWER), lowerStrict = listOf(true))
+        var charges = 0L
+        val token = Cancellation { charges > 0L }
+        val meter = WorkMeter { charges += it }
+
+        val result = ExactContinuation(input).resume(cancellation = token, nativeWork = meter)
+
+        assertEquals(ContinuationDecline.CANCELLED, result.metrics.decline)
+        assertEquals(1L, charges)
+        assertEquals(charges, result.metrics.work)
+        assertNull(result.values)
+        assertNull(result.ray)
+    }
+
     @Test
     fun `strict endpoints should materialize interior coordinates in either direction`() {
         for (upper in listOf(false, true)) {
