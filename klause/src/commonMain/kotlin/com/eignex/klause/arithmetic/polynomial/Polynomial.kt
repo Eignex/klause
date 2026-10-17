@@ -1,6 +1,7 @@
 package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.binarySearchInt
 
 internal class Monomial private constructor(private val powers: Map<Int, Int>) : Comparable<Monomial> {
     private val coordinateIds = powers.keys.toIntArray().apply { sortDescending() }
@@ -87,13 +88,13 @@ internal class Polynomial private constructor(private val coefficients: Map<Mono
 
     fun degree(variable: Int): Int {
         val captured = coordinates ?: return if (isZero) -1 else 0
-        val index = captured.first.binarySearch(variable)
+        val index = captured.first.binarySearchInt(variable)
         return if (index < 0) 0 else captured.second[index]
     }
 
     fun containsVariable(variable: Int): Boolean {
         val ids = coordinates?.first ?: return false
-        return ids.binarySearch(variable) >= 0
+        return ids.binarySearchInt(variable) >= 0
     }
 
     fun coefficient(monomial: Monomial): BigFraction = coefficients[monomial] ?: BigFraction.ZERO
