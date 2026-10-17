@@ -14,12 +14,18 @@ import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.Not
 import com.eignex.klause.model.SchemaEntry
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceObjective
+import com.eignex.klause.solver.evidence.SourceRevision
+import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.evidence.quadraticSourceResultCapture
+import com.eignex.klause.solver.evidence.sourceCondition
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
@@ -37,6 +43,24 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class CompiledSourceBindingTest {
+    @Test
+    fun `a captured helper objective should retain its producing source evidence scope`() {
+        val x = FloatHandle("x", 2.0, 4.0)
+        val compiled = SchemaDef<SchemaEntry>(mapOf("x" to FloatSpec(2.0, 4.0))).compile()
+        val helper = compiled.maximize(x).copy(constant = 7)
+        val objective = compiled.sourceObjective(helper)
+        val strategy = BacktrackSolver.source(compiled)
+        val scope = SourceScope(SourceRevision("compiled-helper", "klause-ir-exact-v1"),
+            Assumptions.None.sourceCondition(), SourceObjective("cost", ObjectiveSense.MINIMIZE))
+        val capture = assertNotNull(strategy.source.quadraticSourceResultCapture(scope, objective))
+        val result = strategy.optimize(helper).result
+
+        val retained = capture.quadratic(result, "compiled-helper")
+
+        assertIs<QuadraticOptimizationResult.Optimal>(retained)
+        assertEquals(scope, assertNotNull(retained.evidence).scope)
+    }
+
     @Test
     fun `a complete original source arm should retain a point outside its compatibility grid`() {
         val compiled = SchemaDef<SchemaEntry>(mapOf(
@@ -183,10 +207,13 @@ class CompiledSourceBindingTest {
         val definition = SchemaDef<SchemaEntry>(mapOf("x" to FloatSpec(0.0, 1.0)))
         val first = definition.compile()
         val second = definition.compile()
+        val objective = first.minimize(x)
 
         for (strategy in listOf(BacktrackSolver.source(second),
-                BacktrackSolver.source(second.sourceBinding.originalProblem))) {
-            assertFailsWith<IllegalArgumentException> { strategy.optimize(first.minimize(x)) }
+                LocalSearchSolver.source(second), BacktrackSolver.source(second.sourceBinding.originalProblem),
+                LocalSearchSolver.source(second.sourceBinding.originalProblem))) {
+            assertFailsWith<IllegalArgumentException> { strategy.optimize(objective) }
+            assertFailsWith<IllegalArgumentException> { strategy.optimizeOpen(objective) }
         }
     }
 

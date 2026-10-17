@@ -2776,7 +2776,9 @@ the actual helper's exact carrier for result capture; the quadratic arm uses the
 same canonical typed objective. Records identify `compiled-source-strategy` and
 retain the existing independent original-source checks. `entry=setup` is the default
 shared setup probe. Source result capture uses the exact quadratic carrier for both
-source strategy arms.
+source strategy arms. Checker provisioning first uses the host's existing Python
+venv support; the Linux package bootstrap runs only when environment creation fails.
+Dependencies remain inside the owned job environment.
 The source objective must be affine, with integer Boolean weights/constant fitting
 Long and real coefficients exactly representable in binary64. Other objectives
 decline rather than acquire rounded coefficients. Each execution gets fresh state,
