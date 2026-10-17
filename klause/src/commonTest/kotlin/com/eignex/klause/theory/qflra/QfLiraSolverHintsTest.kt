@@ -16,6 +16,8 @@ import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.WideConstants
+import com.eignex.klause.ir.WideConsts
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
@@ -32,11 +34,14 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm
+import com.eignex.klause.theory.EncodedTheoryModel
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -46,6 +51,399 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverHintsTest {
+    @Test
+    fun `selected queries should preserve the original comparison polarity`() {
+        for (op in LinearOp.entries) {
+            for (strict in listOf(false, true)) {
+                val declaration = object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0) {
+                    override val linearForm: LinearForm = LinearForm.Conjunction(listOf(
+                        LinearRow.ofColumns(intArrayOf(), intArrayOf(0),
+                            RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0)), 0.0, strict),
+                            op, activator = 0),
+                    ))
+                }
+                val model = Problem(
+                    numBoolVars = 65530,
+                    intBounds = openBounds(0),
+                    numRealVars = 3,
+                    realLower = DoubleArray(3),
+                    realUpper = DoubleArray(3),
+                    factors = arrayOf(
+                        ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                            doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
+                        declaration,
+                    ),
+                )
+                ExactLiraSearchComponent(model).use { component ->
+                    val hints = assertNotNull(
+                        component.partialPointHints(Cancellation.Never, defaultOpening = true),
+                    ).second
+                    val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+                    val expected = when (op) {
+                        LinearOp.LE, LinearOp.GE -> !strict
+                        LinearOp.EQ -> true
+                        LinearOp.NE -> false
+                    }
+
+                    assertEquals(expected, hints.preferredBool(0))
+                    assertNull(session.boolValue(0))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a graph opening should release selected query membership`() {
+        val model = Problem(
+            numBoolVars = 65534,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.LE, 0.0)),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(hints.preferredBool(0))
+            assertEquals(false, component.partialPointHintAvailable())
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_HINT_SELECTED_GRAPH_DECLINED"))
+        }
+    }
+
+    @Test
+    fun `large primitive groups should permit selected queries only in the default opening`() {
+        val model = Problem(
+            numBoolVars = 65530,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3),
+            factors = arrayOf(
+                ReifiedRealLinear(63, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(65529, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        for (defaultOpening in listOf(false, true)) {
+            ExactLiraSearchComponent(model).use { component ->
+                val prepared = component.partialPointHints(Cancellation.Never, defaultOpening)
+                if (!defaultOpening) {
+                    assertNull(prepared)
+                    return@use
+                }
+                val (variables, hints) = assertNotNull(prepared)
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                val before = component.lpMetrics
+
+                assertContentEquals(intArrayOf(63, 65529), variables)
+                assertEquals(true, hints.preferredBool(63))
+                assertEquals(true, hints.preferredBool(65529))
+                assertNull(hints.preferredBool(2))
+                assertNull(hints.preferredBool(-1))
+                assertNull(hints.preferredBool(model.numBoolVars))
+                assertNull(session.boolValue(63))
+                assertEquals(before, component.lpMetrics)
+            }
+        }
+    }
+
+    @Test
+    fun `selected primitive queries should require agreement from every member`() {
+        for ((bound, expected) in listOf(0.0 to true, -1.0 to null)) {
+            val first = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.LE, 0.0)
+            val second = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.LE, bound)
+            val other = ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0)
+            val unconditional = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.EQ, 0.0)
+            for (factors in listOf(arrayOf<Factor>(first, second, other), arrayOf<Factor>(first, other, second),
+                arrayOf<Factor>(other, second, first), arrayOf<Factor>(first, unconditional, other, second))) {
+                val model = Problem(
+                    numBoolVars = 65530,
+                    intBounds = openBounds(0),
+                    numRealVars = 3,
+                    realLower = DoubleArray(3),
+                    realUpper = DoubleArray(3),
+                    factors = factors,
+                )
+                ExactLiraSearchComponent(model).use { component ->
+                    val hints = assertNotNull(
+                        component.partialPointHints(Cancellation.Never, defaultOpening = true),
+                    ).second
+                    val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+
+                    assertEquals(expected, hints.preferredBool(0))
+                    assertEquals(true, hints.preferredBool(1))
+                    assertNull(session.boolValue(0))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `selected primitive queries should retain unresolved Boolean dependencies`() {
+        val declaration = object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+            intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0) {
+            override val linearForm: LinearForm = LinearForm.Conjunction(listOf(
+                LinearRow.ofColumns(intArrayOf(), intArrayOf(0),
+                    RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0)), 0.0, false),
+                    LinearOp.LE, activator = 0),
+                TaggedLinearRow(intArrayOf(Term.ofLit(Lit.make(2, true)), Term.ofRealVar(0)),
+                    RealConstants(RealConsts(doubleArrayOf(1.0)), RealConsts(doubleArrayOf(1.0)), 0.0, false),
+                    LinearOp.LE, activator = 0),
+            ))
+        }
+        val model = Problem(
+            numBoolVars = 65530,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3),
+            factors = arrayOf(
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
+                declaration,
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertNull(hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+            assertEquals(true, hints.preferredBool(0))
+
+            session.popTo(0)
+
+            assertNull(hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+            assertNull(hints.preferredBool(0))
+        }
+    }
+
+    @Test
+    fun `cancelled selected queries should debit an existing containing meter`() {
+        val model = Problem(
+            numBoolVars = 65530,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3),
+            factors = arrayOf(
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        for (registrationMeter in listOf(false, true)) {
+            var armed = false
+            var halted = false
+            var charged = 0L
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = halted
+                override fun workMeter(): WorkMeter = WorkMeter {
+                    charged += it
+                    if (armed) halted = true
+                }
+            }
+            ExactLiraSearchComponent(model).use { component ->
+                val hints = assertNotNull(component.partialPointHints(
+                    if (registrationMeter) stop else Cancellation.Never,
+                    defaultOpening = true,
+                )).second
+                component.useSolveStop(stop)
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertEquals(true, hints.preferredBool(0))
+                val before = charged
+                armed = true
+
+                assertNull(hints.preferredBool(0))
+
+                assertTrue(halted)
+                assertTrue(charged > before)
+                assertNull(session.boolValue(0))
+            }
+        }
+    }
+
+    @Test
+    fun `selected hint registration should retain its storage limit`() {
+        val model = Problem(
+            numBoolVars = 65530,
+            intBounds = openBounds(0),
+            numRealVars = 600,
+            realLower = DoubleArray(600),
+            realUpper = DoubleArray(600),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = component.partialPointHints(Cancellation.Never, defaultOpening = true)
+
+            assertNull(hints)
+            assertEquals(false, component.partialPointHintAvailable())
+        }
+    }
+
+    @Test
+    fun `selected point capture should reserve complete coordinate storage`() {
+        val model = Problem(
+            numBoolVars = 65530,
+            intBounds = openBounds(0),
+            numRealVars = 540,
+            realLower = DoubleArray(540) { 1e20 },
+            realUpper = DoubleArray(540) { 1e20 },
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                doubleArrayOf(1.0, 1.0, -2.0), LinearOp.LE, 0.0)),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(hints.preferredBool(0))
+            assertEquals(false, component.partialPointHintAvailable())
+            assertTrue((stats.snapshot().completeSearchStages?.get("POINT_HINT_SELECTED_STORAGE_DECLINED") ?: 0L) > 0L)
+        }
+    }
+
+    @Test
+    fun `selected point hints should decline encoded private real frames`() {
+        val source = Problem(
+            numBoolVars = 65530,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0)),
+        )
+        val encoded = EncodedTheoryModel(source, source.factors, null, 4)
+        ExactLiraSearchComponent(encoded).use { component ->
+            val hints = component.partialPointHints(Cancellation.Never, defaultOpening = true)
+
+            assertNull(hints)
+        }
+    }
+
+    @Test
+    fun `selected points should follow clause-only source scopes`() {
+        val model = Problem(
+            numBoolVars = 65530,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3),
+            factors = arrayOf(
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(true, hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+            assertEquals(true, hints.preferredBool(0))
+
+            session.popTo(0)
+
+            assertNull(hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+            assertEquals(true, hints.preferredBool(0))
+            component.releasePartialPointHints()
+            assertNull(hints.preferredBool(0))
+        }
+    }
+
+    @Test
+    fun `cancelled selected hint preparation should retain its debit`() {
+        var halted = false
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = halted
+            override fun workMeter(): WorkMeter = WorkMeter {
+                charged += it
+                if (it >= 64L) halted = true
+            }
+        }
+        val model = Problem(
+            numBoolVars = 65530,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = component.partialPointHints(stop, defaultOpening = true)
+
+            assertNull(hints)
+            assertTrue(halted)
+            assertTrue(charged > 0L)
+            assertEquals(false, component.partialPointHintAvailable())
+        }
+    }
+
+    @Test
+    fun `oversized selected members should not supply a primitive preference`() {
+        val wide = BIG_ONE shl 4096
+        val declaration = object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+            intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0) {
+            override val linearForm: LinearForm = LinearForm.Conjunction(listOf(TaggedLinearRow(
+                intArrayOf(Term.ofLit(Lit.make(2, true)), Term.ofRealVar(0)),
+                WideConstants(WideConsts(arrayOf(wide, BIG_ONE)), BIG_ZERO), LinearOp.LE, activator = 0,
+            )))
+        }
+        val model = Problem(
+            numBoolVars = 65530,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3),
+            factors = arrayOf(
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, 1.0), LinearOp.LE, 0.0),
+                declaration,
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+
+            assertNull(hints.preferredBool(0))
+            assertEquals(true, hints.preferredBool(1))
+            assertNull(session.boolValue(0))
+        }
+    }
+
     @Test
     fun `explicit integer point preparation should decline without charging its caller`() {
         var charged = 0L

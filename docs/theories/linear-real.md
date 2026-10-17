@@ -129,6 +129,35 @@ Explicit zero retains bounded construction observations without component steeri
 positive values permit indexed preferences. Arithmetic and index work keep their
 existing cumulative owners and limits, independently of the Boolean draw's flip ceiling.
 
+If the default pure-real opening declines the eager primitive table's structural
+entry bound, it can register selected primitive queries over the immutable prepared
+rows. Explicit registrations retain eager admission. A private bitset records complete
+activator membership; a detached copy of an existing checked continuous point supplies
+coordinates. This fallback uses the canonical source frame with no integer or private
+real coordinates, source disjunctions, private assertions, branches or retained
+reductions. Every selected activator's members must be evaluable and agree before a
+preference is returned. Unregistered variables, incomplete groups and interruptions
+return no preference. No row is asserted and no numerical invocation is added.
+Construction checks whether activators are ordered in the immutable row catalogue.
+Ordered catalogues use a lower-bound lookup for the selected complete group; other
+catalogues scan all prepared rows. Neither path builds another row index.
+
+Selected registration and capture retain a 65,536-cell bound of
+`ceil(B/64) + K + 98C + 4W + 8192 + 256`, where `B` is the Boolean span, `K` the
+complete activator count, `C` the real coordinate count and `W` the sum of numerator
+and denominator limb counts in 64-bit units. The reservation covers the bitset,
+returned ids, coordinate references, conservative scalar headers and backing storage,
+and bounded arithmetic scratch. It reserves full scalar ownership despite sharing
+immutable values; it is not a measured heap figure. Construction reserves at least
+one denominator limb per coordinate before publishing membership. A query admits
+at most 65,536 prepared-row visits plus selected row/term entries, retains the existing
+4,096-bit arithmetic checks, and debits existing operation, registration and containing
+solve/context cancellation tokens without creating an allowance. Complete scope and
+point identity checks precede publication. An existing graph-first opening releases
+this fallback's membership; its admitted eager guidance policy is unchanged.
+Arithmetic assertions, retraction, restart and release clear the point; clause-only
+assertions can advance its live level.
+
 At a complete Boolean leaf, an optimal floating LP point can propose source-aware
 completion when numerical exact-point recovery declines. Pure-real sources with
 no private real coordinates use the same completion with an empty integer part.
