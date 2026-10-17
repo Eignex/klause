@@ -79,14 +79,21 @@ internal class OpenPortfolio(
     private val publication: SourcePublicationObserver? = null,
     preparedSource: PreparedSourcePlan? = null,
     private val completeOnly: Boolean = false,
+    private val numericalOnly: Boolean = false,
 ) {
     private val descentVerdict = AtomicReference<OpenTheoryOptimum.Unbounded?>(null)
     private val lifetime = theoryParams.cancellation or theoryParams.timeout
     private val preparedPlan = preparedSource ?: request?.preparedPlan ?:
         model.prepareExecutionPlan(cancellation = lifetime)
     private val sourceModel = preparedPlan.originalSource as? Problem ?: model
-    private val witnessProjection = PropagationProblem(sourceModel,
-        preparedPlan.factorProjections?.forEngineView(sourceModel) ?: sourceModel.selectedFactorProjections())
+    init {
+        require(!numericalOnly || (completeOnly && request == null &&
+            preparedPlan.execution is PreparedExecution.NumericalWorking && sourceObjective?.context != null))
+    }
+    private val witnessProjection by lazy {
+        PropagationProblem(sourceModel,
+            preparedPlan.factorProjections?.forEngineView(sourceModel) ?: sourceModel.selectedFactorProjections())
+    }
 
     private fun workerParams(slot: PortfolioWorkerSlot): TheoryParams = theoryParams.copy(
         randomSeed = slot.seed,
@@ -138,7 +145,7 @@ internal class OpenPortfolio(
                 cancellation = lifetime or cancellation,
                 nodeBudget = theoryParams.nodeBudget,
             ),
-            PortfolioEvidence(identity, openWitnessVerifier(sourceModel, null, null, stop, witnessProjection))
+            PortfolioEvidence(identity, openWitnessVerifier(sourceModel, null, null, stop) { witnessProjection })
                 .bindInvocation(binding, lifetime or cancellation),
         ) { workers ->
             PortfolioInvocationPolicy(
@@ -183,7 +190,7 @@ internal class OpenPortfolio(
         )
         val context = sourceValues.context
         val integral = minimizer.takeIf { context == null }
-        val rational = request != null && integral == null
+        val rational = (request != null || numericalOnly) && integral == null
         val firstLocalArm = if (integral != null || rational) 1 else 0
         val localSearch = localSearchFactories(firstLocalArm, stop, objective)
         val incumbents = sourceValues.incumbents()
@@ -215,9 +222,10 @@ internal class OpenPortfolio(
                 add(
                     PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
                 val retained = AtomicReference<LinearPortfolioSearch?>(null)
-                val worker = PortfolioWorker.ofMinimize("theory/exact-rational-descent", 0, resumable = {
+                val label = if (numericalOnly) "numerical/linear-traversal" else "theory/exact-rational-descent"
+                val worker = PortfolioWorker.ofMinimize(label, 0, resumable = {
                     val descent = RationalTheoryDescent(sourceModel, objective, workerParams(slot), context,
-                        publicationInvocation = binding) {
+                        publicationInvocation = binding, allowTheoryFallback = !numericalOnly) {
                         incumbents.exchange.current()?.let { it.assignment to it.objective.execution }
                     }
                     if (linear == null) {
@@ -250,7 +258,7 @@ internal class OpenPortfolio(
                 binding = { SourceWorkerBinding(binding, provesResults = it.permitsSourceProofs) },
             ) { slot -> factory.materialize(preparedPlan, slot) }
         }
-        val verifier = openWitnessVerifier(sourceModel, objective, context, stop, witnessProjection)
+        val verifier = openWitnessVerifier(sourceModel, objective, context, stop) { witnessProjection }
         val evidence = PortfolioEvidence(identity, verifier).bindInvocation(binding, stop)
         val profile = ProblemProfile.of(model, optimizing = true)
         val share = if (integral != null || rational) DESCENT_SHARE else 0.0
@@ -549,16 +557,17 @@ internal fun openWitnessVerifier(
     objective: LinearObjective?,
     context: SourceProofContext? = null,
     cancellation: Cancellation = Cancellation.Never,
-): CandidateVerifier<Sample, Double?> = openWitnessVerifier(
-    model, objective, context, cancellation, PropagationProblem(model),
-)
+): CandidateVerifier<Sample, Double?> {
+    val projection by lazy { PropagationProblem(model) }
+    return openWitnessVerifier(model, objective, context, cancellation) { projection }
+}
 
 private fun openWitnessVerifier(
     model: Problem,
     objective: LinearObjective?,
     context: SourceProofContext?,
     cancellation: Cancellation,
-    projection: PropagationProblem,
+    projection: () -> PropagationProblem,
 ): CandidateVerifier<Sample, Double?> = CandidateVerifier { candidate ->
     val sample = candidate.assignment
     val claimed = candidate.objective
@@ -579,7 +588,7 @@ private fun openWitnessVerifier(
             ?: model.linearAuthorityContext(objective ?: LinearObjective(), ObjectiveSense.MINIMIZE, cancellation)
             ?: return@CandidateVerifier Verification.Indeterminate("exact original-source witness check unavailable")
         source.linearWitnessVerifier(cancellation).verify(candidate)
-    } else verifyOpenWitness(model, sample, cancellation, projection)
+    } else verifyOpenWitness(model, sample, cancellation, projection())
     when (checked) {
         is Verification.Rejected -> return@CandidateVerifier checked
         is Verification.Indeterminate -> return@CandidateVerifier checked

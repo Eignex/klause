@@ -39,6 +39,7 @@ internal class RationalTheoryDescent(
     private val context: SourceProofContext? = source.linearAuthorityContext(
         objective, ObjectiveSense.MINIMIZE, params.cancellation or params.timeout),
     private val publicationInvocation: EngineInvocation? = null,
+    private val allowTheoryFallback: Boolean = true,
     private val external: () -> Pair<Sample, BigFraction>? = { null },
 ) : ResumableSearch {
     init {
@@ -97,8 +98,9 @@ internal class RationalTheoryDescent(
             val authority = LinearOptimizationResult(sourceContext.scope, completed.terminal, completed.bound,
                 completed.incumbent, completed.value, completed.reason, completed.stats, sourceContext.semantics)
             linearResult = authority
-            if (authority.terminal == null && authority.reason == TerminationReason.Unsupported &&
-                sourceContext.affineObjectiveAvailable && sourceContext.linearCoordinatesSupported()
+            if (allowTheoryFallback && authority.terminal == null &&
+                authority.reason == TerminationReason.Unsupported && sourceContext.affineObjectiveAvailable &&
+                sourceContext.linearCoordinatesSupported()
             ) {
                 nativeStats = completed.stats
                 checkedIncumbent = authority.incumbent
@@ -211,8 +213,9 @@ internal class RationalTheoryDescent(
             context?.scope?.condition?.implies(invocation.executionCondition) == true
 
     private fun attestWitness(sample: Sample, cancellation: Cancellation) {
-        val original = witnessContext ?: source.linearAuthorityContext(LinearObjective(), ObjectiveSense.MINIMIZE,
-            cancellation)?.also { witnessContext = it } ?: return
+        val original = context ?: witnessContext ?: source.linearAuthorityContext(
+            LinearObjective(), ObjectiveSense.MINIMIZE, cancellation,
+        )?.also { witnessContext = it } ?: return
         val evidence = SourceEvidence(original.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
         if (SourceEvidenceVerifier(original.withLinearAuthority()).verify(evidence, cancellation) !=
             SourceEvidenceCheck.Checked

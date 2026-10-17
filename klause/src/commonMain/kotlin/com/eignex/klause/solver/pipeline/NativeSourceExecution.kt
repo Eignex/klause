@@ -97,14 +97,8 @@ internal fun executeNativeSource(
             SourceExecutionResult.Numerical(
                 invocation,
                 publication.execute {
-                native.request.solve(
-                    controls,
-                    complete = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
-                    onIncumbent = { sample, value ->
-                        publication.accepted(sample, com.eignex.klause.solver.evidence.SourceValue.Rational(value))
-                    },
-                )
-            }
+                    native.request.solve(controls, engine, request.cores, native.preparedPlan, publication)
+                },
             )
         }
 
