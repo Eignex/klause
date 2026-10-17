@@ -11434,6 +11434,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getClauseShareLbd ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getClauseShareLen ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getCoolingRate ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getDryRunPresolve ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getDryRunSolver ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getEmaRestart ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getInitialTemp ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -12591,6 +12592,7 @@ public final class com/eignex/klause/solver/pipeline/SourceExecutionRequest {
 	public final fun getNonlinearInteger ()Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;
 	public final fun getPolicy ()Lcom/eignex/klause/solver/pipeline/SourceExecutionPolicy;
 	public final fun getPolynomial ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;
+	public final fun getPrepareOnly ()Z
 	public final fun getPresolveBudget ()Lcom/eignex/klause/presolve/PresolveBudget;
 	public final fun getPresolveCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getPresolveConfig ()Lcom/eignex/klause/presolve/PresolveConfig;
@@ -12624,6 +12626,12 @@ public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Numer
 
 public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Polynomial : com/eignex/klause/solver/pipeline/SourceExecutionResult {
 	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Prepared : com/eignex/klause/solver/pipeline/SourceExecutionResult {
+	public final fun getElapsed-UwyO8pc ()J
+	public final fun getOriginalProblem ()Lcom/eignex/klause/ir/Problem;
+	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/OpenPreparation;
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceExecutionResult$Quadratic : com/eignex/klause/solver/pipeline/SourceExecutionResult {
