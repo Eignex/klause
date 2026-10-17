@@ -317,10 +317,6 @@ internal object ObjectiveRepresentationProbe {
                 } else (completed as? SourceExecutionResult.Quadratic)?.result
                     ?: error("source setup did not install quadratic optimization: $completed")
                 val elapsed = System.nanoTime() - started
-                val scopeRecord = if (capture) captureRecord(
-                    requireNotNull(compiled), affine, sourceQuadratic, pins, identity, execution.result,
-                    if (sourceEntry) "quadratic" else encoding,
-                ) else null
                 val record = buildJsonObject {
                     put("sourceSha256", identity)
                     put("engine", engine.name)
@@ -332,9 +328,18 @@ internal object ObjectiveRepresentationProbe {
                     put("nativeWork", execution.nativeWork)
                     put("javaCores", Runtime.getRuntime().availableProcessors())
                     put("result", resultRecord(execution.result, source, compiled, sourceEntry))
-                    if (scopeRecord != null) put("sourceCapture", scopeRecord)
                 }
-                File(output, "$identity.${engine.name}.$encoding.json").writeText(record.toString() + "\n")
+                val recordFile = File(output, "$identity.${engine.name}.$encoding.json")
+                recordFile.writeText(record.toString() + "\n")
+                if (capture) {
+                    val scopeRecord = captureRecord(requireNotNull(compiled), affine, sourceQuadratic, pins,
+                        identity, execution.result, if (sourceEntry) "quadratic" else encoding)
+                    val capturedRecord = buildJsonObject {
+                        for ((key, value) in record) put(key, value)
+                        put("sourceCapture", scopeRecord)
+                    }
+                    recordFile.writeText(capturedRecord.toString() + "\n")
+                }
                 println("${input.name} $engine $encoding ${execution.result::class.simpleName} $elapsed ns")
             }
         }
