@@ -208,10 +208,12 @@ constants, and products with a finite selected operand. Exact absolute values re
 alternatives privately. Implied inequalities alone do not enforce this relation.
 Finite membership retains `RealFiniteDomain` for every applicable original real,
 including disconnected declarations and compatibility components. No domain-cover
-Booleans are allocated at intake. Finite-choice products whose finite encoding fits
-the captured alternative limit retain `ContinuousProduct` with their declared values,
-including constant results and operand aliases. Other products retain their unrestricted
-original equality; an encoding limit cannot reject source intake.
+Booleans are allocated at intake. Finite-choice products retain `ContinuousProduct`
+with their declared operand values, including constant results and operand aliases.
+Other products retain their unrestricted original equality. The alternative limit
+selects a requested compatibility representation; it does not discard canonical
+operand membership or reject original source intake. Selected exact encoders retain
+their containing resource and representation limits.
 Private selected linear consumers install the complete product alternatives;
 frontends do not expand those products into guarded rows. Literal-only exact
 products retain fixed real operands so binary64 multiplication cannot round away
