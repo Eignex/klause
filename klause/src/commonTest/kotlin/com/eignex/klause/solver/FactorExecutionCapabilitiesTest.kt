@@ -79,6 +79,8 @@ class FactorExecutionCapabilitiesTest {
             Sort(intArrayOf(0, 1), intArrayOf(2, 3)),
             RealProduct(0, 0, 1, 0.0, 1.0),
             ContinuousProduct(0, 0, 1),
+            RealFiniteDomain(0, doubleArrayOf()),
+            RealFiniteDomain(0, doubleArrayOf(0.125, 0.375)),
             Power(
                 Power.Coordinate.Real(com.eignex.klause.ir.SourceRealId(0)),
                 2,
