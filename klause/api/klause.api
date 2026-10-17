@@ -11398,6 +11398,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption {
 public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getAcceptance ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getAdaptiveRestart ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getAlnsIterations ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getArms ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getBacktrackArms ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getBacktrackArmsByLabel ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -11427,12 +11428,24 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getLsResiduals ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getLuby ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getMaxDecisions ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getMaxFlips ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getMaxInstructions ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getMaxLearned ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getMidLbd ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getMinTemp ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getModeSwitchingRestart ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getNiaCandidates ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getNiaMoves ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getNodeLimit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNoise ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getNraDenseCoefficients ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getNraMatrixCells ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getNraWorkLimit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getObjectiveGuidedValues ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getOpenBranching ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getOpenHintFlips ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getOpenHintMinSplits ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getOpenWorkLimit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPbLearning ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPbObjectiveCutoff ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPhaseRetention ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -11442,6 +11455,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getRestart ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getScoring ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSeed ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSharedRestart ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSkewAlpha ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSliceGrowth ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSliceMaxWork ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -12515,6 +12529,8 @@ public final class com/eignex/klause/solver/pipeline/SourceExecutionKt {
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceExecutionRequest {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lcom/eignex/klause/solver/pipeline/ExecutionOptions;Lkotlin/jvm/functions/Function1;ILjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveConfig;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lcom/eignex/klause/solver/pipeline/ExecutionOptions;Lkotlin/jvm/functions/Function1;ILjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveConfig;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;I)V
 	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;I)V
@@ -12524,6 +12540,7 @@ public final class com/eignex/klause/solver/pipeline/SourceExecutionRequest {
 	public final fun getCores ()I
 	public final fun getFiniteRequest ()Lkotlin/jvm/functions/Function1;
 	public final fun getInvocation ()Lcom/eignex/klause/solver/pipeline/PreparedSourceInvocation;
+	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
 	public final fun getNonlinearInteger ()Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;
 	public final fun getPolynomial ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;
 	public final fun getPresolveBudget ()Lcom/eignex/klause/presolve/PresolveBudget;

@@ -176,8 +176,8 @@ its containing controls. Historical FlatZinc model/decoder access remains lazy; 
 constructor/copy/component descriptors are retained, while Kotlin `isData` changes.
 
 `SourceSetup.execute(SourceExecutionRequest(invocation, ...))` dispatches that captured
-operation. Finite callers supply their existing full `FiniteSolveRequest` factory over
-its selected shape. Arithmetic callers supply `TheoryParams` or `PolynomialTheoryParams`,
+operation. Its typed compatibility constructors accept the existing full
+`FiniteSolveRequest` factory over the selected shape, or `TheoryParams` and `PolynomialTheoryParams`,
 with explicit lane count and optional linear preparation controls. Additional request
 constructors accept complete `NonlinearIntegerTheoryParams` or
 `TranscendentalTheoryParams`, retaining the existing node ledger and native limits.
@@ -192,6 +192,7 @@ strategies. A supplied ledger retains its spent work; a conflicting `node-limit`
 rejects. Native limits use the existing parameter types' defaults. Parsed `auto`
 selects that default, `unlimited` removes the cap and a nonnegative amount supplies
 the cap in its native units. Typed nullable allowance options use null for unlimited.
+Finite dense coefficient capacities must be positive.
 Unknown and inapplicable keys reject on the selected route. Finite consumers can use
 the built-in request factory or supply their application hooks and LP policy; binding
 preserves those controls while applying the common seed, ledger and containing stop.

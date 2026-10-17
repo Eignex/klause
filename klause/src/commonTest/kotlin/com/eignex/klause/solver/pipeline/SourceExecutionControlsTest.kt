@@ -156,6 +156,36 @@ class SourceExecutionControlsTest {
     }
 
     @Test
+    fun `a finite application factory should not replace the containing node ledger`() {
+        val source = SmtLib.parse("(declare-const b Bool) (assert b)").source
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val foreign = SourceExecutionRequest(invocation, ExecutionOptions(), nodeBudget = NodeBudget(4))
+        val budget = NodeBudget(4)
+        val request = SourceExecutionRequest(
+            invocation, ExecutionOptions(), nodeBudget = budget, finiteRequest = foreign.finiteRequest,
+        )
+
+        assertFailsWith<IllegalArgumentException> { SourceSetup.execute(request) }
+        assertEquals(0L, budget.spent)
+    }
+
+    @Test
+    fun `function source auto work should retain the function parameter default`() {
+        val source = SmtLib.parse("(declare-const x Real) (assert (= (sin x) 0))").source
+        for ((raw, expected) in listOf("auto" to TranscendentalTheoryParams().maximumWork, "unlimited" to null)) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+            ))
+
+            val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("nra-work-limit=$raw")))
+
+            assertEquals(expected, assertNotNull(request.transcendental).maximumWork)
+        }
+    }
+
+    @Test
     fun `source execution should reject unknown options across source families`() {
         for (text in listOf(
             "(declare-const b Bool) (assert b)",
