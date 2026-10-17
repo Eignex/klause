@@ -15,6 +15,7 @@ internal class SourceExecutionControls(
     val finiteRequest: (FiniteSolveShape) -> FiniteSolveRequest,
     val nodeBudget: NodeBudget?,
     val presolveConfig: PresolveConfig?,
+    val prepareOnly: Boolean,
 )
 
 internal fun bindSourceExecutionControls(
@@ -40,10 +41,11 @@ internal fun bindSourceExecutionControls(
     val seed = reader[ExecutionOption.seed] ?: randomSeed ?: 0L
     val kind = SourceSetup.executionKind(invocation)
     val preparation = reader.presolve(presolveConfig ?: PresolveConfig.DEFAULT)
-    policy.validate(kind, invocation.request.engine, preparation.requested)
+    val prepareOnly = reader[ExecutionOption.dryRunPresolve] == true
+    policy.validate(kind, invocation.request.engine, preparation.requested, prepareOnly)
     val resolvedPresolve = preparation.config.takeIf { presolveConfig != null || preparation.requested }
     val stop = cancellation or timeout or invocation.cancellation
-    val finiteOptions = options.withoutPresolve().without("node-limit")
+    val finiteOptions = options.withoutPresolve().without("node-limit", "dry-run-presolve")
         .overriddenBy(ExecutionOptions(ExecutionOption.seed(seed)))
     val finite: (FiniteSolveShape) -> FiniteSolveRequest = { shape ->
         val supplied = finiteRequest?.invoke(shape)
@@ -56,11 +58,11 @@ internal fun bindSourceExecutionControls(
                 randomSeed = seed, nodeBudget = budget,
                 solveBudgetMillis = null, allSolutions = invocation.operation == ExecutionOperation.ENUMERATE,
                 solutionCap = null, deadlineExceeded = { timeout.isCancelled() },
-                onEvent = null, onPortfolioEvent = null,
+                onEvent = null, onPortfolioEvent = null, prepareOnly = prepareOnly,
             )
         } else {
             require(supplied.cores == cores) { "finite factory supplied a different lane count" }
-            supplied.withSourceControls(finiteOptions, budget, seed, stop, policy, resolvedPresolve)
+            supplied.withSourceControls(finiteOptions, budget, seed, stop, policy, resolvedPresolve, prepareOnly)
         }
     }
     if (kind == SourceExecutionKind.FINITE || kind == SourceExecutionKind.REFUTED) {
@@ -73,6 +75,7 @@ internal fun bindSourceExecutionControls(
             finite,
             budget,
             resolvedPresolve,
+            prepareOnly,
         )
     }
     val decisions = reader[ExecutionOption.maxDecisions] ?: BacktrackParams().maxDecisions
@@ -173,7 +176,9 @@ internal fun bindSourceExecutionControls(
         null
     }
     reader.finish("source ${kind.name.lowercase()}", "common strategy controls and the selected family's native limits")
-    return SourceExecutionControls(theory, polynomial, integer, functions, finite, budget, resolvedPresolve)
+    return SourceExecutionControls(
+        theory, polynomial, integer, functions, finite, budget, resolvedPresolve, prepareOnly,
+    )
 }
 
 private fun FiniteSolveRequest.withSourceControls(
@@ -183,6 +188,7 @@ private fun FiniteSolveRequest.withSourceControls(
     stop: Cancellation,
     policy: SourceExecutionPolicy,
     resolvedPresolve: PresolveConfig?,
+    preparationOnly: Boolean,
 ): FiniteSolveRequest {
     require(sourceControls == null) { "native finite controls must use the typed source execution constructor" }
     require(nodeBudget == null || nodeBudget === budget) { "finite factory supplied a different node allowance" }
@@ -197,7 +203,7 @@ private fun FiniteSolveRequest.withSourceControls(
         executionOptions = policy.options(
             engine,
             executionOptions.withoutPresolve()
-                .without("node-limit").overriddenBy(options),
+                .without("node-limit", "dry-run-presolve").overriddenBy(options),
         ),
         randomSeed = seed, defaultArms = policy.arms(engine, cores, defaultArms),
         lpConfig = policy.lpConfig(engine, lpConfig),
@@ -205,6 +211,7 @@ private fun FiniteSolveRequest.withSourceControls(
         nodeBudget = budget, solveBudgetMillis = solveBudgetMillis, allSolutions = allSolutions,
         solutionCap = solutionCap,
         deadlineExceeded = deadlineExceeded, onEvent = onEvent, onPortfolioEvent = onPortfolioEvent,
-        onPortfolioFault = onPortfolioFault, prepareOnly = prepareOnly, toleranceCheck = toleranceCheck,
+        onPortfolioFault = onPortfolioFault, prepareOnly = prepareOnly || preparationOnly,
+        toleranceCheck = toleranceCheck,
     )
 }

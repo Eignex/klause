@@ -248,6 +248,10 @@ Solver-control flags are common to **every** mode:
     `N` is nonnegative; zero is exhausted. Presolve automatic derives work from its phase
     time policy. Unlimited work keeps the separate phase clock. See
     [resource allowances](solver/resources.md) for units and parallel quota behavior.
+  - preparation diagnostics: `dry-run-presolve=true` returns the selected finite or
+    open-linear preparation summary without solution or completion markers. The
+    library binds the phase and returns its diagnostics; unsupported native phases
+    decline explicitly. `false` retains ordinary solving.
   - presolve effort (any engine): `presolve-abort-fraction` (finite number in `[0,1]`, default `0.001`),
     `presolve-max-rounds` (nonnegative, default `1` for conservative, `16` for default/aggressive),
     `presolve-probe-per-var` and `presolve-probe-total` (nonnegative propagation-call caps;

@@ -1,14 +1,9 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.presolve.PresolveBudget
-import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.pipeline.EngineParams
-import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
-import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialTheoryExecution
 import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
@@ -16,14 +11,11 @@ import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
 import com.eignex.klause.solver.pipeline.SourceExecutionKind
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
-import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
-import kotlin.time.TimeSource
 
 internal fun solveCapturedSource(
     solvable: Solvable,
@@ -32,28 +24,19 @@ internal fun solveCapturedSource(
     output: OutputProtocol,
     publication: ArithmeticPublication,
     controls: SourceExecutionRequest,
-    presolveConfig: PresolveConfig,
-    presolveCancellation: Cancellation,
-    presolveBudget: PresolveBudget?,
     budgetSpent: (Boolean) -> Boolean,
 ) {
     val invocation = rendering.invocation
     val kind = SourceSetup.executionKind(invocation)
-    if (invocation.operation == ExecutionOperation.ENUMERATE && kind != SourceExecutionKind.REFUTED) {
-        usageError("all-solution enumeration is unavailable for this exact source")
-    }
-    if (kind == SourceExecutionKind.LINEAR && EngineParams(common.engineParams).bool("dry-run-presolve") == true) {
-        val request = (invocation.route as SourceProblemRoute.OpenTheory).request.withPresolve(
-            controls.presolveConfig ?: presolveConfig, cancellation = presolveCancellation, budget = presolveBudget,
-        )
-        val mark = TimeSource.Monotonic.markNow()
-        val prepared = OpenTheoryPipeline.prepare(request)
+    if (controls.prepareOnly) {
+        val result = SourceSetup.execute(controls) as SourceExecutionResult.Prepared
+        val prepared = result.result
         SolveCore.printPresolved(
-            request.model, prepared.model, prepared.stats, mark.elapsedNow(),
+            result.originalProblem, prepared.model, prepared.stats, result.elapsed,
             loadElapsedMs = null, constructionBakeElapsed = Duration.ZERO,
         )
         errPrintln("  open sides closed: ${prepared.closedSides}")
-        presolveBudget?.let { errPrintln("  work: ${it.spent()} of ${it.allowance}") }
+        controls.presolveBudget?.let { errPrintln("  work: ${it.spent()} of ${it.allowance}") }
         if (prepared.infeasible) errPrintln("  preparation refuted the model")
         return
     }
@@ -184,6 +167,7 @@ internal fun solveCapturedSource(
         }
 
         is SourceExecutionResult.Finite -> error("finite source execution requires its finite renderer")
+        is SourceExecutionResult.Prepared -> error("preparation diagnostics require their diagnostic renderer")
     }
 }
 

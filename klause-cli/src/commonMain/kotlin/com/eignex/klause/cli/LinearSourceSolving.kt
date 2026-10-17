@@ -151,7 +151,8 @@ private fun SourceExecutionResult.linearSourceStats(): SolveStats = when (this) 
 
     is SourceExecutionResult.Transcendental -> result.result.stats
 
-    is SourceExecutionResult.Declined, is SourceExecutionResult.Refuted -> SolveStats.EMPTY
+    is SourceExecutionResult.Prepared, is SourceExecutionResult.Declined, is SourceExecutionResult.Refuted ->
+        SolveStats.EMPTY
 }
 
 private fun SourceExecutionResult.linearSourceReason(): TerminationReason? = when (this) {
@@ -176,5 +177,5 @@ private fun SourceExecutionResult.linearSourceReason(): TerminationReason? = whe
 
     is SourceExecutionResult.Finite -> if (linearSourceStats().run.timedOut) TerminationReason.Timeout else null
 
-    is SourceExecutionResult.Refuted -> null
+    is SourceExecutionResult.Prepared, is SourceExecutionResult.Refuted -> null
 }

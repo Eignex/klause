@@ -66,6 +66,15 @@ word coefficient uses the wide integer row representation; aliased result and re
 operand positions combine their exact coefficients before construction. Coordinate
 remapping retains that combined row and the original source-check obligation.
 
+`SourceSetup.execute` owns preparation-only execution selected through typed common
+options. It validates operation and phase applicability before executing preparation.
+Finite requests retain their `PreparedOnly` envelope, including application-supplied
+factories. Open linear requests return `SourceExecutionResult.Prepared` with their
+original model, native preparation and elapsed time. The original containing stop,
+optional phase token and spent phase ledger compose without a new allowance. These
+results contain diagnostics, with no search publication or source solve terminal;
+frontends only format them. Other native preparation phases decline explicitly.
+
 ## Rebuild ownership
 
 For a selected private float grid, finite presolve reconstructs into its actual

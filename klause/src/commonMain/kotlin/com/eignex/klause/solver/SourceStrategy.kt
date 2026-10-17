@@ -133,7 +133,7 @@ class SourceStrategy internal constructor(
             }
             is SourceExecutionResult.Refuted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
             is SourceExecutionResult.Declined -> OpenTheoryResult.Unknown(execution.reason, SolveStats.EMPTY)
-            is SourceExecutionResult.Numerical, is SourceExecutionResult.Quadratic ->
+            is SourceExecutionResult.Prepared, is SourceExecutionResult.Numerical, is SourceExecutionResult.Quadratic ->
                 OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
         }
         if (stop()) return stopped(result.stats).withSourceSemantics(source.semantics)

@@ -217,6 +217,16 @@ finite factory is called. A foreign shape, engine or operation binding rejects b
 execution; nonfinite enumeration explicitly declines. Source deductions can refute an
 empty enumeration without constructing a worker.
 
+`ExecutionOption.dryRunPresolve(true)` requests preparation diagnostics through that
+same boundary. Finite execution returns `FiniteSolveOutcome.PreparedOnly`; open
+linear execution returns `SourceExecutionResult.Prepared`, retaining the original
+model, `OpenPreparation` and elapsed phase time. Neither result runs search workers
+or publishes a solved witness or terminal. The containing stop and existing phase
+ledger remain bound. Other source families explicitly reject an enabled request;
+`false` leaves execution enabled. A source solve facade whose return type cannot
+represent diagnostics returns `Unknown(Unsupported)` after preparation; consume
+`SourceSetup.execute` directly to inspect the preparation result.
+
 The `ExecutionOptions` request constructor resolves common controls in the library.
 It binds one seed (default zero) and one `NodeBudget` across the selected native
 strategies. A supplied ledger retains its spent work; a conflicting `node-limit`
