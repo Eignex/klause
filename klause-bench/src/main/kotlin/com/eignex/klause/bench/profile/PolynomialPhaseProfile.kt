@@ -230,7 +230,12 @@ internal object PolynomialPhaseProfile {
                 atoms.size, guides?.size, kinds, charges)
         }
 
-        fun measure(text: String, maximumWork: Long? = null, timeoutMs: Long = 60_000L): PhaseTrace {
+        fun measure(
+            text: String,
+            maximumWork: Long? = null,
+            timeoutMs: Long = 60_000L,
+            onQuery: ((Any) -> Unit)? = null,
+        ): PhaseTrace {
             val clock = Cancellation.after(timeoutMs.milliseconds)
             var charges = 0L
             var stop: List<String>? = null
@@ -253,6 +258,7 @@ internal object PolynomialPhaseProfile {
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
             val arithmetic = queryType.getDeclaredField("arithmetic").apply { isAccessible = true }.get(owner)
             val observation = ArithmeticObservation(arithmetic, owner)
+            onQuery?.invoke(owner)
             val checkpoints = ArrayList<PhaseCheckpoint>()
             val start = System.nanoTime()
             var calls = 0L
@@ -282,50 +288,72 @@ internal object PolynomialPhaseProfile {
     }
 }
 
-private class PipelineQueryObservation(request: Any) {
+internal class PipelineQueryObservation(request: Any? = null) {
     private val history = ArrayList<PipelineQuery>()
+    private val current = LinkedHashMap<Any, ObservedPipelineQuery>()
     private var observed = 0L
-    private var discarded = 0L
-    private var current: Any? = null
-    private var arithmetic: ArithmeticObservation? = null
-    private var invocation = 0
-    private var invocationQuery = 0L
-    private var origin = emptyList<String>()
+    private var discardedHistory = 0L
+    private var discardedQueries = 0L
 
     init {
+        if (request != null) install(request)
+    }
+
+    private fun install(request: Any) {
         val resolved = Class.forName("com.eignex.klause.solver.pipeline.PolynomialTheoryRequestKt").methods.single {
             it.name.substringBefore('$') == "resolvedModel" && it.parameterCount == 1
         }.invoke(null, request)
         val service = resolved.javaClass.getMethod("getService").invoke(resolved)
         val observer: (Any, Any) -> Unit = { owner, query ->
-            current?.let {
-                if (history.size < 4096) history += summarize(it) else discarded++
-            }
-            observed++
-            current = query
-            invocation = System.identityHashCode(owner)
-            invocationQuery = owner.javaClass.getMethod("getQueries").invoke(owner) as Long
-            origin = Thread.currentThread().stackTrace.map { it.toString() }
-            val context = query.javaClass.getDeclaredField("arithmetic").apply { isAccessible = true }.get(query)
-            arithmetic = ArithmeticObservation(context, query)
+            observe(owner, owner.javaClass.getMethod("getQueries").invoke(owner) as Long, query)
         }
         service.javaClass.methods.single {
             it.name.substringBefore('$') == "setQueryObserver" && it.parameterCount == 1
         }.invoke(service, observer)
     }
 
-    private fun summarize(query: Any): PipelineQuery {
+    fun observe(owner: Any, ordinal: Long, query: Any) {
+        observed++
+        current.remove(owner)?.let {
+            if (history.size < 4096) history += it.summarize() else discardedHistory++
+        }
+        if (current.size >= 4096) {
+            discardedQueries++
+            return
+        }
+        current[owner] = ObservedPipelineQuery(observed, System.identityHashCode(owner), ordinal,
+            Thread.currentThread().stackTrace.map { it.toString() }, query)
+    }
+
+    fun snapshot(): PipelineQueries {
+        val latest = current.values.sortedBy { it.sequence }.map { it.snapshot() }
+        return PipelineQueries(observed, discardedHistory, discardedQueries, history.toList(), latest,
+            history.sumOf { it.nativeWork } + latest.sumOf { it.query.nativeWork })
+    }
+}
+
+private class ObservedPipelineQuery(
+    val sequence: Long,
+    private val invocation: Int,
+    private val ordinal: Long,
+    private val origin: List<String>,
+    private val query: Any,
+) {
+    private val context = query.javaClass.getDeclaredField("arithmetic").apply { isAccessible = true }.get(query)
+    private val arithmetic = ArithmeticObservation(context, query)
+
+    fun summarize(): PipelineQuery {
         val result = query.javaClass.getDeclaredField("result").apply { isAccessible = true }.get(query)
-        return PipelineQuery(observed, invocation, invocationQuery, origin,
+        val stats = query.javaClass.getMethod("getStats").invoke(query)
+        return PipelineQuery(sequence, invocation, ordinal, origin,
             result?.javaClass?.simpleName ?: "Pending",
             result?.javaClass?.methods?.singleOrNull { it.name == "getReason" }?.invoke(result)?.toString(),
             result?.javaClass?.methods?.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
-            query.javaClass.getMethod("getStats").invoke(query).toString())
+            stats.toString(), stats.javaClass.getMethod("getWorkSpent").invoke(stats) as Long)
     }
 
-    fun snapshot(): PipelineQueries = PipelineQueries(observed, discarded, history.toList(),
-        current?.let(::summarize), arithmetic?.subresultants(), arithmetic?.division(),
-        arithmetic?.projection(), arithmetic?.reducedRegion())
+    fun snapshot(): PipelineQueryPhase = PipelineQueryPhase(summarize(),
+        arithmetic.subresultants(), arithmetic.division(), arithmetic.projection(), arithmetic.reducedRegion())
 }
 
 private class ArithmeticObservation(arithmetic: Any, query: Any) {
@@ -557,8 +585,15 @@ internal data class PipelinePhaseTrace(
 internal data class PipelineQueries(
     val observed: Long,
     val discardedHistory: Long,
+    val discardedQueries: Long,
     val previous: List<PipelineQuery>,
-    val last: PipelineQuery?,
+    val latestByInvocation: List<PipelineQueryPhase>,
+    val observedNativeWork: Long,
+)
+
+@Serializable
+internal data class PipelineQueryPhase(
+    val query: PipelineQuery,
     val lastSubresultants: PhaseSubresultants?,
     val lastDivision: PhaseDivision?,
     val lastProjection: PhaseProjection?,
@@ -575,4 +610,5 @@ internal data class PipelineQuery(
     val reason: String?,
     val resource: String?,
     val stats: String,
+    val nativeWork: Long,
 )

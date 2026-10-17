@@ -2748,10 +2748,15 @@ validate a source witness. Keep ordinary CLI records for publication/control evi
 Add `queryTrace=true` with `pipeline=true` to observe the actual composed polynomial
 queries. The fresh prepared service installs an invocation-local observer before
 execution. Each query records its creation stack, invocation identity, native stats
-and terminal result or pending state. At most 4,096 previous query summaries are
-retained; `discardedHistory` explicitly counts omitted summaries without stopping
-search. Only the last query retains arithmetic, projection-family and reduced-region
-references. Their metadata is read after execution stops. A pending observer request
+and terminal result or pending state. A previous query is finalized only when the
+same invocation opens another query. Interleaved invocations retain their latest
+query until execution ends; their final snapshots appear in `latestByInvocation`.
+At most 4,096 previous summaries and 4,096 invocation owners are retained;
+`discardedHistory` and `discardedQueries` count omissions without stopping search.
+`observedNativeWork` sums the retained query snapshots and is incomplete if either
+omission count is nonzero. Each retained invocation keeps its last arithmetic,
+projection-family and reduced-region references. Their metadata is read after
+execution stops. A pending observer request
 does not establish completed arithmetic, a CPU hotspot or a source verdict. The trace
 does not emit a wire model or perform independent checking. Direct-query mode also
 reports its final observed subresultant, division, projection and reduced region.
