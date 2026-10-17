@@ -122,6 +122,60 @@ class QfLiraSolverBranchingTest {
     }
 
     @Test
+    fun `guarded rows sharing a source condition should publish in the same propagation pass`() {
+        for (positive in listOf(false, true)) {
+            val model = Problem(
+                numBoolVars = 2,
+                intBounds = openBounds(0),
+                numRealVars = 4,
+                realLower = doubleArrayOf(0.0, 1.0, 0.0, 0.0),
+                realUpper = doubleArrayOf(0.0, 1.0, 1.0, 1.0),
+                factors = arrayOf(RealChoice(0, 2, 0, 1), RealChoice(0, 3, 1, 0)),
+            )
+            val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+            val atoms = ArrayList<SearchTheoryAtom>()
+            val reasons = LinkedHashMap<Int, SearchExplanation>()
+            var checks = 0
+            val context = object : SearchContext by session {
+                override fun registerAtom(positive: SearchTheoryDecision, negative: SearchTheoryDecision) =
+                    session.registerAtom(positive, negative).also { atoms += assertNotNull(it) }
+                override fun imply(literal: Int, explanation: SearchExplanation): ComponentResult {
+                    reasons[literal] = explanation
+                    return session.imply(literal, explanation)
+                }
+                override fun consumeCheck(): Boolean {
+                    checks++
+                    return true
+                }
+            }
+            ExactLiraSearchComponent(model).use { component ->
+                assertIs<ComponentResult.Consistent>(component.initialize(context))
+                assertIs<ComponentResult.Consistent>(component.propagate(context))
+                val guard = SearchDecision.Bool(Lit.make(0, positive))
+                assertIs<ComponentResult.Consistent>(session.push(guard))
+                assertIs<ComponentResult.Consistent>(component.assert(guard, context))
+                val before = checks
+
+                assertIs<ComponentResult.Consistent>(component.propagate(context))
+
+                assertEquals(2, reasons.size)
+                assertEquals(2, atoms.size)
+                assertEquals(before, checks)
+                assertNull(session.boolValue(1))
+                for (atom in atoms) {
+                    assertEquals(setOf(guard.literal xor 1, atom.positive.literal),
+                        assertNotNull(reasons[atom.positive.literal]).literals.toSet())
+                    assertIs<ComponentResult.Consistent>(
+                        component.assert(SearchDecision.Theory(atom.positive), context),
+                    )
+                }
+                assertIs<ComponentResult.Consistent>(component.propagate(context))
+                assertEquals(before + 1, checks)
+            }
+        }
+    }
+
+    @Test
     fun `a guarded row should preserve a conflict with its already false target`() {
         val model = Problem(
             numBoolVars = 2,

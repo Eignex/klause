@@ -1044,6 +1044,10 @@ class ExactLiraSearchComponent private constructor(
         }
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((index, prepared) in preparedRows.withIndex()) {
+            if (impliedDisjunct) {
+                operationStop.charge(1L)
+                if (operationStop()) return ComponentResult.Indeterminate
+            }
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
             if (context.decisionLevel > 0 && sourceAssertionLevels[index] >= 0) continue
@@ -1069,8 +1073,8 @@ class ExactLiraSearchComponent private constructor(
                 if (implied !is ComponentResult.Consistent) return implied
                 impliedDisjunct = true
                 observeCompleteStage("GUARDED_ROW_IMPLIED")
-                return ComponentResult.Consistent
             }
+            if (impliedDisjunct) continue
             if (prepared.disjunction && asserted == null) continue
             val truth = node.rowTruth(address, prepared.row, bools) ?: continue
             val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
@@ -1086,6 +1090,7 @@ class ExactLiraSearchComponent private constructor(
                 sourceAssertionLevels[index] = context.decisionLevel
             }
         }
+        if (impliedDisjunct) return ComponentResult.Consistent
         for (atom in node.sourceBranches) {
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return ComponentResult.Indeterminate)
             if (!system.assertAtom(atom, premise)) return ComponentResult.Indeterminate

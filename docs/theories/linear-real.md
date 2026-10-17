@@ -33,7 +33,10 @@ equality before the other source Booleans are assigned. Complete preparation rec
 the active signed guard on the existing numeric row and adds its variable to the
 arithmetic dependency set. Assertion names only that entailed row through the existing
 row-address namespace and implies its positive atom under the actual source Boolean
-antecedent. The shared queue delivers the assertion before numerical work resumes.
+antecedent. One prepared-row pass queues every eligible implication. After its first
+publication, the pass only inspects further guarded rows and charges that inspection
+to the containing operation; other source assertions wait for delivery. The shared
+queue delivers the assertions before numerical work resumes.
 An already false row atom conflicts under the same source reason. Naming, explanation
 or resource refusal leaves the check undecided; neither a missing name nor interruption
 authorizes a fact or a source refutation. The containing operation token pays for
