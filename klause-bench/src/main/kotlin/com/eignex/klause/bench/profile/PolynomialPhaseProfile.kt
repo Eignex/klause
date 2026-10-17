@@ -246,7 +246,8 @@ internal object PolynomialPhaseProfile {
                 result.javaClass.methods.singleOrNull { it.name == "getReason" }?.invoke(result)?.toString(),
                 result.javaClass.methods.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
                 nativeWork, charges - preparationCharges, preparationCharges, stop,
-                observation.subresultants(), observation.division(), observation.projection(), observation.reducedRegion())
+                observation.subresultants(), observation.division(), observation.projection(),
+                observation.reducedRegion())
         }
     }
 }
