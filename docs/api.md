@@ -51,6 +51,14 @@ locations. `solve` returns `OpenTheoryResult` and exact source-coordinate assign
 including algebraic reals and arbitrary-width open integers. Finite globals remain
 part of the same source rather than becoming an unconstrained finite projection.
 
+Explicit `FiniteEngine` overloads of `solve` and both affine and quadratic `optimize`
+accept FIXED, BACKTRACK, LOCAL_SEARCH, MIXED and ALNS per call. They bind common
+`ExecutionOptions`, lane count, timeout, cancellation and a containing `NodeBudget`
+through `SourceExecutionRequest`. Compiled source names, objective ownership and
+published coordinate frames retain the same binding. The factory-selected `engine`
+remains the default for typed compatibility overloads. FIXED rejects multiple lanes;
+inapplicable options and conflicting node limits reject through the common entry.
+
 Finite `SourceStrategy.solve` and affine `optimizeOpen` dispatch their captured invocations through
 `SourceSetup.execute` and `FinitePipeline.solve`. Its internal single-consumer adapter
 retains the full typed CP or LS parameters, including assumptions, hooks, starting
@@ -97,8 +105,9 @@ sense and are evaluated exactly from reconstructed source coordinates, independe
 of the native floating score. Neither entry point converts rounded
 finite scores into exact source claims. Source `optimize` proves available integer
 bounds before polynomial preparation, retaining source identity, provider capture
-and declared holes. Surviving open integers retain the explicit unsupported result;
-a presolve refutation alone does not fabricate a quadratic engine certificate.
+and declared holes. Surviving open integers use supported native integer optimization;
+unsupported encodings decline. A presolve refutation alone does not fabricate a
+quadratic engine certificate.
 
 The baked `BacktrackSolver` and `LocalSearchSolver` classes retain their finite
 sessions, streams, enumeration and resumable APIs. Their compiled/schema constructors

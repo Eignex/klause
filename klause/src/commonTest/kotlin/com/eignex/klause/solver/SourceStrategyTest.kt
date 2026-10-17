@@ -63,9 +63,23 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SourceStrategyTest {
+    @Test
+    fun `an explicit source portfolio should retain the compiled coordinate frame`() {
+        val x = FloatHandle("x", 0.125, 0.125)
+        val compiled = SchemaDef<SchemaEntry>(mapOf("x" to FloatSpec(0.125, 0.125, 2))).compile()
+        val strategy = BacktrackSolver.source(compiled)
+
+        val result = strategy.solve(FiniteEngine.MIXED)
+
+        val point = assertIs<OpenTheoryAssignment.Sampled>(assertIs<OpenTheoryResult.Sat>(result).assignment).sample
+        assertSame(strategy.source, point.coordinateFrame)
+        assertEquals(0.125, point.realValue(assertNotNull(compiled.sourceRealId(x)).index))
+    }
+
     @Test
     fun `finite source traversal should retain the common node allowance`() {
         val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(AllDifferent(intArrayOf(0, 1), 0, 2)))
