@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -13,6 +14,8 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.LeafRealSolver
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -29,6 +32,38 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class ExactLinearTest {
+    @Test
+    fun `integer source row deductions should follow their signed and reified premises`() {
+        for (activator in listOf(-1, 0)) {
+            for (relation in listOf(LinearOp.LE, LinearOp.EQ, LinearOp.NE)) {
+                val row = ExactLinear.of(
+                    intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.ofLong(-2)), relation, BigFraction.ZERO,
+                    activator = activator,
+                )
+                val source = Problem(activator + 1, 2, Array(2) { IntDomain(0, 3) }, arrayOf(row))
+
+                PropagationReasonOracle.assertReasonsImply(source, "$relation activator=$activator") { state ->
+                    state.tightenIntMin(0, 2L) && (activator < 0 || state.pinBool(activator, true))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `integer source rows should reject overflowing activity at a pinned point`() {
+        val coefficient = BigFraction.ofLong(1L shl 33)
+        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+            listOf(coefficient, coefficient), LinearOp.LE, BigFraction.ofLong(10))
+        val session = PropagationSession(Problem(0, 2,
+            Array(2) { IntDomain(-(1L shl 62), 1L shl 62) }, arrayOf(row)))
+
+        session.pinInt(0, 1L shl 33)
+        val result = session.pinInt(1, 1L shl 33)
+
+        assertIs<PropagationResult.Unsat>(result)
+    }
+
     @Test
     fun `numerical completion should retain exact negative values of a free real column`() {
         val value = BigFraction.of(bigIntOf(-1), bigIntOf(10))
