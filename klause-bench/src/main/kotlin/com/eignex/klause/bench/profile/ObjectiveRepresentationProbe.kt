@@ -357,7 +357,8 @@ internal object ObjectiveRepresentationProbe {
                 replay = "foreign original objective rejected"
                 if (pins.sourceCondition() != Assumptions.None.sourceCondition()) {
                     val unrestricted = requireNotNull(compiled.model.problem.quadraticSourceResultCapture(
-                        SourceScope(revision, Assumptions.None.sourceCondition(), SourceObjective("cost", result.sense)),
+                        SourceScope(revision, Assumptions.None.sourceCondition(),
+                            SourceObjective("cost", result.sense)),
                         quadratic,
                     ))
                     check(unrestricted.quadratic(result, "weaker-condition") === result)
