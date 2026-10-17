@@ -9,6 +9,7 @@ import com.eignex.klause.ir.QuadraticCoefficient
 import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.model.FloatLinearConstraint
 import com.eignex.klause.model.FloatSpec
@@ -31,6 +32,7 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.quadraticSourceResultCapture
 import com.eignex.klause.solver.evidence.sourceCondition
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
@@ -39,6 +41,7 @@ import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.skema.SchemaDef
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -48,6 +51,33 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class CompiledSourceBindingTest {
+    @Test
+    fun `local source witnesses should retain optional values after private helper capture`() {
+        for (pinAbsent in listOf(true, false)) {
+            val schema = object : VariableSchema() {
+                val x by optFloatVar(-1.0, 1.0, 2)
+                val y by floatVar(0.0, 1.0, 2)
+                init {
+                    constraint(Not(x.present.toExpr()))
+                    constraint((x.value * x.value) eq y)
+                }
+            }
+            val compiled = schema.compile(semanticOverrides = SemanticOverrides(pinAbsentOptionalValues = pinAbsent))
+            val helper = compiled.minimize(schema.x.value)
+
+            val result = assertIs<OpenTheoryResult.Sat>(LocalSearchSolver.source(compiled).solve(
+                LocalSearchParams(maxFlips = 1000, randomSeed = 17)))
+            val point = assertIs<OpenTheoryAssignment.Sampled>(result.assignment).sample
+
+            assertSame(compiled.sourceBinding.originalProblem, point.coordinateFrame)
+            assertNull(compiled.decode(schema.x, point))
+            assertEquals(if (pinAbsent) 0.0 else 1.0, abs(compiled.decode(schema.x.value, point)))
+            assertEquals(if (pinAbsent) 0.0 else 1.0, compiled.decode(schema.y, point))
+            assertEquals(QuadraticVariable.Real(assertNotNull(compiled.sourceRealId(schema.x.value))),
+                compiled.sourceObjective(helper).terms.single().first)
+        }
+    }
+
     @Test
     fun `a captured helper objective should retain its producing source evidence scope`() {
         val x = FloatHandle("x", 2.0, 4.0)
