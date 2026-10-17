@@ -66,12 +66,18 @@ class LpScopeObservationAgentTest {
             assertEquals(selected.size, before.size)
             assertEquals(before, LpScopeObservationAgent.schema(rewritten, selected))
             assertNotEquals(LpScopeObservationAgent.sha(bytes), LpScopeObservationAgent.sha(rewritten))
-            mapOf("class" to name, "beforeSha256" to LpScopeObservationAgent.sha(bytes),
-                "afterSha256" to LpScopeObservationAgent.sha(rewritten), "methods" to before)
+            mapOf(
+                "class" to name,
+                "beforeSha256" to LpScopeObservationAgent.sha(bytes),
+                "afterSha256" to LpScopeObservationAgent.sha(rewritten),
+                "methods" to before,
+            )
         }
         val fields = LpScopeObservationAgent.fieldSchema(loader)
         assertEquals(8, fields.size)
-        println("LP_SCOPE_COMPILED_SCHEMA=" + LpScopeObservationAgent.json(mapOf("classes" to schemas, "fields" to fields)))
+        println(
+            "LP_SCOPE_COMPILED_SCHEMA=" + LpScopeObservationAgent.json(mapOf("classes" to schemas, "fields" to fields)),
+        )
     }
 
     private fun fixture(suffix: String): Class<*> {
@@ -84,19 +90,31 @@ class LpScopeObservationAgentTest {
             builder.withMethodBody("<init>", MethodTypeDesc.of(voidType), methodFlags) {
                 it.aload(0).invokespecial(objectType, "<init>", MethodTypeDesc.of(voidType)).return_()
             }
-            builder.withMethodBody("push", MethodTypeDesc.of(ConstantDescs.CD_boolean, ConstantDescs.CD_boolean), methodFlags) {
+            builder.withMethodBody(
+                "push",
+                MethodTypeDesc.of(ConstantDescs.CD_boolean, ConstantDescs.CD_boolean),
+                methodFlags,
+            ) {
                 it.iload(1).ireturn()
             }
             builder.withMethodBody("solve", MethodTypeDesc.of(objectType, objectType), methodFlags) {
                 it.aload(1).areturn()
             }
             builder.withMethodBody("publish", MethodTypeDesc.of(voidType), methodFlags) { it.return_() }
-            builder.withMethodBody("close", MethodTypeDesc.of(voidType, ClassDesc.of("java.lang.Throwable")), methodFlags) {
+            builder.withMethodBody(
+                "close",
+                MethodTypeDesc.of(voidType, ClassDesc.of("java.lang.Throwable")),
+                methodFlags,
+            ) {
                 it.aload(1).athrow()
             }
         }
-        val selected = mapOf("push" to LpScopeObservation.Method.PUSH, "solve" to LpScopeObservation.Method.SOLVE,
-            "publish" to LpScopeObservation.Method.PUBLISH, "close" to LpScopeObservation.Method.CLOSE)
+        val selected = mapOf(
+            "push" to LpScopeObservation.Method.PUSH,
+            "solve" to LpScopeObservation.Method.SOLVE,
+            "publish" to LpScopeObservation.Method.PUBLISH,
+            "close" to LpScopeObservation.Method.CLOSE,
+        )
         val rewritten = LpScopeObservationAgent.rewrite(bytes, selected, javaClass.classLoader)
         return MethodHandles.lookup().defineClass(rewritten)
     }

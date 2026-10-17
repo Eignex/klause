@@ -65,13 +65,18 @@ internal object CliLpScopeCapture {
                 properties.setProperty("class.$type", sha256(bytes))
                 properties.setProperty("schema.$type", sha256(LpScopeObservationAgent.schemaText(schema).toByteArray()))
                 properties.setProperty("rewrite.$type", sha256(rewritten))
-                mapOf("class" to type, "beforeSha256" to sha256(bytes), "afterSha256" to sha256(rewritten),
-                    "methods" to schema)
+                mapOf(
+                    "class" to type,
+                    "beforeSha256" to sha256(bytes),
+                    "afterSha256" to sha256(rewritten),
+                    "methods" to schema,
+                )
             }
         }
         File(out, "target-schema.json").writeText(LpScopeObservationAgent.json(schemas))
         File(out, "field-schema.json").writeText(
-            LpScopeObservationAgent.json(LpScopeObservationAgent.fieldSchema(javaClass.classLoader)))
+            LpScopeObservationAgent.json(LpScopeObservationAgent.fieldSchema(javaClass.classLoader)),
+        )
         config.outputStream().use { properties.store(it, null) }
         val command = command(request, launcher, input)
         val environment = childEnvironment(System.getenv(), runtime, agent, config)
@@ -101,24 +106,27 @@ internal object CliLpScopeCapture {
             readers.forEach { it.join(2000L) }
             overflow.set(true)
         }
-        Reports.writeJson(File(out, "measurement.json").path, buildJsonObject {
-            put("head", Reports.readGitSha())
-            put("scope", "installed-cli-child-scope-boundaries")
-            put("sourceSha256", request.sha256)
-            put("sourceBytes", source.size)
-            put("timeoutMs", request.timeout)
-            put("seed", request.seed)
-            put("processors", 1)
-            put("childPid", process.pid())
-            put("exit", process.exitValue())
-            put("watchdog", !completed)
-            put("streamsIncomplete", overflow.get())
-            put("processElapsedNs", System.nanoTime() - started)
-            put("jvmOptions", environment.getValue("KLAUSE_CLI_OPTS"))
-            put("agentSha256", sha256(agent.readBytes()))
-            put("configSha256", sha256(config.readBytes()))
-            put("ordinaryTimingOrRecoveryCredit", false)
-        })
+        Reports.writeJson(
+            File(out, "measurement.json").path,
+            buildJsonObject {
+                put("head", Reports.readGitSha())
+                put("scope", "installed-cli-child-scope-boundaries")
+                put("sourceSha256", request.sha256)
+                put("sourceBytes", source.size)
+                put("timeoutMs", request.timeout)
+                put("seed", request.seed)
+                put("processors", 1)
+                put("childPid", process.pid())
+                put("exit", process.exitValue())
+                put("watchdog", !completed)
+                put("streamsIncomplete", overflow.get())
+                put("processElapsedNs", System.nanoTime() - started)
+                put("jvmOptions", environment.getValue("KLAUSE_CLI_OPTS"))
+                put("agentSha256", sha256(agent.readBytes()))
+                put("configSha256", sha256(config.readBytes()))
+                put("ordinaryTimingOrRecoveryCredit", false)
+            },
+        )
         check(completed && process.exitValue() == 0)
         check(sha256(input.readBytes()) == request.sha256)
         check(before == InstalledBuild.capture(launcher, runtime, environment))
@@ -142,22 +150,34 @@ internal object CliLpScopeCapture {
                 arguments.none { "StartFlightRecording" in it } &&
                 (details["agentSha256"] as? JsonPrimitive)?.content == sha256(agent.readBytes()) &&
                 (details["configSha256"] as? JsonPrimitive)?.content == sha256(config.readBytes())
-            if (identity && !overflow.get() && (details?.get("status") as? JsonPrimitive)?.content == "COMPLETE") {
+            if (identity && !overflow.get() && (details["status"] as? JsonPrimitive)?.content == "COMPLETE") {
                 status = "COMPLETE"
             }
         }
-        val controlled = out.listFiles().orEmpty().filter { it.isFile && it.name != input.name &&
-            !it.name.endsWith(".jfr") }.sumOf { it.length() }
+        val controlled = out.listFiles().orEmpty().filter {
+            it.isFile && it.name != input.name &&
+                !it.name.endsWith(".jfr")
+        }.sumOf { it.length() }
         if (controlled > 2L * 1024 * 1024) status = "INCONCLUSIVE"
-        Reports.writeJson(File(out, "capture.json").path, buildJsonObject {
-            put("status", status)
-            put("controlledBytesBeforeReceipt", controlled)
-            put("reportSha256", if (report.isFile && report.length() <= 524288L) sha256(report.readBytes()) else "absent-or-oversized")
-            put("targetSchemaSha256", sha256(File(out, "target-schema.json").readBytes()))
-            put("instrumentedClassBodies", true)
-            put("independentSourceOrProofCheck", false)
-            put("ordinaryTimingOrRecoveryCredit", false)
-        })
+        Reports.writeJson(
+            File(out, "capture.json").path,
+            buildJsonObject {
+                put("status", status)
+                put("controlledBytesBeforeReceipt", controlled)
+                put(
+                    "reportSha256",
+                    if (report.isFile && report.length() <= 524288L) {
+                        sha256(report.readBytes())
+                    } else {
+                        "absent-or-oversized"
+                    },
+                )
+                put("targetSchemaSha256", sha256(File(out, "target-schema.json").readBytes()))
+                put("instrumentedClassBodies", true)
+                put("independentSourceOrProofCheck", false)
+                put("ordinaryTimingOrRecoveryCredit", false)
+            },
+        )
         println("Scope boundary capture $status; source ${request.sha256}")
     }
 
@@ -173,15 +193,23 @@ internal object CliLpScopeCapture {
         require(values.getValue("sha256").matches(Regex("[0-9a-f]{64}")))
         val timeout = requireNotNull(values.getValue("timeout").toLongOrNull())
         require(timeout in 1L..60000L)
-        return Request(suite, problem, values.getValue("sha256"), timeout,
-            requireNotNull(values.getValue("seed").toLongOrNull()))
+        return Request(
+            suite,
+            problem,
+            values.getValue("sha256"),
+            timeout,
+            requireNotNull(values.getValue("seed").toLongOrNull()),
+        )
     }
 
     internal fun command(request: Request, launcher: File, source: File): List<String> =
         listOf(launcher.path, source.path, "-t", request.timeout.toString(), "-r", request.seed.toString(), "-s")
 
     internal fun childEnvironment(
-        inherited: Map<String, String>, runtime: File, agent: File, config: File,
+        inherited: Map<String, String>,
+        runtime: File,
+        agent: File,
+        config: File,
     ): Map<String, String> = inherited.toMutableMap().apply {
         listOf("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS", "CLASSPATH").forEach(::remove)
         put("JAVA_HOME", runtime.path)
@@ -199,9 +227,11 @@ internal object CliLpScopeCapture {
             mainAttributes.putValue("Can-Retransform-Classes", "false")
         }
         JarFile(source).use { jar ->
-            val selected = jar.entries().asSequence().filter { !it.isDirectory &&
-                it.name.startsWith("com/eignex/klause/bench/profile/LpScopeObservation") &&
-                it.name.endsWith(".class") }.take(129).toList().sortedBy { it.name }
+            val selected = jar.entries().asSequence().filter {
+                !it.isDirectory &&
+                    it.name.startsWith("com/eignex/klause/bench/profile/LpScopeObservation") &&
+                    it.name.endsWith(".class")
+            }.take(129).toList().sortedBy { it.name }
             require(selected.size in 1..128)
             var total = 0
             JarOutputStream(output.outputStream(), manifest).use { target ->
@@ -237,8 +267,17 @@ internal object CliLpScopeCapture {
         } catch (_: Exception) {
             incomplete.set(true)
         }
-    }.apply { isDaemon = true; start() }
+    }.apply {
+        isDaemon = true
+        start()
+    }
 
     @Serializable
-    internal data class Request(val suite: String, val problem: String, val sha256: String, val timeout: Long, val seed: Long)
+    internal data class Request(
+        val suite: String,
+        val problem: String,
+        val sha256: String,
+        val timeout: Long,
+        val seed: Long,
+    )
 }

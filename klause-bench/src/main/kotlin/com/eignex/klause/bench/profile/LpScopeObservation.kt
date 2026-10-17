@@ -30,11 +30,17 @@ internal class LpScopeObservation(
         private val absent = value == null
         private val reference = value?.let(::WeakReference)
 
-        fun matches(value: Any?): Boolean = if (absent) value == null else
+        fun matches(value: Any?): Boolean = if (absent) {
+            value == null
+        } else {
             reference?.get()?.let { it === value } == true
+        }
 
-        fun matches(other: Identity): Boolean = if (absent) other.absent else
+        fun matches(other: Identity): Boolean = if (absent) {
+            other.absent
+        } else {
             reference?.get()?.let { other.matches(it) } == true
+        }
     }
 
     class Controls(val values: List<Long>, references: List<Any?> = emptyList()) {
@@ -120,8 +126,14 @@ internal class LpScopeObservation(
     private var positiveReturns = 0L
     private var purePushes = 0L
     private val priorKinds = linkedMapOf("WITNESS" to 0L, "BOUND" to 0L, "BOTH" to 0L)
-    private val returnedKinds = linkedMapOf("NULL" to 0L, "NONE" to 0L, "WITNESS" to 0L, "BOUND" to 0L,
-        "BOTH" to 0L, "OTHER" to 0L)
+    private val returnedKinds = linkedMapOf(
+        "NULL" to 0L,
+        "NONE" to 0L,
+        "WITNESS" to 0L,
+        "BOUND" to 0L,
+        "BOTH" to 0L,
+        "OTHER" to 0L,
+    )
     var disabled: Boolean = false
         private set
 
@@ -152,14 +164,7 @@ internal class LpScopeObservation(
         owner.bound = root != null && session != null
     }
 
-    fun enter(
-        method: Method,
-        value: Any,
-        state: State,
-        controls: Controls,
-        now: Long,
-        thread: Long,
-    ) {
+    fun enter(method: Method, value: Any, state: State, controls: Controls, now: Long, thread: Long) {
         if (disabled || method == Method.PROPAGATOR) return
         val owner = owner(value) ?: return
         if (owner.frames.size >= 16 || (owner.frames.isNotEmpty() && owner.thread != thread)) {
@@ -176,13 +181,15 @@ internal class LpScopeObservation(
             origin.stamp.numericalOwner.matches(state.numericalOwner) &&
             !state.closed && !state.working && state.production
         val bindingLive = owner.bound && origin != null && owner.root.matches(owner.root) &&
-            owner.session.matches(owner.session) && origin.root.matches(origin.root) && origin.session.matches(origin.session)
+            owner.session.matches(
+                owner.session,
+            ) && origin.root.matches(origin.root) && origin.session.matches(origin.session)
         val match = basic && bindingLive && origin != null && origin.root.matches(owner.root) &&
             origin.session.matches(owner.session)
         if (method == Method.SOLVE && basic && !bindingLive) missingRootCandidates++
         if (method == Method.SOLVE && match) {
             matchedEntries++
-            origin?.let { priorKinds[it.kind] = priorKinds.getValue(it.kind) + 1L }
+            priorKinds[origin.kind] = priorKinds.getValue(origin.kind) + 1L
         }
         owner.frames.addLast(Frame(method, Stamp(state), controls, origin, owner.serial, owner.binding, now, match))
         if (method != Method.PUSH) {
@@ -190,18 +197,13 @@ internal class LpScopeObservation(
         }
         if (method == Method.WORKING || method == Method.CLOSE ||
             (method == Method.FLOAT && owner.frames.dropLast(1).none { it.method == Method.SOLVE })
-        ) owner.serial++
+        ) {
+            owner.serial++
+        }
         emit(owner, method, "entry", state, match)
     }
 
-    fun returned(
-        method: Method,
-        value: Any,
-        state: State,
-        resultKind: String,
-        acceptedPush: Boolean,
-        now: Long,
-    ) {
+    fun returned(method: Method, value: Any, state: State, resultKind: String, acceptedPush: Boolean, now: Long) {
         if (disabled || method == Method.PROPAGATOR) return
         val owner = owner(value) ?: return
         val frame = owner.frames.lastOrNull()
@@ -215,6 +217,7 @@ internal class LpScopeObservation(
                 owner.serial++
                 owner.lastPublished = Identity(state.identity)
             }
+
             Method.PUSH -> {
                 val pure = acceptedPush && frame.stamp.sameMath(state) &&
                     state.depth == frame.stamp.depth + 1 && owner.serial == frame.serial + 1L &&
@@ -231,6 +234,7 @@ internal class LpScopeObservation(
                     owner.origin = null
                 }
             }
+
             Method.SOLVE -> {
                 val duration = (now - frame.started).coerceAtLeast(0L)
                 solveNanos = add(solveNanos, duration)
@@ -243,10 +247,17 @@ internal class LpScopeObservation(
                 }
                 if (unchanged && (resultKind == "WITNESS" || resultKind == "BOUND" || resultKind == "BOTH")) {
                     positiveReturns++
-                    owner.origin = Origin(Stamp(state), owner.root, owner.session, owner.binding,
-                        frame.controls, resultKind)
+                    owner.origin = Origin(
+                        Stamp(state),
+                        owner.root,
+                        owner.session,
+                        owner.binding,
+                        frame.controls,
+                        resultKind,
+                    )
                 }
             }
+
             else -> Unit
         }
         emit(owner, method, "return:$resultKind", state, frame.entryMatch)
@@ -291,7 +302,9 @@ internal class LpScopeObservation(
 
     private fun owner(value: Any): Owner? {
         owners.removeAll { current ->
-            if (current.reference.get() != null) false else {
+            if (current.reference.get() != null) {
+                false
+            } else {
                 if (current.frames.isNotEmpty()) fail("evicted-owner-has-unfinished-entry")
                 true
             }
@@ -302,7 +315,10 @@ internal class LpScopeObservation(
             fail("owner-cap")
             return null
         }
-        return Owner(value, ++nextOwner).also { owners += it; ownerHighWater = maxOf(ownerHighWater, owners.size) }
+        return Owner(value, ++nextOwner).also {
+            owners += it;
+            ownerHighWater = maxOf(ownerHighWater, owners.size)
+        }
     }
 
     private fun emit(owner: Owner, method: Method, stage: String, state: State, matched: Boolean) {
@@ -314,13 +330,15 @@ internal class LpScopeObservation(
         if (!owner.model.matches(state.model)) owner.modelEpoch++
         owner.state = Identity(state.identity)
         owner.model = Identity(state.model)
-        trace += linkedMapOf("owner" to owner.id, "method" to method.name, "stage" to stage,
+        trace += linkedMapOf(
+            "owner" to owner.id, "method" to method.name, "stage" to stage,
             "depth" to state.depth, "revisions" to state.revisions.toList(), "binding" to owner.binding,
             "sourceBound" to owner.bound, "matchedEntry" to matched,
             "stateEpoch" to owner.stateEpoch, "modelEpoch" to owner.modelEpoch,
             "editAttempts" to state.editAttempts, "editSuccesses" to state.editSuccesses,
             "ownerGeneration" to state.generation.toList(),
-            "positiveKind" to owner.origin?.kind, "positivePushes" to owner.origin?.pushes)
+            "positiveKind" to owner.origin?.kind, "positivePushes" to owner.origin?.pushes,
+        )
     }
 
     private fun add(total: Long, increment: Long): Long =

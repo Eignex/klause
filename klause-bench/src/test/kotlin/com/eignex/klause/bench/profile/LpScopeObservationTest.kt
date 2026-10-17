@@ -23,8 +23,10 @@ class LpScopeObservationTest {
     @Test
     fun `intervening changes should prevent a scope only match`() {
         val revisionNames = listOf("matrix", "bound", "objective", "row", "pop")
-        for (change in revisionNames + listOf("model", "root", "session", "policy", "context", "factory", "controls",
-            "failed-edit", "numerical-owner", "generation", "publication")) {
+        for (change in revisionNames + listOf(
+            "model", "root", "session", "policy", "context", "factory", "controls",
+            "failed-edit", "numerical-owner", "generation", "publication",
+        )) {
             val case = ObservationCase()
             case.positive()
             case.push()
@@ -100,7 +102,9 @@ class LpScopeObservationTest {
         val observer = LpScopeObservation()
         val first = ObservationCase(observer)
         first.enter(LpScopeObservation.Method.SOLVE)
-        val owners = observer.javaClass.getDeclaredField("owners").apply { isAccessible = true }.get(observer) as List<*>
+        val owners = observer.javaClass.getDeclaredField(
+            "owners",
+        ).apply { isAccessible = true }.get(observer) as List<*>
         val owner = checkNotNull(owners.first())
         val reference = owner.javaClass.getDeclaredField("reference").apply { isAccessible = true }.get(owner)
         (reference as WeakReference<*>).clear()
@@ -183,9 +187,11 @@ class LpScopeObservationTest {
             observer.bind(owner, root, session)
         }
 
-        private fun state() = LpScopeObservation.State(identity, model, context, policy, factory,
+        private fun state() = LpScopeObservation.State(
+            identity, model, context, policy, factory,
             revisions.toList(), depth, editAttempts = edits, editSuccesses = successes,
-            generation = generation, numericalOwner = numerical)
+            generation = generation, numericalOwner = numerical,
+        )
 
         fun enter(method: LpScopeObservation.Method) {
             observer.ledger(method, true)

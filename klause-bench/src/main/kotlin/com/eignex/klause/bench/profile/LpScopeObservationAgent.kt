@@ -19,6 +19,7 @@ import java.lang.management.ManagementFactory
 import java.lang.reflect.Field
 import java.security.MessageDigest
 import java.security.ProtectionDomain
+import java.util.Locale
 import java.util.Properties
 
 @Suppress("TooGenericExceptionCaught")
@@ -28,15 +29,27 @@ internal object LpScopeObservationAgent {
     private const val PROPAGATOR = "com/eignex/klause/lp/bounding/LpPropagator"
     private val helper = ClassDesc.of("com.eignex.klause.bench.profile.LpScopeObservationAgent")
     private val objectType = ConstantDescs.CD_Object
-    private val enterType = MethodTypeDesc.of(ConstantDescs.CD_void,
-        ConstantDescs.CD_int, objectType, objectType.arrayType())
-    private val returnType = MethodTypeDesc.of(ConstantDescs.CD_void,
-        objectType, ConstantDescs.CD_int, objectType)
+    private val enterType = MethodTypeDesc.of(
+        ConstantDescs.CD_void,
+        ConstantDescs.CD_int,
+        objectType,
+        objectType.arrayType(),
+    )
+    private val returnType = MethodTypeDesc.of(
+        ConstantDescs.CD_void,
+        objectType,
+        ConstantDescs.CD_int,
+        objectType,
+    )
     private val methods = mapOf(
-        SYSTEM to linkedMapOf("push" to LpScopeObservation.Method.PUSH,
-            "publish" to LpScopeObservation.Method.PUBLISH, "solve" to LpScopeObservation.Method.SOLVE,
-            "solveFloat" to LpScopeObservation.Method.FLOAT, "withWorkingModel" to LpScopeObservation.Method.WORKING,
-            "close" to LpScopeObservation.Method.CLOSE),
+        SYSTEM to linkedMapOf(
+            "push" to LpScopeObservation.Method.PUSH,
+            "publish" to LpScopeObservation.Method.PUBLISH,
+            "solve" to LpScopeObservation.Method.SOLVE,
+            "solveFloat" to LpScopeObservation.Method.FLOAT,
+            "withWorkingModel" to LpScopeObservation.Method.WORKING,
+            "close" to LpScopeObservation.Method.CLOSE,
+        ),
         PROPAGATOR to mapOf("solve" to LpScopeObservation.Method.PROPAGATOR),
     )
     private val access = Access()
@@ -49,57 +62,81 @@ internal object LpScopeObservationAgent {
         val configFile = File(argument)
         require(configFile.isFile && configFile.length() <= 16384)
         val config = Properties().apply { configFile.inputStream().use(::load) }
-        require(config.stringPropertyNames() == setOf("report", "coreJar", "agentSha256") +
-            methods.keys.flatMap { listOf("class.$it", "schema.$it", "rewrite.$it") })
+        require(
+            config.stringPropertyNames() == setOf("report", "coreJar", "agentSha256") +
+            methods.keys.flatMap { listOf("class.$it", "schema.$it", "rewrite.$it") }
+        )
         val ownJar = File(javaClass.protectionDomain.codeSource.location.toURI())
         require(sha(ownJar.readBytes()) == config.getProperty("agentSha256"))
         val core = File(config.getProperty("coreJar")).canonicalFile
         val recorder = LpScopeObservation()
         observation = recorder
-        instrumentation.addTransformer(object : ClassFileTransformer {
-            override fun transform(
-                loader: ClassLoader?,
-                className: String?,
-                classBeingRedefined: Class<*>?,
-                protectionDomain: ProtectionDomain?,
-                classfileBuffer: ByteArray,
-            ): ByteArray? {
-                val selected = methods[className] ?: return null
-                return synchronized(recorder) {
-                    try {
-                        require(classBeingRedefined == null && classfileBuffer.size <= 2 * 1024 * 1024)
-                        val location = requireNotNull(protectionDomain?.codeSource?.location)
-                        require(File(location.toURI()).canonicalFile == core)
-                        require(sha(classfileBuffer) == config.getProperty("class.$className"))
-                        val schema = schema(classfileBuffer, selected)
-                        require(sha(schemaText(schema).toByteArray()) == config.getProperty("schema.$className"))
-                        val output = rewrite(classfileBuffer, selected, loader)
-                        require(sha(output) == config.getProperty("rewrite.$className"))
-                        transformations += mapOf("class" to className, "beforeSha256" to sha(classfileBuffer),
-                            "afterSha256" to sha(output), "methods" to schema, "codeSource" to location.toString())
-                        output
-                    } catch (failure: Throwable) {
-                        recorder.fail("transform:${failure.javaClass.simpleName}")
-                        null
+        instrumentation.addTransformer(
+            object : ClassFileTransformer {
+                override fun transform(
+                    loader: ClassLoader?,
+                    className: String?,
+                    classBeingRedefined: Class<*>?,
+                    protectionDomain: ProtectionDomain?,
+                    classfileBuffer: ByteArray,
+                ): ByteArray? {
+                    val selected = methods[className] ?: return null
+                    return synchronized(recorder) {
+                        try {
+                            require(classBeingRedefined == null && classfileBuffer.size <= 2 * 1024 * 1024)
+                            val location = requireNotNull(protectionDomain?.codeSource?.location)
+                            require(File(location.toURI()).canonicalFile == core)
+                            require(sha(classfileBuffer) == config.getProperty("class.$className"))
+                            val schema = schema(classfileBuffer, selected)
+                            require(sha(schemaText(schema).toByteArray()) == config.getProperty("schema.$className"))
+                            val output = rewrite(classfileBuffer, selected, loader)
+                            require(sha(output) == config.getProperty("rewrite.$className"))
+                            transformations += mapOf(
+                                "class" to className,
+                                "beforeSha256" to sha(classfileBuffer),
+                                "afterSha256" to sha(output),
+                                "methods" to schema,
+                                "codeSource" to location.toString(),
+                            )
+                            output
+                        } catch (failure: Throwable) {
+                            recorder.fail("transform:${failure.javaClass.simpleName}")
+                            null
+                        }
                     }
                 }
-            }
-        }, false)
-        Runtime.getRuntime().addShutdownHook(Thread({
-            synchronized(recorder) {
-                if (transformations.map { it["class"] }.toSet() != methods.keys) recorder.fail("transform-coverage")
-                val report = recorder.snapshot() + mapOf(
-                    "transformations" to transformations.toList(), "agentSha256" to config.getProperty("agentSha256"),
-                    "configSha256" to sha(configFile.readBytes()), "pid" to ProcessHandle.current().pid(),
-                    "javaCommand" to System.getProperty("sun.java.command"),
-                    "jvmArguments" to ManagementFactory.getRuntimeMXBean().inputArguments,
-                    "processors" to Runtime.getRuntime().availableProcessors(),
-                )
-                val text = json(report)
-                File(config.getProperty("report")).writeText(if (text.toByteArray().size <= 524288) text else
-                    "{\"status\":\"INCONCLUSIVE\",\"failures\":[\"report-cap\"]}")
-            }
-        }, "lp-scope-report"))
+            },
+            false,
+        )
+        Runtime.getRuntime().addShutdownHook(
+            Thread(
+                {
+                    synchronized(recorder) {
+                        if (transformations.map { it["class"] }.toSet() != methods.keys) {
+                            recorder.fail("transform-coverage")
+                        }
+                        val report = recorder.snapshot() + mapOf(
+                            "transformations" to transformations.toList(),
+                            "agentSha256" to config.getProperty("agentSha256"),
+                            "configSha256" to sha(configFile.readBytes()),
+                            "pid" to ProcessHandle.current().pid(),
+                            "javaCommand" to System.getProperty("sun.java.command"),
+                            "jvmArguments" to ManagementFactory.getRuntimeMXBean().inputArguments,
+                            "processors" to Runtime.getRuntime().availableProcessors(),
+                        )
+                        val text = json(report)
+                        File(config.getProperty("report")).writeText(
+                            if (text.toByteArray().size <= 524288) {
+                                text
+                            } else {
+                                "{\"status\":\"INCONCLUSIVE\",\"failures\":[\"report-cap\"]}"
+                            },
+                        )
+                    }
+                },
+                "lp-scope-report",
+            ),
+        )
     }
 
     @JvmStatic
@@ -115,8 +152,14 @@ internal object LpScopeObservationAgent {
                         recorder.bind(owner, access.field(emitter, "modelKey"), access.field(emitter, "proofContext"))
                     }
                 } else {
-                    recorder.enter(method, emitter, access.state(emitter), access.controls(method, emitter, arguments),
-                        System.nanoTime(), Thread.currentThread().threadId())
+                    recorder.enter(
+                        method,
+                        emitter,
+                        access.state(emitter),
+                        access.controls(method, emitter, arguments),
+                        System.nanoTime(),
+                        Thread.currentThread().threadId(),
+                    )
                 }
             } catch (failure: Throwable) {
                 recorder.fail("entry:${failure.javaClass.simpleName}")
@@ -132,17 +175,32 @@ internal object LpScopeObservationAgent {
             recorder.ledger(method, false)
             if (recorder.disabled || method == LpScopeObservation.Method.PROPAGATOR) return
             try {
-                val kind = if (method != LpScopeObservation.Method.SOLVE) "OTHER" else when {
+                val kind = if (method != LpScopeObservation.Method.SOLVE) {
+                    "OTHER"
+                } else {
+                    when {
                     result == null -> "NULL"
+
                     (access.field(result, "verdict") as Enum<*>).name in
                         listOf("INFEASIBLE", "UNBOUNDED", "TOLERANCE_OPTIMUM") -> "OTHER"
+
                     access.field(result, "witness") != null && access.field(result, "bound") != null -> "BOTH"
+
                     access.field(result, "witness") != null -> "WITNESS"
+
                     access.field(result, "bound") != null -> "BOUND"
+
                     else -> "NONE"
                 }
-                recorder.returned(method, emitter, access.state(emitter), kind, result is Boolean && result,
-                    System.nanoTime())
+                }
+                recorder.returned(
+                    method,
+                    emitter,
+                    access.state(emitter),
+                    kind,
+                    result is Boolean && result,
+                    System.nanoTime(),
+                )
             } catch (failure: Throwable) {
                 recorder.fail("return:${failure.javaClass.simpleName}")
             }
@@ -162,15 +220,25 @@ internal object LpScopeObservationAgent {
     fun schema(bytes: ByteArray, selected: Map<String, LpScopeObservation.Method>): List<Map<String, Any?>> {
         val model = ClassFile.of().parse(bytes)
         return selected.map { (name, tag) ->
-            val method = model.methods().single { it.methodName().stringValue() == name &&
-                it.flags().flagsMask() and 8 == 0 }
+            val method = model.methods().single {
+                it.methodName().stringValue() == name &&
+                    it.flags().flagsMask() and 8 == 0
+            }
             val type = method.methodTypeSymbol()
             require(type.parameterCount() <= 16)
-            require(type.parameterList().all { it.descriptorString().startsWith("L") ||
-                it.descriptorString().startsWith("[") || it.descriptorString() == "Z" })
+            require(
+                type.parameterList().all {
+                it.descriptorString().startsWith("L") ||
+                    it.descriptorString().startsWith("[") || it.descriptorString() == "Z"
+            }
+            )
             val returns = method.code().orElseThrow().count { it is ReturnInstruction }
-            mapOf("name" to name, "descriptor" to type.descriptorString(), "tag" to tag.ordinal,
-                "normalReturns" to returns)
+            mapOf(
+                "name" to name,
+                "descriptor" to type.descriptorString(),
+                "tag" to tag.ordinal,
+                "normalReturns" to returns,
+            )
         }
     }
 
@@ -178,11 +246,7 @@ internal object LpScopeObservationAgent {
         listOf(it["name"], it["descriptor"], it["tag"], it["normalReturns"]).joinToString("\t")
     }
 
-    fun rewrite(
-        bytes: ByteArray,
-        selected: Map<String, LpScopeObservation.Method>,
-        loader: ClassLoader?,
-    ): ByteArray {
+    fun rewrite(bytes: ByteArray, selected: Map<String, LpScopeObservation.Method>, loader: ClassLoader?): ByteArray {
         schema(bytes, selected)
         // Resource parsing avoids recursively defining an application class while transforming it.
         val resolver = ClassHierarchyResolver.ofResourceParsing(requireNotNull(loader))
@@ -192,7 +256,9 @@ internal object LpScopeObservationAgent {
             val tag = (element as? MethodModel)?.methodName()?.stringValue()?.let(selected::get)
             if (element is MethodModel && tag != null && element.flags().flagsMask() and 8 == 0) {
                 val type = element.methodTypeSymbol()
-                builder.transformMethod(element, MethodTransform.transformingCode(object : CodeTransform {
+                builder.transformMethod(
+                    element,
+                    MethodTransform.transformingCode(object : CodeTransform {
                     override fun atStart(code: CodeBuilder) {
                         emitEntry(code, tag, type)
                     }
@@ -201,7 +267,8 @@ internal object LpScopeObservationAgent {
                         if (part is ReturnInstruction) emitReturn(code, tag, part.opcode())
                         code.with(part)
                     }
-                }))
+                })
+                )
             } else {
                 builder.with(element)
             }
@@ -214,8 +281,11 @@ internal object LpScopeObservationAgent {
         for ((index, parameter) in type.parameterList().withIndex()) {
             code.dup().loadConstant(index)
             if (parameter.descriptorString() == "Z") {
-                code.iload(slot).invokestatic(ClassDesc.of("java.lang.Boolean"), "valueOf",
-                    MethodTypeDesc.of(ClassDesc.of("java.lang.Boolean"), ConstantDescs.CD_boolean))
+                code.iload(slot).invokestatic(
+                    ClassDesc.of("java.lang.Boolean"),
+                    "valueOf",
+                    MethodTypeDesc.of(ClassDesc.of("java.lang.Boolean"), ConstantDescs.CD_boolean),
+                )
             } else {
                 code.aload(slot)
             }
@@ -228,9 +298,15 @@ internal object LpScopeObservationAgent {
     private fun emitReturn(code: CodeBuilder, tag: LpScopeObservation.Method, opcode: Opcode) {
         when (opcode) {
             Opcode.ARETURN -> code.dup()
-            Opcode.IRETURN -> code.dup().invokestatic(ClassDesc.of("java.lang.Boolean"), "valueOf",
-                MethodTypeDesc.of(ClassDesc.of("java.lang.Boolean"), ConstantDescs.CD_boolean))
+
+            Opcode.IRETURN -> code.dup().invokestatic(
+                ClassDesc.of("java.lang.Boolean"),
+                "valueOf",
+                MethodTypeDesc.of(ClassDesc.of("java.lang.Boolean"), ConstantDescs.CD_boolean),
+            )
+
             Opcode.RETURN -> code.aconst_null()
+
             else -> error("unsupported return opcode")
         }
         code.loadConstant(tag.ordinal).aload(0).invokestatic(helper, "returned", returnType)
@@ -254,27 +330,68 @@ internal object LpScopeObservationAgent {
             val state = requireNotNull(field(requireNotNull(field(owner, "trail")), "state"))
             val context = requireNotNull(field(owner, "context"))
             val policy = requireNotNull(field(context, "certificationPolicy"))
-            return LpScopeObservation.State(state, requireNotNull(field(state, "model")), context, policy,
+            return LpScopeObservation.State(
+                state, requireNotNull(field(state, "model")), context, policy,
                 requireNotNull(field(context, "engineFactory")),
-                scalars(state, listOf("matrixRevision", "boundRevision", "objectiveRevision", "rowRevision",
-                    "popRevision")), (field(state, "scopeMarks") as List<*>).size,
+                scalars(
+                    state,
+                    listOf(
+                        "matrixRevision",
+                        "boundRevision",
+                        "objectiveRevision",
+                        "rowRevision",
+                        "popRevision",
+                    ),
+                ),
+                (field(state, "scopeMarks") as List<*>).size,
                 field(owner, "closed") as Boolean, field(owner, "workingActive") as Boolean,
                 policy.javaClass.name == "${ENGINE}ProductionLpCertificationPolicy",
                 number(field(owner, "editAttempts")), number(field(owner, "editSuccesses")),
-                scalars(owner, listOf("createdOwners", "closedOwners", "preparationAttempts")), field(owner, "solver"))
+                scalars(owner, listOf("createdOwners", "closedOwners", "preparationAttempts")), field(owner, "solver"),
+            )
         }
 
-        fun controls(method: LpScopeObservation.Method, owner: Any, arguments: Array<Any?>): LpScopeObservation.Controls {
+        fun controls(
+            method: LpScopeObservation.Method,
+            owner: Any,
+            arguments: Array<Any?>,
+        ): LpScopeObservation.Controls {
             if (method != LpScopeObservation.Method.SOLVE) return LpScopeObservation.Controls(emptyList())
             require(arguments.size == 8)
-            val values = scalars(owner, listOf("refactorUpdateLimit", "iterationLimit", "workLimit",
-                "trackDegeneracy", "maxRetainedRows")) + listOf(number(arguments[4]), number(arguments[7])) +
-                scalars(requireNotNull(arguments[3]), listOf("maxRows", "maxColumns", "maxCells", "maxBits",
-                    "maxWork", "maxAllocation", "maxTimeNs", "maxImportPivots", "maxPivots")) +
-                scalars(requireNotNull(arguments[6]), listOf("maxRounds", "maxAuxiliaries", "maxCoordinates",
-                    "maxEntries", "maxBits", "maxWork", "maxAllocation", "maxPivots", "time"))
-            return LpScopeObservation.Controls(values, listOf(arguments[0], arguments[1], arguments[2], arguments[5],
-                field(owner, "pricing")))
+            val values = scalars(
+                owner,
+                listOf(
+                    "refactorUpdateLimit",
+                    "iterationLimit",
+                    "workLimit",
+                    "trackDegeneracy",
+                    "maxRetainedRows",
+                ),
+            ) + listOf(number(arguments[4]), number(arguments[7])) +
+                scalars(
+                    requireNotNull(arguments[3]),
+                    listOf(
+                        "maxRows", "maxColumns", "maxCells", "maxBits",
+                        "maxWork", "maxAllocation", "maxTimeNs", "maxImportPivots", "maxPivots",
+                    ),
+                ) +
+                scalars(
+                    requireNotNull(arguments[6]),
+                    listOf(
+                        "maxRounds", "maxAuxiliaries", "maxCoordinates",
+                        "maxEntries", "maxBits", "maxWork", "maxAllocation", "maxPivots", "time",
+                    ),
+                )
+            return LpScopeObservation.Controls(
+                values,
+                listOf(
+                    arguments[0],
+                    arguments[1],
+                    arguments[2],
+                    arguments[5],
+                    field(owner, "pricing"),
+                ),
+            )
         }
 
         private fun scalars(value: Any, names: List<String>): List<Long> = names.map { number(field(value, it)) }
@@ -288,44 +405,69 @@ internal object LpScopeObservationAgent {
 
         companion object {
             val schema = mapOf(
-                "${ENGINE}LpScopedSolver" to listOf("trail", "context", "closed", "workingActive", "editAttempts",
+                "${ENGINE}LpScopedSolver" to listOf(
+                    "trail", "context", "closed", "workingActive", "editAttempts",
                     "editSuccesses", "createdOwners", "closedOwners", "preparationAttempts", "solver",
-                    "refactorUpdateLimit", "iterationLimit", "workLimit", "trackDegeneracy", "maxRetainedRows", "pricing"),
+                    "refactorUpdateLimit", "iterationLimit", "workLimit", "trackDegeneracy", "maxRetainedRows",
+                    "pricing",
+                ),
                 "${ENGINE}LpBoundTrail" to listOf("state"),
-                "${ENGINE}LpExactState" to listOf("model", "matrixRevision", "boundRevision", "objectiveRevision",
-                    "rowRevision", "popRevision", "scopeMarks"),
+                "${ENGINE}LpExactState" to listOf(
+                    "model",
+                    "matrixRevision",
+                    "boundRevision",
+                    "objectiveRevision",
+                    "rowRevision",
+                    "popRevision",
+                    "scopeMarks",
+                ),
                 "${ENGINE}LpSolveContext" to listOf("certificationPolicy", "engineFactory"),
                 "${ENGINE}CertifiedLpResult" to listOf("witness", "bound", "verdict"),
-                "${ENGINE}LpRefinementLimits" to listOf("maxRounds", "maxAuxiliaries", "maxCoordinates", "maxEntries",
-                    "maxBits", "maxWork", "maxAllocation", "maxPivots", "time"),
-                "com.eignex.klause.simplex.exact.ExactContinuationLimits" to listOf("maxRows", "maxColumns", "maxCells",
-                    "maxBits", "maxWork", "maxAllocation", "maxTimeNs", "maxImportPivots", "maxPivots"),
+                "${ENGINE}LpRefinementLimits" to listOf(
+                    "maxRounds", "maxAuxiliaries", "maxCoordinates", "maxEntries",
+                    "maxBits", "maxWork", "maxAllocation", "maxPivots", "time",
+                ),
+                "com.eignex.klause.simplex.exact.ExactContinuationLimits" to listOf(
+                    "maxRows", "maxColumns", "maxCells",
+                    "maxBits", "maxWork", "maxAllocation", "maxTimeNs", "maxImportPivots", "maxPivots",
+                ),
                 "com.eignex.klause.lp.bounding.LpPropagator" to listOf("owner", "modelKey", "proofContext"),
             )
         }
     }
 
     fun sha(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") {
-        "%02x".format(it.toInt() and 255)
+        "%02x".format(Locale.ROOT, it.toInt() and 255)
     }
 
     fun json(value: Any?): String = when (value) {
         null -> "null"
+
         is Boolean, is Long, is Int -> value.toString()
+
         is String -> buildString {
             append('"')
-            for (character in value) when (character) {
-                '"' -> append("\\\"")
-                '\\' -> append("\\\\")
-                '\n' -> append("\\n")
-                '\r' -> append("\\r")
-                '\t' -> append("\\t")
-                else -> if (character.code < 32) append("\\u%04x".format(character.code)) else append(character)
+            for (character in value) {
+                when (character) {
+                    '"' -> append("\\\"")
+                    '\\' -> append("\\\\")
+                    '\n' -> append("\\n")
+                    '\r' -> append("\\r")
+                    '\t' -> append("\\t")
+                    else -> if (character.code < 32) {
+                        append("\\u%04x".format(Locale.ROOT, character.code))
+                    } else {
+                        append(character)
+                    }
+                }
             }
             append('"')
         }
+
         is Map<*, *> -> value.entries.joinToString(",", "{", "}") { json(it.key.toString()) + ":" + json(it.value) }
+
         is Iterable<*> -> value.joinToString(",", "[", "]", transform = ::json)
+
         else -> error("unsupported report value")
     }
 }
