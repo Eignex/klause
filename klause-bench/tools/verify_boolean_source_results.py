@@ -1,4 +1,4 @@
-"""Check DIMACS, WCNF and linear OPB claims with exact Boolean source arithmetic."""
+"""Check DIMACS, WCNF and polynomial OPB claims with exact Boolean source arithmetic."""
 
 import argparse
 from fractions import Fraction
@@ -114,6 +114,24 @@ def pigeonhole(clauses):
     return len(positive) > len(components) and all((all((adj[v] >= part - {v} for v in part)) and all((len(group & part) == 1 for group in positive)) for part in components))
 
 
+def opb_terms(expression):
+    words, terms = expression.split(), []
+    offset = 0
+    while offset < len(words):
+        assert re.fullmatch(r'[+-]?\d+', words[offset]), 'invalid OPB coefficient'
+        coefficient = int(words[offset])
+        offset += 1
+        product = []
+        while offset < len(words) and not re.fullmatch(r'[+-]?\d+', words[offset]):
+            name = words[offset]
+            assert re.fullmatch(r'~?x[1-9]\d*', name), 'unsupported OPB literal'
+            product.append((int(name.lstrip('~x')), name.startswith('~')))
+            offset += 1
+        assert product, 'OPB term has no literals'
+        terms.append((coefficient, product))
+    return terms
+
+
 def opb(text):
     header = re.search('#variable=\\s*(\\d+)', text)
     size = int(header[1]) if header else None
@@ -147,10 +165,8 @@ def opb(text):
             assert match, 'unsupported OPB syntax'
             expression, relation, rhs = match.groups()
             rhs = int(rhs)
-        pattern = '([+-]?\\d+)\\s+(~?x[1-9]\\d*)'
-        terms = [(int(coef), int(name.lstrip('~x')), name.startswith('~')) for coef, name in re.findall(pattern, expression)]
-        assert not re.sub(pattern, '', expression).strip(), 'nonlinear or unsupported OPB expression'
-        assert all((size is None or 1 <= index <= size for _, index, _ in terms))
+        terms = opb_terms(expression)
+        assert all(size is None or 1 <= index <= size for _, product in terms for index, _ in product)
         if relation == 'min':
             objective = terms
         elif soft_weight is None:
@@ -160,7 +176,7 @@ def opb(text):
     if size is None:
         terms = (objective or []) + [term for row, _, _ in rows for term in row]
         terms += [term for _, row, _, _ in soft_rows for term in row]
-        size = max((index for _, index, _ in terms), default=0)
+        size = max((index for _, product in terms for index, _ in product), default=0)
     return (size, objective, rows, soft_rows, top)
 
 
@@ -199,7 +215,8 @@ def check(case, source_root):
         size, objective, rows, soft_rows, top = opb(text)
 
         def value(terms, values):
-            return sum((c * (not values[i] if neg else values[i]) for c, i, neg in terms))
+            return sum(c * all(not values[i] if neg else values[i] for i, neg in product)
+                       for c, product in terms)
     else:
         size, clauses = cnf(text, weighted)
     if lower is not None:
@@ -249,7 +266,8 @@ def check(case, source_root):
     if is_opb:
 
         def expression(terms):
-            return z3.Sum([z3.If(z3.Not(variables[i]) if neg else variables[i], c, 0) for c, i, neg in terms])
+            return z3.Sum([z3.If(z3.And([z3.Not(variables[i]) if neg else variables[i]
+                                       for i, neg in product]), c, 0) for c, product in terms])
         for terms, rel, rhs in rows:
             solver.add(relation_holds(expression(terms), rel, rhs))
         soft_cost = z3.Sum([z3.If(relation_holds(expression(terms), rel, rhs), 0, weight)

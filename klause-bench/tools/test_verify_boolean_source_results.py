@@ -111,6 +111,82 @@ class BooleanSourceCheckTest(unittest.TestCase):
             result = proof_check.check(case, Path('.'))
         self.assertEqual(result['proof'], 'source satisfaction')
 
+    def test_opb_product_constraint_requires_every_literal(self):
+        for witness in ['v x1 x2', 'v -x1 x2', 'v x1 -x2', 'v -x1 -x2']:
+            with self.subTest(witness=witness):
+                case = copy.deepcopy(self.case)
+                case['problem']['format'] = 'OPB'
+                case['record']['finalWitness'] = witness
+                with mock.patch.object(proof_check, 'source', return_value='+1 x1 x2 >= 1;'):
+                    result = proof_check.check_cases([case], Path('.'))
+                self.assertEqual('error' not in result[0], witness == 'v x1 x2')
+
+    def test_opb_products_preserve_complements_and_repeated_literals(self):
+        for source in ['+2 x1 ~x2 x1 >= 2;', '+4 x1 ~x1 +1 ~x2 >= 1;']:
+            with self.subTest(source=source):
+                case = copy.deepcopy(self.case)
+                case['problem']['format'] = 'OPB'
+                case['record']['finalWitness'] = 'v x1 -x2'
+                with mock.patch.object(proof_check, 'source', return_value=source):
+                    result = proof_check.check(case, Path('.'))
+                self.assertEqual(result['witness'], 'source feasible')
+
+    def test_opb_product_optimum_excludes_better_original_objectives(self):
+        case = copy.deepcopy(self.case)
+        case['problem']['format'] = 'OPB'
+        case['record'].update(proven=True, finalWitness='v x1 -x2', exactObjective='1')
+        source = 'min: +3 x1 x2 +1 x1 +2 x2; +1 x1 +1 x2 >= 1;'
+        with mock.patch.object(proof_check, 'source', return_value=source):
+            result = proof_check.check(case, Path('.'))
+        self.assertEqual(result['objective'], 1)
+        self.assertEqual(result['proof'], 'strictly better source objective excluded')
+
+    def test_suboptimal_opb_product_witness_cannot_certify_optimum(self):
+        case = copy.deepcopy(self.case)
+        case['problem']['format'] = 'OPB'
+        case['record'].update(proven=True, finalWitness='v x1 x2', exactObjective='6')
+        source = 'min: +3 x1 x2 +1 x1 +2 x2; +1 x1 +1 x2 >= 1;'
+        with mock.patch.object(proof_check, 'source', return_value=source):
+            result = proof_check.check_cases([case], Path('.'))
+        self.assertIn('source counterexample', result[0]['error'])
+
+    def test_opb_product_refutation_checks_original_relations(self):
+        case = copy.deepcopy(self.case)
+        case['problem']['format'] = 'OPB'
+        case['record'].update(feasible=False, proven=True, finalWitness=None)
+        with mock.patch.object(proof_check, 'source', return_value='+1 x1 x2 >= 1; +1 x1 <= 0;'):
+            result = proof_check.check(case, Path('.'))
+        self.assertEqual(result['proof'], 'source refutation')
+
+    def test_feasible_opb_product_source_cannot_certify_refutation(self):
+        case = copy.deepcopy(self.case)
+        case['problem']['format'] = 'OPB'
+        case['record'].update(feasible=False, proven=True, finalWitness=None)
+        with mock.patch.object(proof_check, 'source', return_value='+1 x1 x2 >= 1;'):
+            result = proof_check.check_cases([case], Path('.'))
+        self.assertIn('source counterexample', result[0]['error'])
+
+    def test_wbo_product_penalties_preserve_original_soft_objective(self):
+        case = copy.deepcopy(self.case)
+        case['problem']['format'] = 'OPB'
+        case['record'].update(proven=True, finalWitness='v x1 x2', exactObjective='2')
+        source = 'soft:; [5] +1 x1 x2 >= 1; [2] +1 ~x1 >= 1; +1 x2 = 1;'
+        with mock.patch.object(proof_check, 'source', return_value=source):
+            result = proof_check.check(case, Path('.'))
+        self.assertEqual(result['objective'], 2)
+        self.assertEqual(result['proof'], 'strictly better source objective excluded')
+
+    def test_malformed_or_out_of_range_opb_products_are_rejected(self):
+        for source in ['+1 x1 invalid >= 1;', '+1 >= 1;',
+                       '* #variable= 2\n+1 x1 x3 >= 1;']:
+            with self.subTest(source=source):
+                case = copy.deepcopy(self.case)
+                case['problem']['format'] = 'OPB'
+                case['record']['finalWitness'] = 'v x1 x2'
+                with mock.patch.object(proof_check, 'source', return_value=source):
+                    result = proof_check.check_cases([case], Path('.'))
+                self.assertIn('error', result[0])
+
     def test_utf8_source_comments_preserve_hashed_bytes(self):
         text = '* x1 \u2192 x2\n+1 x1 +1 x2 >= 1;\n'
         raw = text.encode('utf-8')
@@ -188,7 +264,7 @@ class BooleanSourceCheckTest(unittest.TestCase):
             result = proof_check.check_cases([case], Path('.'))
         self.assertIn('source counterexample', result[0]['error'])
 
-    def test_nonlinear_opb_source_is_declined(self):
+    def test_violated_opb_product_constraint_is_rejected(self):
         case = copy.deepcopy(self.case)
         case['problem']['format'] = 'OPB'
         case['record'].update(finalWitness='v -x1 x2', exactObjective='2')
