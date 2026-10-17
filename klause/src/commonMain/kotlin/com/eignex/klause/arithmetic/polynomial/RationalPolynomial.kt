@@ -233,7 +233,11 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         val midpoint = (interval.lower + interval.upper) * BigFraction.ofLong(2).reciprocal()
         if (evaluate(polynomial, midpoint).isZero) return RationalInterval(midpoint, midpoint)
         val left = RationalInterval(interval.lower, midpoint)
-        return if (countOpen(refinementSequence(polynomial), left) == 1) left else RationalInterval(midpoint, interval.upper)
+        return if (countOpen(refinementSequence(polynomial), left) == 1) {
+            left
+        } else {
+            RationalInterval(midpoint, interval.upper)
+        }
     }
 
     private fun refinementSequence(polynomial: RationalPolynomial): List<RationalPolynomial> {

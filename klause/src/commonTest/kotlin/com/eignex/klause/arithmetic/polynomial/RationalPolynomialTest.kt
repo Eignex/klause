@@ -119,7 +119,9 @@ class RationalPolynomialTest {
     fun `separate refinement contexts should retain their own dense limits`() {
         val polynomial = RationalPolynomial.of(-2, 0, 0, 0, 1)
         val interval = arithmetic.refine(polynomial, RationalInterval(BigFraction.ONE, BigFraction.ofLong(2)))
-        val limited = RationalPolynomialArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxDenseCoefficients = 2)))
+        val limited = RationalPolynomialArithmetic(
+            PolynomialArithmetic(limits = PolynomialLimits(maxDenseCoefficients = 2)),
+        )
 
         val failure = assertFailsWith<PolynomialResourceLimit> { limited.refine(polynomial, interval) }
 
