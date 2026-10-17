@@ -19,8 +19,8 @@ enum class ProblemPipeline {
     /**
      * Finite search and optimization route.
      *
-     * This is a frontend policy, not variable ownership: [Problem.componentPlan] may still select a
-     * complete arithmetic theory for the same finite source model when no finite-domain factor is present.
+     * Source setup selects this execution family independently of variable ownership.
+     * [Problem.componentPlan] can describe complete arithmetic mechanisms for the same finite source.
      */
     FINITE_CP,
 
@@ -378,11 +378,10 @@ private sealed interface BoundedRouting {
 }
 
 /**
- * Finite and linear route classification. Use [pipelineRoute] for polynomial composition.
+ * Inspect finite and linear component ownership without selecting a source invocation.
  *
- * A fully bounded model stays on the finite route: that is a frontend policy about which engine owns a
- * finite domain, not a statement that no theory could decide it. Anything with an open integer side is
- * classified by [componentPlan], which reads column and factor ownership rather than demanding one
- * theory cover the whole model.
+ * This inspection prefers finite ownership for bounded integer declarations and performs no source
+ * bound closure. [SourceSetup.prepare] selects an operation's route with source deductions, objective
+ * precision and polynomial composition; this component view does not replace that setup.
  */
 fun Problem.sourceRoute(): ProblemPipeline = componentPlan(preferFinite = hasFiniteIntegerRanges()).theoryPipeline
