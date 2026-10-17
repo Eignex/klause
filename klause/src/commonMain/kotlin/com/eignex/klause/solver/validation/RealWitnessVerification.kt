@@ -23,16 +23,28 @@ import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
 
-internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification<Sample, Unit> {
+internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification<Sample, Unit> =
+    verifyRealCoordinates(model, sample, Cancellation.Never)
+
+internal fun verifyRealCoordinates(
+    model: Problem, sample: Sample, cancellation: Cancellation,
+): Verification<Sample, Unit> {
+    fun stopped(): Boolean {
+        cancellation.charge(1L)
+        return cancellation()
+    }
+    if (stopped()) return Verification.Indeterminate("real witness check cancelled")
     if (model.factors.any { it is Distinct || it is AllDifferent } &&
         (sample.numIntVars != model.numIntVars || sample.numBoolVars != model.numBoolVars)
     ) return Verification.Rejected("assignment does not cover distinctness coordinates")
     for ((id, factor) in model.factors.withIndex()) {
+        if (stopped()) return Verification.Indeterminate("real witness check cancelled")
         if (factor !is Abs && factor !is AffineAbs && factor !is AllDifferent &&
             !(factor is Distinct && factor.variables.reals.isEmpty())
         ) continue
@@ -48,6 +60,7 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             }
             else -> false
         }
+        if (cancellation()) return Verification.Indeterminate("real witness check cancelled")
         if (!valid) {
             return Verification.Rejected("integer factor $id refutes the assignment")
         }
@@ -56,6 +69,7 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
     val reals = sample.exactReals ?: return Verification.Indeterminate("continuous values are not certified")
     if (reals.size != model.numRealVars) return Verification.Rejected("assignment does not cover the real variables")
     for (id in reals.indices) {
+        if (stopped()) return Verification.Indeterminate("real witness check cancelled")
         val lower = BigFraction.ofDouble(model.realLower[id])
         val upper = BigFraction.ofDouble(model.realUpper[id])
         if ((lower != null && reals[id] < lower) || (upper != null && reals[id] > upper)) {
@@ -68,10 +82,14 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             BigFraction.of(sample.exactIntValue(column - model.numRealVars), BIG_ONE)
         }
     }
-    fun holds(row: LinearRow): Boolean = row.exactComparison(
-        model.numRealVars, row.activator == LinearRow.ALWAYS || witness.truth(row.activator), witness::truth,
-    ).holdsAt(witness)
+    fun holds(row: LinearRow): Boolean {
+        if (stopped()) return false
+        return row.exactComparison(
+            model.numRealVars, row.activator == LinearRow.ALWAYS || witness.truth(row.activator), witness::truth,
+        ).holdsAt(witness)
+    }
     for ((id, factor) in model.factors.withIndex()) {
+        if (stopped()) return Verification.Indeterminate("real witness check cancelled")
         if (factor.variables.reals.isEmpty()) continue
         if (factor is Distinct) {
             if (!factor.isSatisfied(sample::exactIntValue, sample::boolValue, reals::get)) {
@@ -93,6 +111,7 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             factor.finiteChoices?.let { choices ->
                 var admitted = false
                 for (index in 0 until choices.size) {
+                    if (stopped()) return Verification.Indeterminate("real witness check cancelled")
                     val matches = reals[choices.operand] == BigFraction.ofDouble(choices.valueAt(index))
                     admitted = admitted || matches
                     if (choices.hasGuards) {
@@ -124,6 +143,7 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
         if (factor is RealArrayMinMax) {
             var selected = reals[factor.xs[0]]
             for (operand in factor.xs) {
+                if (stopped()) return Verification.Indeterminate("real witness check cancelled")
                 val value = reals[operand]
                 if (if (factor.max) value > selected else value < selected) selected = value
             }
@@ -141,7 +161,9 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
         }
         if (factor is LinearIndicator) {
             val trigger = bigIntOf(if (factor.whenOne) 1L else 0L)
-            if (sample.exactIntValue(factor.indicator) == trigger && !holds(factor.row)) {
+            val valid = sample.exactIntValue(factor.indicator) != trigger || holds(factor.row)
+            if (cancellation()) return Verification.Indeterminate("real witness check cancelled")
+            if (!valid) {
                 return Verification.Rejected("real factor $id refutes the assignment")
             }
             continue
@@ -155,8 +177,10 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             is LinearForm.Disjunction -> form.rows.any(::holds)
             is LinearForm.Relaxation -> false
         }
+        if (cancellation()) return Verification.Indeterminate("real witness check cancelled")
         if (!valid) return Verification.Rejected("real factor $id refutes the assignment")
     }
+    if (cancellation()) return Verification.Indeterminate("real witness check cancelled")
     return Verification.Accepted(Candidate(sample, Unit))
 }
 

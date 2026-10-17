@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
@@ -30,6 +31,21 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class OpenExactNeighborhoodTest {
+    @Test
+    fun `real min max completion should publish a checked original source point`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), true)),
+            numRealVars = 3, realLower = doubleArrayOf(0.0, 1.0, 0.0), realUpper = doubleArrayOf(2.0, 3.0, 3.0))
+        val adapter = OpenExactNeighborhood(source, TheoryParams(maxInstructions = 1000, randomSeed = 17))
+
+        val result = adapter.use {
+            it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+        }
+
+        val point = assertIs<ExactNeighborhoodResult.Witness>(result).sample
+        val coordinates = assertNotNull(point.exactReals)
+        assertEquals(maxOf(coordinates[0], coordinates[1]), coordinates[2])
+    }
+
     @Test
     fun `generated Boolean centers should respect required source root values`() {
         for (value in listOf(true, false)) {
