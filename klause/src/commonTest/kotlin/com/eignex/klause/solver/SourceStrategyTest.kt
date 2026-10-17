@@ -127,7 +127,7 @@ class SourceStrategyTest {
         for (sense in ObjectiveSense.entries) {
             val budget = NodeBudget(1000)
             val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-                localSearch = LocalSearchParams(randomSeed = 17, nodeBudget = budget),
+                localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17, nodeBudget = budget),
             ))
 
             val execution = assertIs<OpenTheoryExecution.Optimize>(LocalSearchSolver.source(source).optimizeOpen(
