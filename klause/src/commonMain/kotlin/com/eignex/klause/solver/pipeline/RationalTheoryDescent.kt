@@ -46,6 +46,7 @@ internal class RationalTheoryDescent(
     private val external: () -> Pair<Sample, BigFraction>? = { null },
 ) : ResumableSearch {
     init {
+        require(!numericalOnly || context != null) { "numerical traversal requires its captured source context" }
         require(
             publicationInvocation == null ||
                 (
