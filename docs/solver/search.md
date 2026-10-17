@@ -376,8 +376,14 @@ filtering, scoring and check roles.
 `SOUND_FILTERING`, `BOUNDS_FILTERING` and `DOMAIN_FILTERING` describe deduction
 mechanisms; they do not promise full consistency at every size or resource limit.
 AllDifferent filtering selects its cached incremental path before the full matching
-fallback. The fallback retains value mapping, matching, Hall reasons, pruning and
-cache publication in one private phase with borrowed state.
+fallback. The fallback separates warm seeding, Hall failure recovery, free-value
+reachability and unsupported-edge pruning over borrowed graph and matching state.
+Excepted-value copies retain their traversal order and remain shareable during
+pruning. Matching and fixpoint publication follow successful pruning; a failed
+exclusion returns its Hall conflict before either cache publication.
+The incremental rebuild separates value counting, warm seeding, Hall recovery,
+matching publication and fixpoint recording. Matching publication precedes SCC
+pruning; validity and domain-reference publication follow successful pruning.
 
 Complete finite checks pin the full assignment and run a completed CP fixpoint.
 They stop after an interrupted root or before further coordinate pins when their
