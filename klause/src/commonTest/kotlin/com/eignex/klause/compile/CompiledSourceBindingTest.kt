@@ -20,8 +20,10 @@ import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -35,6 +37,33 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class CompiledSourceBindingTest {
+    @Test
+    fun `a complete original source arm should retain a point outside its compatibility grid`() {
+        val compiled = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, 2),
+            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -1.0)),
+            "half" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.EQ, 0.5)),
+        )).compile()
+
+        val result = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(compiled).solve())
+
+        assertEquals("1/2", result.assignment.realValue(assertNotNull(compiled.sourceRealId(
+            FloatHandle("x", 0.0, 1.0))).index))
+    }
+
+    @Test
+    fun `private grid exhaustion should retain an incomplete source result`() {
+        val compiled = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, 2),
+            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -1.0)),
+            "half" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.EQ, 0.5)),
+        )).compile()
+
+        val result = assertIs<OpenTheoryResult.Unknown>(LocalSearchSolver.source(compiled).solve())
+
+        assertEquals(TerminationReason.Unsupported, result.reason)
+    }
+
     @Test
     fun `source adapters should retain real declarations beside a selected compatibility grid`() {
         val x = FloatHandle("x", -1.0, 1.0)
@@ -137,12 +166,15 @@ class CompiledSourceBindingTest {
         )).compile()
         val objective = compiled.minimize(x).copy(intCoefficients = longArrayOf(9_007_199_254_740_993L), constant = 7)
 
-        val exact = compiled.sourceBinding.originalObjective(objective)
+        val exact = compiled.sourceObjective(objective)
 
         assertEquals(QuadraticVariable.Real(SourceRealId(0)), exact.terms.single().first)
         assertEquals(QuadraticCoefficient.ofLong(9_007_199_254_740_993L), exact.terms.single().coefficient)
         assertEquals(QuadraticCoefficient.ofLong(7), exact.constant)
+        assertSame(exact, compiled.sourceBinding.originalObjective(objective))
+        assertSame(exact, compiled.sourceObjective(objective))
         assertNull(compiled.sourceBinding.openObjective(objective))
+        assertFailsWith<IllegalArgumentException> { objective.toQuadraticObjectiveSpec() }
     }
 
     @Test
@@ -152,8 +184,9 @@ class CompiledSourceBindingTest {
         val first = definition.compile()
         val second = definition.compile()
 
-        assertFailsWith<IllegalArgumentException> {
-            BacktrackSolver.source(second).optimize(first.minimize(x))
+        for (strategy in listOf(BacktrackSolver.source(second),
+                BacktrackSolver.source(second.sourceBinding.originalProblem))) {
+            assertFailsWith<IllegalArgumentException> { strategy.optimize(first.minimize(x)) }
         }
     }
 

@@ -274,6 +274,7 @@ internal object ObjectiveRepresentationProbe {
                     File(output, "$identity.${engine.name}.$encoding.json").writeText(record.toString() + "\n")
                     continue
                 }
+                var sourceQuadratic = quadratic
                 val execution = if (sourceEntry) {
                     val model = requireNotNull(compiled).model
                     val strategy = if (engine == FiniteEngine.BACKTRACK) BacktrackSolver.source(model)
@@ -283,13 +284,14 @@ internal object ObjectiveRepresentationProbe {
                         val paired = helper?.copy(boolWeights = affine.boolWeights,
                             intCoefficients = affine.intCoefficients, constant = affine.constant,
                             realCoefficients = affine.realCoefficients) ?: affine
+                        sourceQuadratic = model.sourceObjective(paired)
                         strategy.optimize(paired, params, captured.sense)
                     } else strategy.optimize(quadratic, params, captured.sense)
                 } else (completed as? SourceExecutionResult.Quadratic)?.result
                     ?: error("source setup did not install quadratic optimization: $completed")
                 val elapsed = System.nanoTime() - started
                 val scopeRecord = if (capture) captureRecord(
-                    requireNotNull(compiled), affine, quadratic, pins, identity, execution.result,
+                    requireNotNull(compiled), affine, sourceQuadratic, pins, identity, execution.result,
                     if (sourceEntry) "quadratic" else encoding,
                 ) else null
                 val record = buildJsonObject {

@@ -36,7 +36,11 @@ fun LinearObjective.toQuadraticObjectiveSpec(): QuadraticObjectiveSpec {
             ))
         }
     }
-    return QuadraticObjectiveSpec(terms, QuadraticCoefficient.ofLong(constant))
+    val native = QuadraticObjectiveSpec(terms, QuadraticCoefficient.ofLong(constant))
+    val pairing = sourcePairing ?: return native
+    val original = pairing.original(this)
+    require(original == native) { "private compiled objectives require CompiledSchema.sourceObjective" }
+    return original
 }
 
 /** Capture lowered affine coefficients without changing source namespaces or binary64 authority. */

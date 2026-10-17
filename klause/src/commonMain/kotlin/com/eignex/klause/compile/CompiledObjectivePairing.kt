@@ -20,9 +20,15 @@ internal class CompiledObjectivePairing private constructor(
     private val constant: QuadraticCoefficient,
     private val native: LinearObjective,
 ) : SourceObjectivePairing {
+    private val exact: QuadraticObjectiveSpec by lazy { original() }
+
     override fun original(objective: LinearObjective): QuadraticObjectiveSpec {
         require(objective.sourcePairing === this) { "objective does not retain its compiled pairing" }
         requireNative(objective)
+        return exact
+    }
+
+    private fun original(): QuadraticObjectiveSpec {
         val terms = ArrayList<QuadraticObjectiveTerm>()
         fun append(coordinates: List<QuadraticVariable?>, weights: List<QuadraticCoefficient?>) {
             for ((id, captured) in weights.withIndex()) {
