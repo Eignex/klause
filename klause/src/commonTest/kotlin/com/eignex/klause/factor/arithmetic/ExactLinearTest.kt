@@ -15,6 +15,9 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.LeafRealSolver
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
@@ -27,12 +30,55 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class ExactLinearTest {
+    @Test
+    fun `word sized constants should reject a pinned activity beyond signed 128 bits`() {
+        for (coefficient in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
+            for (relation in listOf(LinearOp.LE, LinearOp.GE)) {
+                val positiveActivity = relation == LinearOp.LE
+                val value = if (positiveActivity == (coefficient > 0L)) Long.MAX_VALUE else Long.MIN_VALUE
+                val row = ExactLinear.of(IntArray(4) { Term.ofIntVar(it) },
+                    List(4) { BigFraction.ofLong(coefficient) }, relation, BigFraction.ZERO)
+                val state = PropagationState(Problem(0, 4,
+                    Array(4) { IntDomain(value, value) }, arrayOf(row)), Assumptions.None)
+
+                val consistent = state.factorAt(0).propagate(state, 0)
+
+                assertFalse(consistent, "$coefficient $relation")
+            }
+        }
+    }
+
+    @Test
+    fun `reified word endpoint comparisons should enforce either truth direction exactly`() {
+        for (relation in listOf(LinearOp.LE, LinearOp.GE)) {
+            for (bound in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
+                for (value in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
+                    for (strict in listOf(false, true)) {
+                        for (indicator in listOf(false, true)) {
+                            val row = ExactLinear.of(IntArray(2) { Term.ofIntVar(it) },
+                                List(2) { BigFraction.ONE }, relation, BigFraction.ofLong(bound), strict, activator = 0)
+                            val state = PropagationState(Problem(1, 2,
+                                Array(2) { IntDomain(value, value) }, arrayOf(row)), Assumptions.None)
+                            state.pinBool(0, indicator)
+                            val holds = (relation == LinearOp.GE) == (value == Long.MAX_VALUE)
+
+                            val consistent = state.factorAt(0).propagate(state, 0)
+
+                            assertEquals(holds == indicator, consistent, "$relation $bound $value $strict $indicator")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     fun `integer source row repairs should cross holes toward a satisfying point`() {
         val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE),
