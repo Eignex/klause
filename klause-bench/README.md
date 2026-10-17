@@ -2378,6 +2378,8 @@ and except-zero its 150. No solver or fixture source is edited.
 
 The owned build compiles the pinned test outputs through
 `compilation-study/fixture-classpath.init.gradle`, outside all measurements.
+This export command disables configuration caching because its task action reads
+the live test compilation model.
 Installed production CLI jars precede the byte-retained test outputs,
 test-only dependencies and observer probe jar. Same-name dependencies must match
 the original CLI bytes; both Regin facades must load from its exact original jar,

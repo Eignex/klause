@@ -91,7 +91,8 @@ internal object OriginalFixtureAllocationStudy {
             listOf("./gradlew", ":klause:writeOriginalFixtureClasspath",
                 "-Pklause.fixture.classpath=${classpathFile.path}", "--init-script",
                 File(out, "jvm-only.init.gradle").path, "--init-script", initialization.path,
-                "--max-workers=2", "--no-daemon", "-Pkotlin.compiler.execution.strategy=in-process"))
+                "--max-workers=2", "--no-daemon", "--no-configuration-cache",
+                "-Pkotlin.compiler.execution.strategy=in-process"))
         check(CompilationStudyDistributions.identity(initialization) == scriptIdentity)
         check(CompilationStudyBuilds.command(build.root, out, "${build.arm}-clean-fixture-after",
             listOf("git", "status", "--porcelain")).isBlank())
