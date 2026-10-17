@@ -335,7 +335,10 @@ fast path retains the bank's spent balance; retraction, restart, release and clo
 invalidate its point without replenishing credit. Only a later required producer
 query and a fresh parent precharge can fund another generation. Advisory exhaustion
 withholds optional preferences and supplies no search stop or source evidence.
-Containing cancellation and native stops retain their existing reporting and priority.
+Containing cancellation and native stops retain their existing reporting and priority,
+including when the private bank also runs out. A real stop during precharge withholds
+both deferred publication and eager fallback. A refused consultation debit polls the
+containing stop and returns before allocating evaluation tokens or visiting rows.
 For a default opening with an established complete pure-real difference graph,
 an at-most-one or exactly-one source Boolean cardinality over three or more
 literals retains direct comparison guidance under the existing operation token.

@@ -447,6 +447,7 @@ class ExactLiraSearchComponent private constructor(
         val value = prepaid.values.getOrNull(variable) ?: return null
         if (containingHintStopped(current)) return null
         prepaid.charge(1L)
+        if (prepaidHintStopped(current, prepaid)) return null
         var preference = value
         if (value <= PREPAID_HINT_PENDING) {
             val token = prepaid or pointHintStop or parentStop or current.executionControls.cancellation or
@@ -480,15 +481,7 @@ class ExactLiraSearchComponent private constructor(
         } else {
             observeCompleteStage("POINT_HINT_PREPAID_CACHE_HIT")
         }
-        if (prepaid.exhausted) {
-            prepaid.invalidate()
-            pointHintValues = null
-            observeCompleteStage("POINT_HINT_PREPAID_EXHAUSTED")
-            return null
-        }
-        if (containingHintStopped(current) || pointHintStop() || prepaid.point !== point ||
-            !partialPointHintAvailable()
-        ) {
+        if (prepaidHintStopped(current, prepaid) || prepaid.point !== point || !partialPointHintAvailable()) {
             return null
         }
         prepaid.values[variable] = preference
@@ -497,6 +490,17 @@ class ExactLiraSearchComponent private constructor(
             FALSE -> false
             else -> null
         }
+    }
+
+    private fun prepaidHintStopped(current: SearchContext, prepaid: PrepaidIntegerPointHints): Boolean {
+        val containingStopped = containingHintStopped(current)
+        if (prepaid.exhausted) {
+            prepaid.invalidate()
+            pointHintValues = null
+            observeCompleteStage("POINT_HINT_PREPAID_EXHAUSTED")
+            return true
+        }
+        return containingStopped || pointHintStop()
     }
 
     private fun containingHintStopped(current: SearchContext): Boolean {
@@ -536,7 +540,9 @@ class ExactLiraSearchComponent private constructor(
             ?: IntArray(model.numBoolVars) { UNASSIGNED }
         val prepaid = prepaidPointHints
         if (prepaid != null && capturePrepaidPoint(point, context, rows, prepaid)) return
-        if (operationStop() || pointHintStop() || context.cancelled()) return
+        if (operationStop() || pointHintStop() || context.cancelled() || context.executionControls.exhausted) {
+            return
+        }
         for (prepared in rows) {
             operationStop.charge(1)
             if (operationStop() || pointHintStop()) return
@@ -597,7 +603,9 @@ class ExactLiraSearchComponent private constructor(
         if (operationStop() || pointHintStop()) return false
         operationStop.charge(PREPAID_HINT_WORK)
         observeCompleteStage("POINT_HINT_PREPAID_CHARGED")
-        if (operationStop() || pointHintStop() || context.cancelled()) return false
+        if (operationStop() || pointHintStop() || context.cancelled() || context.executionControls.exhausted) {
+            return false
+        }
         prepaid.fund(point)
         pointHintValues = prepaid.values
         pointHintLevel = context.decisionLevel

@@ -49,6 +49,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.ComparableTimeMark
 
 class QfLiraSolverHintsTest {
     @Test
@@ -973,6 +974,80 @@ class QfLiraSolverHintsTest {
             assertIs<ComponentResult.Indeterminate>(initialized)
             assertNull(hints.preferredBool(0))
             assertEquals(SearchStopCause.OperationAllowance, session.executionControls.stopCause)
+        }
+    }
+
+    @Test
+    fun `native exhaustion during precharge should publish neither prepaid nor eager hints`() {
+        var nativeStopped = false
+        val producer = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { units ->
+                if (units == 65_536L) nativeStopped = true
+            }
+        }
+        val accounting = object : SearchExecutionAccounting {
+            override val exhausted: Boolean get() = nativeStopped
+        }
+        val controls = SearchExecutionControlAdapter(Cancellation.Never, accounting)
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            component.useSolveStop(producer)
+            component.observeWith(stats)
+            component.observeCompleteTraversal()
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2), executionControls = controls)
+
+            session.initialize()
+
+            assertNull(hints.preferredBool(0))
+            assertEquals(SearchStopCause.WorkAllowance, controls.stopCause)
+            assertEquals(1L, stats.snapshot().completeSearchStages?.get("POINT_HINT_PREPAID_CHARGED"))
+            assertNull(stats.snapshot().completeSearchStages?.get("POINT_HINT_PREPAID_CAPTURE"))
+            assertNull(stats.snapshot().completeSearchStages?.get("POINT_HINT_LP_CAPTURE"))
+        }
+    }
+
+    @Test
+    fun `private hint exhaustion should retain a simultaneous parent stop before further work`() {
+        for (arithmetic in listOf(false, true)) {
+            var armed = false
+            var parentPolls = 0
+            var deadlineReads = 0
+            val parent = object : Cancellation {
+                override fun isCancelled(): Boolean = armed && ++parentPolls >= if (arithmetic) 6 else 4
+                override fun deadline(): ComparableTimeMark? {
+                    deadlineReads++
+                    return null
+                }
+            }
+            val model = Problem(
+                numBoolVars = 3,
+                intBounds = openBounds(),
+                factors = arrayOf(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                    ReifiedPseudoBoolean(1, longArrayOf(1), intArrayOf(Lit.make(2, true)), PbOp.GE, 1),
+                ),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                component.useSolveStop(parent)
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                repeat(65_536 - if (arithmetic) 1 else 0) { hints.preferredBool(1) }
+                assertTrue(component.partialPointHintAvailable())
+                val priorDeadlineReads = deadlineReads
+
+                armed = true
+                val preference = hints.preferredBool(0)
+
+                assertNull(preference)
+                assertEquals(SearchStopCause.OperationAllowance, session.executionControls.stopCause)
+                if (arithmetic) assertTrue(deadlineReads > priorDeadlineReads)
+                else assertEquals(priorDeadlineReads, deadlineReads)
+                assertNull(session.boolValue(0))
+            }
         }
     }
 
