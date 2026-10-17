@@ -137,9 +137,6 @@ object SourceSetup {
             polynomialCancellation = polynomialCancellation or stop,
             onLpStats = onLpStats,
         )
-        val selected = if (route is SourceProblemRoute.PolynomialTheory &&
-            request.objective?.realCoefficientValues?.any { it != 0.0 } == true
-        ) SourceProblemRoute.NativeFormula(NativeSourceExecution.Polynomial(route.request)) else route
-        return PreparedSourceInvocation(request, selected, stop)
+        return PreparedSourceInvocation(request, route, stop)
     }
 }
