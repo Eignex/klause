@@ -165,13 +165,17 @@ object EncoderProviderProfile {
                         if (engine == "cp") {
                             BacktrackSolver.source(factorSource(problem)).withProjectionProviders(providers)
                                 .solve(
-                                    BacktrackParams(cancellation = stop, randomSeed = seed, nodeBudget = selectedBudget),
+                                    BacktrackParams(
+                                        cancellation = stop, randomSeed = seed, nodeBudget = selectedBudget,
+                                    ),
                                     theory = theory,
                                 )
                         } else {
                             LocalSearchSolver.source(factorSource(problem)).withProjectionProviders(providers)
                                 .solve(
-                                    LocalSearchParams(cancellation = stop, randomSeed = seed, nodeBudget = selectedBudget),
+                                    LocalSearchParams(
+                                        cancellation = stop, randomSeed = seed, nodeBudget = selectedBudget,
+                                    ),
                                     theory = theory,
                                 )
                         }
