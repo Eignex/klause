@@ -70,12 +70,17 @@ internal fun LinearSourceProblem.integralRealBounds(
                 }
                 val first = weight * lo
                 val second = weight * hi
-                minimum += minOf(first, second)
-                maximum += maxOf(first, second)
+                if (first <= second) {
+                    minimum += first
+                    maximum += second
+                } else {
+                    minimum += second
+                    maximum += first
+                }
             }
             if (!supported) continue
-            minimum = lower[target]?.let { maxOf(minimum, it) } ?: minimum
-            maximum = upper[target]?.let { minOf(maximum, it) } ?: maximum
+            lower[target]?.let { if (it > minimum) minimum = it }
+            upper[target]?.let { if (it < maximum) maximum = it }
             if (!minimum.num.fitsLong() || !maximum.num.fitsLong()) continue
             integral[target] = true
             lower[target] = minimum
