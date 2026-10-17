@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.LinearSourceObjective
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.presolve.PresolveBudget
@@ -12,6 +13,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import kotlin.time.Duration
 
 /** Installed execution family, after source routing and operation admission. */
 enum class SourceExecutionKind {
@@ -82,6 +84,8 @@ class SourceExecutionRequest private constructor(
     val nodeBudget: NodeBudget?,
     /** Caller policy retained independently of immutable source declarations. */
     val policy: SourceExecutionPolicy = SourceExecutionPolicy(explicitPresolve = presolveConfig != null),
+    /** Whether the selected preparation phase returns diagnostics without constructing search workers. */
+    val prepareOnly: Boolean = false,
 ) {
     /**
      * Resolve common options once for the captured route. Omitted native limits use their parameter
@@ -142,7 +146,7 @@ class SourceExecutionRequest private constructor(
         invocation, controls.finiteRequest, controls.theory, controls.polynomial, cores,
         controls.presolveConfig, presolveCancellation, presolveBudget,
         controls.nonlinearInteger, controls.transcendental,
-        controls.nodeBudget, policy,
+        controls.nodeBudget, policy, controls.prepareOnly,
     )
 
     /** Bind existing finite, linear or polynomial controls to their captured source. */
@@ -185,7 +189,7 @@ class SourceExecutionRequest private constructor(
         if (invocation.request.engine == FiniteEngine.FIXED && cores > 1) {
             throw PipelineConfigException("engine 'fixed' is single-core; use 'backtrack' for a parallel pool")
         }
-        policy.validate(SourceSetup.executionKind(invocation), invocation.request.engine)
+        policy.validate(SourceSetup.executionKind(invocation), invocation.request.engine, prepareOnly = prepareOnly)
     }
 }
 
@@ -225,6 +229,17 @@ sealed class SourceExecutionResult protected constructor(
     /** Bind an invocation without an additional original-unit linear qualification. */
     protected constructor(invocation: PreparedSourceInvocation) : this(invocation, null)
     override val semantics: EffectiveSourceSemantics = invocation.source.semantics
+
+    /** Source preparation diagnostics, without a solved witness, bound or terminal. */
+    class Prepared internal constructor(
+        invocation: PreparedSourceInvocation,
+        /** Original model before optional preparation. */
+        val originalProblem: Problem,
+        /** Prepared model and phase diagnostics. */
+        val result: OpenPreparation,
+        /** Time spent in the optional preparation phase. */
+        val elapsed: Duration,
+    ) : SourceExecutionResult(invocation)
 
     /** Finite preparation, native outcome and scoped engine evidence. */
     class Finite internal constructor(
@@ -332,15 +347,13 @@ fun SourceSetup.execute(
     request: SourceExecutionRequest,
     callbacks: SourceExecutionCallbacks = SourceExecutionCallbacks(),
 ): SourceExecutionResult {
+    val kind = validateSourceExecution(request)
+    if (request.prepareOnly && kind == SourceExecutionKind.LINEAR) return prepareSourceExecution(request)
     if (request.invocation.linearSource != null) return executeLinearSource(request, callbacks, ::executeCapturedSource)
     return executeCapturedSource(request, callbacks)
 }
 
-private fun executeCapturedSource(
-    request: SourceExecutionRequest,
-    callbacks: SourceExecutionCallbacks,
-    bindScope: ((Cancellation, Boolean) -> Unit)? = null,
-): SourceExecutionResult {
+private fun validateSourceExecution(request: SourceExecutionRequest): SourceExecutionKind {
     val invocation = request.invocation
     invocation.freezeExecution()
     val kind = SourceSetup.executionKind(invocation)
@@ -362,6 +375,16 @@ private fun executeCapturedSource(
     require(request.transcendental == null || kind == SourceExecutionKind.FUNCTIONS) {
         "native function controls require their captured function source"
     }
+    return kind
+}
+
+private fun executeCapturedSource(
+    request: SourceExecutionRequest,
+    callbacks: SourceExecutionCallbacks,
+    bindScope: ((Cancellation, Boolean) -> Unit)? = null,
+): SourceExecutionResult {
+    val invocation = request.invocation
+    val kind = SourceSetup.executionKind(invocation)
     val engine = invocation.request.engine
     return when (val route = invocation.engineRoute) {
         is SourceProblemRoute.NativeFormula -> executeNativeSource(request, route, callbacks)

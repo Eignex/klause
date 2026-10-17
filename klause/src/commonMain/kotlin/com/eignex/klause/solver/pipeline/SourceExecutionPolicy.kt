@@ -64,18 +64,29 @@ class SourceExecutionPolicy(
         val reader = executionOptions.reader()
         val preparation = reader.presolve(presolveConfig)
         val seed = reader[ExecutionOption.seed] ?: randomSeed ?: 0L
+        val preparationOnly = reader[ExecutionOption.dryRunPresolve] == true || prepareOnly
         return FiniteSolveRequest(
             shape, engine, preparation.config, explicitPresolve, solutionSetSensitive,
             cancellation, presolveCancellation, presolveBudget, cores,
-            options(engine, executionOptions.withoutPresolve()),
+            options(engine, executionOptions.withoutPresolve().without("dry-run-presolve")),
             seed, arms(engine, cores), lpConfig(engine),
             zeroObjectivePricing ?: LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget,
             solveBudgetMillis.takeIf { engine == FiniteEngine.FIXED }, allSolutions, solutionCap,
-            deadlineExceeded, onEvent, onPortfolioEvent, onPortfolioFault, prepareOnly, toleranceCheck,
+            deadlineExceeded, onEvent, onPortfolioEvent, onPortfolioFault, preparationOnly, toleranceCheck,
         )
     }
 
-    internal fun validate(kind: SourceExecutionKind, engine: FiniteEngine, presolveTuning: Boolean = false) {
+    internal fun validate(
+        kind: SourceExecutionKind,
+        engine: FiniteEngine,
+        presolveTuning: Boolean = false,
+        prepareOnly: Boolean = false,
+    ) {
+        if (prepareOnly && kind !in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.LINEAR)) {
+            pipelineConfigError(
+                "dry-run-presolve requires finite or linear source execution; selected ${kind.name.lowercase()}",
+            )
+        }
         val finite = kind == SourceExecutionKind.FINITE || kind == SourceExecutionKind.REFUTED
         if (!finite) {
             if (lpCeiling != null || (engine != FiniteEngine.FIXED && portfolioLpCeiling != null)) {

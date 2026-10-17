@@ -228,6 +228,7 @@ internal fun executeLinearSource(
         }
     }
     when (result) {
+        is SourceExecutionResult.Prepared -> return result
         is SourceExecutionResult.Finite -> (result.result.outcome as? FiniteSolveOutcome.Completed)?.let { completed ->
             sample(completed.bestSample)
             native = when (completed.verdict) {
@@ -374,6 +375,7 @@ internal fun executeLinearSource(
         nativeClaimsUnrestricted, prepared.view.objectiveScale,
     )
     return when (result) {
+        is SourceExecutionResult.Prepared -> result
         is SourceExecutionResult.Finite -> SourceExecutionResult.Finite(invocation, result.result, snapshot)
         is SourceExecutionResult.Linear -> SourceExecutionResult.Linear(invocation, result.result, snapshot)
         is SourceExecutionResult.Numerical -> SourceExecutionResult.Numerical(invocation, result.result, snapshot)

@@ -91,6 +91,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
     /** Tuning and resource settings, separate from source declarations. */
     companion object {
+        /** Stop after supported source or finite preparation without constructing search workers. */
+        val dryRunPresolve: ExecutionOption<Boolean> = ExecutionOption("dry-run-presolve", ValueKind.BOOLEAN)
+
         /** Ordering of pivots during source affine elimination. */
         val affinePivotOrder: ExecutionOption<AffinePivotOrder> =
             ExecutionOption("affine-pivot-order", ValueKind.AFFINE_PIVOT_ORDER)
@@ -351,7 +354,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         internal val byId by lazy {
             listOf(
-                affinePivotOrder, presolveAbortFraction, presolveMaxRounds, presolveProbePerVar, presolveProbeTotal,
+                dryRunPresolve, affinePivotOrder, presolveAbortFraction, presolveMaxRounds,
+                presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,
                 openHintFlips, openHintMinSplits,

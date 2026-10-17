@@ -10,7 +10,6 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
@@ -24,13 +23,11 @@ import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
-import com.eignex.klause.solver.pipeline.SourceExecutionKind
 import com.eignex.klause.solver.pipeline.SourceExecutionPolicy
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.execute
-import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.solver.pipeline.solve
 import com.eignex.klause.solver.pipeline.variablePartition
 import com.eignex.klause.solver.result.LpStats
@@ -81,13 +78,8 @@ internal object SolveCore {
         // `-p N` gives the open portfolio a lane per core, as it does the finite one.
         val openCores = common.parallel ?: 1
         val sourceControls = rawSolvable.sourceInvocation?.let { invocation ->
-            val kind = SourceSetup.executionKind(invocation)
-            val options = common.engineParams.filterNot {
-                it.substringBefore('=') == "dry-run-presolve" &&
-                    kind in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.LINEAR)
-            }
             SourceExecutionRequest(
-                invocation, policy, ExecutionOptions.parse(options),
+                invocation, policy, ExecutionOptions.parse(common.engineParams),
                 finiteRequest = { shape ->
                     finiteRequest(
                         shape, common, engine, openCores, config, solutionSetSensitive,
@@ -109,7 +101,6 @@ internal object SolveCore {
             is SourceRendering.ExactSource -> {
                 solveCapturedSource(
                     rawSolvable, pipeline, common, output, publication, requireNotNull(sourceControls),
-                    config, presolveCancel, presolveBudget,
                 ) { budgetSpent(common, it) }
                 return
             }
@@ -480,7 +471,6 @@ internal object SolveCore {
             onEvent = if (fixed) verboseListener(common.verbose) else null,
             onPortfolioEvent = if (fixed) null else portfolioVerboseListener(common.verbose),
             onPortfolioFault = if (fixed) null else ::warnPortfolioFault,
-            prepareOnly = EngineParams(common.engineParams).bool("dry-run-presolve") == true,
             toleranceCheck = toleranceCheck,
         )
     }
