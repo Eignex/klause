@@ -109,10 +109,13 @@ internal object PolynomialPhaseProfile {
         val factors = original as? Problem
         val polynomial = (invocation.route as? SourceProblemRoute.PolynomialTheory)?.request?.problem
             ?: original as? PolynomialRealProblem
+        fun count(field: String): Int? = polynomial?.let { value ->
+            value.javaClass.getDeclaredField(field).apply { isAccessible = true }.getInt(value)
+        }
         return PhaseSourceShape(
             source.realVarNames.size, source.boolVarNames.size, source.intVarNames.size,
             factors?.numRealVars, factors?.numBoolVars, factors?.numIntVars, factors?.numFactors,
-            polynomial?.realCount, polynomial?.boolCount, invocation.route.javaClass.simpleName,
+            count("totalRealCount"), count("totalBoolCount"), invocation.route.javaClass.simpleName,
             observation.charges,
         )
     }
