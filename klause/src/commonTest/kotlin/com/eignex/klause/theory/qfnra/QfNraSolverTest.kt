@@ -19,6 +19,39 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `affine boundary intersections solve without dense matrix allocation`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (> x0 0) (>= (* x0 x1) 1) (<= (* x0 x1) 2)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val product = algebraic.multiply(witness.realValue(0), witness.realValue(1))
+        assertTrue(algebraic.sign(witness.realValue(0)) > 0)
+        assertTrue(algebraic.compare(product, algebraic.rational(BigFraction.ONE)) >= 0)
+        assertTrue(algebraic.compare(product, algebraic.rational(BigFraction.ofLong(2))) <= 0)
+        assertEquals(33, witness.realCount)
+    }
+
+    @Test
+    fun `affine projection retains zero leading coefficient fibers`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (>= x0 0) (<= x0 0) (>= (* x0 x1) 0) (>= (+ (* x0 x1) 1) 0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertEquals(0, algebraic.sign(witness.realValue(0)))
+        assertEquals(33, witness.realCount)
+    }
+
+    @Test
     fun `solver should find an exact irrational satisfying section`() {
         val source = SmtLibPolynomial.parse(
             """

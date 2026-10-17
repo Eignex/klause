@@ -41,6 +41,11 @@ constant cases. Principal subresultant coefficients use the truncated Sylvester
 matrices for indices 0 through one less than the smaller degree. Index zero is
 the resultant; leading coefficients are separately accessible. Policy chooses
 which polynomials, reducta and coefficient families to project.
+For two inputs affine in the eliminated coordinate, their sole principal subresultant is the exact difference
+of coefficient products. Both eager and prepared paths evaluate that expression
+without allocating a dense matrix. Coefficients can vanish under specialization;
+the identity introduces no nonzero premise or division. Prepared products retain
+their ordinary cancellation and suspension checkpoints.
 
 Prepared subresultant cursors retain private matrices, pivot signs, previous divisors
 and pending polynomial products across caller checkpoints. Multiplication snapshots
@@ -60,6 +65,8 @@ by default and do not select operations or change limits. The phase diagnostic
 records immutable operand references during execution and reads their sizes after
 the query stops; native arithmetic charges remain unchanged. A recorded matrix
 request can precede allocation refusal and does not certify a completed operation.
+The reported minor order also describes a matrix-free affine determinant; it does
+not assert that a matrix was allocated.
 
 ## Rational roots and scalar identity
 

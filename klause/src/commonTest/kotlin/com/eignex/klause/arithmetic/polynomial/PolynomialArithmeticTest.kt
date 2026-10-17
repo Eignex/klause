@@ -112,6 +112,45 @@ class PolynomialArithmeticTest {
     }
 
     @Test
+    fun `affine subresultants agree with Sylvester determinants without matrix allocation`() {
+        val z = Polynomial.variable(2)
+        for ((a, b, c, d) in listOf(
+            listOf(y, Polynomial.ONE, y, constant(2)),
+            listOf(arithmetic.add(y, Polynomial.ONE), arithmetic.subtract(arithmetic.power(z, 2), Polynomial.ONE),
+                arithmetic.subtract(y, Polynomial.ONE), arithmetic.add(z, constant(2))),
+        )) {
+            val left = arithmetic.add(arithmetic.multiply(a, x), b)
+            val right = arithmetic.add(arithmetic.multiply(c, x), d)
+            val expected = arithmetic.resultant(left, right, 0)
+            val limited = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0))
+
+            val immediate = limited.principalSubresultants(left, right, 0)
+            val pending = limited.preparePrincipalSubresultants(left, right, 0)
+            var resumed: List<Polynomial>? = null
+            while (resumed == null) resumed = pending.next()
+
+            assertEquals(listOf(expected), immediate)
+            assertEquals(immediate, resumed)
+        }
+    }
+
+    @Test
+    fun `affine subresultant products retain containing cancellation across checkpoints`() {
+        val a = Polynomial.of((0..16).map { PolynomialTerm(Monomial.of(mapOf(1 to it)), BigFraction.ONE) })
+        val b = Polynomial.of((0..16).map { PolynomialTerm(Monomial.of(mapOf(2 to it)), BigFraction.ONE) })
+        val left = arithmetic.add(arithmetic.multiply(a, x), b)
+        val right = arithmetic.add(arithmetic.multiply(b, x), a)
+        var stopped = false
+        val limited = PolynomialArithmetic(Cancellation { stopped }, PolynomialLimits(maxMatrixCells = 0))
+        val pending = limited.preparePrincipalSubresultants(left, right, 0)
+
+        assertNull(pending.next())
+        stopped = true
+
+        assertFailsWith<PolynomialInterrupted> { pending.next() }
+    }
+
+    @Test
     fun `solve cancellation should terminate prepared subresultants`() {
         var stopped = false
         val counted = PolynomialArithmetic(Cancellation { stopped })

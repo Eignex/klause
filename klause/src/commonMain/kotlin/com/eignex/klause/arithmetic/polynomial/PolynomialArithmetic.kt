@@ -230,6 +230,10 @@ internal class PolynomialArithmetic(
         val b = coefficients(right, variable)
         val m = a.lastIndex
         val n = b.lastIndex
+        if (m == 1 && n == 1) {
+            subresultantObserver?.invoke(left, right, variable, 0)
+            return listOf(subtract(multiply(a[1], b[0]), multiply(a[0], b[1])))
+        }
         return (0 until minOf(m, n)).map { index ->
             subresultantObserver?.invoke(left, right, variable, index)
             val matrix = matrix(m.toLong() + n - 2L * index)
@@ -261,6 +265,23 @@ internal class PolynomialArithmetic(
         val b = coefficients(right, variable)
         val m = a.lastIndex
         val n = b.lastIndex
+        if (m == 1 && n == 1) {
+            subresultantObserver?.invoke(left, right, variable, 0)
+            val first = prepareMultiply(a[1], b[0])
+            var ad: Polynomial? = null
+            while (ad == null) {
+                ad = first.next()
+                if (ad == null) yield(null)
+            }
+            val second = prepareMultiply(a[0], b[1])
+            var bc: Polynomial? = null
+            while (bc == null) {
+                bc = second.next()
+                if (bc == null) yield(null)
+            }
+            yield(listOf(subtract(ad, bc)))
+            return@sequence
+        }
         val result = ArrayList<Polynomial>()
         for (index in 0 until minOf(m, n)) {
             subresultantObserver?.invoke(left, right, variable, index)
