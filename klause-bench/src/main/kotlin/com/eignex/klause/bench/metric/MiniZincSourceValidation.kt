@@ -222,8 +222,13 @@ internal object MiniZincSourceValidation {
     }
 }
 
-internal fun SolveRecord.sourceChecked(validation: SourceValidation, approximation: Boolean): SolveRecord {
+internal fun SolveRecord.sourceChecked(
+    validation: SourceValidation,
+    approximation: Boolean,
+    witnessOnly: Boolean = false,
+): SolveRecord {
     val reject = validation.status == "invalid" ||
+        (witnessOnly && (feasible != true || validation.status != "valid")) ||
         (approximation && (feasible == false || (feasible == true && validation.status != "valid")))
     val checkerStats = listOfNotNull(validation.checker?.let { "sourceValidationChecker" to it }).toMap()
     val verifiedStats = stats + checkerStats + mapOf(
@@ -240,7 +245,7 @@ internal fun SolveRecord.sourceChecked(validation: SourceValidation, approximati
         feasible = if (reject) null else feasible,
         objective = if (reject) null else objective,
         exactObjective = if (reject) null else exactObjective,
-        proven = proven && !reject && !approximation,
+        proven = proven && !reject && !approximation && !witnessOnly,
         timeToBestMs = if (reject) null else timeToBestMs,
         processTimeToFirstFeasibleMs = if (reject) null else processTimeToFirstFeasibleMs,
         processTimeToBestMs = if (reject) null else processTimeToBestMs,
