@@ -13721,6 +13721,8 @@ final class com.eignex.klause.solver.pipeline/FiniteSolveRequest { // com.eignex
 final class com.eignex.klause.solver.pipeline/FiniteSolveResult { // com.eignex.klause.solver.pipeline/FiniteSolveResult|null[0]
     constructor <init>(com.eignex.klause.solver.pipeline/FinitePipelinePreparation, kotlin.time/Duration, com.eignex.klause.solver.pipeline/FiniteSolveOutcome) // com.eignex.klause.solver.pipeline/FiniteSolveResult.<init>|<init>(com.eignex.klause.solver.pipeline.FinitePipelinePreparation;kotlin.time.Duration;com.eignex.klause.solver.pipeline.FiniteSolveOutcome){}[0]
 
+    final val completeSearchAdmitted // com.eignex.klause.solver.pipeline/FiniteSolveResult.completeSearchAdmitted|{}completeSearchAdmitted[0]
+        final fun <get-completeSearchAdmitted>(): kotlin/Boolean? // com.eignex.klause.solver.pipeline/FiniteSolveResult.completeSearchAdmitted.<get-completeSearchAdmitted>|<get-completeSearchAdmitted>(){}[0]
     final val nativeGridOutcome // com.eignex.klause.solver.pipeline/FiniteSolveResult.nativeGridOutcome|{}nativeGridOutcome[0]
         final fun <get-nativeGridOutcome>(): com.eignex.klause.solver.pipeline/NativeGridOutcome? // com.eignex.klause.solver.pipeline/FiniteSolveResult.nativeGridOutcome.<get-nativeGridOutcome>|<get-nativeGridOutcome>(){}[0]
     final val outcome // com.eignex.klause.solver.pipeline/FiniteSolveResult.outcome|{}outcome[0]
@@ -17287,6 +17289,8 @@ sealed class com.eignex.klause.solver.pipeline/PortfolioPlan { // com.eignex.kla
 }
 
 sealed class com.eignex.klause.solver.pipeline/SourceExecutionResult : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.solver.pipeline/SourceExecutionResult|null[0]
+    final val completeSearchAdmitted // com.eignex.klause.solver.pipeline/SourceExecutionResult.completeSearchAdmitted|{}completeSearchAdmitted[0]
+        final fun <get-completeSearchAdmitted>(): kotlin/Boolean? // com.eignex.klause.solver.pipeline/SourceExecutionResult.completeSearchAdmitted.<get-completeSearchAdmitted>|<get-completeSearchAdmitted>(){}[0]
     final val invocation // com.eignex.klause.solver.pipeline/SourceExecutionResult.invocation|{}invocation[0]
         final fun <get-invocation>(): com.eignex.klause.solver.pipeline/PreparedSourceInvocation // com.eignex.klause.solver.pipeline/SourceExecutionResult.invocation.<get-invocation>|<get-invocation>(){}[0]
     final val linearSource // com.eignex.klause.solver.pipeline/SourceExecutionResult.linearSource|{}linearSource[0]
