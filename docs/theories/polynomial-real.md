@@ -738,6 +738,18 @@ mixed-sign cancellation remain admitted. This complete proof pass shares the
 query's native work and cancellation owner; it does not re-enter the bounded
 witness probe or alter its original admission and attempt limits.
 
+After graph and affine reduction, each complete region can also supply necessary
+closed rational magnitude bounds. In an oriented sum of nonnegative even
+monomials bounded above by a nonnegative constant, a pure even-power summand
+bounds its coordinate. A zero ceiling forces that coordinate to zero; otherwise
+the maximum of one and the ceiling-to-coefficient ratio is a conservative radius.
+This inference takes no roots and retains boundary equality. Mixed-sign or
+odd-power summands supply no such premise. Exact monomial and sum enclosures
+use the retained radii; an unbounded coordinate withholds that enclosure. Only an
+enclosure excluding a required relation refutes the region. Bounds belong to that
+region, retain the same arithmetic token and kernel power representation checks,
+and supply no satisfying assignment. An unfinished pass withholds the refutation.
+
 Projection records a permutation of all original coordinates and any further total graph
 sections. Dependencies in those sections occupy earlier lifting levels. Prefix literal checks
 use those levels rather than source coordinate IDs. Fixed coordinates retain their
