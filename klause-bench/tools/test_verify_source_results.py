@@ -12,16 +12,99 @@ class ProofCheckTest(unittest.TestCase):
     source = '(declare-const x Real) (assert (>= x (/ 1 3))) (minimize x)'
     mps_source = 'NAME fixture\nROWS\n N obj\n E row\nCOLUMNS\n x obj 0.1 row 1\nRHS\n rhs row 1 obj 0.2\nBOUNDS\n FR b x\nENDATA\n'
 
-    def case(self, suite='smtlib-core', arm='fast-exact', **updates):
+    def case(self, suite='smtlib-core', arm='fast-exact', source_tolerance=None, **updates):
         record = dict(problem='fixture', gitSha='fixture', kind='optimize', sourceHashes={'model': 'fixture'}, feasible=True,
                       proven=True, objective='1/3', maximize=False,
                       finalWitness='((define-fun x () Real (/ 1.0 3.0)))')
         record.update(updates)
-        return dict(index=0, status='DONE', arm=arm, problem={'suite': suite}, record=record)
+        case = dict(index=0, status='DONE', arm=arm, problem={'suite': suite}, record=record)
+        if source_tolerance is not None:
+            case['sourceTolerance'] = source_tolerance
+        return case
 
     def check(self, case, source=None):
         with mock.patch.object(proof_check, 'source', return_value=source or self.source):
             return proof_check.check([case])[0]['check']
+
+    def test_captured_mps_optimum_excludes_better_tolerance_accepted_points(self):
+        case = self.case(suite='mps-core', arm='default', objective=None, exactObjective='-1/10',
+                         source_tolerance={'absolute': '1e-7', 'relative': '1e-7'},
+                         finalWitness='v x=1', stats={'sourcePolicy': 'captured-linear-source'})
+
+        with self.assertRaisesRegex(AssertionError, 'strictly better source objective exclusion expected unsat'):
+            self.check(case, self.mps_source)
+
+    def test_captured_mps_infeasibility_cannot_refute_a_tolerance_accepted_point(self):
+        source = ('ROWS\n N cost\n E first\n E second\nCOLUMNS\n x cost 1 first 1\n'
+                  ' x second 1\nRHS\n r first 0 second 0.00000001\nBOUNDS\n FR b x\nENDATA\n')
+        case = self.case(suite='mps-core', arm='default', feasible=False, objective=None, finalWitness=None,
+                         source_tolerance={'absolute': '1e-7', 'relative': '1e-7'},
+                         stats={'sourcePolicy': 'captured-linear-source'})
+
+        with self.assertRaisesRegex(AssertionError, 'source infeasibility expected unsat'):
+            self.check(case, source)
+
+    def test_captured_exact_mps_retains_nominal_infeasibility(self):
+        source = ('ROWS\n N cost\n E first\n E second\nCOLUMNS\n x cost 1 first 1\n'
+                  ' x second 1\nRHS\n r first 0 second 0.00000001\nBOUNDS\n FR b x\nENDATA\n')
+        case = self.case(suite='mps-core', feasible=False, objective=None, finalWitness=None,
+                         source_tolerance={'absolute': '0', 'relative': '0'},
+                         stats={'sourcePolicy': 'captured-linear-source'})
+
+        result = self.check(case, source)
+
+        self.assertEqual(result['sourceQuerySemantics'], 'exact source')
+        self.assertEqual(result['verdictCheck'], 'source unsat')
+
+    def test_captured_mps_queries_do_not_reuse_nominal_proof_checks(self):
+        legacy = self.case(suite='mps-core', arm='default', objective=None, exactObjective='-1/10', finalWitness='v x=1')
+        captured = self.case(suite='mps-core', arm='default', objective=None, exactObjective='-1/10',
+                             source_tolerance={'absolute': '1e-7', 'relative': '1e-7'},
+                             finalWitness='v x=1', stats={'sourcePolicy': 'captured-linear-source'})
+        captured['index'] = 1
+
+        with mock.patch.object(proof_check, 'source', return_value=self.mps_source):
+            with self.assertRaisesRegex(AssertionError, 'strictly better source objective exclusion expected unsat'):
+                proof_check.check([legacy, captured])
+
+    def test_captured_mps_integer_optimum_covers_tolerance_acceptance(self):
+        source = 'ROWS\n N cost\nCOLUMNS\n x cost 1\nBOUNDS\n BV b x\nENDATA\n'
+        case = self.case(suite='mps-core', arm='default', objective=None, exactObjective='0', finalWitness='v x=0',
+                         source_tolerance={'absolute': '1e-7', 'relative': '1e-7'},
+                         stats={'sourcePolicy': 'captured-linear-source'})
+
+        result = self.check(case, source)
+
+        self.assertEqual(result['sourceQuerySemantics'], 'MPS tolerance acceptance')
+        self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
+
+    def test_captured_mps_requires_explicit_tolerance_metadata(self):
+        case = self.case(suite='mps-core', arm='default', proven=False, objective=None, finalWitness='v x=1',
+                         stats={'sourcePolicy': 'captured-linear-source'})
+
+        with self.assertRaisesRegex(AssertionError, 'captured MPS source tolerance is absent'):
+            self.check(case, self.mps_source)
+
+    def test_captured_mps_cache_keeps_distinct_tolerance_policies(self):
+        cases = [self.case(suite='mps-core', arm='default', proven=False, objective=None, finalWitness='v x=1.000001',
+                           source_tolerance={'absolute': absolute, 'relative': '0'},
+                           stats={'sourcePolicy': 'captured-linear-source'}) for absolute in ('1e-5', '1e-7')]
+        cases[1]['index'] = 1
+
+        accepted = self.check(cases[0], self.mps_source)
+        self.assertTrue(accepted['toleranceAccepted'])
+        self.assertEqual(accepted['sourceTolerance'], {'absolute': '1/100000', 'relative': '0'})
+        with mock.patch.object(proof_check, 'source', return_value=self.mps_source):
+            with self.assertRaisesRegex(AssertionError, 'MPS point exceeds source tolerance'):
+                proof_check.check(cases)
+
+    def test_captured_exact_mps_rejects_nonzero_policy_metadata(self):
+        case = self.case(suite='mps-core', proven=False, objective=None, finalWitness='v x=1',
+                         source_tolerance={'absolute': '1e-7', 'relative': '0'},
+                         stats={'sourcePolicy': 'captured-linear-source'})
+
+        with self.assertRaisesRegex(AssertionError, 'exact MPS request has nonzero captured tolerance'):
+            self.check(case, self.mps_source)
 
     def test_original_mps_root_bounds_use_minimized_source_units_in_either_sense(self):
         for sense, bound in [('MIN', 3.125), ('MAX', -4.625)]:
