@@ -556,8 +556,12 @@ lanes retain their selected recipes.
 
 A curated sequential mixed finite optimization pool with at least six configured
 slots appends an applicable aggressive LP companion for models composed entirely
-of ordinary integer linear rows and an objective over integer coordinates. Existing worker positions
-and seeds remain stable. Size and technique ceilings control applicability; assembled
+of ordinary integer linear rows and an objective over integer coordinates. Unconditional
+exact rows with signed-word integral constants and only integer references share that
+eligibility after denominator clearing and normalization of strict integer bounds. Real,
+wide, reified and indicator exact rows do not establish this model fact. Source
+validation and proof authority remain with the execution binding. Existing worker
+positions and seeds remain stable. Size and technique ceilings control applicability; assembled
 column integrality and source mapping control cut work. The companion also runs
 under a cuts-off ceiling, allowing separation to vary without removing its bound
 search. Explicit pools, annotations, backtrack edits and parallel or single-engine

@@ -5,13 +5,24 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.toBacktrackParams
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
+import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.ValueSelection
 import com.eignex.klause.ir.VariableSelection
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemClass
+import com.eignex.klause.solver.ProblemProfile
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -216,6 +227,46 @@ class PortfolioCompositionTest {
         )
 
         assertEquals(baseline.map { it.label } + "lp-aggressive", composed.map { it.label })
+    }
+
+    @Test
+    fun `exact integer equivalents should preserve ordinary row composition under caller controls`() {
+        val ordinary = Problem(0, 2, Array(2) { IntDomain(0, 5) }, arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+        )).bake()
+        val refs = intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1))
+        val half = BigFraction.of(bigIntOf(1), bigIntOf(2))
+        val rows = listOf(
+            ExactLinear.of(refs, List(2) { BigFraction.ONE }, LinearOp.GE, BigFraction.ofLong(3)),
+            ExactLinear.of(refs, List(2) { half }, LinearOp.GE, BigFraction.of(bigIntOf(3), bigIntOf(2))),
+            ExactLinear.of(refs, List(2) { BigFraction.ONE }, LinearOp.GE, BigFraction.ofLong(2), strict = true),
+        )
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val controls = listOf(
+            scenario,
+            scenario.copy(lpCeiling = LpConfig.OFF),
+            scenario.copy(lpCeiling = LpConfig.parse("aggressive,-cuts")),
+            scenario.copy(cores = 2),
+            scenario.copy(engine = EngineMix.BACKTRACK),
+            scenario.copy(kind = Kind.CSP),
+            scenario.copy(arms = 5),
+            scenario.copy(btEdit = { it }),
+            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
+            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
+            scenario.copy(annotationArm = BacktrackParams()),
+        )
+        for (row in rows) {
+            val exact = Problem(0, 2, Array(2) { IntDomain(0, 5) }, arrayOf<Factor>(row)).bake()
+            for (control in controls) {
+                val ordinaryFacts = ProblemFacts.of(ordinary, ProblemProfile.of(ordinary, true), control.lpCeiling)
+                val exactFacts = ProblemFacts.of(exact, ProblemProfile.of(exact, true), control.lpCeiling)
+                val expected = PortfolioComposition.compose(control, ordinaryFacts).map { it.label }
+
+                val composed = PortfolioComposition.compose(control, exactFacts)
+
+                assertEquals(expected, composed.map { it.label })
+            }
+        }
     }
 
     @Test
