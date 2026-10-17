@@ -66,7 +66,7 @@ def source_sexprs(commands):
 
     def power(base, exponent):
         if exponent == 0:
-            return ['+', ['*', '0', base], '1']
+            return ['^', base, '0']
         if exponent == 1:
             return ['*', '1', base]
         bindings, selected = [], []
