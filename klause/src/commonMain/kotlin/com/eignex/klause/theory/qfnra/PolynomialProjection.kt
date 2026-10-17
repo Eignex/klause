@@ -228,6 +228,8 @@ private fun reducta(
         val coefficient = coefficients[degree]
         if (coefficient.isZero) continue
         result.add(remaining)
+        // A nonzero rational leading coefficient preserves this degree on every base cell.
+        if (coefficient.mainVariable == null) break
         val leading = arithmetic.multiply(coefficient, arithmetic.power(Polynomial.variable(variable), degree))
         remaining = arithmetic.subtract(remaining, leading)
     }

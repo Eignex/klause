@@ -11,12 +11,23 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PolynomialProjectionTest {
     private val arithmetic = PolynomialArithmetic()
     private val x = Polynomial.variable(0)
     private val y = Polynomial.variable(1)
+
+    @Test
+    fun `constant leading coefficients exclude reductum only root boundaries`() {
+        val polynomial = arithmetic.multiply(arithmetic.add(y, x),
+            arithmetic.add(arithmetic.power(y, 2), Polynomial.ONE))
+
+        val projection = PolynomialProjection.compute(listOf(polynomial), 2, arithmetic)
+
+        assertFalse(hasBoundary(projection, BigFraction.ofLong(2).reciprocal()))
+    }
 
     @Test
     fun `a supplied coordinate order retains its projected root change boundary`() {

@@ -700,7 +700,7 @@ lifting level. Equality sections can override the preference while retaining all
 their coordinate dependencies at earlier lifting levels.
 
 For each eliminated top-variable family, the projection contains all coefficient
-polynomials, every principal subresultant coefficient of each nonconstant reductum
+polynomials and every principal subresultant coefficient of each needed nonconstant reductum
 and its derivative, and every principal subresultant coefficient between reducta
 from distinct input polynomials. Equal-degree pairs use the same exact kernel
 operation. Zero and rational constant projections add no boundaries. Projection
@@ -710,8 +710,11 @@ normalization concerns zero loci and does not provide signed source-atom truth.
 Coefficient signs preserve degree and identically-zero specializations over a base
 cell. Subresultant vanishing preserves distinct-root counts and common-root
 structure. Together they preserve delineability, including repeated roots, shared
-roots and vanishing leading coefficients. The complete projection includes all
-reducta rather than relying on a nonvanishing discriminant or leading coefficient.
+roots and vanishing leading coefficients. The reductum list stops at its first
+nonzero rational leading coefficient. That coefficient cannot vanish under any base
+specialization, so lower degrees cannot occur on that fiber. Variable leading
+coefficients retain the degree-loss reducta; the construction assumes no nonzero
+variable coefficient or discriminant.
 
 ### Lifting and truth
 
