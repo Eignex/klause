@@ -1516,6 +1516,10 @@ residual. This checker does not verify refutations, optimization claims or expor
 proofs. Preserve unknown/decline records and check cancellation charges and portfolio
 arm segments separately from mathematical witness acceptance.
 
+The exact ground function checker retains lexical helper closures and parallel
+`let` bindings. Function `distinct` checks exact operand values and repeated roles;
+uncertified symbolic comparisons remain unavailable.
+
 ### Ground witness profile
 
 `com.eignex.klause.bench.profile.SmtWitnessValidation` evaluates retained complete

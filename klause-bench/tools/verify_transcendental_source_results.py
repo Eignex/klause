@@ -135,24 +135,56 @@ def compare(left, right):
     raise Unavailable('symbolic comparison is not certified')
 
 
-def evaluate(node, values):
+def helper_value(helper, arguments):
+    names, sorts, result, body, values, functions = helper
+    if len(arguments) != len(names):
+        raise ValueError('helper argument count mismatch')
+    for sort, value in zip(sorts, arguments):
+        check_sort(sort, value)
+    result_value = evaluate(body, values | dict(zip(names, arguments)), functions)
+    check_sort(result, result_value)
+    return result_value
+
+
+def check_sort(sort, value):
+    if sort not in ('Bool', 'Int', 'Real'):
+        raise Unavailable('unsupported helper sort')
+    if (sort == 'Bool') != isinstance(value, bool):
+        raise ValueError('helper sort mismatch')
+    if sort == 'Int' and (not isinstance(value, Fraction) or value.denominator != 1):
+        raise ValueError('nonintegral helper value')
+
+
+def evaluate(node, values, functions=None):
+    functions = functions or {}
     if isinstance(node, str):
         if node in ('true', 'false'):
             return node == 'true'
         if symbol(node) in values:
             return values[symbol(node)]
+        if symbol(node) in functions:
+            return helper_value(functions[symbol(node)], [])
         if node == 'pi':
             return ('pi',)
         if re.fullmatch(r'-?\d+(?:\.\d+)?', node):
             return Fraction(node)
         raise Unavailable('unsupported source atom ' + node)
     op, *terms = node
+    if symbol(op) in functions:
+        return helper_value(functions[symbol(op)], [evaluate(term, values, functions) for term in terms])
+    if op == 'let':
+        bindings, body = terms
+        names = [symbol(binding[0]) for binding in bindings]
+        if len(set(names)) != len(names):
+            raise ValueError('duplicate let binding')
+        bound = {name: evaluate(binding[1], values, functions) for name, binding in zip(names, bindings)}
+        return evaluate(body, values | bound, functions)
     if op == 'ite':
-        condition = evaluate(terms[0], values)
+        condition = evaluate(terms[0], values, functions)
         if not isinstance(condition, bool):
             raise ValueError('nonboolean condition')
-        return evaluate(terms[1 if condition else 2], values)
-    arguments = [evaluate(term, values) for term in terms]
+        return evaluate(terms[1 if condition else 2], values, functions)
+    arguments = [evaluate(term, values, functions) for term in terms]
     if op in ('exp', 'log', 'sin', 'cos'):
         return real(op, arguments)
     if op in ('+', '*'):
@@ -174,6 +206,13 @@ def evaluate(node, values):
             raise ValueError('nonboolean logical operand')
         return {'and': lambda: all(arguments), 'or': lambda: any(arguments),
                 'not': lambda: not arguments[0], '=>': lambda: not arguments[0] or arguments[1]}[op]()
+    if op == 'distinct':
+        if any(isinstance(value, bool) for value in arguments):
+            if not all(isinstance(value, bool) for value in arguments):
+                raise ValueError('mixed distinct sorts')
+            return len(set(arguments)) == len(arguments)
+        return all(compare(left, right) != 0 for index, left in enumerate(arguments)
+                   for right in arguments[index + 1:])
     if op in ('=', '<', '<=', '>', '>='):
         if any(isinstance(value, bool) for value in arguments):
             if op != '=' or not all(isinstance(value, bool) for value in arguments):
@@ -187,9 +226,10 @@ def evaluate(node, values):
 
 
 def check_witness(text, witness):
-    declarations, assertions = {}, []
+    declarations, helpers, assertions = {}, {}, []
+    commands = expressions(text)
     queried = False
-    for command in expressions(text):
+    for command in commands:
         op, *arguments = command
         if op in ('declare-const', 'declare-fun'):
             if queried:
@@ -198,13 +238,24 @@ def check_witness(text, witness):
             if op == 'declare-fun' and arguments[1]:
                 raise Unavailable('nonconstant declaration')
             name = symbol(name)
-            if name in declarations or sort not in ('Real', 'Int', 'Bool'):
+            if name in declarations or name in helpers or sort not in ('Real', 'Int', 'Bool'):
                 raise ValueError('invalid declaration')
             declarations[name] = sort
+        elif op == 'define-fun':
+            if queried:
+                raise Unavailable('incremental source')
+            name, parameters, result, body = arguments
+            name = symbol(name)
+            names = [symbol(parameter[0]) for parameter in parameters]
+            sorts = [parameter[1] for parameter in parameters]
+            if name in declarations or name in helpers or len(set(names)) != len(names) or \
+                    result not in ('Bool', 'Int', 'Real') or any(sort not in ('Bool', 'Int', 'Real') for sort in sorts):
+                raise ValueError('invalid helper declaration')
+            helpers[name] = (names, sorts, result, body, set(declarations), helpers.copy())
         elif op == 'assert':
             if queried:
                 raise Unavailable('incremental source')
-            assertions.append(arguments[0])
+            assertions.append((arguments[0], set(declarations), helpers.copy()))
         elif op == 'check-sat':
             if queried:
                 raise Unavailable('multiple queries')
@@ -220,8 +271,20 @@ def check_witness(text, witness):
             raise ValueError('witness sort mismatch')
         if sort == 'Int' and (not isinstance(value, Fraction) or value.denominator != 1):
             raise ValueError('integer witness is not integral')
-    for assertion in assertions:
-        if evaluate(assertion, values) is not True:
+    captured = {}
+
+    def bind(helper):
+        key = id(helper)
+        if key not in captured:
+            names, sorts, result, body, visible, functions = helper
+            captured[key] = (names, sorts, result, body,
+                             {name: values[name] for name in visible},
+                             {name: bind(value) for name, value in functions.items()})
+        return captured[key]
+
+    for assertion, visible, functions in assertions:
+        if evaluate(assertion, {name: values[name] for name in visible},
+                    {name: bind(value) for name, value in functions.items()}) is not True:
             raise ValueError('witness violates source assertion')
 
 
