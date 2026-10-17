@@ -20,6 +20,7 @@ tasks.withType<org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask>().configureEa
 
 dependencies {
     implementation(project(":klause"))
+    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.10")
     implementation("org.xcsp:xcsp3-tools:2.5")
     testImplementation("org.junit.jupiter:junit-jupiter")
     // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.

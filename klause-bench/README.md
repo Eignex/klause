@@ -2649,6 +2649,43 @@ The complete uncompressed report and its summary are each bounded to 512 MiB.
 These limits decline the complete review; they never permit selecting a smaller
 source, class, method, stratum or successful-outcome subset.
 
+`bench.profile.JvmSourceDeclarations` accepts `declarations=` and
+`declarations-sha256=` for an HTTPS source specification with the same schema-1
+`sources` array. Each entry supplies `id`, `path`, `sourceFile`, `sha256` and
+the complete `sourceText`. All entries are byte-authenticated before parsing;
+duplicate JSON keys, IDs and paths, unsafe paths and invalid UTF-8 fail admission.
+Kotlin, Kotlin script and Java files are parsed with the observer's pinned
+Kotlin compiler 2.4.10 PSI implementation. This dependency belongs only to the
+unpublished benchmark module. The observer records its compiler JAR identities
+and checks its installed distribution and runtime before and after processing.
+
+`source-declarations.jsonl.gz` retains source boundaries and every declaration,
+expression, statement, source reference and parser error, with lexical parents.
+Constructors, accessors, local functions, lambdas, default expressions and property
+initializers/delegates retain separate nodes; overloads retain separate ranges.
+Each node has UTF-16 offsets, exact UTF-8 byte offsets/hash and original line
+positions. Literal comment/string text creates no declaration; executable string
+interpolations retain their source constructs. A syntax error
+retains the complete tree and fails the completion; other failures retain a partial
+gzip without accepting its prefix. The complete gzip is round-trip checked.
+The first record declares `source-syntax-columns-v1` and its ordered `nodeColumns`
+and `rangeColumns`. Each `syntax-node` stores the corresponding arrays; its
+`psiKind` is an integer index into preceding `psi-kind` records containing the
+complete compiler PSI class name. The dictionary is shared within the report and
+bounded to 4,096 names. Expanding the column arrays and class index preserves every
+node value and object-key order; the observer checks each round trip before writing.
+`source-start` and `source-end` records bind the nodes to the original file identity
+and retain its complete node/error counts. Inspect or expand actual reports only
+on the supported profiling worker.
+Input JSON is bounded to 128 MiB, total source to 64 MiB and 4,096 files, traversal
+to 10 million PSI nodes and depth 4,096, and the uncompressed report to 512 MiB.
+Bounds decline the complete inventory rather than select a smaller source set.
+This is syntax parsing, without symbol resolution, original-source compilation
+or target-program launch. Source ranges do not establish resolved calls,
+generated JVM members, semantic phases, actual loaded selection or compiler costs.
+Run and inspect actual source/metadata inventories on the supported profiling
+worker and retain complete positive, unavailable and negative results.
+
 The installed-JAR and runtime-image class readers retain every source-debug
 extension as opaque `sourceDebugExtensionContentsBase64`, in the same attribute
 order as `sourceDebugExtensionIdentities`. Empty payloads remain distinct from
