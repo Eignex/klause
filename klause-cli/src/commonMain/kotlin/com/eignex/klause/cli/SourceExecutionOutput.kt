@@ -21,7 +21,6 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
 import kotlin.time.TimeSource
@@ -162,7 +161,6 @@ internal fun solveCapturedSource(
             common.statistics,
             solvable.routingElapsedMs,
             complete,
-            retainHeuristicRefutation = kind == SourceExecutionKind.NONLINEAR_INTEGER,
         )
 
         is SourceExecutionResult.Transcendental -> reportNativeSatisfaction(
@@ -177,7 +175,6 @@ internal fun solveCapturedSource(
             common.statistics,
             solvable.routingElapsedMs,
             complete,
-            retainHeuristicRefutation = false,
         )
 
         is SourceExecutionResult.Declined -> {
@@ -190,24 +187,19 @@ internal fun solveCapturedSource(
     }
 }
 
-private fun reportNativeSatisfaction(
+internal fun reportNativeSatisfaction(
     execution: PolynomialTheoryExecution,
     rendering: SourceRendering.ExactSource,
     output: OutputProtocol,
     statistics: Boolean,
     routingElapsedMs: Long,
-    complete: Boolean,
-    retainHeuristicRefutation: Boolean,
+    completePool: Boolean,
 ) {
-    val result = if (!complete && !retainHeuristicRefutation && execution.result is OpenTheoryResult.Unsat) {
-        OpenTheoryResult.Unknown(TerminationReason.BudgetExhausted, execution.result.stats)
-    } else {
-        execution.result
-    }
+    val result = execution.result
     output.onVerdictContext(
         VerdictContext(
             terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
-            completePool = complete,
+            completePool = completePool,
         ),
     )
     when (result) {
