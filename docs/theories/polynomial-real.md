@@ -669,7 +669,11 @@ available. Ordinary levels use Collins projection. The component reads the
 projection operations and coordinate order.
 The theory does not materialize finite CP domains or depend on the linear engines.
 
-Each complete Boolean region first applies exact affine inequality elimination.
+Each complete Boolean region first substitutes its total required-equation graph
+sections using the same graph-selection primitive as projection, preserving every
+remaining predicate's relation. Completed graphs use the existing section counter,
+including graphs completed before a later interruption or representation decline.
+The region then applies exact affine inequality elimination to the exposed constraints.
 A coordinate qualifies only when every occurrence is a pure linear monomial with a
 nonzero rational coefficient in an inequality. Occurrences in equalities,
 disequalities, powers or variable coefficients retain that coordinate for CAD.
@@ -680,8 +684,9 @@ increase the active constraint count; every completed step removes one coordinat
 from that conjunction. All work and suspension checkpoints use the same query owner.
 
 CAD receives the equivalent reduced conjunction with the original real count and
-the region's source Boolean assignment. After a reduced witness, stored fibres are
-reconstructed in reverse order. Exact algebraic maxima/minima determine the interval;
+the region's source Boolean assignment. After a reduced witness, stored graph and
+interval fibres are reconstructed together in reverse order. A graph evaluates its
+polynomial at the reconstructed remaining coordinates. Exact algebraic maxima/minima determine an interval;
 coincident weak endpoints retain their exact value, and nonempty open intervals use
 certified rational interior samples, including one-sided unbounded intervals.
 Every original coordinate remains in the reconstructed assignment. The original
@@ -711,8 +716,8 @@ equality alone supplies no factor zero or nonzero premise. Other coordinate
 occurrences remain for subsequent projection; only total rational polynomial
 graphs are substituted.
 
-Projection records a permutation of all original coordinates and the total graph
-sections. Graph dependencies occupy earlier lifting levels. Prefix literal checks
+Projection records a permutation of all original coordinates and any further total graph
+sections. Dependencies in those sections occupy earlier lifting levels. Prefix literal checks
 use those levels rather than source coordinate IDs. Fixed coordinates retain their
 source values; graph coordinates are reconstructed by exact evaluation at the
 selected earlier coordinates. Every original declaration remains in the complete
@@ -729,7 +734,7 @@ kernel resource stops propagate without publishing a partial family.
 Construction eliminates total graph coordinates when available, then selects a
 justified required-root coordinate, otherwise follows the captured coordinate
 preference. Required-root selection prefers the earliest eligible elimination
-coordinate in that preference. Complete queries rank the original region
+coordinate in that preference. Complete queries rank the current reduced region
 boundaries by the sum of degrees in each coordinate, then peak degree and number
 of monomials containing it. Smaller scores eliminate first, with descending source
 ID resolving ties. This preference changes no polynomial, declared coordinate,

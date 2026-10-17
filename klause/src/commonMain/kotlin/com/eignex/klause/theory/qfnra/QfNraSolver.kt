@@ -150,7 +150,10 @@ internal class QfNraQuery(
                         work.booleanTheoryConstantRefutations = constants + minOf(1L, Long.MAX_VALUE - constants)
                         continue
                     }
-                    val reducing = PolynomialAffineReduction.prepare(normalized, region, realCount, arithmetic)
+                    val reducing = PolynomialAffineReduction.prepare(normalized, region, realCount, arithmetic) {
+                        val sections = checkNotNull(work.equationalSections)
+                        work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
+                    }
                     var reduction: PolynomialAffineReduction? = null
                     while (reduction == null) {
                         reduction = reducing.next()

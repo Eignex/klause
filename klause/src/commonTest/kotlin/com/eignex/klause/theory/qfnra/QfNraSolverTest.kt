@@ -19,6 +19,44 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `graph reductions and affine fibers reconstruct every original coordinate in reverse order`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= x0 (+ (* x1 x1) 1)) (= x2 (+ x0 x3)) " +
+                "(>= x3 x1) (<= x3 (+ x1 1))))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val square = algebraic.power(witness.realValue(1), 2)
+        assertEquals(0, algebraic.compare(witness.realValue(0),
+            algebraic.add(square, algebraic.rational(BigFraction.ONE))))
+        assertEquals(0, algebraic.compare(witness.realValue(2),
+            algebraic.add(witness.realValue(0), witness.realValue(3))))
+        assertTrue(algebraic.compare(witness.realValue(3), witness.realValue(1)) >= 0)
+        assertTrue(algebraic.compare(witness.realValue(3),
+            algebraic.add(witness.realValue(1), algebraic.rational(BigFraction.ONE))) <= 0)
+        assertEquals(2L, result.stats.equationalSections)
+        assertEquals(33, witness.realCount)
+    }
+
+    @Test
+    fun `graph reductions expose an affine contradiction on remaining coordinates`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (= x0 (+ x1 1)) (>= x0 0) (<= x1 (- 2))))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+        assertEquals(1L, result.stats.equationalSections)
+    }
+
+    @Test
     fun `affine elimination preserves strictness at coincident endpoints`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         for ((relation, feasible) in listOf(">=" to true, ">" to false)) {

@@ -269,7 +269,7 @@ private fun monomialLeaders(
     return leaders
 }
 
-private fun inconsistentEquations(equations: List<Polynomial>, arithmetic: PolynomialArithmetic): Boolean {
+internal fun inconsistentEquations(equations: List<Polynomial>, arithmetic: PolynomialArithmetic): Boolean {
     for (equation in equations) {
         arithmetic.step()
         if (!equation.isZero && equation.variables.isEmpty()) return true

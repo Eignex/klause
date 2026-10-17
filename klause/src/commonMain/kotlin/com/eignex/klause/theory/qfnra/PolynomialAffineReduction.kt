@@ -25,6 +25,11 @@ internal class PolynomialAffineReduction private constructor(
         }
         for (fibre in fibres.asReversed()) {
             arithmetic.step()
+            val graph = fibre.point
+            if (graph != null) {
+                point[fibre.variable] = algebraic.evaluate(graph, point)
+                continue
+            }
             val lower = endpoint(fibre.lower, point, true, arithmetic, algebraic)
             val upper = endpoint(fibre.upper, point, false, arithmetic, algebraic)
             check(lower != null || upper != null)
@@ -43,6 +48,7 @@ internal class PolynomialAffineReduction private constructor(
             region: PolynomialBooleanRegion,
             realCount: Int,
             arithmetic: PolynomialArithmetic,
+            onGraph: (() -> Unit)? = null,
         ): Iterator<PolynomialAffineReduction?> = sequence {
             var current = region.atoms.map { (index, truth) ->
                 arithmetic.step()
@@ -50,7 +56,34 @@ internal class PolynomialAffineReduction private constructor(
                 if (truth) atom else PolynomialAtom(atom.polynomial, complement(atom.relation))
             }
             val fibres = ArrayList<AffineFibre>()
+            var inconsistent = false
             while (true) {
+                val equations = current.mapNotNull { atom ->
+                    arithmetic.step()
+                    if (atom.relation == PolynomialRelation.EQ) atom.polynomial else null
+                }
+                if (inconsistentEquations(equations, arithmetic) || zeroContradiction(current, arithmetic)) {
+                    inconsistent = true
+                    break
+                }
+                val graph = equationalSection(equations, current.map { arithmetic.step(); it.polynomial }, arithmetic)
+                    ?: break
+                val rewritten = ArrayList<PolynomialAtom>()
+                for (atom in current) {
+                    arithmetic.step()
+                    val polynomial = if (graph.variable in atom.polynomial.variables) {
+                        arithmetic.substitute(atom.polynomial, graph.variable, graph.replacement)
+                    } else atom.polynomial
+                    rewritten.add(PolynomialAtom(polynomial, atom.relation))
+                    yield(null)
+                }
+                arithmetic.step()
+                fibres.add(AffineFibre(graph.variable, graph.replacement, emptyList(), emptyList()))
+                current = rewritten
+                onGraph?.invoke()
+                yield(null)
+            }
+            while (!inconsistent) {
                 val variable = affineCoordinate(current, realCount, arithmetic)
                 if (variable < 0) break
                 val monomial = Monomial.of(mapOf(variable to 1))
@@ -79,7 +112,7 @@ internal class PolynomialAffineReduction private constructor(
                     yield(null)
                 }
                 arithmetic.step()
-                fibres.add(AffineFibre(variable, lower.toList(), upper.toList()))
+                fibres.add(AffineFibre(variable, null, lower.toList(), upper.toList()))
                 current = next
                 yield(null)
             }
@@ -90,8 +123,21 @@ internal class PolynomialAffineReduction private constructor(
 }
 
 private class AffineBound(val polynomial: Polynomial, val strict: Boolean)
-private class AffineFibre(val variable: Int, val lower: List<AffineBound>, val upper: List<AffineBound>)
+private class AffineFibre(
+    val variable: Int,
+    val point: Polynomial?,
+    val lower: List<AffineBound>,
+    val upper: List<AffineBound>,
+)
 private class AffineEndpoint(val value: AlgebraicReal, val strict: Boolean)
+
+private fun zeroContradiction(atoms: List<PolynomialAtom>, arithmetic: PolynomialArithmetic): Boolean {
+    for (atom in atoms) {
+        arithmetic.step()
+        if (atom.polynomial.isZero && !atom.holds(0)) return true
+    }
+    return false
+}
 
 private fun endpoint(
     bounds: List<AffineBound>,
