@@ -737,7 +737,7 @@ private fun executeSourceMinimum(
         )
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
             request.problem,
-            completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, null) else null,
+            completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, objective) else null,
         ).minimize(objective, controls.params.copy(cancellation = controls.cancellation or request.cancellation))
     }
     val sample = result.assignment

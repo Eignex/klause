@@ -22,7 +22,8 @@ same move and node allowances; a completed witness can be published after that
 atomic completion exhausts the remaining slice. A zero allowance starts no completion.
 Mixed finite optimization requests its configured real completion for generated
 starting points that pass the finite checks. Completed move evaluation then compares
-exact completed objectives under the same allowance.
+exact completed objectives under the same allowance. The finite source facade passes
+the working minimized objective into real completion for each finite pin.
 Propagation-only custom factors use the shared [source validation](validation.md)
 service for a private full-coordinate check before
 publication. Finite-only checks precede caller completion; checks needing real

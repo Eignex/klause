@@ -118,6 +118,31 @@ class SourceStrategyTest {
     }
 
     @Test
+    fun `finite affine heuristic completion should optimize its real objective in the original direction`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 0)), emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(constant = 7, realCoefficients = doubleArrayOf(3.0))
+        for (sense in ObjectiveSense.entries) {
+            val budget = NodeBudget(1000)
+            val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+                localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17, nodeBudget = budget),
+            ))
+
+            val execution = assertIs<OpenTheoryExecution.Optimize>(LocalSearchSolver.source(source).optimizeOpen(
+                objective, params, TheoryParams(randomSeed = 17, nodeBudget = budget), sense,
+            ))
+
+            val result = assertIs<OpenTheoryOptimum.Bounded>(execution.result)
+            val maximize = sense == ObjectiveSense.MAXIMIZE
+            assertEquals(if (maximize) "1" else "0", assertNotNull(result.incumbent).realValue(0))
+            assertEquals(BigFraction.ofLong(if (maximize) -10 else 7), result.value)
+            assertEquals(BigFraction.ofLong(if (maximize) 10 else 7),
+                assertIs<SourceValue.Rational>(assertNotNull(execution.acceptedIncumbent).value).value)
+            assertEquals("ls", result.stats.run.backend)
+        }
+    }
+
+    @Test
     fun `finite affine heuristic optimization should complete rational coordinates without a supplied start`() {
         val source = Problem(0, 1, arrayOf(IntDomain(1, 2)),
             arrayOf(Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(3.0),
