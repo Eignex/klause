@@ -190,7 +190,7 @@ class QfLiraSolverConflictTest {
             intBounds = IntBounds.fromModelBounds(longArrayOf(0L, 0L), longArrayOf(10L, 10L), null, null),
             factors = arrayOf(
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
-                ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                object : Factor by ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0) {},
             ),
         )
         ExactLiraSearchComponent(model).use { component ->
@@ -205,6 +205,38 @@ class QfLiraSolverConflictTest {
                 setOf(1, assertNotNull(session.atomLiteral(bound)) xor 1),
                 assertNotNull(conflict.explanation).literals.toSet(),
             )
+        }
+    }
+
+    @Test
+    fun `a shared integer side should explain an interval guard before a conflicting choice`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0L, 0L), longArrayOf(10L, 10L), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val bound = SearchDecision.IntAtLeast(0, 4L)
+
+            assertIs<ComponentResult.Consistent>(session.push(bound))
+
+            assertEquals(false, session.boolValue(0))
+            assertEquals(
+                setOf(1, assertNotNull(session.atomLiteral(bound)) xor 1),
+                assertNotNull(session.reasonFor(0)).literals.toSet(),
+            )
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(0)))
+            session.popTo(0)
+            assertEquals(null, session.boolValue(0))
+            assertEquals(null, session.reasonFor(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtMost(0, 0L)))
+            assertEquals(null, session.boolValue(0))
+            assertEquals(null, session.reasonFor(0))
         }
     }
 

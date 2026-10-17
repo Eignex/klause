@@ -1016,6 +1016,7 @@ class ExactLiraSearchComponent private constructor(
         if (intervalGuardStopped(context)) return ComponentResult.Indeterminate
         operationStop.charge(8L)
         if (intervalGuardStopped(context)) return ComponentResult.Indeterminate
+        if (lp.state?.conflict != null) return null
         val stop = object : Cancellation {
             private var interrupted = false
 

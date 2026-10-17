@@ -263,10 +263,19 @@ internal class LiveQfLraSystem(
         val state = lp.state ?: return null
         if (state.conflict != null) return null
         val key = preparedTerms[comparison.ordered]?.positive ?: return null
+        val work = MixedPointArithmetic(stop)
+        if (!work.admitted(comparison.bound)) return null
+        var equality = comparison.terms.size.toLong() + 1L
+        for (coefficient in comparison.terms.values) {
+            if (!work.admitted(coefficient)) return null
+            equality += 2L + coefficient.num.magnitudeBitLength() / Long.SIZE_BITS +
+                coefficient.den.magnitudeBitLength() / Long.SIZE_BITS
+        }
+        stop.charge(equality)
+        if (stop()) return null
         val slot = normalized[key] ?: return null
         val coefficients = slot.term.coefficients
         if (slot.column >= 0 || coefficients.size !in 2 until INTERVAL_GUARD_REASON_NODES) return null
-        val work = MixedPointArithmetic(stop)
         var hashing = coefficients.size.toLong() + 1L
         for (coefficient in coefficients.values) {
             if (!work.admitted(coefficient)) return null

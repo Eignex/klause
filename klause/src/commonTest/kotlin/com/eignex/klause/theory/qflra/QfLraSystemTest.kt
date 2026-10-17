@@ -32,6 +32,7 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -588,18 +589,56 @@ class QfLraSystemTest {
     }
 
     @Test
+    fun `wide duplicate source keys should spend raw scalar work before normalized lookup`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val firstValue = parseBigInt("1" + "0".repeat(1300))
+        val secondValue = parseBigInt("1" + "0".repeat(1300))
+        val first = ReifiedLinear(2, intArrayOf(0, 1), arrayOf(firstValue, firstValue), LinearOp.LE, BIG_ONE)
+        val second = ReifiedLinear(3, intArrayOf(0, 1), arrayOf(secondValue, secondValue), LinearOp.LE, BIG_ONE)
+        val source = Problem(4, intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(first, second))
+        val firstForm = first.linearRows.single().exactForm(0)
+        val secondForm = second.linearRows.single().exactForm(0)
+        var stopped = false
+        val charges = ArrayList<Long>()
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = stopped
+            override fun workMeter(): WorkMeter = WorkMeter { units ->
+                charges += units
+                if (units > 64L) stopped = true
+            }
+        }
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp, listOf(listOf(firstForm), listOf(secondForm)))
+            assertTrue(system.install())
+            val before = assertNotNull(lp.state).model
+
+            val proof = system.intervalGuard(secondForm.comparison(true) { false }, stop)
+
+            assertNull(proof)
+            assertTrue(stopped)
+            assertTrue(charges.last() > 64L)
+            assertEquals(1, charges.count { it > 64L })
+            assertTrue(before === assertNotNull(lp.state).model)
+        }
+    }
+
+    @Test
     fun `oversized exact source sides should withhold an interval proof`() {
         val open = Bits(2).also { it.set(0); it.set(1) }
         val target = ReifiedLinear(2, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)
         val source = Problem(3, intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
             factors = arrayOf(target))
         val form = target.linearRows.single().exactForm(0)
-        val large = BigFraction.of(parseBigInt("1" + "0".repeat(1300)), BIG_ONE)
+        val large = BigFraction.of(BIG_ONE, parseBigInt("1" + "0".repeat(1300)))
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             val system = LiveQfLraSystem(source, lp, listOf(listOf(form)))
             assertTrue(system.install())
             assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(large)), axiom))
             assertTrue(lp.assertBound(1, true, ExactLpSide(ExactLpNumber.of(1L)), axiom))
+            val selected = assertNotNull(assertNotNull(lp.state).activeSide(0, true)).side.number.value
+            assertEquals(large, selected)
+            assertTrue(selected.den.magnitudeBitLength() > 4096)
 
             val proof = system.intervalGuard(form.comparison(true) { false }, Cancellation.Never)
 

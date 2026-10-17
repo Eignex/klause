@@ -21,7 +21,6 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
@@ -871,7 +870,9 @@ class QfLiraSolverTest {
             )
             ExactLiraSearchComponent(source).use { component ->
                 component.useSolveStop(parent)
-                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4), executionControls = controls)
+                val session = SearchSession(
+                    listOf(component), atoms = SearchAtomRegistry(4), executionControls = controls,
+                )
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
 
@@ -903,7 +904,7 @@ class QfLiraSolverTest {
             (assert (or b (<= y 1)))
             (assert (or c (<= (+ x y) 2)))
             (check-sat)
-        """.trimIndent()).model.bake()
+        """.trimIndent()).model
         val rows = source.factors.filterIsInstance<ReifiedLinear>()
         val x = rows.single { it.vars.contentEquals(intArrayOf(0)) }
         val y = rows.single { it.vars.contentEquals(intArrayOf(1)) }
