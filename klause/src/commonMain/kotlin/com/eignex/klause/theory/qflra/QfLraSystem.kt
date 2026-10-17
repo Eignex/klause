@@ -157,13 +157,29 @@ internal class LiveQfLraSystem(
     private val preparedTerms = buildMap {
         if (numericRows == null) {
             for ((factorIndex, forms) in rowForms.withIndex()) {
+                val factor = source.factors[factorIndex]
+                val rows = factor.linearRows
+                val disjunction = factor.linearForm is LinearForm.Disjunction
                 for (rowIndex in forms.indices) {
-                    prepareTerms(this, rowForms, factorIndex, rowIndex)
+                    prepareTerms(this, forms[rowIndex], rows[rowIndex], disjunction)
                 }
             }
         } else {
+            var factorIndex = -1
+            var forms: List<ExactRowForm> = emptyList()
+            var rows: List<LinearRow> = emptyList()
+            var disjunction = false
             for (index in 0 until numericRows.size) {
-                prepareTerms(this, rowForms, numericRows.factorAt(index), numericRows.rowAt(index))
+                val next = numericRows.factorAt(index)
+                if (next != factorIndex) {
+                    factorIndex = next
+                    val factor = source.factors[next]
+                    forms = rowForms[next]
+                    rows = factor.linearRows
+                    disjunction = factor.linearForm is LinearForm.Disjunction
+                }
+                val rowIndex = numericRows.rowAt(index)
+                prepareTerms(this, forms[rowIndex], rows[rowIndex], disjunction)
             }
         }
     }
@@ -176,16 +192,14 @@ internal class LiveQfLraSystem(
 
     private fun prepareTerms(
         target: MutableMap<ExactOrderedTerms, SmtRowKeys>,
-        rowForms: List<List<ExactRowForm>>,
-        factorIndex: Int,
-        rowIndex: Int,
+        form: ExactRowForm,
+        row: LinearRow,
+        disjunction: Boolean,
     ) {
-        val factor = source.factors[factorIndex]
-        val comparison = rowForms[factorIndex][rowIndex].comparison(true) { false }
+        val comparison = form.comparison(true) { false }
         val keys = SmtRowKeys(comparison.terms)
         target[comparison.ordered] = keys
-        val row = factor.linearRows[rowIndex]
-        if (factor.linearForm !is LinearForm.Disjunction && row.activator == LinearRow.ALWAYS &&
+        if (!disjunction && row.activator == LinearRow.ALWAYS &&
             (0 until row.size).none { Term.isBool(row.ref(it)) }
         ) {
             initialTerms += keys.positive

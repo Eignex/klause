@@ -106,12 +106,13 @@ internal class PreparedSearchComponents(
         val boolean = descriptors.firstOrNull { it.responsibility == ComponentResponsibility.BOOLEAN }
             ?: ExecutionComponentDescriptor("boolean", ComponentResponsibility.BOOLEAN, emptyList(),
                 emptyList(), emptyList())
-        selected += PreparedSearchRegistration(spec, boolean) {
+        selected += PreparedSearchRegistration(spec, boolean) { controls ->
             val peer = ClauseSearchComponent(clauses)
             if (clauses.isNotEmpty() && plan.factorProjections.providers.encoder === BuiltInEncoderProvider &&
                 (plan.theoryPipeline == ProblemPipeline.EXACT_LRA || plan.theoryPipeline == ProblemPipeline.EXACT_LIRA)
             ) {
                 peer.retainSource(spec, PlannedSharedClauseSelection(spec, plan))
+                controls.own(AutoCloseable { peer.releaseSource() })
             }
             listOf(peer) + if (cardinalities.isEmpty()) emptyList()
             else listOf(CardinalitySearchComponent(cardinalities))

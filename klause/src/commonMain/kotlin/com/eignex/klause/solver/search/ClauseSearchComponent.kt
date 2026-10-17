@@ -37,6 +37,11 @@ class ClauseSearchComponent(clauses: Iterable<Clause>) :
         sourceSelection = selection
     }
 
+    internal fun releaseSource() {
+        sharedSource = null
+        sourceSelection = null
+    }
+
     internal fun matchesSource(stop: Cancellation): Boolean {
         val source = sharedSource ?: return false
         val selected = sourceSelection ?: return false

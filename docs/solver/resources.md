@@ -543,8 +543,9 @@ The only additional variable buffers are sorted source clause indices `S` and
 retained original global numeric row indices `K`. Construction first counts them
 with overflow-safe arithmetic, then requires `S + K + 128 <= 65536` conservative
 cells and prepays their initialization and fill storage. The fixed 128-cell reserve
-covers binding fields, the immutable selection descriptor, the view object, array
-headers and fixed traversal temporaries; it does not describe total heap use.
+covers binding fields, the immutable selection descriptor, one invocation-owned
+peer cleanup callback, the view object, array headers and fixed traversal temporaries;
+it does not describe total heap use.
 Full prepared source data, exact conversions and hint caches retain their ordinary
 accounting. No factor mask, copied attribution getter or per-row view object is
 created. Zero eligibility or zero omissions leaves the full path in place.

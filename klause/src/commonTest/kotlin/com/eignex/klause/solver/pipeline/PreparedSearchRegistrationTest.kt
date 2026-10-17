@@ -108,16 +108,33 @@ class PreparedSearchRegistrationTest {
             realUpper = doubleArrayOf(1.0),
             factors = arrayOf(Clause(intArrayOf(0))),
         )
-        val search = source.componentPlan().search(source, emptyMap())
+        val prepared = PreparedSearchComponents(source.componentPlan(), source, emptyMap())
+        lateinit var peer: ClauseSearchComponent
+        val registrations = prepared.registrations.map { registration ->
+            PreparedSearchRegistration(source, registration.descriptor) { opening ->
+                registration.open(opening).also { components ->
+                    for (component in components) {
+                        if (component is ClauseSearchComponent) peer = component
+                    }
+                }
+            }
+        }
+        val search = PreparedSearchRegistrations(source, registrations).open(
+            Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null,
+        )
         val theory = assertIs<ExactLiraSearchComponent>(search.theory)
         search.use {
             assertIs<ComponentResult.Consistent>(search.session.initialize())
             assertEquals(1, theory.sharedClauseSourceCount)
+            assertSame(source, peer.sharedSource)
             assertEquals(0, theory.numericSourceRowCount)
             assertIs<SearchResult.Satisfied>(search.session.solve(1))
         }
 
         assertEquals(0, theory.sharedClauseSourceCount)
+        assertNull(peer.sharedSource)
+        peer.releaseSource()
+        assertNull(peer.sharedSource)
     }
 
 
