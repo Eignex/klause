@@ -492,13 +492,20 @@ class Portfolio(
             if (failure is UnsoundnessException) claim.fault = failure.message
             (terminal as? MinimizeResult.WithSample)?.let { accept(claim, it) }
             check(claim)
-            if (terminal is MinimizeResult.Unknown && terminal.reason == TerminationReason.SearchExhausted &&
-                observedCutoffs[arm] == null && incumbent.current() == null &&
+            val unrestrictedExhaustion = observedCutoffs[arm] == null &&
                 worker.family == ArmFamily.Backtrack && !worker.improvementOnly && !worker.auxiliaryProof &&
                 worker.permitsSourceProofs && worker.controlsObjectiveCutoff
-            ) {
-                // A shared callback with no finite cutoff leaves the complete arm's source space unrestricted.
-                terminal = MinimizeResult.Infeasible(stats = terminal.stats)
+            if (unrestrictedExhaustion) {
+                terminal = when (val completed = terminal) {
+                    is MinimizeResult.Unknown -> if (completed.reason == TerminationReason.SearchExhausted &&
+                        incumbent.current() == null
+                    ) MinimizeResult.Infeasible(stats = completed.stats) else completed
+                    is MinimizeResult.BestFound -> if (completed.reason == TerminationReason.SearchExhausted) {
+                        MinimizeResult.Optimal(completed.sample, completed.objective, completed.stats,
+                            evidence = completed.evidence, semantics = completed.semantics)
+                    } else completed
+                    else -> completed
+                }
             }
             if (terminal is MinimizeResult.Infeasible && incumbent.current() != null) {
                 claim.fault = "claimed infeasibility while the pool holds a verified solution"

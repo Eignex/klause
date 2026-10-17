@@ -34,6 +34,26 @@ import kotlin.test.assertIs
 class PortfolioEvidenceTest {
 
     @Test
+    fun `unrestricted complete exhaustion should retain an optimum without a shared cutoff`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 0)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1), constant = 7)
+        val identity = ModelIdentity.of(source, objective)
+        val invocation = EngineInvocation(source.prepareExecutionPlan(objective), identity, objective)
+        val point = Sample(booleanArrayOf(), longArrayOf(0))
+        val worker = PortfolioWorker.ofMinimize("exhausted", 0) { _, _, _, _ ->
+            sequenceOf(MinimizeResult.BestFound(point, 7.0, TerminationReason.SearchExhausted))
+        }.bindSource(SourceWorkerBinding(invocation, sharingInvocation = invocation)).also {
+            it.controlsObjectiveCutoff = true
+        }
+
+        val result = Portfolio.thompson(listOf(worker)).use { it.minimize() }
+
+        val optimum = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(point, optimum.sample)
+        assertEquals(7.0, optimum.objective)
+    }
+
+    @Test
     fun `unrestricted exhaustion should retain refutation only for a complete bound worker`() {
         val source = Problem(
             0,
