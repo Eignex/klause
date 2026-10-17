@@ -152,6 +152,7 @@ explanation. Rounded integer candidates, partial or changed frames, cancellation
 and numerical decline cannot authorize rejection. Point-only consumers retain
 their nullable witness surface. The completion retains the same operation token
 and numerical invocation; no refutation adds a solve or renews an allowance.
+Numerical owner cleanup precedes the final cancellation poll and result publication.
 
 A general residual component that exceeds the source LP dimension limit can first
 compact exact positive-parallel inequalities. It keeps the strongest original side;

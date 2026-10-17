@@ -106,12 +106,21 @@ internal fun checkMixedRealComponents(
                 return MixedPointCompletionResult.Declined
             }
             onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_REQUEST")
-            SourceLp(numericalRows, component.size, budget).use { owner ->
+            val completed = SourceLp(numericalRows, component.size, budget).use { owner ->
                 val result = owner.solve(stop)
                 onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_${result?.verdict?.name ?: "NO_RESULT"}")
-                if (stop()) return MixedPointCompletionResult.Declined
-                if (result?.verdict == LpVerdict.INFEASIBLE) return MixedPointCompletionResult.Refuted
-                result?.exactPrimal?.take(component.size)
+                when {
+                    stop() -> MixedPointCompletionResult.Declined
+                    result?.verdict == LpVerdict.INFEASIBLE -> MixedPointCompletionResult.Refuted
+                    else -> result?.exactPrimal?.take(component.size)?.let { MixedPointCompletionResult.Point(it) }
+                        ?: MixedPointCompletionResult.Declined
+                }
+            }
+            if (stop()) return MixedPointCompletionResult.Declined
+            when (completed) {
+                is MixedPointCompletionResult.Point -> completed.values
+                MixedPointCompletionResult.Refuted -> return MixedPointCompletionResult.Refuted
+                MixedPointCompletionResult.Declined -> null
             }
         }
         if (values == null || values.size != component.size || stop()) {

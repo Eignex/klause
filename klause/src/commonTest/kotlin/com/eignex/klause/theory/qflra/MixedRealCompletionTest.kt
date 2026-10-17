@@ -254,15 +254,25 @@ class MixedRealCompletionTest {
             ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.ONE }, BigFraction.ZERO),
             ExactRationalInequality(intArrayOf(0, 1, 2), List(3) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
         )
-        var cancelled = false
-        val stop = Cancellation { cancelled }
+        for (cancelDuringClose in listOf(false, true)) {
+            var cancelled = false
+            var refutationObserved = false
+            val stop = Cancellation { cancelled }
+            val budget = SourceLpBudget(onWork = {
+                if (cancelDuringClose && refutationObserved) cancelled = true
+            })
 
-        val result = checkMixedRealComponents(3, rows, SourceLpBudget(), stop) { stage ->
-            if (stage == "RECOVERY_REAL_COMPONENT_LP_INFEASIBLE") cancelled = true
+            val result = checkMixedRealComponents(3, rows, budget, stop) { stage ->
+                if (stage == "RECOVERY_REAL_COMPONENT_LP_INFEASIBLE") {
+                    refutationObserved = true
+                    if (!cancelDuringClose) cancelled = true
+                }
+            }
+
+            assertTrue(refutationObserved)
+            assertTrue(cancelled)
+            assertEquals(MixedPointCompletionResult.Declined, result)
         }
-
-        assertTrue(cancelled)
-        assertEquals(MixedPointCompletionResult.Declined, result)
     }
 
     @Test

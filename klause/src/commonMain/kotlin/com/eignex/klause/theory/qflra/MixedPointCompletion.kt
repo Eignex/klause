@@ -8,12 +8,6 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.math.round
 
-internal sealed interface MixedPointCompletionResult {
-    class Point(val values: List<BigFraction>) : MixedPointCompletionResult
-    data object Refuted : MixedPointCompletionResult
-    data object Declined : MixedPointCompletionResult
-}
-
 internal fun completeMixedPoint(
     realColumns: Int,
     integerColumns: Int,
