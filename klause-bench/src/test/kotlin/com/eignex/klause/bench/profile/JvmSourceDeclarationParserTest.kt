@@ -9,6 +9,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -30,9 +32,10 @@ class JvmSourceDeclarationParserTest {
         parser.close()
     }
 
-    @Test
-    fun `overloads and local functions retain distinct ranges and lexical parents`() {
-        val text = "fun pick(x: Int) = x\nfun pick(x: String): String { fun local() = x; return local() }\n"
+    @ParameterizedTest
+    @ValueSource(strings = ["\n", ";;"])
+    fun `overloads and local functions retain distinct ranges and lexical parents`(separator: String) {
+        val text = "fun pick(x: Int) = x\nfun pick(x: String): String { fun local() = x${separator} return local() }\n"
         val rows = ArrayList<JsonObject>()
 
         val result = parser.inspect("Pick.kt", text, rows::add)
@@ -56,10 +59,11 @@ class JvmSourceDeclarationParserTest {
             .map { it.getValue("name").jsonPrimitive.content })
     }
 
-    @Test
-    fun `executable string interpolation retains its local declarations`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["\n", ";;"])
+    fun `executable string interpolation retains its local declarations`(separator: String) {
         val rows = ArrayList<JsonObject>()
-        val text = "fun render() = \"value=\${run { fun local() = 1; local() }}\""
+        val text = "fun render() = \"value=\${run { fun local() = 1${separator} local() }}\""
 
         val result = parser.inspect("Render.kt", text, rows::add)
 
@@ -102,9 +106,10 @@ class JvmSourceDeclarationParserTest {
         assertTrue(roles.containsAll(listOf("property-delegate", "property-initializer")))
     }
 
-    @Test
-    fun `unicode and CRLF source ranges retain exact original byte identities`() {
-        val text = "// emoji \uD83D\uDE00\r\nfun \u03A9() = \"\uD83D\uDE00\"\r\n"
+    @ParameterizedTest
+    @ValueSource(strings = ["\n", "\r\n", "\r"])
+    fun `unicode and line separators retain exact original byte identities`(separator: String) {
+        val text = "// emoji \uD83D\uDE00${separator}fun \u03A9() = \"\uD83D\uDE00\"$separator"
         val raw = text.encodeToByteArray()
         val rows = ArrayList<JsonObject>()
 
@@ -115,12 +120,35 @@ class JvmSourceDeclarationParserTest {
         val range = function.getValue("range").jsonObject
         assertEquals(2, range.getValue("firstLine").jsonPrimitive.int)
         assertEquals("\u03A9", function.getValue("name").jsonPrimitive.content)
+        assertEquals(11 + separator.length, range.getValue("startUtf16").jsonPrimitive.int)
+        assertEquals(13 + separator.length, range.getValue("startByte").jsonPrimitive.int)
+        assertEquals("fun \u03A9() = \"\uD83D\uDE00\"",
+            raw.copyOfRange(range.getValue("startByte").jsonPrimitive.int,
+                range.getValue("endByteExclusive").jsonPrimitive.int).decodeToString())
+        assertEquals(raw.size, rows.first().getValue("range").jsonObject.getValue("endByteExclusive").jsonPrimitive.int)
         for (row in rows) {
             val span = row.getValue("range").jsonObject
             val bytes = raw.copyOfRange(span.getValue("startByte").jsonPrimitive.int,
                 span.getValue("endByteExclusive").jsonPrimitive.int)
             assertEquals(sha256(bytes), span.getValue("sha256").jsonPrimitive.content)
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = [
+        "fun pick(x: Int) = x\nfun pick(x: String): String { fun local() = x; return local() }\n",
+        "fun render() = \"value=\${run { fun local() = 1; local() }}\"",
+    ])
+    fun `compiler rejected local function separators retain errors and declarations`(text: String) {
+        val rows = ArrayList<JsonObject>()
+
+        val result = parser.inspect("Rejected.kt", text, rows::add)
+
+        assertEquals(1, result.syntaxErrors)
+        assertEquals("Unexpected tokens (use ';' to separate expressions on the same line)",
+            rows.single { it["kind"]?.jsonPrimitive?.content == "syntax-error" }
+                .getValue("syntaxError").jsonPrimitive.content)
+        assertTrue(rows.any { it["name"]?.jsonPrimitive?.content == "local" })
     }
 
     @Test

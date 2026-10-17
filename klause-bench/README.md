@@ -2665,8 +2665,10 @@ environment is disposed after processing, without global IDE cache mutation.
 expression, statement, source reference and parser error, with lexical parents.
 Constructors, accessors, local functions, lambdas, default expressions and property
 initializers/delegates retain separate nodes; overloads retain separate ranges.
-Each node has UTF-16 offsets, exact UTF-8 byte offsets/hash and original line
-positions. Literal comment/string text creates no declaration; executable string
+Each node has original UTF-16 offsets, exact UTF-8 byte offsets/hash and original
+line positions. PSI requires LF line endings; CRLF and CR are normalized for
+parsing, and every node boundary maps back to the unchanged original source.
+Literal comment/string text creates no declaration; executable string
 interpolations retain their source constructs. A syntax error
 retains the complete tree and fails the completion; other failures retain a partial
 gzip without accepting its prefix. The complete gzip is round-trip checked.

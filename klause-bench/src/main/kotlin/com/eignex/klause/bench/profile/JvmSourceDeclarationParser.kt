@@ -77,13 +77,13 @@ internal class JvmSourceDeclarationParser : AutoCloseable {
         val fileName = path.substringAfterLast('/')
         val file = if (path.endsWith(".java")) {
             PsiFileFactory.getInstance(environment.project)
-                .createFileFromText(fileName, JavaFileType.INSTANCE, text, 0L, false, false)
+                .createFileFromText(fileName, JavaFileType.INSTANCE, source.parserText, 0L, false, false)
                 .also { require(it is PsiJavaFile) { "Java parser unavailable" } }
         } else {
             require(path.endsWith(".kt") || path.endsWith(".kts"))
-            factory.createFile(fileName, text)
+            factory.createFile(fileName, source.parserText)
         }
-        require(file.text == text) { "Parser changed original source text" }
+        require(file.text == source.parserText) { "Parser changed normalized source text" }
         val pending = ArrayDeque<SourceSyntaxCursor>()
         pending.addLast(SourceSyntaxCursor(file, null, 0))
         var records = 0
@@ -207,11 +207,21 @@ internal data class SourceSyntaxResult(val records: Int, val syntaxErrors: Int)
 private data class SourceSyntaxCursor(val element: PsiElement, val parentIndex: Int?, val depth: Int)
 
 private class SourceSyntaxIndex(private val text: String) {
+    val parserText = text.replace("\r\n", "\n").replace('\r', '\n')
     private val raw = text.encodeToByteArray()
+    private val originalOffsets = IntArray(parserText.length + 1)
     private val byteOffsets = IntArray(text.length + 1) { -1 }
     private val lineStarts = ArrayList<Int>().apply { add(0) }
 
     init {
+        var original = 0
+        var normalized = 0
+        while (original < text.length) {
+            originalOffsets[normalized++] = original
+            original += if (text[original] == '\r' && original + 1 < text.length && text[original + 1] == '\n') 2 else 1
+        }
+        originalOffsets[normalized] = original
+        check(normalized == parserText.length)
         var offset = 0
         var bytes = 0
         while (offset < text.length) {
@@ -238,8 +248,8 @@ private class SourceSyntaxIndex(private val text: String) {
 
     fun range(element: PsiElement): JsonObject {
         val range = element.textRange
-        val start = range.startOffset
-        val end = range.endOffset
+        val start = originalOffsets[range.startOffset]
+        val end = originalOffsets[range.endOffset]
         require(start in 0..end && end <= text.length && byteOffsets[start] >= 0 && byteOffsets[end] >= 0)
         return buildJsonObject {
             put("startUtf16", start)
