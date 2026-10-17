@@ -12,6 +12,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.LeafRealSolver
 import com.eignex.klause.propagation.PropagationResult
@@ -32,6 +33,71 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class ExactLinearTest {
+    @Test
+    fun `integer source row repairs should cross holes toward a satisfying point`() {
+        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE),
+            LinearOp.LE, BigFraction.ofLong(2))
+        val domain = IntDomain(0, 3).excludeValue(1).excludeValue(2)
+        val state = LocalSearchState(LocalSearchModel.open(Problem(0, 1, arrayOf(domain), arrayOf(row))), Random(3))
+        state.assignment.setInt(0, 3)
+        state.recompute()
+
+        state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+        val move = state.moveSink.list.filterIsInstance<IntSet>().single()
+        val delta = state.netDelta(move)
+        val before = state.cost
+        state.apply(move)
+
+        assertEquals(0L, move.newValue)
+        assertEquals(-before, delta)
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `reified integer source row move scores should match fresh grading`() {
+        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE),
+            LinearOp.LE, BigFraction.ONE, activator = 0)
+        val source = Problem(1, 1, arrayOf(IntDomain(0, 3)), arrayOf(row))
+        val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
+        state.assignment.setBool(0, true)
+        state.assignment.setInt(0, 3)
+        state.recompute()
+        val before = state.cost
+
+        val delta = state.netDelta(IntSet(0, 1L))
+        state.apply(IntSet(0, 1L))
+        val after = state.cost
+        state.recompute()
+
+        assertEquals(0L, after)
+        assertEquals(after - before, delta)
+        assertEquals(after, state.cost)
+    }
+
+    @Test
+    fun `word sized coefficients should retain exact scores over overflowing move domains`() {
+        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+            listOf(BigFraction.ofLong(1L shl 33), BigFraction.ofLong(-(1L shl 33))),
+            LinearOp.EQ, BigFraction.ZERO)
+        val source = Problem(0, 2, Array(2) { IntDomain(0, 1L shl 34) }, arrayOf(row))
+        val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
+        state.assignment.setInt(0, 1L shl 33)
+        state.assignment.setInt(1, 1L shl 33)
+        state.recompute()
+        val before = state.cost
+
+        val move = IntSet(0, (1L shl 33) + 1L)
+        val delta = state.netDelta(move)
+        state.apply(move)
+        val after = state.cost
+        state.recompute()
+
+        assertEquals(0L, before)
+        assertTrue(after > 0L)
+        assertEquals(after - before, delta)
+        assertEquals(after, state.cost)
+    }
+
     @Test
     fun `integer source row deductions should follow their signed and reified premises`() {
         for (activator in listOf(-1, 0)) {
