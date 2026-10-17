@@ -282,7 +282,7 @@ class AggregationMirSeparatorTest {
                 coeffs.map(BigFraction::ofLong), LinearOp.LE, BigFraction.ofLong(bound))
             else Linear(coeffs, intArrayOf(0, 1), LinearOp.LE, bound)
             val p = Problem(0, 2, Array(2) { IntDomain(lower, lower + 1) }, arrayOf<Factor>(row, row))
-            val objective = LinearObjective(intCoefficients = longArrayOf(-1, -1))
+            val objective = LinearObjective(intCoefficients = longArrayOf(-1, 1))
 
             val (cuts, _) = separate(p, objective, doubleArrayOf(0.0, 0.0)) ?: error("LP columns expected")
 
