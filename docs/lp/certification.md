@@ -96,6 +96,9 @@ reports at the accepted prefix; reports retain zero charges and first-visit orde
 Reconstruction converts signed single-word fractions directly between
 `BigFraction` and `Frac128`; wider values use both words. Both paths retain the
 same bit checks, work charges, allocation allowance and cancellation checks.
+Fixed-width additive identities (`x + 0`, `x - 0` and `0 + x`) reuse the normalized
+operand after checking the overflow latch. Negation retains overflow escalation,
+and certifiers retain their operation charges.
 
 `BigFraction` factories preserve reduced numerators and positive denominators.
 Zero has denominator one. A unit numerator or denominator is already coprime;

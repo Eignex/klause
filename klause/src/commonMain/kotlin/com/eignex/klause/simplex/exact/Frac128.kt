@@ -305,6 +305,8 @@ internal class Frac128Ops : FracOps<Frac128> {
 
     private fun addSub(a: Frac128, b: Frac128, negateB: Boolean): Frac128 {
         if (latched) return Frac128.ZERO
+        if (b.isZero) return a
+        if (!negateB && a.isZero) return b
         // n = na·db ± nb·da over d = da·db, then normalize.
         val da = U128(a.dHi.toULong(), a.dLo.toULong())
         val db = U128(b.dHi.toULong(), b.dLo.toULong())
