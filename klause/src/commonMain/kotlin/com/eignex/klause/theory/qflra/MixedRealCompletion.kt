@@ -87,7 +87,9 @@ internal fun completeMixedRealComponents(
             }
             onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_REQUEST")
             SourceLp(numericalRows, component.size, budget).use { owner ->
-                owner.solve(stop)?.exactPrimal?.take(component.size)
+                val result = owner.solve(stop)
+                onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_${result?.verdict?.name ?: "NO_RESULT"}")
+                result?.exactPrimal?.take(component.size)
             }
         }
         if (values == null || values.size != component.size || stop()) {
@@ -115,96 +117,84 @@ internal fun compactMixedRealRows(
         terms += row.columns.size
         if (stop() || terms + rows.size > 65536L) return null
     }
-    // Covers live component views, ordering buffers, survivor references and bounded rational scratch.
+    // Covers live component views, survivor references and bounded rational scratch.
     val cells = 96L * rows.size + 4L * terms + 16L * columns + 8192L
     if (cells > 65536L) return null
     stop.charge(4L * rows.size + 2L * columns + 1L)
     if (stop()) return null
-    val positions = IntArray(columns) { -1 }
-    val retained = ArrayList<OrderedRealRow>()
+    val retained = ArrayList<ExactRationalInequality>()
     val arithmetic = MixedPointArithmetic(stop)
     var visits = 0L
     for (row in rows) {
         stop.charge(2L * columns + 8L * row.columns.size + 1L)
         if (stop()) return null
-        val candidate = orderedRealRow(row, positions, arithmetic, stop) ?: return null
+        if (!admittedRealRow(columns, row, arithmetic)) return null
         var matched = false
         for (index in retained.indices) {
             if (++visits > 65536L) return null
-            when (compareParallelRows(candidate, retained[index], arithmetic, stop)) {
+            when (compareParallelRows(row, retained[index], arithmetic, stop)) {
                 ParallelRowMatch.DIFFERENT -> Unit
                 ParallelRowMatch.DECLINED -> return null
                 ParallelRowMatch.RETAIN -> matched = true
                 ParallelRowMatch.REPLACE -> {
-                    retained[index] = candidate
+                    retained[index] = row
                     matched = true
                 }
             }
             if (matched) break
         }
-        if (!matched) retained += candidate
+        if (!matched) retained += row
     }
     stop.charge(retained.size.toLong() + 1L)
     if (stop()) return null
-    return retained.map { it.source }.takeUnless { stop() }
+    return retained.toList().takeUnless { stop() }
 }
 
-private class OrderedRealRow(val source: ExactRationalInequality, val order: IntArray)
-
-private fun orderedRealRow(
+private fun admittedRealRow(
+    columns: Int,
     row: ExactRationalInequality,
-    positions: IntArray,
     arithmetic: MixedPointArithmetic,
-    stop: Cancellation,
-): OrderedRealRow? {
-    if (row.columns.isEmpty() || row.columns.size != row.coefficients.size ||
-        !arithmetic.admitted(row.rhs) || row.coefficients.any { it.isZero || !arithmetic.admitted(it) }
-    ) return null
+): Boolean {
+    if (row.columns.isEmpty() || row.columns.size != row.coefficients.size || !arithmetic.admitted(row.rhs)) {
+        return false
+    }
     for (index in row.columns.indices) {
         val column = row.columns[index]
-        if (column !in positions.indices || positions[column] >= 0) return null
-        positions[column] = index
+        if (column !in 0 until columns || (index > 0 && row.columns[index - 1] >= column) ||
+            row.coefficients[index].isZero || !arithmetic.admitted(row.coefficients[index])
+        ) return false
     }
-    if (stop()) return null
-    val order = IntArray(row.columns.size)
-    var size = 0
-    for (column in positions.indices) {
-        val index = positions[column]
-        if (index < 0) continue
-        order[size++] = index
-        positions[column] = -1
-    }
-    return OrderedRealRow(row, order).takeUnless { stop() }
+    return true
 }
 
 private enum class ParallelRowMatch { DIFFERENT, DECLINED, RETAIN, REPLACE }
 
 private fun compareParallelRows(
-    candidate: OrderedRealRow,
-    previous: OrderedRealRow,
+    candidate: ExactRationalInequality,
+    previous: ExactRationalInequality,
     arithmetic: MixedPointArithmetic,
     stop: Cancellation,
 ): ParallelRowMatch {
-    stop.charge(2L * candidate.order.size + 1L)
+    stop.charge(2L * candidate.columns.size + 1L)
     if (stop()) return ParallelRowMatch.DECLINED
-    if (candidate.order.size != previous.order.size) return ParallelRowMatch.DIFFERENT
-    val row = candidate.source
-    val kept = previous.source
-    for (index in candidate.order.indices) {
-        if (row.columns[candidate.order[index]] != kept.columns[previous.order[index]]) {
+    if (candidate.columns.size != previous.columns.size) return ParallelRowMatch.DIFFERENT
+    val row = candidate
+    val kept = previous
+    for (index in candidate.columns.indices) {
+        if (row.columns[index] != kept.columns[index]) {
             return ParallelRowMatch.DIFFERENT
         }
     }
-    val scale = arithmetic.quotient(row.coefficients[candidate.order[0]], kept.coefficients[previous.order[0]])
+    val scale = arithmetic.quotient(row.coefficients[0], kept.coefficients[0])
         ?: return ParallelRowMatch.DECLINED
     if (scale <= BigFraction.ZERO) return ParallelRowMatch.DIFFERENT
-    for (index in 1 until candidate.order.size) {
-        val difference = arithmetic.subtractProduct(row.coefficients[candidate.order[index]], scale,
-            kept.coefficients[previous.order[index]]) ?: return ParallelRowMatch.DECLINED
+    for (index in 1 until candidate.columns.size) {
+        val difference = arithmetic.subtractProduct(row.coefficients[index], scale,
+            kept.coefficients[index]) ?: return ParallelRowMatch.DECLINED
         if (!difference.isZero) return ParallelRowMatch.DIFFERENT
     }
     val difference = arithmetic.subtractProduct(row.rhs, scale, kept.rhs) ?: return ParallelRowMatch.DECLINED
-    return if (difference < BigFraction.ZERO || difference.isZero && row.strict && !kept.strict) {
+    return if (difference < BigFraction.ZERO || (difference.isZero && row.strict && !kept.strict)) {
         ParallelRowMatch.REPLACE
     } else {
         ParallelRowMatch.RETAIN

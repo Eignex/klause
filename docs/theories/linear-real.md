@@ -140,16 +140,16 @@ can become a witness; a floating point or failed completion supplies no proof.
 A general residual component that exceeds the source LP dimension limit can first
 compact exact positive-parallel inequalities. It keeps the strongest original side;
 strictness wins at equal bounds, and opposite directions remain separate. Compaction
-borrows original rows and retains only column-order buffers and survivor references.
+uses the row type's canonical column order and retains only original row references.
 It admits at most 65,536 input row/term entries, examined row pairs and conservative
 64-bit cells independently. The cell reservation is `96R + 4T + 16C + 8192` for
-`R` input rows, `T` terms and `C` coordinates, covering live component views, buffers,
-references and bounded rational scratch. Existing 4,096-bit arithmetic checks charge
+`R` input rows, `T` terms and `C` coordinates, covering live component views, survivor
+lists and bounded rational scratch. Existing 4,096-bit arithmetic checks charge
 the current operation token. A cancelled or declined scan publishes no partial list.
 The numerical owner retains its dimension, entry, bit and work limits. A point from
 a compacted component is checked against all its original residual rows before
-source reconstruction and full source acceptance. Compaction observations describe
-completed row counts; they establish neither a witness nor allocation savings.
+source reconstruction and full source acceptance. Completed row counts and numerical
+status observations establish neither a source verdict nor allocation savings.
 
 Linear completion also serves finite mixed models and local-search candidates.
 Boolean pins and source rows stay intact through completion. The shared search

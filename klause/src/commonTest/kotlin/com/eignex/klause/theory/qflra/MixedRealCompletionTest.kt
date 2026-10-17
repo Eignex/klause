@@ -60,8 +60,8 @@ class MixedRealCompletionTest {
         for (direction in listOf(1L, -1L)) {
             val rows = listOf(
                 ExactRationalInequality(
-                    intArrayOf(1, 0),
-                    listOf(BigFraction.ofLong(2 * direction), BigFraction.ofLong(4 * direction)),
+                    intArrayOf(0, 1),
+                    listOf(BigFraction.ofLong(4 * direction), BigFraction.ofLong(2 * direction)),
                     BigFraction.ofLong(8 * direction),
                 ),
                 ExactRationalInequality(
@@ -118,7 +118,7 @@ class MixedRealCompletionTest {
     fun `opposite parallel directions should retain both source sides`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ONE }, BigFraction.ONE),
-            ExactRationalInequality(intArrayOf(1, 0), List(2) { BigFraction.MINUS_ONE }, BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.ZERO),
         )
 
         val compacted = assertNotNull(compactMixedRealRows(2, rows, Cancellation.Never))
