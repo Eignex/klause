@@ -1189,7 +1189,7 @@ class MpsModeTest {
         assertTrue("s SATISFIABLE" in text.lines(), text)
         assertTrue("nominalSourceOptimizationStatus=" in text, text)
         assertTrue("o 0.10000000000000000001" in text.lines(), text)
-        assertTrue("v I=0 X=1/10" in text.lines(), text)
+        assertTrue("v I=0 X=0.1" in text.lines(), text)
     }
 
     @Test
