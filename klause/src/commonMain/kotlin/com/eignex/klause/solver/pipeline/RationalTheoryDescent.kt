@@ -42,7 +42,7 @@ internal class RationalTheoryDescent(
         params.cancellation or params.timeout,
     ),
     private val publicationInvocation: EngineInvocation? = null,
-    private val allowTheoryFallback: Boolean = true,
+    private val numericalOnly: Boolean = false,
     private val external: () -> Pair<Sample, BigFraction>? = { null },
 ) : ResumableSearch {
     init {
@@ -130,7 +130,7 @@ internal class RationalTheoryDescent(
                 sourceContext.semantics,
             )
             linearResult = authority
-            if (allowTheoryFallback && authority.terminal == null &&
+            if (!numericalOnly && authority.terminal == null &&
                 authority.reason == TerminationReason.Unsupported && sourceContext.affineObjectiveAvailable &&
                 sourceContext.linearCoordinatesSupported()
             ) {
@@ -289,10 +289,11 @@ internal class RationalTheoryDescent(
         context?.scope?.condition?.implies(invocation.executionCondition) == true
 
     private fun attestWitness(sample: Sample, cancellation: Cancellation) {
-        val original = context ?: witnessContext ?: source.linearAuthorityContext(
+        val original = witnessContext ?: source.linearAuthorityContext(
             LinearObjective(),
             ObjectiveSense.MINIMIZE,
             cancellation,
+            numericalIndicators = numericalOnly,
         )?.also { witnessContext = it } ?: return
         val evidence = SourceEvidence(original.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
         if (SourceEvidenceVerifier(original.withLinearAuthority()).verify(evidence, cancellation) !=
