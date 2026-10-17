@@ -33,7 +33,7 @@ class JvmSourceDeclarationParserTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["\n", ";;"])
+    @ValueSource(strings = ["\n", ";\n"])
     fun `overloads and local functions retain distinct ranges and lexical parents`(separator: String) {
         val text = "fun pick(x: Int) = x\nfun pick(x: String): String { fun local() = x${separator} return local() }\n"
         val rows = ArrayList<JsonObject>()
@@ -60,7 +60,7 @@ class JvmSourceDeclarationParserTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["\n", ";;"])
+    @ValueSource(strings = ["\n", ";\n"])
     fun `executable string interpolation retains its local declarations`(separator: String) {
         val rows = ArrayList<JsonObject>()
         val text = "fun render() = \"value=\${run { fun local() = 1${separator} local() }}\""
@@ -118,13 +118,16 @@ class JvmSourceDeclarationParserTest {
         assertEquals(0, result.syntaxErrors, rows.filter { it["syntaxError"] != JsonNull }.toString())
         val function = rows.single { it["kind"]?.jsonPrimitive?.content == "function" }
         val range = function.getValue("range").jsonObject
-        assertEquals(2, range.getValue("firstLine").jsonPrimitive.int)
+        assertEquals(1, range.getValue("firstLine").jsonPrimitive.int)
         assertEquals("\u03A9", function.getValue("name").jsonPrimitive.content)
-        assertEquals(11 + separator.length, range.getValue("startUtf16").jsonPrimitive.int)
-        assertEquals(13 + separator.length, range.getValue("startByte").jsonPrimitive.int)
-        assertEquals("fun \u03A9() = \"\uD83D\uDE00\"",
-            raw.copyOfRange(range.getValue("startByte").jsonPrimitive.int,
-                range.getValue("endByteExclusive").jsonPrimitive.int).decodeToString())
+        assertEquals(0, range.getValue("startUtf16").jsonPrimitive.int)
+        assertEquals(0, range.getValue("startByte").jsonPrimitive.int)
+        val body = rows.single { it["role"]?.jsonPrimitive?.content == "body" }.getValue("range").jsonObject
+        assertEquals(2, body.getValue("firstLine").jsonPrimitive.int)
+        assertEquals(21 + separator.length, body.getValue("startUtf16").jsonPrimitive.int)
+        assertEquals(24 + separator.length, body.getValue("startByte").jsonPrimitive.int)
+        assertEquals("\"\uD83D\uDE00\"", raw.copyOfRange(body.getValue("startByte").jsonPrimitive.int,
+            body.getValue("endByteExclusive").jsonPrimitive.int).decodeToString())
         assertEquals(raw.size, rows.first().getValue("range").jsonObject.getValue("endByteExclusive").jsonPrimitive.int)
         for (row in rows) {
             val span = row.getValue("range").jsonObject
@@ -138,6 +141,8 @@ class JvmSourceDeclarationParserTest {
     @ValueSource(strings = [
         "fun pick(x: Int) = x\nfun pick(x: String): String { fun local() = x; return local() }\n",
         "fun render() = \"value=\${run { fun local() = 1; local() }}\"",
+        "fun pick(x: Int) = x\nfun pick(x: String): String { fun local() = x;; return local() }\n",
+        "fun render() = \"value=\${run { fun local() = 1;; local() }}\"",
     ])
     fun `compiler rejected local function separators retain errors and declarations`(text: String) {
         val rows = ArrayList<JsonObject>()
