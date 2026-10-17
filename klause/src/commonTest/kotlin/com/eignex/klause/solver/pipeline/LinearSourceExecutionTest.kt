@@ -27,6 +27,7 @@ import com.eignex.klause.solver.validation.LinearSourceWitness
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -38,6 +39,37 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LinearSourceExecutionTest {
+    @Test
+    fun `nonzero numerical underflow should retain an unsupported numerical result`() {
+        val tiny = SemanticRational.of(BIG_ONE, parseBigInt("1" + "0".repeat(400)))
+        for (tolerance in listOf(SourceTolerance(), SourceTolerance(
+            absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000)),
+            relative = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000)),
+        ))) {
+            val source = LinearSourceProblem(
+                listOf(LinearSourceVariable("x", false, SemanticRational.ZERO, SemanticRational.ONE)),
+                listOf(LinearSourceRow(listOf(LinearSourceTerm(0, tiny)),
+                    lower = SemanticRational.of(BIG_ONE, bigIntOf(10)))),
+                LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+                SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
+            )
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
+            ))
+
+            val result = SourceSetup.execute(SourceExecutionRequest(invocation,
+                finiteRequest = { error("an unsupported numerical source cannot construct a finite consumer") }))
+
+            assertEquals(SourceExecutionKind.NUMERICAL, SourceSetup.executionKind(invocation))
+            val native = assertIs<SourceExecutionResult.Numerical>(result).result
+            assertEquals(TerminationReason.Unsupported, native.reason)
+            assertNull(native.terminal)
+            assertNull(native.incumbent)
+            assertNull(native.bound)
+            assertEquals(LinearSourceConclusion.UNKNOWN, assertNotNull(result.linearSource).conclusion)
+        }
+    }
+
     @Test
     fun `an integral real backing should reconstruct an optimized original source point`() {
         val source = LinearSourceProblem(

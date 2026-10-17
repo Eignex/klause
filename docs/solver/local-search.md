@@ -15,6 +15,11 @@ A run prepares its model projection, initializes an assignment, generates and sc
 moves, accepts selected changes, and restarts when needed. Candidate publication
 checks every required source constraint, including arithmetic completion. A low
 score guides the walk; it does not prove feasibility, optimality or infeasibility.
+When all declarations are continuous, the first candidate requests the configured
+completion independently of its floating violation score. Exact rational solutions
+need not have a zero-violation floating representation. Completion work consumes the
+same move and node allowances; a completed witness can be published after that
+atomic completion exhausts the remaining slice. A zero allowance starts no completion.
 Propagation-only custom factors use the shared [source validation](validation.md)
 service for a private full-coordinate check before
 publication. Finite-only checks precede caller completion; checks needing real
