@@ -50,6 +50,21 @@ class JvmSourceDeclarationsTest {
         assertFalse(File(out, "source-declarations.jsonl.gz").exists())
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["uncompressed", "compressed"])
+    fun `report byte bounds decline the complete inventory`(variant: String, @TempDir out: File) {
+        val text = "fun pick() = 1"
+        val sources = listOf(SourceSyntaxInput("pick", "Pick.kt", sha256(text.encodeToByteArray()), text))
+
+        assertFailsWith<IllegalStateException> {
+            if (variant == "uncompressed") JvmSourceDeclarations.inspect(sources, out, maximumReportBytes = 1)
+            else JvmSourceDeclarations.inspect(sources, out, maximumCompressedReportBytes = 1)
+        }
+
+        assertTrue(File(out, "source-declarations.partial.jsonl.gz").isFile)
+        assertFalse(File(out, "source-declarations.jsonl.gz").exists())
+    }
+
     @Test
     fun `request retains the complete immutable source specification identity`() {
         val arguments = arrayOf("declarations=https://example.test/sources.json",
