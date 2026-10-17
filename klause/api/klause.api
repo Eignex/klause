@@ -12410,6 +12410,7 @@ public final class com/eignex/klause/solver/pipeline/PreparedSourcePlan {
 	public final fun withObjective (Lcom/eignex/klause/solver/objective/LinearObjective;Z)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public static synthetic fun withObjective$default (Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public static synthetic fun withObjective$default (Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;Lcom/eignex/klause/solver/objective/LinearObjective;ZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
+	public final fun workingCoordinate (Lcom/eignex/klause/solver/evidence/SourceCoordinate;)Lcom/eignex/klause/solver/evidence/SourceCoordinate;
 }
 
 public final class com/eignex/klause/solver/pipeline/PreparedSourcePlanKt {

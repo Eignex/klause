@@ -106,7 +106,7 @@ class LinearSourceExecutionTest {
     @Test
     fun `declining optional bound closure should retain required numerical source execution`() {
         val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("n", true)),
+            listOf(LinearSourceVariable("n", true, SemanticRational.ZERO)),
             listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
                 upper = SemanticRational.ofLong(5))),
             LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE)),

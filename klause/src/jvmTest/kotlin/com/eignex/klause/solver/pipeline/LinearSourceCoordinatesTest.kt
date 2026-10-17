@@ -24,6 +24,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 @RunWith(Parameterized::class)
@@ -74,6 +75,7 @@ class LinearSourceCoordinatesTest(private val realFirst: Boolean, private val ex
         assertEquals(SourceCoordinate(SourceCoordinate.Kind.Integer, zColumn),
             plan.workingCoordinate(SourceCoordinate(SourceCoordinate.Kind.Real, 0)))
         assertFailsWith<IllegalArgumentException> { plan.realCoordinate(0) }
+        assertNull(plan.sourceCoordinates(Cancellation.Never))
         assertEquals(if (realFirst) listOf(BigFraction.ofLong(5), BigFraction.ONE) else
             listOf(BigFraction.ONE, BigFraction.ofLong(5)), checked.witness.values)
         assertEquals(BigFraction.ofLong(5), checked.witness.objective)

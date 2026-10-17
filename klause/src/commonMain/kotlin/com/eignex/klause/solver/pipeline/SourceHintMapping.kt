@@ -3,10 +3,17 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.Cancellation
 
 internal fun PreparedSourcePlan.sourceCoordinates(cancellation: Cancellation): VarRemap? {
     if (cancellation()) return null
+    for (id in 0 until sourceRealCount) {
+        cancellation.charge(1)
+        if (cancellation()) return null
+        val coordinate = workingCoordinate(SourceCoordinate(SourceCoordinate.Kind.Real, id))
+        if (coordinate.kind != SourceCoordinate.Kind.Real || coordinate.id != id) return null
+    }
     val bools = IntArray(sourceBoolCount)
     val ints = IntArray(sourceIntCount)
     for (id in bools.indices) {
@@ -17,7 +24,9 @@ internal fun PreparedSourcePlan.sourceCoordinates(cancellation: Cancellation): V
     for (id in ints.indices) {
         cancellation.charge(1)
         if (cancellation()) return null
-        ints[id] = integerCoordinate(id)
+        val coordinate = workingCoordinate(SourceCoordinate(SourceCoordinate.Kind.Integer, id))
+        if (coordinate.kind != SourceCoordinate.Kind.Integer) return null
+        ints[id] = coordinate.id
     }
     return VarRemap(bools, ints)
 }
