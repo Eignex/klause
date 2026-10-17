@@ -21,6 +21,42 @@ class PolynomialProjectionTest {
     private val y = Polynomial.variable(1)
 
     @Test
+    fun `common monomial boundaries avoid higher degree matrices while retaining zero fibers`() {
+        val factor = arithmetic.multiply(arithmetic.power(x, 2), arithmetic.power(y, 2))
+        val inputs = listOf(arithmetic.multiply(factor, arithmetic.add(x, y)),
+            arithmetic.multiply(factor, arithmetic.subtract(x, y)))
+        val limited = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0))
+
+        val projection = PolynomialProjection.compute(inputs, 2, limited)
+
+        assertTrue(hasBoundary(projection, BigFraction.ZERO))
+        assertTrue(projection.polynomials(1).all { it.degree(1) <= 1 })
+        assertTrue(projection.polynomials(1).any { arithmetic.substitute(it, 1, Polynomial.ZERO).isZero })
+    }
+
+    @Test
+    fun `required zero products retain their whole root equation`() {
+        val equation = arithmetic.multiply(x, y)
+
+        val projection = PolynomialProjection.compute(listOf(equation), 2, arithmetic,
+            listOf(equation), nonzeroVariables = setOf(0))
+
+        assertEquals(equation, projection.rootSection(1)?.polynomial)
+        assertFalse(projection.inconsistentEquations)
+    }
+
+    @Test
+    fun `required nonzero products retain their graph rewrite contradiction`() {
+        val equation = arithmetic.add(y, Polynomial.ONE)
+        val nonzero = arithmetic.multiply(x, equation)
+
+        val projection = PolynomialProjection.compute(listOf(equation, nonzero), 2, arithmetic,
+            listOf(equation), nonzeroPolynomials = listOf(nonzero))
+
+        assertTrue(projection.inconsistentEquations)
+    }
+
+    @Test
     fun `elimination observations preserve boundaries and native charges`() {
         val equation = arithmetic.subtract(arithmetic.add(arithmetic.power(x, 2), arithmetic.power(y, 2)),
             Polynomial.ONE)

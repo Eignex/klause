@@ -669,6 +669,16 @@ available. Ordinary levels use Collins projection. The component reads the
 projection operations and coordinate order.
 The theory does not materialize finite CP domains or depend on the linear engines.
 
+Boundary canonicalization separates a polynomial's common monomial into its distinct
+coordinate factors and the remaining primitive polynomial, then removes duplicate
+boundaries. Sign invariance of those factors preserves the original product's sign,
+including every zero-coordinate fibre and odd or repeated powers. This applies to
+initial boundaries, graph substitutions and projected families under the same
+arithmetic owner. Required-zero equations and retained required-nonzero polynomials
+stay whole in the boundary family: graph rewrites and necessary resultants refer to
+those complete relations. No product equation becomes simultaneous factor equations.
+Lifting still evaluates every original selected predicate and the full source formula.
+
 Within a Boolean region, a true equality or false disequality requires its whole
 polynomial to vanish. These premises permit total graph sections: a coordinate
 occurring in exactly one pure linear monomial with a nonzero rational coefficient

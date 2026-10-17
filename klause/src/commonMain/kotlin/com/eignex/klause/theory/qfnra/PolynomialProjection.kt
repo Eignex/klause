@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qfnra
 
+import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
@@ -103,8 +104,8 @@ internal class PolynomialProjection private constructor(
                 require(polynomial in inputs) { "A required nonzero must belong to the input family" }
             }
             var equations = requiredZeroes
-            var pending = projectionFamily(polynomials, arithmetic)
             var exclusions = nonzeroFamily(nonzeroPolynomials, nonzero, arithmetic)
+            var pending = boundaryFamily(polynomials, equations + exclusions.orEmpty(), arithmetic)
             var fallback = variableCount - 1
             var sectionCount = 0
             for (level in variableCount - 1 downTo 0) {
@@ -167,7 +168,7 @@ internal class PolynomialProjection private constructor(
                         rewritten.getValue(it)
                     }
                     exclusions = nonzeroFamily(rewrittenExclusions, nonzero, arithmetic)
-                    pending = projectionFamily(projected, arithmetic)
+                    pending = boundaryFamily(projected, equations + exclusions.orEmpty(), arithmetic)
                     sectionCount++
                     onSection()
                 } else if (level > 0) {
@@ -190,7 +191,7 @@ internal class PolynomialProjection private constructor(
                     if (independent) {
                         // Rational univariate boundaries contribute no lower-coordinate projection.
                         equations = lowerEquations
-                        pending = projectionFamily(lower, arithmetic)
+                        pending = boundaryFamily(lower, equations + exclusions.orEmpty(), arithmetic)
                         yield(null)
                         continue
                     }
@@ -202,7 +203,8 @@ internal class PolynomialProjection private constructor(
                         if (projected == null) yield(null)
                     }
                     equations = lowerEquations + projected.equations
-                    pending = projectionFamily(lower + projected.polynomials, arithmetic)
+                    pending = boundaryFamily(lower + projected.polynomials,
+                        equations + exclusions.orEmpty(), arithmetic)
                 }
             }
             arithmetic.step()
@@ -300,6 +302,60 @@ private fun projectionFamily(values: List<Polynomial>, arithmetic: PolynomialAri
         distinct.add(arithmetic.scale(polynomial, polynomial.terms.last().coefficient.reciprocal()))
     }
     return distinct.toList()
+}
+
+private fun boundaryFamily(
+    values: List<Polynomial>,
+    required: List<Polynomial>,
+    arithmetic: PolynomialArithmetic,
+): List<Polynomial> {
+    val preserved = HashSet<Polynomial>()
+    for (polynomial in projectionFamily(required, arithmetic)) {
+        arithmetic.step()
+        preserved.add(polynomial)
+    }
+    val distinct = LinkedHashSet<Polynomial>()
+    for (polynomial in projectionFamily(values, arithmetic)) {
+        arithmetic.step()
+        val terms = polynomial.terms
+        val factor = if (polynomial in preserved) null else commonMonomial(terms, arithmetic)
+        if (factor == null) {
+            distinct.add(polynomial)
+            continue
+        }
+        // Separate boundaries preserve product signs and zero fibres; required relations stay whole.
+        for (variable in factor.variables) {
+            arithmetic.step()
+            distinct.add(Polynomial.variable(variable))
+        }
+        val primitive = Polynomial.of(terms.map { term ->
+            arithmetic.step()
+            PolynomialTerm(checkNotNull(term.monomial.quotient(factor)), term.coefficient)
+        })
+        if (primitive.mainVariable != null) distinct.add(primitive)
+    }
+    return distinct.toList()
+}
+
+private fun commonMonomial(terms: List<PolynomialTerm>, arithmetic: PolynomialArithmetic): Monomial? {
+    val first = terms.first().monomial
+    val powers = HashMap<Int, Int>()
+    for (variable in first.variables) {
+        arithmetic.step()
+        powers[variable] = first.exponent(variable)
+    }
+    if (powers.isEmpty()) return null
+    for (index in 1 until terms.size) {
+        arithmetic.step()
+        if (powers.isEmpty()) return null
+        val term = terms[index]
+        for (variable in powers.keys.toList()) {
+            arithmetic.step()
+            val degree = minOf(powers.getValue(variable), term.monomial.exponent(variable))
+            if (degree == 0) powers.remove(variable) else powers[variable] = degree
+        }
+    }
+    return if (powers.isEmpty()) null else Monomial.of(powers)
 }
 
 private class ProjectionElimination(val polynomials: List<Polynomial>, val equations: List<Polynomial>)

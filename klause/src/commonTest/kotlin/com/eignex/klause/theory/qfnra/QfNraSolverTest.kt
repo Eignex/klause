@@ -19,6 +19,39 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `factored weak boundaries retain either zero coordinate fiber`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        for (fixed in 0..1) {
+            val source = SmtLibPolynomial.parse(
+                "$declarations (assert (and (> x${1 - fixed} 0) (>= x$fixed 0) (<= x$fixed 0) " +
+                    "(>= (* x0 x0 x1 x1 (+ x0 x1)) 0) (<= (* x0 x0 x1 x1 (- x0 x1)) 0)))",
+            )
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+                QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+            val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+            assertEquals(0, algebraic.sign(witness.realValue(fixed)))
+            assertTrue(algebraic.sign(witness.realValue(1 - fixed)) > 0)
+            assertEquals(33, witness.realCount)
+        }
+    }
+
+    @Test
+    fun `factored boundaries retain odd monomial signs in original predicates`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (assert (and (>= x0 (- 1)) (<= x0 (- 1)) (>= x1 2) " +
+                "(>= (* x0 x0 x0 x1 (+ x0 x1)) 0)))",
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
     fun `affine boundary intersections solve without dense matrix allocation`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(

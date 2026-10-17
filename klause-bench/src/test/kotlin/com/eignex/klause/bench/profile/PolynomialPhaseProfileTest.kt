@@ -38,7 +38,7 @@ class PolynomialPhaseProfileTest {
     @Test
     fun `phase observations distinguish family pairs and common monomial factors`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
-        val source = "$declarations (assert (>= (* x0 x1) 0)) (assert (>= (+ (* x0 x1) x1) 0))"
+        val source = "$declarations (assert (> (* x0 x1) 0)) (assert (> (+ (* x0 x1) x1) 0))"
 
         val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, timeoutMs = 10_000)
 
