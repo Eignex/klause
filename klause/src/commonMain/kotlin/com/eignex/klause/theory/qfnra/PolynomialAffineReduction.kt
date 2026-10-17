@@ -10,6 +10,7 @@ import com.eignex.klause.ir.PolynomialRelation
 internal class PolynomialAffineReduction private constructor(
     val atoms: List<PolynomialAtom>,
     private val fibres: List<AffineFibre>,
+    val inconsistent: Boolean,
 ) {
     val eliminatedCount: Int get() = fibres.size
 
@@ -54,6 +55,17 @@ internal class PolynomialAffineReduction private constructor(
                 arithmetic.step()
                 val atom = formula.atoms[index]
                 if (truth) atom else PolynomialAtom(atom.polynomial, complement(atom.relation))
+            }
+            val signChecking = preparePolynomialSignRefutation(current, realCount, arithmetic)
+            var signConflict: Boolean? = null
+            while (signConflict == null) {
+                signConflict = signChecking.next()
+                if (signConflict == null) yield(null)
+            }
+            if (signConflict) {
+                arithmetic.step()
+                yield(PolynomialAffineReduction(current, emptyList(), true))
+                return@sequence
             }
             val fibres = ArrayList<AffineFibre>()
             var inconsistent = false
@@ -118,7 +130,7 @@ internal class PolynomialAffineReduction private constructor(
                 yield(null)
             }
             arithmetic.step()
-            yield(PolynomialAffineReduction(current.toList(), fibres.toList()))
+            yield(PolynomialAffineReduction(current.toList(), fibres.toList(), inconsistent))
         }.iterator()
     }
 }

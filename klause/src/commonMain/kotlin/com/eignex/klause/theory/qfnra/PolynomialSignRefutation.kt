@@ -2,7 +2,15 @@ package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
-import com.eignex.klause.ir.PolynomialRelation
+import com.eignex.klause.theory.qfnra.PolynomialSigns.ALL_SIGNS
+import com.eignex.klause.theory.qfnra.PolynomialSigns.NEGATIVE_SIGN
+import com.eignex.klause.theory.qfnra.PolynomialSigns.NONZERO_SIGNS
+import com.eignex.klause.theory.qfnra.PolynomialSigns.POSITIVE_SIGN
+import com.eignex.klause.theory.qfnra.PolynomialSigns.ZERO_SIGN
+import com.eignex.klause.theory.qfnra.PolynomialSigns.addSigns
+import com.eignex.klause.theory.qfnra.PolynomialSigns.multiplySigns
+import com.eignex.klause.theory.qfnra.PolynomialSigns.negateSigns
+import com.eignex.klause.theory.qfnra.PolynomialSigns.relationSigns
 
 internal fun refutePolynomialSigns(
     formula: PolynomialFormula,
@@ -56,40 +64,3 @@ internal fun refutePolynomialSigns(
     }
     return false
 }
-
-private fun relationSigns(relation: PolynomialRelation): Int = when (relation) {
-    PolynomialRelation.EQ -> ZERO_SIGN
-    PolynomialRelation.NE -> NONZERO_SIGNS
-    PolynomialRelation.LT -> NEGATIVE_SIGN
-    PolynomialRelation.LE -> NEGATIVE_SIGN or ZERO_SIGN
-    PolynomialRelation.GT -> POSITIVE_SIGN
-    PolynomialRelation.GE -> POSITIVE_SIGN or ZERO_SIGN
-}
-
-private fun negateSigns(signs: Int): Int = (signs and ZERO_SIGN) or
-    (if (signs and NEGATIVE_SIGN == 0) 0 else POSITIVE_SIGN) or
-    (if (signs and POSITIVE_SIGN == 0) 0 else NEGATIVE_SIGN)
-
-private fun multiplySigns(left: Int, right: Int): Int =
-    (if ((left or right) and ZERO_SIGN == 0) 0 else ZERO_SIGN) or
-        (if ((left and NEGATIVE_SIGN != 0 && right and POSITIVE_SIGN != 0) ||
-            (left and POSITIVE_SIGN != 0 && right and NEGATIVE_SIGN != 0)
-        ) NEGATIVE_SIGN else 0) or
-        (if ((left and NEGATIVE_SIGN != 0 && right and NEGATIVE_SIGN != 0) ||
-            (left and POSITIVE_SIGN != 0 && right and POSITIVE_SIGN != 0)
-        ) POSITIVE_SIGN else 0)
-
-private fun addSigns(left: Int, right: Int): Int {
-    if (left == ZERO_SIGN) return right
-    if (right == ZERO_SIGN) return left
-    if ((left and NEGATIVE_SIGN != 0 && right and POSITIVE_SIGN != 0) ||
-        (left and POSITIVE_SIGN != 0 && right and NEGATIVE_SIGN != 0)
-    ) return ALL_SIGNS
-    return left or right
-}
-
-private const val NEGATIVE_SIGN = 1
-private const val ZERO_SIGN = 2
-private const val POSITIVE_SIGN = 4
-private const val NONZERO_SIGNS = 5
-private const val ALL_SIGNS = 7
