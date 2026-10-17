@@ -309,7 +309,9 @@ class MixedPointCompletionTest {
                 override fun workMeter(): WorkMeter = WorkMeter { charged += it }
             }
 
-            val point = completeMixedPoint(1, integerColumns, doubleArrayOf(0.0, 1.0).copyOf(1 + integerColumns), emptyList(), stop)
+            val point = completeMixedPoint(
+                1, integerColumns, doubleArrayOf(0.0, 1.0).copyOf(1 + integerColumns), emptyList(), stop,
+            )
 
             assertNull(point)
             assertTrue(charged > 0L)
