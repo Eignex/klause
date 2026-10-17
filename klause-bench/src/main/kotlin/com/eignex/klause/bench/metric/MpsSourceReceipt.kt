@@ -26,6 +26,14 @@ internal data class MpsCheckerRuntime(
 )
 
 @Serializable
+internal data class MpsGroundArithmetic(
+    val implementation: String,
+    val pythonVersion: String,
+    val pythonExecutableSha256: String,
+    val modules: Map<String, MpsCheckerFile>,
+)
+
+@Serializable
 internal data class MpsCheckerStream(
     val bytes: Long,
     val observedBytes: Long,
@@ -58,6 +66,14 @@ internal object MpsSourceReceipt {
 
     fun requireComplete(receipt: MpsSourceValidation.Receipt, json: JsonObject, exact: Boolean) {
         val runtime = requireNotNull(receipt.runtime)
+        val arithmetic = requireNotNull(receipt.groundArithmetic)
+        require(arithmetic.implementation == MPS_GROUND_CHECKER)
+        require(arithmetic.pythonVersion == runtime.pythonVersion &&
+            arithmetic.pythonExecutableSha256 == runtime.pythonExecutableSha256)
+        require(arithmetic.modules.keys == setOf("fractions", "numbers", "math"))
+        require(arithmetic.modules.values.all { file ->
+            file.path.startsWith('/') && file.bytes in 1..4_194_304L && digest.matches(file.sha256)
+        })
         require(runtime.packageVersion == "4.15.3.0" && runtime.checkerVersion == "4.15.3")
         require(runtime.machine == "x86_64" && !runtime.globalInstallationPerformed)
         require(runtime.wheelBytes == 29_056_003L && runtime.wheelSha256 == WHEEL_SHA && runtime.wheelUrl == WHEEL_URL)
@@ -90,7 +106,7 @@ internal object MpsSourceReceipt {
         require(receipt.setupMs + receipt.checkMs <= 70_000)
         val child = Reports.json.parseToJsonElement(logs.getValue("check.stdout")).jsonObject
         val fields = setOf("status", "reason", "scope", "bindings", "solverSearchQueries",
-            "proofCertificateChecked", "checkedWitness", "checker") + if (receipt.status == "valid") {
+            "proofCertificateChecked", "checkedWitness", "checker", "groundArithmetic") + if (receipt.status == "valid") {
             setOf("exactFeasible", "toleranceAccepted", "sourceTolerance", "witnessCheck")
         } else {
             emptySet()

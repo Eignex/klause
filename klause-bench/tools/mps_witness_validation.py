@@ -1,5 +1,9 @@
 """Pinned private runtime for ordinary bench MPS ground witness validation."""
 import atexit
+import fractions
+import math
+import numbers
+import platform
 import hashlib
 import importlib.util
 import json
@@ -12,6 +16,7 @@ import time
 TOOLS = {'mps_witness_validation.py', 'smt_witness_validation.py',
          'verify_nra_source_results.py', 'verify_source_results.py', 'requirements-source-checks.txt'}
 SCOPE = 'ground-original-mps-witness'
+CHECKER = 'python-fractions-mps-ground-v1'
 
 
 def digest(raw):
@@ -31,6 +36,17 @@ def bindings(out):
             for name in ('source.mps', 'stdout.txt', 'record.json', 'request.json')}
 
 
+def arithmetic_runtime():
+    modules = {}
+    for module in (fractions, numbers, math):
+        path = pathlib.Path(module.__file__).resolve()
+        raw = path.read_bytes()
+        assert 0 < len(raw) <= 4194304
+        modules[module.__name__] = {'path': str(path), 'bytes': len(raw), 'sha256': digest(raw)}
+    return {'implementation': CHECKER, 'pythonVersion': platform.python_version(),
+            'pythonExecutableSha256': digest(pathlib.Path(sys.executable).read_bytes()), 'modules': modules}
+
+
 def check(out, dependencies):
     sys.path.insert(0, str(dependencies))
     import importlib.metadata
@@ -46,7 +62,7 @@ def check(out, dependencies):
     assert record['sourceOutputSha256'] == digest(raw)
     result = {'status': 'unknown', 'reason': 'source checking incomplete', 'scope': SCOPE,
               'bindings': bindings(out), 'solverSearchQueries': 0, 'proofCertificateChecked': False,
-              'checkedWitness': None, 'checker': 'z3-4.15.3'}
+              'checkedWitness': None, 'checker': CHECKER, 'groundArithmetic': arithmetic_runtime()}
     try:
         checked = verifier.check_mps_ground(source.decode('utf-8'), record, raw.decode('utf-8'), request['exact'])
         result.update(checked)
@@ -54,7 +70,7 @@ def check(out, dependencies):
                       checkedWitness=record['finalWitness'])
     except AssertionError as error:
         result.update(status='invalid', reason=str(error)[:500])
-    except (ValueError, KeyError, TypeError, UnicodeError, RuntimeError, z3.Z3Exception) as error:
+    except (ValueError, KeyError, TypeError, UnicodeError, RuntimeError, ZeroDivisionError, OverflowError, z3.Z3Exception) as error:
         result.update(reason='unsupported source or witness: ' + str(error)[:400])
     print(json.dumps(result))
 
@@ -105,7 +121,7 @@ def supervise(out, expected, tools, parent):
         assert checked['bindings'] == expected and checked['solverSearchQueries'] == 0
         assert checked['proofCertificateChecked'] is False and checked['scope'] == SCOPE
         assert checked['status'] in ('valid', 'invalid', 'unknown')
-        assert checked['checker'] == 'z3-' + result['runtime']['checkerVersion']
+        assert checked['checker'] == CHECKER
         assert checked['status'] != 'valid' or checked['checkedWitness'] == json.loads(
             (out / 'record.json').read_bytes())['finalWitness']
         result.update(checked)

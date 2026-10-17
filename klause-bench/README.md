@@ -1153,16 +1153,17 @@ SHA-256 as `sourceOutputSha256`; unknown checking retains the reported witness.
 Earlier incumbents are unchecked, so attribution is limited to the final objective.
 
 MPS runs opt in with `param=source-validation=true` under policy
-`mps-original-ground-witness-v1`. The installed bench uses the maintained independent
-Python MPS parser and exact rational substitution in `verify_source_results.py`.
+`mps-original-rational-ground-witness-v2`. The installed bench uses the maintained independent
+Python MPS parser in `verify_source_results.py`, shared with its symbolic proof
+builder. The `python-fractions-mps-ground-v1` checker evaluates the supplied point
+with exact `Fraction` arithmetic.
 It checks the literal final stdout point against every original row, bound,
 indicator and integrality declaration, and recomputes the original objective and
-sense. Complete exact typed point substitutions are prepared once; native exact
-substitution and simplification evaluate the row/bound conjunction and objective.
-Nominal ground checks omit unused magnitude trees; tolerance checks retain every
-separate source term. Default runs permit original MPS absolute/relative tolerances of `1e-7`;
-`exact=true` requires zero slack. Tolerance magnitudes retain separate original
-terms, including cancellation. Text bounds at or beyond magnitude `1e20` are open
+sense. Parsing and direct evaluation each run once, retaining every separate source
+term for tolerance magnitudes. Ground evaluation constructs no symbolic model or
+substitution graph. Default runs permit original MPS absolute/relative tolerances of `1e-7`;
+`exact=true` requires zero slack. Tolerance magnitudes include cancellation between
+separate original terms. Text bounds at or beyond magnitude `1e20` are open
 for columns and each row side, including derived range endpoints; affine objective
 constants remain literal. Original-file declaration defaults apply; unsupported
 semantics overrides, syntax and incomplete points leave checking unknown.
@@ -1179,9 +1180,11 @@ for later inspection. Packaged checker/requirements hashes, interpreter and pinn
 wheel/extracted-file identities, process logs and cleanup receipts accompany it. Valid/invalid receipts require the
 pinned runtime/wheel and extracted-file ledger, successful bounded bootstrap/check
 processes, complete stream bytes/hashes and matching child JSON; missing or mutated
-mandatory custody leaves checking unknown.
+mandatory custody leaves checking unknown. The arithmetic receipt identifies the
+actual Python interpreter and `fractions`, `numbers` and `math` module bytes.
 The existing pinned runtime runner provisions a private `z3-solver==4.15.3.0`
-wheel environment on Linux x86-64/glibc, without global installation. Setup is
+wheel environment on Linux x86-64/glibc, without global installation. Z3 remains a
+shared module/proof-builder and CI-oracle dependency; it is not the ground evaluator. Setup is
 bounded to 30 seconds/2 GiB, point checking to 30 seconds/4 GiB, and the worker to
 60 seconds. The JVM reserves a 70-second allowance across preparation and waiting,
 plus at most two five-second termination/reaping waits. With the solver's existing

@@ -14,7 +14,8 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.jsonObject
 
-internal const val MPS_SOURCE_POLICY = "mps-original-ground-witness-v1"
+internal const val MPS_SOURCE_POLICY = "mps-original-rational-ground-witness-v2"
+internal const val MPS_GROUND_CHECKER = "python-fractions-mps-ground-v1"
 
 internal object MpsSourceValidation {
     private const val SCOPE = "ground-original-mps-witness"
@@ -40,6 +41,7 @@ internal object MpsSourceValidation {
         val setupMs: Long = 0,
         val checkMs: Long = 0,
         val runtime: MpsCheckerRuntime? = null,
+        val groundArithmetic: MpsGroundArithmetic? = null,
         val bootstrapProcess: MpsCheckerProcess? = null,
         val checkProcess: MpsCheckerProcess? = null,
         val processLogs: Map<String, String>? = null,
@@ -151,7 +153,7 @@ internal object MpsSourceValidation {
             MpsSourceReceipt.requireComplete(receipt, Reports.json.parseToJsonElement(json).jsonObject, exact)
         }
         check(receipt.status != "valid" || (record.feasible == true && record.finalWitness != null &&
-            receipt.checkedWitness == record.finalWitness && receipt.checker == "z3-4.15.3"))
+            receipt.checkedWitness == record.finalWitness && receipt.checker == MPS_GROUND_CHECKER))
         Result(SourceValidation(receipt.status, receipt.reason, scope = SCOPE,
             checkedWitness = receipt.checkedWitness.takeIf { receipt.status == "valid" }, checker = receipt.checker),
             mapOf("sourceValidationSetupMs" to receipt.setupMs.toString(),

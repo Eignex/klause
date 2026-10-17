@@ -33,6 +33,11 @@ class BenchCacheTest {
                 )
             }
             assertNotEquals(
+                BenchCache.keyFor(model, null, "klause", budget, build,
+                    validationPolicy = "mps-original-ground-witness-v1"),
+                BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = MPS_SOURCE_POLICY),
+            )
+            assertNotEquals(
                 BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = "xcsp3-source-witness-v1"),
                 BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = XCSP_SOURCE_POLICY),
             )

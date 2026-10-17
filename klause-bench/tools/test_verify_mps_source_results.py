@@ -110,6 +110,75 @@ class MpsGroundTest(unittest.TestCase):
             result = self.check('v ', '1/8', exact=True, source=source)
         self.assertTrue(result['exactFeasible'])
 
+    def test_fraction_grounding_has_no_symbolic_model_or_solver_fallback(self):
+        with contextlib.ExitStack() as guards:
+            for name in ('mps', 'mps_point', 'mps_substitutions', 'mps_apply_point',
+                         'mps_objective_matches', 'check_mps_z3_ground'):
+                guards.enter_context(mock.patch.object(verifier, name, side_effect=AssertionError('symbolic fallback forbidden')))
+            for name in ('Int', 'Real', 'IntVal', 'RealVal', 'And', 'If', 'Abs', 'substitute', 'simplify'):
+                guards.enter_context(mock.patch.object(z3, name, side_effect=AssertionError('symbolic construction forbidden')))
+            self.assertTrue(self.check()['exactFeasible'])
+            self.assertTrue(self.check('v x=1.0000001 z=0', '1.0000001')['toleranceAccepted'])
+            with self.assertRaisesRegex(AssertionError, 'exceeds original source tolerance'):
+                self.check('v x=1.000001 z=0', '1.000001')
+
+    def test_fraction_checker_matches_symbolic_ground_checker_for_valid_and_rejected_boundaries(self):
+        cases = [(self.source, witness, objective, False) for witness, objective in (
+            ('v x=1 z=0', '1'), ('v x=1.0000001 z=0', '1.0000001'),
+            ('v x=1.00000010000002 z=0', '1.00000010000002'), ('v x=1 z=0', '2'),
+            ('v x=1', '1'), ('v x=1 z=0 x=1', '1'), ('v x=NaN z=0', '1'))]
+        for name, witness, objective, maximize in (
+                ('bounded-decimal-constant', 'v I=0 X=1/10', '1/8', False),
+                ('bounded-decimal-constant', 'v I=1/2 X=1/10', '1/8', False),
+                ('original-decimal-cancellation', 'v I=1 X=1', '1', False),
+                ('indicator-disabled', 'v I=0 X=0', '0', False),
+                ('indicator-disabled', 'v I=1 X=0', '0', False),
+                ('zero-row-disabled', 'v I=0', '0', False),
+                ('wide-bounded-mixed', 'v I=1 X=1', '1', False),
+                ('continuous-decimal', 'v X=1/3', '1/30', False),
+                ('primal-point-max', 'v I=0 X=1', '13', True)):
+            cases.append(((self.fixture_root / (name + '.mps')).read_text(), witness, objective, maximize))
+        for source, witness, objective, maximize in cases:
+            for exact in (False, True):
+                with self.subTest(witness=witness, objective=objective, exact=exact):
+                    record = dict(feasible=True, finalWitness=witness, kind='optimize', exactObjective=objective,
+                                  maximize=maximize)
+                    raw = 'o ' + objective + '\n' + witness + '\n'
+                    outcomes = []
+                    for checker in (verifier.check_mps_ground, verifier.check_mps_z3_ground):
+                        try:
+                            outcomes.append(('valid', checker(source, record, raw, exact)))
+                        except (AssertionError, ValueError, ZeroDivisionError) as error:
+                            outcomes.append((type(error).__name__, str(error)))
+                    self.assertEqual(outcomes[0], outcomes[1])
+
+    def test_fraction_grounding_matches_symbolic_ranges_infinity_and_signed_word_limits(self):
+        for kind in ('L', 'G', 'E'):
+            for span in ('-2', '0', '2'):
+                for bound in ('0', '-9223372036854775808', '9223372036854775807', '100000000000000000000'):
+                    source = ('ROWS\n N cost\n ' + kind + ' row\nCOLUMNS\n x cost 0 row 1\n'
+                              'RHS\n r row ' + bound + '\nRANGES\n r row ' + span + '\nBOUNDS\n FR b x\nENDATA\n')
+                    for point in (fractions.Fraction(bound) - 1, fractions.Fraction(bound), fractions.Fraction(bound) + 1):
+                        witness = 'v x=' + str(point)
+                        record = dict(feasible=True, finalWitness=witness, kind='optimize', exactObjective='0', maximize=False)
+                        raw = 'o 0\n' + witness + '\n'
+                        for exact in (False, True):
+                            with self.subTest(kind=kind, span=span, bound=bound, point=point, exact=exact):
+                                outcomes = []
+                                for checker in (verifier.check_mps_ground, verifier.check_mps_z3_ground):
+                                    try:
+                                        outcomes.append(('valid', checker(source, record, raw, exact)))
+                                    except AssertionError as error:
+                                        outcomes.append(('invalid', str(error)))
+                                self.assertEqual(outcomes[0], outcomes[1])
+
+    def test_disabled_rows_still_reject_malformed_source_numbers(self):
+        source = (self.fixture_root / 'indicator-disabled.mps').read_text().replace('X A 1 B 1', 'X A invalid B 1')
+        for checker in (verifier.check_mps_ground, verifier.check_mps_z3_ground):
+            with self.subTest(checker=checker.__name__), self.assertRaises(ValueError):
+                checker(source, dict(feasible=True, finalWitness='v I=0 X=0', kind='optimize',
+                    exactObjective='0', maximize=False), 'o 0\nv I=0 X=0\n', False)
+
     def test_missing_extra_duplicate_nonfinite_and_fractional_integer_coordinates_are_rejected(self):
         for witness in ('v x=1', 'v x=1 z=0 extra=0', 'v x=1 z=0 x=1',
                         'v x=NaN z=0', 'v x=Infinity z=0', 'v x=1/0 z=0'):

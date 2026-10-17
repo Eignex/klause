@@ -34,13 +34,19 @@ class MpsSourceValidationTest {
     private val check = bootstrap.copy(command = listOf("/usr/bin/python3", "-I",
         "/owned/case/tools/mps_witness_validation.py", "check", "/owned/case", "/private/runtime/dependencies"),
         addressSpaceBytes = 4_294_967_296)
+    private val arithmetic = MpsGroundArithmetic(MPS_GROUND_CHECKER, runtime.pythonVersion,
+        runtime.pythonExecutableSha256, mapOf(
+            "fractions" to MpsCheckerFile("/stdlib/fractions.py", 100, "e".repeat(64)),
+            "numbers" to MpsCheckerFile("/stdlib/numbers.py", 100, "f".repeat(64)),
+            "math" to MpsCheckerFile("/stdlib/math.so", 100, "a".repeat(64)),
+        ))
     private val base = MpsSourceValidation.Receipt("valid", "ground checked", "ground-original-mps-witness",
-        bindings, tools, 0, false, true, "v x=1", "z3-4.15.3", 125, 4, runtime, bootstrap, check,
+        bindings, tools, 0, false, true, "v x=1", MPS_GROUND_CHECKER, 125, 4, runtime, arithmetic, bootstrap, check,
         exactFeasible = true, toleranceAccepted = false,
         sourceTolerance = mapOf("absolute" to "1/10000000", "relative" to "1/10000000"),
         witnessCheck = "all original MPS rows bounds integrality and objective evaluated at supplied point")
     private val childFields = setOf("status", "reason", "scope", "bindings", "solverSearchQueries",
-        "proofCertificateChecked", "checkedWitness", "checker", "exactFeasible", "toleranceAccepted",
+        "proofCertificateChecked", "checkedWitness", "checker", "groundArithmetic", "exactFeasible", "toleranceAccepted",
         "sourceTolerance", "witnessCheck")
     private val child = JsonObject(Reports.json.parseToJsonElement(Reports.json.encodeToString(base)).jsonObject
         .filterKeys { it in childFields }).toString() + "\n"
@@ -96,7 +102,8 @@ class MpsSourceValidationTest {
         "cleanup", "scope", "status", "runtime", "negative-time", "missing-runtime", "wheel", "runtime-hash",
         "platform", "package", "files", "missing-bootstrap", "missing-check", "missing-logs", "bootstrap-exit",
         "check-timeout", "stream-hash", "stream-truncated", "log-changed", "child-bindings", "memory", "command",
-        "wall-time", "process-time"])
+        "wall-time", "process-time", "missing-arithmetic", "arithmetic-authority", "arithmetic-python",
+        "arithmetic-runtime-hash", "arithmetic-modules", "arithmetic-module-hash", "arithmetic-module-path"])
     fun `incomplete or changed checker custody should remain unknown`(failure: String) {
         val changed = when (failure) {
             "source" -> receipt.copy(bindings = bindings + ("source.mps" to "changed"))
@@ -137,6 +144,16 @@ class MpsSourceValidationTest {
             "command" -> receipt.copy(bootstrapProcess = bootstrap.copy(command = listOf("arbitrary")))
             "wall-time" -> receipt.copy(bootstrapProcess = bootstrap.copy(processWallNs = 50_000_000_000))
             "process-time" -> receipt.copy(bootstrapProcess = bootstrap.copy(timeoutSeconds = 180))
+            "missing-arithmetic" -> receipt.copy(groundArithmetic = null)
+            "arithmetic-authority" -> receipt.copy(groundArithmetic = arithmetic.copy(implementation = "z3"))
+            "arithmetic-python" -> receipt.copy(groundArithmetic = arithmetic.copy(pythonVersion = "different"))
+            "arithmetic-runtime-hash" -> receipt.copy(groundArithmetic = arithmetic.copy(
+                pythonExecutableSha256 = "0".repeat(64)))
+            "arithmetic-modules" -> receipt.copy(groundArithmetic = arithmetic.copy(modules = emptyMap()))
+            "arithmetic-module-hash" -> receipt.copy(groundArithmetic = arithmetic.copy(modules = arithmetic.modules +
+                ("fractions" to arithmetic.modules.getValue("fractions").copy(sha256 = "unhashed"))))
+            "arithmetic-module-path" -> receipt.copy(groundArithmetic = arithmetic.copy(modules = arithmetic.modules +
+                ("fractions" to arithmetic.modules.getValue("fractions").copy(path = "relative"))))
             else -> receipt
         }
         val text = if (failure == "malformed") "{" else Reports.json.encodeToString(changed)
