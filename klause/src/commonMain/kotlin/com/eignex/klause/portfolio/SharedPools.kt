@@ -14,6 +14,7 @@ import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.result.MirUseBudget
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -36,6 +37,7 @@ internal class SharedPools(
     val localSearchProjection: LocalSearchPreparation? = null,
     val localSearchInvariants: InvariantNetworkPreparation? = null,
     val identity: ModelIdentity? = null,
+    val mirUseBudget: MirUseBudget? = null,
 ) {
     fun offerSolution(
         model: ModelIdentity,

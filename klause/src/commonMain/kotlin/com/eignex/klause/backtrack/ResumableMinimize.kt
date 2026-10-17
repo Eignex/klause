@@ -129,7 +129,7 @@ internal class ResumableMinimize(
     private val problem: BakedProblem = solver.problem,
     preparedSession: PropagationSession? = null,
     preparationBudget: SliceBudget? = null,
-    private val sink: SolveStatsSink = SolveStatsSink(backend = "backtrack"),
+    private val sink: SolveStatsSink = SolveStatsSink(backend = "backtrack", mirUseBudget = solver.mirUseBudget),
     private val deferredInstallation: Boolean = false,
 ) : ResumableSearch, ReseedGuard {
     private val hasPreparation = preparationBudget != null

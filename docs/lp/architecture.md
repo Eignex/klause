@@ -152,6 +152,26 @@ row count, trimming by activity before each augmented solve. This bounds matrix
 growth before cuts reach repeated node queries. Structural, circuit and explicit
 plan paths keep their existing pool policy.
 
+Aggregation MIR use statistics are optional observations of existing separation work.
+The CLI's statistics request enables collection only for sequential finite mixed
+optimization. One invocation owns the budget shared by its ordinary backtrack LP
+instances; fixed, parallel, native-theory, standalone, presolve and heuristic repair
+instances remain uncollected. LP owners and their immutable postpresolve projection
+bindings receive invocation-local tokens at construction, independently of seeds.
+A token identifies that actual instance and projection, not an equivalent model in
+another process. Seed-based arm attribution requires a separately verified arm graph.
+
+The first separation snapshot records bounded potential compact exact rows separately
+from rows the separator actually admits, and produced cuts separately from unavailable
+selection/application attribution. Data retains stored units, tagged coordinates,
+LP columns and declared lower endpoints. Source IDs name postpresolve factors and
+row directions; an available LP column map does not establish original MPS row names.
+Collection does not enable skipped rows or perform a shadow separation, parser or solve.
+[Resource limits](../solver/resources.md#mir-use-observations) bound all owners and
+copies before input walks. [Benchmark records](../../klause-bench/README.md#mir-use-statistics)
+define the closed encoding and omissions. These observations supply neither numerical
+proof authority nor uninstrumented quality or timing evidence.
+
 For unrounded Lagrangian bound `L`, reduced cost `d(j)` and cutoff `U`, a fixing
 allows movement at most `(U - L) / abs(d(j))` from the minimizing endpoint.
 Use that certificate's costs and scale, round integer movement on the source

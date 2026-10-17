@@ -352,6 +352,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `bt-arm` execution setting. */
         val backtrackArmsByLabel: ExecutionOption<List<String>> = ExecutionOption("bt-arm", ValueKind.LABELS)
 
+        internal val statistics: ExecutionOption<Boolean> = ExecutionOption("__statistics", ValueKind.BOOLEAN)
+
         internal val byId by lazy {
             listOf(
                 dryRunPresolve, affinePivotOrder, presolveAbortFraction, presolveMaxRounds,
@@ -371,7 +373,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 scoring, acceptance, restart, strategy, localSearchArm,
                 lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
                 clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, phaseRetention,
-                reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
+                reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel, statistics,
             ).associateBy { it.id }
         }
     }
@@ -408,9 +410,12 @@ class ExecutionOptions private constructor(
     /** Whether an arm count or engine-mix count was supplied explicitly. */
     val explicitArms: Boolean get() = listOf("arms", "ls", "bt").any { it in values }
 
+    internal val collectMirUse: Boolean
+        get() = (values[ExecutionOption.statistics.id] as? OptionValue.Valid)?.value == true
+
     internal fun reader(): ExecutionOptionReader {
         malformed?.let { pipelineConfigError(it) }
-        return CapturedExecutionOptionReader(values.toMutableMap())
+        return CapturedExecutionOptionReader(values.toMutableMap()).also { it[ExecutionOption.statistics] }
     }
 
     internal fun without(vararg keys: String): ExecutionOptions = ExecutionOptions(
@@ -433,7 +438,7 @@ class ExecutionOptions private constructor(
             val option = ExecutionOption.byId[key] ?: continue
             reader[option]
         }
-        reader.finish("source", ExecutionOption.byId.keys.joinToString())
+        reader.finish("source", ExecutionOption.byId.keys.filterNot { it.startsWith("__") }.joinToString())
     }
 
     /** Frontend syntax capture for immutable execution settings. */

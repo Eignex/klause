@@ -15,6 +15,7 @@ import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.MirUseBudget
 import com.eignex.klause.util.Cancellation
 
 internal data class PortfolioInvocationControls(
@@ -53,6 +54,7 @@ internal class PortfolioInvocation(
     evidence: PortfolioEvidence,
     objective: LinearObjective? = null,
     onFault: ((ArmFault) -> Unit)? = null,
+    private val mirUseBudget: MirUseBudget? = null,
     policy: (List<PortfolioWorker>) -> PortfolioInvocationPolicy = { PortfolioInvocationPolicy() },
 ) : PortfolioExecutor {
     init { require(factories.isNotEmpty()) { "portfolio invocation requires admitted arm factories" } }
@@ -98,6 +100,7 @@ internal class PortfolioInvocation(
         throw failure
     }
     private var closed = false
+    private var mirUseReported = false
 
     val completeSearchAdmitted: Boolean
         get() = workers.any {
@@ -114,7 +117,7 @@ internal class PortfolioInvocation(
         onImprovement: ((AttributedImprovement) -> Unit)?,
     ): MinimizeResult {
         check(!closed) { "portfolio invocation is closed" }
-        return portfolio.minimize(controls.cancellation or cancellation, onImprovement)
+        return withMirUse(portfolio.minimize(controls.cancellation or cancellation, onImprovement))
     }
 
     fun <V> minimize(
@@ -125,13 +128,28 @@ internal class PortfolioInvocation(
         onAccepted: ((AcceptedPortfolioIncumbent<V>) -> Unit)? = null,
     ): MinimizeResult {
         check(!closed) { "portfolio invocation is closed" }
-        return portfolio.minimize(controls.cancellation or cancellation, onImprovement, incumbents, terminalCheck,
-            onAccepted)
+        return withMirUse(portfolio.minimize(controls.cancellation or cancellation, onImprovement, incumbents,
+            terminalCheck, onAccepted))
+    }
+
+    private fun withMirUse(result: MinimizeResult): MinimizeResult {
+        val budget = mirUseBudget ?: return result
+        if (mirUseReported) return result
+        mirUseReported = true
+        val stats = result.stats.copy(lp = result.stats.lp.copy(mirUse = budget.finish()))
+        return when (result) {
+            is MinimizeResult.Optimal -> result.copy(stats = stats)
+            is MinimizeResult.BestFound -> result.copy(stats = stats)
+            is MinimizeResult.Unbounded -> result.copy(stats = stats)
+            is MinimizeResult.Infeasible -> result.copy(stats = stats)
+            is MinimizeResult.Unknown -> result.copy(stats = stats)
+        }
     }
 
     override fun close() {
         if (closed) return
         closed = true
+        mirUseBudget?.finish()
         try {
             portfolio.close()
         } catch (failure: Throwable) {

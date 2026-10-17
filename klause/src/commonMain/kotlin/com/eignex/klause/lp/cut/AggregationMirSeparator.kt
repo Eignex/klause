@@ -35,24 +35,33 @@ import com.eignex.klause.util.mulExact
  * as `1 − x`, its constant folded into the rhs), and a pair may mix the two. Flow-cover cuts live in
  * [FlowCoverSeparator].
  */
-internal class AggregationMirSeparator : CutSeparator {
+internal class AggregationMirSeparator(private val diagnostic: MirUseObservation? = null) : CutSeparator {
     private val tol = 1e-6
 
     /** A `≤`-row over shifted nonnegative variables `y_j = x_j − lo_j`: `Σ a[k]·y_{cols[k]} ≤ b`. */
     private class Row(val cols: IntArray, val a: LongArray, val b: Long)
 
     override fun separate(ctx: CutContext): List<Cut> {
+        diagnostic?.begin(ctx)
+        try {
+            return separateRows(ctx)
+        } finally {
+            diagnostic?.end()
+        }
+    }
+
+    private fun separateRows(ctx: CutContext): List<Cut> {
         val loOf = MutableIntLongMap()
         val rows = collectRows(ctx, loOf)
         if (rows.isEmpty()) return emptyList()
         val cuts = ArrayList<Cut>()
         for (i in rows.indices) {
-            halfCut(ctx, loOf, rows[i], null)?.let { cuts.add(it) }
+            halfCut(ctx, loOf, rows[i], null, i, -1)?.let { cuts.add(it) }
             if (cuts.size >= MAX_CUTS) return cuts
         }
         for (i in rows.indices) {
             for (j in i + 1 until rows.size) {
-                halfCut(ctx, loOf, rows[i], rows[j])?.let { cuts.add(it) }
+                halfCut(ctx, loOf, rows[i], rows[j], i, j)?.let { cuts.add(it) }
                 if (cuts.size >= MAX_CUTS) return cuts
             }
         }
@@ -64,7 +73,10 @@ internal class AggregationMirSeparator : CutSeparator {
      *  EQ / a cardinality range contributes both directions. */
     private fun collectRows(ctx: CutContext, loOf: MutableIntLongMap): List<Row> {
         val rows = ArrayList<Row>()
-        for (factor in ctx.problem.factors) {
+        for (factorIndex in ctx.problem.factors.indices) {
+            val factor = ctx.problem.factors[factorIndex]
+            val before = rows.size
+            diagnostic?.factor(factorIndex, factor)
             when (factor) {
                 // A real or wide row carries no plain-integer Long coefficients to build a cut row from.
                 is Linear -> if (factor.integerConstants != null) {
@@ -83,7 +95,10 @@ internal class AggregationMirSeparator : CutSeparator {
                 }
 
                 is PseudoBoolean -> {
-                    if (!permitsLongPseudoBoolean(factor.constants)) continue
+                    if (!permitsLongPseudoBoolean(factor.constants)) {
+                        diagnostic?.rowOverflow()
+                        continue
+                    }
                     val lits = factor.literals
                     val w = { k: Int -> factor.weights[k] }
                     val b = factor.bound
@@ -108,7 +123,11 @@ internal class AggregationMirSeparator : CutSeparator {
 
                 else -> Unit
             }
-            if (rows.size >= MAX_ROWS) break
+            diagnostic?.potential(factor, rows.size > before, ctx)
+            if (rows.size >= MAX_ROWS) {
+                if (factorIndex < ctx.problem.factors.lastIndex) diagnostic?.policyStopped()
+                break
+            }
         }
         return rows
     }
@@ -133,7 +152,10 @@ internal class AggregationMirSeparator : CutSeparator {
             var b = if (flip) -bound else bound
             for (k in lits.indices) {
                 val col = ctx.relaxation.boolColOf[Lit.variable(lits[k])]
-                if (col < 0) return
+                if (col < 0) {
+                    diagnostic?.missingColumn()
+                    return
+                }
                 val w = if (flip) -weightOf(k) else weightOf(k)
                 if (!coef.containsKey(col)) order.add(col)
                 if (Lit.isPositive(lits[k])) {
@@ -151,8 +173,10 @@ internal class AggregationMirSeparator : CutSeparator {
                 cols[i] = order[i]
                 a[i] = coef.getOrDefault(order[i], 0L)
             }
+            diagnostic?.booleanRow(lits, weightOf, bound, flip, out.size, cols, a, b, ctx)
             out.add(Row(cols, a, b))
         } catch (_: CheckedLongOverflowException) {
+            diagnostic?.rowOverflow()
             return // an overflowing accumulation is dropped, not approximated
         }
     }
@@ -172,27 +196,42 @@ internal class AggregationMirSeparator : CutSeparator {
             var b = if (flip) -row.bound else row.bound
             for (idx in 0 until k) {
                 val col = ctx.relaxation.intColOf[factor.vars[idx]]
-                if (col < 0) return // a variable without an LP column ⇒ skip the row
+                if (col < 0) {
+                    diagnostic?.missingColumn()
+                    return
+                } // a variable without an LP column ⇒ skip the row
                 val coeff = if (flip) -row.coeff(idx) else row.coeff(idx)
                 cols[idx] = col
                 a[idx] = coeff
                 // The rounding needs `y_j = x_j − lo_j ≥ 0`, and the cut is emitted globally. Over a
                 // column the model leaves open below, the root box's endpoint is not a lower bound of the
                 // model, so the shift would not hold there — drop the row instead of shifting by it.
-                if (!ctx.statesLowerBound(factor.vars[idx])) return
+                if (!ctx.statesLowerBound(factor.vars[idx])) {
+                    diagnostic?.openLower()
+                    return
+                }
                 val lo = ctx.rootDomain(factor.vars[idx]).min
                 loOf.put(col, lo)
                 b = addExact(b, -mulExact(coeff, lo)) // shift to y_j = x_j − lo_j
             }
+            diagnostic?.integerRow(factor, flip, out.size, cols, a, b, ctx)
             out.add(Row(cols, a, b))
         } catch (_: CheckedLongOverflowException) {
+            diagnostic?.rowOverflow()
             return // a coefficient × bound that overflows Long is dropped, not approximated
         }
     }
 
     /** The {0,½} cut from one or two rows, in original `x` coordinates, or null when it has no integer
      *  term or the LP point does not violate it. */
-    private fun halfCut(ctx: CutContext, loOf: MutableIntLongMap, r1: Row, r2: Row?): Cut? = try {
+    private fun halfCut(
+        ctx: CutContext,
+        loOf: MutableIntLongMap,
+        r1: Row,
+        r2: Row?,
+        firstRow: Int,
+        secondRow: Int,
+    ): Cut? = try {
         val agg = MutableIntLongMap()
         var bSum = r1.b
         accumulate(agg, r1)
@@ -217,8 +256,11 @@ internal class AggregationMirSeparator : CutSeparator {
         }
         if (cols.size == 0) return null
         if (lhs <= rhsX.toDouble() + tol) return null // not violated by the LP point
-        Cut(cols.toIntArray(), coeffs.toLongArray(), Relation.LE, rhsX, global = true)
+        Cut(cols.toIntArray(), coeffs.toLongArray(), Relation.LE, rhsX, global = true).also {
+            diagnostic?.produced(firstRow, secondRow, it, ctx)
+        }
     } catch (_: CheckedLongOverflowException) {
+        diagnostic?.combinationOverflow()
         null
     }
 

@@ -20,6 +20,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionStrategy
 import com.eignex.klause.solver.pipeline.PreparedSourceHints
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
+import com.eignex.klause.solver.result.MirUseBudget
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.kumulant.core.Concurrency
@@ -97,6 +98,7 @@ object PortfolioBuilder {
         profile: ProblemProfile,
         numericalCompletion: Boolean,
         sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
+        mirUseBudget: MirUseBudget? = null,
     ): List<FinitePortfolioFactory> {
         val plan = PortfolioComposition.plan(scenario, ProblemFacts.of(problem, profile, scenario.lpCeiling, objective))
         val residuals = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
@@ -120,6 +122,7 @@ object PortfolioBuilder {
             selectedSweep,
             objective,
             clausePeers = (0 until count).count { configs[it % configs.size] is BacktrackWorkerConfig } > 1,
+            mirUseBudget = mirUseBudget,
         )
         return configs.mapIndexed { armId, config ->
             val family = when (config) {
@@ -271,6 +274,7 @@ object PortfolioBuilder {
         definitionalSweep: DefinitionalSweep?,
         objective: LinearObjective?,
         clausePeers: Boolean,
+        mirUseBudget: MirUseBudget? = null,
     ): SharedPools? {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null
         val identity = ModelIdentity.of(problem, objective)
@@ -324,6 +328,7 @@ object PortfolioBuilder {
                 concurrency.lock(),
             ),
             identity = identity,
+            mirUseBudget = mirUseBudget,
         )
     }
 }

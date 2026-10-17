@@ -268,6 +268,29 @@ Custom contexts retain the cancellation-only default for compatibility. Alternat
 coordinators inject persistent controls to retain deadline metadata, accounting
 and typed diagnostics across component callbacks.
 
+## MIR use observations
+
+Optional aggregation MIR observations share one budget across the supported sequential
+finite portfolio invocation's ordinary backtrack LP instances. The collector observes
+at most eight owners, one first snapshot per owner, 48 row records and 16 cut records
+per snapshot, 2,048 retained scalar entries and 65,536 encoded bytes across the invocation.
+A conservative 1,536-word arena plus 128 scalar bookkeeping reservations fits the scalar
+ceiling; the byte preflight reserves two worst-case decimal encoding copies and fixed
+metadata before retaining data. Oversized rows decline before copying, hashing, converting
+source strings or walking references. Refusal and truncated parent identities remain
+explicit; there is no full-row hash after a cap is reached.
+
+Counters use fixed labels and saturating arithmetic. Returned observations own immutable
+primitive text, retain no solver objects and are attached once after worker statistics
+folding. Duplicate snapshots reuse that payload. Merging foreign invocations keeps the
+first payload, refuses the foreign data and marks the result incomplete rather than
+renewing its caps. Closing releases the mutable arena; unsupported modes are uncollected.
+The CLI statistics request changes collection only. Decisions, row order and admission,
+seeds, numerical work and solver meters do not consult these observations. Instrumented
+objectives and wall times cannot establish ordinary performance. See
+[LP consumers](../lp/architecture.md#consumers-explanations-and-cuts) and the
+[MIR record contract](../../klause-bench/README.md#mir-use-statistics).
+
 ## Parallel cap
 
 Built-in finite portfolios with more than one lane partition the remaining solve

@@ -842,6 +842,78 @@ cleanup while needed. After promoting useful results and checking all active
 consumers, delete obsolete release assets/tags, ended lab jobs and external copies
 under that workflow; do not retain a historical archive.
 
+### MIR use statistics
+
+CLI `-s` requests bounded aggregation MIR observations for sequential finite mixed
+optimization. Ordinary `BacktrackWorkerConfig` LP instances share one invocation
+budget; other routes and modes report `lpMirUseStatus=uncollected`. Existing aggregate
+LP counts retain their meaning. `lpMirUseStatus` is `complete` or `incomplete` when
+that bounded scope was collected, with `lpMirUseInvocation`,
+`lpMirUseRetainedScalars`, `lpMirUseForeignDiscarded` and `lpMirUse` alongside it.
+A complete first snapshot is not an exhaustive history of later calls or other workers.
+The record has no witness/proof authority. Instrumented objectives and times are
+not ordinary quality or throughput evidence.
+
+`lpMirUse` is an ASCII JSON array of signed 64-bit integers. Decode with an exact
+integer parser; binary floating-point JSON numbers cannot retain these units.
+Its first 16 words are a version-1 header: version, process-local invocation ID,
+scope (`1` = sequential finite portfolio backtrack LPs), observed owner count,
+refused owner count, incomplete flag, total encoded word count, unavailable
+selected/applied attribution (`-1`), then eight reserved zero words.
+Each following record starts with a tag and its total word length.
+
+| Tag | Record fields after tag and length |
+|---|---|
+| `1` | Owner/projection IDs, seed-presence flag, seed, requested LP emphasis ordinal, resolved plan flags, Boolean/integer/real/factor counts, then the fixed counters below |
+| `2` | Owner ID, postpresolve factor index, source kind (`2` = exact), stored relation ordinal, activator, strictness, RHS, term count; then `(tagged reference, coefficient, LP column, declared-lower flag, lower endpoint, column mapping)` per term |
+| `3` | Owner ID, admitted row ordinal, factor index, flipped flag, source kind, stored relation, stored RHS, shifted RHS, source term count; source `(tagged reference, coefficient)` pairs followed by normalized column tuples |
+| `4` | Owner ID, first and optional second admitted row ordinals (`-1` = absent), global flag, RHS, term count; then `(LP column, coefficient, postpresolve variable ID, Boolean flag)` per cut term |
+
+Owner records contain 40 words. Owner/projection IDs occupy offsets 2/3; each
+projection token is bound at that actual LP instance's construction and does not
+assert cross-owner or cross-process model equality. Seed/configuration are metadata,
+not owner keys. Plan flags at offset 7 are cuts/root-harvest/tableau-Gomory/tableau-MIR
+bits `1/2/4/8`; source dimensions occupy offsets 8 through 11. Remaining offsets are:
+
+| Offset | Meaning |
+|---|---|
+| 12–13 | Actual root/node MIR calls across the observed owner lifetime |
+| 14 | Potential compact exact factors considered in the first snapshot |
+| 15–17 | Actually admitted ordinary/exact/Boolean rows across calls |
+| 18 | Actually produced MIR cuts across calls |
+| 19–21 | First-snapshot flag and retained row/cut record counts |
+| 22–26 | Quota refusals, missing columns, absent declared lower sides, row arithmetic declines, combination overflow declines |
+| 27–30 | Source scan stopped at row policy, LP source-map availability (`-1` = unobserved), first-snapshot route (`-1` unobserved / `0` root / `1` node), mapping omissions |
+| 31 | First-snapshot LP source-map epoch (`-1` when absent) |
+| 32–38 | Non-word constants, conditional rows, strict rows, real coordinates, disequalities, unsupported factors, unavailable cut parents; shape counts concern the first snapshot |
+| 39 | Resolved plan observed (`0` unobserved / `1` prepared) |
+
+Source kind codes are ordinary/exact/pseudo-Boolean/cardinality `1/2/3/4`.
+Relations follow `LinearOp` order `LE/EQ/GE/NE`; cardinality ranges use code `4`.
+A row record's normalized term count is `(recordLength - 11 - 2 * sourceTermCount) / 13`. Each normalized tuple retains
+`(LP column, Boolean flag, postpresolve variable ID, shifted coefficient, declared
+lower endpoint, declared-lower flag, column mapping)`. A column mapping occupies seven
+words: presence (`1` complete / `0` absent / `-1` non-word), source kind and ID,
+exact scale numerator/denominator, and exact offset numerator/denominator. Source
+kinds are integer/Boolean/real/term/auxiliary `0/1/2/3/4`. Wider mappings decline
+identity capture without conversion or hashing. The source column namespace and stored
+scale remain explicit. These factor/row/direction IDs are not original MPS text row IDs;
+that interpretation requires a maintained source map. Potential exact metadata never
+materializes or enables a row the producing revision skips. A cut identity is absent
+when either parent row identity could not be retained. Selection and application
+remain unavailable, rather than inferred from aggregate cut statistics.
+
+The invocation caps collection at eight owners, one first snapshot each, 48 row and
+16 cut records per snapshot, 2,048 retained scalar entries and 65,536 encoded bytes.
+A more conservative internal word limit reserves bookkeeping and both encoding
+copies; refusal can precede those ceilings. All capacity checks precede allocation,
+copying, string conversion and input walks. Truncation, policy prefixes, unsupported
+identity shapes and resource refusals make completeness false. There is no uncapped
+fallback dump or hash. Duplicate stats snapshots reuse one immutable payload; a
+foreign-invocation merge discards foreign observations and marks incompleteness.
+[LP ownership](../docs/lp/architecture.md#consumers-explanations-and-cuts) and
+[resource policy](../docs/solver/resources.md#mir-use-observations) define the scope.
+
 ### Original corpus source capture
 
 `com.eignex.klause.bench.profile.CorpusSourceCapture` exports original SMT archive

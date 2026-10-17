@@ -18,6 +18,18 @@ import kotlin.math.round
  * Every key has an `lp` prefix.
  */
 internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
+    val mir = stats.lp.mirUse
+    val diagnostic = if (mir == null) {
+        listOf("lpMirUseStatus" to "uncollected")
+    } else {
+        listOf(
+            "lpMirUseStatus" to if (mir.complete) "complete" else "incomplete",
+            "lpMirUseInvocation" to mir.invocationId.toString(),
+            "lpMirUseRetainedScalars" to mir.retainedScalars.toString(),
+            "lpMirUseForeignDiscarded" to mir.foreignObservationsDiscarded.toString(),
+            "lpMirUse" to mir.encoded,
+        )
+    }
     val solves = stats.lp.solves.sum
     val lagrangian = stats.scheduling.lagrangianPruned.sum
     val energetic = stats.scheduling.energeticPruned.sum
@@ -27,12 +39,13 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
         lagrangian == 0.0 && energetic == 0.0 && splits == 0.0 &&
         stats.lp.basisVerification.calls == 0L && stats.lp.continuation.calls == 0L && stats.lp.phases.isEmpty()
     ) {
-        return emptyList()
+        return diagnostic
     }
 
     val pruned = stats.lp.pruned.sum
     val infeasible = stats.lp.infeasible.sum
     val out = ArrayList<Pair<String, String>>()
+    out += diagnostic
     out += "lpSolves" to "${solves.toLong()}"
     out += "lpPruned" to "${pruned.toLong()}"
     out += "lpInfeasible" to "${infeasible.toLong()}"

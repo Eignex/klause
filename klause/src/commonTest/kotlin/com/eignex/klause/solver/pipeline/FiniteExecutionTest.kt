@@ -1,13 +1,52 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class FiniteExecutionTest {
+    @Test
+    fun `sequential finite optimization statistics should collect MIR observations only when requested`() {
+        for (statistics in listOf(false, true)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(problem),
+                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
+                objective = LinearObjective(intCoefficients = longArrayOf(-1))))
+            val options = ExecutionOptions.parse(if (statistics) listOf("__statistics=true") else emptyList())
+            val request = SourceExecutionRequest(invocation, options)
+
+            val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(request))
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
+
+            assertEquals(FiniteSolveVerdict.OPTIMAL, completed.verdict)
+            assertEquals(3L, assertNotNull(completed.bestSample).ints[0])
+            if (statistics) assertNotNull(completed.stats.lp.mirUse) else assertNull(completed.stats.lp.mirUse)
+        }
+    }
+
+    @Test
+    fun `parallel finite optimization should leave MIR observations uncollected`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(problem),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
+            objective = LinearObjective(intCoefficients = longArrayOf(-1))))
+        val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("__statistics=true")),
+            cores = 2)
+
+        val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(request))
+        val completed = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
+
+        assertEquals(FiniteSolveVerdict.OPTIMAL, completed.verdict)
+        assertNull(completed.stats.lp.mirUse)
+    }
+
     @Test
     fun `a mixed request with only heuristic arms should retain its resolved admission`() {
         val invocation = SourceSetup.prepare(SourceSetupRequest(

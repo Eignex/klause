@@ -20,6 +20,20 @@ import kotlin.test.assertTrue
 
 class ExecutionOptionsTest {
     @Test
+    fun `internal statistics configuration should preserve solver settings`() {
+        val plain = ExecutionOptions.parse(listOf("seed=3", "arms=6"))
+        val observed = ExecutionOptions.parse(listOf("seed=3", "arms=6", "__statistics=true"))
+
+        val before = buildPortfolioScenario(plain.reader(), null, 1, Kind.COP, EngineMix.MIXED, 6)
+        val after = buildPortfolioScenario(observed.reader(), null, 1, Kind.COP, EngineMix.MIXED, 6)
+
+        assertEquals(before, after)
+        assertFalse(plain.collectMirUse)
+        assertTrue(observed.collectMirUse)
+        assertTrue(observed.withNumericalCompletion().collectMirUse)
+    }
+
+    @Test
     fun `resource settings should retain automatic unlimited and zero as distinct policies`() {
         for ((raw, expected) in listOf("auto" to 13L, "unlimited" to null, "0" to 0L, "7" to 7L)) {
             val options = ExecutionOptions.parse(listOf("nra-work-limit=$raw"))

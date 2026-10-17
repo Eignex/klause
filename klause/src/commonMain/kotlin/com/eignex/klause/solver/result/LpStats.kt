@@ -394,11 +394,17 @@ data class LpStats(
     val rootRoute: LpRouteSolveStats = LpRouteSolveStats(),
     /** Inclusive phase timings and outcomes, keyed by engine phase and consumer route. */
     val phases: Map<String, LpPhaseStats> = emptyMap(),
+    /**
+     * Optional bounded aggregation MIR observations; null means uncollected, never zero work.
+     * [MirUseDiagnostics] has no proof or ordinary performance authority.
+     */
+    val mirUse: MirUseDiagnostics? = null,
 ) {
     /** Combine two workers' LP stats: counts add, LU maxes take the larger, wall time sums, and the
      *  root bound (same root across workers) keeps the tightest finite reading (NaN defers). */
     fun mergedWith(o: LpStats): LpStats = LpStats(
         phases = mergePhaseStats(phases, o.phases),
+        mirUse = mergeMirUse(mirUse, o.mirUse),
         nodePasses = SumResult(nodePasses.sum + o.nodePasses.sum),
         standalonePasses = SumResult(standalonePasses.sum + o.standalonePasses.sum),
         componentPasses = SumResult(componentPasses.sum + o.componentPasses.sum),

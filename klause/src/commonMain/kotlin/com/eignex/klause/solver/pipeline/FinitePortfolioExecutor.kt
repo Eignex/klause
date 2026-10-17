@@ -24,6 +24,7 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MirUseBudget
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
@@ -70,13 +71,17 @@ internal fun FinitePipeline.portfolioExecutor(
     cancellation: Cancellation,
     numericalCompletion: Boolean,
     sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
+    collectMirUse: Boolean = false,
 ): PortfolioInvocation {
+    val mirUseBudget = if (collectMirUse && scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&
+        scenario.kind == Kind.COP
+    ) MirUseBudget.create() else null
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
     val factories = PortfolioBuilder.factories(
         problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
-        profile, numericalCompletion, sourceHints,
+        profile, numericalCompletion, sourceHints, mirUseBudget,
     ).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
             SourceWorkerBinding(
@@ -108,6 +113,7 @@ internal fun FinitePipeline.portfolioExecutor(
             .bindInvocation(binding, cancellation),
         objective,
         onFault,
+        mirUseBudget = mirUseBudget,
     ) { workers ->
         val proofShares = clausalProofShares(scenario, profile, workers.map { it.label })
         val shares = if (proofShares.isEmpty()) {

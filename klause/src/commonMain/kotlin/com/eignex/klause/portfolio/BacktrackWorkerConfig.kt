@@ -154,8 +154,7 @@ internal class BacktrackWorkerConfig(
         worker = PortfolioWorker.of(
             workerLabel,
             armId,
-            (matchedPools?.nativeProjection?.let { BacktrackSolver(problem, it) }
-                ?: BacktrackSolver(problem)).session(),
+            BacktrackSolver(problem, matchedPools?.nativeProjection, matchedPools?.mirUseBudget).session(),
             params,
             objective = objective,
             withBound = withBound,
