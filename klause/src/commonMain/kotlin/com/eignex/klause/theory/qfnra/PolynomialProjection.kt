@@ -41,9 +41,10 @@ internal class PolynomialProjection private constructor(
             requiredZeroes: List<Polynomial> = emptyList(),
             preferredOrder: IntArray? = null,
             nonzeroVariables: Set<Int> = emptySet(),
+            nonzeroPolynomials: List<Polynomial> = emptyList(),
         ): PolynomialProjection {
             val pending = prepare(polynomials, variableCount, arithmetic,
-                requiredZeroes, preferredOrder, nonzeroVariables)
+                requiredZeroes, preferredOrder, nonzeroVariables, nonzeroPolynomials)
             while (true) pending.next()?.let { return it }
         }
 
@@ -54,6 +55,7 @@ internal class PolynomialProjection private constructor(
             requiredZeroes: List<Polynomial> = emptyList(),
             preferredOrder: IntArray? = null,
             nonzeroVariables: Set<Int> = emptySet(),
+            nonzeroPolynomials: List<Polynomial> = emptyList(),
             onRootSection: () -> Unit = {},
             onSection: () -> Unit = {},
         ): Iterator<PolynomialProjection?> = sequence {
@@ -81,13 +83,13 @@ internal class PolynomialProjection private constructor(
                 seen[variable] = true
                 preference[variable] = rank
             }
-            val nonzero = nonzeroVariables.toSet()
+            val nonzero = nonzeroVariables.toMutableSet()
             for (variable in nonzero) {
                 arithmetic.step()
                 require(variable in 0 until variableCount)
             }
             val inputs = HashSet<Polynomial>()
-            if (requiredZeroes.isNotEmpty()) for (polynomial in polynomials) {
+            if (requiredZeroes.isNotEmpty() || nonzeroPolynomials.isNotEmpty()) for (polynomial in polynomials) {
                 arithmetic.step()
                 inputs.add(polynomial)
             }
@@ -95,13 +97,18 @@ internal class PolynomialProjection private constructor(
                 arithmetic.step()
                 require(equation in inputs) { "A required zero must belong to the input family" }
             }
+            for (polynomial in nonzeroPolynomials) {
+                arithmetic.step()
+                require(polynomial in inputs) { "A required nonzero must belong to the input family" }
+            }
             var equations = requiredZeroes
             var pending = projectionFamily(polynomials, arithmetic)
+            var exclusions = nonzeroFamily(nonzeroPolynomials, nonzero, arithmetic)
             var fallback = variableCount - 1
             var sectionCount = 0
             for (level in variableCount - 1 downTo 0) {
                 arithmetic.step()
-                if (inconsistentEquations(equations, arithmetic)) {
+                if (exclusions == null || inconsistentEquations(equations, arithmetic)) {
                     yield(PolynomialProjection(Array(variableCount) { emptyList() },
                         IntArray(variableCount) { it }, arrayOfNulls(variableCount),
                         arrayOfNulls(variableCount), arithmetic, true, sectionCount))
@@ -154,10 +161,19 @@ internal class PolynomialProjection private constructor(
                         arithmetic.step()
                         rewritten.getValue(it)
                     }
+                    val rewrittenExclusions = checkNotNull(exclusions).map {
+                        arithmetic.step()
+                        rewritten.getValue(it)
+                    }
+                    exclusions = nonzeroFamily(rewrittenExclusions, nonzero, arithmetic)
                     pending = projectionFamily(projected, arithmetic)
                     sectionCount++
                     onSection()
                 } else if (level > 0) {
+                    exclusions = checkNotNull(exclusions).filter {
+                        arithmetic.step()
+                        variable !in it.variables
+                    }
                     val required = HashSet<Polynomial>()
                     val lowerEquations = ArrayList<Polynomial>()
                     for (equation in equations) {
@@ -188,7 +204,7 @@ internal class PolynomialProjection private constructor(
                 }
             }
             arithmetic.step()
-            if (inconsistentEquations(equations, arithmetic)) {
+            if (exclusions == null || inconsistentEquations(equations, arithmetic)) {
                 yield(PolynomialProjection(Array(variableCount) { emptyList() },
                     IntArray(variableCount) { it }, arrayOfNulls(variableCount),
                     arrayOfNulls(variableCount), arithmetic, true, sectionCount))
@@ -255,6 +271,23 @@ private fun inconsistentEquations(equations: List<Polynomial>, arithmetic: Polyn
         if (!equation.isZero && equation.variables.isEmpty()) return true
     }
     return false
+}
+
+private fun nonzeroFamily(
+    polynomials: List<Polynomial>,
+    variables: MutableSet<Int>,
+    arithmetic: PolynomialArithmetic,
+): List<Polynomial>? {
+    for (polynomial in polynomials) {
+        arithmetic.step()
+        if (polynomial.isZero) return null
+        val term = polynomial.terms.singleOrNull() ?: continue
+        for (variable in term.monomial.variables) {
+            arithmetic.step()
+            variables.add(variable)
+        }
+    }
+    return projectionFamily(polynomials, arithmetic)
 }
 
 private fun projectionFamily(values: List<Polynomial>, arithmetic: PolynomialArithmetic): List<Polynomial> {

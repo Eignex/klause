@@ -20,6 +20,13 @@ class PolynomialProjectionTest {
     private val y = Polynomial.variable(1)
 
     @Test
+    fun `nonzero premises must belong to the input family`() {
+        assertFailsWith<IllegalArgumentException> {
+            PolynomialProjection.compute(listOf(x), 2, arithmetic, nonzeroPolynomials = listOf(y))
+        }
+    }
+
+    @Test
     fun `nonzero constant resultants refute incompatible required equations`() {
         val first = arithmetic.subtract(arithmetic.add(arithmetic.power(x, 2), arithmetic.power(y, 2)),
             Polynomial.ONE)

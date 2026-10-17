@@ -664,11 +664,13 @@ The theory does not materialize finite CP domains or depend on the linear engine
 Within a Boolean region, a true equality or false disequality requires its whole
 polynomial to vanish. These premises permit total graph sections: a coordinate
 occurring in exactly one pure linear monomial with a nonzero rational coefficient
-is solved as a polynomial in the remaining coordinates. Every region boundary and
-remaining required equation is substituted before further elimination. A nonzero
-constant required equation refutes that region. Products remain whole equations;
-no factor acquires a zero or nonzero premise. Other coordinate occurrences remain
-for subsequent projection; only total rational polynomial graphs are substituted.
+is solved as a polynomial in the remaining coordinates. Every region boundary,
+remaining required equation and selected nonzero predicate is substituted before
+further elimination. A nonzero constant required equation or a zero required
+nonzero polynomial refutes that region. Products remain whole equations; a product
+equality alone supplies no factor zero or nonzero premise. Other coordinate
+occurrences remain for subsequent projection; only total rational polynomial
+graphs are substituted.
 
 Projection records a permutation of all original coordinates and the total graph
 sections. Graph dependencies occupy earlier lifting levels. Prefix literal checks
@@ -705,10 +707,17 @@ their coordinate dependencies at earlier lifting levels.
 
 #### Required root sections
 
-A selected source predicate whose truth excludes zero and whose polynomial is one
-monomial proves every coordinate in that monomial nonzero. These facts belong to
-that Boolean region and conditioned query. A required equality can restrict a
-lifting level to its real roots when its leading coefficient is one nonzero
+A selected source predicate whose truth excludes zero proves its whole polynomial
+nonzero. Total graph substitutions preserve that premise. Whenever the original
+or rewritten polynomial is one monomial, every coordinate in it is nonzero. For
+example, `z != 0` and `z = x*y` prove both `x != 0` and `y != 0`; a sum supplies
+no such factor inference. Rewritten nonzero constants discharge the premise, and
+zero refutes the region. After ordinary projection eliminates a coordinate,
+predicates involving it stop supplying graph rewrite facts; already proved
+coordinate facts remain valid. These proof facts belong to that Boolean region
+and conditioned query, and reuse the boundary substitutions and native owner.
+Every source predicate remains in the complete source check. A required equality
+can restrict a lifting level to its real roots when its leading coefficient is one nonzero
 rational monomial and every coefficient coordinate has such a source nonzero fact.
 A rational constant leading coefficient needs no additional fact. A coefficient
 sum or an unproved nonzero coordinate supplies no permission to omit a zero fiber.

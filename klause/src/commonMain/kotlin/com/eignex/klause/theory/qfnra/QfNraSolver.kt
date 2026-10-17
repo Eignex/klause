@@ -149,16 +149,12 @@ internal class QfNraQuery(
                         work.booleanTheoryConstantRefutations = constants + minOf(1L, Long.MAX_VALUE - constants)
                         continue
                     }
-                    val nonzero = HashSet<Int>()
+                    val nonzero = ArrayList<Polynomial>()
                     val polynomials = region.atoms.map { (index, truth) ->
                         arithmetic.step()
                         val atom = normalized.atoms[index]
                         if (atom.holds(0) != truth) {
-                            val term = atom.polynomial.terms.singleOrNull()
-                            if (term != null) for (variable in term.monomial.variables) {
-                                arithmetic.step()
-                                nonzero.add(variable)
-                            }
+                            nonzero.add(atom.polynomial)
                         }
                         atom.polynomial
                     }
@@ -171,7 +167,7 @@ internal class QfNraQuery(
                     }
                     val order = polynomialVariableOrder(polynomials, realCount, arithmetic)
                     val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic,
-                        equations, order, nonzero, onRootSection = {
+                        equations, order, nonzeroPolynomials = nonzero, onRootSection = {
                             val roots = checkNotNull(work.equationalRootLevels)
                             work.equationalRootLevels = roots + minOf(1L, Long.MAX_VALUE - roots)
                         }) {

@@ -18,6 +18,152 @@ import kotlin.test.assertTrue
 
 class PolynomialBooleanRegionsTest {
     @Test
+    fun `graph substitutions expose strict nonzero factors within the matrix allowance`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        for ((predicate, sign) in listOf(
+            "(distinct x2 0)" to 0, "(> x2 0)" to 1, "(< x2 0)" to -1,
+            "(not (= x2 0))" to 0, "(not (<= x2 0))" to 1, "(not (>= x2 0))" to -1,
+        )) {
+            val source = SmtLibPolynomial.parse(
+                """
+                $declarations
+                (assert (and (= x2 (* x0 x1)) $predicate (= (* x0 x3 x3) 1)
+                             (distinct (+ (* x3 x3 x3) (* x0 x0 x0)) 0)
+                             (distinct (- (* x3 x3 x3) (* x0 x0 x0)) 0)))
+                """.trimIndent(),
+            )
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+                QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 25)))
+
+            val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+            val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
+            val x = witness.realValue(0)
+            val y = witness.realValue(1)
+            val z = witness.realValue(2)
+            val u = witness.realValue(3)
+            val xx = algebraic.multiply(x, x)
+            val uu = algebraic.multiply(u, u)
+            val xxx = algebraic.multiply(xx, x)
+            val uuu = algebraic.multiply(uu, u)
+            assertEquals(0, algebraic.compare(z, algebraic.multiply(x, y)))
+            assertEquals(0, algebraic.compare(algebraic.multiply(x, uu), algebraic.rational(BigFraction.ONE)))
+            if (sign == 0) assertTrue(algebraic.sign(z) != 0) else assertEquals(sign, algebraic.sign(z))
+            assertTrue(algebraic.sign(algebraic.add(uuu, xxx)) != 0)
+            assertTrue(algebraic.sign(algebraic.subtract(uuu, xxx)) != 0)
+            assertEquals(33, witness.realCount)
+        }
+    }
+
+    @Test
+    fun `a nonzero rewritten sum retains its zero coordinate solutions`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations
+            (assert (and (= x2 (+ x0 x1)) (distinct x2 0) (= (* x0 x3 x3) 0)
+                         (= (* x3 x3) 1) (= (* x1 x1) 1) (> x1 0)))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
+        assertEquals(0, algebraic.sign(witness.realValue(0)))
+        assertEquals(0, algebraic.compare(witness.realValue(2), witness.realValue(1)))
+        assertTrue(algebraic.sign(witness.realValue(2)) > 0)
+    }
+
+    @Test
+    fun `a weak rewritten predicate retains its zero factors`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations
+            (assert (and (= x2 (* x0 x1)) (>= x2 0) (= (* x0 x3 x3) 0)
+                         (= (* x3 x3) 1) (= (* x1 x1) 1)))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
+        assertEquals(0, algebraic.sign(witness.realValue(0)))
+        assertEquals(0, algebraic.sign(witness.realValue(2)))
+    }
+
+    @Test
+    fun `graph derived nonzero factors stay within their Boolean region`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const b Bool)
+            (assert (or (and (not b) (= x2 (* x0 x1)) (distinct x2 0)
+                             (distinct x3 0) (= (* x0 x3 x3) 0))
+                        (and b (= x0 0) (= x1 3) (= x2 0) (= x3 1))))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+        assertTrue(witness.boolValue(0))
+        assertEquals(BigFraction.ZERO, witness.realValue(0).rational)
+        assertEquals(BigFraction.ZERO, witness.realValue(2).rational)
+    }
+
+    @Test
+    fun `retracted pins remove graph derived nonzero factors`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations (declare-const b Bool)
+            (assert (and (=> b (and (= x2 (* x0 x1)) (distinct x2 0) (= (* x0 x3 x3) 1)))
+                         (=> (not b) (and (= x0 0) (= x1 3) (= x2 0) (= x3 1)))))
+            """.trimIndent(),
+        )
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+
+        service.invocation().use { invocation ->
+            for (pin in listOf(true, false, true)) {
+                val result = invocation.check(PolynomialCondition(bools = mapOf(0 to pin)))
+
+                val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+                val algebraic = AlgebraicArithmetic(PolynomialArithmetic())
+                assertEquals(pin, witness.boolValue(0))
+                if (pin) {
+                    assertTrue(algebraic.sign(witness.realValue(2)) != 0)
+                    assertEquals(0, algebraic.compare(witness.realValue(2),
+                        algebraic.multiply(witness.realValue(0), witness.realValue(1))))
+                } else {
+                    assertEquals(0, algebraic.sign(witness.realValue(0)))
+                    assertEquals(0, algebraic.sign(witness.realValue(2)))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a rewritten nonzero contradiction refutes without exploring cells`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = SmtLibPolynomial.parse(
+            """
+            $declarations
+            (assert (and (= x2 (+ (* x0 x1) 1)) (distinct (- x2 (* x0 x1) 1) 0)))
+            """.trimIndent(),
+        )
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+        assertEquals(0L, result.stats.liftedCells)
+    }
+
+    @Test
     fun `zero resultants do not accept a noncommon required root`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = SmtLibPolynomial.parse(
