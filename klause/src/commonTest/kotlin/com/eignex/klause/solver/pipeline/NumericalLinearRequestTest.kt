@@ -356,8 +356,14 @@ class NumericalLinearRequestTest {
 
         val result = request.solve(complete = false)
 
-        assertEquals(BigFraction.ofLong(10).reciprocal(), result.value)
-        assertEquals(BigFraction.ONE, assertNotNull(result.incumbent).exactReals?.get(0))
+        val point = assertNotNull(result.incumbent)
+        val original = compiled.sourceWitness(compiled.columns.map { column ->
+            if (column.real) assertNotNull(point.exactReals)[column.id]
+            else BigFraction.ofLong(point.intValue(column.id))
+        })
+        assertEquals(BigFraction.ofLong(10).reciprocal(), original.objective)
+        assertEquals(original.objective * BigFraction.ofLong(compiled.objectiveScale), result.value)
+        assertTrue(original.exact)
         assertNull(result.terminal)
         assertNull(result.bound)
     }
