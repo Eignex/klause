@@ -33,7 +33,7 @@ class FznStreamCheckerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["% objective=0\n", "_objective = 0;\n"])
+    @ValueSource(strings = ["% objective=0\n", "_objective = 0;\n", "% klause-exact: _objective = 0;\n"])
     fun `satisfaction publications should not supply an optimization cost`(metadata: String) {
         val source = "var float: x; var float: y; constraint float_abs(x,y); solve satisfy;"
         val output = metadata + "x = 0;\ny = 0;\n----------\n"
@@ -96,10 +96,11 @@ class FznStreamCheckerTest {
         assertEquals("valid", result.status)
     }
 
-    @Test
-    fun `a rounded display conflicting with its exact objective should be rejected`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["_objective = 0.5;\n", "% objective=1/2\n_objective = 0.6142857142857143;\n"])
+    fun `cost metadata conflicting with its exact objective should be rejected`(metadata: String) {
         val source = "var float: x; solve minimize x;"
-        val output = "x = 0.6142857142857143;\n_objective = 0.5;\n" +
+        val output = "x = 0.6142857142857143;\n" + metadata +
             "% klause-exact: x = 43/70;\n% klause-exact: _objective = 43/70;\n----------\n"
 
         assertFailsWith<IllegalArgumentException> {
