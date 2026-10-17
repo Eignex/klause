@@ -136,7 +136,7 @@ its selection. Use `reference=any` in lab specs to preserve frozen membership.
 
 Settings, budgets, non-default solver seeds, parameters and labels distinguish
 configuration directories. Run configurations separately to compare them.
-`param=source-validation=true` opts MiniZinc integer and XCSP3 runs into independent
+`param=source-validation=true` opts MiniZinc integer, XCSP3 and MPS runs into independent
 source-witness checking and is consumed by the bench before CLI launch.
 
 The `divmod` suite retains self-authored scalar, affine wide, equivalent linear and
@@ -1223,6 +1223,68 @@ not a source optimum/refutation. `reportedFeasible`, `reportedObjective` and
 `reportedProven` retain the original claims. Integer opt-in also captures stdout
 SHA-256 as `sourceOutputSha256`; unknown checking retains the reported witness.
 Earlier incumbents are unchecked, so attribution is limited to the final objective.
+
+MPS runs opt in with `param=source-validation=true` under policy
+`mps-original-rational-ground-witness-v2`. The installed bench uses the maintained independent
+Python MPS parser in `verify_source_results.py`, shared with its symbolic proof
+builder. The `python-fractions-mps-ground-v1` checker evaluates the supplied point
+with exact `Fraction` arithmetic.
+It checks the literal final stdout point against every original row, bound,
+indicator and integrality declaration, and recomputes the original objective and
+sense. Parsing and direct evaluation each run once, retaining every separate source
+term for tolerance magnitudes. Ground evaluation constructs no symbolic model or
+substitution graph. Default runs permit original MPS absolute/relative tolerances of `1e-7`;
+`exact=true` requires zero slack. Tolerance magnitudes include cancellation between
+separate original terms. Text bounds at or beyond magnitude `1e20` are open
+for columns and each row side, including derived range endpoints; affine objective
+constants remain literal. Original-file declaration defaults apply; unsupported
+semantics overrides, syntax and incomplete points leave checking unknown.
+
+Each check writes original source bytes, stdout, final witness and the complete
+producer record under an adjacent `mps-source-check-*` directory, with SHA-256
+bindings in `result.json`. The saved solve record also retains exact producer-record
+JSON, source retrieval identity and the complete receipt JSON in
+`sourceValidationProducerRecordJson`, `sourceValidationSourceIdentityJson` and
+`sourceValidationReceiptJson`. Literal final coordinates/objective and source/stdout
+hashes remain in the ordinary record. This preserves checker custody when ordinary
+workers return only that record; preserve hash-matching original sources separately
+for later inspection. Packaged checker/requirements hashes, interpreter and pinned
+wheel/extracted-file identities, process logs and cleanup receipts accompany it. Valid/invalid receipts require the
+pinned runtime/wheel and extracted-file ledger, successful bounded bootstrap/check
+processes, complete stream bytes/hashes and matching child JSON; missing or mutated
+mandatory custody leaves checking unknown. The arithmetic receipt identifies the
+actual Python interpreter and mandatory file-backed `fractions` and `numbers`
+module bytes. File-backed `math` retains its module file identity; built-in `math`
+requires its actual `built-in` origin and `BuiltinImporter` loader, the executing
+Linux interpreter and all mapped `libpython` providers. Other or ambiguous origins
+remain unknown. Built-in custody retains bounded `/proc/self/maps` text and its
+hash: at most 256 KiB/4096 lines, with one to three executable provider files,
+each at most 64 MiB (192 MiB total). Module files retain their separate 4 MiB cap.
+Providers are hashed in 64 KiB blocks within the existing check deadline.
+The existing pinned runtime runner provisions a private `z3-solver==4.15.3.0`
+wheel environment on Linux x86-64/glibc, without global installation. Z3 remains a
+shared module/proof-builder and CI-oracle dependency; it is not the ground evaluator. Setup is
+bounded to 30 seconds/2 GiB, point checking to 30 seconds/4 GiB, and the worker to
+60 seconds. The JVM reserves a 70-second allowance across preparation and waiting,
+plus at most two five-second termination/reaping waits. With the solver's existing
+40-second watchdog and two-second stderr drain for a feasible ten-second run, this
+leaves 18 seconds for source/receipt I/O inside the ordinary 140-second case deadline.
+The external deadline still governs incomplete work. Sources over 64 MiB, solver stdout over 8 MiB,
+producer records/receipts over 4 MiB and checker streams over 1 MiB remain unchecked. Private dependencies are removed after checking. Missing dependencies,
+timeout, incomplete output, changed custody or failed cleanup cannot yield valid
+credit.
+
+MPS ground checking performs no satisfiability search, repairs, replacement-point
+construction, optimum query or refutation check. Only a valid witness retains
+feasibility/objective credit; unknown/invalid checks and reported UNSAT claims
+become undecided. All proof claims remain uncredited. Original claims stay in
+`reportedFeasible`, `reportedObjective`, `reportedExactObjective` and
+`reportedProven`, and `checkedWitness` is separate from `finalWitness`.
+`sourceValidationSetupMs` and `sourceValidationCheckMs` are outside the solver
+budget and elapsed/incumbent times. `sourceValidationReceiptSha256` binds the
+retained receipt JSON to the saved result. The validation policy separates raw solve
+cache entries; a raw cache hit still checks its retained point afresh and does not
+reuse acceptance. The offline verifier's proof path is unchanged.
 
 XCSP3 integer runs opt in with `param=source-validation=true`. The installed bench
 includes the independent `org.xcsp:xcsp3-tools:2.5` `SolutionChecker`, also used by
